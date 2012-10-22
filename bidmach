@@ -1,0 +1,24 @@
+#!/bin/bash
+export BIDMAT_HOME="../BIDMat" # Change if needed
+export LD_LIBRARY_PATH="${BIDMAT_HOME}/lib/linux64:${LD_LIBRARY_PATH}" # Only needed/works on Linux
+# export JAVA_HOME="" # Set here if not set in environment
+export JAVA_OPTS="-Xmx6G -Xms128M" # Set as much memory as possible
+# Fix these if needed
+export JCUDA_VERSION="0.4.2"
+export JCUDA_LIBDIR="${BIDMAT_HOME}/lib"
+export BIDLIB="${BIDMAT_HOME}/lib"
+export LIBDIR=./lib
+
+export BIDMAT_LIBS="./BIDMach.jar;${LIBDIR}/BIDMat.jar;${BIDLIB}/ptplot.jar;${BIDLIB}/ptplotapplication.jar;${BIDLIB}/jhdf5.jar"
+
+export JCUDA_LIBS="${JCUDA_LIBDIR}/jcuda-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcublas-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcufft-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcurand-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcusparse-${JCUDA_VERSION}.jar"
+
+export ALL_LIBS="${BIDMAT_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
+
+echo ${ALL_LIBS}
+
+if [ ! "$OS" = "Windows_NT" ]; then
+    export ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
+fi
+
+scala -nobootcp -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala
