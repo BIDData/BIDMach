@@ -8,23 +8,24 @@ class LinearRegModel extends RegressionModel {
   class Options extends Learner.Options {}
   options = new Options
   
-  options.blocksize = 10000
-  options.npasses = 100
+  options.blocksize = 8000
+  options.npasses = 10
   options.alpha = 200f
   options.convslope = -1e-6
   
-  var diff:FMat = null
-  var tmp0:FMat = null
+  var diff:Mat = null
+  var tmp0:Mat = null
        
-  override def regfn(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit =
+  override def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit =
     linearMap1(targ, pred, lls, gradw)
-  
-  def linearMap1(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit= {
-    diff = checkSize(diff, targ)
+
+  def linearMap1(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit= {
+  	diff = checkSize(diff, targ)
     tmp0 = checkSize(tmp0, targ)
-    
+
     diff ~ targ - pred  
-    lls ~ (tmp0 ~ diff *@ diff) * -1
+    tmp0 ~ diff *@ diff
+    lls ~ tmp0 * -1
     gradw ~ diff * 2
   }
 }
@@ -34,9 +35,12 @@ class LogisticModel extends RegressionModel {
   options = new Options
   
   options.blocksize = 10000
-  options.npasses = 100
+  options.npasses = 20
   options.alpha = 500f
   options.convslope = -1e-6
+       
+  override def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit =
+    logisticMap1(targ.asInstanceOf[FMat], pred.asInstanceOf[FMat], lls.asInstanceOf[FMat], gradw.asInstanceOf[FMat])
   
   var tfact:FMat = null
   var ptfact:FMat = null
@@ -45,19 +49,11 @@ class LogisticModel extends RegressionModel {
   var tmp0:FMat = null
   var tmp1:FMat = null
   
-  override def initmodel(learner:Learner, data:Mat, target:Mat):Mat = {
-    val out = super.initmodel(learner, data, target)
-    out
-  }
-      
-  override def regfn(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit =
-    logisticMap1(targ, pred, lls, gradw)
-  
   def logisticMap1(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit= {
-    tfact = checkSize(tfact, targ)
-    ptfact = checkSize(ptfact, targ)
-    epred = checkSize(epred, targ)
-    lle = checkSize(lle, targ)
+    tfact = checkSize(tfact, targ).asInstanceOf[FMat]
+    ptfact = checkSize(ptfact, targ).asInstanceOf[FMat]
+    epred = checkSize(epred, targ).asInstanceOf[FMat]
+    lle = checkSize(lle, targ).asInstanceOf[FMat]
     
     var i = 0
     while (i < targ.length) {
@@ -89,10 +85,10 @@ class LogisticModel extends RegressionModel {
   }
     
   def logisticMap3(targ:FMat, pred:FMat, lls:FMat, gradw:FMat) = {
-    tfact = checkSize(tfact, targ)
-    epred = checkSize(epred, targ)
-    tmp0 = checkSize(tmp0, targ)
-    tmp1 = checkSize(tmp1, targ)
+    tfact = checkSize(tfact, targ).asInstanceOf[FMat]
+    epred = checkSize(epred, targ).asInstanceOf[FMat]
+    tmp0 = checkSize(tmp0, targ).asInstanceOf[FMat]
+    tmp1 = checkSize(tmp1, targ).asInstanceOf[FMat]
     
     tfact ~ row(1) - (tmp0 ~ row(2)*targ)
     min(40f, tmp0 ~ tfact *@ pred, tmp1)
@@ -103,10 +99,10 @@ class LogisticModel extends RegressionModel {
   }
   
   def logisticMap4(targ:FMat, pred:FMat, lls:FMat, gradw:FMat) = {
-    tfact = checkSize(tfact, targ)
-    ptfact = checkSize(ptfact, targ)
-    epred = checkSize(epred, targ)
-    lle = checkSize(lle, targ)
+    tfact = checkSize(tfact, targ).asInstanceOf[FMat]
+    ptfact = checkSize(ptfact, targ).asInstanceOf[FMat]
+    epred = checkSize(epred, targ).asInstanceOf[FMat]
+    lle = checkSize(lle, targ).asInstanceOf[FMat]
     
     Learner.mapfun2x2((targ:Float, pred:Float) => (1-2*targ, math.min(40f, pred * (1-2*targ))), targ, pred, tfact, ptfact)
     exp(ptfact, epred)
@@ -118,40 +114,56 @@ class LogisticModel extends RegressionModel {
 }
 
 abstract class RegressionModel extends Model {
-    
-  var tpred:FMat = null
-  var fttarget:FMat = null
-  var lls:FMat = null
-  var gradw:FMat = null
-  var modelmat:FMat = null
 
-  def regfn(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit
+  def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit
   
-  def initmodel(learner:Learner, data:Mat,target:Mat):Mat = {
+  def initmodel(learner:Learner, data:Mat, target:Mat):Mat = {
     val m = size(data, 1)
     val n = size(target, 1)
-    val out = 0.1f*normrnd(0,1,m,n)
+    val out = gnormrnd(0,1,n,m)*0.1f
+//    val out = 0.1f*normrnd(0,1,m,n)
+    println("norm="+norm(out))
     learner.modelmat = out
-    modelmat = out
     out
   }
   
-  def gradfun(data:Mat, target:Mat, model:Mat, diff:Mat):Double = {
-  	val sdata = data.asInstanceOf[SMat]
-  	val ftarget = target.asInstanceOf[FMat]
-  	val fmodel = model.asInstanceOf[FMat]
-  	val fdiff = diff.asInstanceOf[FMat]
-  	
-  	fttarget = checkSize(fttarget, target.ncols, target.nrows)
-  	lls = checkSize(lls, fttarget)
-  	tpred = checkSize(tpred, fttarget)
-  	gradw = checkSize(gradw, fttarget)
-  	
-  	fttarget ~ ftarget t;
-  	tpred ~ sdata Tx fmodel 
-  	regfn(fttarget, tpred, lls, gradw)
-  	fdiff ~ sdata * gradw
-    mean(mean(lls)).v
-  }
+  var tpred:Mat = null
+  var ttarget:Mat = null
+  var lls:Mat = null
+  var gradw:Mat = null
+  var data:Mat = null
+  var target:Mat = null
+  
+  def gradfun(idata:Mat, itarget:Mat, model:Mat, diff:Mat):Double = { 
+    (idata, itarget, model) match {
+  	  case (sdata:SMat, ftarget:FMat, gmodel:GMat) => {
+  	  	lls = checkSize(lls, itarget.nrows, itarget.ncols, model)  	
+  	  	tpred = checkSize(tpred, lls)
+  	  	gradw = checkSize(gradw, lls)
+  
+  	    data = GSMat(sdata)
+  	    target = GMat(ftarget)
+  	    tpred ~ gmodel * data;
+  	    regfn(target, tpred, lls, gradw)
+  	    diff ~ gradw xT data
+  	    target.asInstanceOf[GMat].free
+  	    data.asInstanceOf[GSMat].free
+  	    mean(mean(lls)).dv
+
+  	  }
+  	  case (sdata:SMat, ftarget:FMat, fmodel:FMat) => {
+  	  	ttarget = checkSize(ttarget, itarget.ncols, itarget.nrows, itarget) 	
+  	  	lls = checkSize(lls, ttarget)  	
+  	  	tpred = checkSize(tpred, ttarget)
+  	  	gradw = checkSize(gradw, ttarget)
+  	  	
+  	  	ttarget ~ ftarget t; 
+  	  	tpred ~ sdata Tx fmodel 
+  	  	regfn(ttarget, tpred, lls, gradw)
+  	  	diff ~ sdata * gradw
+  	  	mean(mean(lls)).dv
+  	  }
+    }
+  } 
 }
 

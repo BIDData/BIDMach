@@ -19,11 +19,19 @@ object TestLearner {
   }
   
   def main(args: Array[String]): Unit = {
+    tic
     val dirname = "d:\\sentiment\\sorted_data\\books\\parts\\"
   	val revtrain:SDMat = load(dirname+"part1.mat", "revtrain")
-  	val rt = SMat(revtrain) 
+  	val rt = SMat(revtrain)(0->40000,0->(32*(size(revtrain,2)/32)))
   	val scrtrain:IMat = load(dirname+"part1.mat", "scrtrain")
   	val st = FMat(scrtrain).t
-    runLinLearner(rt, st)
+  	val t = toc
+  	println("Reading time=%3.2f seconds" format t)
+  	val stt = zeros(256, size(st,2))
+  	for (i<-0 until size(stt,1)) {stt(i,?) = st}
+  	flip
+    runLinLearner(rt, stt)
+    val (ff, tt) = gflop
+    println("Time=%5.3f, gflops=%3.2f" format (tt, ff))
   }
 }
