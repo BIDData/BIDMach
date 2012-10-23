@@ -48,7 +48,7 @@ case class Learner(datamat:Mat, targetmat:Mat, model:Model, optimizer:Optimizer)
   			}
   			if (toc >= tsecs || done || (ipass == options.npasses-1 && i >= n)) {
   				println("pass=%d, i=%d t=%3.1f secs, ll=%5.4f, slope=%5.4g, norm=%5.2f" format 
-  				    (ipass, i, tsecs, llest, llder, norm(modelmat.asInstanceOf[FMat])))
+  				    (ipass, i, tsecs, llest, llder, norm(modelmat)))
   				tsecs += options.secprint
   			}
   		}
@@ -71,15 +71,15 @@ object Learner {
 		var eps:Float = 1e-8f
   }
 	
-  def checkSize(a:FMat, nr:Int, nc:Int):FMat = {
+  def checkSize(a:Mat, nr:Int, nc:Int, b:Mat):Mat = {
     if (a.asInstanceOf[AnyRef] != null && a.nrows == nr && a.ncols == nc) {
       a
     } else {
-      zeros(nr, nc)
+      b.zeros(nr, nc)
     }
   }
   
-  def checkSize(a:FMat, b:FMat):FMat = checkSize(a, b.nrows, b.ncols)
+  def checkSize(a:Mat, b:Mat):Mat = checkSize(a, b.nrows, b.ncols, b)
   
   def fsqrt(v:Float):Float = math.sqrt(v).asInstanceOf[Float]
   
