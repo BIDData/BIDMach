@@ -6,14 +6,16 @@ import BIDMat.Plotting._
 import Learner._
 import scala.collection.immutable.List
 
-case class Learner(datamat:Mat, targetmat:Mat, model:Model, regularizer:Regularizer, updater:Updater, val opts:Learner.Options = new Learner.Options) {
+case class Learner(datamat:Mat, targetmat:Mat, datatest:Mat, targtest:Mat, 
+		model:Model, regularizer:Regularizer, updater:Updater, val opts:Learner.Options = new Learner.Options) {
 
   val n = datamat.ncols
   val options = opts
   val nw = options.memwindow/options.blocksize
   val nww = options.convwindow/options.blocksize
-  var tscores:List[Float] = List()
-  var tsteps:List[Float] = List()
+  var tscores:List[Double] = List()
+  var tscorex:List[Double] = List()
+  var tsteps:List[Double] = List()
 
   def run() = {
   	var done:Boolean = false
@@ -43,18 +45,21 @@ case class Learner(datamat:Mat, targetmat:Mat, model:Model, regularizer:Regulari
   				done = true
   			}
   			if (toc >= tsecs || done || (ipass == options.npasses-1 && i >= n)) {
-  				println("pass=%d, i=%d t=%3.1f secs, ll=%5.4f, slope=%5.4g" format (ipass, i, tsecs, llest, llder))
-  				tscores = tscores :+ -llest.asInstanceOf[Float]
-  				tsteps = tsteps :+ nsteps.asInstanceOf[Float]
+  			  val llx = model.gradfun(datatest, targtest)
+  				println("pass=%d, n=%dk t=%3.1f secs, ll=%5.4f, llx=%5.4f" format (ipass, nsteps/1000, tsecs, llest, llx))
+  				tscores = tscores :+ -llest
+  				tscorex = tscorex :+ -llx
+  				tsteps = tsteps :+ nsteps.asInstanceOf[Double]
   			  tsecs += options.secprint
   			}
   		}
   		ipass += 1
   	}
-  val timeplot = plot(1->(tscores.size+1), row(tscores.toArray))
-  val stepplot = plot(row(tsteps.toArray), row(tscores.toArray))
-  timeplot.setTitle("Neg log likelihood vs time in seconds")
-  stepplot.setTitle("Neg log likelihood vs number of samples")
+    val xvals = irow(1->(tscores.size+1))
+    val timeplot = plot(xvals, drow(tscores), xvals, drow(tscorex))
+    val stepplot = plot(drow(tsteps), drow(tscores), drow(tsteps), drow(tscorex))
+    timeplot.setTitle("Neg. log likelihood vs time in seconds")
+    stepplot.setTitle("Neg. log likelihood vs number of samples")
   }
 }
 
