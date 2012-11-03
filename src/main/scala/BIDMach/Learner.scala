@@ -2,26 +2,19 @@ package BIDMach
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMat.Plotting._
 import Learner._
+import scala.collection.immutable.List
 
-trait Model {
-  var options:Learner.Options = null
-  def initmodel(learner:Learner, data:Mat, target:Mat):Mat
-  def gradfun(data:Mat, target:Mat, model:Mat, diff:Mat):Double
-}
+case class Learner(datamat:Mat, targetmat:Mat, model:Model, regularizer:Regularizer, updater:Updater, val opts:Learner.Options = new Learner.Options) {
 
-case class Learner(datamat:Mat, targetmat:Mat, model:Model, optimizer:Optimizer) {
-
-  var options:Options = model.options
-  var modelmat:Mat = null	
-	model.initmodel(this, datamat, targetmat)
-  val (nrows, ncols) = size(modelmat)
-  val diff:Mat = modelmat.zeros(nrows, ncols)
   val n = datamat.ncols
+  val options = opts
   val nw = options.memwindow/options.blocksize
   val nww = options.convwindow/options.blocksize
-  optimizer.init(this, modelmat)
-  
+  var tscores:List[Float] = List()
+  var tsteps:List[Float] = List()
+
   def run() = {
   	var done:Boolean = false
   	var ipass = 0
@@ -29,15 +22,18 @@ case class Learner(datamat:Mat, targetmat:Mat, model:Model, optimizer:Optimizer)
   	var llder:Double = 0
   	var llold:Double = 0
   	var tsecs:Double = 1
+  	var nsteps:Long = 0
   	tic
   	while (ipass < options.npasses && ! done) {
   		var i = 0
   		while (i < n && ! done) {
   			var iend = math.min(n, i+options.blocksize)
+  			nsteps += iend - i
   			var dslice = datamat(?, i->iend)
   			var tslice = targetmat(?, i->iend)
-  			val tll = model.gradfun(dslice, tslice, modelmat, diff)
-  			optimizer.update(modelmat, diff, options.blocksize)
+  			val tll = model.gradfun(dslice, tslice)
+  			regularizer.compute(iend-i)
+  			updater.update(iend-i)
 
   			llest = (1/nw)*(tll + (nw-1)*llest)
   			llder = (1/nww)*(tll-llold + (nww-1)*llder)
@@ -47,25 +43,28 @@ case class Learner(datamat:Mat, targetmat:Mat, model:Model, optimizer:Optimizer)
   				done = true
   			}
   			if (toc >= tsecs || done || (ipass == options.npasses-1 && i >= n)) {
-  				println("pass=%d, i=%d t=%3.1f secs, ll=%5.4f, slope=%5.4g, norm=%5.2f" format 
-  				    (ipass, i, tsecs, llest, llder, norm(modelmat)))
-  				tsecs += options.secprint
+  				println("pass=%d, i=%d t=%3.1f secs, ll=%5.4f, slope=%5.4g" format (ipass, i, tsecs, llest, llder))
+  				tscores = tscores :+ -llest.asInstanceOf[Float]
+  				tsteps = tsteps :+ nsteps.asInstanceOf[Float]
+  			  tsecs += options.secprint
   			}
   		}
   		ipass += 1
   	}
+  val timeplot = plot(1->(tscores.size+1), row(tscores.toArray))
+  val stepplot = plot(row(tsteps.toArray), row(tscores.toArray))
+  timeplot.setTitle("Neg log likelihood vs time in seconds")
+  stepplot.setTitle("Neg log likelihood vs number of samples")
   }
 }
 
 
 object Learner {
 	class Options {
-		var blocksize:Int = 10000
+		var blocksize:Int = 8000
 		var npasses:Int = 100
-		var alpha:Float = 500f
-		var memwindow:Double = 1000000
+	  var memwindow:Double = 1000000
 		var convwindow:Double = 1000000	
-		var gradwindow:Float = 10000000
 		var convslope:Double = -1e-6
 		var secprint:Double = 1
 		var eps:Float = 1e-8f

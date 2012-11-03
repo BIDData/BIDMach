@@ -6,28 +6,41 @@ import Learner._
 
 
 object TestLearner {
-  def runLogLearner(rt:SMat, st:FMat):Learner = {
-  	val learner = Learner(rt, st > 4, new LogisticModel, new ADAGradOptimizer)
+  def runLogLearner(rt:SMat, st:FMat) = {
+    val model = new LogisticModel(rt, st)
+    val regularizer = new L1Regularizer(model)
+    val updater = new ADAGradUpdater(model)
+  	val learner = Learner(rt, st > 4, model, regularizer, updater)
   	learner.run
-  	learner
   }
   
-  def runLinLearner(rt:SMat, st:FMat):Learner = {
-  	val learner = Learner(rt, st, new LinearRegModel, new ADAGradOptimizer)
+  def runLinLearner(rt:SMat, st:FMat) = {
+    val model = new LinearRegModel(rt, st) { 
+      override def initmodel(data:Mat, target:Mat) = initmodelf(data, target) 
+      override def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit =  linearMap1(targ, pred, lls, gradw)
+      }
+    val regularizer = new L1Regularizer(model)
+    val updater = new ADAGradUpdater(model) { override def update(step:Int):Unit = update1(step) }
+    val learner = Learner(rt, st, model, regularizer, updater)
+    regularizer.options.beta = 1e-7f
+    updater.options.alpha = 300f
+    updater.options.gradwindow = 1e6f
+  	learner.options.npasses = 50
   	learner.run
-  	learner
   }
   
   def main(args: Array[String]): Unit = {
+    Mat.checkCUDA
     tic
     val dirname = "d:\\sentiment\\sorted_data\\books\\parts\\"
   	val revtrain:SDMat = load(dirname+"part1.mat", "revtrain")
-  	val rt = SMat(revtrain)(0->40000,0->(32*(size(revtrain,2)/32)))
+  	val t1 = toc; tic
+  	val rt = SMat(revtrain)(0->40000,0->(8000*(size(revtrain,2)/8000)))
   	val scrtrain:IMat = load(dirname+"part1.mat", "scrtrain")
   	val st = FMat(scrtrain).t
-  	val t = toc
-  	println("Reading time=%3.2f seconds" format t)
-  	val stt = zeros(256, size(st,2))
+  	val t2 = toc
+  	println("Reading time=%3.2f+%3.2f seconds" format (t1,t2))
+  	val stt = zeros(16, size(st,2))
   	for (i<-0 until size(stt,1)) {stt(i,?) = st}
   	flip
     runLinLearner(rt, stt)
