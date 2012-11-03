@@ -1,4 +1,5 @@
 package BIDMach
+
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
@@ -34,6 +35,7 @@ class LinearRegModel(data0:Mat, target0:Mat, opts:Model.Options = new Model.Opti
       flls.data(i) = -diff * diff
       i += 1
     }
+  	Mat.nflops += 4L*targ.length
   }
 }
 
@@ -59,10 +61,10 @@ class LogisticModel(data0:Mat, target0:Mat, opts:Model.Options = new Model.Optio
     val ftarg = targ.asInstanceOf[FMat]
     val fpred = pred.asInstanceOf[FMat]
     val fgradw = gradw.asInstanceOf[FMat]
-    tfact = checkSize(tfact, ftarg).asInstanceOf[FMat]
-    ptfact = checkSize(ptfact, ftarg).asInstanceOf[FMat]
-    epred = checkSize(epred, ftarg).asInstanceOf[FMat]
-    lle = checkSize(lle, targ).asInstanceOf[FMat]
+    ftfact = checkSize(tfact, ftarg).asInstanceOf[FMat]
+    fptfact = checkSize(ptfact, ftarg).asInstanceOf[FMat]
+    fepred = checkSize(epred, ftarg).asInstanceOf[FMat]
+    flle = checkSize(lle, targ).asInstanceOf[FMat]
     
     var i = 0
     while (i < ftarg.length) {
@@ -70,7 +72,7 @@ class LogisticModel(data0:Mat, target0:Mat, opts:Model.Options = new Model.Optio
       fptfact.data(i) = math.min(40f, fpred.data(i) * ftfact.data(i))
       i+=1
     }
-    exp(ptfact, fepred)
+    exp(fptfact, fepred)
     log1p(fepred, flle)
     lls ~ row(-1) * flle
     i = 0
@@ -99,7 +101,7 @@ class LogisticModel(data0:Mat, target0:Mat, opts:Model.Options = new Model.Optio
     tmp0 = checkSize(tmp0, targ)
     tmp1 = checkSize(tmp1, targ)
     
-    tfact ~ row(1) - (tmp0 ~ row(2)*targ)
+    tfact ~ 1 - (tmp0 ~ 2*targ)
     min(40.0, tmp0 ~ tfact *@ pred, tmp1)
     exp(tmp1, epred)
     log1p(epred, tmp0)
@@ -122,7 +124,8 @@ class LogisticModel(data0:Mat, target0:Mat, opts:Model.Options = new Model.Optio
   }
 }
 
-abstract class RegressionModel(data0:Mat, target0:Mat, opts:Model.Options) extends Model(data0, target0, opts) {
+abstract class RegressionModel(data0:Mat, target0:Mat, opts:Model.Options) 
+  extends Model(data0, target0, opts) {
 
   var modelmat:Mat = null
   var updatemat:Mat = null
@@ -130,20 +133,22 @@ abstract class RegressionModel(data0:Mat, target0:Mat, opts:Model.Options) exten
 
   def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit
   
-  def initmodel(data:Mat, target:Mat) = initmodelf(data, target)
+  override def initmodel(data:Mat, target:Mat):Mat = initmodelf(data, target)
   
-  def initmodelf(data:Mat, target:Mat) = {
+  def initmodelf(data:Mat, target:Mat):Mat = {
     val m = size(data, 1)
     val n = size(target, 1)
     modelmat = 0.1f*normrnd(0,1,m,n)
     updatemat = modelmat.zeros(m, n)
+    target
   }
   
-  def initmodelg(data:Mat, target:Mat) = {
+  def initmodelg(data:Mat, target:Mat):Mat = {
     val m = size(data, 1)
     val n = size(target, 1)
     modelmat = gnormrnd(0,1,n,m)*0.1f
     updatemat = modelmat.zeros(n, m)
+    target
   }
   
   var tpred:Mat = null
@@ -153,7 +158,7 @@ abstract class RegressionModel(data0:Mat, target0:Mat, opts:Model.Options) exten
   var data:Mat = null
   var target:Mat = null
   
-  def gradfun(idata:Mat, itarget:Mat):Double = { 
+  override def gradfun(idata:Mat, itarget:Mat):Double = { 
     (idata, itarget, modelmat) match {
   	  case (sdata:SMat, ftarget:FMat, gmodel:GMat) => {
   	  	lls = checkSize(lls, itarget.nrows, itarget.ncols, modelmat)  	
