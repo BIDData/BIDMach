@@ -1,19 +1,20 @@
 #!/bin/bash
-export BIDMAT_HOME="../BIDMat" # Change if needed
-export LD_LIBRARY_PATH="${BIDMAT_HOME}/lib/linux64:${LD_LIBRARY_PATH}" # Only needed/works on Linux
+export BIDMACH_ROOT="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
+export BIDMAT_ROOT="${BIDMACH_ROOT}/../BIDMat" # Change if needed
+export LD_LIBRARY_PATH="${BIDMAT_ROOT}/lib/linux64:${BIDMAT_ROOT}/lib/linux64/JCUDA5.0:/usr/local/cuda-5.0/lib64:${LD_LIBRARY_PATH}"
 # export JAVA_HOME="" # Set here if not set in environment
-export JAVA_OPTS="-Xmx6G -Xms128M" # Set as much memory as possible
+export JAVA_OPTS="-Xmx12G -Xms128M" # Set as much memory as possible
 # Fix these if needed
-export JCUDA_VERSION="0.4.2"
-export JCUDA_LIBDIR="${BIDMAT_HOME}/lib"
-export BIDLIB="${BIDMAT_HOME}/lib"
-export LIBDIR=./lib
+export JCUDA_VERSION="0.5.0RC"
+export JCUDA_LIBDIR="${BIDMAT_ROOT}/lib"
+export BIDLIB="${BIDMAT_ROOT}/lib"
+export LIBDIR=${BIDMACH_ROOT}/lib
 
-export BIDMAT_LIBS="./BIDMach.jar;${LIBDIR}/BIDMat.jar;${BIDLIB}/ptplot.jar;${BIDLIB}/ptplotapplication.jar;${BIDLIB}/jhdf5.jar"
-
+export BIDMAT_LIBS="${BIDMAT_ROOT}/BIDMat.jar;${BIDLIB}/ptplot.jar;${BIDLIB}/ptplotapplication.jar;${BIDLIB}/jhdf5.jar"
 export JCUDA_LIBS="${JCUDA_LIBDIR}/jcuda-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcublas-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcufft-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcurand-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcusparse-${JCUDA_VERSION}.jar"
 
-export ALL_LIBS="${BIDMAT_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
+export ALL_LIBS="${BIDMACH_ROOT}/BIDMach.jar;${BIDMAT_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
 
 echo ${ALL_LIBS}
 

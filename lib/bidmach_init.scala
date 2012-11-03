@@ -3,7 +3,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Plotting._
-import BIDMach.{Learner,LogisticModel,LinearRegModel,ADAGradOptimizer}
+import BIDMach.{Learner,LogisticModel,LinearRegModel,ADAGradUpdater}
 
 {
 var a = new Array[Int](1)
