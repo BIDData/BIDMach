@@ -9,8 +9,8 @@ class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) e
 
   def uupdate(sdata:SMat, model:FMat, user:FMat):Unit = { 
 	val preds = DDS(model, user, sdata)
-  	val loss = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
-  	val prod = model * loss
+  	val prat = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
+  	val prod = model * prat
     var i = 0;  while (i < prod.ncols) { 
       var j = 0;  while (j < prod.nrows) { 
         val ji = j + i*prod.nrows
@@ -19,7 +19,7 @@ class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) e
           if (v > 1) {
         	v - 0.5f
           } else {
-        	  0.5f * v * v
+        	0.5f * v * v
           }
         j += 1}
       i += 1}
@@ -27,8 +27,8 @@ class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) e
   
   def mupdate(sdata:SMat, model:FMat, user:FMat, update:FMat) = {  
 	val preds = DDS(model, user, sdata)
-	val loss = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
-	update ~ (loss * user.t).t - sum(user,2) * ones(1,size(user,2))
+	val prat = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
+	update ~ (prat * user.t).t - sum(user,2) * ones(1,size(user,2))
 	val vdat = row(sdata.data)
     val vpreds = row(preds.data)
     mean(vdat *@ ln(max(options.weps, vpreds)) - gammaln(vdat)).dv
@@ -60,6 +60,8 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
   
   usermat = initmodel(data0, null) 
   
+  def initupdate(data:SMat, prod:FMat) = {}
+  
   def uupdate(data:SMat, prod:FMat, user:FMat):Unit
   
   def mupdate(sdata:SMat, fmodel:FMat, user:FMat, update:FMat):Double
@@ -68,6 +70,7 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
     (idata, modelmat, iuser, updatemat) match {
   	  case (sdata:SMat, fmodel:FMat, fuser:FMat, fupdate:FMat) => {
         var i = 0
+        initupdate(sdata, fmodel)
         while (i < options.niter) { 
           uupdate(sdata, fmodel, fuser)
         }
