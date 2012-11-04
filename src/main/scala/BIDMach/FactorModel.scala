@@ -7,33 +7,33 @@ import Learner._
 
 class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) extends FactorModel(data0, opts) { 
 
-  def lossfn(preds:SMat, data:SMat):SMat = data.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
-
-  def ldaf(v:Float):Float = { 
-//    exp(psi(v))
-    if (v > 1) {
-      v - 0.5f
-    } else {
-      0.5f * v * v
-    }
-  }
-
-  def uupdate(prod:FMat, user:FMat):Unit = { 
+  def uupdate(sdata:SMat, model:FMat, user:FMat):Unit = { 
+	val preds = DDS(model, user, sdata)
+  	val loss = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
+  	val prod = model * loss
     var i = 0;  while (i < prod.ncols) { 
       var j = 0;  while (j < prod.nrows) { 
         val ji = j + i*prod.nrows
-        user.data(ji) = ldaf(user.data(ji)*prod.data(ji) + options.prior(j))
+        val v = user.data(ji)*prod.data(ji) + options.prior(j)
+        user.data(ji) = 
+          if (v > 1) {
+        	v - 0.5f
+          } else {
+        	  0.5f * v * v
+          }
         j += 1}
       i += 1}
   }
-
-  def likelihood(data:SMat, preds:SMat):Double = { 
-    val vdat = row(data.data)
+  
+  def mupdate(sdata:SMat, model:FMat, user:FMat, update:FMat) = {  
+	val preds = DDS(model, user, sdata)
+	val loss = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
+	update ~ (loss * user.t).t - sum(user,2) * ones(1,size(user,2))
+	val vdat = row(sdata.data)
     val vpreds = row(preds.data)
-    mean(vdat *@ ln(max(options.weps, vpreds)) - gammaln(vdat)).dv      
+    mean(vdat *@ ln(max(options.weps, vpreds)) - gammaln(vdat)).dv
   }
 }
-
 
 abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(data0, null, opts) {
 
@@ -42,12 +42,6 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
   var usermat:Mat = null
   val options = opts
 
-  def lossfn(preds:SMat, data:SMat):SMat
-
-  def uupdate(prod:FMat, user:FMat):Unit
-
-  def likelihood(data:SMat, preds:SMat):Double
-  
   override def initmodel(data:Mat, user:Mat):Mat = initmodelf(data, user)
   
   def initmodelf(data:Mat, user:Mat):Mat = {
@@ -55,27 +49,29 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
     val n =  size(data, 2)
     val d = options.dim
     modelmat = 0.1f*normrnd(0,1,d,m)
-    val out = 0.1f*normrnd(0,1,d,n)
+    val out = if (user.asInstanceOf[AnyRef] == null) {
+      0.1f*normrnd(0,1,d,n)
+    } else{
+      user
+    }
     updatemat = modelmat.zeros(d, m)
     out
   }
   
-  usermat = initmodel(data0, null)
+  usermat = initmodel(data0, null) 
+  
+  def uupdate(data:SMat, prod:FMat, user:FMat):Unit
+  
+  def mupdate(sdata:SMat, fmodel:FMat, user:FMat, update:FMat):Double
   
   override def gradfun(idata:Mat, iuser:Mat):Double = { 
     (idata, modelmat, iuser, updatemat) match {
   	  case (sdata:SMat, fmodel:FMat, fuser:FMat, fupdate:FMat) => {
         var i = 0
-        var fpreds:SMat = null
-        var loss:SMat = null
         while (i < options.niter) { 
-          fpreds = DDS(fmodel, fuser, sdata)
-  	  	  loss = lossfn(fpreds, sdata)
-  	  	  val prod = fmodel * loss
-          uupdate(prod, fuser)
+          uupdate(sdata, fmodel, fuser)
         }
-        fupdate ~ loss * fuser.t
-  	  	likelihood(sdata, fpreds)
+        mupdate(sdata, fmodel, fuser, fupdate)
   	  }
     }
   } 
