@@ -60,7 +60,7 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
   
   usermat = initmodel(data0, null) 
   
-  def initupdate(data:SMat, prod:FMat) = {}
+  def initupdate(data:SMat, prod:FMat)  = {}
   
   def uupdate(data:SMat, prod:FMat, user:FMat):Unit
   
