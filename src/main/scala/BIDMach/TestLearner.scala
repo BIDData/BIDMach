@@ -6,12 +6,33 @@ import Learner._
 
 
 object TestLearner {
+  def runNMFLearner(rt:SMat, rtest:SMat) = {
+    val model = new NMFmodel(rt)
+    model.options.dim = 32
+    model.options.uiter = 2
+    model.options.uprior = 1e-4f
+    model.options.nzPerColumn = 400
+    val usertest = model.initmodel(rtest, null)
+    val usermat = model.initmodel(rt, null)
+    val regularizer = new L2Regularizer(model)
+    val updater = new ADAGradUpdater(model)
+  	val learner = Learner(rt, usermat, rtest, usertest, model, regularizer, updater)
+  	regularizer.options.mprior = 1e-4f
+    updater.options.alpha = 0.5f
+    updater.options.gradwindow = 4e5f
+    updater.options.initsumsq = 1e-3f
+  	learner.options.npasses = 20
+  	learner.options.secprint = 100
+  	learner.run
+  }
+  
   def runLogLearner(rt:SMat, st:FMat, rtest:SMat, stest:FMat) = {
     val model = new LogisticModel(rt, st)
+    model.initmodel(rt, st)
     val regularizer = new L1Regularizer(model)
     val updater = new ADAGradUpdater(model)
   	val learner = Learner(rt, st > 4, rtest, stest > 4, model, regularizer, updater)
-  	regularizer.options.beta = 1e-7f
+  	regularizer.options.mprior = 1e-7f
     updater.options.alpha = 300f
     updater.options.gradwindow = 1e6f
   	learner.options.npasses = 20
@@ -29,7 +50,7 @@ object TestLearner {
     val regularizer = new L1Regularizer(model)
     val updater = new ADAGradUpdater(model) { override def update(step:Int):Unit = update1(step) }
     val learner = Learner(rt, st, rtest, stest, model, regularizer, updater)
-    regularizer.options.beta = 1e-6f
+    regularizer.options.mprior = 1e-6f
 //    regularizer.options.beta = 1e-7f
     updater.options.alpha = 200f
     updater.options.gradwindow = 1e6f
@@ -63,6 +84,7 @@ object TestLearner {
   	ntest match {
   	  case 1 => runLinLearner(rt, stt, rtest, sttest)
   	  case 2 => runLogLearner(rt, stt, rtest, sttest)
+  	  case 3 => runNMFLearner(rt, rtest)
   	}
   	
 

@@ -12,32 +12,44 @@ class NMFmodel(data0:SMat, opts:FactorModel.Options = new NMFmodel.Options) exte
   var mmodelt:Mat = null
   var maxeps:Mat = null
   var mmodeltuser:Mat = null
+  var idiag:Mat = null
   var quot:Mat = null
   var ud:Mat = null
   var uu:Mat = null
   var uum:Mat = null
   
+  override  def initmodelf(data:Mat, user:Mat):Mat = {
+  	val v = super.initmodelf(data, user)
+  	idiag = mkdiag(options.uprior*ones(options.dim,1)):FMat
+  	v
+  }
+  
   override def initupdate(sdata:Mat, model:Mat, user:Mat) = {
-	  modeldata = recycleTry(modeldata, user)      ~ model * sdata
-  	mmodelt = recycleTry(mmodelt, d, d, model)   ~ model * model.t    
+	  modeldata = recycleTry(modeldata, user)      ~ modelmat * sdata
+  	mmodelt = recycleTry(mmodelt, d, d, model)   ~ modelmat xT modelmat
+  	mmodelt                                      ~ mmodelt + idiag
   }
    
   override def uupdate(sdata:Mat, model:Mat, user:Mat):Unit = { 
-    val NMFeps = options.asInstanceOf[NMFmodel.Options].NMFeps
-    maxeps = recycleTry(maxeps, mmodelt)
-    maxeps =                                      max(NMFeps, mmodelt, maxeps):Mat
-    mmodeltuser = recycleTry(mmodeltuser, user)  ~ maxeps * user
+    mmodeltuser = recycleTry(mmodeltuser, user)  ~ mmodelt * user
     quot = recycleTry(quot, user)                ~ modeldata /@ mmodeltuser
-	  user                                        ~ user *@ quot
+                                                 max(0.1f, quot, quot)
+                                                 min(10.0f, quot, quot)
+//    println("max quot=%f" format maxi(quot(?),1).dv)
+	  user                                         ~ user *@ quot
+//	  println("norm diff=%f" format norm(modeldata-mmodeltuser).dv)
   }
    
   override def mupdate(sdata:Mat, model:Mat, user:Mat, update:Mat) = {  
-    ud = recycleTry(ud, model)                   ~ user xT sdata
-    uu = recycleTry(uu, d, d, model)             ~ user * user.t
-    uum = recycleTry(uum, model)                 ~ uu * model
-    update                                      ~ ud - uum
-    val diff = sum(sdata,2) - (sum(user,2).t * model).t
-    mean(diff *@ diff).dv
+    ud = recycleTry(ud, modelmat)                ~ user xT sdata
+    uu = recycleTry(uu, d, d, modelmat)          ~ user xT user
+    uum = recycleTry(uum, modelmat)              ~ uu * modelmat
+    update                                       ~ ud - uum
+    val tmp0 = (sum(user,2).t * modelmat).t
+    val diff = sum(sdata,2) - tmp0
+    val v = -(diff dot diff)/sdata.nrows/sdata.ncols
+//    println("norm diff=%f, v=%f" format (norm(diff).dv/math.sqrt(diff.length), v))
+    v
   }
 }
 
@@ -52,7 +64,7 @@ class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) e
     	var i = 0;  while (i < prod.ncols) { 
     		var j = 0;  while (j < prod.nrows) { 
     			val ji = j + i*prod.nrows
-    			val v = fuser.data(ji)*prod.data(ji) + options.prior(j)
+    			val v = fuser.data(ji)*prod.data(ji) + options.uprior
     			fuser.data(ji) = 
     				if (v > 1) {
     					v - 0.5f
@@ -81,9 +93,6 @@ class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) e
 
 abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(data0, null, opts) {
 
-  var modelmat:Mat = null
-  var updatemat:Mat = null
-  var usermat:Mat = null
   val options = opts
   var d = 0
 
@@ -93,7 +102,7 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
     val m = size(data, 1)
     val n =  size(data, 2)
     d = options.dim
-    modelmat = 0.1f*normrnd(0,1,d,m)
+    modelmat = 0.1f*normrnd(0,1,d,m)  
     val out = if (user.asInstanceOf[AnyRef] == null) {
       0.1f*normrnd(0,1,d,n)
     } else{
@@ -101,9 +110,7 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
     }
     updatemat = modelmat.zeros(d, m)
     out
-  }
-  
-  usermat = initmodel(data0, null) 
+  } 
   
   def initupdate(data:Mat, model:Mat, user:Mat)  = {}
   
@@ -114,10 +121,12 @@ abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(d
   override def gradfun(data:Mat, user:Mat):Double = { 
 	  var i = 0
 	  initupdate(data, modelmat, user)
-	  while (i < options.niter) { 
+	  while (i < options.uiter) { 		    
 	  	uupdate(data, modelmat, user)
+	  	i += 1
 	  }
-	  mupdate(data, modelmat, user, updatemat)
+	  val v = mupdate(data, modelmat, user, updatemat)
+	  v
   }
 
 }
@@ -131,8 +140,8 @@ object NMFmodel  {
 object FactorModel { 
   class Options extends Model.Options { 
     var dim = 20
-    var niter = 10
+    var uiter = 10
     var weps = 1e-10f
-    var prior:FMat = null
+    var uprior = 0.01f
   }
 }

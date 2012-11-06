@@ -129,10 +129,7 @@ extends RegressionModel(data0, target0, opts)  {
 abstract class RegressionModel(data0:Mat, target0:Mat, opts:RegressionModel.Options) 
   extends Model(data0, target0, opts) {
   
-  val options = opts
-
-  var modelmat:Mat = null
-  var updatemat:Mat = null    
+  val options = opts   
   var data:Mat = null
   var target:Mat = null
   var ttarget:Mat = null

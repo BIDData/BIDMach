@@ -9,7 +9,7 @@ trait Updater {
   def update(step:Int):Unit
 }
 
-class ADAGradUpdater(val model:RegressionModel, opts:Updater.Options = new Updater.Options) extends Updater {
+class ADAGradUpdater(val model:Model, opts:Updater.Options = new Updater.Options) extends Updater {
 
   var tmp0:Mat = null
   var tmp1:Mat = null

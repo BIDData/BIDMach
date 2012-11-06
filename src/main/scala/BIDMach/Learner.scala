@@ -44,9 +44,9 @@ case class Learner(datamat:Mat, targetmat:Mat, datatest:Mat, targtest:Mat,
   			if (llder > 0 && llder < options.convslope) {
   				done = true
   			}
-  			if (toc >= tsecs || done || (ipass == options.npasses-1 && i >= n)) {
+  			if (toc >= tsecs || done || (i >= n)) {
   			  val llx = model.gradfun(datatest, targtest)
-  				println("pass=%d, n=%dk t=%3.1f secs, ll=%5.4f, llx=%5.4f" format (ipass, nsteps/1000, tsecs, llest, llx))
+  				println("pass=%d, n=%dk t=%3.1f secs, ll=%5.4f, llx=%5.4f" format (ipass, nsteps/1000, toc, llest, llx))
   				tscores = tscores :+ -llest
   				tscorex = tscorex :+ -llx
   				tsteps = tsteps :+ nsteps.asInstanceOf[Double]
@@ -68,8 +68,8 @@ object Learner {
 	class Options {
 		var blocksize:Int = 8000
 		var npasses:Int = 100
-	  var memwindow:Double = 1000000
-		var convwindow:Double = 1000000	
+	  var memwindow:Double = 100000
+		var convwindow:Double = 100000	
 		var convslope:Double = -1e-6
 		var secprint:Double = 1
 		var eps:Float = 1e-8f
