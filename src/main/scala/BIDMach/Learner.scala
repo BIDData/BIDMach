@@ -23,7 +23,7 @@ case class Learner(datamat:Mat, targetmat:Mat, datatest:Mat, targtest:Mat,
   	var llest:Double = 0
   	var llder:Double = 0
   	var llold:Double = 0
-  	var tsecs:Double = 1
+  	var tsecs:Double = options.secprint
   	var nsteps:Long = 0
   	tic
   	while (ipass < options.npasses && ! done) {
@@ -74,16 +74,6 @@ object Learner {
 		var secprint:Double = 1
 		var eps:Float = 1e-8f
   }
-	
-  def checkSize(a:Mat, nr:Int, nc:Int, b:Mat):Mat = {
-    if (a.asInstanceOf[AnyRef] != null && a.nrows == nr && a.ncols == nc) {
-      a
-    } else {
-      b.zeros(nr, nc)
-    }
-  }
-  
-  def checkSize(a:Mat, b:Mat):Mat = checkSize(a, b.nrows, b.ncols, b)
   
   def fsqrt(v:Float):Float = math.sqrt(v).asInstanceOf[Float]
   

@@ -14,6 +14,8 @@ abstract class Model(data0:Mat, target0:Mat, opts:Model.Options) {
 
 object Model {
 	class Options {
+	  var nzPerColumn:Int = 0
+	  var startBlock = 8000
   }
 	
   def checkSize(a:Mat, nr:Int, nc:Int, b:Mat):Mat = {
