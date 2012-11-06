@@ -5,6 +5,9 @@ import BIDMat.SciFunctions._
 
 abstract class Model(data0:Mat, target0:Mat, opts:Model.Options) {
   
+  var modelmat:Mat = null
+  var updatemat:Mat = null
+  
   def initmodel(data:Mat, target:Mat):Mat
   
   def gradfun(data:Mat, target:Mat):Double 
