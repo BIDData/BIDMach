@@ -25,9 +25,9 @@ class ADAGradUpdater(val model:RegressionModel, opts:Updater.Options = new Updat
 	
 	def update1(step:Int):Unit =	{
 	  val nw = (options.gradwindow/step)
-	  tmp0 = checkSize(tmp0, modelmat)
-	  tmp1 = checkSize(tmp1, modelmat)
-	  tmp2 = checkSize(tmp2, modelmat)
+	  tmp0 = recycleTry(tmp0, modelmat)
+	  tmp1 = recycleTry(tmp1, modelmat)
+	  tmp2 = recycleTry(tmp2, modelmat)
 	  sumSq ~ (tmp1 ~ (tmp0 ~ updatemat *@ updatemat) + (tmp2 ~ sumSq*(nw-1))) * (1/nw)
 	  if (nsteps > options.waitsteps) {
 	  	sqrt(tmp0 ~ sumSq*nsteps, tmp1)
@@ -41,8 +41,8 @@ class ADAGradUpdater(val model:RegressionModel, opts:Updater.Options = new Updat
 	  val fmodel = modelmat.asInstanceOf[FMat]
 	  val fsumSq = sumSq.asInstanceOf[FMat]
 	  val fupdate = updatemat.asInstanceOf[FMat]
-	  val ftmp0 = checkSize(tmp0, fmodel).asInstanceOf[FMat]
-	  val ftmp1 = checkSize(tmp1, fmodel).asInstanceOf[FMat]
+	  val ftmp0 = recycleTry(tmp0, fmodel).asInstanceOf[FMat]
+	  val ftmp1 = recycleTry(tmp1, fmodel).asInstanceOf[FMat]
 
 	  var i = 0 
 	  while (i < modelmat.length) {
