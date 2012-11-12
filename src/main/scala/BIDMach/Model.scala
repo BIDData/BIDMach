@@ -3,14 +3,16 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-abstract class Model(data0:Mat, target0:Mat, opts:Model.Options) {
+abstract class Model {
   
   var modelmat:Mat = null
   var updatemat:Mat = null
   
-  def initmodel(data:Mat, target:Mat):Mat
+  def initmodel(data:Mat, target:Mat, datatest:Mat, testtarg:Mat):(Mat, Mat)
   
-  def gradfun(data:Mat, target:Mat):Double 
+  def gradfun(data:Mat, target:Mat):Unit
+  
+  def eval(data:Mat, target:Mat):(Double, Double)
 
 }
 
@@ -19,6 +21,7 @@ object Model {
 	class Options {
 	  var nzPerColumn:Int = 0
 	  var startBlock = 8000
+	  var useGPU = false
   }
 	
   def checkSize(a:Mat, nr:Int, nc:Int, b:Mat):Mat = {

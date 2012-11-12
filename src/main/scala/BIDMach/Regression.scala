@@ -5,22 +5,19 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import Learner._
 
-class LinearRegModel(data0:Mat, target0:Mat, opts:RegressionModel.Options = new RegressionModel.Options) 
-extends RegressionModel(data0, target0, opts) {
+class LinearRegModel(opts:RegressionModel.Options = new RegressionModel.Options) 
+extends RegressionModel(opts) {
   
-  var tmp0:Mat = null
-  var diff:Mat = null
+  var tmp0 = blank
+  var diff = blank
   
   def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit =  linearMap1(targ, pred, lls, gradw)
 
   def linearMap1(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit= {
-  	diff = recycleTry(diff, targ)
-    tmp0 = recycleTry(tmp0, targ)
-
-    diff ~ targ - pred  
-    tmp0 ~ diff *@ diff
-    lls ~ tmp0 * -1
-    gradw ~ diff * 2
+    diff = diff  ~ targ - pred  
+    tmp0 = tmp0  ~ diff *@ diff
+    lls          ~ tmp0 * -1
+    gradw        ~ diff * 2
   }
   
   def linearMap2(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit= {
@@ -40,8 +37,8 @@ extends RegressionModel(data0, target0, opts) {
   }
 }
 
-class LogisticModel(data0:Mat, target0:Mat, opts:RegressionModel.Options = new RegressionModel.Options) 
-extends RegressionModel(data0, target0, opts)  {
+class LogisticModel(opts:RegressionModel.Options = new RegressionModel.Options) 
+extends RegressionModel(opts)  {
 
   def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit = logisticMap1(targ, pred, lls, gradw)
   
@@ -85,7 +82,7 @@ extends RegressionModel(data0, target0, opts)  {
     Mat.nflops += 8L * targ.length
   }
   
-  def logisticMap2(targ:FMat, pred:FMat, lls:FMat, gradw:FMat) = {
+  def logisticMap2(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit = {
     var i = 0
     while (i < targ.length) {
       val tfact:Double = (1-2*targ.data(i))
@@ -97,7 +94,7 @@ extends RegressionModel(data0, target0, opts)  {
     Mat.nflops += 14L * targ.length
   }
     
-  def logisticMap3(targ:Mat, pred:Mat, lls:Mat, gradw:Mat) = {
+  def logisticMap3(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit = {
     tfact = recycleTry(tfact, targ)
     epred = recycleTry(epred, targ)
     tmp0 = recycleTry(tmp0, targ)
@@ -111,7 +108,7 @@ extends RegressionModel(data0, target0, opts)  {
     gradw ~ -1 * (tmp0 ~ tfact *@ (tmp1 ~ epred /@ (tmp0 ~ 1 + epred)))
   }
   
-  def logisticMap4(targ:FMat, pred:FMat, lls:FMat, gradw:FMat) = {
+  def logisticMap4(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit = {
     ftfact = recycleTry(tfact, targ).asInstanceOf[FMat]
     fptfact = recycleTry(ptfact, targ).asInstanceOf[FMat]
     fepred = recycleTry(epred, targ).asInstanceOf[FMat]
@@ -126,12 +123,14 @@ extends RegressionModel(data0, target0, opts)  {
   }
 }
 
-abstract class RegressionModel(data0:Mat, target0:Mat, opts:RegressionModel.Options) 
-  extends Model(data0, target0, opts) {
+abstract class RegressionModel(opts:RegressionModel.Options) 
+  extends Model {
   
   val options = opts   
   var data:Mat = null
   var target:Mat = null
+  var testtarg:Mat = null
+  
   var ttarget:Mat = null
   var lls:Mat = null
   var tpred:Mat = null
@@ -139,11 +138,10 @@ abstract class RegressionModel(data0:Mat, target0:Mat, opts:RegressionModel.Opti
 
   def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit
   
-  override def initmodel(data:Mat, target:Mat):Mat = initmodelf(data, target)
-  
-  def initmodelf(data:Mat, target:Mat) = {
-    val m = size(data, 1)
-    val n = size(target, 1)
+  override def initmodel(data0:Mat, target0:Mat, datatest0:Mat, testtarg0:Mat):(Mat, Mat) = {
+    val m = size(data0, 1)
+    val n = size(target0, 1)
+    val k = options.startBlock
     if (options.transpose) {
     	modelmat = 0.1f*normrnd(0,1,m,n)
     	updatemat = modelmat.zeros(m,n)
@@ -151,33 +149,29 @@ abstract class RegressionModel(data0:Mat, target0:Mat, opts:RegressionModel.Opti
     	modelmat = 0.1f*normrnd(0,1,n,m)
     	updatemat = modelmat.zeros(n,m)
     }
-    target
-  }
-  
-  def initmodelg(data0:Mat, target0:Mat):Mat = {
-    val m = size(data0, 1)
-    val n = size(target0, 1)
-    val k = options.startBlock
-    if (options.transpose) {
-    	modelmat = gnormrnd(0,1,m,n)*0.1f
-    	updatemat = modelmat.zeros(m,n)
-    } else {
-    	modelmat = gnormrnd(0,1,n,m)*0.1f
-    	updatemat = modelmat.zeros(n, m)
+    if (options.useGPU) {
+      modelmat = GMat(modelmat.asInstanceOf[FMat])
+      updatemat = GMat(updatemat.asInstanceOf[FMat])
+      data = GSMat(m, k, k * options.nzPerColumn)
+      target = GMat(n, k)
+      testtarg = GMat(n, k)
     }
-    data = GSMat(m, k, k * options.nzPerColumn)
-    target = GMat(n, k)
-    target
+    (target0, testtarg0)
   }
   
-  override def gradfun(idata:Mat, itarget:Mat):Double = { 
+  override def eval(idata:Mat, itarget:Mat) = {
+  	tpred ~ modelmat * data;
+  	regfn(target, tpred, lls, gradw)
+  	(mean(mean(lls,2)).dv, 0.0)
+  }
+  
+  override def gradfun(idata:Mat, itarget:Mat):Unit = { 
     if (options.transpose) {
-    	ttarget = recycleTry(ttarget, itarget.ncols, itarget.nrows, itarget) 
-    	ttarget ~ itarget t;
+    	ttarget = ttarget ~ itarget t;
     } else {
     	ttarget = itarget
     }
-    lls = recycleTry(lls, ttarget.nrows, ttarget.ncols, modelmat)
+    lls = recycleTry(lls, ttarget.nrows, ttarget.ncols, modelmat, 0)
     tpred = recycleTry(tpred, lls)
     gradw = recycleTry(gradw, lls)
     modelmat match {
@@ -199,7 +193,6 @@ abstract class RegressionModel(data0:Mat, target0:Mat, opts:RegressionModel.Opti
     	tpred ~ modelmat * data;
     	regfn(target, tpred, lls, gradw)
     	updatemat ~ gradw xT data
-    	mean(mean(lls,2)).dv
     }	                   
   } 
 }

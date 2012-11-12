@@ -6,60 +6,85 @@ import BIDMat.SciFunctions._
 import Learner._
 
 
-class NMFmodel(data0:SMat, opts:FactorModel.Options = new NMFmodel.Options) extends FactorModel(data0, opts) { 
+class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorModel(opts) { 
 
-  var modeldata:Mat = null
-  var mmodelt:Mat = null
-  var maxeps:Mat = null
-  var mmodeltuser:Mat = null
-  var idiag:Mat = null
-  var quot:Mat = null
-  var ud:Mat = null
-  var uu:Mat = null
-  var uum:Mat = null
+  var modeldata    = blank
+  var mm           = blank
+  var maxeps       = blank
+  var mmodeltuser  = blank
+  var udiag        = blank
+  var mdiag        = blank
+  var quot         = blank
+  var uu           = blank
+  var diff         = blank
   
-  override  def initmodelf(data:Mat, user:Mat):Mat = {
-  	val v = super.initmodelf(data, user)
-  	idiag = mkdiag(options.uprior*ones(options.dim,1)):FMat
+  override  def initmodel(data0:Mat, user0:Mat, datatest0:Mat, usertest0:Mat):(Mat, Mat) = {
+  	val v = super.initmodel(data0, user0, datatest0, usertest0)
+  	udiag = mkdiag(options.uprior*ones(options.dim,1)):FMat
+  	mdiag = mkdiag(options.mprior*ones(options.dim,1)):FMat
+    if (options.useGPU) {
+      udiag = GMat(udiag)
+      mdiag = GMat(mdiag)
+      val k = options.startBlock
+      idata = GSMat(size(data0,1), k, k * options.nzPerColumn)
+      iuser = GMat(options.dim, k)
+    }
   	v
   }
   
-  override def initupdate(sdata:Mat, model:Mat, user:Mat) = {
-	  modeldata = recycleTry(modeldata, user)      ~ modelmat * sdata
-  	mmodelt = recycleTry(mmodelt, d, d, model)   ~ modelmat xT modelmat
-  	mmodelt                                      ~ mmodelt + idiag
+  override def initupdate(sdata:Mat, user:Mat) = {
+    val d = options.dim
+	  modeldata = modeldata  ~ modelmat * sdata
+  	mm        = mm         ~ modelmat xT modelmat
+  	mm                     ~ mm + udiag
   }
    
-  override def uupdate(sdata:Mat, model:Mat, user:Mat):Unit = { 
-    mmodeltuser = recycleTry(mmodeltuser, user)  ~ mmodelt * user
-    quot = recycleTry(quot, user)                ~ modeldata /@ mmodeltuser
-                                                 max(0.1f, quot, quot)
-                                                 min(10.0f, quot, quot)
-//    println("max quot=%f" format maxi(quot(?),1).dv)
-	  user                                         ~ user *@ quot
-//	  println("norm diff=%f" format norm(modeldata-mmodeltuser).dv)
+  override def uupdate(sdata:Mat, user:Mat):Unit = { 
+    mmodeltuser = mmodeltuser  ~ mm * user
+    quot        = quot         ~ modeldata /@ mmodeltuser
+    quot        =                max(0.3f, quot, quot)
+    quot        =                min(3.0f, quot, quot)
+	  user                       ~ user *@ quot
+                                 max(options.minuser, user, user)
   }
    
-  override def mupdate(sdata:Mat, model:Mat, user:Mat, update:Mat) = {  
-    ud = recycleTry(ud, modelmat)                ~ user xT sdata
-    uu = recycleTry(uu, d, d, modelmat)          ~ user xT user
-    uum = recycleTry(uum, modelmat)              ~ uu * modelmat
-    update                                       ~ ud - uum
-    val tmp0 = (sum(user,2).t * modelmat).t
-    val diff = sum(sdata,2) - tmp0
-    val v = -(diff dot diff)/sdata.nrows/sdata.ncols
-//    println("norm diff=%f, v=%f" format (norm(diff).dv/math.sqrt(diff.length), v))
-    v
+  override def mupdate(sdata:Mat, user:Mat):Unit = {
+    val d = options.dim
+    updatemat       ~ user xT sdata
+    uu =     uu     ~ user xT user
+    uu              ~ uu + mdiag
+    updateDenom     ~ uu * modelmat    
+  }
+  
+  override def eval(sdata:Mat, user:Mat):(Double, Double) = {
+	  modeldata = modeldata ~ modelmat * sdata
+    uu        = uu        ~ user xT user 
+                uu        ~ uu + mdiag
+    mm        = mm        ~ modelmat xT modelmat
+
+    val ll0 = sdata.contents dot sdata.contents
+    val ll1 =               modeldata dot user
+    val ll2 =               uu dot mm
+//    println("ll %f %f %f" format (ll0, ll1, ll2))
+    val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
+    val v2 =               -options.uprior*(user dot user)/sdata.nnz
+    (v1,v2)
   }
 }
 
-class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) extends FactorModel(data0, opts) { 
+class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends FactorModel(opts) { 
 
-  override def uupdate(data:Mat, model:Mat, user:Mat):Unit = { 
-    (data, model, user) match {
+  var preds = blank
+  var prat = blank
+  var prod = blank
+  
+  override def uupdate(data:Mat, user:Mat):Unit = uupdate1(data, user)
+  
+  def uupdate1(data:Mat, user:Mat):Unit = { 
+    (data, modelmat, user) match {
     case (sdata:SMat, fmodel:FMat, fuser:FMat) => {
-    	val preds = DDS(fmodel, fuser, sdata)
-    	val prat = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
+    	preds = DDS(fmodel, fuser, sdata, preds)
+    	val prat = sdata.ssMatOp(preds.asInstanceOf[SMat], (x:Float, y:Float) => x / math.max(options.weps, y))
     	val prod = fmodel * prat
     	var i = 0;  while (i < prod.ncols) { 
     		var j = 0;  while (j < prod.nrows) { 
@@ -77,58 +102,102 @@ class LDAmodel(data0:SMat, opts:FactorModel.Options = new FactorModel.Options) e
     }
   }
   
-  override def mupdate(data:Mat, model:Mat, user:Mat, update:Mat) = { 
-  	(data, model, user, update) match {
-  	case (sdata:SMat, fmodel:FMat, fuser:FMat, fupdate:FMat) => {
-  		val preds = DDS(fmodel, fuser, sdata)
-  		val prat = sdata.ssMatOp(preds, (x:Float, y:Float) => x / math.max(options.weps, y))
-  		fupdate ~ (prat * fuser.t).t - sum(fuser,2) * ones(1,size(fuser,2))
-  		val vdat = row(sdata.data)
-  		val vpreds = row(preds.data)
-  		mean(vdat *@ ln(max(options.weps, vpreds)) - gammaln(vdat)).dv
-  	}
-  	}
+  def uupdate2(data:Mat, user:Mat):Unit = { 
+  	preds = DDS(modelmat, user, data, preds)
+  	max(options.weps, preds, preds)
+  	prat = prat ~ data /@ preds
+  	prod = prod ~ modelmat * prat
+  	       user ~ prod *@ user
+  	       user ~ user + options.uprior
+  	exppsi(user, user)
+  }
+  
+  var ll = blank
+  var glvdat = blank
+  
+  override def mupdate(data:Mat, user:Mat):Unit = { 
+  	preds = DDS(modelmat, user, data, preds)
+  	max(options.weps, preds, preds)
+  	prat = prat ~ data /@ preds
+  	updatemat ~ user xT prat;
+  	updateDenom ~ sum(user,2) * user.ones(1,size(user,2))
+  }
+  
+  override def eval(data:Mat, user:Mat):(Double, Double) = {  	
+  	val vdat = data.contents
+  	val vpreds = data.contents
+  	max(options.weps, vpreds, vpreds)
+  	ln(vpreds, ll)
+  	ll ~ ll *@ vdat
+  	glvdat = gammaln(vdat, glvdat)
+  	ll ~ ll - glvdat
+  	(mean(ll).dv,0)
   }
 }
 
-abstract class FactorModel(data0:SMat, opts:FactorModel.Options) extends Model(data0, null, opts) {
+abstract class FactorModel(opts:FactorModel.Options) extends Model {
 
   val options = opts
-  var d = 0
-
-  override def initmodel(data:Mat, user:Mat):Mat = initmodelf(data, user)
+  var idata = blank
+  var iuser = blank
+  var usertest = blank
+  var updateDenom = blank
   
-  def initmodelf(data:Mat, user:Mat):Mat = {
-    val m = size(data, 1)
-    val n =  size(data, 2)
-    d = options.dim
-    modelmat = 0.1f*normrnd(0,1,d,m)  
-    val out = if (user.asInstanceOf[AnyRef] == null) {
-      0.1f*normrnd(0,1,d,n)
+  override def initmodel(data0:Mat, user0:Mat, datatest0:Mat, usertest0:Mat):(Mat, Mat) = {
+    val m = size(data0, 1)
+    val n =  size(data0, 2)
+    val nt = size(datatest0, 2)
+    val d = options.dim
+    modelmat = 0.1f*rand(d,m)  
+    val target = if (user0.asInstanceOf[AnyRef] == null) {
+      0.1f*rand(d,n)
     } else{
-      user
+      user0
+    }
+    val testtarg = if (usertest0.asInstanceOf[AnyRef] == null) {
+      0.1f*rand(d,nt)
+    } else{
+      usertest0
+    }
+    if (options.useGPU) {
+      modelmat = GMat(modelmat.asInstanceOf[FMat])
     }
     updatemat = modelmat.zeros(d, m)
-    out
+    updateDenom = modelmat.zeros(d, m)
+    (target, testtarg)
   } 
   
-  def initupdate(data:Mat, model:Mat, user:Mat)  = {}
+  def initupdate(data:Mat, user:Mat) = {}
   
-  def uupdate(data:Mat, model:Mat, user:Mat):Unit
+  def uupdate(data:Mat, user:Mat):Unit
   
-  def mupdate(sdata:Mat, model:Mat, user:Mat, update:Mat):Double
+  def mupdate(sdata:Mat, user:Mat):Unit
   
-  override def gradfun(data:Mat, user:Mat):Double = { 
+  override def gradfun(data0:Mat, user0:Mat) = { 
 	  var i = 0
-	  initupdate(data, modelmat, user)
+	  modelmat match {
+	    case m:FMat => {
+	      idata = data0
+	      iuser = user0
+	    }
+	    case m:GMat => {
+	    	idata = GSMat.fromSMat(data0.asInstanceOf[SMat], idata.asInstanceOf[GSMat])
+	    	iuser = GMat.fromFMat(user0.asInstanceOf[FMat], iuser.asInstanceOf[GMat])
+	    }
+	  }
+	  initupdate(idata, iuser)
 	  while (i < options.uiter) { 		    
-	  	uupdate(data, modelmat, user)
+	  	uupdate(idata, iuser)
 	  	i += 1
 	  }
-	  val v = mupdate(data, modelmat, user, updatemat)
-	  v
+	  (iuser, user0) match {
+	  case (guser:GMat, fuser0:FMat) => {
+      fuser0 <-- guser
+    }
+	  case _ => {}
+	  }
+	  mupdate(idata, iuser)
   }
-
 }
 
 object NMFmodel  {
@@ -143,5 +212,7 @@ object FactorModel {
     var uiter = 10
     var weps = 1e-10f
     var uprior = 0.01f
+    var mprior = 1e-4f
+    var minuser = 1e-8f
   }
 }
