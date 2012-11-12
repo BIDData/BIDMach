@@ -5,23 +5,38 @@ import BIDMat.SciFunctions._
 
 abstract class Regularizer(val model:Model, opts:Regularizer.Options = new Regularizer.Options) { 
   val options = opts
-  def compute(step:Int)
-  val modelmat = model.modelmat
-  val updatemat = model.updatemat
-  var tmp0 = modelmat.zeros(size(modelmat,1), size(modelmat,2))
-  var tmp1 = modelmat.zeros(size(modelmat,1), size(modelmat,2))
+  var modelmat:Mat = null
+  var updatemat:Mat = null
+  var tmp0:Mat = null
+  var tmp1:Mat = null 
+  
+  def compute(step:Float)
+  
+  def initregularizer = {
+    modelmat = model.modelmat
+    updatemat = model.updatemat
+    tmp0 = modelmat.zeros(size(modelmat,1), size(modelmat,2))
+    tmp1 = modelmat.zeros(size(modelmat,1), size(modelmat,2))
+  }
 }
 
 class L1Regularizer(model:Model, opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(model, opts) { 
-   def compute(step:Int) = {
+   def compute(step:Float) = {
      sign(modelmat, tmp0)
      updatemat ~ updatemat + (tmp1 ~  tmp0 * (-step * options.mprior))
    }
 }
 
 class L2Regularizer(model:Model, opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(model, opts) { 
-   def compute(step:Int) = {
+   def compute(step:Float) = {
      updatemat ~ updatemat + (tmp1 ~ modelmat * (-options.mprior * step))
+   }
+}
+
+class L2MultRegularizer(model:Model, opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(model, opts) { 
+   def compute(step:Float) = {
+     val updateDenom = model.asInstanceOf[FactorModel].updateDenom
+     updateDenom ~ updateDenom + (tmp1 ~ updateDenom * (step*options.mprior))
    }
 }
 
