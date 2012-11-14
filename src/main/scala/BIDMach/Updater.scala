@@ -7,19 +7,21 @@ import Learner._
 
 trait Updater {
   def update(step:Int):Unit;
-  def initupdater:Unit;
+  def initupdater(model:Model):Unit;
 }
 
-class MultUpdater(val model:FactorModel, opts:Updater.Options = new Updater.Options) extends Updater {
+class MultUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
   val options = opts  
   var nsteps = 0
   var updatesum:Mat = null
   var updateDenomsum:Mat = null
   var ratio = blank
   var msum = blank
+  var model:FactorModel = null
   
-  def initupdater = {
+  def initupdater(model0:Model) = {
     nsteps = 0 
+    model = model0.asInstanceOf[FactorModel]
     val modelmat = model.modelmat
     updatesum = modelmat.zeros(size(modelmat,1),size(modelmat,2))
     updateDenomsum = modelmat.zeros(size(modelmat,1),size(modelmat,2))
@@ -49,7 +51,7 @@ class MultUpdater(val model:FactorModel, opts:Updater.Options = new Updater.Opti
   }
 }
 
-class ADAMultUpdater(val model:FactorModel, opts:Updater.Options = new Updater.Options) extends Updater {
+class ADAMultUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
 
   var ratio = blank
   var msum = blank
@@ -60,10 +62,12 @@ class ADAMultUpdater(val model:FactorModel, opts:Updater.Options = new Updater.O
   val options = opts  
   var nsteps = options.initnsteps
   var lastdiff:Mat = null
+  var model:FactorModel = null
   
 	def update(step:Int):Unit = update1(step)
 	
-	def initupdater = {
+	def initupdater(model0:Model) = {
+    model = model0.asInstanceOf[FactorModel]
     nsteps = options.initnsteps 
     val modelmat  = model.modelmat
     lastdiff = modelmat.zeros(size(modelmat,1),size(modelmat,2))
@@ -71,7 +75,7 @@ class ADAMultUpdater(val model:FactorModel, opts:Updater.Options = new Updater.O
     if (sumSq.asInstanceOf[AnyRef] == null) {
       sumSq = modelmat.ones(size(modelmat,1), size(modelmat,2)) * options.initsumsq
     } else {
-    	sumSq(?) = options.initsumsq
+    	sumSq.set(options.initsumsq)
     }
   }  
 	
@@ -111,17 +115,19 @@ class ADAMultUpdater(val model:FactorModel, opts:Updater.Options = new Updater.O
 	}
 }
 
-class ADAGradUpdater(val model:Model, opts:Updater.Options = new Updater.Options) extends Updater {
+class ADAGradUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
 
   var tmp0 = blank
   var tmp1 = blank
   
   val options = opts
   var nsteps = 0f
+  var model:FactorModel = null
   
   var sumSq:Mat = null 
 
-  def initupdater = {
+  def initupdater(model0:Model) = {
+    model = model0.asInstanceOf[FactorModel]
 	  val modelmat = model.modelmat
     nsteps = options.initnsteps 
     if (sumSq.asInstanceOf[AnyRef] == null) {
