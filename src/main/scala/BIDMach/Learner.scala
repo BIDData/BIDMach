@@ -27,7 +27,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   	var nsteps:Long = 0
   	val (targetm, targettest) = model.initmodel(datamat0, targetmat0, datatest0, targtest0)
   	targetmat = targetm
-  	updater.initupdater
+  	updater.initupdater(model)
   	if (regularizer != null) regularizer.initregularizer
   	var blocksize = options.blocksize
   	tic
@@ -48,9 +48,9 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			val (tll, tllx) = model.eval(dslice, tslice)
   			targetmat(?, i->iend) = tslice
   			if (regularizer != null) regularizer.compute(1.0f*(iend-i)/n)
-  			val v1 = model.eval(dslice, tslice) 			
+//  			val v1 = model.eval(dslice, tslice) 			
   			updater.update(iend-i)
-  			val v2 = model.eval(dslice, tslice)
+//  			val v2 = model.eval(dslice, tslice)
 //  			println("delta = %f, %f, %f, nw=%f" format (tll, v1._1, v2._1, nw))
 
   			llest = (1/(nw+1))*(tll + nw*llest)
@@ -61,6 +61,103 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   				done = true
   			}
   			if (toc >= tsecs || done || (i >= n)) {
+  			  val tmp = model.asInstanceOf[FactorModel].options.uiter
+  			  model.asInstanceOf[FactorModel].options.uiter = 20
+  			  val (llx, llxa) = model.eval(datatest0, targettest)
+  			  model.asInstanceOf[FactorModel].options.uiter = tmp
+  				println("pass=%d, n=%dk t=%3.1f secs, ll=%5.4f, llx=%5.4f(u%5.4f)" format (ipass, nsteps/1000, toc, llest, llx, llxa))
+//  				println("normu=%f, normm=%f, block=%d" format (norm(targetmat), norm(model.modelmat), blocksize))
+  				tscores = tscores :+ -llest
+  				tscorex = tscorex :+ -llx
+  				tsteps = tsteps :+ nsteps.asInstanceOf[Double]
+  			  tsecs += options.secprint
+  			}
+  		}
+  	}
+  }
+  
+   def runpar() = {
+
+  	val numthreads = options.numGPUthreads
+  	var ipass = 0
+  	var llest = 0.0
+  	var llder = 0.0
+  	var llold = 0.0
+  	var tsecs:Double = options.secprint
+  	var nsteps:Long = 0
+  	val curdevice = 0
+  	device(0)
+  	val (targetm, targettest) = model.initmodel(datamat0, targetmat0, datatest0, targtest0) 
+  	targetmat = targetm
+  	updater.initupdater(model)
+  	val models = new Array[FactorModel](numthreads)
+//  	println("got here 1, device=%d" format curdevice)
+  	val nmodel = model.asInstanceOf[FactorModel]
+  	models(0) = nmodel
+  	for (i <- 1 until numthreads) {
+  	  device(i)
+  	  if (curdevice != i) connect(curdevice)
+  	  models(i) = model.make(model.options).asInstanceOf[FactorModel]
+      models(i).initmodel(datamat0, ones(1,1), datatest0, ones(1,1))
+  	}
+//    println("got here 2")
+  	device(curdevice)
+  	updater.initupdater(model)
+  	if (regularizer != null) regularizer.initregularizer
+  	var blocksize = options.blocksize
+  	tic
+  	while (ipass < options.npasses) {
+  		ipass += 1
+  		var ipos = 0
+  		val nw = math.round(options.memwindow/blocksize).asInstanceOf[Double]
+  		val nww = options.convwindow/blocksize
+  		while (ipos < n) {
+//  			println("got here 3")
+  			val ind = math.min(n, ipos+numthreads*blocksize)
+  			nsteps += ind - ipos
+  			val tlls = zeros(numthreads,1)
+  			val tllxs = zeros(numthreads,1)
+  			val done = zeros(numthreads,1) 
+//  			var ithread = 0
+  			for (ithread <- 0 until numthreads) {
+ // 			  scala.actors.Actor.actor {
+  			    device(ithread)
+  			    if (ithread > 0) models(ithread).modelmat <-- model.modelmat
+  			  	val iloc = ipos + ithread*blocksize
+  			  	var iend = math.min(n, iloc+blocksize)
+  			  	if (iloc < iend) {
+  			  		var dslice = datamat0(?, iloc->iend)
+  			  		var tslice = targetmat(?, iloc->iend)
+  			  		models(ithread).gradfun(dslice, tslice)
+  			  		val (tll, tllx) = models(ithread).eval(dslice, tslice)
+  			  		if (tll < -100) {
+  			  			println("iloc=%d, iend=%d, ithread=%d, tll=%f" format (iloc, iend, ithread, tll))
+  			  		}
+  			  		tlls(ithread) = tll
+  			  		tllxs(ithread) = tllx
+  			  		targetmat(?, iloc->iend) = tslice
+  			  		if (regularizer != null) regularizer.compute(1.0f*(iend-iloc)/n)	
+  			  	}
+  			    done(ithread) = 1
+//  			  	println("done %d" format ithread)
+// 			  }
+  			}
+// 			println("got here 5")
+  			while (sum(done).dv < numthreads) {Thread.sleep(10)}
+ 			device(curdevice)
+//  			println("got here 6")
+  			for (ithread <- 0 until numthreads) {
+  				val iloc = ipos + ithread*blocksize
+  				var iend = math.min(n, iloc+blocksize)
+  				if (ithread > 0) {
+  					model.updatemat <-- models(ithread).updatemat
+  					nmodel.updateDenom <-- models(ithread).updateDenom
+  				}
+  				updater.update(iend-iloc)
+  				llest = (1/(nw+1))*(tlls(ithread) + nw*llest)
+  			}
+  			ipos += numthreads*blocksize
+  			if (toc >= tsecs || (ipos >= n)) {
   			  val tmp = model.asInstanceOf[FactorModel].options.uiter
   			  model.asInstanceOf[FactorModel].options.uiter = 20
   			  val (llx, llxa) = model.eval(datatest0, targettest)
@@ -87,6 +184,7 @@ object Learner {
 		var convslope:Double = -1e-6
 		var secprint:Double = 1
 		var eps:Float = 1e-8f
+		var numGPUthreads = 1
   }
   
   def fsqrt(v:Float):Float = math.sqrt(v).asInstanceOf[Float]

@@ -11,6 +11,8 @@ extends RegressionModel(opts) {
   var tmp0 = blank
   var diff = blank
   
+  def make(opts:Model.Options) = new LinearRegModel(opts.asInstanceOf[RegressionModel.Options])
+  
   def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit =  linearMap1(targ, pred, lls, gradw)
 
   def linearMap1(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit= {
@@ -39,6 +41,8 @@ extends RegressionModel(opts) {
 
 class LogisticModel(opts:RegressionModel.Options = new RegressionModel.Options) 
 extends RegressionModel(opts)  {
+  
+	def make(opts:Model.Options) = new LogisticModel(opts.asInstanceOf[RegressionModel.Options])
 
   def regfn(targ:Mat, pred:Mat, lls:Mat, gradw:Mat):Unit = logisticMap1(targ, pred, lls, gradw)
   

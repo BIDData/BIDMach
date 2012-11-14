@@ -7,6 +7,8 @@ import Learner._
 
 
 class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorModel(opts) { 
+  
+  def make(opts:Model.Options) = new NMFmodel(opts.asInstanceOf[NMFmodel.Options])
 
   var modeldata    = blank
   var mm           = blank
@@ -56,23 +58,35 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
     updateDenom     ~ uu * modelmat    
   }
   
-  override def eval(sdata:Mat, user:Mat):(Double, Double) = {
-	  modeldata = modeldata ~ modelmat * sdata
-    uu        = uu        ~ user xT user 
+  override def eval(data0:Mat, user0:Mat):(Double, Double) = {
+    modelmat match {
+	    case m:FMat => {
+	      idata = data0
+	      iuser = user0
+	    }
+	    case m:GMat => {
+	    	idata = GSMat.fromSMat(data0.asInstanceOf[SMat], idata.asInstanceOf[GSMat])
+	    	iuser = GMat.fromFMat(user0.asInstanceOf[FMat], iuser.asInstanceOf[GMat])
+	    }
+	  }
+	  modeldata = modeldata ~ modelmat * idata
+    uu        = uu        ~ iuser xT iuser 
                 uu        ~ uu + mdiag
     mm        = mm        ~ modelmat xT modelmat
 
-    val ll0 = sdata.contents dot sdata.contents
-    val ll1 =               modeldata dot user
+    val ll0 = idata.contents dot idata.contents
+    val ll1 =               modeldata dot iuser
     val ll2 =               uu dot mm
 //    println("ll %f %f %f" format (ll0, ll1, ll2))
-    val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
-    val v2 =               -options.uprior*(user dot user)/sdata.nnz
+    val v1  =              (-ll0 + 2*ll1 - ll2)/idata.nnz
+    val v2 =               -options.uprior*(iuser dot iuser)/idata.nnz
     (v1,v2)
   }
 }
 
 class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends FactorModel(opts) { 
+  
+  def make(opts:Model.Options) = new LDAmodel(opts.asInstanceOf[FactorModel.Options])
 
   var preds = blank
   var prat = blank
@@ -137,7 +151,7 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
 
 abstract class FactorModel(opts:FactorModel.Options) extends Model {
 
-  val options = opts
+  override val options = opts
   var idata = blank
   var iuser = blank
   var usertest = blank

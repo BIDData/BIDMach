@@ -5,7 +5,10 @@ import BIDMat.SciFunctions._
 
 abstract class Model {
   
+  val options:Model.Options
+  
   var modelmat:Mat = null
+  
   var updatemat:Mat = null
   
   def initmodel(data:Mat, target:Mat, datatest:Mat, testtarg:Mat):(Mat, Mat)
@@ -13,6 +16,8 @@ abstract class Model {
   def gradfun(data:Mat, target:Mat):Unit
   
   def eval(data:Mat, target:Mat):(Double, Double)
+  
+  def make(opts:Model.Options):Model
 
 }
 
