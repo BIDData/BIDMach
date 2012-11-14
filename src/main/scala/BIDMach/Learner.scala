@@ -144,18 +144,17 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			}
 // 			println("got here 5")
   			while (sum(done).dv < numthreads) {Thread.sleep(10)}
- 			device(curdevice)
+ 			  device(curdevice)
 //  			println("got here 6")
-  			for (ithread <- 0 until numthreads) {
+ 			  var iend = 0
+  			for (ithread <- 1 until numthreads) {
   				val iloc = ipos + ithread*blocksize
-  				var iend = math.min(n, iloc+blocksize)
-  				if (ithread > 0) {
-  					model.updatemat <-- models(ithread).updatemat
-  					nmodel.updateDenom <-- models(ithread).updateDenom
-  				}
-  				updater.update(iend-iloc)
-  				llest = (1/(nw+1))*(tlls(ithread) + nw*llest)
+  				iend = math.min(n, iloc+blocksize)
+  				model.updatemat ~ model.updatemat + models(ithread).updatemat
+  				nmodel.updateDenom ~ nmodel.updateDenom + models(ithread).updateDenom
   			}
+  			updater.update(iend-ipos)
+  			llest = (1/(nw+1))*(mean(tlls).dv + nw*llest)
   			ipos += numthreads*blocksize
   			if (toc >= tsecs || (ipos >= n)) {
   			  val tmp = model.asInstanceOf[FactorModel].options.uiter
