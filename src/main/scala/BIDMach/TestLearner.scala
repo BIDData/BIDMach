@@ -7,7 +7,7 @@ import Learner._
 
 
 object TestLearner {
-  def runNMFLearner(rt:SMat, rtest:SMat):Learner = {
+  def runNMFLearner(rt:SMat, rtest:SMat, nthreads:Int):Learner = {
     val model = new NMFmodel()
     model.options.dim = 256
     model.options.uiter = 4
@@ -27,7 +27,7 @@ object TestLearner {
   	learner.options.npasses = 4
   	learner.options.secprint = 100
   	learner.options.blocksize = 8000 //size(rt,2)//40000 //
-  	learner.options.numGPUthreads = 4
+  	learner.options.numGPUthreads = nthreads
   	learner.runpar
   	learner
   }
@@ -72,7 +72,7 @@ object TestLearner {
   	learner
   }
   
-  def runtest(ntest:Int, dirname:String):Learner = {
+  def runtest(dirname:String, ntest:Int, nthreads:Int):Learner = {
     tic
   	val revtrain:SMat = load(dirname+"xpart1.mat", "revtrain")
   	val revtest:SMat = load(dirname+"xpart1.mat", "revtest")
@@ -93,7 +93,7 @@ object TestLearner {
   	val learner:Learner = ntest match {
   	  case 1 => runLinLearner(rt, stt, rtest, sttest)
   	  case 2 => runLogLearner(rt, stt, rtest, sttest)
-  	  case 3 => runNMFLearner(rt , rtest)
+  	  case 3 => runNMFLearner(rt , rtest, nthreads)
   	}	
     val (ff, tt) = gflop
     println("Time=%5.3f, gflops=%3.2f" format (tt, ff))
@@ -114,9 +114,11 @@ object TestLearner {
   
   
   def main(args: Array[String]): Unit = {
-    val ntest = args(0).toInt
-    val dirname = args(1)
+    val dirname = args(0)
+    val ntest = args(1).toInt
+    val nthreads = args(2).toInt
+
     Mat.checkCUDA
-    runtest(ntest, dirname)
+    runtest(dirname, ntest, nthreads)
   }
 }
