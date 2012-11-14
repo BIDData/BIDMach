@@ -7,9 +7,9 @@ import Learner._
 
 
 object TestLearner {
-  def runNMFLearner(rt:SMat, rtest:SMat, nthreads:Int):Learner = {
+  def runNMFLearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int):Learner = {
     val model = new NMFmodel()
-    model.options.dim = 256
+    model.options.dim = ndims
     model.options.uiter = 4
     model.options.uprior = 1e1f
     model.options.mprior = 1e2f
@@ -72,7 +72,7 @@ object TestLearner {
   	learner
   }
   
-  def runtest(dirname:String, ntest:Int, nthreads:Int):Learner = {
+  def runtest(dirname:String, ntest:Int, ndims:Int, nthreads:Int):Learner = {
     tic
   	val revtrain:SMat = load(dirname+"xpart1.mat", "revtrain")
   	val revtest:SMat = load(dirname+"xpart1.mat", "revtest")
@@ -85,7 +85,7 @@ object TestLearner {
   	val stest = (FMat(scrtest).t)(?,0->(8000*(size(revtest,2)/8000)))
   	val t2 = toc
   	println("Reading time=%3.2f+%3.2f seconds" format (t1,t2))
-  	val ntargs = 16
+  	val ntargs = ndims
   	val stt = zeros(ntargs, size(st,2))
   	val sttest = zeros(ntargs, size(stest,2))
   	for (i<-0 until size(stt,1)) {stt(i,?) = st; sttest(i,?) = stest}
@@ -93,7 +93,7 @@ object TestLearner {
   	val learner:Learner = ntest match {
   	  case 1 => runLinLearner(rt, stt, rtest, sttest)
   	  case 2 => runLogLearner(rt, stt, rtest, sttest)
-  	  case 3 => runNMFLearner(rt , rtest, nthreads)
+  	  case 3 => runNMFLearner(rt , rtest, ndims, nthreads)
   	}	
     val (ff, tt) = gflop
     println("Time=%5.3f, gflops=%3.2f" format (tt, ff))
@@ -116,9 +116,11 @@ object TestLearner {
   def main(args: Array[String]): Unit = {
     val dirname = args(0)
     val ntest = args(1).toInt
-    val nthreads = args(2).toInt
+    val ndims = args(2).toInt
+    val nthreads = args(3).toInt
+    
 
     Mat.checkCUDA
-    runtest(dirname, ntest, nthreads)
+    runtest(dirname, ntest, ndims, nthreads)
   }
 }
