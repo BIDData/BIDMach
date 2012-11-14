@@ -26,7 +26,7 @@ object TestLearner {
   	val learner = Learner(rt, null, rtest, null, model, null, updater)
   	learner.options.npasses = 4
   	learner.options.secprint = 100
-  	learner.options.blocksize = 8000 //size(rt,2)//40000 //
+  	learner.options.blocksize = 8000/nthreads //size(rt,2)//40000 //
   	learner.options.numGPUthreads = nthreads
   	learner.runpar
   	learner
