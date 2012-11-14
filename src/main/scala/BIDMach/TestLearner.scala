@@ -72,9 +72,8 @@ object TestLearner {
   	learner
   }
   
-  def runtest(ntest:Int):Learner = {
+  def runtest(ntest:Int, dirname:String):Learner = {
     tic
-    val dirname = "d:\\sentiment\\sorted_data\\books\\parts\\"
   	val revtrain:SMat = load(dirname+"xpart1.mat", "revtrain")
   	val revtest:SMat = load(dirname+"xpart1.mat", "revtest")
   	val t1 = toc; tic
@@ -116,7 +115,8 @@ object TestLearner {
   
   def main(args: Array[String]): Unit = {
     val ntest = args(0).toInt
+    val dirname = args(1)
     Mat.checkCUDA
-    runtest(ntest)
+    runtest(ntest, dirname)
   }
 }
