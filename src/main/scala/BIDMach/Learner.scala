@@ -120,7 +120,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			val done = zeros(numthreads,1) 
 //  			var ithread = 0
   			for (ithread <- 0 until numthreads) {
- // 			  scala.actors.Actor.actor {
+  			  scala.actors.Actor.actor {
   			    device(ithread)
   			    if (ithread > 0) models(ithread).modelmat <-- model.modelmat
   			  	val iloc = ipos + ithread*blocksize
@@ -140,7 +140,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			  	}
   			    done(ithread) = 1
 //  			  	println("done %d" format ithread)
-// 			  }
+  			  }
   			}
 // 			println("got here 5")
   			while (sum(done).dv < numthreads) {Thread.sleep(10)}
