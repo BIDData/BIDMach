@@ -7,8 +7,9 @@ import Learner._
 
 
 object TestLearner {
-  def runNMFLearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int):Learner = {
-    val model = new NMFmodel()
+  
+  def runLDALearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int):Learner = {
+    val model = new LDAmodel()
     model.options.dim = ndims
     model.options.uiter = 4
     model.options.uprior = 1e1f
@@ -27,6 +28,31 @@ object TestLearner {
   	learner.options.npasses = 4
   	learner.options.secprint = 100
   	learner.options.blocksize = 8000/nthreads //size(rt,2)//40000 //
+  	learner.options.numGPUthreads = nthreads
+  	learner.run
+  	learner
+  }
+  
+  def runNMFLearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int, useGPU:Boolean):Learner = {
+    val model = new NMFmodel()
+    model.options.dim = ndims
+    model.options.uiter = 4
+    model.options.uprior = 1e1f
+    model.options.mprior = 1e2f
+    model.options.minuser = 1e-8f
+    model.options.nzPerColumn = 400
+    model.options.useGPU = useGPU
+
+    val updater = new ADAMultUpdater
+    updater.options.alpha = 0.1f
+//    val updater = new MultUpdater(model)
+//    updater.options.alpha = 0.1f
+    updater.options.initnsteps = 8000f
+    
+  	val learner = Learner(rt, null, rtest, null, model, null, updater)
+  	learner.options.npasses = 4
+  	learner.options.secprint = 100
+  	learner.options.blocksize = 16000/nthreads //size(rt,2)//40000 //
   	learner.options.numGPUthreads = nthreads
   	learner.runpar
   	learner
@@ -72,7 +98,7 @@ object TestLearner {
   	learner
   }
   
-  def runtest(dirname:String, ntest:Int, ndims:Int, nthreads:Int):Learner = {
+  def runtest(dirname:String, ntest:Int, ndims:Int, nthreads:Int, useGPU:Boolean):Learner = {
     tic
   	val revtrain:SMat = load(dirname+"xpart1.mat", "revtrain")
   	val revtest:SMat = load(dirname+"xpart1.mat", "revtest")
@@ -93,7 +119,8 @@ object TestLearner {
   	val learner:Learner = ntest match {
   	  case 1 => runLinLearner(rt, stt, rtest, sttest)
   	  case 2 => runLogLearner(rt, stt, rtest, sttest)
-  	  case 3 => runNMFLearner(rt , rtest, ndims, nthreads)
+  	  case 3 => runNMFLearner(rt , rtest, ndims, nthreads, useGPU)
+  	  case 4 => runLDALearner(rt , rtest, ndims, nthreads)
   	}	
     val (ff, tt) = gflop
     println("Time=%5.3f, gflops=%3.2f" format (tt, ff))
@@ -111,16 +138,15 @@ object TestLearner {
     learner
   }
  
-  
-  
+ 
   def main(args: Array[String]): Unit = {
     val dirname = args(0)
     val ntest = args(1).toInt
     val ndims = args(2).toInt
     val nthreads = args(3).toInt
+    val useGPU = args(4).toBoolean
     
-
     Mat.checkCUDA
-    runtest(dirname, ntest, ndims, nthreads)
+    runtest(dirname, ntest, ndims, nthreads, useGPU)
   }
 }

@@ -90,6 +90,7 @@ class ADAMultUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 //	  val weight = options.alpha * math.sqrt(math.sqrt(options.initnsteps/nsteps)).asInstanceOf[Float]
 //  	val weight = options.alpha
   	ratio = ratio ~ updatemat /@ updateDenom
+  	max(0.01f, min(100f, ratio, ratio), ratio)
   	diff = ln(ratio, diff)
 //	  diff = diff   ~ updatemat - updateDenom
 /*	         diff   ~ diff *@ modelmat
@@ -101,7 +102,7 @@ class ADAMultUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 //	  if (nsteps > options.waitsteps) {	  	
 //	  	diff ~ diff /@ sqrt(tmp0 ~ sumSq*(options.alpha * nsteps / options.initnsteps), tmp1)
 	  	diff ~ diff *@ weight
-    	max(-1f, min(1f, diff, diff), diff)  	  
+    	max(-1f, min(1f, diff, diff), diff)  
 //    	println("mean diff=%f" format mean(abs(diff.asInstanceOf[FMat])(?)).dv)
   	  ratio = exp(diff, ratio)
       modelmat ~ modelmat *@ ratio
