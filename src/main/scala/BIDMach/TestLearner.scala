@@ -8,7 +8,9 @@ import Learner._
 
 object TestLearner {
   
-  def runLDALearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int):Learner = {
+  def runLDALearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int, useGPU:Boolean):Learner = {
+    
+    Mat.numThreads = 1
     val model = new LDAmodel()
     model.options.dim = ndims
     model.options.uiter = 4
@@ -16,7 +18,7 @@ object TestLearner {
     model.options.mprior = 1e2f
     model.options.minuser = 1e-8f
     model.options.nzPerColumn = 400
-    model.options.useGPU = true
+    model.options.useGPU = useGPU
 
     val updater = new ADAMultUpdater
     updater.options.alpha = 0.1f
@@ -26,7 +28,7 @@ object TestLearner {
     
   	val learner = Learner(rt, null, rtest, null, model, null, updater)
   	learner.options.npasses = 4
-  	learner.options.secprint = 100
+  	learner.options.secprint = 0.1
   	learner.options.blocksize = 8000/nthreads //size(rt,2)//40000 //
   	learner.options.numGPUthreads = nthreads
   	learner.run
@@ -120,7 +122,7 @@ object TestLearner {
   	  case 1 => runLinLearner(rt, stt, rtest, sttest)
   	  case 2 => runLogLearner(rt, stt, rtest, sttest)
   	  case 3 => runNMFLearner(rt , rtest, ndims, nthreads, useGPU)
-  	  case 4 => runLDALearner(rt , rtest, ndims, nthreads)
+  	  case 4 => runLDALearner(rt , rtest, ndims, nthreads, useGPU)
   	}	
     val (ff, tt) = gflop
     println("Time=%5.3f, gflops=%3.2f" format (tt, ff))

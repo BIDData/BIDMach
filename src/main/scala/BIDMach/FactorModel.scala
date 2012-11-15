@@ -103,7 +103,7 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
     (data, modelmat, user) match {
     case (sdata:SMat, fmodel:FMat, fuser:FMat) => {
     	preds = DDS(fmodel, fuser, sdata, preds)
-    	val prat = sdata.ssMatOp(preds.asInstanceOf[SMat], (x:Float, y:Float) => x / math.max(options.weps, y))
+    	val prat = sdata.ssMatOp(preds.asInstanceOf[SMat], (x:Float, y:Float) => x / math.max(options.weps, y), null)
     	val prod = fmodel * prat
     	var i = 0;  while (i < prod.ncols) { 
     		var j = 0;  while (j < prod.nrows) { 
@@ -121,10 +121,14 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
     }
   }
   
-  def uupdate2(data:Mat, user:Mat):Unit = { 
+  def uupdate2(data:Mat, user:Mat):Unit = {
+/*      	println("data=%d,%d,%d, preds=%d,%d prat=%d,%d" format (size(data,1),size(data,2),data.nnz,
+  	    size(preds,1),size(preds,2),
+  	    size(prat,1),size(prat,2)));*/
   	preds = DDS(modelmat, user, data, preds)
   	max(options.weps, preds, preds)
   	prat = prat ~ data /@ preds
+
   	prod = prod ~ modelmat * prat
   	       user ~ prod *@ user
   	       user ~ user + options.uprior
@@ -142,13 +146,16 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
   	updateDenom ~ sum(user,2) * user.ones(1,size(user,2))
   }
   
-  override def eval(data:Mat, user:Mat):(Double, Double) = {  	
+  override def eval(data:Mat, user:Mat):(Double, Double) = {  
+  	preds = DDS(modelmat, user, data, preds)
+  	max(options.weps, preds, preds)
   	val vdat = data.contents
-  	val vpreds = data.contents
-  	max(options.weps, vpreds, vpreds)
-  	ln(vpreds, ll)
+  	val vpreds = preds.contents
+  	ll = ln(vpreds, ll)
   	ll ~ ll *@ vdat
-  	glvdat = gammaln(vdat, glvdat)
+  	ll ~ ll - vpreds
+  	glvdat = glvdat ~ vdat + 1f
+  	glvdat = gammaln(glvdat, glvdat)
   	ll ~ ll - glvdat
   	(mean(ll).dv,0)
   }
