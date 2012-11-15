@@ -16,12 +16,15 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
   var mmodeltuser  = blank
   var udiag        = blank
   var mdiag        = blank
+  var smdiag       = blank
   var quot         = blank
   var uu           = blank
   var diff         = blank
+  var nusers = 0
   
   override  def initmodel(data0:Mat, user0:Mat, datatest0:Mat, usertest0:Mat):(Mat, Mat) = {
   	val v = super.initmodel(data0, user0, datatest0, usertest0)
+  	nusers = size(data0, 2)
   	udiag = mkdiag(options.uprior*ones(options.dim,1)):FMat
   	mdiag = mkdiag(options.mprior*ones(options.dim,1)):FMat
     if (options.useGPU) {
@@ -54,7 +57,8 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
     val d = options.dim
     updatemat       ~ user xT sdata
     uu =     uu     ~ user xT user
-    uu              ~ uu + mdiag
+    smdiag = smdiag ~ mdiag * (1.0f*size(user,2)/nusers)
+    uu              ~ uu + smdiag
     updateDenom     ~ uu * modelmat    
   }
   
@@ -71,10 +75,11 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
 	  }
 	  modeldata = modeldata ~ modelmat * idata
     uu        = uu        ~ iuser xT iuser 
-                uu        ~ uu + mdiag
+    smdiag    = smdiag    ~ mdiag * (1.0f*size(iuser,2)/nusers)
+                uu        ~ uu + smdiag
     mm        = mm        ~ modelmat xT modelmat
 
-    val ll0 = idata.contents dot idata.contents
+    val ll0 =               idata.contents dot idata.contents
     val ll1 =               modeldata dot iuser
     val ll2 =               uu dot mm
 //    println("ll %f %f %f" format (ll0, ll1, ll2))
@@ -92,7 +97,7 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
   var prat = blank
   var prod = blank
   
-  override def uupdate(data:Mat, user:Mat):Unit = uupdate1(data, user)
+  override def uupdate(data:Mat, user:Mat):Unit = uupdate2(data, user)
   
   def uupdate1(data:Mat, user:Mat):Unit = { 
     (data, modelmat, user) match {

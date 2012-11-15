@@ -42,16 +42,16 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			nsteps += iend - i
   			var dslice = datamat0(?, i->iend)
   			var tslice = targetmat(?, i->iend)
-  			val nmodel = model.asInstanceOf[NMFmodel]
-//  	    val v0 = nmodel.eval(dslice, model.modelmat, tslice)
+  			val nmodel = model.asInstanceOf[FactorModel]
+ // 	    val (v0,x0) = model.eval(dslice, tslice)
   			model.gradfun(dslice, tslice)
   			val (tll, tllx) = model.eval(dslice, tslice)
   			targetmat(?, i->iend) = tslice
   			if (regularizer != null) regularizer.compute(1.0f*(iend-i)/n)
-//  			val v1 = model.eval(dslice, tslice) 			
+//  			val (v1,x1) = model.eval(dslice, tslice) 			
   			updater.update(iend-i)
-//  			val v2 = model.eval(dslice, tslice)
-//  			println("delta = %f, %f, %f, nw=%f" format (tll, v1._1, v2._1, nw))
+//  			val (v2,x2) = model.eval(dslice, tslice)
+//  			println("i=%d, delta = %f, %f, %f, %f" format (i, tll, v0, v1, v2))
 
   			llest = (1/(nw+1))*(tll + nw*llest)
   			llder = (1/(nww+1))*(tll-llold + nww*llder)
@@ -122,7 +122,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			for (ithread <- 0 until numthreads) {
   			  scala.actors.Actor.actor {
   			    device(ithread)
-  			    if (ithread > 0) models(ithread).modelmat <-- model.modelmat
+  			    if (ithread == curdevice) models(ithread).modelmat <-- model.modelmat
   			  	val iloc = ipos + ithread*blocksize
   			  	var iend = math.min(n, iloc+blocksize)
   			  	if (iloc < iend) {
@@ -130,9 +130,6 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			  		var tslice = targetmat(?, iloc->iend)
   			  		models(ithread).gradfun(dslice, tslice)
   			  		val (tll, tllx) = models(ithread).eval(dslice, tslice)
-  			  		if (tll < -100) {
-  			  			println("iloc=%d, iend=%d, ithread=%d, tll=%f" format (iloc, iend, ithread, tll))
-  			  		}
   			  		tlls(ithread) = tll
   			  		tllxs(ithread) = tllx
   			  		targetmat(?, iloc->iend) = tslice
@@ -146,13 +143,11 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			while (sum(done).dv < numthreads) {Thread.sleep(10)}
  			  device(curdevice)
 //  			println("got here 6")
- 			  var iend = 0
   			for (ithread <- 1 until numthreads) {
-  				val iloc = ipos + ithread*blocksize
-  				iend = math.min(n, iloc+blocksize)
   				model.updatemat ~ model.updatemat + models(ithread).updatemat
   				nmodel.updateDenom ~ nmodel.updateDenom + models(ithread).updateDenom
   			}
+ 			  val iend = math.min(n, ipos+4*blocksize)
   			updater.update(iend-ipos)
   			llest = (1/(nw+1))*(mean(tlls).dv + nw*llest)
   			ipos += numthreads*blocksize
