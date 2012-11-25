@@ -12,15 +12,17 @@ trait Updater {
 
 class MultUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
   val options = opts  
-  var nsteps = 0
-  var updatesum:Mat = null
-  var updateDenomsum:Mat = null
+  var nsteps = 0L
+  var updatesum = blank
+  var updateDenomsum = blank
   var ratio = blank
   var msum = blank
+  var tmp0 = blank
+  var tmp1 = blank
   var model:FactorModel = null
   
   def initupdater(model0:Model) = {
-    nsteps = 0 
+    nsteps = 0
     model = model0.asInstanceOf[FactorModel]
     val modelmat = model.modelmat
     updatesum = modelmat.zeros(size(modelmat,1),size(modelmat,2))
@@ -33,21 +35,30 @@ class MultUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
 	  val updatemat = model.updatemat
 	  val updateDenom = model.updateDenom
 	  val sdim = 1f/math.sqrt(size(modelmat,2)).asInstanceOf[Float]
-//	  updatesum ~ updatesum + updatemat
-//	  updateDenomsum ~ updateDenomsum + updateDenom
-//	  if (math.sqrt(nsteps) % 1 < 1e-9) {
-	  
-	  	ratio = ratio ~ updatemat /@ updateDenom
-	  	max(0.2f, ratio, ratio)
-	  	min(5f, ratio, ratio)
-	  	modelmat ~ modelmat *@ ratio
-//	  	updatesum.clear
-//	  	updateDenomsum.clear
-//	  } 
-	  	msum = sum(modelmat, 2, msum)
-  	  msum ~ msum *@ sdim
-	  modelmat ~ modelmat /@ msum
-	  nsteps += 1
+
+    updatesum           ~ updatesum + updatemat
+    updateDenomsum      ~ updateDenomsum + updateDenom
+//    println("updatesum\n"+updatesum.asInstanceOf[FMat](0->4,0->8).toString)
+//    println("updateDenomsum\n"+updateDenomsum.asInstanceOf[FMat](0->4,0).toString)
+    
+    if (nsteps >= model.nusers) {
+    	ratio = ratio ~ updatesum /@ updateDenomsum
+//    	println(ratio.asInstanceOf[FMat](0->4,0->8).toString)
+    	max(0.001f, min(1000f, ratio, ratio), ratio)
+    	println("updating ratio norm %f" format norm(ln(ratio.asInstanceOf[FMat](?))))
+    	val fmodelmat = modelmat.asInstanceOf[FMat]
+//    	println("modelmat = " + fmodelmat(0,0))
+//    	println("norm modelmat %f" format norm(modelmat))
+    	modelmat ~ modelmat *@ ratio
+//    	println("norm modelmat %f" format norm(modelmat))
+    	updatesum.clear
+    	updateDenomsum.clear
+    	nsteps = 0    	
+    	msum = sum(modelmat, 2, msum)
+    	modelmat ~ modelmat /@ msum
+    	println("norm modelmat %f" format norm(modelmat))
+    }
+	  nsteps += step
   }
 }
 
@@ -84,14 +95,22 @@ class ADAMultUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 	  val modelmat = model.modelmat
 	  val updatemat = model.updatemat
 	  val updateDenom = model.updateDenom
+//	  	  println("updater norm modelmat=%f, updatemat=%f, updatedenom=%f" format (norm(modelmat),norm(updatemat),norm(updateDenom)))
 	  val sdim = 1f/math.sqrt(size(modelmat,2)).asInstanceOf[Float]
 	  
 	  val weight = options.alpha * math.sqrt(options.initnsteps/nsteps).asInstanceOf[Float]
 //	  val weight = options.alpha * math.sqrt(math.sqrt(options.initnsteps/nsteps)).asInstanceOf[Float]
 //  	val weight = options.alpha
+//	  println("updater min updatedenom=%f" format mini(updateDenom(?,10), 1).dv)
+//	  println("sizes %d,%d  %d,%d" format (size(updatemat,1),size(updatemat,2),size(updateDenom,1),size(updateDenom,2)))
   	ratio = ratio ~ updatemat /@ updateDenom
+  	ratio = ratio ~ ratio /@ modelmat
+//  	ratio = updatemat.asInstanceOf[FMat] /@ updateDenom.asInstanceOf[FMat]
+//  	  	println("updater norm ratio=%f" format norm(ratio))
+//  	println("minmax %f,%f" format (maxi(maxi(updatemat,1),2).dv , mini(mini(updateDenom,1),2).dv))
   	max(0.01f, min(100f, ratio, ratio), ratio)
   	diff = ln(ratio, diff)
+
 //	  diff = diff   ~ updatemat - updateDenom
 /*	         diff   ~ diff *@ modelmat
 	  tmp0 = tmp0   ~ diff *@ diff
@@ -110,7 +129,7 @@ class ADAMultUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 //	  }
 
   	msum = sum(modelmat, 2, msum)
-  	msum ~ msum *@ sdim
+// 	msum ~ msum *@ sdim
 	  modelmat ~ modelmat /@ msum
 	  nsteps += step
 	}

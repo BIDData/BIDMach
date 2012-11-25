@@ -7,9 +7,9 @@ abstract class Model {
   
   val options:Model.Options
   
-  var modelmat:Mat = null
+  var modelmat = blank
   
-  var updatemat:Mat = null
+  var updatemat = blank
   
   def initmodel(data:Mat, target:Mat, datatest:Mat, testtarg:Mat):(Mat, Mat)
   
@@ -18,6 +18,8 @@ abstract class Model {
   def eval(data:Mat, target:Mat):(Double, Double)
   
   def make(opts:Model.Options):Model
+  
+  var nusers = 0
 
 }
 
