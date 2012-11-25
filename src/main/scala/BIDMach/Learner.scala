@@ -62,7 +62,8 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			}
   			if (toc >= tsecs || done || (i >= n)) {
   			  val tmp = model.asInstanceOf[FactorModel].options.uiter
-  			  model.asInstanceOf[FactorModel].options.uiter = 20
+  			  model.asInstanceOf[FactorModel].options.uiter = 10
+  			  model.gradfun(datatest0, targettest)
   			  val (llx, llxa) = model.eval(datatest0, targettest)
   			  model.asInstanceOf[FactorModel].options.uiter = tmp
   				println("pass=%d, n=%dk t=%3.1f secs, ll=%5.4f, llx=%5.4f(u%5.4f)" format (ipass, nsteps/1000, toc, llest, llx, llxa))

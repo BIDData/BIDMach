@@ -10,26 +10,26 @@ object TestLearner {
   
   def runLDALearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int, useGPU:Boolean):Learner = {
     
-    Mat.numThreads = 1
+//    Mat.numThreads = 1
     val model = new LDAmodel()
     model.options.dim = ndims
     model.options.uiter = 4
-    model.options.uprior = 1e1f
-    model.options.mprior = 1e2f
-    model.options.minuser = 1e-8f
+    model.options.uprior = 1e-1f
+    model.options.mprior = 1e0f
+    model.options.minuser = 1e-7f
     model.options.nzPerColumn = 400
     model.options.useGPU = useGPU
 
-    val updater = new ADAMultUpdater
-    updater.options.alpha = 0.1f
+    val updater = new MultUpdater
+    updater.options.alpha = 0.3f
 //    val updater = new MultUpdater(model)
 //    updater.options.alpha = 0.1f
     updater.options.initnsteps = 8000f
     
   	val learner = Learner(rt, null, rtest, null, model, null, updater)
-  	learner.options.npasses = 4
-  	learner.options.secprint = 0.1
-  	learner.options.blocksize = 8000/nthreads //size(rt,2)//40000 //
+  	learner.options.npasses = 20
+  	learner.options.secprint = 100
+  	learner.options.blocksize = 8000 //size(rt,2)
   	learner.options.numGPUthreads = nthreads
   	learner.run
   	learner
@@ -39,24 +39,24 @@ object TestLearner {
     val model = new NMFmodel()
     model.options.dim = ndims
     model.options.uiter = 4
-    model.options.uprior = 1e1f
+    model.options.uprior = 1e-4f
     model.options.mprior = 1e2f
     model.options.minuser = 1e-8f
     model.options.nzPerColumn = 400
     model.options.useGPU = useGPU
 
-    val updater = new ADAMultUpdater
+    val updater = new MultUpdater
     updater.options.alpha = 0.1f
 //    val updater = new MultUpdater(model)
 //    updater.options.alpha = 0.1f
     updater.options.initnsteps = 8000f
     
   	val learner = Learner(rt, null, rtest, null, model, null, updater)
-  	learner.options.npasses = 4
+  	learner.options.npasses = 10
   	learner.options.secprint = 100
   	learner.options.blocksize = 16000/nthreads //size(rt,2)//40000 //
   	learner.options.numGPUthreads = nthreads
-  	learner.runpar
+  	learner.run
   	learner
   }
   
@@ -105,8 +105,8 @@ object TestLearner {
   	val revtrain:SMat = load(dirname+"xpart1.mat", "revtrain")
   	val revtest:SMat = load(dirname+"xpart1.mat", "revtest")
   	val t1 = toc; tic
-  	val rt = revtrain(0->40000,0->(8000*(size(revtrain,2)/8000)))
-  	val rtest = revtest(0->40000,0->(8000*(size(revtest,2)/8000)))
+  	val rt = revtrain(0->4000,0->(8000*(size(revtrain,2)/8000)))
+  	val rtest = revtest(0->4000,0->(8000*(size(revtest,2)/8000)))
   	val scrtrain:IMat = load(dirname+"xpart1.mat", "scrtrain")
   	val scrtest:IMat = load(dirname+"xpart1.mat", "scrtest")
   	val st = FMat(scrtrain).t

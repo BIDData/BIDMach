@@ -20,11 +20,9 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
   var quot         = blank
   var uu           = blank
   var diff         = blank
-  var nusers = 0
   
   override  def initmodel(data0:Mat, user0:Mat, datatest0:Mat, usertest0:Mat):(Mat, Mat) = {
   	val v = super.initmodel(data0, user0, datatest0, usertest0)
-  	nusers = size(data0, 2)
   	udiag = mkdiag(options.uprior*ones(options.dim,1)):FMat
   	mdiag = mkdiag(options.mprior*ones(options.dim,1)):FMat
     if (options.useGPU) {
@@ -46,20 +44,21 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
    
   override def uupdate(sdata:Mat, user:Mat):Unit = { 
     mmodeltuser = mmodeltuser  ~ mm * user
-    quot        = quot         ~ modeldata /@ mmodeltuser
-    quot        =                max(0.3f, quot, quot)
-    quot        =                min(3.0f, quot, quot)
+    quot        = quot         ~ modeldata /@ mmodeltuser                
+    quot        =                min(10.0f, max(0.1f, quot, quot), quot)
 	  user                       ~ user *@ quot
+//	  println("norm user %f" format norm(user))
                                  max(options.minuser, user, user)
   }
    
   override def mupdate(sdata:Mat, user:Mat):Unit = {
     val d = options.dim
-    updatemat       ~ user xT sdata
+    updatemat = updatemat ~ user xT sdata
+//    updatemat       ~ updatemat *@ modelmat
     uu =     uu     ~ user xT user
     smdiag = smdiag ~ mdiag * (1.0f*size(user,2)/nusers)
     uu              ~ uu + smdiag
-    updateDenom     ~ uu * modelmat    
+    updateDenom = updateDenom ~ uu * modelmat    
   }
   
   override def eval(data0:Mat, user0:Mat):(Double, Double) = {
@@ -96,6 +95,15 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
   var preds = blank
   var prat = blank
   var prod = blank
+  var mones = blank
+  var sdat = blank
+  
+  
+  override  def initmodel(data0:Mat, user0:Mat, datatest0:Mat, usertest0:Mat):(Mat, Mat) = {
+  	val v = super.initmodel(data0, user0, datatest0, usertest0)
+  	mones = ones(1, size(modelmat,2))
+  	v
+  }
   
   override def uupdate(data:Mat, user:Mat):Unit = uupdate2(data, user)
   
@@ -122,9 +130,7 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
   }
   
   def uupdate2(data:Mat, user:Mat):Unit = {
-/*      	println("data=%d,%d,%d, preds=%d,%d prat=%d,%d" format (size(data,1),size(data,2),data.nnz,
-  	    size(preds,1),size(preds,2),
-  	    size(prat,1),size(prat,2)));*/
+//  	println("norm model=%f, user=%f" format (norm(modelmat),norm(user)))
   	preds = DDS(modelmat, user, data, preds)
   	max(options.weps, preds, preds)
   	prat = prat ~ data /@ preds
@@ -132,32 +138,33 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
   	prod = prod ~ modelmat * prat
   	       user ~ prod *@ user
   	       user ~ user + options.uprior
-  	exppsi(user, user)
+  	       exppsi(user, user)
   }
   
   var ll = blank
   var glvdat = blank
+  var su1 = blank
+  var su2 = blank
   
   override def mupdate(data:Mat, user:Mat):Unit = { 
   	preds = DDS(modelmat, user, data, preds)
   	max(options.weps, preds, preds)
-  	prat = prat ~ data /@ preds
-  	updatemat ~ user xT prat;
-  	updateDenom ~ sum(user,2) * user.ones(1,size(user,2))
+  	prat      = prat        ~ data /@ preds
+  	updatemat = updatemat   ~ user xT prat;
+  	su2       =               sum(user,2,su2)
+  	updateDenom =             su2
   }
   
   override def eval(data:Mat, user:Mat):(Double, Double) = {  
   	preds = DDS(modelmat, user, data, preds)
   	max(options.weps, preds, preds)
-  	val vdat = data.contents
-  	val vpreds = preds.contents
-  	ll = ln(vpreds, ll)
-  	ll ~ ll *@ vdat
-  	ll ~ ll - vpreds
-  	glvdat = glvdat ~ vdat + 1f
-  	glvdat = gammaln(glvdat, glvdat)
-  	ll ~ ll - glvdat
-  	(mean(ll).dv,0)
+  	ll = ln(preds.contents, ll)
+  	sdat = sum(data,1,sdat)
+  	su1 = sum(user,1,su1)
+  	su1 = ln(su1, su1)
+//  	val nvv = sum(sdat,2).dv
+//  	println("vals %f, %f, %f, %f, %f" format (nvv, sum(data.contents,1).dv, sum(ll,1).dv/nvv, (ll dot data.contents)/nvv,(sdat dot su1)/nvv))
+  	(((ll dot data.contents) - (sdat dot su1))/sum(sdat,2).dv,0)
   }
 }
 
@@ -168,28 +175,33 @@ abstract class FactorModel(opts:FactorModel.Options) extends Model {
   var iuser = blank
   var usertest = blank
   var updateDenom = blank
+  var msum = blank
   
   override def initmodel(data0:Mat, user0:Mat, datatest0:Mat, usertest0:Mat):(Mat, Mat) = {
     val m = size(data0, 1)
-    val n =  size(data0, 2)
+    nusers = size(data0, 2)
     val nt = size(datatest0, 2)
     val d = options.dim
-    modelmat = 0.1f*rand(d,m)  
+    val sdat = (sum(data0,2).t + 1.0f).asInstanceOf[FMat]
+    val sp = sdat /@ sum(sdat)
+    println("initial perplexity=%f" format (sp dot ln(sp)) )
+    modelmat = rand(d,m)  
+    modelmat ~ modelmat *@ sdat
+    msum = sum(modelmat, 2, msum)
+    modelmat ~ modelmat /@ msum
     val target = if (user0.asInstanceOf[AnyRef] == null) {
-      0.1f*rand(d,n)
+      rand(d,nusers)
     } else{
       user0
     }
     val testtarg = if (usertest0.asInstanceOf[AnyRef] == null) {
-      0.1f*rand(d,nt)
+      rand(d,nt)
     } else{
       usertest0
     }
     if (options.useGPU) {
       modelmat = GMat(modelmat.asInstanceOf[FMat])
     }
-    updatemat = modelmat.zeros(d, m)
-    updateDenom = modelmat.zeros(d, m)
     (target, testtarg)
   } 
   
