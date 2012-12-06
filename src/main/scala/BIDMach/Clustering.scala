@@ -23,7 +23,7 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
   }
   
   def dists(a:FMat):FMat = {
-    val dd = if (Mat.hasCUDA > 0) a xG a.t else a xT a;
+    val dd = if (Mat.hasCUDA > 0) a xTG a else a xT a;
     val d1 = getdiag(dd)
     dd ~ dd * 2.0f
     dd ~ d1 - dd
@@ -121,13 +121,25 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
 	  deltas
   }
   
+  def sortgen(dd:FMat):(FMat,IMat) = {
+    if (Mat.hasCUDA == 0) {
+      sort2(dd,1)
+    } else {
+      val smat = dd.copy
+      val imat = icol(0->nsamps)*iones(1,nsamps)
+      GMat.GPUsort(smat, imat)
+      (smat, imat)
+    }
+  }
+  
   def run = {
+    println("PAM clustering %d points with %d features into %d centers" format (nsamps, nfeats, ncenters))
     flip
     val dd = dists(a)
     val ft1 = gflop
     println("Distances in %f seconds, %f gflops" format (ft1._2,ft1._1))
     flip
-    val (ds, iss) = sort2(dd,1)                                        // Sort the distances
+    val (ds, iss) = sortgen(dd)                                        // Sort the distances
     Mat.nflops += math.round(math.log(size(ds,1))/math.log(2.0))*size(ds,1)*size(ds,2)
     val ft2 = gflop
     println("Sort in %f seconds, %f gcomps" format (ft2._2,ft2._1))
@@ -193,7 +205,7 @@ object PAMmodel {
   class Options { 
     var ncenters = 1000
     var maxpasses = 10
-    var ntrys = 3
+    var ntrys = 1
     var verb = false
   }
   
