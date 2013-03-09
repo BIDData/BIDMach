@@ -122,8 +122,7 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
   }
   
   def sortgen(dd:FMat):(FMat,IMat) = {
-    if (Mat.hasCUDA == 0) {  // until GPUsort fixed
-//    if (true) {
+    if (Mat.hasCUDA <= 0) {  // until GPUsort fixed
       sort2(dd,1)
     } else {
       val smat = dd.copy
