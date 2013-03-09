@@ -209,11 +209,7 @@ object PAMmodel {
     var verb = false
   }
   
-  def main(args:Array[String]) = {
-//    Mat.checkCUDA
-    val nfeats = args(0).toInt
-    val nsamps = args(1).toInt
-    val ncenters = args(2).toInt
+  def runit(nfeats:Int, nsamps:Int, ncenters:Int) = {
     println("Generating dataset")
     val c = rand(ncenters, nfeats)
     val a = rand(nsamps, nfeats)*0.3f
@@ -222,5 +218,13 @@ object PAMmodel {
     cc.options.ncenters = ncenters
     cc.init(a)
     cc.run
+  }
+  
+  def main(args:Array[String]) = {
+    Mat.checkCUDA
+    val nfeats= args(0).toInt
+    val nsamps = args(1).toInt
+    val ncenters = args(2).toInt
+    runit(nfeats, nsamps, ncenters)
   }
 }
