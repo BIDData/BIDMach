@@ -109,7 +109,7 @@ extends RegressionModel(opts)  {
     exp(tmp1, epred)
     log1p(epred, tmp0)
     lls ~ row(-1) * tmp0
-    gradw ~ -1 * (tmp0 ~ tfact *@ (tmp1 ~ epred /@ (tmp0 ~ 1 + epred)))
+    gradw ~ -1 * (tmp0 ~ tfact *@ (tmp1 ~ epred / (tmp0 ~ 1 + epred)))
   }
   
   def logisticMap4(targ:FMat, pred:FMat, lls:FMat, gradw:FMat):Unit = {
