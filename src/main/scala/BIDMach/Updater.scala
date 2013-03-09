@@ -42,7 +42,7 @@ class MultUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
 //    println("updateDenomsum\n"+updateDenomsum.asInstanceOf[FMat](0->4,0).toString)
     
     if (nsteps >= model.nusers) {
-    	ratio = ratio ~ updatesum /@ updateDenomsum
+    	ratio = ratio ~ updatesum / updateDenomsum
 //    	println(ratio.asInstanceOf[FMat](0->4,0->8).toString)
     	max(0.001f, min(1000f, ratio, ratio), ratio)
     	println("updating ratio norm %f" format norm(ln(ratio.asInstanceOf[FMat](?))))
@@ -55,7 +55,7 @@ class MultUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
     	updateDenomsum.clear
     	nsteps = 0    	
     	msum = sum(modelmat, 2, msum)
-    	modelmat ~ modelmat /@ msum
+    	modelmat ~ modelmat / msum
     	println("norm modelmat %f" format norm(modelmat))
     }
 	  nsteps += step
@@ -103,8 +103,8 @@ class ADAMultUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 //  	val weight = options.alpha
 //	  println("updater min updatedenom=%f" format mini(updateDenom(?,10), 1).dv)
 //	  println("sizes %d,%d  %d,%d" format (size(updatemat,1),size(updatemat,2),size(updateDenom,1),size(updateDenom,2)))
-  	ratio = ratio ~ updatemat /@ updateDenom
-  	ratio = ratio ~ ratio /@ modelmat
+  	ratio = ratio ~ updatemat / updateDenom
+  	ratio = ratio ~ ratio / modelmat
 //  	ratio = updatemat.asInstanceOf[FMat] /@ updateDenom.asInstanceOf[FMat]
 //  	  	println("updater norm ratio=%f" format norm(ratio))
 //  	println("minmax %f,%f" format (maxi(maxi(updatemat,1),2).dv , mini(mini(updateDenom,1),2).dv))
@@ -130,7 +130,7 @@ class ADAMultUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 
   	msum = sum(modelmat, 2, msum)
 // 	msum ~ msum *@ sdim
-	  modelmat ~ modelmat /@ msum
+	  modelmat ~ modelmat / msum
 	  nsteps += step
 	}
 }
@@ -169,7 +169,7 @@ class ADAGradUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 	         sumSq  ~ tmp0 * (1/nw)
 	  if (nsteps > options.waitsteps) {
 	  	sqrt(tmp0 ~ sumSq*nsteps, tmp1)
-	  	modelmat ~ modelmat + (tmp1 ~ (tmp0 ~ updatemat /@ tmp1) * options.alpha)
+	  	modelmat ~ modelmat + (tmp1 ~ (tmp0 ~ updatemat / tmp1) * options.alpha)
 	  }
 	  nsteps += step
 	}

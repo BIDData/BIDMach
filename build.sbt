@@ -5,21 +5,22 @@ version := "0.1.0"
 
 organization := "edu.berkeley.bid"
 
-scalaVersion := "2.9.1"
+scalaVersion := "2.9.2"
 
 resolvers ++= Seq(
-  "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/"
+  "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
+  "Scala Mirror" at "https://oss.sonatype.org/content/repositories/releases/"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
   deps :+ ("org.scala-lang" % "scala-compiler" % sv)
 }
 
-libraryDependencies += "org.scala-lang" % "jline" % "2.9.1"
+libraryDependencies += "org.scala-lang" % "jline" % "2.9.2"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test"
 
-libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.9" % "test"
 
 libraryDependencies += "junit" % "junit" % "4.5" % "test"
 
@@ -33,16 +34,7 @@ initialCommands := scala.io.Source.fromFile("lib/bidmach_init.scala").getLines.m
 
 javaOptions += "-Xmx12g"
 
-seq(ProguardPlugin.proguardSettings :_*)
+//seq(ProguardPlugin.proguardSettings :_*)
 
-proguardOptions ++= Seq (
-  "-keep class scala.** { *; }",
-  "-keep class org.jfree.** { *; }",
-  keepMain("scala.tools.nsc.MainGenericRunner"),
-  keepLimitedSerializability,
-  keepAllScala,
-  "-keep class ch.epfl.** { *; }",
-  "-keep interface scala.ScalaObject"
-)
 
 

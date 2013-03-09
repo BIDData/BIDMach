@@ -122,7 +122,8 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
   }
   
   def sortgen(dd:FMat):(FMat,IMat) = {
-    if (Mat.hasCUDA == 0) {
+    if (Mat.hasCUDA == 0) {  // until GPUsort fixed
+//    if (true) {
       sort2(dd,1)
     } else {
       val smat = dd.copy
@@ -210,13 +211,14 @@ object PAMmodel {
   }
   
   def main(args:Array[String]) = {
-    Mat.checkCUDA
+//    Mat.checkCUDA
     val nfeats = args(0).toInt
     val nsamps = args(1).toInt
     val ncenters = args(2).toInt
+    println("Generating dataset")
     val c = rand(ncenters, nfeats)
     val a = rand(nsamps, nfeats)*0.3f
-    for (i <- 0 until nsamps by ncenters) {val il = math.min(i+ncenters, nsamps); a(i->il,?) += c}
+    for (i <- 0 until nsamps by ncenters) {val il = math.min(i+ncenters, nsamps); a(i->il,?) += c(0->(il-i),?)}
     val cc = new PAMmodel
     cc.options.ncenters = ncenters
     cc.init(a)

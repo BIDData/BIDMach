@@ -44,7 +44,7 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
    
   override def uupdate(sdata:Mat, user:Mat):Unit = { 
     mmodeltuser = mmodeltuser  ~ mm * user
-    quot        = quot         ~ modeldata /@ mmodeltuser                
+    quot        = quot         ~ modeldata / mmodeltuser                
     quot        =                min(10.0f, max(0.1f, quot, quot), quot)
 	  user                       ~ user *@ quot
 //	  println("norm user %f" format norm(user))
@@ -78,12 +78,12 @@ class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorMo
                 uu        ~ uu + smdiag
     mm        = mm        ~ modelmat xT modelmat
 
-    val ll0 =               idata.contents dot idata.contents
-    val ll1 =               modeldata dot iuser
-    val ll2 =               uu dot mm
+    val ll0 =               idata.contents ddot idata.contents
+    val ll1 =               modeldata ddot iuser
+    val ll2 =               uu ddot mm
 //    println("ll %f %f %f" format (ll0, ll1, ll2))
     val v1  =              (-ll0 + 2*ll1 - ll2)/idata.nnz
-    val v2 =               -options.uprior*(iuser dot iuser)/idata.nnz
+    val v2 =               -options.uprior*(iuser ddot iuser)/idata.nnz
     (v1,v2)
   }
 }
@@ -133,7 +133,7 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
 //  	println("norm model=%f, user=%f" format (norm(modelmat),norm(user)))
   	preds = DDS(modelmat, user, data, preds)
   	max(options.weps, preds, preds)
-  	prat = prat ~ data /@ preds
+  	prat = prat ~ data / preds
 
   	prod = prod ~ modelmat * prat
   	       user ~ prod *@ user
@@ -149,7 +149,7 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
   override def mupdate(data:Mat, user:Mat):Unit = { 
   	preds = DDS(modelmat, user, data, preds)
   	max(options.weps, preds, preds)
-  	prat      = prat        ~ data /@ preds
+  	prat      = prat        ~ data / preds
   	updatemat = updatemat   ~ user xT prat;
   	su2       =               sum(user,2,su2)
   	updateDenom =             su2
@@ -164,7 +164,7 @@ class LDAmodel(opts:FactorModel.Options = new FactorModel.Options) extends Facto
   	su1 = ln(su1, su1)
 //  	val nvv = sum(sdat,2).dv
 //  	println("vals %f, %f, %f, %f, %f" format (nvv, sum(data.contents,1).dv, sum(ll,1).dv/nvv, (ll dot data.contents)/nvv,(sdat dot su1)/nvv))
-  	(((ll dot data.contents) - (sdat dot su1))/sum(sdat,2).dv,0)
+  	(((ll ddot data.contents) - (sdat ddot su1))/sum(sdat,2).dv,0)
   }
 }
 
@@ -183,12 +183,12 @@ abstract class FactorModel(opts:FactorModel.Options) extends Model {
     val nt = size(datatest0, 2)
     val d = options.dim
     val sdat = (sum(data0,2).t + 1.0f).asInstanceOf[FMat]
-    val sp = sdat /@ sum(sdat)
+    val sp = sdat / sum(sdat)
     println("initial perplexity=%f" format (sp dot ln(sp)) )
     modelmat = rand(d,m)  
     modelmat ~ modelmat *@ sdat
     msum = sum(modelmat, 2, msum)
-    modelmat ~ modelmat /@ msum
+    modelmat ~ modelmat / msum
     val target = if (user0.asInstanceOf[AnyRef] == null) {
       rand(d,nusers)
     } else{
