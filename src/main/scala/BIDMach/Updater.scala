@@ -3,13 +3,14 @@ package BIDMach
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import Learner._
+
 
 trait Updater {
   def update(step:Int):Unit;
   def initupdater(model:Model):Unit;
 }
 
+/*
 class MultUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
   val options = opts  
   var nsteps = 0L
@@ -212,4 +213,4 @@ object Updater {
     var waitsteps = 200000
     var minmodel = 1e-7f
   }
-}
+}*/

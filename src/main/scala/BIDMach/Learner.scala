@@ -3,9 +3,9 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
-import Learner._
 import scala.collection.immutable.List
 
+/*
 case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat, 
 		model:Model, regularizer:Regularizer, updater:Updater, val opts:Learner.Options = new Learner.Options) {
 
@@ -208,4 +208,4 @@ object Learner {
       i += 1
     }
   }
-}
+}*/

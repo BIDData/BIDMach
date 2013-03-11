@@ -3,9 +3,8 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
-import Learner._
 
-
+/*
 object TestLearner {
   
   def runLDALearner(rt:SMat, rtest:SMat, ndims:Int, nthreads:Int, useGPU:Boolean):Learner = {
@@ -151,4 +150,4 @@ object TestLearner {
     Mat.checkCUDA
     runtest(dirname, ntest, ndims, nthreads, useGPU)
   }
-}
+} */
