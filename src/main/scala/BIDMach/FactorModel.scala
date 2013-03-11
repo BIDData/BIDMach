@@ -3,9 +3,8 @@ package BIDMach
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import Learner._
 
-
+/*
 class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorModel(opts) { 
   
   def make(opts:Model.Options) = new NMFmodel(opts.asInstanceOf[NMFmodel.Options])
@@ -253,4 +252,4 @@ object FactorModel {
     var mprior = 1e-4f
     var minuser = 1e-8f
   }
-}
+} */
