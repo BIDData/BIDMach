@@ -195,8 +195,8 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
     }
     val t3=gflop
     val vdists2 = mini(dd(?,bestc),2)
-    println("Optimum in %f secs, %f gflops, mean dist=%f, verify=%f, maxdepth=%d, nspills=%d" format 
-    		(t3._2, t3._1, bestvd, mean(DMat(vdists2),1).v, maxdepth, nspills))
+    println("Optimum in %f secs, %f gflops, mean dist=%f, verify=%f, maxdepth=%d, nspills=%d\nTotal time %f seconds" format 
+    		(t3._2, t3._1, bestvd, mean(DMat(vdists2),1).v, maxdepth, nspills, t3._2+ft2._2+ft1._2))
   }
   
 }
