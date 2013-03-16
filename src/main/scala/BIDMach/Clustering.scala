@@ -13,6 +13,7 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
   val options = opts
   var maxdepth = 0
   var nspills = 0
+  var bestc:IMat = null
   
   def init(a0:FMat) = {
     a = a0
@@ -143,7 +144,6 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
     Mat.nflops += math.round(math.log(size(ds,1))/math.log(2.0))*size(ds,1)*size(ds,2)
     val ft2 = gflop
     println("Sort in %f seconds, %f gcomps" format (ft2._2,ft2._1))
-    var bestc:IMat = null
     var bestv:DMat = null
     var besti:IMat = null
     var bestvd = Double.MaxValue 
