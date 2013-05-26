@@ -87,7 +87,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   	var tsecs:Double = options.secprint
   	var nsteps:Long = 0
   	val curdevice = 0
-  	device(0)
+  	setGPU(0)
   	val (targetm, targettest) = model.initmodel(datamat0, targetmat0, datatest0, targtest0) 
   	targetmat = targetm
   	updater.initupdater(model)
@@ -96,13 +96,13 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   	val nmodel = model.asInstanceOf[FactorModel]
   	models(0) = nmodel
   	for (i <- 1 until numthreads) {
-  	  device(i)
+  	  setGPU(i)
   	  if (curdevice != i) connect(curdevice)
   	  models(i) = model.make(model.options).asInstanceOf[FactorModel]
       models(i).initmodel(datamat0, ones(1,1), datatest0, ones(1,1))
   	}
 //    println("got here 2")
-  	device(curdevice)
+  	setGPU(curdevice)
   	updater.initupdater(model)
   	if (regularizer != null) regularizer.initregularizer
   	var blocksize = options.blocksize
@@ -122,7 +122,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
 //  			var ithread = 0
   			for (ithread <- 0 until numthreads) {
   			  scala.actors.Actor.actor {
-  			    device(ithread)
+  			    setGPU(ithread)
   			    if (ithread == curdevice) models(ithread).modelmat <-- model.modelmat
   			  	val iloc = ipos + ithread*blocksize
   			  	var iend = math.min(n, iloc+blocksize)
@@ -142,7 +142,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   			}
 // 			println("got here 5")
   			while (sum(done).dv < numthreads) {Thread.sleep(10)}
- 			  device(curdevice)
+ 			  setGPU(curdevice)
 //  			println("got here 6")
   			for (ithread <- 1 until numthreads) {
   				model.updatemat ~ model.updatemat + models(ithread).updatemat
