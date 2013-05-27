@@ -4,30 +4,7 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-class LinearPredictor {
-    
-  def derivfn(targ:Mat, pred:Mat, lls:Mat):Mat =  linearDeriv(targ, pred, lls)
 
-  def linearDeriv(targ:Mat, pred:Mat, lls:Mat):Mat= {
-    val diff = targ - pred  
-    lls  ~ lls - diff ∙∙ diff
-    2 * diff
-  }  
-}
-
-class LogisticPredictor {
-  
-  def derivfn(targ:Mat, pred:Mat, lls:Mat):Mat =  logisticDeriv(targ, pred, lls)
-
-  def logisticDeriv(targ:Mat, pred:Mat, lls:Mat):Mat= {
-    val mpred = max(-40, min(40, pred))
-    val tp = (2 * targ - 1)
-    val ep = exp(tp ∘ mpred)
-    val expp1 = ep + 1
-    lls  ~ lls - sum(1 / expp1, 2)
-    tp ∘ ep / expp1 / expp1
-  }  
-}
 
 abstract class RegressionModel(opts:RegressionModel.Options) 
   extends Model {
@@ -43,15 +20,23 @@ abstract class RegressionModel(opts:RegressionModel.Options)
   
   def derivfn(targ:Mat, pred:Mat, lls:Mat):Mat 
   
-  override def doblock(datamats:Array[Mat], updatemats:Array[Mat]):Unit = {
-    val sdata = datamats(0)
-    val target = datamats(1)
-    val model = modelmats(0)
+  def llfun(targ:Mat, pred:Mat):Mat
+  
+  override def doblock(istart:Int, iend:Int):Unit = {
+    val range = istart -> iend
+    val sdata = datamats(0)(?, range)
+    val target = datamats(1)(?, range)
     val mupdate = updatemats(0)
     
-    val mvals = model * sdata
-    val dd = derivfn(target, mvals, lls)    
+    val dd = derivfn(target, sdata, lls)    
     mupdate ~ mupdate + dd *^ sdata
+  }
+  
+  def evalfun(istart:Int, iend:Int):Mat = {
+    val range = istart -> iend
+    val sdata = datamats(0)(?, range)
+    val target = datamats(1)(?, range)
+    llfun(target, sdata)
   }
  
 }
