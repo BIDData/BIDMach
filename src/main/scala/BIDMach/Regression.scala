@@ -18,25 +18,23 @@ abstract class RegressionModel(opts:RegressionModel.Options)
     lls = if (opts.useGPU) gzeros(opts.nmodels, 1) else zeros(opts.nmodels, 1)
   }
   
-  def derivfn(targ:Mat, pred:Mat, lls:Mat):Mat 
+  def derivfn(sdata:Mat, targ:Mat, lls:Mat):Mat 
   
-  def llfun(targ:Mat, pred:Mat):Mat
+  def llfun(sdata:Mat, targ:Mat):Mat
   
-  override def doblock(istart:Int, iend:Int):Unit = {
-    val range = istart -> iend
-    val sdata = datamats(0)(?, range)
-    val target = datamats(1)(?, range)
+  override def doblock(datamats:Array[Mat]):Unit = {
+    val sdata = datamats(0)
+    val target = datamats(1)
     val mupdate = updatemats(0)
     
-    val dd = derivfn(target, sdata, lls)    
+    val dd = derivfn(sdata, target, lls)    
     mupdate ~ mupdate + dd *^ sdata
   }
   
-  def evalfun(istart:Int, iend:Int):Mat = {
-    val range = istart -> iend
-    val sdata = datamats(0)(?, range)
-    val target = datamats(1)(?, range)
-    llfun(target, sdata)
+  def evalfun(datamats:Array[Mat]):Mat = {
+    val sdata = datamats(0)
+    val target = datamats(1)
+    llfun(sdata, target)
   }
  
 }

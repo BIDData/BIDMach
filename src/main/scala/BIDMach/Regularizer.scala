@@ -30,6 +30,5 @@ class L2Regularizer(opts:Regularizer.Options = new Regularizer.Options) extends 
 
 object Regularizer {
   class Options {
-    var mprior:Float = 1e-7f
-  }
+    var mprior:Float = 1e-7f }
 }
