@@ -11,8 +11,6 @@ abstract class Model {
   
   var updatemats:Array[Mat] = null
   
-  var datamats:Array[Mat] = null
-  
   var regularizer:Regularizer = null
   
   var updater:Updater = null
@@ -21,9 +19,9 @@ abstract class Model {
   
   def initmodel:Unit
   
-  def doblock(istart:Int, iend:Int):Unit
+  def doblock(datamats:Array[Mat]):Unit
   
-  def evalfun(istart:Int, iend:Int):Mat
+  def evalfun(datamats:Array[Mat]):Mat
 
 }
 
