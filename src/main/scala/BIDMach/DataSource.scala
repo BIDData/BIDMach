@@ -151,10 +151,10 @@ object FilesDataSource {
     (yy, mm, dd)
   }
   
-  def sampleFun:(Int)=>String = {
+  def sampleFun(middle:String):(Int)=>String = {
     (n:Int) => {    
     	val (yy, mm, dd) = decodeDate(n)
-    	("/disk%02d/%04d/%02d/%02d/" format (n % 16, yy, mm, dd))
+    	("/disk%02d/" + middle + "%04d/%02d/%02d/" format (n % 16, yy, mm, dd))
     }    
   }
 }
