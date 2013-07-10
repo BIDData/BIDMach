@@ -46,24 +46,24 @@ class MatDataSource(mats:Array[Mat], opts:DataSource.Options = new DataSource.Op
 
 }
 
-class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, ndirs:Int, 
+class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int, 
 		opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
   val sizeMargin = opts.sizeMargin
   val blockSize = opts.blockSize
-  var fileno = 0
+  var fileno = nstart
   var colno = 0
   var omats:Array[Mat] = null
   var matqueue:Array[Array[Mat]] = null
   var ready:IMat = null
   
   def init = {
-    fileno = 0                                                // Number of the current output file
+    fileno = nstart                                           // Number of the current output file
     colno = 0                                                 // Column number in the current output file
     omats = new Array[Mat](fnames.size)
     matqueue = new Array[Array[Mat]](fnames.size)             // Queue of matrices for each output matrix
-    ready = IMat(opts.lookahead, 1)                           // Numbers of files currently loaded in queue
+    ready = -iones(opts.lookahead, 1)                         // Numbers of files currently loaded in queue
     for (i <- 0 until fnames.size) {
-      val mm = HMat.loadMat(dirname(0) + fnames(i))
+      val mm = HMat.loadMat(dirname(nstart) + fnames(i))
       omats(i) = mm match {
       case mm:SMat => SMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
       case mm:SDMat => SDMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
@@ -73,7 +73,7 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, ndirs:Int,
     }
     for (i <- 0 until opts.lookahead) {
       Actor.actor {
-        prefetch(i)
+        prefetch(nstart + i)
       }
     }
   }
@@ -85,30 +85,30 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, ndirs:Int,
     var ccols = 0
     while (ready(filex) < fileno) Thread.`yield`
     for (i <- 0 until fnames.size) {
-      val matq = matqueue(i)(filex)
-      ccols = math.min(colno + blockSize, matq.ncols)
-      omats(i) = matq(?, colno -> ccols)
+    	val matq = matqueue(i)(filex)
+    	ccols = math.min(colno + blockSize, matq.ncols)
+    	omats(i) = matq(?, colno -> ccols)
     }
     if (ccols - colno <= blockSize) {
-      todo = blockSize - ccols + colno
-      colno = todo
-      if (todo > 0) {
-        var done = false
-        while (!done && fileno+1 < ndirs) {
-    	  val filey = (fileno+1) % opts.lookahead
-    	  while (ready(filey) < fileno+1) Thread.`yield`
-    	  if (matqueue(0)(filey) != null) {
-    	    for (i <- 0 until fnames.size) {
-    		  val matq = matqueue(i)(filey)
-    		  omats(i) = omats(i) \ matq(?, 0 -> todo)
-    	    } 
-    	    done = true
-    	  }
-    	  fileno += 1
-        }
-      } 
+    	todo = blockSize - ccols + colno
+    	colno = todo
+    	if (todo > 0) {
+    		var done = false
+    		while (!done && fileno+1 < nend) {
+    			val filey = (fileno+1) % opts.lookahead
+    			while (ready(filey) < fileno+1) Thread.`yield`
+    			if (matqueue(0)(filey) != null) {
+    				for (i <- 0 until fnames.size) {
+    					val matq = matqueue(i)(filey)
+    					omats(i) = omats(i) \ matq(?, 0 -> todo)
+    				} 
+    				done = true
+    			}
+    			fileno += 1
+    		}
+    	} 
     } else {
-      colno += blockSize
+    	colno += blockSize
     }
     omats
   }
@@ -119,28 +119,44 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, ndirs:Int,
   }
   
   def prefetch(ifile:Int) = {
-	ready(ifile) = ifile - opts.lookahead
-	for (inew <- ifile until ndirs by opts.lookahead) {
-	  while (ready(ifile) >= fileno) Thread.`yield`
-	  val fexists = fileExists(dirname(inew) + fnames(0))
-	  for (i <- 0 until fnames.size) {
-	    matqueue(i)(ifile) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
-	  }
-	  ready(ifile) = inew
-	}
+  	ready(ifile) = ifile - opts.lookahead
+  	for (inew <- ifile until nend by opts.lookahead) {
+  		while (ready(ifile) >= fileno) Thread.`yield`
+  		val fexists = fileExists(dirname(inew) + fnames(0)) && (rand(1,1).v < opts.sampleFiles)
+  		for (i <- 0 until fnames.size) {
+  			matqueue(i)(ifile) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
+  		}
+  		ready(ifile) = inew
+  	}
   }
   
   def hasNext:Boolean = {
-    (fileno < ndirs)
+    (fileno < nend)
   }
 }
 
 object FilesDataSource {
   class Options extends DataSource.Options {
   	var lookahead = 8
+  	var sampleFiles = 1.0f
   }
   
-  def dateid(yy:Int, mm:Int, dd:Int) = 372*yy + 31*mm + dd
+  def encodeDate(yy:Int, mm:Int, dd:Int) = 372*yy + 31*mm + dd
+  
+  def decodeDate(n:Int):(Int, Int, Int) = {
+    val yy = (n - 32) / 372
+    val days = n - 32 - 372 * yy
+    val mm = days / 31 + 1
+    val dd = days - 31 * (mm - 1) + 1
+    (yy, mm, dd)
+  }
+  
+  def sampleFun:(Int)=>String = {
+    (n:Int) => {    
+    	val (yy, mm, dd) = decodeDate(n)
+    	("/disk%02d/%04d/%02d/%02d/" format (n % 16, yy, mm, dd))
+    }    
+  }
 }
 
 object DataSource {
