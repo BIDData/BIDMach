@@ -119,14 +119,15 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
   }
   
   def prefetch(ifile:Int) = {
-  	ready(ifile) = ifile - opts.lookahead
+    val ifilex = ifile % opts.lookahead
+  	ready(ifilex) = ifile - opts.lookahead
   	for (inew <- ifile until nend by opts.lookahead) {
-  		while (ready(ifile) >= fileno) Thread.`yield`
+  		while (ready(ifilex) >= fileno) Thread.`yield`
   		val fexists = fileExists(dirname(inew) + fnames(0)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
   			matqueue(i)(ifile) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
   		}
-  		ready(ifile) = inew
+  		ready(ifilex) = inew
   	}
   }
   
