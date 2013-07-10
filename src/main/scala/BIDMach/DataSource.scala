@@ -5,15 +5,12 @@ import BIDMat.SciFunctions._
 import scala.actors._
 import java.io._
 
-abstract class DataSource(opts:DataSource.Options = new DataSource.Options) { 
-  val options = opts
-  
-  def next:Array[Mat]
-  
+abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) {   
+  def next:Array[Mat]  
   def hasNext:Boolean
 }
 
-class MatDataSource(mats:Array[Mat], opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
+class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
   val sizeMargin = opts.sizeMargin
   var here = 0
   val blockSize = opts.blockSize
