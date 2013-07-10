@@ -241,7 +241,7 @@ object NMFmodel  {
   class Options extends FactorModel.Options {
     var NMFeps = 1e-9
   }
-}
+} */
 
 object FactorModel { 
   class Options extends Model.Options { 
@@ -252,4 +252,4 @@ object FactorModel {
     var mprior = 1e-4f
     var minuser = 1e-8f
   }
-} */
+} 
