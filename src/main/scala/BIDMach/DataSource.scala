@@ -46,7 +46,7 @@ class MatDataSource(mats:Array[Mat], opts:DataSource.Options = new DataSource.Op
 
 }
 
-class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int, 
+class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int, transpose:IMat=null,
 		opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
   val sizeMargin = opts.sizeMargin
   val blockSize = opts.blockSize
@@ -63,7 +63,8 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
     matqueue = new Array[Array[Mat]](fnames.size)             // Queue of matrices for each output matrix
     ready = -iones(opts.lookahead, 1)                         // Numbers of files currently loaded in queue
     for (i <- 0 until fnames.size) {
-      val mm = HMat.loadMat(dirname(nstart) + fnames(i))
+      var mm = HMat.loadMat(dirname(nstart) + fnames(i))
+      if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) mm = mm.t
       omats(i) = mm match {
       case mm:SMat => SMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
       case mm:SDMat => SDMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
@@ -126,6 +127,7 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
   		val fexists = fileExists(dirname(inew) + fnames(0)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
   			matqueue(i)(ifilex) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
+  			if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) matqueue(i)(ifilex) = (matqueue(i)(ifilex)).t
   		}
   		ready(ifilex) = inew
   	}
