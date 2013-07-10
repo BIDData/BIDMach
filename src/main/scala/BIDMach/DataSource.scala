@@ -3,6 +3,7 @@ import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDM
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.actors._
+import java.io._
 
 abstract class DataSource(opts:DataSource.Options = new DataSource.Options) { 
   val options = opts
@@ -81,39 +82,49 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, ndirs:Int,
     val filex = fileno % opts.lookahead
     var donextfile = false
     var todo = 0
+    var ccols = 0
     while (ready(filex) < fileno) Thread.`yield`
     for (i <- 0 until fnames.size) {
       val matq = matqueue(i)(filex)
-      val ccols = math.min(colno + blockSize, matq.ncols)
+      ccols = math.min(colno + blockSize, matq.ncols)
       omats(i) = matq(?, colno -> ccols)
-      if (ccols - colno <= blockSize) {
-    	todo = blockSize - ccols + colno
-    	donextfile = true
-    	if (todo > 0) {
-    	  if (fileno+1 < ndirs) {
-    	    val filey = (filex + 1) % opts.lookahead
-    	    while (ready(filey) < fileno+1) Thread.`yield`
-    	    val matq = matqueue(i)(filey)
-    	    omats(i) = omats(i) \ matq(?, 0 -> todo)
-    	  } 
-    	}
-      } 
     }
-    if (donextfile) {
+    if (ccols - colno <= blockSize) {
+      todo = blockSize - ccols + colno
       colno = todo
-      fileno += 1
+      if (todo > 0) {
+        var done = false
+        while (!done && fileno+1 < ndirs) {
+    	  val filey = (fileno+1) % opts.lookahead
+    	  while (ready(filey) < fileno+1) Thread.`yield`
+    	  if (matqueue(0)(filey) != null) {
+    	    for (i <- 0 until fnames.size) {
+    		  val matq = matqueue(i)(filey)
+    		  omats(i) = omats(i) \ matq(?, 0 -> todo)
+    	    } 
+    	    done = true
+    	  }
+    	  fileno += 1
+        }
+      } 
     } else {
       colno += blockSize
     }
     omats
   }
   
+  def fileExists(fname:String) = {
+    val testme = new File(fname)
+    testme.exists
+  }
+  
   def prefetch(ifile:Int) = {
 	ready(ifile) = ifile - opts.lookahead
 	for (inew <- ifile until ndirs by opts.lookahead) {
 	  while (ready(ifile) >= fileno) Thread.`yield`
+	  val fexists = fileExists(dirname(inew) + fnames(0))
 	  for (i <- 0 until fnames.size) {
-	    matqueue(i)(ifile) = HMat.loadMat(dirname(inew) + fnames(i))
+	    matqueue(i)(ifile) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
 	  }
 	  ready(ifile) = inew
 	}
