@@ -45,8 +45,8 @@ class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new 
 
 class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpose:IMat=null,
 		override val opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
-  val sizeMargin = opts.sizeMargin
-  val blockSize = opts.blockSize
+  var sizeMargin = 0f
+  var blockSize = 0 
   var fileno = 0
   var colno = 0
   var omats:Array[Mat] = null
@@ -55,6 +55,8 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
   
   def init = {
     var nstart = nstart0
+    sizeMargin = opts.sizeMargin
+    blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
     fileno = nstart                                           // Number of the current output file
     colno = 0                                                 // Column number in the current output file
