@@ -83,31 +83,28 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
     val filex = fileno % opts.lookahead
     var donextfile = false
     var todo = 0
-    var ccols = 0
     while (ready(filex) < fileno) Thread.`yield`
     for (i <- 0 until fnames.size) {
     	val matq = matqueue(i)(filex)
-    	ccols = math.min(colno + blockSize, matq.ncols)
+    	val ccols = math.min(colno + blockSize, matq.ncols)
     	omats(i) = matq(?, colno -> ccols)
-    }
-    if (ccols - colno <= blockSize) {
     	todo = blockSize - ccols + colno
-    	colno = todo
-    	if (todo > 0) {
-    		var done = false
-    		while (!done && fileno+1 < nend) {
-    			val filey = (fileno+1) % opts.lookahead
-    			while (ready(filey) < fileno+1) Thread.`yield`
-    			if (matqueue(0)(filey) != null) {
-    				for (i <- 0 until fnames.size) {
-    					val matq = matqueue(i)(filey)
-    					omats(i) = omats(i) \ matq(?, 0 -> todo)
-    				} 
-    				done = true
-    			}
-    			fileno += 1
+    }
+    if (todo > 0) {    	
+    	var done = false
+    	while (!done && fileno+1 < nend) {
+    		val filey = (fileno+1) % opts.lookahead
+    		while (ready(filey) < fileno+1) Thread.`yield`
+    		if (matqueue(0)(filey) != null) {
+    			for (i <- 0 until fnames.size) {
+    				val matq = matqueue(i)(filey)
+    				omats(i) = omats(i) \ matq(?, 0 -> todo)
+    			} 
+    			done = true
     		}
-    	} 
+    		fileno += 1
+    	}
+    	colno = todo
     } else {
     	colno += blockSize
     }
@@ -127,7 +124,8 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
   		val fexists = fileExists(dirname(inew) + fnames(0)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
   			matqueue(i)(ifilex) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
-  			if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) matqueue(i)(ifilex) = (matqueue(i)(ifilex)).t
+  			if (matqueue(i)(ifilex).asInstanceOf[AnyRef] != null && transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) matqueue(i)(ifilex) = (matqueue(i)(ifilex)).t
+  			println("%d" format inew)
   		}
   		ready(ifilex) = inew
   	}
