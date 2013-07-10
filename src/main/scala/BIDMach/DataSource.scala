@@ -99,7 +99,7 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
     	while (!done && fileno+1 < nend) {
     		val filey = (fileno+1) % opts.lookahead
     		while (ready(filey) < fileno+1) Thread.`yield`
-    		if (matqueue(0)(filey) != null) {
+    		if (matqueue(0)(filey).asInstanceOf[AnyRef] != null && matqueue(0)(filey).ncols >= todo) {
     			for (i <- 0 until fnames.size) {
     				val matq = matqueue(i)(filey)
     				omats(i) = omats(i) \ matq(?, 0 -> todo)
