@@ -125,7 +125,7 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
   		while (ready(ifilex) >= fileno) Thread.`yield`
   		val fexists = fileExists(dirname(inew) + fnames(0)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
-  			matqueue(i)(ifile) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
+  			matqueue(i)(ifilex) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
   		}
   		ready(ifilex) = inew
   	}
