@@ -128,7 +128,7 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
   			  val tmp = HMat.loadMat(fnames(i)(inew))
   			  if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) tmp.t else tmp
   			} else null  			
-  			println("%d" format inew)
+//  			println("%d" format inew)
   		}
   		ready(ifilex) = inew
   	}
