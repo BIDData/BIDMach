@@ -46,24 +46,26 @@ class MatDataSource(mats:Array[Mat], opts:DataSource.Options = new DataSource.Op
 
 }
 
-class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int, transpose:IMat=null,
+class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpose:IMat=null,
 		opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
   val sizeMargin = opts.sizeMargin
   val blockSize = opts.blockSize
-  var fileno = nstart
+  var fileno = 0
   var colno = 0
   var omats:Array[Mat] = null
   var matqueue:Array[Array[Mat]] = null
   var ready:IMat = null
   
   def init = {
+    var nstart = nstart0
+    while (!fileExists(fnames(0)(nstart))) {nstart += 1}
     fileno = nstart                                           // Number of the current output file
     colno = 0                                                 // Column number in the current output file
     omats = new Array[Mat](fnames.size)
     matqueue = new Array[Array[Mat]](fnames.size)             // Queue of matrices for each output matrix
     ready = -iones(opts.lookahead, 1)                         // Numbers of files currently loaded in queue
     for (i <- 0 until fnames.size) {
-      var mm = HMat.loadMat(dirname(nstart) + fnames(i))
+      var mm = HMat.loadMat(fnames(i)(nstart))
       if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) mm = mm.t
       omats(i) = mm match {
       case mm:SMat => SMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
@@ -123,10 +125,12 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
   	ready(ifilex) = ifile - opts.lookahead
   	for (inew <- ifile until nend by opts.lookahead) {
   		while (ready(ifilex) >= fileno) Thread.`yield`
-  		val fexists = fileExists(dirname(inew) + fnames(0)) && (rand(1,1).v < opts.sampleFiles)
+  		val fexists = fileExists(fnames(0)(inew)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
-  			matqueue(i)(ifilex) = if (fexists) HMat.loadMat(dirname(inew) + fnames(i)) else null
-  			if (matqueue(i)(ifilex).asInstanceOf[AnyRef] != null && transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) matqueue(i)(ifilex) = (matqueue(i)(ifilex)).t
+  			matqueue(i)(ifilex) = if (fexists) {
+  			  val tmp = HMat.loadMat(fnames(i)(inew))
+  			  if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) tmp.t else tmp
+  			} else null  			
   			println("%d" format inew)
   		}
   		ready(ifilex) = inew
@@ -144,22 +148,25 @@ object FilesDataSource {
   	var sampleFiles = 1.0f
   }
   
-  def encodeDate(yy:Int, mm:Int, dd:Int) = 372*yy + 31*mm + dd
+  def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = (372*yy + 31*mm + dd)*24 + hh
   
-  def decodeDate(n:Int):(Int, Int, Int) = {
-    val yy = (n - 32) / 372
-    val days = n - 32 - 372 * yy
+  def decodeDate(n:Int):(Int, Int, Int, Int) = {
+    val yy = (n/24 - 32) / 372
+    val days = n/24 - 32 - 372 * yy
     val mm = days / 31 + 1
     val dd = days - 31 * (mm - 1) + 1
-    (yy, mm, dd)
+    val hh = n % 24
+    (yy, mm, dd, hh)
   }
   
-  def sampleFun(middle:String):(Int)=>String = {
+  def sampleFun(fname:String):(Int)=>String = {
     (n:Int) => {    
-    	val (yy, mm, dd) = decodeDate(n)
-    	("/disk%02d/" + middle + "%04d/%02d/%02d/" format (n % 16, yy, mm, dd))
+    	val (yy, mm, dd, hh) = decodeDate(n)
+    	(fname format ((n / 24) % 16, yy, mm, dd, hh))
     }    
   }
+  
+  def filexx = sampleFun("/disk%02d/twitter/smiley/tokenized/%04d/%02d/%02d/tweet%02d.gz")
 }
 
 object DataSource {
