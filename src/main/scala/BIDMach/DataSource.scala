@@ -86,9 +86,11 @@ class FilesDataSource(fnames:CSMat, dirname:(Int)=>String, nstart:Int, nend:Int,
     while (ready(filex) < fileno) Thread.`yield`
     for (i <- 0 until fnames.size) {
     	val matq = matqueue(i)(filex)
-    	val ccols = math.min(colno + blockSize, matq.ncols)
-    	omats(i) = matq(?, colno -> ccols)
-    	todo = blockSize - ccols + colno
+    	if (matq != null) {
+    		val ccols = math.min(colno + blockSize, matq.ncols)
+    		omats(i) = matq(?, colno -> ccols)
+    		todo = blockSize - ccols + colno
+    	}
     }
     if (todo > 0) {    	
     	var done = false
