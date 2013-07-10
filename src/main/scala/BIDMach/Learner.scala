@@ -167,7 +167,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
   		}
   	}
   }
-}
+} */
 
 
 object Learner {
@@ -208,4 +208,4 @@ object Learner {
       i += 1
     }
   }
-}*/
+}
