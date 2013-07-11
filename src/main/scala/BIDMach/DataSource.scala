@@ -174,7 +174,7 @@ object FilesDataSource {
     }    
   }
   
-  def filexx = sampleFun("/disk%02d/twitter/smiley/tokenized/%04d/%02d/%02d/tweet%02d.gz")
+  def filexx = sampleFun("/disk%02d/twitter/tokenized/%04d/%02d/%02d/tweet%02d.gz")
 }
 
 object DataSource {
