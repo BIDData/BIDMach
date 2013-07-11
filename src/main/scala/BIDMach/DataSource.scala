@@ -89,7 +89,7 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
     	val matq = matqueue(i)(filex)
     	if (matq != null) {
     		val ccols = math.min(colno + blockSize, matq.ncols)
-    		omats(i) = matq(?, colno -> ccols)
+    		omats(i) = matq.colslice(colno, ccols, omats(i))
     		todo = blockSize - ccols + colno
     	}
     }
@@ -119,6 +119,15 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
     testme.exists
   }
   
+  def lazyTranspose(a:Mat) = {
+    a match {
+      case af:FMat => FMat(a.ncols, a.nrows, af.data)
+      case ad:DMat => DMat(a.ncols, a.nrows, ad.data)
+      case ai:IMat => IMat(a.ncols, a.nrows, ai.data)
+      case _ => throw new RuntimeException("laztTranspose cant deal with "+a.getClass.getName)
+    }
+  }
+  
   def prefetch(ifile:Int) = {
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
@@ -127,8 +136,8 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
   		val fexists = fileExists(fnames(0)(inew)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
   			matqueue(i)(ifilex) = if (fexists) {
-  			  val tmp = HMat.loadMat(fnames(i)(inew))
-  			  if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) tmp.t else tmp
+  			  val tmp = HMat.loadMat(fnames(i)(inew), true, matqueue(i)(ifilex))
+  			  if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) lazyTranspose(tmp) else tmp
   			} else null  			
 //  			println("%d" format inew)
   		}
