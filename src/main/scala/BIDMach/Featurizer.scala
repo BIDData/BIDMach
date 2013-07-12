@@ -19,50 +19,57 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       val dict = Dict(loadBMat(opts.fromDir(idir)+opts.localDict))
       val dmap = dict --> alldict
       for (ifile <- 0 until 24) { 
-        val idata = loadIMat(opts.fromDir(idir)+opts.fromFile(ifile))
+      	val fn = opts.fromDir(idir)+opts.fromFile(ifile)
+      	if (fileExists(fn)) {
+      		val idata = loadIMat(fn)
+      		var active = false
+      		var intext = false
+      		var i = 0
+      		var istatus = -1
+      		var nbi = 0
+      		var ntri = 0
+      		var len = idata.length
+      		while (i < len) {
+      			val tok = idata.data(i)
+      			if (tok == isstart) {
+      				active = true
+      				istatus += 1
+      			} else if (tok == itstart && active) {
+      				intext = true
+      			} else if (tok == itend) {
+      				intext = false
+      			} else if (tok == isend) {
+      				intext = false
+      				active = false
+      			} else if (intext && idata.data(i-1) != itstart) {
+      				bigramsx(nbi, 0) = idata.data(i-1)
+      				bigramsx(nbi, 1) = tok
+      				nbi += 1
+      				if (idata.data(i-2) != itstart) {
+      					trigramsx(nbi, 0) = idata.data(i-2)
+      					trigramsx(nbi, 1) = idata.data(i-1)
+      					trigramsx(nbi, 2) = tok
+      					ntri += 1
+      				}
+      			}
+      			i += 1
+      		}
+      		val bigramst = IMat(nbi, 2, bigramsx.data)
+      		val (bigdx, im1, im2) = uniquerows(bigramst)
+      		val bicountsx = accum(im2, 1, bigdx.nrows, 1)
 
-        var active = false
-        var intext = false
-        var i = 0
-        var istatus = -1
-        var nbi = 0
-        var ntri = 0
-        var len = idata.length
-        while (i < len) {
-          val tok = idata.data(i)
-          if (tok == isstart) {
-            active = true
-            istatus += 1
-          } else if (tok == itstart && active) {
-            intext = true
-          } else if (tok == itend) {
-            intext = false
-          } else if (tok == isend) {
-          	intext = false
-          	active = false
-          } else if (intext && idata.data(i-1) != itstart) {
-            bigramsx(nbi, 0) = idata.data(i-1)
-            bigramsx(nbi, 1) = tok
-            nbi += 1
-            if (idata.data(i-2) != itstart) {
-            	trigramsx(nbi, 0) = idata.data(i-2)
-            	trigramsx(nbi, 1) = idata.data(i-1)
-            	trigramsx(nbi, 2) = tok
-            	ntri += 1
-            }
-          }
-          i += 1
-        }
-        val bigramst = IMat(nbi, 2, bigramsx.data)
-        val (bigdx, im1, im2) = uniquerows(bigramst)
-        val bicountsx = accum(im2, 1, bigdx.nrows, 1)
-        
-        val trigramst = IMat(ntri, 3, trigramsx.data)
-        val (trigd, it1, it2) = uniquerows(trigramst)
-        val tricounts = accum(it2, 1, trigd.nrows, 1)
-        println(".")
+      		val trigramst = IMat(ntri, 3, trigramsx.data)
+      		val (trigd, it1, it2) = uniquerows(trigramst)
+      		val tricounts = accum(it2, 1, trigd.nrows, 1)
+      		println(".")
+      	}
       }
     }
+  }
+  
+  def fileExists(fname:String) = {
+    val testme = new File(fname)
+    testme.exists
   }
 }
 
