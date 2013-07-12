@@ -21,7 +21,7 @@ else
   export LD_LIBRARY_PATH="${BIDMAT_ROOT}/lib/linux64:${BIDMAT_ROOT}/lib/linux64/JCUDA5.0:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
 fi
 
-BIDMAT_LIBS="${BIDMAT_ROOT}/BIDMat.jar;${BIDLIB}/ptplot.jar;${BIDLIB}/ptplotapplication.jar;${BIDLIB}/jhdf5.jar;${BIDLIB}/commons-math3-3.1.1.jar;${LIBDIR}/lz4-1.1.2.jar"
+BIDMAT_LIBS="${BIDMAT_ROOT}/BIDMat.jar;${BIDLIB}/ptplot.jar;${BIDLIB}/ptplotapplication.jar;${BIDLIB}/jhdf5.jar;${BIDLIB}/commons-math3-3.1.1.jar;${BIDLIB}/lz4-1.1.2.jar"
 JCUDA_LIBS="${JCUDA_LIBDIR}/jcuda-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcublas-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcufft-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcurand-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcusparse-${JCUDA_VERSION}.jar"
 
 export ALL_LIBS="${BIDMACH_ROOT}/BIDMach.jar;${BIDMAT_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
