@@ -4,7 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 
-class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) { 
+class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) { 
   var a:FMat = null
   var nfeats = 0
   var nsamps = 0
