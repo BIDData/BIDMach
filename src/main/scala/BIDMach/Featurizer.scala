@@ -31,32 +31,38 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		var ntri = 0
       		var len = idata.length
       		while (i < len) {
-      			val tok = dmap(idata.data(i))
-      			if (tok == isstart) {
-      				active = true
-      				istatus += 1
-      			} else if (tok == itstart && active) {
-      				intext = true
-      			} else if (tok == itend) {
-      				intext = false
-      			} else if (tok == isend) {
-      				intext = false
-      				active = false
-      			} else {
-      			  val tok1 = dmap(idata.data(i-1))
-      			  if (intext &&  tok >= 0 && tok1 >= 0 && tok1 != itstart) {
-      			  	bigramsx(nbi, 0) = tok1
-      			  	bigramsx(nbi, 1) = tok
-      			  	nbi += 1
-      			  	val tok2 = dmap(idata.data(i-2))
-      			  	if (tok2 >= 0 && tok2 != itstart) {
-      			  		trigramsx(nbi, 0) = tok2
-      			  		trigramsx(nbi, 1) = tok1
-      			  		trigramsx(nbi, 2) = tok
-      			  		ntri += 1
-      			  	}
-      			  }
-      			}
+      		  if (idata.data(i) >= 0) {
+      		  	val tok = dmap(idata.data(i))
+      		  	if (tok == isstart) {
+      		  		active = true
+      		  		istatus += 1
+      		  	} else if (tok == itstart && active) {
+      		  		intext = true
+      		  	} else if (tok == itend) {
+      		  		intext = false
+      		  	} else if (tok == isend) {
+      		  		intext = false
+      		  		active = false
+      		  	} else {
+      		  		if (idata.data(i-1) >= 0) {      			
+      		  			val tok1 = dmap(idata.data(i-1))
+      		  			if (intext && tok1 != itstart) {
+      		  				bigramsx(nbi, 0) = tok1
+      		  				bigramsx(nbi, 1) = tok
+      		  				nbi += 1
+      		  				if (idata.data(i-2) >= 0) {
+      		  					val tok2 = dmap(idata.data(i-2))
+      		  					if (tok2 != itstart) {
+      		  						trigramsx(nbi, 0) = tok2
+      		  						trigramsx(nbi, 1) = tok1
+      		  						trigramsx(nbi, 2) = tok
+      		  						ntri += 1
+      		  					}
+      		  				}
+      		  			}
+      		  		}
+      		  	}
+      		  }
       			i += 1
       		}
       		val bigramst = IMat(nbi, 2, bigramsx.data)
