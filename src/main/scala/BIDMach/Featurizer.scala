@@ -31,8 +31,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		var ntri = 0
       		var len = idata.length
       		while (i < len) {
-      		  if (idata.data(i) >= 0) {
-      		  	val tok = dmap(idata.data(i))
+      		  if (idata.data(i) > 0) {
+      		  	val tok = dmap(idata.data(i)-1)
       		  	if (tok == isstart) {
       		  		active = true
       		  		istatus += 1
@@ -44,14 +44,14 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  		intext = false
       		  		active = false
       		  	} else {
-      		  		if (intext && idata.data(i-1) >= 0) {      			
-      		  			val tok1 = dmap(idata.data(i-1))
+      		  		if (intext && idata.data(i-1) > 0) {      			
+      		  			val tok1 = dmap(idata.data(i-1)-1)
       		  			if (tok1 != itstart) {
       		  				bigramsx(nbi, 0) = tok1
       		  				bigramsx(nbi, 1) = tok
       		  				nbi += 1
-      		  				if (idata.data(i-2) >= 0) {
-      		  					val tok2 = dmap(idata.data(i-2))
+      		  				if (idata.data(i-2) > 0) {
+      		  					val tok2 = dmap(idata.data(i-2)-1)
       		  					if (tok2 != itstart) {
       		  						trigramsx(nbi, 0) = tok2
       		  						trigramsx(nbi, 1) = tok1
