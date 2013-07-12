@@ -44,12 +44,12 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       				active = false
       			} else {
       			  val tok1 = dmap(idata.data(i-1))
-      			  if (intext &&  tok1 != itstart) {
+      			  if (intext &&  tok >= 0 && tok1 >= 0 && tok1 != itstart) {
       			  	bigramsx(nbi, 0) = tok1
       			  	bigramsx(nbi, 1) = tok
       			  	nbi += 1
       			  	val tok2 = dmap(idata.data(i-2))
-      			  	if (tok2 != itstart) {
+      			  	if (tok2 >= 0 && tok2 != itstart) {
       			  		trigramsx(nbi, 0) = tok2
       			  		trigramsx(nbi, 1) = tok1
       			  		trigramsx(nbi, 2) = tok
