@@ -44,9 +44,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  		intext = false
       		  		active = false
       		  	} else {
-      		  		if (idata.data(i-1) >= 0) {      			
+      		  		if (intext && idata.data(i-1) >= 0) {      			
       		  			val tok1 = dmap(idata.data(i-1))
-      		  			if (intext && tok1 != itstart) {
+      		  			if (tok1 != itstart) {
       		  				bigramsx(nbi, 0) = tok1
       		  				bigramsx(nbi, 1) = tok
       		  				nbi += 1
