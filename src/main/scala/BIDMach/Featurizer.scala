@@ -66,8 +66,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			i += 1
       		}
       		val bigramst = IMat(nbi, 2, bigramsx.data)
-      		val (bigdx, im1, im2) = uniquerows(bigramst)
-      		val bicountsx = accum(im2, 1, bigdx.nrows, 1)
+      		val (bigd, im1, im2) = uniquerows(bigramst)
+      		val bicounts = accum(im2, 1, bigd.nrows, 1)
 
       		val trigramst = IMat(ntri, 3, trigramsx.data)
       		val (trigd, it1, it2) = uniquerows(trigramst)
