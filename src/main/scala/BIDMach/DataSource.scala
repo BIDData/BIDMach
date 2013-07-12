@@ -43,7 +43,7 @@ class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new 
 
 }
 
-class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpose:IMat=null,
+class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpose:IMat=null, compressed:Int=0,
 		override val opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f
   var blockSize = 0 
@@ -64,7 +64,7 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
     matqueue = new Array[Array[Mat]](fnames.size)             // Queue of matrices for each output matrix
     ready = -iones(opts.lookahead, 1)                         // Numbers of files currently loaded in queue
     for (i <- 0 until fnames.size) {
-      var mm = HMat.loadMat(fnames(i)(nstart))
+      var mm = HMat.loadMat(fnames(i)(nstart), compressed)
       if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) mm = mm.t
       omats(i) = mm match {
       case mm:SMat => SMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
@@ -101,7 +101,7 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
     		if (matqueue(0)(filey).asInstanceOf[AnyRef] != null && matqueue(0)(filey).ncols >= todo) {
     			for (i <- 0 until fnames.size) {
     				val matq = matqueue(i)(filey)
-    				omats(i) = omats(i) \ matq(?, 0 -> todo)
+    				omats(i) = omats(i) \ matq.colslice(0, todo, null)
     			} 
     			done = true
     		}
@@ -136,7 +136,7 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
   		val fexists = fileExists(fnames(0)(inew)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
   			matqueue(i)(ifilex) = if (fexists) {
-  			  val tmp = HMat.loadMat(fnames(i)(inew), true, matqueue(i)(ifilex))
+  			  val tmp = HMat.loadMat(fnames(i)(inew), compressed, matqueue(i)(ifilex))
   			  if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) lazyTranspose(tmp) else tmp
   			} else null  			
 //  			println("%d" format inew)

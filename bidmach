@@ -1,5 +1,5 @@
 #!/bin/bash
-export JAVA_OPTS="-Xmx12G -Xms128M" # Set as much memory as possible
+export JAVA_OPTS="-Xmx24G -Xms128M" # Set as much memory as possible
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
