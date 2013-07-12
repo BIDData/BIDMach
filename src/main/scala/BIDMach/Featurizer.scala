@@ -7,7 +7,7 @@ import scala.actors._
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
-  def countGrams = { 
+
     val alldict = Dict(loadBMat(opts.mainDict))
     val isstart = alldict(opts.startItem)
     val isend = alldict(opts.endItem)
@@ -15,6 +15,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val itend = alldict(opts.endText)
     val bigramsx = IMat(opts.guessSize, 2)
     val trigramsx = IMat(opts.guessSize, 3)
+      def countGrams = { 
     for (idir <- opts.nstart until opts.nend) {
       val dict = Dict(loadBMat(opts.fromDir(idir)+opts.localDict))
       val dmap = dict --> alldict
@@ -30,7 +31,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		var ntri = 0
       		var len = idata.length
       		while (i < len) {
-      			val tok = idata.data(i)
+      			val tok = dmap(idata.data(i))
       			if (tok == isstart) {
       				active = true
       				istatus += 1
@@ -41,16 +42,20 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			} else if (tok == isend) {
       				intext = false
       				active = false
-      			} else if (intext && idata.data(i-1) != itstart) {
-      				bigramsx(nbi, 0) = idata.data(i-1)
-      				bigramsx(nbi, 1) = tok
-      				nbi += 1
-      				if (idata.data(i-2) != itstart) {
-      					trigramsx(nbi, 0) = idata.data(i-2)
-      					trigramsx(nbi, 1) = idata.data(i-1)
-      					trigramsx(nbi, 2) = tok
-      					ntri += 1
-      				}
+      			} else {
+      			  val tok1 = dmap(idata.data(i-1))
+      			  if (intext &&  tok1 != itstart) {
+      			  	bigramsx(nbi, 0) = tok1
+      			  	bigramsx(nbi, 1) = tok
+      			  	nbi += 1
+      			  	val tok2 = dmap(idata.data(i-2))
+      			  	if (tok2 != itstart) {
+      			  		trigramsx(nbi, 0) = tok2
+      			  		trigramsx(nbi, 1) = tok1
+      			  		trigramsx(nbi, 2) = tok
+      			  		ntri += 1
+      			  	}
+      			  }
       			}
       			i += 1
       		}
