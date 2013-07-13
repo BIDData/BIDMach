@@ -7,84 +7,92 @@ import scala.actors._
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
-
+	def countGrams = {
     val alldict = Dict(loadBMat(opts.mainDict))
     val isstart = alldict(opts.startItem)
     val isend = alldict(opts.endItem)
     val itstart = alldict(opts.startText)
     val itend = alldict(opts.endText)
-    val bigramsx = IMat(opts.guessSize, 2)
-    val trigramsx = IMat(opts.guessSize, 3)
-    val bdicts = new Array[IDict](24)
-    val tdicts = new Array[IDict](24)
-      def countGrams = { 
-    for (idir <- opts.nstart until opts.nend) {
-      val dict = Dict(loadBMat(opts.fromDir(idir)+opts.localDict))
-      val dmap = dict --> alldict
-      for (ifile <- 0 until 24) { 
-      	val fn = opts.fromDir(idir)+opts.fromFile(ifile)
-      	if (fileExists(fn)) {
-      		val idata = loadIMat(fn)
-      		var active = false
-      		var intext = false
-      		var i = 0
-      		var istatus = -1
-      		var nbi = 0
-      		var ntri = 0
-      		var len = idata.length
-      		while (i < len) {
-      		  if (idata.data(i) > 0) {
-      		  	val tok = dmap(idata.data(i)-1)
-      		  	if (tok == isstart) {
-      		  		active = true
-      		  		istatus += 1
-      		  	} else if (tok == itstart && active) {
-      		  		intext = true
-      		  	} else if (tok == itend) {
-      		  		intext = false
-      		  	} else if (tok == isend) {
-      		  		intext = false
-      		  		active = false
-      		  	} else {
-      		  		if (intext && idata.data(i-1) > 0) {      			
-      		  			val tok1 = dmap(idata.data(i-1)-1)
-      		  			if (tok1 != itstart) {
-      		  				bigramsx(nbi, 0) = tok1
-      		  				bigramsx(nbi, 1) = tok
-      		  				nbi += 1
-      		  				if (idata.data(i-2) > 0) {
-      		  					val tok2 = dmap(idata.data(i-2)-1)
-      		  					if (tok2 != itstart) {
-      		  						trigramsx(nbi, 0) = tok2
-      		  						trigramsx(nbi, 1) = tok1
-      		  						trigramsx(nbi, 2) = tok
-      		  						ntri += 1
-      		  					}
-      		  				}
-      		  			}
-      		  		}
-      		  	}
-      		  }
-      			i += 1
+      
+    for (ithread <- 0 until opts.nthreads) {
+      Actor.actor {
+      	val bigramsx = IMat(opts.guessSize, 2)
+      	val trigramsx = IMat(opts.guessSize, 3)
+      	val bdicts = new Array[IDict](24)
+      	val tdicts = new Array[IDict](24)
+
+      	for (idir <- (opts.nstart+ithread) until opts.nend by opts.nthreads) {
+      		val fname = opts.fromDir(idir)+opts.localDict
+      		if (fileExists(fname)) {
+      			val dict = Dict(loadBMat(fname))
+      			val dmap = dict --> alldict
+      			for (ifile <- 0 until 24) { 
+      				val fn = opts.fromDir(idir)+opts.fromFile(ifile)
+      				if (fileExists(fn)) {
+      					val idata = loadIMat(fn)
+      					var active = false
+      					var intext = false
+      					var i = 0
+      					var istatus = -1
+      					var nbi = 0
+      					var ntri = 0
+      					var len = idata.length
+      					while (i < len) {
+      						if (idata.data(i) > 0) {
+      							val tok = dmap(idata.data(i)-1)
+      							if (tok == isstart) {
+      								active = true
+      								istatus += 1
+      							} else if (tok == itstart && active) {
+      								intext = true
+      							} else if (tok == itend) {
+      								intext = false
+      							} else if (tok == isend) {
+      								intext = false
+      								active = false
+      							} else {
+      								if (intext && idata.data(i-1) > 0) {      			
+      									val tok1 = dmap(idata.data(i-1)-1)
+      									if (tok1 != itstart) {
+      										bigramsx(nbi, 0) = tok1
+      										bigramsx(nbi, 1) = tok
+      										nbi += 1
+      										if (idata.data(i-2) > 0) {
+      											val tok2 = dmap(idata.data(i-2)-1)
+      											if (tok2 != itstart) {
+      												trigramsx(nbi, 0) = tok2
+      												trigramsx(nbi, 1) = tok1
+      												trigramsx(nbi, 2) = tok
+      												ntri += 1
+      											}
+      										}
+      									}
+      								}
+      							}
+      						}
+      						i += 1
+      					}
+      					val bigrams = IMat(nbi, 2, bigramsx.data)
+      					val bid = IDict.dictFromData(bigrams)
+      					val trigrams = IMat(nbi, 3, trigramsx.data)
+      					val trid = IDict.dictFromData(trigrams)
+      					bdicts(ifile) = bid
+      					tdicts(ifile) = trid      		
+      				} else {
+      					bdicts(ifile) = null
+      					tdicts(ifile) = null
+      				}
+      			}
+      			val bf = IDict.union(bdicts)
+      			val tf = IDict.union(tdicts)
+      			saveIMat(opts.fromDir(idir) + "bdict.lz4", bf.grams)
+      			saveDMat(opts.fromDir(idir) + "bcnts.lz4", bf.counts)
+      			saveIMat(opts.fromDir(idir) + "tdict.lz4", tf.grams)
+      			saveDMat(opts.fromDir(idir) + "tcnts.lz4", tf.counts)
+      			print(".")
       		}
-      		val bigrams = IMat(nbi, 2, bigramsx.data)
-      		val bid = IDict.dictFromData(bigrams)
-      		val trigrams = IMat(nbi, 3, trigramsx.data)
-      		val trid = IDict.dictFromData(trigrams)
-      		bdicts(ifile) = bid
-      		tdicts(ifile) = trid      		
-      	} else {
-      		bdicts(ifile) = null
-      		tdicts(ifile) = null
       	}
       }
-      val bf = IDict.union(bdicts)
-      val tf = IDict.union(tdicts)
-      saveIMat(opts.fromDir(idir) + "bdict.lz4", bf.grams)
-      saveDMat(opts.fromDir(idir) + "bcnts.lz4", bf.counts)
-      saveIMat(opts.fromDir(idir) + "tdict.lz4", tf.grams)
-      saveDMat(opts.fromDir(idir) + "tcnts.lz4", tf.counts)
-      println(".")
     }
   }
   
@@ -127,5 +135,6 @@ object Featurizer {
     var mainDict:String = "/big/twitter/tokenized/alldict.gz"
     var mainCounts:String = "/big/twitter/tokenized/allwcount.gz"
     var guessSize = 200000000
+    var nthreads = 4
   }
 }
