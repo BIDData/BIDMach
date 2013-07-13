@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,BMat,CMat,CSMat,Dict,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,BMat,CMat,CSMat,Dict,DMat,FMat,GMat,GIMat,GSMat,HMat,IDict,IMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import HMat._
@@ -15,6 +15,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val itend = alldict(opts.endText)
     val bigramsx = IMat(opts.guessSize, 2)
     val trigramsx = IMat(opts.guessSize, 3)
+    val bdicts = new Array[IDict](24)
+    val tdicts = new Array[IDict](24)
       def countGrams = { 
     for (idir <- opts.nstart until opts.nend) {
       val dict = Dict(loadBMat(opts.fromDir(idir)+opts.localDict))
@@ -65,16 +67,24 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  }
       			i += 1
       		}
-      		val bigramst = IMat(nbi, 2, bigramsx.data)
-      		val (bigd, im1, im2) = uniquerows(bigramst)
-      		val bicounts = accum(im2, 1, bigd.nrows, 1)
-
-      		val trigramst = IMat(ntri, 3, trigramsx.data)
-      		val (trigd, it1, it2) = uniquerows(trigramst)
-      		val tricounts = accum(it2, 1, trigd.nrows, 1)
-      		println(".")
+      		val bigrams = IMat(nbi, 2, bigramsx.data)
+      		val bid = IDict.dictFromData(bigrams)
+      		val trigrams = IMat(nbi, 3, trigramsx.data)
+      		val trid = IDict.dictFromData(trigrams)
+      		bdicts(ifile) = bid
+      		tdicts(ifile) = trid      		
+      	} else {
+      		bdicts(ifile) = null
+      		tdicts(ifile) = null
       	}
       }
+      val bf = IDict.union(bdicts)
+      val tf = IDict.union(tdicts)
+      saveIMat(opts.fromDir(idir) + "bdict.lz4", bf.grams)
+      saveDMat(opts.fromDir(idir) + "bcnts.lz4", bf.counts)
+      saveIMat(opts.fromDir(idir) + "tdict.lz4", tf.grams)
+      saveDMat(opts.fromDir(idir) + "tcnts.lz4", tf.counts)
+      println(".")
     }
   }
   
