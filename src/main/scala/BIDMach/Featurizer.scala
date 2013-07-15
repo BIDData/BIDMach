@@ -41,6 +41,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       					while (i < len) {
       						if (idata.data(i) > 0) {
       							val tok = dmap(idata.data(i)-1)
+      							if (tok < 0) throw new RuntimeException("Bad tok "+tok)
       							if (tok == isstart) {
       								active = true
       								istatus += 1
@@ -54,12 +55,14 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       							} else {
       								if (intext && idata.data(i-1) > 0) {      			
       									val tok1 = dmap(idata.data(i-1)-1)
+      									if (tok1 < 0) throw new RuntimeException("Bad tok1 "+tok)
       									if (tok1 != itstart) {
       										bigramsx(nbi, 0) = tok1
       										bigramsx(nbi, 1) = tok
       										nbi += 1
       										if (idata.data(i-2) > 0) {
       											val tok2 = dmap(idata.data(i-2)-1)
+      											if (tok2 < 0) throw new RuntimeException("Bad tok2 "+tok)
       											if (tok2 != itstart) {
       												trigramsx(nbi, 0) = tok2
       												trigramsx(nbi, 1) = tok1
