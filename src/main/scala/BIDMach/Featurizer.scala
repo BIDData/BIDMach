@@ -8,6 +8,8 @@ import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   var alldict:Dict = null
+  val bdicts = new Array[IDict](24)
+  val tdicts = new Array[IDict](24)
   
   def init = {
     if (alldict == null) alldict = Dict(loadBMat(opts.mainDict))
@@ -23,12 +25,12 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val nthreads = math.max(1, Mat.hasCUDA)
       
     for (ithread <- 0 until nthreads) {
-      Actor.actor {
+//      Actor.actor {
         setGPU(ithread)
       	val bigramsx = IMat(opts.guessSize, 2)
       	val trigramsx = IMat(opts.guessSize, 3)
-      	val bdicts = new Array[IDict](24)
-      	val tdicts = new Array[IDict](24)
+//      	val bdicts = new Array[IDict](24)
+//      	val tdicts = new Array[IDict](24)
 
       	for (idir <- (opts.nstart+ithread) until opts.nend by nthreads) {
       		val fname = opts.fromDir(idir)+opts.localDict
@@ -110,7 +112,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			print(".")
       		}
       	}
-      }
+//      }
     }
   }
   
@@ -144,7 +146,7 @@ object Featurizer {
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
     var toFile:(Int)=>String = (n:Int) => ("tweet%02d.txt" format n)
     var localDict:String = "dict.gz"
-    var nstart:Int = encodeDate(2011,11,21)
+    var nstart:Int = encodeDate(2011,11,22)
     var nend:Int = encodeDate(2013,3,3)
     var startItem:String = "<status>"
     var endItem:String = "</status>"
