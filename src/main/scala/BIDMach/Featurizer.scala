@@ -7,10 +7,14 @@ import scala.actors._
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
-      	val bigramsx = IMat(opts.guessSize, 2)
-      	val trigramsx = IMat(opts.guessSize, 3)
+  var alldict:Dict = null
+  
+  def init = {
+    if (alldict == null) alldict = Dict(loadBMat(opts.mainDict))
+  }      	
+      	    
   def countGrams = {
-    val alldict = Dict(loadBMat(opts.mainDict))
+  	init
     val isstart = alldict(opts.startItem)
     val isend = alldict(opts.endItem)
     val itstart = alldict(opts.startText)
@@ -19,10 +23,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val nthreads = math.max(1, Mat.hasCUDA)
       
     for (ithread <- 0 until nthreads) {
-//      Actor.actor {
+      Actor.actor {
         setGPU(ithread)
-//      	val bigramsx = IMat(opts.guessSize, 2)
-//      	val trigramsx = IMat(opts.guessSize, 3)
+      	val bigramsx = IMat(opts.guessSize, 2)
+      	val trigramsx = IMat(opts.guessSize, 3)
       	val bdicts = new Array[IDict](24)
       	val tdicts = new Array[IDict](24)
 
@@ -63,7 +67,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       										val tok1 = dmap(idata.data(i-1)-1)
       										if (tok1 >= 0) {
       											if (tok1 != itstart) {
-      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
+//      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
       												bigramsx(nbi, 0) = tok1
       												bigramsx(nbi, 1) = tok
       												nbi += 1
@@ -106,7 +110,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			print(".")
       		}
       	}
-//      }
+      }
     }
   }
   
