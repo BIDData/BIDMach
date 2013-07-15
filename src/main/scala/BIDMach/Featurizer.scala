@@ -92,9 +92,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       						}
       						i += 1
       					}
-      					val bigrams = IMat(nbi, 2, bigramsx.data)
+      					val bigrams = bigramsx(0->nbi, ?)
       					val bid = IDict.dictFromData(bigrams)
-      					val trigrams = IMat(nbi, 3, trigramsx.data)
+      					val trigrams = trigramsx(0->ntri, ?)
       					val trid = IDict.dictFromData(trigrams)
       					bdicts(ifile) = bid
       					tdicts(ifile) = trid      		
