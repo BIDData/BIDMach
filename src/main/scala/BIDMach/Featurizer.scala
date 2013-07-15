@@ -7,19 +7,8 @@ import scala.actors._
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
-  var alldict:Dict = null
-  
-  def init = {
-    if (alldict == null) alldict = Dict(loadBMat(opts.mainDict))
-  }      	
-      	    
+  	     	    
   def countGrams = {
-  	init
-    val isstart = alldict(opts.startItem)
-    val isend = alldict(opts.endItem)
-    val itstart = alldict(opts.startText)
-    val itend = alldict(opts.endText)
-    val ioverrun = alldict(opts.overrun)
     val nthreads = math.max(1, Mat.hasCUDA)
       
     for (ithread <- 0 until nthreads) {
@@ -34,57 +23,55 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		val fname = opts.fromDir(idir)+opts.localDict
       		if (fileExists(fname)) {
       			val dict = Dict(loadBMat(fname))
-      			val dmap = dict --> alldict
+      			val isstart = dict(opts.startItem)
+      			val isend = dict(opts.endItem)
+      			val itstart = dict(opts.startText)
+      			val itend = dict(opts.endText)
+      			val ioverrun = dict(opts.overrun)
       			for (ifile <- 0 until 24) { 
       				val fn = opts.fromDir(idir)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
       					var active = false
       					var intext = false
-      					var i = 0
       					var istatus = -1
       					var nbi = 0
       					var ntri = 0
       					var len = idata.length
+      					var i = 0
       					while (i < len) {
-      						if (idata.data(i) > 0) {
-      							val tok = dmap(idata.data(i)-1)
-      							if (tok >= 0) {
-//      							  println("all: "+alldict(tok))
-      								if (tok == isstart) {
-      									active = true
-      									istatus += 1
-      								} else if (tok == itstart && active) {     							  
-      									intext = true
-      								} else if (tok == itend || tok == ioverrun) {
-      									intext = false
-      								} else if (tok == isend) {
-      									intext = false
-      									active = false
-      								} else {
-      									if (intext && idata.data(i-1) > 0) {   
-//      										println("txt: "+alldict(tok))
-      										val tok1 = dmap(idata.data(i-1)-1)
-      										if (tok1 >= 0) {
-      											if (tok1 != itstart) {
-//      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
-      												bigramsx(nbi, 0) = tok1
-      												bigramsx(nbi, 1) = tok
-      												nbi += 1
-      												if (idata.data(i-2) > 0) {
-      													val tok2 = dmap(idata.data(i-2)-1)
-      													if (tok2 >= 0) {
-      														if (tok2 != itstart) {
-      															trigramsx(ntri, 0) = tok2
-      															trigramsx(ntri, 1) = tok1
-      															trigramsx(ntri, 2) = tok
-      															ntri += 1
-      														}
-      													}
-      												}
-      											}
-      										}
-      									}
+      						val tok = idata.data(i)-1
+      						if (tok >= 0) {
+//      							  println("all: "+dict(tok))
+      							if (tok == isstart) {
+      								active = true
+      								istatus += 1
+      							} else if (tok == itstart && active) {     							  
+      								intext = true
+      							} else if (tok == itend || tok == ioverrun) {
+      								intext = false
+      							} else if (tok == isend) {
+      								intext = false
+      								active = false
+      							} else {
+      								val tok1 = idata.data(i-1)-1
+      								if (intext && tok1 >= 0) {   
+      									//      										println("txt: "+dict(tok))
+      								  if (tok1 != itstart) {
+      								  	//      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
+      								  	bigramsx(nbi, 0) = tok1
+      								  	bigramsx(nbi, 1) = tok
+      								  	nbi += 1
+      								  	val tok2 = idata.data(i-2)-1
+      								  	if (tok2 >= 0) {
+      								  		if (tok2 != itstart) {
+      								  			trigramsx(ntri, 0) = tok2
+      								  			trigramsx(ntri, 1) = tok1
+      								  			trigramsx(ntri, 2) = tok
+      								  			ntri += 1
+      								  		}
+      								  	}
+      								  }
       								}
       							}
       						}
