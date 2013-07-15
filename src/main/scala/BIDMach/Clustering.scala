@@ -127,7 +127,7 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
     } else {
       val smat = dd.copy
       val imat = icol(0->nsamps)*iones(1,nsamps)
-      GMat.GPUsort(smat, imat)
+      GMat.sortGPU(smat, imat)
       (smat, imat)
     }
   }
