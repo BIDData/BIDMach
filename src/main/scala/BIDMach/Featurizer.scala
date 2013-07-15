@@ -7,22 +7,25 @@ import scala.actors._
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
-	def countGrams = {
+      	val bigramsx = IMat(opts.guessSize, 2)
+      	val trigramsx = IMat(opts.guessSize, 3)
+  def countGrams = {
     val alldict = Dict(loadBMat(opts.mainDict))
     val isstart = alldict(opts.startItem)
     val isend = alldict(opts.endItem)
     val itstart = alldict(opts.startText)
     val itend = alldict(opts.endText)
+    val nthreads = math.max(1, Mat.hasCUDA)
       
-    for (ithread <- 0 until math.max(1, Mat.hasCUDA)) {
-      Actor.actor {
+    for (ithread <- 0 until nthreads) {
+//      Actor.actor {
         setGPU(ithread)
-      	val bigramsx = IMat(opts.guessSize, 2)
-      	val trigramsx = IMat(opts.guessSize, 3)
+//      	val bigramsx = IMat(opts.guessSize, 2)
+//      	val trigramsx = IMat(opts.guessSize, 3)
       	val bdicts = new Array[IDict](24)
       	val tdicts = new Array[IDict](24)
 
-      	for (idir <- (opts.nstart+ithread) until opts.nend by opts.nthreads) {
+      	for (idir <- (opts.nstart+ithread) until opts.nend by nthreads) {
       		val fname = opts.fromDir(idir)+opts.localDict
       		if (fileExists(fname)) {
       			val dict = Dict(loadBMat(fname))
@@ -102,7 +105,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			print(".")
       		}
       	}
-      }
+//      }
     }
   }
   
