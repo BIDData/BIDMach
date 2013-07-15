@@ -14,8 +14,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val itstart = alldict(opts.startText)
     val itend = alldict(opts.endText)
       
-    for (ithread <- 0 until opts.nthreads) {
+    for (ithread <- 0 until math.max(1, Mat.hasCUDA)) {
       Actor.actor {
+        setGPU(ithread)
       	val bigramsx = IMat(opts.guessSize, 2)
       	val trigramsx = IMat(opts.guessSize, 3)
       	val bdicts = new Array[IDict](24)
@@ -43,7 +44,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       							if (tok == isstart) {
       								active = true
       								istatus += 1
-      							} else if (tok == itstart && active) {
+      							} else if (tok == itstart && active) {     							  
       								intext = true
       							} else if (tok == itend) {
       								intext = false
@@ -137,4 +138,6 @@ object Featurizer {
     var guessSize = 200000000
     var nthreads = 4
   }
+  
+ 
 }
