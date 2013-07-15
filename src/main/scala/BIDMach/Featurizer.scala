@@ -42,7 +42,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       						if (idata.data(i) > 0) {
       							val tok = dmap(idata.data(i)-1)
       							if (tok >= 0) {
-      							  println("all: "+alldict(tok))
+//      							  println("all: "+alldict(tok))
       								if (tok == isstart) {
       									active = true
       									istatus += 1
@@ -55,10 +55,11 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       									active = false
       								} else {
       									if (intext && idata.data(i-1) > 0) {   
-      										println("txt: "+alldict(tok))
+//      										println("txt: "+alldict(tok))
       										val tok1 = dmap(idata.data(i-1)-1)
       										if (tok1 >= 0) {
       											if (tok1 != itstart) {
+      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
       												bigramsx(nbi, 0) = tok1
       												bigramsx(nbi, 1) = tok
       												nbi += 1
