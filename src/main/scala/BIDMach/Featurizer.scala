@@ -54,24 +54,26 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       								intext = false
       								active = false
       							} else {
-      								val tok1 = idata.data(i-1)-1
-      								if (intext && tok1 >= 0) {   
-      									//      										println("txt: "+dict(tok))
-      								  if (tok1 != itstart) {
-      								  	//      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
-      								  	bigramsx(nbi, 0) = tok1
-      								  	bigramsx(nbi, 1) = tok
-      								  	nbi += 1
-      								  	val tok2 = idata.data(i-2)-1
-      								  	if (tok2 >= 0) {
-      								  		if (tok2 != itstart) {
-      								  			trigramsx(ntri, 0) = tok2
-      								  			trigramsx(ntri, 1) = tok1
-      								  			trigramsx(ntri, 2) = tok
-      								  			ntri += 1
-      								  		}
-      								  	}
-      								  }
+      							  if (intext) {
+      							  	val tok1 = idata.data(i-1)-1
+      							  	if (tok1 >= 0) {   
+      							  		//      										println("txt: "+dict(tok))
+      							  		if (tok1 != itstart) {
+      							  			//      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
+      							  			bigramsx(nbi, 0) = tok1
+      							  			bigramsx(nbi, 1) = tok
+      							  			nbi += 1
+      							  			val tok2 = idata.data(i-2)-1
+      							  			if (tok2 >= 0) {
+      							  				if (tok2 != itstart) {
+      							  					trigramsx(ntri, 0) = tok2
+      							  					trigramsx(ntri, 1) = tok1
+      							  					trigramsx(ntri, 2) = tok
+      							  					ntri += 1
+      							  				}
+      							  			}
+      							  		}
+      							  	}
       								}
       							}
       						}
