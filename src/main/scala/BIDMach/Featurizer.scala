@@ -15,6 +15,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val isend = alldict(opts.endItem)
     val itstart = alldict(opts.startText)
     val itend = alldict(opts.endText)
+    val ioverrun = alldict(opts.overrun)
     val nthreads = math.max(1, Mat.hasCUDA)
       
     for (ithread <- 0 until nthreads) {
@@ -51,7 +52,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       									istatus += 1
       								} else if (tok == itstart && active) {     							  
       									intext = true
-      								} else if (tok == itend) {
+      								} else if (tok == itend || tok == ioverrun) {
       									intext = false
       								} else if (tok == isend) {
       									intext = false
@@ -145,6 +146,7 @@ object Featurizer {
     var endItem:String = "</status>"
     var startText:String = "<text>"
     var endText:String = "</text>"
+    var overrun:String = "<user>"
     var mainDict:String = "/big/twitter/tokenized/alldict.gz"
     var mainCounts:String = "/big/twitter/tokenized/allwcount.gz"
     var guessSize = 200000000
