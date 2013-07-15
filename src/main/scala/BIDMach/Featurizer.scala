@@ -142,7 +142,7 @@ object Featurizer {
     var overrun:String = "<user>"
     var mainDict:String = "/big/twitter/tokenized/alldict.gz"
     var mainCounts:String = "/big/twitter/tokenized/allwcount.gz"
-    var guessSize = 200000000
+    var guessSize = 100000000
     var nthreads = 4
   }
   
