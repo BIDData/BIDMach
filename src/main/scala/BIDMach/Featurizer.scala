@@ -9,67 +9,39 @@ import java.io._
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	
   def mergeDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
-  	val dd = new Array[Dict](6)
-  	val md = new Array[Dict](6)
-  	val yd = new Array[Dict](5)
-  	var dy:Dict = null
-  	var nmerged = 0
-  	var ndone = 0
+    val dd = new Array[Dict](5)                                                // Big enough to hold log2(days per month)
+  	val nmonths = 2 + (opts.nend - opts.nstart)/31
+  	val md = new Array[Dict]((math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
 	  for (d <- opts.nstart to opts.nend) {
 	    val (year, month, day) = Featurizer.decodeDate(d)
-	    if (day == 1) ndone = 0
 	  	val fm = new File(opts.fromMonthDir(d) + wcountname)
 	    if (rebuild || ! fm.exists) {
 	    	val fd = new File(opts.fromDayDir(d) + wcountname)
 	    	if (fd.exists) {
 	    		val bb = HMat.loadBMat(opts.fromDayDir(d) + dictname)
 	    		val cc = HMat.loadIMat(opts.fromDayDir(d) + wcountname)
-	    		dd(ndone % 6) = Dict(bb, cc, opts.threshold)
-	    		ndone = ndone + 1
-	    		print("-")
-	    		if (ndone % 6 == 0) {
-	    			md(ndone / 6 - 1) = Dict.union(dd:_*)
-	    			print("+")
-	    		}
+	    		Dict.treeAdd(Dict(bb, cc, opts.threshold), dd)
+	    		print("+")
 	    	}
-	    	if (day == 31 || d == opts.nend - 1) {	    	  
-	  			if (ndone % 6 != 0) {
-	  				md(ndone / 6) = Dict.union(dd.slice(0, ndone % 6):_*)
-	  				print("+")
-	  			}
-	  			if (ndone > 0) {
-	  				val dx = Dict.union(md.slice(0, (ndone-1)/6+1):_*)
-	  				val (sv, iv) = sortdown2(dx.counts)
-	  				val dxx = Dict(dx.cstr(iv), sv)
-	  				HMat.saveBMat(opts.fromMonthDir(d)+dictname, BMat(dxx.cstr))
-	  				HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
-	  			}
+	    	if (day == 31) {	    	  
+	    		val dx = Dict.treeFlush(dd)
+	    		val (sv, iv) = sortdown2(dx.counts)
+	    		val dxx = Dict(dx.cstr(iv), sv)
+	    		HMat.saveBMat(opts.fromMonthDir(d)+dictname, BMat(dxx.cstr))
+	    		HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
 	    	}
 	    }
-	    if (day == 31 || d == opts.nend - 1) {
+	    if (day == 31) {
 	  		val fm = new File(opts.fromMonthDir(d) + wcountname)
 	  		if (fm.exists) {
 	  			val bb = HMat.loadBMat(opts.fromMonthDir(d) + dictname)
 	  			val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
-	  			yd(nmerged % 5) = Dict(bb, cc, 4*opts.threshold)
-	  			nmerged += 1
-	  			print("*")
-	  			if (nmerged % 5 == 0) {
-	  			  val dm = Dict.union(yd:_*)
-	  			  if (nmerged == 5) {
-	  			    dy = dm
-	  			  } else {
-	  			  	dy = Dict.union(dy, dm)
-	  			  }
-	  			}
+	  			Dict.treeAdd(Dict(bb, cc, 4*opts.threshold), md)
 	  		}
 	  	}
 	  }
-  	if (nmerged % 5 != 0) {
-  		val dm = Dict.union(yd.slice(0, nmerged % 5):_*)
-  		dy = Dict.union(dy, dm)
-  	}
   	println
+  	val dy = Dict.treeFlush(md)
   	val (sv, iv) = sortdown2(dy.counts)
   	val dyy = Dict(dy.cstr(iv), sv)
   	HMat.saveBMat(opts.fromDir + dictname, BMat(dyy.cstr))
