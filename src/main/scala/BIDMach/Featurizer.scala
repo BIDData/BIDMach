@@ -219,10 +219,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 //      			tic
       			val bf = IDict.treeFlush(bdicts)
       			val tf = IDict.treeFlush(tdicts)
-      			saveIMat(opts.fromDir(idir) + "bdict.lz4", bf.grams)
-      			saveDMat(opts.fromDir(idir) + "bcnts.lz4", bf.counts)
-      			saveIMat(opts.fromDir(idir) + "tdict.lz4", tf.grams)
-      			saveDMat(opts.fromDir(idir) + "tcnts.lz4", tf.counts)
+      			saveIMat(opts.fromDayDir(idir) + "bdict.lz4", bf.grams)
+      			saveDMat(opts.fromDayDir(idir) + "bcnts.lz4", bf.counts)
+      			saveIMat(opts.fromDayDir(idir) + "tdict.lz4", tf.grams)
+      			saveDMat(opts.fromDayDir(idir) + "tcnts.lz4", tf.counts)
       			print(".")
       		}
       	}
