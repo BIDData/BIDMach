@@ -115,60 +115,66 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	dyy
 	}
   
-  def twitterScanner(opts:Featurizer.Options, dict:Dict, idata:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int) = {
-  	val isstart =  dict(opts.startItem)
-  	val isend =    dict(opts.endItem)
-  	val itstart =  dict(opts.startText)
-  	val itend =    dict(opts.endText)
-  	val ioverrun = dict(opts.overrun)
-  	var active = false
-  	var intext = false
-  	var istatus = -1
-  	var nbi = 0
-  	var ntri = 0
-  	var len = idata.length
-  	var i = 0
-  	while (i < len) {
-  		val tok = idata.data(i)-1
-  		if (tok >= 0) {
-  			if (tok == isstart) {
-  				active = true
-  				istatus += 1
-  			} else if (tok == itstart && active) {     							  
-  				intext = true
-  			} else if (tok == itend || tok == ioverrun) {
-  				intext = false
-  			} else if (tok == isend) {
-  				intext = false
-  				active = false
-  			} else {
-  				if (intext) {
-  					val tok1 = idata.data(i-1)-1
-  					if (tok1 >= 0) {   
-  						if (tok1 != itstart) {
-  							bigramsx(nbi, 0) = tok1
-  							bigramsx(nbi, 1) = tok
-  							nbi += 1
-  							val tok2 = idata.data(i-2)-1
-  							if (tok2 >= 0) {
-  								if (tok2 != itstart) {
-  									trigramsx(ntri, 0) = tok2
-  									trigramsx(ntri, 1) = tok1
-  									trigramsx(ntri, 2) = tok
-  									ntri += 1
+  trait Scanner { 
+  	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int)
+  }
+  
+  object TwitterScanner extends Scanner {  
+  	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int) = {
+  		val isstart =  dict(opts.startItem)
+  		val isend =    dict(opts.endItem)
+  		val itstart =  dict(opts.startText)
+  		val itend =    dict(opts.endText)
+  		val ioverrun = dict(opts.overrun)
+  		var active = false
+  		var intext = false
+  		var istatus = -1
+  		var nbi = 0
+  		var ntri = 0
+  		var len = idata.length
+  		var i = 0
+  		while (i < len) {
+  			val tok = idata.data(i)-1
+  			if (tok >= 0) {
+  				if (tok == isstart) {
+  					active = true
+  					istatus += 1
+  				} else if (tok == itstart && active) {     							  
+  					intext = true
+  				} else if (tok == itend || tok == ioverrun) {
+  					intext = false
+  				} else if (tok == isend) {
+  					intext = false
+  					active = false
+  				} else {
+  					if (intext) {
+  						val tok1 = idata.data(i-1)-1
+  						if (tok1 >= 0) {   
+  							if (tok1 != itstart) {
+  								bigramsx(nbi, 0) = tok1
+  								bigramsx(nbi, 1) = tok
+  								nbi += 1
+  								val tok2 = idata.data(i-2)-1
+  								if (tok2 >= 0) {
+  									if (tok2 != itstart) {
+  										trigramsx(ntri, 0) = tok2
+  										trigramsx(ntri, 1) = tok1
+  										trigramsx(ntri, 2) = tok
+  										ntri += 1
+  									}
   								}
   							}
   						}
   					}
   				}
   			}
+  			i += 1
   		}
-  		i += 1
+  		(nbi, ntri)
   	}
-  	(nbi, ntri)
   }
   
-  def gramDicts(scanner:(Featurizer.Options, Dict, IMat, IMat, IMat)=>(Int, Int)=twitterScanner) = {
+  def gramDicts(scanner:Scanner=TwitterScanner) = {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
@@ -187,7 +193,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
-      					val (nbi, ntri) = scanner(opts, dict, idata, bigramsx, trigramsx)
+      					val (nbi, ntri) = scanner.scan(opts, dict, idata, bigramsx, trigramsx)
       					val bigrams = bigramsx(0->nbi, ?)
       					val bid = IDict.dictFromData(bigrams)
       					val trigrams = trigramsx(0->ntri, ?)
