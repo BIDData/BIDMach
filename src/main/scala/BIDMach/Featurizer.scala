@@ -84,6 +84,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       					val bid = IDict.dictFromData(bigrams)
       					val trigrams = trigramsx(0->ntri, ?)
       					val trid = IDict.dictFromData(trigrams)
+      					println("bid=%d, trid=%d" format (bid.length, trid.length))
       					bdicts(ifile) = bid
       					tdicts(ifile) = trid      		
       				} else {
