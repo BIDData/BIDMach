@@ -79,66 +79,78 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   
   def mergeIDicts(rebuild:Boolean,dictname:String="bdict.lz4",wcountname:String="bcnts.lz4"):IDict = {
     val alldict = Dict(HMat.loadBMat(opts.mainDict))
-  	val dd = new Array[IDict](6)
-  	val md = new Array[IDict](6)
+  	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
+  	val nmonths = 2 + (opts.nend - opts.nstart)/31
+  	val md = new Array[IDict]((math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
   	var dy:IDict = null
-  	var nmerged = 0
-  	var ndone = 0
+  	var mdict:Dict = null                                                     
+  	var domonth:Boolean = false
+  	var lastmonth = 0
 	  for (d <- opts.nstart to opts.nend) {
 	    val (year, month, day) = Featurizer.decodeDate(d)
-	    if (day == 1) ndone = 0
-	  	val fm = new File(opts.fromMonthDir(d) + wcountname)
-	    if (rebuild || ! fm.exists) {
+	    if (month != lastmonth) {
+	    	mdict = Dict(HMat.loadBMat(opts.fromMonthDir(d) + opts.localDict))     // Load token dictionary for this month
+	    	val fm = new File(opts.fromMonthDir(d) + wcountname)                   // Did we process this month?
+	    	domonth = ! fm.exists
+	    	lastmonth = month
+	    }
+	    if (rebuild || domonth) {
 	    	val fd = new File(opts.fromDayDir(d) + wcountname)
 	    	if (fd.exists) {
-	    	  val dict = Dict(HMat.loadBMat(opts.fromDayDir(d) + opts.localDict))
-	    	  val map = dict --> alldict
-	    		val bb = HMat.loadIMat(opts.fromDayDir(d) + dictname)
+	    	  val dict = Dict(HMat.loadBMat(opts.fromDayDir(d) + opts.localDict))  // Load token dictionary for this day
+	    		val bb = HMat.loadIMat(opts.fromDayDir(d) + dictname)                // Load IDict info for this day
 	    		val cc = HMat.loadDMat(opts.fromDayDir(d) + wcountname)
-	    		val bm = map(bb)
-	    		val igood = find(min(bm, 2) >= 0)
+	    		val map = dict --> mdict                                             // Map from this days tokens to month dictionary
+	    		val bm = map(bb)                                                     // Map the ngrams
+	    		val igood = find(min(bm, 2) >= 0)                                    // Find the good ones
 	    		val bg = bm(igood,?)
 	    		val cg = cc(igood)
 	    		val ip = icol(0->igood.length)
-	    		IDict.sortlex2or3cols(bg, ip)
-	    		IDict.treeAdd(IDict(bg, cg(ip), opts.threshold), dd)
+	    		IDict.sortlex2or3cols(bg, ip)                                        // lex sort them
+	    		IDict.treeAdd(IDict(bg, cg(ip), opts.threshold), dd)                 // accumulate them
 	    		print("-")
 	    	}
-	    	if (day == 31 || d == opts.nend - 1) {	    	  
+	    	if (day == 31) {	    	                                               // On the last day, save the accumulated results
 	    		val dx = IDict.treeFlush(dd)
 	    		if (dx != null) {
-	  				val (sv, iv) = sortdown2(dx.counts)
-	  				HMat.saveIMat(opts.fromMonthDir(d)+dictname, dx.grams(iv,?))
-	  				HMat.saveDMat(opts.fromMonthDir(d)+wcountname, sv)
+	  				HMat.saveIMat(opts.fromMonthDir(d)+dictname, dx.grams)
+	  				HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dx.counts)
 	  			}
 	    	}
 	    }
-	    if (day == 31 || d == opts.nend - 1) {
+	    if (day == 31) {                                                         // Unconditionally accumulate monthly dicts
 	  		val fm = new File(opts.fromMonthDir(d) + wcountname)
 	  		if (fm.exists) {
-	  			val bb = HMat.loadIMat(opts.fromMonthDir(d) + dictname)
+	  			val bb = HMat.loadIMat(opts.fromMonthDir(d) + dictname)              // Load the IDict data for this month
 	  			val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
-	  			val ip = icol(0->cc.length)
-	  			val iss = IDict.sortlex2or3cols(bb, ip)
-	    		IDict.treeAdd(IDict(bb, cc(ip), 4*opts.threshold), md)
+	  			val map = mdict --> alldict
+	  			val bm = map(bb)                                                     // Map to global token dictionary
+	    		val igood = find(min(bm, 2) >= 0)                                    // Save the good stuff
+	    		val bg = bm(igood,?)
+	    		val cg = cc(igood)
+	    		val ip = icol(0->igood.length)
+	  			IDict.sortlex2or3cols(bg, ip)
+	    		IDict.treeAdd(IDict(bg, cg(ip), 4*opts.threshold), md)
 	  		}
 	  	}
 	  }
-  	dy = IDict.treeFlush(md)
+  	dy = IDict.treeFlush(md)                                                   // Final dictionary for the time period
   	println
-  	val (sv, iv) = sortdown2(dy.counts)
+  	val (sv, iv) = sortdown2(dy.counts)                                        // Sort down by ngram frequency
   	val dyy = IDict(dy.grams(iv,?), sv)
   	HMat.saveIMat(opts.fromDir + dictname, dyy.grams)
   	HMat.saveDMat(opts.fromDir + wcountname, dyy.counts)
   	dyy
 	}
   
+  // Has trouble with more than two threads
+  
   def gramDicts = {
-    val nthreads = math.max(1, Mat.hasCUDA)
+    val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
       
     for (ithread <- 0 until nthreads) {
       Actor.actor {
-        setGPU(ithread)
+        if (Mat.hasCUDA > 0) setGPU(ithread)
       	val bigramsx = IMat(opts.guessSize, 2)
       	val trigramsx = IMat(opts.guessSize, 3)
       	val bdicts = new Array[IDict](5)
@@ -281,7 +293,7 @@ object Featurizer {
     var mainCounts:String = "/big/twitter/tokenized/allwcount.gz"
     var threshold = 10
     var guessSize = 100000000
-    var nthreads = 4
+    var nthreads = 2
   }
   
  
