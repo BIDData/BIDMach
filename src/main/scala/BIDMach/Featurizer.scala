@@ -8,8 +8,8 @@ import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	
-  def mergeDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
-    val dd = new Array[Dict](5)                                                // Big enough to hold log2(days per month)
+  def mergeDailyDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
+    val dd = new Array[Dict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
   	val md = new Array[Dict]((math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
 	  for (d <- opts.nstart to opts.nend) {
@@ -49,7 +49,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	dyy
 	}
   
-  def mergeIDicts(rebuild:Boolean,dictname:String="bdict.lz4",wcountname:String="bcnts.lz4"):IDict = {
+  def mergeDailyIDicts(rebuild:Boolean,dictname:String="bdict.lz4",wcountname:String="bcnts.lz4"):IDict = {
     val alldict = Dict(HMat.loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
@@ -115,11 +115,61 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	dyy
 	}
   
-  // Has trouble with more than two threads
+  def twitterScanner(opts:Featurizer.Options, dict:Dict, idata:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int) = {
+  	val isstart =  dict(opts.startItem)
+  	val isend =    dict(opts.endItem)
+  	val itstart =  dict(opts.startText)
+  	val itend =    dict(opts.endText)
+  	val ioverrun = dict(opts.overrun)
+  	var active = false
+  	var intext = false
+  	var istatus = -1
+  	var nbi = 0
+  	var ntri = 0
+  	var len = idata.length
+  	var i = 0
+  	while (i < len) {
+  		val tok = idata.data(i)-1
+  		if (tok >= 0) {
+  			if (tok == isstart) {
+  				active = true
+  				istatus += 1
+  			} else if (tok == itstart && active) {     							  
+  				intext = true
+  			} else if (tok == itend || tok == ioverrun) {
+  				intext = false
+  			} else if (tok == isend) {
+  				intext = false
+  				active = false
+  			} else {
+  				if (intext) {
+  					val tok1 = idata.data(i-1)-1
+  					if (tok1 >= 0) {   
+  						if (tok1 != itstart) {
+  							bigramsx(nbi, 0) = tok1
+  							bigramsx(nbi, 1) = tok
+  							nbi += 1
+  							val tok2 = idata.data(i-2)-1
+  							if (tok2 >= 0) {
+  								if (tok2 != itstart) {
+  									trigramsx(ntri, 0) = tok2
+  									trigramsx(ntri, 1) = tok1
+  									trigramsx(ntri, 2) = tok
+  									ntri += 1
+  								}
+  							}
+  						}
+  					}
+  				}
+  			}
+  		}
+  		i += 1
+  	}
+  	(nbi, ntri)
+  }
   
-  def gramDicts = {
+  def gramDicts(scanner:(Featurizer.Options, Dict, IMat, IMat, IMat)=>(Int, Int)) = {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
-      
     for (ithread <- 0 until nthreads) {
       Actor.actor {
         if (Mat.hasCUDA > 0) setGPU(ithread)
@@ -133,74 +183,19 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		val fnew = opts.fromDayDir(idir)+"tcnts.lz4"
       		if (fileExists(fname) && !fileExists(fnew)) {
       			val dict = Dict(loadBMat(fname))
-      			val isstart = dict(opts.startItem)
-      			val isend = dict(opts.endItem)
-      			val itstart = dict(opts.startText)
-      			val itend = dict(opts.endText)
-      			val ioverrun = dict(opts.overrun)
       			for (ifile <- 0 until 24) { 
       				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
-      					var active = false
-      					var intext = false
-      					var istatus = -1
-      					var nbi = 0
-      					var ntri = 0
-      					var len = idata.length
-      					var i = 0
-      					while (i < len) {
-      						val tok = idata.data(i)-1
-      						if (tok >= 0) {
-//      							  println("all: "+dict(tok))
-      							if (tok == isstart) {
-      								active = true
-      								istatus += 1
-      							} else if (tok == itstart && active) {     							  
-      								intext = true
-      							} else if (tok == itend || tok == ioverrun) {
-      								intext = false
-      							} else if (tok == isend) {
-      								intext = false
-      								active = false
-      							} else {
-      							  if (intext) {
-      							  	val tok1 = idata.data(i-1)-1
-      							  	if (tok1 >= 0) {   
-      							  		//      										println("txt: "+dict(tok))
-      							  		if (tok1 != itstart) {
-      							  			//      											  println("txt: "+alldict(tok1)+" "+alldict(tok))
-      							  			bigramsx(nbi, 0) = tok1
-      							  			bigramsx(nbi, 1) = tok
-      							  			nbi += 1
-      							  			val tok2 = idata.data(i-2)-1
-      							  			if (tok2 >= 0) {
-      							  				if (tok2 != itstart) {
-      							  					trigramsx(ntri, 0) = tok2
-      							  					trigramsx(ntri, 1) = tok1
-      							  					trigramsx(ntri, 2) = tok
-      							  					ntri += 1
-      							  				}
-      							  			}
-      							  		}
-      							  	}
-      								}
-      							}
-      						}
-      						i += 1
-      					}
-//      					println("bi=%d, tri=%d" format (nbi, ntri))
+      					val (nbi, ntri) = scanner(opts, dict, idata, bigramsx, trigramsx)
       					val bigrams = bigramsx(0->nbi, ?)
       					val bid = IDict.dictFromData(bigrams)
       					val trigrams = trigramsx(0->ntri, ?)
       					val trid = IDict.dictFromData(trigrams)
-//      					println("bid=%d, trid=%d" format (bid.length, trid.length))
       					IDict.treeAdd(bid, bdicts)
       					IDict.treeAdd(trid, tdicts)      		
       				} 
       			}
-//      			println("merging")
-//      			tic
       			val bf = IDict.treeFlush(bdicts)
       			val tf = IDict.treeFlush(tdicts)
       			saveIMat(opts.fromDayDir(idir) + "bdict.lz4", bf.grams)
