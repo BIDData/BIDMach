@@ -79,12 +79,12 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       						}
       						i += 1
       					}
-      					println("bi=%d, tri=%d" format (nbi, ntri))
+//      					println("bi=%d, tri=%d" format (nbi, ntri))
       					val bigrams = bigramsx(0->nbi, ?)
       					val bid = IDict.dictFromData(bigrams)
       					val trigrams = trigramsx(0->ntri, ?)
       					val trid = IDict.dictFromData(trigrams)
-      					println("bid=%d, trid=%d" format (bid.length, trid.length))
+//      					println("bid=%d, trid=%d" format (bid.length, trid.length))
       					bdicts(ifile) = bid
       					tdicts(ifile) = trid      		
       				} else {
@@ -92,11 +92,11 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       					tdicts(ifile) = null
       				}
       			}
-      			println("merging")
-      			tic
+//      			println("merging")
+//      			tic
       			val bf = IDict.union(bdicts)
       			val tf = IDict.union(tdicts)
-      			println("time=%f" format toc)
+//      			println("time=%f" format toc)
       			saveIMat(opts.fromDir(idir) + "bdict.lz4", bf.grams)
       			saveDMat(opts.fromDir(idir) + "bcnts.lz4", bf.counts)
       			saveIMat(opts.fromDir(idir) + "tdict.lz4", tf.grams)
