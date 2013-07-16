@@ -79,6 +79,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       						}
       						i += 1
       					}
+      					println("bi=%d, tri=%d" format (nbi, ntri))
       					val bigrams = bigramsx(0->nbi, ?)
       					val bid = IDict.dictFromData(bigrams)
       					val trigrams = trigramsx(0->ntri, ?)
@@ -133,7 +134,7 @@ object Featurizer {
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
     var toFile:(Int)=>String = (n:Int) => ("tweet%02d.txt" format n)
     var localDict:String = "dict.gz"
-    var nstart:Int = encodeDate(2011,11,22)
+    var nstart:Int = encodeDate(2012,03,01)
     var nend:Int = encodeDate(2013,3,3)
     var startItem:String = "<status>"
     var endItem:String = "</status>"
