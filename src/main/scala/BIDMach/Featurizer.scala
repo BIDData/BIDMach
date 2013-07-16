@@ -92,8 +92,11 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       					tdicts(ifile) = null
       				}
       			}
+      			println("merging")
+      			tic
       			val bf = IDict.union(bdicts)
       			val tf = IDict.union(tdicts)
+      			println("time=%f" format toc)
       			saveIMat(opts.fromDir(idir) + "bdict.lz4", bf.grams)
       			saveDMat(opts.fromDir(idir) + "bcnts.lz4", bf.counts)
       			saveIMat(opts.fromDir(idir) + "tdict.lz4", tf.grams)
