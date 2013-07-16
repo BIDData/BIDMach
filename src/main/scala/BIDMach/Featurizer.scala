@@ -168,7 +168,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	(nbi, ntri)
   }
   
-  def gramDicts(scanner:(Featurizer.Options, Dict, IMat, IMat, IMat)=>(Int, Int)) = {
+  def gramDicts(scanner:(Featurizer.Options, Dict, IMat, IMat, IMat)=>(Int, Int)=twitterScanner) = {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
