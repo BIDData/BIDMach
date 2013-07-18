@@ -8,7 +8,7 @@ import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	
-  def mergeDailyDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
+  def mergeDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
     val dd = new Array[Dict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
   	val md = new Array[Dict]((math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
@@ -49,7 +49,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	dyy
 	}
   
-  def mergeDailyIDicts(rebuild:Boolean=true,dictname:String="bdict.lz4",wcountname:String="bcnts.lz4"):IDict = {
+  def mergeIDicts(rebuild:Boolean=false, dictname:String="bdict.lz4", wcountname:String="bcnts.lz4"):IDict = {
     val alldict = Dict(HMat.loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
@@ -93,7 +93,6 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  				HMat.saveIMat(opts.fromMonthDir(d)+dictname, dx.grams)
 	  				HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dx.counts)
 	  			}
-	    		println("%04d-%02d" format (year,month))
 	    	}
 	    }
 	    if (day == 31) {                                                         // Unconditionally accumulate monthly dicts
@@ -109,6 +108,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val ip = icol(0->igood.length)
 	  			IDict.sortlexInds(bg, ip)
 	    		IDict.treeAdd(IDict(bg, cg(ip), 4*opts.threshold), md)
+	    		println("%04d-%02d" format (year,month))
 	  		}
 	  	}
 	  }
@@ -122,7 +122,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	}
   
  
-  def gramDicts(scanner:Scanner=TwitterScanner) = {
+  def mkIDicts(scanner:Scanner=TwitterScanner) = {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
