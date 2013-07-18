@@ -54,7 +54,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val alldict = Dict(HMat.loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
-  	val md = new Array[IDict](1+(math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
+  	val md = new Array[IDict](1+(math.log(nmonths)/math.log(2)).toInt)         // Big enough to hold log2(num months)
   	var dy:IDict = null
   	var mdict:Dict = null                                                     
   	var domonth:Boolean = false
@@ -62,12 +62,18 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  for (d <- opts.nstart to opts.nend) {
 	    val (year, month, day) = Featurizer.decodeDate(d)
 	    if (month != lastmonth) {
-	    	mdict = Dict(HMat.loadBMat(opts.fromMonthDir(d) + opts.localDict))     // Load token dictionary for this month
-	    	val fm = new File(opts.fromMonthDir(d) + wcountname)                   // Did we process this month?
-	    	domonth = ! fm.exists
+	      val dfname = opts.fromMonthDir(d) + opts.localDict
+	      if (fileExists(dfname)) {
+	      	mdict = Dict(HMat.loadBMat(dfname))     // Load token dictionary for this month
+	      	val fm = new File(opts.fromMonthDir(d) + wcountname)                 // Did we process this month?
+	      	domonth = rebuild || !fm.exists
+	      } else {
+	        mdict = null
+	        domonth = false
+	      }
 	    	lastmonth = month
 	    }
-	    if (rebuild || domonth) {
+	    if (domonth) {
 	    	val fd = new File(opts.fromDayDir(d) + wcountname)
 	    	if (fd.exists) {
 	    	  val dict = Dict(HMat.loadBMat(opts.fromDayDir(d) + opts.localDict))  // Load token dictionary for this day
