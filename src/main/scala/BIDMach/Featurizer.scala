@@ -79,7 +79,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bm = map(bb2) // Map the ngrams
 	    		val cc2 = cc(ig,0)
 // Done kludge
-	    		val igood = find(min(bm, 2) >= 0)                                    // Find the good ones
+	    		val igood = find(mini(bm, 2) >= 0)                                    // Find the good ones
 	    		val bg = bm(igood,?)
 	    		val cg = cc2(igood)
 	    		val ip = icol(0->igood.length)
