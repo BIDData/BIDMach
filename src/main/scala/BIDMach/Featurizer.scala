@@ -182,7 +182,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val feats = ggn \ gg
     IDict.sortlex(feats)
     val (outr, ix, dmy) = IDict.uniquerows(feats)
-    val fcounts = (ix(1->ix.length) on ix.length) - ix
+    val fcounts = (ix(1->ix.length, 0) on ix.length) - ix
     outr \ fcounts 
   }
   
@@ -195,7 +195,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val feats = ggn \ gmap
     IDict.sortlex(feats)
     val (outr, ix, dmy) = IDict.uniquerows(feats)
-    val fcounts = (ix(1->ix.length) on ix.length) - ix
+    val fcounts = (ix(1->ix.length, 0) on ix.length) - ix
     outr \ fcounts 
   }
   
