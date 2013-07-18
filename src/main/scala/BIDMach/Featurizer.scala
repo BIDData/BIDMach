@@ -73,7 +73,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bb = loadIMat(opts.fromDayDir(d) + dictname)                     // Load IDict info for this day
 	    		val cc = loadDMat(opts.fromDayDir(d) + wcountname)
 	    		val map = dict --> mdict                                             // Map from this days tokens to month dictionary
-// Kludge to deal with scanner problem
+// Kludge to deal with (old) scanner problem
 	    		val ig = find(maxi(bb, 2) < 0x7fffffff)
 	    		val bb2 = bb(ig, ?)
 	    		val bm = map(bb2) // Map the ngrams
@@ -103,7 +103,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  			val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
 	  			val map = mdict --> alldict
 	  			val bm = map(bb)                                                     // Map to global token dictionary
-	    		val igood = find(min(bm, 2) >= 0)                                    // Save the good stuff
+	    		val igood = find(mini(bm, 2) >= 0)                                   // Save the good stuff
 	    		val bg = bm(igood,?)
 	    		val cg = cc(igood)
 	    		val ip = icol(0->igood.length)
@@ -177,7 +177,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   
   def mkGramFeats(map:IMat, gramsx:IMat, ng:Int, alldict:IDict):IMat = {
   	val grams = map(gramsx(0->ng, 0->(gramsx.ncols-1)))
-  	val igood = find(min(grams, 2) >= 0) 
+  	val igood = find(mini(grams, 2) >= 0) 
   	val gg = grams(igood,?)
   	val ggn = gramsx(igood, gramsx.ncols-1)
   	val gmap = IDict(gg) --> alldict
