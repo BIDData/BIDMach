@@ -93,7 +93,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  				HMat.saveIMat(opts.fromMonthDir(d)+dictname, dx.grams)
 	  				HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dx.counts)
 	  			}
-	    		println("")
+	    		println("%04d-%02d" format (year,month))
 	    	}
 	    }
 	    if (day == 31) {                                                         // Unconditionally accumulate monthly dicts
