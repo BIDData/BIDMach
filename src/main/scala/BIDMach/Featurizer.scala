@@ -143,13 +143,13 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       	val bdicts = new Array[IDict](5)
       	val tdicts = new Array[IDict](5)
 
-      	for (idir <- (opts.nstart+ithread) to opts.nend by nthreads) {
-      		val fname = opts.fromDayDir(idir)+opts.localDict
-      		val fnew = opts.fromDayDir(idir)+opts.triCnts
+      	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
+      		val fname = opts.fromDayDir(d)+opts.localDict
+      		val fnew = opts.fromDayDir(d)+opts.triCnts
       		if (fileExists(fname) && !fileExists(fnew)) {
       			val dict = Dict(loadBMat(fname))
       			for (ifile <- 0 until 24) { 
-      				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
+      				val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
       					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, null, bigramsx, trigramsx)
@@ -163,10 +163,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			}
       			val bf = IDict.treeFlush(bdicts)
       			val tf = IDict.treeFlush(tdicts)
-      			saveIMat(opts.fromDayDir(idir) + opts.biDict, bf.grams)
-      			saveDMat(opts.fromDayDir(idir) + opts.biCnts, bf.counts)
-      			saveIMat(opts.fromDayDir(idir) + opts.triDict, tf.grams)
-      			saveDMat(opts.fromDayDir(idir) + opts.triCnts, tf.counts)
+      			saveIMat(opts.fromDayDir(d) + opts.biDict, bf.grams)
+      			saveDMat(opts.fromDayDir(d) + opts.biCnts, bf.counts)
+      			saveIMat(opts.fromDayDir(d) + opts.triDict, tf.grams)
+      			saveDMat(opts.fromDayDir(d) + opts.triCnts, tf.counts)
       			print(".")
       		}
       	}
@@ -211,29 +211,35 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
 
-      	for (idir <- (opts.nstart+ithread) to opts.nend by nthreads) {
-      		val fdict = opts.fromDayDir(idir)+opts.localDict
+      	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
+      	  val (year, month, day) = Featurizer.decodeDate(d)
+      		val fdict = opts.fromDayDir(d)+opts.localDict
       		if (fileExists(fdict)) {
-      			val dict = Dict(loadBMat(fdict))
-      			val map = dict --> alldict
-      			val fd = new File(opts.toDayDir(idir))
+      			var dict:Dict = null 
+      			var map:IMat = null
+      			val fd = new File(opts.toDayDir(d))
       			if (!fd.exists) fd.mkdirs
       			for (ifile <- 0 until 24) { 
-      				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
-      				val fx = opts.toDayDir(idir)+opts.toTriFeats(ifile)
+      				val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
+      				val fx = opts.toDayDir(d)+opts.toTriFeats(ifile)
       				if (fileExists(fn) && (rebuild || !fileExists(fx))) {
+      				  if (dict == null) {
+      				    dict = Dict(loadBMat(fdict))
+      				    map = dict --> alldict
+      				  }
       					val idata = loadIMat(fn)
       					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx)
       					val unifeats = mkUniFeats(map, unigramsx, nuni)
       					val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
       					val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
-      					saveIMat(opts.toDayDir(idir) + opts.toUniFeats(ifile), unifeats)
-      					saveIMat(opts.toDayDir(idir) + opts.toBiFeats(ifile), bifeats)
-      					saveIMat(opts.toDayDir(idir) + opts.toTriFeats(ifile), trifeats)
+      					saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
+      					saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
+      					saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
       				} 
+      				print(".")
       			}
-      			print(".")
       		}
+      	  if (ithread == 0 && day == 31) println("%04d-%02d" format (year,month))
       	}
       }
     }
