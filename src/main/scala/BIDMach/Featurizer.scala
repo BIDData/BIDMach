@@ -7,6 +7,10 @@ import scala.actors._
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
+  
+  var alldict:Dict = null
+  var allbdict:IDict = null
+  var alltdict:IDict = null
   	
   def mergeDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
     val dd = new Array[Dict](5)                                               // Big enough to hold log2(days per month)
@@ -51,7 +55,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	}
   
   def mergeIDicts(rebuild:Boolean=false, dictname:String="bdict.lz4", wcountname:String="bcnts.lz4"):IDict = {
-    val alldict = Dict(HMat.loadBMat(opts.mainDict))
+    if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
   	val md = new Array[IDict](1+(math.log(nmonths)/math.log(2)).toInt)         // Big enough to hold log2(num months)
@@ -196,9 +200,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   }
   
   def featurize(scanner:Scanner=TwitterScanner, rebuild:Boolean=false) = {
-  	val alldict = Dict(HMat.loadBMat(opts.mainDict))
-  	val allbdict = IDict(HMat.loadIMat(opts.mainDir + opts.biDict))
-  	val alltdict = IDict(HMat.loadIMat(opts.mainDir + opts.triDict))
+    if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
+  	if (allbdict == null) allbdict = IDict(HMat.loadIMat(opts.mainDir + opts.biDict))
+  	if (alltdict == null) alltdict = IDict(HMat.loadIMat(opts.mainDir + opts.triDict))
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
