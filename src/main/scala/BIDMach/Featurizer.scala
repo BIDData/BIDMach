@@ -238,7 +238,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			}
       	  print(".")
       		}
-      	  if (ithread == 0 && day/nthreads == 15) println("%04d-%02d" format (year,month))
+      	  if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
       	}
       }
     }
@@ -286,9 +286,9 @@ object Featurizer {
     var fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
     var toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName + "%04d/%02d/%02d/") 
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
-    var toUniFeats:(Int)=>String = (n:Int) => ("unifeats%02d.bin" format n)
-    var toBiFeats:(Int)=>String = (n:Int) => ("bifeats%02d.bin" format n)
-    var toTriFeats:(Int)=>String = (n:Int) => ("trifeats%02d.bin" format n)
+    var toUniFeats:(Int)=>String = (n:Int) => ("unifeats%02d.lz4" format n)
+    var toBiFeats:(Int)=>String = (n:Int) => ("bifeats%02d.lz4" format n)
+    var toTriFeats:(Int)=>String = (n:Int) => ("trifeats%02d.lz4" format n)
     var localDict:String = "dict.gz"
     var biDict:String = "bdict.lz4"
     var triDict:String = "tdict.lz4"
