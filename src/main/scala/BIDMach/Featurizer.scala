@@ -73,12 +73,17 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bb = loadIMat(opts.fromDayDir(d) + dictname)                     // Load IDict info for this day
 	    		val cc = loadDMat(opts.fromDayDir(d) + wcountname)
 	    		val map = dict --> mdict                                             // Map from this days tokens to month dictionary
-	    		val bm = map(bb)                                                     // Map the ngrams
+// Kludge to deal with scanner problem
+	    		val ig = find(maxi(bb, 2) < 0x7fffffff)
+	    		val bb2 = bb(ig, ?)
+	    		val bm = map(bb2) // Map the ngrams
+	    		val cc2 = cc(ig,0)
+// Done kludge
 	    		val igood = find(min(bm, 2) >= 0)                                    // Find the good ones
 	    		val bg = bm(igood,?)
-	    		val cg = cc(igood)
+	    		val cg = cc2(igood)
 	    		val ip = icol(0->igood.length)
-	    		IDict.sortlexInds(bg, ip)                                        // lex sort them
+	    		IDict.sortlexInds(bg, ip)                                            // lex sort them
 	    		IDict.treeAdd(IDict(bg, cg(ip), opts.threshold), dd)                 // accumulate them
 	    		print(".")
 	    	}
@@ -274,8 +279,6 @@ object Featurizer {
     var guessSize = 100000000
     var nthreads = 2
   }
-  
- 
 }
 
 trait Scanner { 
@@ -301,8 +304,8 @@ object TwitterScanner extends Scanner {
 		var len = idata.length
 		var i = 0
 		while (i < len) {
-			val tok = idata.data(i)-1
-			if (tok >= 0) {
+			if (idata.data(i) > 0) {
+				val tok = idata.data(i)-1
 				if (tok == isstart) {
 					instatus = true
 					istatus += 1
@@ -325,15 +328,15 @@ object TwitterScanner extends Scanner {
 							unigramsx(nuni, 1) = istatus
 							nuni += 1
 						}
-						val tok1 = idata.data(i-1)-1
-						if (tok1 >= 0) {   
+						if (idata.data(i-1) > 0) {  
+							val tok1 = idata.data(i-1)-1
 							if (tok1 != itstart) {
 								bigramsx(nbi, 0) = tok1
 								bigramsx(nbi, 1) = tok
 								bigramsx(nbi, 2) = istatus
 								nbi += 1
-								val tok2 = idata.data(i-2)-1
-								if (tok2 >= 0) {
+								if (idata.data(i-2) > 0) {
+									val tok2 = idata.data(i-2)-1
 									if (tok2 != itstart) {
 										trigramsx(ntri, 0) = tok2
 										trigramsx(ntri, 1) = tok1
