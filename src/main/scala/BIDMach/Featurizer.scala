@@ -11,7 +11,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   def mergeDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
     val dd = new Array[Dict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
-  	val md = new Array[Dict]((math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
+  	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
 	  for (d <- opts.nstart to opts.nend) {
 	    val (year, month, day) = Featurizer.decodeDate(d)
 	  	val fm = new File(opts.fromMonthDir(d) + wcountname)
@@ -21,7 +21,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bb = HMat.loadBMat(opts.fromDayDir(d) + dictname)
 	    		val cc = HMat.loadIMat(opts.fromDayDir(d) + wcountname)
 	    		Dict.treeAdd(Dict(bb, cc, opts.threshold), dd)
-	    		print("+")
+	    		print(".")
 	    	}
 	    	if (day == 31) {	    	  
 	    		val dx = Dict.treeFlush(dd)
@@ -37,6 +37,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  			val bb = HMat.loadBMat(opts.fromMonthDir(d) + dictname)
 	  			val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
 	  			Dict.treeAdd(Dict(bb, cc, 4*opts.threshold), md)
+	  			println("%04d-%02d" format (year,month))
 	  		}
 	  	}
 	  }
@@ -53,7 +54,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val alldict = Dict(HMat.loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
-  	val md = new Array[IDict]((math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
+  	val md = new Array[IDict](1+(math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
   	var dy:IDict = null
   	var mdict:Dict = null                                                     
   	var domonth:Boolean = false
