@@ -139,7 +139,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       	val bdicts = new Array[IDict](5)
       	val tdicts = new Array[IDict](5)
 
-      	for (idir <- (opts.nstart+ithread) until opts.nend by nthreads) {
+      	for (idir <- (opts.nstart+ithread) to opts.nend by nthreads) {
       		val fname = opts.fromDayDir(idir)+opts.localDict
       		val fnew = opts.fromDayDir(idir)+opts.triCnts
       		if (fileExists(fname) && !fileExists(fnew)) {
@@ -195,7 +195,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     outr \ fcounts 
   }
   
-  def featurize(scanner:Scanner=TwitterScanner) = {
+  def featurize(scanner:Scanner=TwitterScanner, rebuild:Boolean=false) = {
   	val alldict = Dict(HMat.loadBMat(opts.mainDict))
   	val allbdict = IDict(HMat.loadIMat(opts.mainDir + opts.biDict))
   	val alltdict = IDict(HMat.loadIMat(opts.mainDir + opts.triDict))
@@ -207,21 +207,22 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
 
-      	for (idir <- (opts.nstart+ithread) until opts.nend by nthreads) {
+      	for (idir <- (opts.nstart+ithread) to opts.nend by nthreads) {
       		val fdict = opts.fromDayDir(idir)+opts.localDict
       		if (fileExists(fdict)) {
       			val dict = Dict(loadBMat(fdict))
       			val map = dict --> alldict
+      			val fd = new File(opts.toDayDir(idir))
+      			if (!fd.exists) fd.mkdirs
       			for (ifile <- 0 until 24) { 
       				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
-      				if (fileExists(fn)) {
+      				val fx = opts.toDayDir(idir)+opts.toTriFeats(ifile)
+      				if (fileExists(fn) && (rebuild || !fileExists(fx))) {
       					val idata = loadIMat(fn)
       					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx)
       					val unifeats = mkUniFeats(map, unigramsx, nuni)
       					val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
       					val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
-      					val fd = new File(opts.toDayDir(idir))
-      					if (!fd.exists) fd.mkdirs
       					saveIMat(opts.toDayDir(idir) + opts.toUniFeats(ifile), unifeats)
       					saveIMat(opts.toDayDir(idir) + opts.toBiFeats(ifile), bifeats)
       					saveIMat(opts.toDayDir(idir) + opts.toTriFeats(ifile), trifeats)
@@ -285,7 +286,7 @@ object Featurizer {
     var biCnts:String = "bcnts.lz4"
     var triCnts:String = "tcnts.lz4"
     var nstart:Int = encodeDate(2011,11,22)
-    var nend:Int = encodeDate(2013,4,1)
+    var nend:Int = encodeDate(2013,3,31)
     var threshold = 10
     var guessSize = 100000000
     var nthreads = 2
