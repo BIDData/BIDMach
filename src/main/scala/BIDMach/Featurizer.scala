@@ -199,7 +199,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     outr \ fcounts 
   }
   
-  def featurize(scanner:Scanner=TwitterScanner, rebuild:Boolean=false) = {
+  def featurize(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {
     if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
   	if (allbdict == null) allbdict = IDict(HMat.loadIMat(opts.mainDir + opts.biDict))
   	if (alltdict == null) alltdict = IDict(HMat.loadIMat(opts.mainDir + opts.triDict))
