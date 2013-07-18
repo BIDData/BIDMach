@@ -210,7 +210,6 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
         val unigramsx = IMat(opts.guessSize, 2)
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
-
       	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
       	  val (year, month, day) = Featurizer.decodeDate(d)
       		val fdict = opts.fromDayDir(d)+opts.localDict
@@ -236,10 +235,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       					saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
       					saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
       				} 
-      				print(".")
       			}
+      	  print(".")
       		}
-      	  if (ithread == 0 && day == 31) println("%04d-%02d" format (year,month))
+      	  if (ithread == 0 && day/nthreads == 15) println("%04d-%02d" format (year,month))
       	}
       }
     }
