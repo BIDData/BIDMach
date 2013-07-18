@@ -70,17 +70,17 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    	val fd = new File(opts.fromDayDir(d) + wcountname)
 	    	if (fd.exists) {
 	    	  val dict = Dict(HMat.loadBMat(opts.fromDayDir(d) + opts.localDict))  // Load token dictionary for this day
-	    		val bb = HMat.loadIMat(opts.fromDayDir(d) + dictname)                // Load IDict info for this day
-	    		val cc = HMat.loadDMat(opts.fromDayDir(d) + wcountname)
+	    		val bb = loadIMat(opts.fromDayDir(d) + dictname)                // Load IDict info for this day
+	    		val cc = loadDMat(opts.fromDayDir(d) + wcountname)
 	    		val map = dict --> mdict                                             // Map from this days tokens to month dictionary
 	    		val bm = map(bb)                                                     // Map the ngrams
 	    		val igood = find(min(bm, 2) >= 0)                                    // Find the good ones
 	    		val bg = bm(igood,?)
 	    		val cg = cc(igood)
 	    		val ip = icol(0->igood.length)
-	    		IDict.sortlex2or3cols(bg, ip)                                        // lex sort them
+	    		IDict.sortlexInds(bg, ip)                                        // lex sort them
 	    		IDict.treeAdd(IDict(bg, cg(ip), opts.threshold), dd)                 // accumulate them
-	    		print("-")
+	    		print(".")
 	    	}
 	    	if (day == 31) {	    	                                               // On the last day, save the accumulated results
 	    		val dx = IDict.treeFlush(dd)
@@ -88,6 +88,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  				HMat.saveIMat(opts.fromMonthDir(d)+dictname, dx.grams)
 	  				HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dx.counts)
 	  			}
+	    		println("")
 	    	}
 	    }
 	    if (day == 31) {                                                         // Unconditionally accumulate monthly dicts
@@ -101,7 +102,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bg = bm(igood,?)
 	    		val cg = cc(igood)
 	    		val ip = icol(0->igood.length)
-	  			IDict.sortlex2or3cols(bg, ip)
+	  			IDict.sortlexInds(bg, ip)
 	    		IDict.treeAdd(IDict(bg, cg(ip), 4*opts.threshold), md)
 	  		}
 	  	}
@@ -116,19 +117,23 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	}
   
   trait Scanner { 
-  	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int)
+  	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int, Int)
   }
   
   object TwitterScanner extends Scanner {  
-  	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int) = {
-  		val isstart =  dict(opts.startItem)
-  		val isend =    dict(opts.endItem)
-  		val itstart =  dict(opts.startText)
-  		val itend =    dict(opts.endText)
-  		val ioverrun = dict(opts.overrun)
-  		var active = false
+  	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int, Int) = {
+  		val isstart =  dict("<status>")
+  		val isend =    dict("</status>")
+  		val irstart =  dict("<retweet>")
+  		val irend =    dict("</retweet>")
+  		val itstart =  dict("<text>")
+  		val itend =    dict("</text>")
+  		val ioverrun = dict("<user>")
+  		var instatus = false
   		var intext = false
+  		var inretweet = false
   		var istatus = -1
+  		var nuni = 0
   		var nbi = 0
   		var ntri = 0
   		var len = idata.length
@@ -137,22 +142,33 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   			val tok = idata.data(i)-1
   			if (tok >= 0) {
   				if (tok == isstart) {
-  					active = true
+  					instatus = true
   					istatus += 1
-  				} else if (tok == itstart && active) {     							  
+  				} else if (tok == itstart && instatus) {     							  
   					intext = true
   				} else if (tok == itend || tok == ioverrun) {
   					intext = false
   				} else if (tok == isend) {
   					intext = false
-  					active = false
+  					instatus = false
+  					inretweet = false
+  				} else if (tok == irstart) {
+  				  inretweet = true
+  				} else if (tok == irend) {
+  				  inretweet = false
   				} else {
   					if (intext) {
+  					  if (unigramsx != null) {
+  					  	unigramsx(nuni, 0) = tok
+  					  	unigramsx(nuni, 1) = istatus
+  					  	nuni += 1
+  					  }
   						val tok1 = idata.data(i-1)-1
   						if (tok1 >= 0) {   
   							if (tok1 != itstart) {
   								bigramsx(nbi, 0) = tok1
   								bigramsx(nbi, 1) = tok
+  								bigramsx(nbi, 2) = istatus
   								nbi += 1
   								val tok2 = idata.data(i-2)-1
   								if (tok2 >= 0) {
@@ -160,6 +176,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   										trigramsx(ntri, 0) = tok2
   										trigramsx(ntri, 1) = tok1
   										trigramsx(ntri, 2) = tok
+  										trigramsx(ntri, 3) = istatus
   										ntri += 1
   									}
   								}
@@ -170,7 +187,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   			}
   			i += 1
   		}
-  		(nbi, ntri)
+  		(nuni, nbi, ntri)
   	}
   }
   
@@ -179,8 +196,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     for (ithread <- 0 until nthreads) {
       Actor.actor {
         if (Mat.hasCUDA > 0) setGPU(ithread)
-      	val bigramsx = IMat(opts.guessSize, 2)
-      	val trigramsx = IMat(opts.guessSize, 3)
+      	val bigramsx = IMat(opts.guessSize, 3)
+      	val trigramsx = IMat(opts.guessSize, 4)
       	val bdicts = new Array[IDict](5)
       	val tdicts = new Array[IDict](5)
 
@@ -193,10 +210,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
-      					val (nbi, ntri) = scanner.scan(opts, dict, idata, bigramsx, trigramsx)
-      					val bigrams = bigramsx(0->nbi, ?)
+      					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, null, bigramsx, trigramsx)
+      					val bigrams = bigramsx(0->nbi, 0->2)
       					val bid = IDict.dictFromData(bigrams)
-      					val trigrams = trigramsx(0->ntri, ?)
+      					val trigrams = trigramsx(0->ntri, 0->3)
       					val trid = IDict.dictFromData(trigrams)
       					IDict.treeAdd(bid, bdicts)
       					IDict.treeAdd(trid, tdicts)      		
@@ -208,6 +225,70 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			saveDMat(opts.fromDayDir(idir) + "bcnts.lz4", bf.counts)
       			saveIMat(opts.fromDayDir(idir) + "tdict.lz4", tf.grams)
       			saveDMat(opts.fromDayDir(idir) + "tcnts.lz4", tf.counts)
+      			print(".")
+      		}
+      	}
+      }
+    }
+  }
+  
+  def mkUniFeats(map:IMat, gramsx:IMat, ng:Int):IMat = {
+  	val unis = map(gramsx(0->ng, 0))
+  	val igood = find(unis >= 0) 
+  	val gg = unis(igood)
+  	val ggn = gramsx(igood, 1)
+    val feats = ggn \ gg
+    IDict.sortlex(feats)
+    val (outr, ix, dmy) = IDict.uniquerows(feats)
+    val fcounts = (ix(1->ix.length) on ix.length) - ix
+    outr \ fcounts 
+  }
+  
+  def mkGramFeats(map:IMat, gramsx:IMat, ng:Int, alldict:IDict):IMat = {
+  	val grams = map(gramsx(0->ng, 0->(gramsx.ncols-1)))
+  	val igood = find(min(grams, 2) >= 0) 
+  	val gg = grams(igood,?)
+  	val ggn = gramsx(igood, gramsx.ncols-1)
+  	val gmap = IDict(gg) --> alldict
+    val feats = ggn \ gmap
+    IDict.sortlex(feats)
+    val (outr, ix, dmy) = IDict.uniquerows(feats)
+    val fcounts = (ix(1->ix.length) on ix.length) - ix
+    outr \ fcounts 
+  }
+  
+  def featurize(scanner:Scanner=TwitterScanner) = {
+  	val alldict = Dict(HMat.loadBMat(opts.mainDict))
+  	val allbdict = IDict(HMat.loadIMat(opts.fromDir + opts.biDict))
+  	val alltdict = IDict(HMat.loadIMat(opts.fromDir + opts.triDict))
+    val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
+    for (ithread <- 0 until nthreads) {
+      Actor.actor {
+        if (Mat.hasCUDA > 0) setGPU(ithread)
+        val unigramsx = IMat(opts.guessSize, 2)
+      	val bigramsx = IMat(opts.guessSize, 3)
+      	val trigramsx = IMat(opts.guessSize, 4)
+
+      	for (idir <- (opts.nstart+ithread) until opts.nend by nthreads) {
+      		val ftridict = opts.fromDayDir(idir)+opts.triDict
+      		if (fileExists(ftridict)) {
+      			val dict = Dict(loadBMat(opts.fromDayDir(idir)+opts.localDict))
+      			val map = dict --> alldict
+      			for (ifile <- 0 until 24) { 
+      				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
+      				if (fileExists(fn)) {
+      					val idata = loadIMat(fn)
+      					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx)
+      					val unifeats = mkUniFeats(map, unigramsx, nuni)
+      					val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
+      					val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
+      					val fd = new File(opts.toDayDir(idir))
+      					if (!fd.exists) fd.mkdirs
+      					saveIMat(opts.toDayDir(idir) + "unifeats.bin", unifeats)
+      					saveIMat(opts.toDayDir(idir) + "bifeats.bin", bifeats)
+      					saveIMat(opts.toDayDir(idir) + "trifeats.bin", trifeats)
+      				} 
+      			}
       			print(".")
       		}
       	}
@@ -247,23 +328,22 @@ object Featurizer {
   }
   
   class Options {
-    var fromDayDir:(Int)=>String = dirxMap("/disk%02d/twitter/tokenized/%04d/%02d/%02d/")
-    var fromDir = "/big/twitter/tokenized/"
+    var tokDirName = ()=>"twitter/tokenized/"
+    var featDirName = ()=>"twitter/featurized/"
+  	var fromDir = "/big/" + tokDirName
+  	var fromYearDir:(Int)=>String = dirMap(fromDir + "%04d/")
     var fromMonthDir:(Int)=>String = dirMap(fromDir + "%04d/%02d/")
-    var fromYearDir:(Int)=>String = dirMap(fromDir + "%04d/")
-    var toDayDir:(Int)=>String = dirMap("/disk%02d/twitter/featurized/%04d/%02d/%02d/") 
+    var fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
+    var toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName + "%04d/%02d/%02d/") 
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
     var toFile:(Int)=>String = (n:Int) => ("tweet%02d.txt" format n)
     var localDict:String = "dict.gz"
+    var biDict:String = "bdict.lz4"
+    var triDict:String = "tdict.lz4"
+    var mainDict:String = "/big/" + tokDirName + "alldict.gz"
+    var mainCounts:String = "/big/" + tokDirName + "allwcount.gz"
     var nstart:Int = encodeDate(2011,11,22)
-    var nend:Int = encodeDate(2013,3,3)
-    var startItem:String = "<status>"
-    var endItem:String = "</status>"
-    var startText:String = "<text>"
-    var endText:String = "</text>"
-    var overrun:String = "<user>"
-    var mainDict:String = "/big/twitter/tokenized/alldict.gz"
-    var mainCounts:String = "/big/twitter/tokenized/allwcount.gz"
+    var nend:Int = encodeDate(2013,4,1)
     var threshold = 10
     var guessSize = 100000000
     var nthreads = 2
