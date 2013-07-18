@@ -49,7 +49,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	dyy
 	}
   
-  def mergeDailyIDicts(rebuild:Boolean,dictname:String="bdict.lz4",wcountname:String="bcnts.lz4"):IDict = {
+  def mergeDailyIDicts(rebuild:Boolean=true,dictname:String="bdict.lz4",wcountname:String="bcnts.lz4"):IDict = {
     val alldict = Dict(HMat.loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
@@ -330,18 +330,18 @@ object Featurizer {
   class Options {
     var tokDirName = ()=>"twitter/tokenized/"
     var featDirName = ()=>"twitter/featurized/"
-  	var fromDir = "/big/" + tokDirName
+  	var fromDir = "/big/" + tokDirName()
   	var fromYearDir:(Int)=>String = dirMap(fromDir + "%04d/")
     var fromMonthDir:(Int)=>String = dirMap(fromDir + "%04d/%02d/")
-    var fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
-    var toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName + "%04d/%02d/%02d/") 
+    var fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName() + "%04d/%02d/%02d/")
+    var toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName() + "%04d/%02d/%02d/") 
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
     var toFile:(Int)=>String = (n:Int) => ("tweet%02d.txt" format n)
     var localDict:String = "dict.gz"
     var biDict:String = "bdict.lz4"
     var triDict:String = "tdict.lz4"
-    var mainDict:String = "/big/" + tokDirName + "alldict.gz"
-    var mainCounts:String = "/big/" + tokDirName + "allwcount.gz"
+    var mainDict:String = "/big/" + tokDirName() + "alldict.gz"
+    var mainCounts:String = "/big/" + tokDirName() + "allwcount.gz"
     var nstart:Int = encodeDate(2011,11,22)
     var nend:Int = encodeDate(2013,4,1)
     var threshold = 10
