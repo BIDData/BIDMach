@@ -45,8 +45,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val dy = Dict.treeFlush(md)
   	val (sv, iv) = sortdown2(dy.counts)
   	val dyy = Dict(dy.cstr(iv), sv)
-  	HMat.saveBMat(opts.fromDir + dictname, BMat(dyy.cstr))
-  	HMat.saveDMat(opts.fromDir + wcountname, dyy.counts)
+  	HMat.saveBMat(opts.mainDir + dictname, BMat(dyy.cstr))
+  	HMat.saveDMat(opts.mainDir + wcountname, dyy.counts)
   	dyy
 	}
   
@@ -64,7 +64,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    if (month != lastmonth) {
 	      val dfname = opts.fromMonthDir(d) + opts.localDict
 	      if (fileExists(dfname)) {
-	      	mdict = Dict(HMat.loadBMat(dfname))     // Load token dictionary for this month
+	      	mdict = Dict(HMat.loadBMat(dfname))                                  // Load token dictionary for this month
 	      	val fm = new File(opts.fromMonthDir(d) + wcountname)                 // Did we process this month?
 	      	domonth = rebuild || !fm.exists
 	      } else {
@@ -123,8 +123,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	println
   	val (sv, iv) = sortdown2(dy.counts)                                        // Sort down by ngram frequency
   	val dyy = IDict(dy.grams(iv,?), sv)
-  	HMat.saveIMat(opts.fromDir + dictname, dyy.grams)
-  	HMat.saveDMat(opts.fromDir + wcountname, dyy.counts)
+  	HMat.saveIMat(opts.mainDir + dictname, dyy.grams)
+  	HMat.saveDMat(opts.mainDir + wcountname, dyy.counts)
   	dyy
 	}
   
@@ -141,7 +141,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 
       	for (idir <- (opts.nstart+ithread) until opts.nend by nthreads) {
       		val fname = opts.fromDayDir(idir)+opts.localDict
-      		val fnew = opts.fromDayDir(idir)+"tcnts.lz4"
+      		val fnew = opts.fromDayDir(idir)+opts.triCnts
       		if (fileExists(fname) && !fileExists(fnew)) {
       			val dict = Dict(loadBMat(fname))
       			for (ifile <- 0 until 24) { 
@@ -159,10 +159,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			}
       			val bf = IDict.treeFlush(bdicts)
       			val tf = IDict.treeFlush(tdicts)
-      			saveIMat(opts.fromDayDir(idir) + "bdict.lz4", bf.grams)
-      			saveDMat(opts.fromDayDir(idir) + "bcnts.lz4", bf.counts)
-      			saveIMat(opts.fromDayDir(idir) + "tdict.lz4", tf.grams)
-      			saveDMat(opts.fromDayDir(idir) + "tcnts.lz4", tf.counts)
+      			saveIMat(opts.fromDayDir(idir) + opts.biDict, bf.grams)
+      			saveDMat(opts.fromDayDir(idir) + opts.biCnts, bf.counts)
+      			saveIMat(opts.fromDayDir(idir) + opts.triDict, tf.grams)
+      			saveDMat(opts.fromDayDir(idir) + opts.triCnts, tf.counts)
       			print(".")
       		}
       	}
@@ -197,8 +197,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   
   def featurize(scanner:Scanner=TwitterScanner) = {
   	val alldict = Dict(HMat.loadBMat(opts.mainDict))
-  	val allbdict = IDict(HMat.loadIMat(opts.fromDir + opts.biDict))
-  	val alltdict = IDict(HMat.loadIMat(opts.fromDir + opts.triDict))
+  	val allbdict = IDict(HMat.loadIMat(opts.mainDir + opts.biDict))
+  	val alltdict = IDict(HMat.loadIMat(opts.mainDir + opts.triDict))
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
@@ -208,9 +208,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       	val trigramsx = IMat(opts.guessSize, 4)
 
       	for (idir <- (opts.nstart+ithread) until opts.nend by nthreads) {
-      		val ftridict = opts.fromDayDir(idir)+opts.triDict
-      		if (fileExists(ftridict)) {
-      			val dict = Dict(loadBMat(opts.fromDayDir(idir)+opts.localDict))
+      		val fdict = opts.fromDayDir(idir)+opts.localDict
+      		if (fileExists(fdict)) {
+      			val dict = Dict(loadBMat(fdict))
       			val map = dict --> alldict
       			for (ifile <- 0 until 24) { 
       				val fn = opts.fromDayDir(idir)+opts.fromFile(ifile)
@@ -222,9 +222,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       					val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
       					val fd = new File(opts.toDayDir(idir))
       					if (!fd.exists) fd.mkdirs
-      					saveIMat(opts.toDayDir(idir) + "unifeats.bin", unifeats)
-      					saveIMat(opts.toDayDir(idir) + "bifeats.bin", bifeats)
-      					saveIMat(opts.toDayDir(idir) + "trifeats.bin", trifeats)
+      					saveIMat(opts.toDayDir(idir) + opts.toUniFeats(ifile), unifeats)
+      					saveIMat(opts.toDayDir(idir) + opts.toBiFeats(ifile), bifeats)
+      					saveIMat(opts.toDayDir(idir) + opts.toTriFeats(ifile), trifeats)
       				} 
       			}
       			print(".")
@@ -266,20 +266,24 @@ object Featurizer {
   }
   
   class Options {
-    var tokDirName = ()=>"twitter/tokenized/"
-    var featDirName = ()=>"twitter/featurized/"
-  	var fromDir = "/big/" + tokDirName()
-  	var fromYearDir:(Int)=>String = dirMap(fromDir + "%04d/")
-    var fromMonthDir:(Int)=>String = dirMap(fromDir + "%04d/%02d/")
-    var fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName() + "%04d/%02d/%02d/")
-    var toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName() + "%04d/%02d/%02d/") 
+    var tokDirName = "twitter/tokenized/"
+    var featDirName = "twitter/featurized/"
+  	var mainDir = "/big/" + tokDirName
+  	var mainDict:String = "/big/" + tokDirName + "alldict.gz"
+    var mainCounts:String = "/big/" + tokDirName + "allwcount.gz"
+  	var fromYearDir:(Int)=>String = dirMap(mainDir + "%04d/")
+    var fromMonthDir:(Int)=>String = dirMap(mainDir + "%04d/%02d/")
+    var fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
+    var toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName + "%04d/%02d/%02d/") 
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
-    var toFile:(Int)=>String = (n:Int) => ("tweet%02d.txt" format n)
+    var toUniFeats:(Int)=>String = (n:Int) => ("unifeats%02d.bin" format n)
+    var toBiFeats:(Int)=>String = (n:Int) => ("bifeats%02d.bin" format n)
+    var toTriFeats:(Int)=>String = (n:Int) => ("trifeats%02d.bin" format n)
     var localDict:String = "dict.gz"
     var biDict:String = "bdict.lz4"
     var triDict:String = "tdict.lz4"
-    var mainDict:String = "/big/" + tokDirName() + "alldict.gz"
-    var mainCounts:String = "/big/" + tokDirName() + "allwcount.gz"
+    var biCnts:String = "bcnts.lz4"
+    var triCnts:String = "tcnts.lz4"
     var nstart:Int = encodeDate(2011,11,22)
     var nend:Int = encodeDate(2013,4,1)
     var threshold = 10
