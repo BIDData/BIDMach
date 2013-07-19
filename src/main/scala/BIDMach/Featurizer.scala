@@ -94,7 +94,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bg = bm(igood,?)
 	    		val cg = cc2(igood)
 	    		val ip = icol(0->igood.length)
-	    		IDict.sortlexInds(bg, ip)                                            // lex sort them
+	    		sortlexInds(bg, ip)                                            // lex sort them
 	    		IDict.treeAdd(IDict(bg, cg(ip), opts.threshold), dd)                 // accumulate them
 	    		print(".")
 	    	}
@@ -117,7 +117,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bg = bm(igood,?)
 	    		val cg = cc(igood)
 	    		val ip = icol(0->igood.length)
-	  			IDict.sortlexInds(bg, ip)
+	  			sortlexInds(bg, ip)
 	    		IDict.treeAdd(IDict(bg, cg(ip), 4*opts.threshold), md)
 	    		println("%04d-%02d" format (year,month))
 	  		}
@@ -182,8 +182,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val gg = unis(igood, 0)
   	val ggn = gramsx(igood, 1)
     val feats = ggn \ gg
-    IDict.sortlex(feats)
-    val (outr, ix, iy) = IDict.uniquerows(feats)
+    sortlex(feats)
+    val (outr, ix, iy) = uniquerows(feats)
     val fcounts = (ix(1->ix.length, 0) on iy.length) - ix
     outr \ fcounts 
   }
@@ -196,8 +196,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val gmap = IDict(gg) --> alldict
   	val igood2 = find(gmap >= 0)
     val feats = ggn(igood2,0) \ gmap(igood2,0)
-    IDict.sortlex(feats)
-    val (outr, ix, iy) = IDict.uniquerows(feats)
+    sortlex(feats)
+    val (outr, ix, iy) = uniquerows(feats)
     val fcounts = (ix(1->ix.length, 0) on iy.length) - ix
     outr \ fcounts 
   }
@@ -234,9 +234,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  		val unifeats = mkUniFeats(map, unigramsx, nuni)
       		  		val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
       		  		val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
-      		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats.t)
-      		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats.t)
-      		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats.t)
+      		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
+      		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
+      		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
       		  	} 
       		  }
       		print(".")
