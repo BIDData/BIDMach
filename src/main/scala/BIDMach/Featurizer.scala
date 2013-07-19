@@ -22,8 +22,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    if (rebuild || ! fm.exists) {
 	    	val fd = new File(opts.fromDayDir(d) + wcountname)
 	    	if (fd.exists) {
-	    		val bb = HMat.loadBMat(opts.fromDayDir(d) + dictname)
-	    		val cc = HMat.loadIMat(opts.fromDayDir(d) + wcountname)
+	    		val bb = loadBMat(opts.fromDayDir(d) + dictname)
+	    		val cc = loadIMat(opts.fromDayDir(d) + wcountname)
 	    		Dict.treeAdd(Dict(bb, cc, opts.threshold), dd)
 	    		print(".")
 	    	}
@@ -31,15 +31,15 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val dx = Dict.treeFlush(dd)
 	    		val (sv, iv) = sortdown2(dx.counts)
 	    		val dxx = Dict(dx.cstr(iv), sv)
-	    		HMat.saveBMat(opts.fromMonthDir(d)+dictname, BMat(dxx.cstr))
-	    		HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
+	    		saveBMat(opts.fromMonthDir(d)+dictname, BMat(dxx.cstr))
+	    		saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
 	    	}
 	    }
 	    if (day == 31) {
 	  		val fm = new File(opts.fromMonthDir(d) + wcountname)
 	  		if (fm.exists) {
-	  			val bb = HMat.loadBMat(opts.fromMonthDir(d) + dictname)
-	  			val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
+	  			val bb = loadBMat(opts.fromMonthDir(d) + dictname)
+	  			val cc = loadDMat(opts.fromMonthDir(d) + wcountname)
 	  			Dict.treeAdd(Dict(bb, cc, 4*opts.threshold), md)
 	  			println("%04d-%02d" format (year,month))
 	  		}
@@ -49,13 +49,13 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val dy = Dict.treeFlush(md)
   	val (sv, iv) = sortdown2(dy.counts)
   	val dyy = Dict(dy.cstr(iv), sv)
-  	HMat.saveBMat(opts.mainDir + dictname, BMat(dyy.cstr))
-  	HMat.saveDMat(opts.mainDir + wcountname, dyy.counts)
+  	saveBMat(opts.mainDir + dictname, BMat(dyy.cstr))
+  	saveDMat(opts.mainDir + wcountname, dyy.counts)
   	dyy
 	}
   
   def mergeIDicts(rebuild:Boolean=false, dictname:String="bdict.lz4", wcountname:String="bcnts.lz4"):IDict = {
-    if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
+    if (alldict == null) alldict = Dict(loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
   	val md = new Array[IDict](1+(math.log(nmonths)/math.log(2)).toInt)         // Big enough to hold log2(num months)
@@ -68,7 +68,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    if (month != lastmonth) {
 	      val dfname = opts.fromMonthDir(d) + opts.localDict
 	      if (fileExists(dfname)) {
-	      	mdict = Dict(HMat.loadBMat(dfname))                                  // Load token dictionary for this month
+	      	mdict = Dict(loadBMat(dfname))                                       // Load token dictionary for this month
 	      	val fm = new File(opts.fromMonthDir(d) + wcountname)                 // Did we process this month?
 	      	domonth = rebuild || !fm.exists
 	      } else {
@@ -80,7 +80,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    if (domonth) {
 	    	val fd = new File(opts.fromDayDir(d) + wcountname)
 	    	if (fd.exists) {
-	    	  val dict = Dict(HMat.loadBMat(opts.fromDayDir(d) + opts.localDict))  // Load token dictionary for this day
+	    	  val dict = Dict(loadBMat(opts.fromDayDir(d) + opts.localDict))  // Load token dictionary for this day
 	    		val bb = loadIMat(opts.fromDayDir(d) + dictname)                     // Load IDict info for this day
 	    		val cc = loadDMat(opts.fromDayDir(d) + wcountname)
 	    		val map = dict --> mdict                                             // Map from this days tokens to month dictionary
@@ -101,8 +101,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    	if (day == 31) {	    	                                               // On the last day, save the accumulated results
 	    		val dx = IDict.treeFlush(dd)
 	    		if (dx != null) {
-	  				HMat.saveIMat(opts.fromMonthDir(d)+dictname, dx.grams)
-	  				HMat.saveDMat(opts.fromMonthDir(d)+wcountname, dx.counts)
+	  				saveIMat(opts.fromMonthDir(d)+dictname, dx.grams)
+	  				saveDMat(opts.fromMonthDir(d)+wcountname, dx.counts)
 	  			}
 	    	}
 	    }
@@ -127,8 +127,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	println
   	val (sv, iv) = sortdown2(dy.counts)                                        // Sort down by ngram frequency
   	val dyy = IDict(dy.grams(iv,?), sv)
-  	HMat.saveIMat(opts.mainDir + dictname, dyy.grams)
-  	HMat.saveDMat(opts.mainDir + wcountname, dyy.counts)
+  	saveIMat(opts.mainDir + dictname, dyy.grams)
+  	saveDMat(opts.mainDir + wcountname, dyy.counts)
   	dyy
 	}
   
@@ -234,9 +234,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  		val unifeats = mkUniFeats(map, unigramsx, nuni)
       		  		val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
       		  		val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
-      		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
-      		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
-      		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
+      		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats.t)
+      		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats.t)
+      		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats.t)
       		  	} 
       		  }
       		print(".")
@@ -267,8 +267,8 @@ object Featurizer {
     val d2 = fs.mergeDicts(rebuild)
     val dd = Dict.union(d1, d2)
     val (sc, ic) = sortdown2(dd.counts)
-    HMat.saveBMat(ff.opts.mainDict, BMat(dd.cstr(ic,0)))
-  	HMat.saveDMat(ff.opts.mainCounts, sc)
+    saveBMat(ff.opts.mainDict, BMat(dd.cstr(ic,0)))
+  	saveDMat(ff.opts.mainCounts, sc)
   }
   
   def buildMainGDicts(rebuild:Boolean=false) = {
@@ -285,15 +285,15 @@ object Featurizer {
   	val bd2 = fs.mergeIDicts(rebuild)
   	val bdd = IDict.merge2(bd1,bd2)
   	val (sbc, ibc) = sortdown2(bdd.counts)
-    HMat.saveIMat(ff.opts.mainBDict, IMat(bdd.grams(ibc,?)))
-  	HMat.saveDMat(ff.opts.mainBCounts, sbc)
+    saveIMat(ff.opts.mainBDict, IMat(bdd.grams(ibc,?)))
+  	saveDMat(ff.opts.mainBCounts, sbc)
   	
   	val td1 = ff.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
   	val td2 = fs.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
   	val tdd = IDict.merge2(td1,td2)
   	val (stc, itc) = sortdown2(tdd.counts)
-    HMat.saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
-  	HMat.saveDMat(ff.opts.mainTCounts, stc)
+    saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
+    saveDMat(ff.opts.mainTCounts, stc)
   }
   
   def encodeDate(yy:Int, mm:Int, dd:Int) = (372*yy + 31*mm + dd)
