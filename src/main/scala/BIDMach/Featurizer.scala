@@ -6,6 +6,11 @@ import HMat._
 import scala.actors._
 import java.io._
 
+object featurizeAll {
+
+  
+}
+
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   
   var alldict:Dict = null
@@ -202,8 +207,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   
   def featurize(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {
     if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
-  	if (allbdict == null) allbdict = IDict(HMat.loadIMat(opts.mainDir + opts.biDict))
-  	if (alltdict == null) alltdict = IDict(HMat.loadIMat(opts.mainDir + opts.triDict))
+  	if (allbdict == null) allbdict = IDict(HMat.loadIMat(opts.mainBDict))
+  	if (alltdict == null) alltdict = IDict(HMat.loadIMat(opts.mainTDict))
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
@@ -252,6 +257,46 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 }
 
 object Featurizer {
+  
+  def buildMainDict(rebuild:Boolean=false) = {
+    val ff = new Featurizer
+    val newopts = new Featurizer.Options{
+      override val tokDirName = "twitter/smiley/tokenized/"
+      override val featDirName = "twitter/smiley/featurized/"
+    }
+    val fs = new Featurizer(newopts)
+    
+    val d1 = ff.mergeDicts(rebuild)
+    val d2 = fs.mergeDicts(rebuild)
+    val dd = Dict.union(d1, d2)
+    val (sc, ic) = sortdown2(dd.counts)
+    HMat.saveBMat(ff.opts.mainDict, BMat(dd.cstr(ic,0)))
+  	HMat.saveDMat(ff.opts.mainCounts, sc)
+  }
+  
+  def buildMainGDicts(rebuild:Boolean=false) = {
+    val ff = new Featurizer
+    val newopts = new Featurizer.Options{
+      override val tokDirName = "twitter/smiley/tokenized/"
+      override val featDirName = "twitter/smiley/featurized/"
+    }
+    val fs = new Featurizer(newopts)
+  	
+  	val (bd1) = ff.mergeIDicts(rebuild)
+  	val (bd2) = fs.mergeIDicts(rebuild)
+  	val (bdd) = IDict.merge2(bd1,bd2)
+  	val (sbc, ibc) = sortdown2(bdd.counts)
+    HMat.saveIMat(ff.opts.mainBDict, IMat(bdd.grams(ibc,?)))
+  	HMat.saveDMat(ff.opts.mainBCounts, sbc)
+  	
+  	val (td1) = ff.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
+  	val (td2) = fs.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
+  	val (tdd) = IDict.merge2(td1,td2)
+  	val (stc, itc) = sortdown2(tdd.counts)
+    HMat.saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
+  	HMat.saveDMat(ff.opts.mainTCounts, stc)
+  }
+  
   def encodeDate(yy:Int, mm:Int, dd:Int) = (372*yy + 31*mm + dd)
   
   def decodeDate(n:Int):(Int, Int, Int) = {
@@ -277,15 +322,19 @@ object Featurizer {
   }
   
   class Options {
-    var tokDirName = "twitter/tokenized/"
-    var featDirName = "twitter/featurized/"
-  	var mainDir = "/big/" + tokDirName
-  	var mainDict:String = "/big/" + tokDirName + "alldict.gz"
-    var mainCounts:String = "/big/" + tokDirName + "allwcount.gz"
-  	var fromYearDir:(Int)=>String = dirMap(mainDir + "%04d/")
-    var fromMonthDir:(Int)=>String = dirMap(mainDir + "%04d/%02d/")
-    var fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
-    var toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName + "%04d/%02d/%02d/") 
+    val tokDirName = "twitter/tokenized/"
+    val featDirName = "twitter/featurized/"
+  	def mainDir = "/big/" + tokDirName
+  	def mainDict:String = "/big/" + tokDirName + "alldict.gz"
+    def mainCounts:String = "/big/" + tokDirName + "allwcount.gz"
+    def mainBDict:String = "/big/" + tokDirName + "allbdict.lz4"
+    def mainBCounts:String = "/big/" + tokDirName + "allbcnts.lz4"
+    def mainTDict:String = "/big/" + tokDirName + "alltdict.lz4"
+    def mainTCounts:String = "/big/" + tokDirName + "alltcnts.lz4"
+  	def fromYearDir:(Int)=>String = dirMap(mainDir + "%04d/")
+    def fromMonthDir:(Int)=>String = dirMap(mainDir + "%04d/%02d/")
+    def fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
+    def toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName + "%04d/%02d/%02d/") 
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
     var toUniFeats:(Int)=>String = (n:Int) => ("unifeats%02d.lz4" format n)
     var toBiFeats:(Int)=>String = (n:Int) => ("bifeats%02d.lz4" format n)
