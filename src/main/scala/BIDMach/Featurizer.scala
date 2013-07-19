@@ -6,11 +6,6 @@ import HMat._
 import scala.actors._
 import java.io._
 
-object featurizeAll {
-
-  
-}
-
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   
   var alldict:Dict = null
@@ -282,16 +277,16 @@ object Featurizer {
     }
     val fs = new Featurizer(newopts)
   	
-  	val (bd1) = ff.mergeIDicts(rebuild)
-  	val (bd2) = fs.mergeIDicts(rebuild)
-  	val (bdd) = IDict.merge2(bd1,bd2)
+  	val bd1 = ff.mergeIDicts(rebuild)
+  	val bd2 = fs.mergeIDicts(rebuild)
+  	val bdd = IDict.merge2(bd1,bd2)
   	val (sbc, ibc) = sortdown2(bdd.counts)
     HMat.saveIMat(ff.opts.mainBDict, IMat(bdd.grams(ibc,?)))
   	HMat.saveDMat(ff.opts.mainBCounts, sbc)
   	
-  	val (td1) = ff.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
-  	val (td2) = fs.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
-  	val (tdd) = IDict.merge2(td1,td2)
+  	val td1 = ff.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
+  	val td2 = fs.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
+  	val tdd = IDict.merge2(td1,td2)
   	val (stc, itc) = sortdown2(tdd.counts)
     HMat.saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
   	HMat.saveDMat(ff.opts.mainTCounts, stc)
