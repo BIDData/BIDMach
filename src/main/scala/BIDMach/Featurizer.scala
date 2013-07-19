@@ -133,7 +133,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	}
   
  
-  def mkIDicts(scanner:Scanner=TwitterScanner) = {
+  def mkIDicts(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
@@ -147,7 +147,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		val (year, month, day) = Featurizer.decodeDate(d)
       		val fname = opts.fromDayDir(d)+opts.localDict
       		val fnew = opts.fromDayDir(d)+opts.triCnts
-      		if (fileExists(fname) && !fileExists(fnew)) {
+      		if (fileExists(fname) && (rebuild || !fileExists(fnew))) {
       			val dict = Dict(loadBMat(fname))
       			for (ifile <- 0 until 24) { 
       				val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
@@ -279,6 +279,8 @@ object Featurizer {
     }
     val fs = new Featurizer(newopts)
   	
+    ff.mkIDicts(rebuild)
+    fs.mkIDicts(rebuild)
   	val bd1 = ff.mergeIDicts(rebuild)
   	val bd2 = fs.mergeIDicts(rebuild)
   	val bdd = IDict.merge2(bd1,bd2)
