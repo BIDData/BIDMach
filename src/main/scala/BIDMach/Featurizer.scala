@@ -144,6 +144,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       	val tdicts = new Array[IDict](5)
 
       	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
+      		val (year, month, day) = Featurizer.decodeDate(d)
       		val fname = opts.fromDayDir(d)+opts.localDict
       		val fnew = opts.fromDayDir(d)+opts.triCnts
       		if (fileExists(fname) && !fileExists(fnew)) {
@@ -153,10 +154,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
       					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, null, bigramsx, trigramsx)
-      					val bigrams = bigramsx(0->nbi, 0->2)
-      					val bid = IDict.dictFromData(bigrams)
+      					val bigrams = bigramsx(0->nbi, 0->2) 
+      					val bid = if (nbi > 0) IDict.dictFromData(bigrams) else null
       					val trigrams = trigramsx(0->ntri, 0->3)
-      					val trid = IDict.dictFromData(trigrams)
+      					val trid = if (ntri > 0) IDict.dictFromData(trigrams) else null
       					IDict.treeAdd(bid, bdicts)
       					IDict.treeAdd(trid, tdicts)      		
       				} 
@@ -169,6 +170,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       			saveDMat(opts.fromDayDir(d) + opts.triCnts, tf.counts)
       			print(".")
       		}
+      		if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
       	}
       }
     }
@@ -212,34 +214,34 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
       	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
-      	  val (year, month, day) = Featurizer.decodeDate(d)
+      		val (year, month, day) = Featurizer.decodeDate(d)
       		val fdict = opts.fromDayDir(d)+opts.localDict
       		if (fileExists(fdict)) {
       			var dict:Dict = null 
       			var map:IMat = null
       			val fd = new File(opts.toDayDir(d))
-      			if (!fd.exists) fd.mkdirs
-      			for (ifile <- 0 until 24) { 
-      				val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
-      				val fx = opts.toDayDir(d)+opts.toTriFeats(ifile)
-      				if (fileExists(fn) && (rebuild || !fileExists(fx))) {
-      				  if (dict == null) {
-      				    dict = Dict(loadBMat(fdict))
-      				    map = dict --> alldict
-      				  }
-      					val idata = loadIMat(fn)
-      					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx)
-      					val unifeats = mkUniFeats(map, unigramsx, nuni)
-      					val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
-      					val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
-      					saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
-      					saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
-      					saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
-      				} 
-      			}
-      	  print(".")
+      		  if (!fd.exists) fd.mkdirs
+      		  for (ifile <- 0 until 24) { 
+      		  	val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
+      		  	val fx = opts.toDayDir(d)+opts.toTriFeats(ifile)
+      		  	if (fileExists(fn) && (rebuild || !fileExists(fx))) {
+      		  		if (dict == null) {
+      		  			dict = Dict(loadBMat(fdict))
+      		  			map = dict --> alldict
+      		  		}
+      		  		val idata = loadIMat(fn)
+      		  		val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx)
+      		  		val unifeats = mkUniFeats(map, unigramsx, nuni)
+      		  		val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
+      		  		val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
+      		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
+      		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
+      		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
+      		  	} 
+      		  }
+      		print(".")
       		}
-      	  if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
+      		if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
       	}
       }
     }
