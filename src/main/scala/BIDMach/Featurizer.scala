@@ -325,12 +325,12 @@ object Featurizer {
     val tokDirName = "twitter/tokenized/"
     val featDirName = "twitter/featurized/"
   	def mainDir = "/big/" + tokDirName
-  	def mainDict:String = "/big/" + tokDirName + "alldict.gz"
-    def mainCounts:String = "/big/" + tokDirName + "allwcount.gz"
-    def mainBDict:String = "/big/" + tokDirName + "allbdict.lz4"
-    def mainBCounts:String = "/big/" + tokDirName + "allbcnts.lz4"
-    def mainTDict:String = "/big/" + tokDirName + "alltdict.lz4"
-    def mainTCounts:String = "/big/" + tokDirName + "alltcnts.lz4"
+  	def mainDict:String = "/big/twitter/tokenized/alldict.gz"
+    def mainCounts:String = "/big/twitter/tokenized/allwcount.gz"
+    def mainBDict:String = "/big/twitter/tokenized/allbdict.lz4"
+    def mainBCounts:String = "/big/twitter/tokenized/allbcnts.lz4"
+    def mainTDict:String = "/big/twitter/tokenized/alltdict.lz4"
+    def mainTCounts:String = "/big/twitter/tokenized/alltcnts.lz4"
   	def fromYearDir:(Int)=>String = dirMap(mainDir + "%04d/")
     def fromMonthDir:(Int)=>String = dirMap(mainDir + "%04d/%02d/")
     def fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
