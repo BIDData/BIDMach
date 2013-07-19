@@ -177,12 +177,12 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   def mkUniFeats(map:IMat, gramsx:IMat, ng:Int):IMat = {
   	val unis = map(gramsx(0->ng, 0))
   	val igood = find(unis >= 0) 
-  	val gg = unis(igood)
+  	val gg = unis(igood, 0)
   	val ggn = gramsx(igood, 1)
     val feats = ggn \ gg
     IDict.sortlex(feats)
-    val (outr, ix, dmy) = IDict.uniquerows(feats)
-    val fcounts = (ix(1->ix.length, 0) on ix.length) - ix
+    val (outr, ix, iy) = IDict.uniquerows(feats)
+    val fcounts = (ix(1->ix.length, 0) on iy.length) - ix
     outr \ fcounts 
   }
   
@@ -192,10 +192,11 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val gg = grams(igood,?)
   	val ggn = gramsx(igood, gramsx.ncols-1)
   	val gmap = IDict(gg) --> alldict
-    val feats = ggn \ gmap
+  	val igood2 = find(gmap >= 0)
+    val feats = ggn(igood2,0) \ gmap(igood2,0)
     IDict.sortlex(feats)
-    val (outr, ix, dmy) = IDict.uniquerows(feats)
-    val fcounts = (ix(1->ix.length, 0) on ix.length) - ix
+    val (outr, ix, iy) = IDict.uniquerows(feats)
+    val fcounts = (ix(1->ix.length, 0) on iy.length) - ix
     outr \ fcounts 
   }
   
