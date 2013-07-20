@@ -259,8 +259,19 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  val alld = alldict.cstr
 	  val bg = allbdict.grams
 	  val tg = alltdict.grams
-	  (alld(bg(?,0)) + CSMat.cselem(" ") + alld(bg(?,1)),	
-	      alld(tg(?,0)) + CSMat.cselem(" ") + alld(tg(?,1)) + CSMat.cselem(" ") + alld(tg(?,2)))
+	  val bd = CSMat(bg.nrows,1)
+	  val td = CSMat(tg.nrows,1)
+	  var i = 0
+	  while (i < bg.nrows) {
+	    bd(i) = alld(bg(i,0)) + " " + alld(bg(i,1))
+	    i += 1
+	  }
+	  i = 0
+	  while (i < tg.nrows) {
+	    td(i) = alld(tg(i,0)) + " " + alld(tg(i,1)) + " " + alld(tg(i,2))
+	    i += 1
+	  }
+	  (bg, td)
   }
 }
 
