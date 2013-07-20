@@ -13,7 +13,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   var alltdict:IDict = null
   	
   def mergeDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
-    val dd = new Array[Dict](5)                                               // Big enough to hold log2(days per month)
+    val dd = new Array[Dict](5)                                                 // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
   	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
 	  for (d <- opts.nstart to opts.nend) {
@@ -250,6 +250,16 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   def fileExists(fname:String) = {
     val testme = new File(fname)
     testme.exists
+  }  
+    
+  def loadDicts() = {
+	  if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
+	  if (allbdict == null) allbdict = IDict(HMat.loadIMat(opts.mainBDict))
+	  if (alltdict == null) alltdict = IDict(HMat.loadIMat(opts.mainTDict))
+	  val alld = alldict.cstr
+	  val bg = allbdict.grams
+	  val tg = alltdict.grams
+	  (alld(bg(?,0)) + " " + alld(bg(?,1)),	alld(tg(?,0)) + " " + alld(tg(?,1)) + " " + alld(tg(?,2)))
   }
 }
 
@@ -319,6 +329,7 @@ object Featurizer {
     	(fname format (yy, mm, dd))
     }    
   }
+
   
   class Options {
     val tokDirName = "twitter/tokenized/"
