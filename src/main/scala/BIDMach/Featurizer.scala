@@ -268,10 +268,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  }
 	  i = 0
 	  while (i < tg.nrows) {
-	    td(i) = alld(tg(i,0)) + " " + alld(tg(i,1)) + " " + alld(tg(i,2))
+	    td(i) = (alld(tg(i,0)) + " " + alld(tg(i,1))) + (" " + alld(tg(i,2)))
 	    i += 1
 	  }
-	  (bg, td)
+	  (alld, bd, td)
   }
 }
 
