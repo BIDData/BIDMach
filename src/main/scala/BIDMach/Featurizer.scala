@@ -206,6 +206,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
   	if (allbdict == null) allbdict = IDict(HMat.loadIMat(opts.mainBDict))
   	if (alltdict == null) alltdict = IDict(HMat.loadIMat(opts.mainTDict))
+  	alldict.makeHash
+  	allbdict.makeSorted
+  	alltdict.makeSorted
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     for (ithread <- 0 until nthreads) {
       Actor.actor {
