@@ -135,9 +135,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
  
   def mkIDicts(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
+    val done = izeros(nthreads,1)
     for (ithread <- 0 until nthreads) {
       Actor.actor {
-        if (Mat.hasCUDA > 0) setGPU(ithread)
+        if (Mat.hasCUDA > 0) setGPU(ithread+Mat.hasCUDA-nthreads)
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
       	val bdicts = new Array[IDict](5)
@@ -172,8 +173,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		}
       		if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
       	}
+        done(ithread,0) = 1
       }
     }
+    while (mini(done).v == 0) Thread.`yield`
   }
   
   def mkUniFeats(map:IMat, gramsx:IMat, ng:Int):IMat = {
@@ -210,9 +213,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	allbdict.makeSorted
   	alltdict.makeSorted
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
+    val done = izeros(nthreads,1)
     for (ithread <- 0 until nthreads) {
       Actor.actor {
-        if (Mat.hasCUDA > 0) setGPU(ithread)
+        if (Mat.hasCUDA > 0) setGPU(ithread+Mat.hasCUDA-nthreads)
         val unigramsx = IMat(opts.guessSize, 2)
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
@@ -240,14 +244,16 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
+      		  		if (ifile == 23) print(".")
       		  	} 
-      		  }
-      		print(".")
+      		  }   		
       		}
       		if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
       	}
+        done(ithread,0) = 1
       }
     }
+    while (mini(done).v == 0) Thread.`yield`
   }
   
   def fileExists(fname:String) = {
@@ -280,14 +286,24 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 
 object Featurizer {
   
-  def buildMainDict(rebuild:Boolean=false) = {
+  def alloptions = {
     val ff = new Featurizer
     val newopts = new Featurizer.Options{
       override val tokDirName = "twitter/smiley/tokenized/"
       override val featDirName = "twitter/smiley/featurized/"
     }
     val fs = new Featurizer(newopts)
-    
+    (ff,fs)
+  }
+  
+  def buildAll(rebuild:Boolean=false) = {
+    buildMainDict(rebuild)
+    buildMainGDicts(rebuild)
+    buildFeatures(rebuild)
+  }
+  
+  def buildMainDict(rebuild:Boolean=false) = {
+  	val (ff,fs) = alloptions    
     val d1 = ff.mergeDicts(rebuild)
     val d2 = fs.mergeDicts(rebuild)
     val dd = Dict.union(d1, d2)
@@ -295,17 +311,12 @@ object Featurizer {
     saveBMat(ff.opts.mainDict, BMat(dd.cstr(ic,0)))
   	saveDMat(ff.opts.mainCounts, sc)
   }
-  
+ 
   def buildMainGDicts(rebuild:Boolean=false) = {
-    val ff = new Featurizer
-    val newopts = new Featurizer.Options{
-      override val tokDirName = "twitter/smiley/tokenized/"
-      override val featDirName = "twitter/smiley/featurized/"
-    }
-    val fs = new Featurizer(newopts)
-  	
+    val (ff, fs) = alloptions
     ff.mkIDicts(rebuild)
     fs.mkIDicts(rebuild)
+
   	val bd1 = ff.mergeIDicts(rebuild)
   	val bd2 = fs.mergeIDicts(rebuild)
   	val bdd = IDict.merge2(bd1,bd2)
@@ -319,6 +330,12 @@ object Featurizer {
   	val (stc, itc) = sortdown2(tdd.counts)
     saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
     saveDMat(ff.opts.mainTCounts, stc)
+  }
+  
+  def buildFeatures(rebuild:Boolean=false) = {
+    val (ff, fs) = alloptions
+    ff.featurize(rebuild)
+    fs.featurize(rebuild) 
   }
   
   def encodeDate(yy:Int, mm:Int, dd:Int) = (372*yy + 31*mm + dd)
@@ -370,7 +387,7 @@ object Featurizer {
     var biCnts:String = "bcnts.lz4"
     var triCnts:String = "tcnts.lz4"
     var nstart:Int = encodeDate(2011,11,22)
-    var nend:Int = encodeDate(2013,3,31)
+    var nend:Int = encodeDate(2013,7,16)
     var threshold = 10
     var guessSize = 100000000
     var nthreads = 2
