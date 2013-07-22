@@ -154,7 +154,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       				val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
-      					val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, null, bigramsx, trigramsx)
+      					val (nuni, nbi, ntri, nusers) = scanner.scan(opts, dict, idata, null, bigramsx, trigramsx, null)
       					val bigrams = bigramsx(0->nbi, 0->2) 
       					val bid = if (nbi > 0) IDict.dictFromData(bigrams) else null
       					val trigrams = trigramsx(0->ntri, 0->3)
@@ -220,6 +220,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
         val unigramsx = IMat(opts.guessSize, 2)
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
+      	val userids = IMat(opts.guessSize/10, 2)
       	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
       		val (year, month, day) = Featurizer.decodeDate(d)
       		val fdict = opts.fromDayDir(d)+opts.localDict
@@ -237,13 +238,14 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  			map = dict --> alldict
       		  		}
       		  		val idata = loadIMat(fn)
-      		  		val (nuni, nbi, ntri) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx)
+      		  		val (nuni, nbi, ntri, nusers) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx, userids)
       		  		val unifeats = mkUniFeats(map, unigramsx, nuni)
       		  		val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
       		  		val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
       		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
+      		  		saveIMat(opts.toDayDir(d) + opts.toUserids(ifile), userids(nusers, ?))
       		  		if (ifile == 23) print(".")
       		  	} 
       		  }   		
@@ -381,6 +383,7 @@ object Featurizer {
     var toUniFeats:(Int)=>String = (n:Int) => ("unifeats%02d.lz4" format n)
     var toBiFeats:(Int)=>String = (n:Int) => ("bifeats%02d.lz4" format n)
     var toTriFeats:(Int)=>String = (n:Int) => ("trifeats%02d.lz4" format n)
+    var toUserids:(Int)=>String = (n:Int) => ("userids%02d.lz4" format n)
     var localDict:String = "dict.gz"
     var biDict:String = "bdict.lz4"
     var triDict:String = "tdict.lz4"
@@ -395,21 +398,35 @@ object Featurizer {
 }
 
 trait Scanner { 
-	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int, Int)
+	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat, userids:IMat):(Int, Int, Int, Int)
 }
 
 object TwitterScanner extends Scanner {  
-	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat):(Int, Int, Int) = {
+	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat, userids:IMat):(Int, Int, Int, Int) = {
 		val isstart =  dict("<status>")
 		val isend =    dict("</status>")
 		val irstart =  dict("<retweet>")
 		val irend =    dict("</retweet>")
 		val itstart =  dict("<text>")
 		val itend =    dict("</text>")
-		val ioverrun = dict("<user>")
-		var instatus = false
-		var intext = false
-		var inretweet = false
+		val iuser  =   dict("<user>")
+		val iuend  =   dict("</user>")
+		val iistart =  dict("<id>")
+		val iiend  =   dict("</id>")
+		var state = 0
+		/*
+		 * state = 0: outside a status
+		 * state = 1: inside a status
+		 * state = 2: inside the first-level user tag
+		 * state = 3: inside the id of a first-level user tag
+		 * state = 4: inside first-level text field
+		 * state = 5: inside a retweet
+		 * state = 6: inside the status tag in a retweet
+		 * state = 7: inside user field of retweet
+		 * state = 8: inside the id of a user in a retweet
+		 * state = 9: inside text field of retweet
+		 */
+
 		var istatus = -1
 		var nuni = 0
 		var nbi = 0
@@ -417,54 +434,96 @@ object TwitterScanner extends Scanner {
 		var len = idata.length
 		var i = 0
 		while (i < len) {
-			if (idata.data(i) > 0) {
-				val tok = idata.data(i)-1
-				if (tok == isstart) {
-					instatus = true
+			val tok = idata.data(i)-1
+			if (tok == isend) {
+				state = 0
+			} else {
+				state match {
+				case 0 => if (tok == isstart) {
+					state = 1
 					istatus += 1
-				} else if (tok == itstart && instatus) {     							  
-					intext = true
-				} else if (tok == itend || tok == ioverrun) {
-					intext = false
-				} else if (tok == isend) {
-					intext = false
-					instatus = false
-					inretweet = false
+				}
+				case 1 => if (tok == iuser) {
+					state = 2
+				} else if (tok == itstart) {
+					state = 4
+				}	else if (tok == irstart) {
+					state = 5
+				} 
+				case 2 => if (tok == iistart) {
+					state = 3
+				} else if (tok == iuend) {
+					state = 1
 				} else if (tok == irstart) {
-					inretweet = true
-				} else if (tok == irend) {
-					inretweet = false
-				} else {
-					if (intext) {
-						if (unigramsx != null) {
-							unigramsx(nuni, 0) = tok
-							unigramsx(nuni, 1) = istatus
-							nuni += 1
-						}
-						if (idata.data(i-1) > 0) {  
-							val tok1 = idata.data(i-1)-1
-							if (tok1 != itstart) {
-								bigramsx(nbi, 0) = tok1
-								bigramsx(nbi, 1) = tok
-								bigramsx(nbi, 2) = istatus
-								nbi += 1
-								if (idata.data(i-2) > 0) {
-									val tok2 = idata.data(i-2)-1
-									if (tok2 != itstart) {
-										trigramsx(ntri, 0) = tok2
-										trigramsx(ntri, 1) = tok1
-										trigramsx(ntri, 2) = tok
-										trigramsx(ntri, 3) = istatus
-										ntri += 1
-									}
+				  state = 5
+				}
+				case 3 => if (tok+1 < 0) {
+					if (userids != null) {
+					  userids(istatus,0) = -(tok+1)
+					  userids(istatus,1) = 0
+					}
+				} else if (tok == iiend) {
+					state = 2
+				}
+				case 4 => if (tok == itend) {
+					state = 1
+				} else if (tok == iuser) {
+					state = 2
+				} else if (tok+1 > 0) {
+					if (unigramsx != null) {
+						unigramsx(nuni, 0) = tok
+						unigramsx(nuni, 1) = istatus
+						nuni += 1
+					}
+					if (idata.data(i-1) > 0) {  
+						val tok1 = idata.data(i-1)-1
+						if (tok1 != itstart) {
+							bigramsx(nbi, 0) = tok1
+							bigramsx(nbi, 1) = tok
+							bigramsx(nbi, 2) = istatus
+							nbi += 1
+							if (idata.data(i-2) > 0) {
+								val tok2 = idata.data(i-2)-1
+								if (tok2 != itstart) {
+									trigramsx(ntri, 0) = tok2
+									trigramsx(ntri, 1) = tok1
+									trigramsx(ntri, 2) = tok
+									trigramsx(ntri, 3) = istatus
+									ntri += 1
 								}
 							}
 						}
 					}
 				}
+				case 5 => if (tok == isstart) {
+					state = 6
+				} else if (tok == irend) {
+					state = 1
+				}
+				case 6 => if (tok == iuser) {
+					state = 7
+				} else if (tok == itstart) {
+					state = 9
+				} 
+				case 7 => if (tok == iuend) {
+					state = 6
+				} else if (tok == iistart) {
+					state = 8
+				}
+				case 8 => if (tok == iiend) {
+					state = 7
+				} else if (tok-1 < 0) {
+					if (userids != null) userids(istatus, 1) = -(tok+1)
+				}
+				case 9 => if (tok == itend) {
+					state = 6
+				} else if (tok == iuser) {
+				  state = 7
+				}
+				}
 			}
 			i += 1
 		}
-		(nuni, nbi, ntri)
+		(nuni, nbi, ntri, istatus)
 	}
 }
