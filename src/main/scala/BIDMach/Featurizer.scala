@@ -30,10 +30,13 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    	}
 	    	if (day == 31) {	    	  
 	    		val dx = Dict.treeFlush(dd)
-	    		val (sv, iv) = sortdown2(dx.counts)
-	    		val dxx = Dict(dx.cstr(iv), sv)
-	    		saveBMat(opts.fromMonthDir(d)+dictname, BMat(dxx.cstr))
-	    		saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
+	    		if (dx != null) {
+	    			val (sv, iv) = sortdown2(dx.counts)
+	    			val dxx = Dict(dx.cstr(iv), sv)
+	    			saveBMat(opts.fromMonthDir(d)+dictname, BMat(dxx.cstr))
+	    			saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
+	    			println("%04d-%02d" format (year,month))
+	    		}
 	    	}
 	    }
 	  }
@@ -108,6 +111,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  				saveIMat(opts.fromMonthDir(d)+dictname, dx.grams)
 	  				saveDMat(opts.fromMonthDir(d)+wcountname, dx.counts)
 	  			}
+	    		println("%04d-%02d" format (year,month))
 	    	}
 	    }
 	  }
