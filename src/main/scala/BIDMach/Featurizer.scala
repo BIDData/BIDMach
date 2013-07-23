@@ -353,6 +353,13 @@ object Featurizer {
   	val (stc, itc) = sortdown2(tdd.counts)
     saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
     saveDMat(ff.opts.mainTCounts, stc)
+    
+    val usr1 = ff.mergeIDicts(rebuild, "usrdict.lz4", "usrcnts.lz4")
+  	val usr2 = fs.mergeIDicts(rebuild, "usrdict.lz4", "usrcnts.lz4")
+  	val usr = IDict.merge2(usr1,usr2)
+  	val (usrs, usrc) = sortdown2(usr.counts)
+    saveIMat(ff.opts.mainUsrDict, IMat(usr.grams(usrc,?)))
+    saveDMat(ff.opts.mainUsrCounts, usrs)
   }
   
   def buildFeatures(rebuild:Boolean=false) = {
@@ -389,13 +396,23 @@ object Featurizer {
   class Options {
     val tokDirName = "twitter/tokenized/"
     val featDirName = "twitter/featurized/"
+    val localDict:String = "dict.gz"
+    val localCount:String = "wcount.gz"
+    val biDict:String = "bdict.lz4"
+    val triDict:String = "tdict.lz4"
+    val usrDict:String = "usrdict.lz4"
+    val biCnts:String = "bcnts.lz4"
+    val triCnts:String = "tcnts.lz4"
+    val usrCnts:String = "usrcnts.lz4"
   	def mainDir = "/big/" + tokDirName
-  	def mainDict:String = "/big/twitter/tokenized/alldict.gz"
-    def mainCounts:String = "/big/twitter/tokenized/allwcount.gz"
-    def mainBDict:String = "/big/twitter/tokenized/allbdict.lz4"
-    def mainBCounts:String = "/big/twitter/tokenized/allbcnts.lz4"
-    def mainTDict:String = "/big/twitter/tokenized/alltdict.lz4"
-    def mainTCounts:String = "/big/twitter/tokenized/alltcnts.lz4"
+  	def mainDict:String = mainDir + "all" + localDict
+    def mainCounts:String = mainDir + "all" + localCount
+    def mainBDict:String = mainDir + "all" + biDict
+    def mainBCounts:String = mainDir + "all" + biCnts
+    def mainTDict:String = mainDir + "all" + triDict
+    def mainTCounts:String = mainDir + "all" + triCnts
+    def mainUsrDict:String = mainDir + "all" + usrDict
+    def mainUsrCounts:String = mainDir + "all" + usrCnts
   	def fromYearDir:(Int)=>String = dirMap(mainDir + "%04d/")
     def fromMonthDir:(Int)=>String = dirMap(mainDir + "%04d/%02d/")
     def fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
@@ -405,13 +422,6 @@ object Featurizer {
     var toBiFeats:(Int)=>String = (n:Int) => ("bifeats%02d.lz4" format n)
     var toTriFeats:(Int)=>String = (n:Int) => ("trifeats%02d.lz4" format n)
     var toUserids:(Int)=>String = (n:Int) => ("userids%02d.lz4" format n)
-    var localDict:String = "dict.gz"
-    var biDict:String = "bdict.lz4"
-    var triDict:String = "tdict.lz4"
-    var usrDict:String = "usrdict.lz4"
-    var biCnts:String = "bcnts.lz4"
-    var triCnts:String = "tcnts.lz4"
-    var usrCnts:String = "usrcnts.lz4"
     var nstart:Int = encodeDate(2011,11,22)
     var nend:Int = encodeDate(2013,6,31)
     var threshold = 10
