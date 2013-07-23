@@ -33,6 +33,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		if (dx != null) {
 	    			val (sv, iv) = sortdown2(dx.counts)
 	    			val dxx = Dict(dx.cstr(iv), sv)
+	    			val fd = new File(opts.fromMonthDir(d))
+      		  if (!fd.exists) fd.mkdirs
 	    			saveBMat(opts.fromMonthDir(d)+dictname, BMat(dxx.cstr))
 	    			saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
 	    			println("%04d-%02d" format (year,month))
