@@ -472,12 +472,14 @@ object TwitterScanner extends Scanner {
 				    case Iuser   => state = InsideUser
 				    case Itstart => state = InsideText
 				    case Irstart =>	state = InsideRetweet
+				    case _ => {}
 				  } 
 				case InsideUser => 
 				  tok match {
 				    case Iistart =>	state = InsideUserId
 				    case Irstart => state = InsideRetweet
 				    case Iuend   => state = InsideStatus
+				    case _ => {}
 				  }
 				case InsideUserId => 
 				  if (tok == Iiend) {
@@ -523,16 +525,19 @@ object TwitterScanner extends Scanner {
 				  tok match {
 				    case Isstart =>	state = InsideStatusL2
 				    case Irend   =>	state = InsideStatus
+				    case _ => {}
 				  }
 				case InsideStatusL2 => 
 				  tok match {
 				    case Iuser   =>	state = InsideUserL2
 				    case Itstart => state = InsideTextL2
+				    case _ => {}
 				  } 
 				case InsideUserL2 => 
 				  tok match {
 				    case Iistart =>	state = InsideUserIdL2
 				    case Iuend   =>	state = InsideStatusL2
+				    case _ => {}
 				  }
 				case InsideUserIdL2 => 
 				  tok match {
@@ -545,8 +550,11 @@ object TwitterScanner extends Scanner {
 				  tok match {
 				    case Itend => state = InsideStatusL2
 				    case Iuser => state = InsideUserL2
+				    case _ => {}
 				  }
+				case _ => {}
 				}
+				
 			}
 			i += 1
 		}
