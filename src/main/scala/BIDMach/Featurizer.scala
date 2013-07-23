@@ -14,10 +14,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   var alltdict:IDict = null
   	
   def mergeDicts(rebuild:Boolean,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
-    val dd = new Array[Dict](5)                                                 // Big enough to hold log2(days per month)
+    val dd = new Array[Dict](5)                                                // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
-  	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)           // Big enough to hold log2(num months)
-	  for (d <- opts.nstart to opts.nend) {
+  	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)          // Big enough to hold log2(num months)
+	  for (d <- opts.nstart to opts.nend) {                                      // Conditional on rebuild, merge the dictionaries for each month
 	    val (year, month, day) = Featurizer.decodeDate(d)
 	  	val fm = new File(opts.fromMonthDir(d) + wcountname)
 	    if (rebuild || ! fm.exists) {
@@ -36,6 +36,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		saveDMat(opts.fromMonthDir(d)+wcountname, dxx.counts)
 	    	}
 	    }
+	  }
+    for (d <- opts.nstart to opts.nend) {                                      // Unconditionally merge all monthly dictionaries
+	    val (year, month, day) = Featurizer.decodeDate(d)
 	    if (day == 31) {
 	  		val fm = new File(opts.fromMonthDir(d) + wcountname)
 	  		if (fm.exists) {
@@ -47,7 +50,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  	}
 	  }
   	println
-  	val dy = Dict.treeFlush(md)
+  	val dy = Dict.treeFlush(md)                                                // Get merged dictionary, sort by counts descending
   	val (sv, iv) = sortdown2(dy.counts)
   	val dyy = Dict(dy.cstr(iv), sv)
   	saveBMat(opts.mainDir + dictname, BMat(dyy.cstr))
@@ -91,11 +94,11 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    		val bm = map(bb2) // Map the ngrams
 	    		val cc2 = cc(ig,0)
 // Done kludge
-	    		val igood = find(mini(bm, 2) >= 0)                                    // Find the good ones
+	    		val igood = find(mini(bm, 2) >= 0)                                   // Find the good ones
 	    		val bg = bm(igood,?)
 	    		val cg = cc2(igood)
 	    		val ip = icol(0->igood.length)
-	    		sortlexInds(bg, ip)                                            // lex sort them
+	    		sortlexInds(bg, ip)                                                  // lex sort them
 	    		IDict.treeAdd(IDict(bg, cg(ip), opts.threshold), dd)                 // accumulate them
 	    		print(".")
 	    	}
@@ -107,6 +110,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	  			}
 	    	}
 	    }
+	  }
+  	for (d <- opts.nstart to opts.nend) {
+	    val (year, month, day) = Featurizer.decodeDate(d)
 	    if (day == 31) {                                                         // Unconditionally accumulate monthly dicts
 	  		val fm = new File(opts.fromMonthDir(d) + wcountname)
 	  		if (fm.exists) {
@@ -134,25 +140,25 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	}
   
  
-  def mkIDicts(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {
+  def mkIDicts(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {      // Build ngram dictionaries for each day
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     val done = izeros(nthreads,1)
     for (ithread <- 0 until nthreads) {
       Actor.actor {
         if (Mat.hasCUDA > 0) setGPU(ithread+Mat.hasCUDA-nthreads)
-      	val bigramsx = IMat(opts.guessSize, 3)
+      	val bigramsx = IMat(opts.guessSize, 3)                                 // Temp storage for grams
       	val trigramsx = IMat(opts.guessSize, 4)
       	val useridsx = IMat(opts.guessSize/10, 2)
-      	val bdicts = new Array[IDict](5)
+      	val bdicts = new Array[IDict](5)                                       // Trees to hold partial merges
       	val tdicts = new Array[IDict](5)
       	val udicts = new Array[IDict](5)
 
       	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
       		val (year, month, day) = Featurizer.decodeDate(d)
       		val fname = opts.fromDayDir(d)+opts.localDict
-      		val fnew = opts.fromDayDir(d)+opts.triCnts
+      		val fnew = opts.fromDayDir(d)+opts.usrCnts                           // Check if the userid dictionary was built yet
       		if (fileExists(fname) && (rebuild || !fileExists(fnew))) {
-      			val dict = Dict(loadBMat(fname))
+      			val dict = Dict(loadBMat(fname))                                   // load token dictionary for this day
       			for (ifile <- 0 until 24) { 
       				val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
