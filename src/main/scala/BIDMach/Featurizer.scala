@@ -142,8 +142,10 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
         if (Mat.hasCUDA > 0) setGPU(ithread+Mat.hasCUDA-nthreads)
       	val bigramsx = IMat(opts.guessSize, 3)
       	val trigramsx = IMat(opts.guessSize, 4)
+      	val useridsx = IMat(opts.guessSize/10, 2)
       	val bdicts = new Array[IDict](5)
       	val tdicts = new Array[IDict](5)
+      	val udicts = new Array[IDict](5)
 
       	for (d <- (opts.nstart+ithread) to opts.nend by nthreads) {
       		val (year, month, day) = Featurizer.decodeDate(d)
@@ -155,21 +157,27 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       				val fn = opts.fromDayDir(d)+opts.fromFile(ifile)
       				if (fileExists(fn)) {
       					val idata = loadIMat(fn)
-      					val (nuni, nbi, ntri, nusers) = scanner.scan(opts, dict, idata, null, bigramsx, trigramsx, null)
+      					val (nuni, nbi, ntri, nusers) = scanner.scan(opts, dict, idata, null, bigramsx, trigramsx, useridsx)
       					val bigrams = bigramsx(0->nbi, 0->2) 
       					val bid = if (nbi > 0) IDict.dictFromData(bigrams) else null
       					val trigrams = trigramsx(0->ntri, 0->3)
       					val trid = if (ntri > 0) IDict.dictFromData(trigrams) else null
+      					val userids = useridsx(0->nusers, 0)
+      					val uid = if (nusers > 0) IDict.dictFromData(userids) else null
       					IDict.treeAdd(bid, bdicts)
-      					IDict.treeAdd(trid, tdicts)      		
+      					IDict.treeAdd(trid, tdicts)    
+      					IDict.treeAdd(uid, udicts)
       				} 
       			}
       			val bf = IDict.treeFlush(bdicts)
       			val tf = IDict.treeFlush(tdicts)
+      			val uf = IDict.treeFlush(udicts)
       			saveIMat(opts.fromDayDir(d) + opts.biDict, bf.grams)
       			saveDMat(opts.fromDayDir(d) + opts.biCnts, bf.counts)
       			saveIMat(opts.fromDayDir(d) + opts.triDict, tf.grams)
       			saveDMat(opts.fromDayDir(d) + opts.triCnts, tf.counts)
+      			saveIMat(opts.fromDayDir(d) + opts.usrDict, uf.grams)
+      			saveDMat(opts.fromDayDir(d) + opts.usrCnts, uf.counts)
       			print(".")
       		}
       		if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
@@ -388,8 +396,10 @@ object Featurizer {
     var localDict:String = "dict.gz"
     var biDict:String = "bdict.lz4"
     var triDict:String = "tdict.lz4"
+    var usrDict:String = "usrdict.lz4"
     var biCnts:String = "bcnts.lz4"
     var triCnts:String = "tcnts.lz4"
+    var usrCnts:String = "usrcnts.lz4"
     var nstart:Int = encodeDate(2011,11,22)
     var nend:Int = encodeDate(2013,7,16)
     var threshold = 10
@@ -403,31 +413,30 @@ trait Scanner {
 }
 
 object TwitterScanner extends Scanner {  
-  	final val outsideStatus = 0
-		final val insideStatus = 1
-		final val insideUser = 2
-		final val insideUserId = 3
-		final val insideText = 4
-		final val insideRetweet = 5
-		final val insideStatusL2 = 6
-		final val insideUserL2 = 7
-		final val insideUserIdL2 = 8
-		final val insideTextL2 = 9
+  	final val OutsideStatus  = 0
+		final val InsideStatus   = 1
+		final val InsideUser     = 2
+		final val InsideUserId   = 3
+		final val InsideText     = 4
+		final val InsideRetweet  = 5
+		final val InsideStatusL2 = 6
+		final val InsideUserL2   = 7
+		final val InsideUserIdL2 = 8
+		final val InsideTextL2   = 9
 		
 	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat, userids:IMat):(Int, Int, Int, Int) = {
 
-  	val isstart =  dict("<status>")
-		val isend =    dict("</status>")
-		val irstart =  dict("<retweet>")
-		val irend =    dict("</retweet>")
-		val itstart =  dict("<text>")
-		val itend =    dict("</text>")
-		val iuser  =   dict("<user>")
-		val iuend  =   dict("</user>")
-		val iistart =  dict("<id>")
-		val iiend  =   dict("</id>")
+  	val Isstart =  dict("<status>")
+		val Isend =    dict("</status>")
+		val Irstart =  dict("<retweet>")
+		val Irend =    dict("</retweet>")
+		val Itstart =  dict("<text>")
+		val Itend =    dict("</text>")
+		val Iuser  =   dict("<user>")
+		val Iuend  =   dict("</user>")
+		val Iistart =  dict("<id>")
+		val Iiend  =   dict("</id>")
 		var state = 0
-
 
 		var istatus = -1
 		var nuni = 0
@@ -439,40 +448,40 @@ object TwitterScanner extends Scanner {
 			val tok = idata.data(i)-1
 			if (tok+1 >0) println(dict(tok)+ " " + state)
 			else println("num " +(-(tok+1))+ " " + state)
-			if (tok == isend) {
-				state = outsideStatus
+			if (tok == Isend) {
+				state = OutsideStatus
 			} else {
 				(state: @switch) match {
-				case `outsideStatus` => 
-				if (tok == isstart) {
-					state = insideStatus
+				case OutsideStatus => 
+				if (tok == Isstart) {
+					state = InsideStatus
 					istatus += 1
 				}
-				case `insideStatus` => 
+				case InsideStatus => 
 				  tok match {
-				    case `iuser`   => state = insideUser
-				    case `itstart` => state = insideText
-				    case `irstart` =>	state = insideRetweet
+				    case Iuser   => state = InsideUser
+				    case Itstart => state = InsideText
+				    case Irstart =>	state = InsideRetweet
 				  } 
-				case `insideUser` => 
+				case InsideUser => 
 				  tok match {
-				    case `iistart` =>	state = insideUserId
-				    case `iuend`   => state = insideStatus
-				    case `irstart` => state = insideRetweet
+				    case Iistart =>	state = InsideUserId
+				    case Irstart => state = InsideRetweet
+				    case Iuend   => state = InsideStatus
 				  }
-				case `insideUserId` => 
-				  if (tok+1 < 0) {
+				case InsideUserId => 
+				  if (tok == Iiend) {
+				  	state = InsideUser
+				  } else if (tok+1 < 0) {
 				  	if (userids != null) {
 				  		userids(istatus,0) = -(tok+1)
 				  		userids(istatus,1) = 0
 				  	}
-				  } else if (tok == iiend) {
-				  	state = insideUser
-				  }
-				case `insideText` => 
+				  } 
+				case InsideText => 
 				  tok match {
-				  case `itend` => state = insideStatus
-				  case `iuser` =>	state = insideUser
+				  case Iuser =>	state = InsideUser
+				  case Itend => state = InsideStatus
 				  case _ => if (tok+1 > 0) {
 				  	if (unigramsx != null) {
 				  		unigramsx(nuni, 0) = tok
@@ -481,14 +490,14 @@ object TwitterScanner extends Scanner {
 				  	}
 				  	if (idata.data(i-1) > 0) {  
 				  		val tok1 = idata.data(i-1)-1
-				  		if (tok1 != itstart) {
+				  		if (tok1 != Itstart) {
 				  			bigramsx(nbi, 0) = tok1
 				  			bigramsx(nbi, 1) = tok
 				  			bigramsx(nbi, 2) = istatus
 				  			nbi += 1
 				  			if (idata.data(i-2) > 0) {
 				  				val tok2 = idata.data(i-2)-1
-				  				if (tok2 != itstart) {
+				  				if (tok2 != Itstart) {
 				  					trigramsx(ntri, 0) = tok2
 				  					trigramsx(ntri, 1) = tok1
 				  					trigramsx(ntri, 2) = tok
@@ -500,32 +509,32 @@ object TwitterScanner extends Scanner {
 				  	}
 				  }
 				  }
-				case `insideRetweet` => 
+				case InsideRetweet => 
 				  tok match {
-				    case `isstart` =>	state = insideStatusL2
-				    case `irend`   =>	state = insideStatus
+				    case Isstart =>	state = InsideStatusL2
+				    case Irend   =>	state = InsideStatus
 				  }
-				case `insideStatusL2` => 
+				case InsideStatusL2 => 
 				  tok match {
-				    case `iuser`   =>	state = insideUserL2
-				    case `itstart` => state = insideTextL2
+				    case Iuser   =>	state = InsideUserL2
+				    case Itstart => state = InsideTextL2
 				  } 
-				case `insideUserL2` => 
+				case InsideUserL2 => 
 				  tok match {
-				    case `iuend`   =>	state = insideStatusL2
-				    case `iistart` =>	state = insideUserIdL2
+				    case Iistart =>	state = InsideUserIdL2
+				    case Iuend   =>	state = InsideStatusL2
 				  }
-				case `insideUserIdL2` => 
+				case InsideUserIdL2 => 
 				  tok match {
-				    case `iiend` =>	state = insideUserL2
+				    case Iiend =>	state = InsideUserL2
 				    case _ => if (tok-1 < 0) {
 				    	if (userids != null) userids(istatus, 1) = -(tok+1)
 				    }
 				  }
-				case `insideTextL2` => 
+				case InsideTextL2 => 
 				  tok match {
-				    case `itend` => state = insideStatusL2
-				    case `iuser` => state = insideUserL2
+				    case Itend => state = InsideStatusL2
+				    case Iuser => state = InsideUserL2
 				  }
 				}
 			}
