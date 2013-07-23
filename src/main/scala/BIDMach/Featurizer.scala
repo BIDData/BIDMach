@@ -407,7 +407,7 @@ object Featurizer {
     var triCnts:String = "tcnts.lz4"
     var usrCnts:String = "usrcnts.lz4"
     var nstart:Int = encodeDate(2011,11,22)
-    var nend:Int = encodeDate(2013,7,16)
+    var nend:Int = encodeDate(2013,6,31)
     var threshold = 10
     var guessSize = 100000000
     var nthreads = 2
