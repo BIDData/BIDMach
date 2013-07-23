@@ -458,8 +458,8 @@ object TwitterScanner extends Scanner {
 		var i = 0
 		while (i < len) {
 			val tok = idata.data(i)-1
-			if (tok+1 >0) println(dict(tok)+ " " + state)
-			else println("num " +(-(tok+1))+ " " + state)
+//			if (tok+1 >0) println(dict(tok)+ " " + state)
+//			else println("num " +(-(tok+1))+ " " + state)
 			if (tok == Isend) {
 				state = OutsideStatus
 			} else {
