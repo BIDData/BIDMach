@@ -4,6 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import HMat._
 import scala.actors._
+import scala.annotation.switch
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
@@ -402,8 +403,20 @@ trait Scanner {
 }
 
 object TwitterScanner extends Scanner {  
+  	final val outsideStatus = 0
+		final val insideStatus = 1
+		final val insideUser = 2
+		final val insideUserId = 3
+		final val insideText = 4
+		final val insideRetweet = 5
+		final val insideStatusL2 = 6
+		final val insideUserL2 = 7
+		final val insideUserIdL2 = 8
+		final val insideTextL2 = 9
+		
 	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat, userids:IMat):(Int, Int, Int, Int) = {
-		val isstart =  dict("<status>")
+
+  	val isstart =  dict("<status>")
 		val isend =    dict("</status>")
 		val irstart =  dict("<retweet>")
 		val irend =    dict("</retweet>")
@@ -414,18 +427,7 @@ object TwitterScanner extends Scanner {
 		val iistart =  dict("<id>")
 		val iiend  =   dict("</id>")
 		var state = 0
-		/*
-		 * state = 0: outside a status
-		 * state = 1: inside a status
-		 * state = 2: inside the first-level user tag
-		 * state = 3: inside the id of a first-level user tag
-		 * state = 4: inside first-level text field
-		 * state = 5: inside a retweet
-		 * state = 6: inside the status tag in a retweet
-		 * state = 7: inside user field of retweet
-		 * state = 8: inside the id of a user in a retweet
-		 * state = 9: inside text field of retweet
-		 */
+
 
 		var istatus = -1
 		var nuni = 0
@@ -438,90 +440,93 @@ object TwitterScanner extends Scanner {
 			if (tok+1 >0) println(dict(tok)+ " " + state)
 			else println("num " +(-(tok+1))+ " " + state)
 			if (tok == isend) {
-				state = 0
+				state = outsideStatus
 			} else {
-				state match {
-				case 0 => if (tok == isstart) {
-					state = 1
+				(state: @switch) match {
+				case `outsideStatus` => 
+				if (tok == isstart) {
+					state = insideStatus
 					istatus += 1
 				}
-				case 1 => if (tok == iuser) {
-					state = 2
-				} else if (tok == itstart) {
-					state = 4
-				}	else if (tok == irstart) {
-					state = 5
-				} 
-				case 2 => if (tok == iistart) {
-					state = 3
-				} else if (tok == iuend) {
-					state = 1
-				} else if (tok == irstart) {
-				  state = 5
-				}
-				case 3 => if (tok+1 < 0) {
-					if (userids != null) {
-					  userids(istatus,0) = -(tok+1)
-					  userids(istatus,1) = 0
-					}
-				} else if (tok == iiend) {
-					state = 2
-				}
-				case 4 => if (tok == itend) {
-					state = 1
-				} else if (tok == iuser) {
-					state = 2
-				} else if (tok+1 > 0) {
-					if (unigramsx != null) {
-						unigramsx(nuni, 0) = tok
-						unigramsx(nuni, 1) = istatus
-						nuni += 1
-					}
-					if (idata.data(i-1) > 0) {  
-						val tok1 = idata.data(i-1)-1
-						if (tok1 != itstart) {
-							bigramsx(nbi, 0) = tok1
-							bigramsx(nbi, 1) = tok
-							bigramsx(nbi, 2) = istatus
-							nbi += 1
-							if (idata.data(i-2) > 0) {
-								val tok2 = idata.data(i-2)-1
-								if (tok2 != itstart) {
-									trigramsx(ntri, 0) = tok2
-									trigramsx(ntri, 1) = tok1
-									trigramsx(ntri, 2) = tok
-									trigramsx(ntri, 3) = istatus
-									ntri += 1
-								}
-							}
-						}
-					}
-				}
-				case 5 => if (tok == isstart) {
-					state = 6
-				} else if (tok == irend) {
-					state = 1
-				}
-				case 6 => if (tok == iuser) {
-					state = 7
-				} else if (tok == itstart) {
-					state = 9
-				} 
-				case 7 => if (tok == iuend) {
-					state = 6
-				} else if (tok == iistart) {
-					state = 8
-				}
-				case 8 => if (tok == iiend) {
-					state = 7
-				} else if (tok-1 < 0) {
-					if (userids != null) userids(istatus, 1) = -(tok+1)
-				}
-				case 9 => if (tok == itend) {
-					state = 6
-				} else if (tok == iuser) {
-				  state = 7
-				}
+				case `insideStatus` => 
+				  tok match {
+				    case `iuser`   => state = insideUser
+				    case `itstart` => state = insideText
+				    case `irstart` =>	state = insideRetweet
+				  } 
+				case `insideUser` => 
+				  tok match {
+				    case `iistart` =>	state = insideUserId
+				    case `iuend`   => state = insideStatus
+				    case `irstart` => state = insideRetweet
+				  }
+				case `insideUserId` => 
+				  if (tok+1 < 0) {
+				  	if (userids != null) {
+				  		userids(istatus,0) = -(tok+1)
+				  		userids(istatus,1) = 0
+				  	}
+				  } else if (tok == iiend) {
+				  	state = insideUser
+				  }
+				case `insideText` => 
+				  tok match {
+				  case `itend` => state = insideStatus
+				  case `iuser` =>	state = insideUser
+				  case _ => if (tok+1 > 0) {
+				  	if (unigramsx != null) {
+				  		unigramsx(nuni, 0) = tok
+				  		unigramsx(nuni, 1) = istatus
+				  		nuni += 1
+				  	}
+				  	if (idata.data(i-1) > 0) {  
+				  		val tok1 = idata.data(i-1)-1
+				  		if (tok1 != itstart) {
+				  			bigramsx(nbi, 0) = tok1
+				  			bigramsx(nbi, 1) = tok
+				  			bigramsx(nbi, 2) = istatus
+				  			nbi += 1
+				  			if (idata.data(i-2) > 0) {
+				  				val tok2 = idata.data(i-2)-1
+				  				if (tok2 != itstart) {
+				  					trigramsx(ntri, 0) = tok2
+				  					trigramsx(ntri, 1) = tok1
+				  					trigramsx(ntri, 2) = tok
+				  					trigramsx(ntri, 3) = istatus
+				  					ntri += 1
+				  				}
+				  			}
+				  		}
+				  	}
+				  }
+				  }
+				case `insideRetweet` => 
+				  tok match {
+				    case `isstart` =>	state = insideStatusL2
+				    case `irend`   =>	state = insideStatus
+				  }
+				case `insideStatusL2` => 
+				  tok match {
+				    case `iuser`   =>	state = insideUserL2
+				    case `itstart` => state = insideTextL2
+				  } 
+				case `insideUserL2` => 
+				  tok match {
+				    case `iuend`   =>	state = insideStatusL2
+				    case `iistart` =>	state = insideUserIdL2
+				  }
+				case `insideUserIdL2` => 
+				  tok match {
+				    case `iiend` =>	state = insideUserL2
+				    case _ => if (tok-1 < 0) {
+				    	if (userids != null) userids(istatus, 1) = -(tok+1)
+				    }
+				  }
+				case `insideTextL2` => 
+				  tok match {
+				    case `itend` => state = insideStatusL2
+				    case `iuser` => state = insideUserL2
+				  }
 				}
 			}
 			i += 1
