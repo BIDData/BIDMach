@@ -142,7 +142,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val dyy = IDict(dy.grams(iv,?), sv)
   	saveIMat(opts.mainDir + dictname, dyy.grams)
   	saveDMat(opts.mainDir + wcountname, dyy.counts)
-  	dyy
+  	dy                                                                         // Return the lex-sorted dictionary
 	}
   
  
@@ -259,14 +259,14 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  			map = dict --> alldict
       		  		}
       		  		val idata = loadIMat(fn)
-      		  		val (nuni, nbi, ntri, nusers) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx, userids)
+      		  		val (nuni, nbi, ntri, nstatuses) = scanner.scan(opts, dict, idata, unigramsx, bigramsx, trigramsx, userids)
       		  		val unifeats = mkUniFeats(map, unigramsx, nuni)
       		  		val bifeats = mkGramFeats(map, bigramsx, nbi, allbdict)
       		  		val trifeats = mkGramFeats(map, trigramsx, ntri, alltdict)   
       		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
-      		  		saveIMat(opts.toDayDir(d) + opts.toUserids(ifile), userids(nusers, ?))
+      		  		saveIMat(opts.toDayDir(d) + opts.toUserids(ifile), userids(nstatuses, ?))
       		  		if (ifile == 23) print(".")
       		  	} 
       		  }   		
