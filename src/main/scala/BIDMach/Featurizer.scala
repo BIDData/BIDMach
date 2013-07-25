@@ -17,6 +17,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val dd = new Array[Dict](5)                                                // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
   	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)          // Big enough to hold log2(num months)
+  	println("Building monthly dicts for "+opts.thisDir)
 	  for (d <- opts.nstart to opts.nend) {                                      // Conditional on rebuild, merge the dictionaries for each month
 	    val (year, month, day) = Featurizer.decodeDate(d)
 	  	val fm = new File(opts.fromMonthDir(d) + wcountname)
@@ -42,25 +43,30 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    	}
 	    }
 	  }
-    for (d <- opts.nstart to opts.nend) {                                      // Unconditionally merge all monthly dictionaries
-	    val (year, month, day) = Featurizer.decodeDate(d)
-	    if (day == 31) {
-	  		val fm = new File(opts.fromMonthDir(d) + wcountname)
-	  		if (fm.exists) {
-	  			val bb = loadBMat(opts.fromMonthDir(d) + dictname)
-	  			val cc = loadDMat(opts.fromMonthDir(d) + wcountname)
-	  			Dict.treeAdd(Dict(bb, cc, 4*opts.threshold), md)
-	  			println("%04d-%02d" format (year,month))
-	  		}
-	  	}
-	  }
-  	println
-  	val dy = Dict.treeFlush(md)                                                // Get merged dictionary, sort by counts descending
-  	val (sv, iv) = sortdown2(dy.counts)
-  	val dyy = Dict(dy.cstr(iv), sv)
-  	saveBMat(opts.thisDir + dictname, BMat(dyy.cstr))
-  	saveDMat(opts.thisDir + wcountname, dyy.counts)
-  	dyy
+    if (rebuild) {
+    	println("Merging monthly dicts for "+opts.thisDir)
+    	for (d <- opts.nstart to opts.nend) {                                      // Conditionally merge all monthly dictionaries
+    		val (year, month, day) = Featurizer.decodeDate(d)
+    		if (day == 31) {
+    			val fm = new File(opts.fromMonthDir(d) + wcountname)
+    			if (fm.exists) {
+    				val bb = loadBMat(opts.fromMonthDir(d) + dictname)
+    				val cc = loadDMat(opts.fromMonthDir(d) + wcountname)
+    				Dict.treeAdd(Dict(bb, cc, 4*opts.threshold), md)
+    				println("%04d-%02d" format (year,month))
+    			}
+    		}
+    	}
+    	println
+    	val dy = Dict.treeFlush(md)                                                // Get merged dictionary, sort by counts descending
+    	val (sv, iv) = sortdown2(dy.counts)
+    	val dyy = Dict(dy.cstr(iv), sv)
+    	saveBMat(opts.thisDir + dictname, BMat(dyy.cstr))
+    	saveDMat(opts.thisDir + wcountname, dyy.counts)
+    	dyy
+    } else {
+      Dict(loadBMat(opts.thisDir + dictname), loadDMat(opts.thisDir + wcountname))
+    }
 	}
   
   def mergeIDicts(rebuild:Boolean=false, dictname:String="bdict.lz4", wcountname:String="bcnts.lz4"):IDict = {
@@ -72,6 +78,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	var mdict:Dict = null                                                     
   	var domonth:Boolean = false
   	var lastmonth = 0
+  	println("Building monthly IDicts for " + opts.thisDir)
 	  for (d <- opts.nstart to opts.nend) {
 	    val (year, month, day) = Featurizer.decodeDate(d)
 	    if (month != lastmonth) {
@@ -117,37 +124,51 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	    	}
 	    }
 	  }
-  	for (d <- opts.nstart to opts.nend) {
-	    val (year, month, day) = Featurizer.decodeDate(d)
-	    if (day == 31) {                                                         // Unconditionally accumulate monthly dicts
-	  		val fm = new File(opts.fromMonthDir(d) + wcountname)
-	  		if (fm.exists) {
-	  			val bb = HMat.loadIMat(opts.fromMonthDir(d) + dictname)              // Load the IDict data for this month
-	  			val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
-	  			val map = mdict --> alldict
-	  			val bm = map(bb)                                                     // Map to global token dictionary
-	    		val igood = find(mini(bm, 2) >= 0)                                   // Save the good stuff
-	    		val bg = bm(igood,?)
-	    		val cg = cc(igood)
-	    		val ip = icol(0->igood.length)
-	  			sortlexInds(bg, ip)
-	    		IDict.treeAdd(IDict(bg, cg(ip), 4*opts.threshold), md)
-	    		println("%04d-%02d" format (year,month))
-	  		}
-	  	}
-	  }
-  	dy = IDict.treeFlush(md)                                                   // Final dictionary for the time period
-  	println
-  	val (sv, iv) = sortdown2(dy.counts)                                        // Sort down by ngram frequency
-  	val dyy = IDict(dy.grams(iv,?), sv)
-  	saveIMat(opts.thisDir + dictname, dyy.grams)
-  	saveDMat(opts.thisDir + wcountname, dyy.counts)
-  	dy                                                                         // Return the lex-sorted dictionary
+    if (rebuild) {
+    	println("Merging monthly IDicts for " + opts.thisDir)
+    	for (d <- opts.nstart to opts.nend) {
+    		val (year, month, day) = Featurizer.decodeDate(d)
+    		if (day == 31) {                                                         // Conditionally accumulate monthly dicts
+    			val dfname = opts.fromMonthDir(d) + opts.localDict
+    			if (fileExists(dfname)) {
+    				mdict = Dict(loadBMat(dfname))
+    				val fm = new File(opts.fromMonthDir(d) + wcountname)
+    				if (fm.exists) {
+    					val bb = HMat.loadIMat(opts.fromMonthDir(d) + dictname)              // Load the IDict data for this month
+    					val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
+    					val map = mdict --> alldict
+    					val bm = map(bb)                                                     // Map to global token dictionary
+    					val igood = find(mini(bm, 2) >= 0)                                   // Save the good stuff
+    					val bg = bm(igood,?)
+    					val cg = cc(igood)
+    					val ip = icol(0->igood.length)
+    					sortlexInds(bg, ip)
+    					IDict.treeAdd(IDict(bg, cg(ip), 4*opts.threshold), md)
+    					println("%04d-%02d" format (year,month))
+    				}
+    			}
+    		}
+    	}
+    	dy = IDict.treeFlush(md)                                                   // Final dictionary for the time period
+    	println
+    	val (sv, iv) = sortdown2(dy.counts)                                        // Sort down by ngram frequency
+    	val dyy = IDict(dy.grams(iv,?), sv)
+    	saveIMat(opts.thisDir + dictname, dyy.grams)
+    	saveDMat(opts.thisDir + wcountname, dyy.counts)
+    	dy                                                                         // Return the lex-sorted dictionary
+    } else {
+      val gyy = loadIMat(opts.thisDir + dictname)
+      val cyy = loadDMat(opts.thisDir + wcountname)
+      val iperm = icol(0->cyy.length)
+      sortlexInds(gyy, iperm)
+      IDict(gyy, cyy(iperm))
+    }
 	}
   
  
   def mkIDicts(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {      // Build ngram dictionaries for each day
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
+    println("Building daily IDicts")
     val done = izeros(nthreads,1)
     for (ithread <- 0 until nthreads) {
       Actor.actor {
@@ -227,6 +248,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   }
   
   def featurize(rebuild:Boolean=false, scanner:Scanner=TwitterScanner) = {
+    println("Featurizing in " + opts.thisDir)
     if (alldict == null) alldict = Dict(HMat.loadBMat(opts.mainDict))
   	if (allbdict == null) allbdict = IDict(HMat.loadIMat(opts.mainBDict))
   	if (alltdict == null) alltdict = IDict(HMat.loadIMat(opts.mainTDict))
@@ -320,6 +342,7 @@ object Featurizer {
   }
   
   def buildAll(rebuild:Boolean=false) = {
+    buildLocalGDicts(rebuild)
     buildMainDict(rebuild)
     buildMainGDicts(rebuild)
     buildFeatures(rebuild)
@@ -329,37 +352,49 @@ object Featurizer {
   	val (ff,fs) = alloptions    
     val d1 = ff.mergeDicts(rebuild)
     val d2 = fs.mergeDicts(rebuild)
-    val dd = Dict.union(d1, d2)
-    val (sc, ic) = sortdown2(dd.counts)
-    saveBMat(ff.opts.mainDict, BMat(dd.cstr(ic,0)))
-  	saveDMat(ff.opts.mainCounts, sc)
+    if (rebuild) {
+    	val dd = Dict.union(d1, d2)
+    	val (sc, ic) = sortdown2(dd.counts)
+    	saveBMat(ff.opts.mainDict, BMat(dd.cstr(ic,0)))
+    	saveDMat(ff.opts.mainCounts, sc)
+    }
+  }
+  
+  def buildLocalGDicts(rebuild:Boolean=false) = {
+    val (ff, fs) = alloptions
+    ff.mkIDicts(rebuild)
+    fs.mkIDicts(rebuild)
   }
  
   def buildMainGDicts(rebuild:Boolean=false) = {
     val (ff, fs) = alloptions
-    ff.mkIDicts(rebuild)
-    fs.mkIDicts(rebuild)
 
   	val bd1 = ff.mergeIDicts(rebuild)
   	val bd2 = fs.mergeIDicts(rebuild)
-  	val bdd = IDict.merge2(bd1,bd2)
-  	val (sbc, ibc) = sortdown2(bdd.counts)
-    saveIMat(ff.opts.mainBDict, IMat(bdd.grams(ibc,?)))
-  	saveDMat(ff.opts.mainBCounts, sbc)
+  	if (rebuild) {
+  		val bdd = IDict.merge2(bd1,bd2)
+  		val (sbc, ibc) = sortdown2(bdd.counts)
+  		saveIMat(ff.opts.mainBDict, IMat(bdd.grams(ibc,?)))
+  		saveDMat(ff.opts.mainBCounts, sbc)
+  	}
   	
   	val td1 = ff.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
   	val td2 = fs.mergeIDicts(rebuild, "tdict.lz4", "tcnts.lz4")
-  	val tdd = IDict.merge2(td1,td2)
-  	val (stc, itc) = sortdown2(tdd.counts)
-    saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
-    saveDMat(ff.opts.mainTCounts, stc)
+  	if (rebuild) {
+  		val tdd = IDict.merge2(td1,td2)
+  		val (stc, itc) = sortdown2(tdd.counts)
+  		saveIMat(ff.opts.mainTDict, IMat(tdd.grams(itc,?)))
+  		saveDMat(ff.opts.mainTCounts, stc)
+  	}
     
     val usr1 = ff.mergeIDicts(rebuild, "usrdict.lz4", "usrcnts.lz4")
   	val usr2 = fs.mergeIDicts(rebuild, "usrdict.lz4", "usrcnts.lz4")
-  	val usr = IDict.merge2(usr1,usr2)
-  	val (usrs, usrc) = sortdown2(usr.counts)
-    saveIMat(ff.opts.mainUsrDict, IMat(usr.grams(usrc,?)))
-    saveDMat(ff.opts.mainUsrCounts, usrs)
+  	if (rebuild) {
+  		val usr = IDict.merge2(usr1,usr2)
+  		val (usrs, usrc) = sortdown2(usr.counts)
+  		saveIMat(ff.opts.mainUsrDict, IMat(usr.grams(usrc,?)))
+  		saveDMat(ff.opts.mainUsrCounts, usrs)
+  	}
   }
   
   def buildFeatures(rebuild:Boolean=false) = {
