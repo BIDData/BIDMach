@@ -16,7 +16,7 @@ class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new 
   val blockSize = opts.blockSize
   var omats:Array[Mat] = null
   
-  def init() = {
+  def init = {
     here = 0
     omats = new Array[Mat](mats.length)
     for (i <- 0 until mats.length) {
@@ -43,35 +43,29 @@ class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new 
 
 }
 
-class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpose:IMat=null, compressed:Int=0,
-		override val opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
+class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f
   var blockSize = 0 
   var fileno = 0
-  var colno = 0
+  var rowno = 0
+  var nstart = 0
+  var fnames:List[(Int)=>String] = null
   var omats:Array[Mat] = null
   var matqueue:Array[Array[Mat]] = null
   var ready:IMat = null
   
-  def init = {
-    var nstart = nstart0
+  def initbase = {
+    nstart = opts.nstart
+    fnames = opts.fnames
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
-    fileno = nstart                                           // Number of the current output file
-    colno = 0                                                 // Column number in the current output file
-    omats = new Array[Mat](fnames.size)
-    matqueue = new Array[Array[Mat]](fnames.size)             // Queue of matrices for each output matrix
-    ready = -iones(opts.lookahead, 1)                         // Numbers of files currently loaded in queue
-    for (i <- 0 until fnames.size) {
-      var mm = HMat.loadMat(fnames(i)(nstart), compressed)
-      if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) mm = mm.t
-      omats(i) = mm match {
-      case mm:SMat => SMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
-      case mm:SDMat => SDMat(mm.nrows, blockSize, (mm.nnz * sizeMargin * blockSize / mm.ncols).toInt)
-      case _ => mm.zeros(mm.nrows, blockSize)
-      } 
-      matqueue(i) = new Array[Mat](opts.lookahead)
+    fileno = nstart                                                    // Number of the current output file
+    rowno = 0                                                          // row number in the current output file
+    matqueue = new Array[Array[Mat]](opts.lookahead)                   // Queue of matrices for each output matrix
+    ready = -iones(opts.lookahead, 1)                                  // Numbers of files currently loaded in queue
+    for (i <- 0 until opts.lookahead) {
+      matqueue(i) = new Array[Mat](fnames.size)
     }
     for (i <- 0 until opts.lookahead) {
       Actor.actor {
@@ -80,36 +74,49 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
     }
   }
   
-  def next:Array[Mat] = {
-    val filex = fileno % opts.lookahead
-    var donextfile = false
-    var todo = 0
-    while (ready(filex) < fileno) Thread.`yield`
+  def init = {
+    initbase
+    omats = new Array[Mat](fnames.size)
     for (i <- 0 until fnames.size) {
-    	val matq = matqueue(i)(filex)
-    	if (matq != null) {
-    		val ccols = math.min(colno + blockSize, matq.ncols)
-    		omats(i) = matq.colslice(colno, ccols, omats(i))
-    		todo = blockSize - ccols + colno
-    	}
-    }
-    if (todo > 0) {    	
-    	var done = false
-    	while (!done && fileno+1 < nend) {
-    		val filey = (fileno+1) % opts.lookahead
-    		while (ready(filey) < fileno+1) Thread.`yield`
-    		if (matqueue(0)(filey).asInstanceOf[AnyRef] != null && matqueue(0)(filey).ncols >= todo) {
-    			for (i <- 0 until fnames.size) {
-    				val matq = matqueue(i)(filey)
-    				omats(i) = omats(i) \ matq.colslice(0, todo, null)
-    			} 
-    			done = true
+      var mm = HMat.loadMat(fnames(i)(nstart))
+      if (opts.dorows) {
+      	omats(i) = mm.zeros(blockSize, mm.ncols)
+      } else {
+      	omats(i) = mm.zeros(mm.nrows, blockSize)
+      }
+    } 
+  }
+  
+  def next:Array[Mat] = {
+    var donextfile = false
+    var todo = blockSize
+    while (todo > 0 && fileno < opts.nend) {
+    	var nrow = rowno
+    	val filex = fileno % opts.lookahead
+    	while (ready(filex) < fileno) Thread.`yield`
+    	for (i <- 0 until fnames.size) {
+    		val matq = matqueue(filex)(i)
+    		if (matq != null) {
+    		  val matqnr = if (opts.dorows) matq.nrows else matq.ncols
+    			nrow = math.min(rowno + todo, matqnr)
+    			if (opts.dorows) {
+      			omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo)  			  
+    			} else {
+    				omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo)   			  
+    			}
+    			if (matqnr == nrow) donextfile = true
+    		} else {
+    		  donextfile = true
     		}
-    		fileno += 1
     	}
-    	colno = todo
-    } else {
-    	colno += blockSize
+    	todo -= nrow - rowno
+    	if (donextfile) {
+    	  fileno += 1
+    	  rowno = 0
+    	  donextfile = false
+    	} else {
+    		rowno = nrow
+    	}
     }
     omats
   }
@@ -131,13 +138,12 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
   def prefetch(ifile:Int) = {
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
-  	for (inew <- ifile until nend by opts.lookahead) {
+  	for (inew <- ifile until opts.nend by opts.lookahead) {
   		while (ready(ifilex) >= fileno) Thread.`yield`
   		val fexists = fileExists(fnames(0)(inew)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
-  			matqueue(i)(ifilex) = if (fexists) {
-  			  val tmp = HMat.loadMat(fnames(i)(inew), compressed, matqueue(i)(ifilex))
-  			  if (transpose.asInstanceOf[AnyRef] != null && transpose(i) == 1) lazyTranspose(tmp) else tmp
+  			matqueue(ifilex)(i) = if (fexists) {
+  			  HMat.loadMat(fnames(i)(inew), matqueue(ifilex)(i))  			 
   			} else null  			
 //  			println("%d" format inew)
   		}
@@ -146,15 +152,143 @@ class FilesDataSource(fnames:List[(Int)=>String], nstart0:Int, nend:Int, transpo
   }
   
   def hasNext:Boolean = {
-    (fileno < nend)
+    (fileno < opts.nend)
   }
 }
 
-object FilesDataSource {
-  class Options extends DataSource.Options {
-  	var lookahead = 8
-  	var sampleFiles = 1.0f
+class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDataSource.Options) extends FilesDataSource(opts) {
+  
+  var inptrs:IMat = null
+  var offsets:IMat = null
+  
+  override def init = {
+    initbase
+    var totsize = sum(opts.fcounts).v
+    omats = new Array[Mat](1)
+    omats(0) = SMat(totsize, opts.blockSize, opts.sBlockSize)
+    inptrs = izeros(opts.fcounts.length, 1)
+    offsets = 0 on cumsum(opts.fcounts)
   }
+  
+  def binFind(i:Int, mat:Mat):Int = {
+    val imat = mat.asInstanceOf[IMat]
+    val nrows = mat.nrows
+    var ibeg = 0
+    var iend = nrows
+    while (ibeg < iend) {
+      val imid = (iend + ibeg)/2
+      if (i > imat(imid, 0)) {
+        ibeg = imid+1
+      } else {
+        iend = imid
+      }
+    }
+    iend    
+  }
+  
+  def sprowslice(inmat:Array[Mat], rowno:Int, nrow:Int, omat0:Mat, done:Int):Mat = {
+    val omat = omat0.asInstanceOf[SMat]
+    val ioff = Mat.ioneBased
+    var idone = done
+    var innz = omat.nnz
+    val lims = opts.fcounts
+    val nfiles = opts.fcounts.length
+    var j = 0
+    while (j < nfiles) {
+    	inptrs(j, 0) = binFind(rowno, inmat(j))
+    	j += 1
+    }
+    var irow = rowno
+    while (irow < nrow) {
+      var j = 0
+      while (j < nfiles) {
+        val mat = inmat(j).asInstanceOf[IMat]
+        var k = inptrs(j)
+        while (k < mat.nrows && mat(k, 0) < irow) k += 1
+        inptrs(j) = k
+        val xoff = innz - k
+        val yoff = offsets(j) + ioff
+        while (k < mat.nrows && mat(k, 0) == irow && mat(k, 1) < lims(j)) {
+          omat.ir(xoff + k) = mat(k, 1) + yoff
+          omat.data(xoff + k) = mat(k, 2)
+          k += 1
+        }
+        innz = xoff + k
+        inptrs(j) = k
+        j += 1
+      }
+      irow += 1
+      idone += 1
+      omat.jc(idone) = innz + ioff
+    }
+    omat.nnz0 = innz
+    omat    
+  }
+  
+  def spmax(matq:Array[Mat]):Int = {
+    var maxv = 0
+    for (i <- 0 until matq.length) {
+      if (matq(i) != null) {
+      	val mat = matq(i).asInstanceOf[IMat]
+      	maxv = math.max(maxv, mat(mat.nrows-1,0))
+      }
+    }
+    maxv
+  }
+  
+  def fillup(mat:Mat, todo:Int) = {
+    val smat = mat.asInstanceOf[SMat]
+    val ncols = mat.ncols
+    var i = ncols - todo
+    val theend = smat.jc(i)
+    while (i < ncols) {
+      i += 1
+      smat.jc(i) = theend
+    }
+  }
+  
+  def flushMat(mat:Mat) = {
+    val smat = mat.asInstanceOf[SMat]
+    smat.nnz0 = 0
+    smat.jc(0) = Mat.ioneBased
+  }
+  
+  override def next:Array[Mat] = {
+
+    var donextfile = false
+    var todo = blockSize
+    flushMat(omats(0))
+    while (todo > 0 && fileno < opts.nend) {
+    	var nrow = rowno
+    	val filex = fileno % opts.lookahead
+    	while (ready(filex) < fileno) Thread.`yield`
+    	val spm = spmax(matqueue(filex))
+    	nrow = math.min(rowno + todo, spm)
+    	val matq = matqueue(filex)
+    	if (matq(0) != null) {
+    		omats(0) = sprowslice(matq, rowno, nrow, omats(0), blockSize - todo)
+    		if (spm == nrow) donextfile = true
+    	} else {
+    		donextfile = true
+    	}
+    	todo -= nrow - rowno
+    	if (donextfile) {
+    	  fileno += 1
+    	  rowno = 0
+    	  donextfile = false
+    	} else {
+    		rowno = nrow
+    	}
+    }
+    if (todo > 0) {
+      fillup(omats(0), todo)
+    }
+    omats
+  }
+
+}
+
+object FilesDataSource {
   
   def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = (372*yy + 31*mm + dd)*24 + hh
   
@@ -175,12 +309,42 @@ object FilesDataSource {
   }
   
   def filexx = sampleFun("/disk%02d/twitter/tokenized/%04d/%02d/%02d/tweet%02d.gz")
+  
+  class Options extends DataSource.Options {
+  	val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+  	def fnames:List[(Int)=>String] = List(sampleFun(localDir + "unifeats%02d.lz4"),
+  			                                  sampleFun(localDir + "bifeats%02d.lz4"),
+  			                                  sampleFun(localDir + "trifeats%02d.lz4"))
+  	var lookahead = 8
+  	var sampleFiles = 1.0f
+    var nstart:Int = encodeDate(2011,11,22,0)
+    var nend:Int = encodeDate(2013,6,31,0)
+    var dorows:Boolean = true
+  }
+}
+
+object SFilesDataSource {
+  class Options extends FilesDataSource.Options {
+  	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+  	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"),
+  			                                           FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4"),
+  			                                           FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4"))
+  	var fcounts = icol(10000,20000,100000)
+  	lookahead = 8
+  	sampleFiles = 1.0f
+    nstart = FilesDataSource.encodeDate(2011,11,22,0)
+    nend = FilesDataSource.encodeDate(2013,6,31,0)
+    blockSize = 10000
+    var sBlockSize = 500000
+  }
 }
 
 object DataSource {
   class Options {
+ 
     var blockSize = 10000
     var sizeMargin = 5f
+
   }
   
 }
