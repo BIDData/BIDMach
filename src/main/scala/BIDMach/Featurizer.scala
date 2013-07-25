@@ -404,7 +404,7 @@ object Featurizer {
     val biCnts:String = "bcnts.lz4"
     val triCnts:String = "tcnts.lz4"
     val usrCnts:String = "usrcnts.lz4"
-  	def mainDir = "/big/" + tokDirName
+  	def mainDir = "/big/twitter/tokenized/"
   	def mainDict:String = mainDir + "all" + localDict
     def mainCounts:String = mainDir + "all" + localCount
     def mainBDict:String = mainDir + "all" + biDict
