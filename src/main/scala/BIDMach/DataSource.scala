@@ -57,7 +57,6 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   def initbase = {
     nstart = opts.nstart
     fnames = opts.fnames
-    sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
     fileno = nstart                                                    // Number of the current output file
@@ -254,7 +253,6 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
   }
   
   override def next:Array[Mat] = {
-
     var donextfile = false
     var todo = blockSize
     flushMat(omats(0))
@@ -341,10 +339,8 @@ object SFilesDataSource {
 
 object DataSource {
   class Options {
- 
     var blockSize = 10000
     var sizeMargin = 5f
-
   }
   
 }
