@@ -404,6 +404,7 @@ object Featurizer {
     val biCnts:String = "bcnts.lz4"
     val triCnts:String = "tcnts.lz4"
     val usrCnts:String = "usrcnts.lz4"
+    def thisDir = "/big/" + tokDirName
   	def mainDir = "/big/twitter/tokenized/"
   	def mainDict:String = mainDir + "all" + localDict
     def mainCounts:String = mainDir + "all" + localCount
@@ -413,8 +414,8 @@ object Featurizer {
     def mainTCounts:String = mainDir + "all" + triCnts
     def mainUsrDict:String = mainDir + "all" + usrDict
     def mainUsrCounts:String = mainDir + "all" + usrCnts
-  	def fromYearDir:(Int)=>String = dirMap(mainDir + "%04d/")
-    def fromMonthDir:(Int)=>String = dirMap(mainDir + "%04d/%02d/")
+  	def fromYearDir:(Int)=>String = dirMap(thisDir + "%04d/")
+    def fromMonthDir:(Int)=>String = dirMap(thisDir + "%04d/%02d/")
     def fromDayDir:(Int)=>String = dirxMap("/disk%02d/" + tokDirName + "%04d/%02d/%02d/")
     def toDayDir:(Int)=>String = dirxMap("/disk%02d/" + featDirName + "%04d/%02d/%02d/") 
     var fromFile:(Int)=>String = (n:Int) => ("tweet%02d.gz" format n)
