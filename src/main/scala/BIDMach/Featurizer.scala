@@ -58,8 +58,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val dy = Dict.treeFlush(md)                                                // Get merged dictionary, sort by counts descending
   	val (sv, iv) = sortdown2(dy.counts)
   	val dyy = Dict(dy.cstr(iv), sv)
-  	saveBMat(opts.mainDir + dictname, BMat(dyy.cstr))
-  	saveDMat(opts.mainDir + wcountname, dyy.counts)
+  	saveBMat(opts.thisDir + dictname, BMat(dyy.cstr))
+  	saveDMat(opts.thisDir + wcountname, dyy.counts)
   	dyy
 	}
   
@@ -140,8 +140,8 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	println
   	val (sv, iv) = sortdown2(dy.counts)                                        // Sort down by ngram frequency
   	val dyy = IDict(dy.grams(iv,?), sv)
-  	saveIMat(opts.mainDir + dictname, dyy.grams)
-  	saveDMat(opts.mainDir + wcountname, dyy.counts)
+  	saveIMat(opts.thisDir + dictname, dyy.grams)
+  	saveDMat(opts.thisDir + wcountname, dyy.counts)
   	dy                                                                         // Return the lex-sorted dictionary
 	}
   
