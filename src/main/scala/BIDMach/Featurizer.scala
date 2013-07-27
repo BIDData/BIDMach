@@ -70,7 +70,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
 	}
   
   def mergeIDicts(rebuild:Int = 0, dictname:String="bdict.lz4", wcountname:String="bcnts.lz4", mapit:Boolean=true):IDict = {
-    println("Building monthly IDicts for " + opts.thisDir)
+    println("Building monthly IDicts for " + opts.thisDir + " " + dictname)
     if (alldict == null) alldict = Dict(loadBMat(opts.mainDict))
   	val dd = new Array[IDict](5)                                               // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
@@ -135,14 +135,16 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     		val (year, month, day) = Featurizer.decodeDate(d)
     		if (day == 31) {                                                         // Conditionally accumulate monthly dicts
     			val dfname = opts.fromMonthDir(d) + opts.localDict
-    			if (fileExists(dfname)) {
-    				mdict = Dict(loadBMat(dfname))
+    			if (fileExists(dfname) || ! mapit) {
+    				mdict = if (mapit) Dict(loadBMat(dfname)) else null
     				val fm = new File(opts.fromMonthDir(d) + wcountname)
     				if (fm.exists) {
     					val bb = HMat.loadIMat(opts.fromMonthDir(d) + dictname)              // Load the IDict data for this month
     					val cc = HMat.loadDMat(opts.fromMonthDir(d) + wcountname)
-    					val map = mdict --> alldict
-    					val bm = map(bb)                                                     // Map to global token dictionary
+    					val bm = if (mapit) {
+    						val map = mdict --> alldict
+    					  map(bb)                                 // Map to global token dictionary
+    					}  else bb 
     					val igood = find(mini(bm, 2) >= 0)                                   // Save the good stuff
     					val bg = bm(igood,?)
     					val cg = cc(igood)
@@ -400,6 +402,8 @@ object Featurizer {
   		saveDMat(ff.opts.mainTCounts, stc)
   	}
     
+  	ff.opts.threshold = 1
+  	fs.opts.threshold = 1
     val usr1 = ff.mergeIDicts(rebuild, "usrdict.lz4", "usrcnts.lz4", false)
   	val usr2 = fs.mergeIDicts(rebuild, "usrdict.lz4", "usrcnts.lz4", false)
   	if (rebuild>0) {
