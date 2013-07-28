@@ -295,7 +295,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		  		saveIMat(opts.toDayDir(d) + opts.toUniFeats(ifile), unifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toBiFeats(ifile), bifeats)
       		  		saveIMat(opts.toDayDir(d) + opts.toTriFeats(ifile), trifeats)
-      		  		saveIMat(opts.toDayDir(d) + opts.toUserids(ifile), userids(nstatuses, ?))
+      		  		saveIMat(opts.toDayDir(d) + opts.toUserids(ifile), userids(0->nstatuses, ?))
       		  		if (ifile == 23) print(".")
       		  	} 
       		  }   		
@@ -416,8 +416,8 @@ object Featurizer {
   
   def buildFeatures(rebuild:Int) = {
     val (ff, fs) = alloptions
-    ff.featurize(rebuild)
     fs.featurize(rebuild) 
+    ff.featurize(rebuild)
   }
   
   def encodeDate(yy:Int, mm:Int, dd:Int) = (372*yy + 31*mm + dd)
