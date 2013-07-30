@@ -6,8 +6,9 @@ import BIDMat.SciFunctions._
 
 
 trait Updater {
-  def update(step:Int):Unit
-  def init(model:Model):Unit;
+  def update(step:Long):Unit
+  def updateM():Unit = {}
+  def init(model:Model):Unit
 }
 
 abstract class BatchUpdater extends Updater {
@@ -23,7 +24,6 @@ class BatchMultUpdater(opts:BatchMultUpdater.Options = new BatchMultUpdater.Opti
   def init(model0:Model) = {
     model = model0
     modelmats = model.modelmats
-    updatemats = model.updatemats
     accumulators = new Array[Mat](updatemats.size)
     for (i <- 0 until updatemats.size) accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
   }
@@ -34,13 +34,13 @@ class BatchMultUpdater(opts:BatchMultUpdater.Options = new BatchMultUpdater.Opti
     }
   }
   
-  def update(step:Int) = {
+  def update(step:Long) = {
     for (i <- 0 until updatemats.size) {
       accumulators(i) ~ accumulators(i) + updatemats(i)
     }   
   }
   
-  def updateM():Unit = {
+  override def updateM():Unit = {
     val modelmat = modelmats(0)
     modelmat ~ modelmat *@ (updatemats(0) / updatemats(1))
   }
@@ -68,9 +68,9 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
     }
   } 
   
-	def update(step:Int):Unit = update1(step)
+	def update(step:Long):Unit = update1(step)
 	
-	def update1(step:Int):Unit =	{
+	def update1(step:Long):Unit =	{
 
 	  val nw = (options.gradwindow/step)
 	  val ee = options.exponent
@@ -83,7 +83,7 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	  nsteps += step
 	}
 	
-  def update2(step:Int):Unit =	{
+  def update2(step:Long):Unit =	{
 	  val nwm = options.gradwindow/step
 	  val alpham = options.alpha
 	  val fmodel = modelmat.asInstanceOf[FMat]
