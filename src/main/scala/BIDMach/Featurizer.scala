@@ -265,7 +265,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     val done = izeros(nthreads,1)
     for (ithread <- 0 until nthreads) {
-//      Actor.actor {
+      Actor.actor {
         if (Mat.hasCUDA > 0) setGPU(ithread+Mat.hasCUDA-nthreads)
         val unigramsx = IMat(opts.guessSize, 2)
       	val bigramsx = IMat(opts.guessSize, 3)
@@ -303,7 +303,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
       		if (ithread == 0 && day/nthreads == 31/nthreads) println("%04d-%02d" format (year,month))
       	}
         done(ithread,0) = 1
-//      }
+      }
     }
     while (mini(done).v == 0) Thread.`yield`
   }
@@ -479,7 +479,7 @@ object Featurizer {
     var nend:Int = encodeDate(2013,6,31)
     var threshold = 10
     var guessSize = 100000000
-    var nthreads = 1
+    var nthreads = 2
   }
 }
 
