@@ -9,6 +9,7 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def next:Array[Mat]  
   def hasNext:Boolean
   def reset:Unit
+  def putBack(mats:Array[Mat],i:Int)
 }
 
 class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
@@ -45,6 +46,8 @@ class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new 
   def hasNext:Boolean = {
     here < mats(0).ncols
   }
+  
+  def putBack(mats:Array[Mat],i:Int) = {}
 
 }
 
@@ -170,6 +173,8 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   def hasNext:Boolean = {
     (fileno < opts.nend)
   }
+  
+  def putBack(mats:Array[Mat],i:Int) = {}
 }
 
 class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDataSource.Options) extends FilesDataSource(opts) {

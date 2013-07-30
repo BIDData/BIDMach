@@ -6,17 +6,17 @@ import BIDMat.SciFunctions._
 
 
 class LDAModel(opts:LDAModel.Options = new LDAModel.Options) extends FactorModel(opts) { 
+  var mm:Mat = null
   
-  override def init() = {
-    super.init()
+  override def init(datasource:DataSource) = {
+    super.init(datasource)
     updatemats = new Array[Mat](2)
-    val mm = modelmats(0)
+    mm = modelmats(0)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     updatemats(0) = mm.zeros(mm.nrows, 1)
   }
   
   def uupdate(sdata:Mat, user:Mat):Unit = {
-    val mm = modelmats(0)
     for (i <- 0 until opts.uiter) {
     	val preds = DDS(mm, user, sdata)
     	max(opts.weps, preds, preds)
@@ -27,19 +27,22 @@ class LDAModel(opts:LDAModel.Options = new LDAModel.Options) extends FactorModel
   }
   
   def mupdate(sdata:Mat, user:Mat):Unit = {
-  	val mm = modelmats(0)
-  	updatemats(0) = (user xT sdata) *@ mm
+  	val preds = DDS(mm, user, sdata)
+  	max(opts.weps, preds, preds)
+  	val prat = sdata / preds
+  	updatemats(0) <-- user xT prat           
+  	updatemats(1) <-- sum(user,2)
   }
   
-  def evalfun(data:Mat, user:Mat):(Double, Double) = {  
-  	val preds = DDS(modelmats(0), user, data)
+  def evalfun(sdata:Mat, user:Mat):FMat = {  
+  	val preds = DDS(mm, user, sdata)
   	max(opts.weps, preds, preds)
   	val ll = ln(preds.contents)
-  	val sdat = sum(data,1)
+  	val sdat = sum(sdata,1)
   	val su1 = ln(sum(user,1))
 //  	val nvv = sum(sdat,2).dv
 //  	println("vals %f, %f, %f, %f, %f" format (nvv, sum(data.contents,1).dv, sum(ll,1).dv/nvv, (ll dot data.contents)/nvv,(sdat dot su1)/nvv))
-  	(((ll ddot data.contents) - (sdat ddot su1))/sum(sdat,2).dv,0)
+  	row(((ll ddot sdata.contents) - (sdat ddot su1))/sum(sdat,2).dv,0)
   }
 }
 /*
@@ -131,7 +134,7 @@ abstract class FactorModel(opts:FactorModel.Options) extends Model {
   
   var mats:Array[Mat] = null
   
-  override def init() = {
+  override def init(datasource:DataSource) = {
     mats = datasource.next
     val data0 = mats(0)
     val m = size(data0, 1)
@@ -163,10 +166,22 @@ abstract class FactorModel(opts:FactorModel.Options) extends Model {
   
   def uupdate(data:Mat, user:Mat)
   
-  def doblock(i:Int) = {
-    val data = mats(0)
+  def mupdate(data:Mat, user:Mat)
+  
+  def evalfun(data:Mat, user:Mat):FMat
+  
+  def doblock(mats:Array[Mat], i:Long) = {
+    val sdata = mats(0)
     val user = mats(1)
-    uupdate(data, user)
+    uupdate(sdata, user)
+    mupdate(sdata, user)
+  }
+  
+  def evalblock(mats:Array[Mat]):FMat = {
+    val sdata = mats(0)
+    val user = mats(1)
+    uupdate(sdata, user)
+    evalfun(sdata, user)
   }
   
 }

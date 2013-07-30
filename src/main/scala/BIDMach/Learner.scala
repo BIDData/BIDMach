@@ -5,7 +5,39 @@ import BIDMat.SciFunctions._
 import BIDMat.Plotting._
 import scala.collection.immutable.List
 
-
+case class Learner(datasource:DataSource, model:Model, regularizer:Regularizer, updater:Updater, 
+		val opts:Learner.Options = new Learner.Options) {
+  
+  def run() = {
+    model.init(datasource)
+    updater.init(model)
+    if (regularizer != null) regularizer.init(model)
+    flip 
+    var done = false
+    var ipass = 0
+    var here = 0L
+    while (ipass < opts.npasses && ! done) {
+      datasource.reset
+      var istep = 0
+      while (datasource.hasNext) {
+        val mats = datasource.next
+        here += datasource.opts.blockSize
+        if (datasource.hasNext) {
+        	model.doblock(mats, here)
+        	if (regularizer != null) regularizer.compute(here)
+        	updater.update(here)
+        } else {
+          val scores = model.evalblock(mats)
+          print("ll="); scores.data.foreach(v => (" %4.3f" format v)); println()
+        }   
+        if (opts.putBack >= 0) datasource.putBack(mats, opts.putBack)
+        istep += 1
+      }
+      updater.updateM
+      ipass += 1
+    }
+  }
+}
 
 /*
 case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat, 
@@ -181,6 +213,7 @@ object Learner {
 		var convslope:Double = -1e-6
 		var secprint:Double = 1
 		var eps:Float = 1e-8f
+		var putBack = 1
 		var numGPUthreads = 1
   }
   

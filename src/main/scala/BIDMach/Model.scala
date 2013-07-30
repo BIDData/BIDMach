@@ -5,23 +5,15 @@ import BIDMat.SciFunctions._
 
 abstract class Model {
   
-  var datasource:DataSource = null
-  
   var modelmats:Array[Mat] = null
   
   var updatemats:Array[Mat] = null
   
-  var regularizer:Regularizer = null
+  def init(datasource:DataSource):Unit
   
-  var updater:Updater = null
+  def doblock(mats:Array[Mat], i:Long)                                    // Calculate an update for the updater
   
-  var sampler:Sampler = null
-  
-  def init:Unit
-  
-  def doblock(i:Int):Unit                                // Calculate an update for the updater
-  
-//  def evalfun(datamats:Array[Mat]):Mat                                 // Scores (log likelihoods)
+  def evalblock(mats:Array[Mat]):FMat                                        // Scores (log likelihoods)
 
 }
 
