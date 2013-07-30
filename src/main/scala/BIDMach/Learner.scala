@@ -5,6 +5,8 @@ import BIDMat.SciFunctions._
 import BIDMat.Plotting._
 import scala.collection.immutable.List
 
+
+
 /*
 case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat, 
 		model:Model, regularizer:Regularizer, updater:Updater, val opts:Learner.Options = new Learner.Options) {

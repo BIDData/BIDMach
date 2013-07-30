@@ -7,6 +7,8 @@ abstract class Model {
   
   val options:Model.Options
   
+  var datasource:DataSource = null
+  
   var modelmats:Array[Mat] = null
   
   var updatemats:Array[Mat] = null
