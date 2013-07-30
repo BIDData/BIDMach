@@ -5,8 +5,6 @@ import BIDMat.SciFunctions._
 
 abstract class Model {
   
-  val options:Model.Options
-  
   var datasource:DataSource = null
   
   var modelmats:Array[Mat] = null
@@ -19,11 +17,11 @@ abstract class Model {
   
   var sampler:Sampler = null
   
-  def initmodel:Unit
+  def init:Unit
   
-  def doblock(datamats:Array[Mat]):Unit
+  def doblock(i:Int):Unit                                // Calculate an update for the updater
   
-  def evalfun(datamats:Array[Mat]):Mat
+//  def evalfun(datamats:Array[Mat]):Mat                                 // Scores (log likelihoods)
 
 }
 

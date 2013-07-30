@@ -6,11 +6,47 @@ import BIDMat.SciFunctions._
 
 
 trait Updater {
-  def update(step:Int):Unit;
-  def initupdater(model:Model):Unit;
+  def update(step:Int):Unit
+  def init(model:Model):Unit;
 }
 
-class ADAGradUpdater(opts:Updater.Options = new Updater.Options) extends Updater {
+abstract class BatchUpdater extends Updater {
+	def updateM():Unit;
+}
+
+class BatchMultUpdater(opts:BatchMultUpdater.Options = new BatchMultUpdater.Options) extends BatchUpdater {
+  var model:Model = null
+  var modelmats:Array[Mat] = null
+  var updatemats:Array[Mat] = null
+  var accumulators:Array[Mat] = null
+  
+  def init(model0:Model) = {
+    model = model0
+    modelmats = model.modelmats
+    updatemats = model.updatemats
+    accumulators = new Array[Mat](updatemats.size)
+    for (i <- 0 until updatemats.size) accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
+  }
+  
+  def clear() = {
+    for (i <- 0 until accumulators.size) {
+      accumulators(i).clear
+    }
+  }
+  
+  def update(step:Int) = {
+    for (i <- 0 until updatemats.size) {
+      accumulators(i) ~ accumulators(i) + updatemats(i)
+    }   
+  }
+  
+  def updateM():Unit = {
+    val modelmat = modelmats(0)
+    modelmat ~ modelmat *@ (updatemats(0) / updatemats(1))
+  }
+}
+
+class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
   
   val options = opts
   var nsteps = 0f
@@ -20,7 +56,7 @@ class ADAGradUpdater(opts:Updater.Options = new Updater.Options) extends Updater
   
   var sumSq:Mat = null 
 
-  def initupdater(model0:Model) = {
+  def init(model0:Model) = {
     model = model0
 	  modelmat = model.modelmats(0)
 	  updatemat = model.updatemats(0)
@@ -87,8 +123,14 @@ class ADAGradUpdater(opts:Updater.Options = new Updater.Options) extends Updater
 	}
 }
 
-object Updater {
-  class Options {
+object BatchMultUpdater {
+  class Options extends Updater.Options {
+    
+  }
+}
+
+object ADAGradUpdater {
+  class Options extends Updater.Options {
     var gradwindow:FMat = 1e6f
     var alpha:FMat = 100f
     var exponent:FMat = 0.5f
@@ -96,5 +138,11 @@ object Updater {
     var initsumsq:Float = 1e-4f
     var waitsteps = 200000
     var minmodel = 1e-7f
+  }
+}
+
+object Updater {
+  class Options {
+
   }
 }
