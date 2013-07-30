@@ -5,7 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 
-
+/*
 abstract class RegressionModel(opts:RegressionModel.Options) 
   extends Model {
   
@@ -38,7 +38,7 @@ abstract class RegressionModel(opts:RegressionModel.Options)
   }
  
 }
-
+*/
 object RegressionModel {
   class Options extends Model.Options {
     var nrows = 0

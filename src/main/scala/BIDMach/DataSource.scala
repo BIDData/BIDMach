@@ -8,6 +8,7 @@ import java.io._
 abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) {   
   def next:Array[Mat]  
   def hasNext:Boolean
+  def reset:Unit
 }
 
 class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
@@ -26,6 +27,10 @@ class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new 
         case _ => mats(i).zeros(mats(i).nrows, blockSize)
       }      
     }    
+  }
+  
+  def reset = {
+    here = 0
   }
   
   def next:Array[Mat] = {
@@ -53,6 +58,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   var omats:Array[Mat] = null
   var matqueue:Array[Array[Mat]] = null
   var ready:IMat = null
+  var stop:Boolean = false
   
   def initbase = {
     nstart = opts.nstart
@@ -71,6 +77,16 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
         prefetch(nstart + i)
       }
     }
+  }
+  
+  def reset = {
+    fileno = nstart
+    rowno = 0
+    for (i <- 0 until opts.lookahead) {
+      val ifile = nstart + i
+      val ifilex = ifile % opts.lookahead
+      ready(ifilex) = ifile - opts.lookahead
+    } 
   }
   
   def init = {
@@ -137,8 +153,9 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   def prefetch(ifile:Int) = {
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
-  	for (inew <- ifile until opts.nend by opts.lookahead) {
+  	while  (!stop) {
   		while (ready(ifilex) >= fileno) Thread.`yield`
+  		val inew = ready(ifilex) + opts.lookahead
   		val fexists = fileExists(fnames(0)(inew)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
   			matqueue(ifilex)(i) = if (fexists) {
