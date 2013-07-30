@@ -479,7 +479,7 @@ object Featurizer {
     var nend:Int = encodeDate(2013,6,31)
     var threshold = 10
     var guessSize = 100000000
-    var nthreads = 2
+    var nthreads = 1
   }
 }
 
