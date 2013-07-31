@@ -360,7 +360,7 @@ object SFilesDataSource {
   
   val singleOpts = new Options {
     override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
-    fcounts = icol(10000)
+    fcounts = icol(100000)
   }
 }
 
