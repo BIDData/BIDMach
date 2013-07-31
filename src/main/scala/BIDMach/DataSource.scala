@@ -362,6 +362,7 @@ object SFilesDataSource {
 object DataSource {
   class Options {
     var blockSize = 10000
+    var nusers  = 1000000L
     var sizeMargin = 5f
   }
   
