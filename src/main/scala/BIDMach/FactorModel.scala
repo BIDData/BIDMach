@@ -17,13 +17,14 @@ class LDAModel(opts:LDAModel.Options = new LDAModel.Options) extends FactorModel
   }
   
   def uupdate(sdata:Mat, user:Mat):Unit = {
-    for (i <- 0 until opts.uiter) {
-    	val preds = DDS(mm, user, sdata)
-    	max(opts.weps, preds, preds)
-    	val prat = sdata / preds
-    	val unew = user *@ (mm * prat) + opts.alpha
-    	user <-- unew                                                      // Or apply LDA function exp(Psi(*))
-    }
+	  for (i <- 0 until opts.uiter) {
+	  	val preds = DDS(mm, user, sdata)
+	  	max(opts.weps, preds, preds)
+	  	val prat = sdata / preds
+	  	val unew = user *@ (mm * prat) + opts.alpha
+	  	if (opts.exppsi) exppsi(unew, unew)
+	  	user <-- unew                                                     
+	  }
   }
   
   def mupdate(sdata:Mat, user:Mat):Unit = {
@@ -45,90 +46,64 @@ class LDAModel(opts:LDAModel.Options = new LDAModel.Options) extends FactorModel
   	row(((ll ddot sdata.contents) - (sdat ddot su1))/sum(sdat,2).dv,0)
   }
 }
-/*
-class NMFmodel(opts:FactorModel.Options = new NMFmodel.Options) extends FactorModel(opts) { 
-  
-  def make(opts:Model.Options) = new NMFmodel(opts.asInstanceOf[NMFmodel.Options])
 
-  var modeldata    = blank
-  var mm           = blank
-  var maxeps       = blank
-  var mmodeltuser  = blank
-  var udiag        = blank
-  var mdiag        = blank
-  var smdiag       = blank
-  var quot         = blank
-  var uu           = blank
-  var diff         = blank
+class NMFModel(opts:FactorModel.Options = new NMFModel.Options) extends FactorModel(opts) { 
   
-  override  def initmodel(data0:Mat, user0:Mat, datatest0:Mat, usertest0:Mat):(Mat, Mat) = {
-  	val v = super.initmodel(data0, user0, datatest0, usertest0)
-  	udiag = mkdiag(options.uprior*ones(options.dim,1)):FMat
-  	mdiag = mkdiag(options.mprior*ones(options.dim,1)):FMat
-    if (options.useGPU) {
+  var mm:Mat = null
+  var mdiag:Mat = null
+  var udiag:Mat = null
+  var datasource:DataSource = null
+  
+  override def init(datasourcex:DataSource) = {
+    datasource = datasourcex
+  	super.init(datasource)
+  	updatemats = new Array[Mat](2)
+    mm = modelmats(0)
+    updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
+    updatemats(0) = mm.zeros(mm.nrows, 1)
+    udiag = mkdiag(opts.uprior*ones(opts.dim,1))
+  	mdiag = mkdiag(opts.mprior*ones(opts.dim,1))
+    if (opts.useGPU) {
       udiag = GMat(udiag)
       mdiag = GMat(mdiag)
-      val k = options.startBlock
-      idata = GSMat(size(data0,1), k, k * options.nzPerColumn)
-      iuser = GMat(options.dim, k)
     }
-  	v
   }
   
-  override def initupdate(sdata:Mat, user:Mat) = {
-    val d = options.dim
-	  modeldata = modeldata  ~ modelmat * sdata
-  	mm        = mm         ~ modelmat xT modelmat
-  	mm                     ~ mm + udiag
-  }
-   
-  override def uupdate(sdata:Mat, user:Mat):Unit = { 
-    mmodeltuser = mmodeltuser  ~ mm * user
-    quot        = quot         ~ modeldata / mmodeltuser                
-    quot        =                min(10.0f, max(0.1f, quot, quot), quot)
-	  user                       ~ user *@ quot
-//	  println("norm user %f" format norm(user))
-                                 max(options.minuser, user, user)
+  override def uupdate(sdata:Mat, user:Mat) = {
+	  val modeldata = mm * sdata
+  	val mmu = mm xT mm + udiag
+    for (i <- 0 until opts.uiter) {
+    	val mmtu = mmu * user
+    	val quot =  mm / mmtu                
+    	min(10.0f, max(0.1f, quot, quot), quot)
+    	user ~ user *@ quot
+    	max(opts.minuser, user, user)
+    }
   }
    
   override def mupdate(sdata:Mat, user:Mat):Unit = {
-    val d = options.dim
-    updatemat = updatemat ~ user xT sdata
-//    updatemat       ~ updatemat *@ modelmat
-    uu =     uu     ~ user xT user
-    smdiag = smdiag ~ mdiag * (1.0f*size(user,2)/nusers)
-    uu              ~ uu + smdiag
-    updateDenom = updateDenom ~ uu * modelmat    
+    updatemats(0) <-- user xT sdata
+    val uu = user xT user + mdiag * (1.0f*size(user,2)/datasource.opts.nusers)
+    updatemats(1) <-- uu * mm    
   }
   
-  override def eval(data0:Mat, user0:Mat):(Double, Double) = {
-    modelmat match {
-	    case m:FMat => {
-	      idata = data0
-	      iuser = user0
-	    }
-	    case m:GMat => {
-	    	idata = GSMat.fromSMat(data0.asInstanceOf[SMat], idata.asInstanceOf[GSMat])
-	    	iuser = GMat.fromFMat(user0.asInstanceOf[FMat], iuser.asInstanceOf[GMat])
-	    }
-	  }
-	  modeldata = modeldata ~ modelmat * idata
-    uu        = uu        ~ iuser xT iuser 
-    smdiag    = smdiag    ~ mdiag * (1.0f*size(iuser,2)/nusers)
-                uu        ~ uu + smdiag
-    mm        = mm        ~ modelmat xT modelmat
+  override def evalfun(sdata:Mat, user:Mat):FMat = {
 
-    val ll0 =               idata.contents ddot idata.contents
-    val ll1 =               modeldata ddot iuser
-    val ll2 =               uu ddot mm
+	  val modeldata =  mm * sdata
+    val uu = user xT user + mdiag * (1.0f*size(user,2)/datasource.opts.nusers)
+    val mmm = mm xT mm
+
+    val ll0 =  sdata.contents ddot sdata.contents
+    val ll1 =  modeldata ddot user
+    val ll2 =  uu ddot mmm
 //    println("ll %f %f %f" format (ll0, ll1, ll2))
-    val v1  =              (-ll0 + 2*ll1 - ll2)/idata.nnz
-    val v2 =               -options.uprior*(iuser ddot iuser)/idata.nnz
-    (v1,v2)
+    val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
+    val v2 =               -opts.uprior*(user ddot user)/sdata.nnz
+    row(v1,v2)
   }
 }
 
-} */
+
 
 abstract class FactorModel(opts:FactorModel.Options) extends Model {
   
@@ -148,7 +123,7 @@ abstract class FactorModel(opts:FactorModel.Options) extends Model {
     val msum = sum(modelmat, 2)
     modelmat ~ modelmat / msum
     modelmats = Array[Mat](1)
-    modelmats(0) = modelmat
+    modelmats(0) = if (opts.useGPU) GMat(modelmat) else modelmat
     datasource.reset
     
     if (mats.size > 1) {
@@ -195,6 +170,7 @@ object NMFModel  {
 object LDAModel  {
   class Options extends FactorModel.Options {
     var LDAeps = 1e-9
+    var exppsi = true
     var alpha = 1.0f
   }
 }
