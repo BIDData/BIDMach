@@ -185,3 +185,7 @@ object FactorModel {
     var minuser = 1e-8f
   }
 } 
+
+object TestLDA {
+  
+}
