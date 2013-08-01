@@ -5,7 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 
-class LDAModel(opts:LDAModel.Options = new LDAModel.Options) extends FactorModel(opts) { 
+class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extends FactorModel(opts) { 
   var mm:Mat = null
   
   override def init(datasource:DataSource) = {
@@ -105,7 +105,7 @@ class NMFModel(opts:FactorModel.Options = new NMFModel.Options) extends FactorMo
 
 
 
-abstract class FactorModel(opts:FactorModel.Options) extends Model {
+abstract class FactorModel(val opts:FactorModel.Options) extends Model {
   
   var mats:Array[Mat] = null
   
@@ -177,7 +177,7 @@ object LDAModel  {
 
 object FactorModel { 
   class Options extends Model.Options { 
-    var dim = 20
+    var dim = 10
     var uiter = 10
     var weps = 1e-10f
     var uprior = 0.01f
@@ -186,6 +186,4 @@ object FactorModel {
   }
 } 
 
-object TestLDA {
-  
-}
+

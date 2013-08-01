@@ -244,3 +244,23 @@ object Learner {
     }
   }
 }
+
+class TestLDA {
+  var fname:String = "/big/twitter/data/smat_20_100_400.lz4"
+  var dd:MatDataSource = null
+  var model:LDAModel = null
+  var updater:BatchMultUpdater = null
+  var lda:Learner = null
+  def setup = { 
+    val aa = new Array[Mat](1)
+    aa(0) = HMat.loadSMat(fname)
+    dd = new MatDataSource(aa)
+    model = new LDAModel
+    updater = new BatchMultUpdater
+    dd.init
+    model.init(dd)
+    updater.init(model)
+    lda = new Learner(dd, model, null, updater)   
+  }
+  def run = lda.run
+}
