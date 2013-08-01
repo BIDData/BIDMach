@@ -15,7 +15,7 @@ abstract class BatchUpdater extends Updater {
 	def updateM():Unit;
 }
 
-class BatchMultUpdater(opts:BatchMultUpdater.Options = new BatchMultUpdater.Options) extends BatchUpdater {
+class BatchMultUpdater(val opts:BatchMultUpdater.Options = new BatchMultUpdater.Options) extends BatchUpdater {
   var model:Model = null
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null
