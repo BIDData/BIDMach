@@ -24,6 +24,7 @@ class BatchMultUpdater(val opts:BatchMultUpdater.Options = new BatchMultUpdater.
   def init(model0:Model) = {
     model = model0
     modelmats = model.modelmats
+    updatemats = model.updatemats
     accumulators = new Array[Mat](updatemats.size)
     for (i <- 0 until updatemats.size) accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
   }
