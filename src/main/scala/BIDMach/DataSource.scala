@@ -69,8 +69,8 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     fnames = opts.fnames
     blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
-    val (dmy, rr) = sort2(rand(opts.nend-nstart,1))
-    permfn = (a:Int) => rr(a-nstart)
+    val (dmy, rr) = sort2(rand(opts.nend-opts.nstart,1))
+    permfn = (a:Int) => rr(a-opts.nstart)
     fileno = nstart                                                    // Number of the current output file
     rowno = 0                                                          // row number in the current output file
     matqueue = new Array[Array[Mat]](opts.lookahead)                   // Queue of matrices for each output matrix
