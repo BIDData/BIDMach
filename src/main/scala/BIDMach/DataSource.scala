@@ -54,7 +54,7 @@ class MatDataSource(val mats:Array[Mat], override val opts:DataSource.Options = 
 class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f
   var blockSize = 0 
-  var fileno = 0
+  @volatile var fileno = 0
   var rowno = 0
   var nstart = 0
   var fnames:List[(Int)=>String] = null
