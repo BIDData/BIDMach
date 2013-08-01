@@ -157,7 +157,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
   	while  (!stop) {
-  		while (ready(ifilex) >= fileno) Thread.`yield`
+  		while (ready(ifilex) >= fileno) {}
   		val inew = ready(ifilex) + opts.lookahead
   		val fexists = fileExists(fnames(0)(inew)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
