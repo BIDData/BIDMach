@@ -13,15 +13,17 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
     updatemats = new Array[Mat](2)
     mm = modelmats(0)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    updatemats(0) = mm.zeros(mm.nrows, 1)
+    updatemats(1) = mm.zeros(mm.nrows, 1)
   }
   
   def uupdate(sdata:Mat, user:Mat):Unit = {
 	  for (i <- 0 until opts.uiter) {
 	  	val preds = DDS(mm, user, sdata)
-	  	max(opts.weps, preds, preds)
-	  	val prat = sdata / preds
-	  	val unew = user *@ (mm * prat) + opts.alpha
+	  	val dc = sdata.contents
+	  	val pc = preds.contents
+	  	max(opts.weps, pc, pc)
+	  	pc ~ dc / pc
+	  	val unew = user *@ (mm * preds) + opts.alpha
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
 	  }
@@ -29,21 +31,25 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   
   def mupdate(sdata:Mat, user:Mat):Unit = {
   	val preds = DDS(mm, user, sdata)
-  	max(opts.weps, preds, preds)
-  	val prat = sdata / preds
-  	updatemats(0) <-- user xT prat           
+  	val dc = sdata.contents
+  	val pc = preds.contents
+  	max(opts.weps, pc, pc)
+  	pc ~ dc / pc
+  	updatemats(0) <-- user xT preds           
   	updatemats(1) <-- sum(user,2)
   }
   
   def evalfun(sdata:Mat, user:Mat):FMat = {  
   	val preds = DDS(mm, user, sdata)
-  	max(opts.weps, preds, preds)
-  	val ll = ln(preds.contents)
+  	val dc = sdata.contents
+  	val pc = preds.contents
+  	max(opts.weps, pc, pc)
+  	val ll = ln(pc)
   	val sdat = sum(sdata,1)
   	val su1 = ln(sum(user,1))
 //  	val nvv = sum(sdat,2).dv
 //  	println("vals %f, %f, %f, %f, %f" format (nvv, sum(data.contents,1).dv, sum(ll,1).dv/nvv, (ll dot data.contents)/nvv,(sdat dot su1)/nvv))
-  	row(((ll ddot sdata.contents) - (sdat ddot su1))/sum(sdat,2).dv,0)
+  	row(((ll ddot dc) - (sdat ddot su1))/sum(sdat,2).dv,0)
   }
 }
 
@@ -108,6 +114,7 @@ class NMFModel(opts:FactorModel.Options = new NMFModel.Options) extends FactorMo
 abstract class FactorModel(val opts:FactorModel.Options) extends Model {
   
   var mats:Array[Mat] = null
+  var userdat:Mat = null
   
   override def init(datasource:DataSource) = {
     mats = datasource.next
@@ -130,7 +137,7 @@ abstract class FactorModel(val opts:FactorModel.Options) extends Model {
       while (datasource.hasNext) {
         mats = datasource.next
         val dmat = mats(1).asInstanceOf[FMat]
-        dmat(?) = 1.0/d
+        dmat(?) = 1.0f/d
       }
     }
 

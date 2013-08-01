@@ -252,10 +252,11 @@ class TestLDA {
   var updater:BatchMultUpdater = null
   var lda:Learner = null
   def setup = { 
-    val aa = new Array[Mat](1)
+    val aa = new Array[Mat](2)
     aa(0) = HMat.loadSMat(fname)
     dd = new MatDataSource(aa)
     model = new LDAModel
+    aa(1) = ones(model.opts.dim, aa(0).ncols)
     updater = new BatchMultUpdater
     dd.init
     model.init(dd)

@@ -12,7 +12,7 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def putBack(mats:Array[Mat],i:Int)
 }
 
-class MatDataSource(mats:Array[Mat], override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
+class MatDataSource(val mats:Array[Mat], override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
   val sizeMargin = opts.sizeMargin
   var here = 0
   val blockSize = opts.blockSize
