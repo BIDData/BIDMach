@@ -111,7 +111,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
-    	while (ready(filex) < fileno) Thread.`yield`
+    	while (ready(filex) < fileno) {}
     	for (i <- 0 until fnames.size) {
     		val matq = matqueue(filex)(i)
     		if (matq != null) {
@@ -281,7 +281,7 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
-    	while (ready(filex) < fileno) Thread.`yield`
+    	while (ready(filex) < fileno) {}
     	val spm = spmax(matqueue(filex))
     	nrow = math.min(rowno + todo, spm)
     	val matq = matqueue(filex)
