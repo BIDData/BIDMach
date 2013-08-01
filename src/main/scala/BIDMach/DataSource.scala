@@ -62,12 +62,15 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   var matqueue:Array[Array[Mat]] = null
   var ready:IMat = null
   var stop:Boolean = false
+  var permfn:(Int)=>Int = null
   
   def initbase = {
     nstart = opts.nstart
     fnames = opts.fnames
     blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
+    val (dmy, rr) = sort2(rand(opts.nend-nstart,1))
+    permfn = (a:Int) => rr(a-nstart)
     fileno = nstart                                                    // Number of the current output file
     rowno = 0                                                          // row number in the current output file
     matqueue = new Array[Array[Mat]](opts.lookahead)                   // Queue of matrices for each output matrix
@@ -159,10 +162,11 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   	while  (!stop) {
   		while (ready(ifilex) >= fileno) Thread.sleep(10)
   		val inew = ready(ifilex) + opts.lookahead
-  		val fexists = fileExists(fnames(0)(inew)) && (rand(1,1).v < opts.sampleFiles)
+  		val pnew = permfn(inew)
+  		val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles)
   		for (i <- 0 until fnames.size) {
   			matqueue(ifilex)(i) = if (fexists) {
-  			  HMat.loadMat(fnames(i)(inew), matqueue(ifilex)(i))  			 
+  			  HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i))  			 
   			} else null  			
 //  			println("%d" format inew)
   		}
