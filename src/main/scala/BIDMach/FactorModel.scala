@@ -116,7 +116,7 @@ abstract class FactorModel(val opts:FactorModel.Options) extends Model {
     val d = opts.dim
     val sdat = (sum(data0,2).t + 1.0f).asInstanceOf[FMat]
     val sp = sdat / sum(sdat)
-    println("initial perplexity=%f" format (sp dot ln(sp)) )
+    println("initial perplexity=%f" format (sp ddot ln(sp)) )
     
     val modelmat = rand(d,m) 
     modelmat ~ modelmat *@ sdat
