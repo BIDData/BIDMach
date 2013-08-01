@@ -246,7 +246,7 @@ object Learner {
 }
 
 class TestLDA {
-  var fname:String = "/big/twitter/data/smat_20_100_400.lz4"
+  var fname:String = "/big/twitter/test/smat_20_100_400.lz4"
   var dd:MatDataSource = null
   var model:LDAModel = null
   var updater:BatchMultUpdater = null
