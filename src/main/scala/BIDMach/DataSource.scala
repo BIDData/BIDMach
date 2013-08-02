@@ -69,8 +69,17 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     fnames = opts.fnames
     blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
-    val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-opts.nstart,1))
-    permfn = (a:Int) => rr(a-opts.nstart)+opts.nstart
+    if (opts.order == 1) {
+    	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-opts.nstart,1))
+    	permfn = (a:Int) => rr(a-opts.nstart)+opts.nstart
+    } else {
+      permfn = (n:Int) => {
+      	val (yy, mm, dd, hh) = FilesDataSource.decodeDate(n)
+      	val hhdd = (hh-1) + dd * 24
+      	FilesDataSource.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
+      }
+    }
+    
     fileno = nstart                                                    // Number of the current output file
     rowno = 0                                                          // row number in the current output file
     matqueue = new Array[Array[Mat]](opts.lookahead)                   // Queue of matrices for each output matrix
@@ -344,6 +353,7 @@ object FilesDataSource {
     var nstart:Int = encodeDate(2011,11,22,0)
     var nend:Int = encodeDate(2013,6,31,0)
     var dorows:Boolean = true
+    var order:Int = 0                           // 0 = sequential order, 1 = random
   }
 }
 
