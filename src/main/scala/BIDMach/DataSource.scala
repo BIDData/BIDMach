@@ -70,19 +70,19 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
     if (opts.order == 1) {
-    	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-nstart,1))
+    	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-nstart,1))         // Randomize the file read order
     	permfn = (a:Int) => rr(a-opts.nstart)+nstart
     } else {
-      permfn = (n:Int) => {
+      permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
         val (yy, mm, dd, hh) = FilesDataSource.decodeDate(n)
         val hhdd = hh + 24 * (mm - 1)
         FilesDataSource.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
       } 
     }    
-    fileno = nstart                                                    // Number of the current output file
-    rowno = 0                                                          // row number in the current output file
-    matqueue = new Array[Array[Mat]](opts.lookahead)                   // Queue of matrices for each output matrix
-    ready = -iones(opts.lookahead, 1)                                  // Numbers of files currently loaded in queue
+    fileno = nstart                                                            // Number of the current output file
+    rowno = 0                                                                  // row number in the current output file
+    matqueue = new Array[Array[Mat]](opts.lookahead)                           // Queue of matrices for each output matrix
+    ready = -iones(opts.lookahead, 1)                                          // Numbers of files currently loaded in queue
     for (i <- 0 until opts.lookahead) {
       matqueue(i) = new Array[Mat](fnames.size)
     }
@@ -122,7 +122,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
-    	while (ready(filex) < fileno) Thread.sleep(10)
+    	while (ready(filex) < fileno) Thread.sleep(1)
     	for (i <- 0 until fnames.size) {
     		val matq = matqueue(filex)(i)
     		if (matq != null) {
@@ -168,7 +168,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
   	while  (!stop) {
-  		while (ready(ifilex) >= fileno) Thread.sleep(10)
+  		while (ready(ifilex) >= fileno) Thread.sleep(1)
   		val inew = ready(ifilex) + opts.lookahead
   		val pnew = permfn(inew)
   		val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles)
@@ -236,14 +236,15 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
       var j = 0
       while (j < nfiles) {
         val mat = inmat(j).asInstanceOf[IMat]
+        val mrows = mat.nrows
         var k = inptrs(j)
-        while (k < mat.nrows && mat(k, 0) < irow) k += 1
+        while (k < mrows && mat.data(k) < irow) k += 1
         inptrs(j) = k
         val xoff = innz - k
         val yoff = offsets(j) + ioff
-        while (k < mat.nrows && mat(k, 0) == irow && mat(k, 1) < lims(j)) {
-          omat.ir(xoff + k) = mat(k, 1) + yoff
-          omat.data(xoff + k) = mat(k, 2)
+        while (k < mat.nrows && mat.data(k) == irow && mat.data(k+mrows) < lims(j)) {
+          omat.ir(xoff + k) = mat.data(k+mrows) + yoff
+          omat.data(xoff + k) = mat.data(k+2*mrows)
           k += 1
         }
         innz = xoff + k
@@ -293,7 +294,7 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
-    	while (ready(filex) < fileno) Thread.sleep(10)
+    	while (ready(filex) < fileno) Thread.sleep(1)
     	val spm = spmax(matqueue(filex))
     	nrow = math.min(rowno + todo, spm)
     	val matq = matqueue(filex)
