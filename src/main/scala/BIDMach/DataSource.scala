@@ -73,7 +73,11 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-nstart,1))
     	permfn = (a:Int) => rr(a-opts.nstart)+nstart
     } else {
-      permfn = (n:Int) => n 
+      permfn = (n:Int) => {
+        val (yy, mm, dd, hh) = FilesDataSource.decodeDate(n)
+        val hhdd = hh + 24 * (mm - 1)
+        FilesDataSource.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
+      } 
     }    
     fileno = nstart                                                    // Number of the current output file
     rowno = 0                                                          // row number in the current output file
@@ -318,16 +322,15 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
 
 object FilesDataSource {
   
-  def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = ((12*yy + mm-1)*31)*24 + hh*31 + (dd-1)
+  def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = (((12*yy + mm) * 31) + dd)*24 + hh
   
   def decodeDate(n:Int):(Int, Int, Int, Int) = {
-    val xx = n / (31*24)
-    val yy = xx / 12
-    val mm = xx % 12 + 1
-    val zz = n % (31*24)
-    val dd = zz % 31 + 1
-    val hh = zz / 31
-    (yy, mm, dd, hh)
+    val days = n / 24
+    val dd = (days - 1) % 31 + 1
+    val months = (days - dd) / 31
+    val mm = (months - 1) % 12 + 1
+    val yy = (months - mm) / 12
+    (yy, mm, dd, n % 24)
   }
   
   def sampleFun(fname:String):(Int)=>String = {
