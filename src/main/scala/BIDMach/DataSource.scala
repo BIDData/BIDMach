@@ -70,16 +70,11 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     blockSize = opts.blockSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
     if (opts.order == 1) {
-    	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-opts.nstart,1))
-    	permfn = (a:Int) => rr(a-opts.nstart)+opts.nstart
+    	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-nstart,1))
+    	permfn = (a:Int) => rr(a-opts.nstart)+nstart
     } else {
-      permfn = (n:Int) => {
-      	val (yy, mm, dd, hh) = FilesDataSource.decodeDate(n)
-      	val hhdd = (hh-1) + dd * 24
-      	FilesDataSource.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
-      }
-    }
-    
+      permfn = (n:Int) => n 
+    }    
     fileno = nstart                                                    // Number of the current output file
     rowno = 0                                                          // row number in the current output file
     matqueue = new Array[Array[Mat]](opts.lookahead)                   // Queue of matrices for each output matrix
@@ -323,14 +318,15 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
 
 object FilesDataSource {
   
-  def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = (372*yy + 31*mm + dd)*24 + hh
+  def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = ((12*yy + mm-1)*31)*24 + hh*31 + (dd-1)
   
   def decodeDate(n:Int):(Int, Int, Int, Int) = {
-    val yy = (n/24 - 32) / 372
-    val days = n/24 - 32 - 372 * yy
-    val mm = days / 31 + 1
-    val dd = days - 31 * (mm - 1) + 1
-    val hh = n % 24
+    val xx = n / (31*24)
+    val yy = xx / 12
+    val mm = xx % 12 + 1
+    val zz = n % (31*24)
+    val dd = zz % 31 + 1
+    val hh = zz / 31
     (yy, mm, dd, hh)
   }
   
