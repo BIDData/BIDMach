@@ -5,45 +5,67 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 
-trait Updater {
-  def update(step:Long):Unit
-  def updateM():Unit = {}
-  def init(model:Model):Unit
-}
-
-abstract class BatchUpdater extends Updater {
-	def updateM():Unit;
-}
-
-class BatchMultUpdater(val opts:BatchMultUpdater.Options = new BatchMultUpdater.Options) extends BatchUpdater {
+abstract class Updater {
   var model:Model = null
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null
-  var accumulators:Array[Mat] = null
+
   
   def init(model0:Model) = {
     model = model0
     modelmats = model.modelmats
     updatemats = model.updatemats
-    accumulators = new Array[Mat](updatemats.size)
-    for (i <- 0 until updatemats.size) accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
   }
   
-  def clear() = {
-    for (i <- 0 until accumulators.size) {
-      accumulators(i).clear
-    }
-  }
+  def update(step:Long):Unit
+  def updateM():Unit = {}
+  def clear():Unit = {}
+}
+
+
+class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Options) extends Updater {
   
+  var firstStep = 0f
+      
   def update(step:Long) = {
-    for (i <- 0 until updatemats.size) {
-      accumulators(i) ~ accumulators(i) + updatemats(i)
-    }   
+  	val modelmat = modelmats(0)
+  	val updatemat = updatemats(0)
+  	val rr = if (step == 0) 1f else {
+  	  if (firstStep == 0f) {
+  	    firstStep = step
+  	    1f
+  	  } else {
+  	    step / firstStep
+  	  }
+  	}
+    modelmat ~ modelmat + updatemat / (sum(updatemat,2) * rr) 
+    modelmat ~ modelmat / sum(modelmat,2)
+  }
+  
+  override def clear() = {
+	  firstStep = 0f
+  }
+}
+
+class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.Options) extends Updater {
+  var accumulator:Mat = null
+  
+  override def init(model0:Model) = {
+    super.init(model0)
+    accumulator = updatemats(0).zeros(updatemats(0).nrows, updatemats(0).ncols)
+  }
+     
+  def update(step:Long) = {
+    accumulator ~ accumulator + updatemats(0) 
+  }
+  
+  override def clear() = {
+	  accumulator.clear
   }
   
   override def updateM():Unit = {
     val modelmat = modelmats(0)
-    modelmat ~ modelmat *@ (updatemats(0) / updatemats(1))
+    modelmat ~ accumulator / sum(accumulator,2)
   }
 }
 
@@ -51,13 +73,12 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
   
   val options = opts
   var nsteps = 0f
-  var model:Model = null
   var modelmat:Mat = null
   var updatemat:Mat = null
   
   var sumSq:Mat = null 
 
-  def init(model0:Model) = {
+  override def init(model0:Model) = {
     model = model0
 	  modelmat = model.modelmats(0)
 	  updatemat = model.updatemats(0)
@@ -124,7 +145,13 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	}
 }
 
-object BatchMultUpdater {
+object IncNormUpdater {
+  class Options extends Updater.Options {
+    
+  }
+}
+
+object BatchNormUpdater {
   class Options extends Updater.Options {
     
   }

@@ -10,33 +10,31 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
-    updatemats = new Array[Mat](2)
+    updatemats = new Array[Mat](1)
     mm = modelmats(0)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    updatemats(1) = mm.zeros(mm.nrows, 1)
   }
   
   def uupdate(sdata:Mat, user:Mat):Unit = {
 	  for (i <- 0 until opts.uiter) {
 	  	val preds = DDS(mm, user, sdata)
+
 	  	val dc = sdata.contents
 	  	val pc = preds.contents
 	  	max(opts.weps, pc, pc)
 	  	pc ~ dc / pc
 	  	val unew = user *@ (mm * preds) + opts.alpha
+/*	  	val unew1 = mm * preds
+	  	val unew2 = user *@ unew1
+	  	val unew = unew2 + opts.alpha */
+//	  	println("uupdate %d %d %d, %d %d %d %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, unew1.GUID, unew2.GUID, unew.GUID))
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
-	  }
+	  }	  
   }
   
   def mupdate(sdata:Mat, user:Mat):Unit = {
-  	val preds = DDS(mm, user, sdata)
-  	val dc = sdata.contents
-  	val pc = preds.contents
-  	max(opts.weps, pc, pc)
-  	pc ~ dc / pc
-  	updatemats(0) <-- user xT preds           
-  	updatemats(1) <-- sum(user,2)
+  	updatemats(0) <-- user *^ sdata           
   }
   
   def evalfun(sdata:Mat, user:Mat):FMat = {  
@@ -46,10 +44,10 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   	max(opts.weps, pc, pc)
   	val ll = ln(pc)
   	val sdat = sum(sdata,1)
-  	val su1 = ln(sum(user,1))
-//  	val nvv = sum(sdat,2).dv
-//  	println("vals %f, %f, %f, %f, %f" format (nvv, sum(data.contents,1).dv, sum(ll,1).dv/nvv, (ll dot data.contents)/nvv,(sdat dot su1)/nvv))
-  	row(((ll ddot dc) - (sdat ddot su1))/sum(sdat,2).dv,0)
+  	val mms = sum(mm,2).t
+  	val su1 = ln(mms*user)
+  	val vv = ((ll ddot dc) - (sdat ddot su1))/sum(sdat,2).dv
+  	row(vv, math.exp(-vv))
   }
 }
 
@@ -138,6 +136,7 @@ abstract class FactorModel(val opts:FactorModel.Options) extends Model {
         mats = datasource.next
         val dmat = mats(1).asInstanceOf[FMat]
         dmat(?) = 1.0f/d
+        datasource.putBack(mats,1)
       }
     }
 
@@ -178,14 +177,14 @@ object LDAModel  {
   class Options extends FactorModel.Options {
     var LDAeps = 1e-9
     var exppsi = true
-    var alpha = 1.0f
+    var alpha = 0.1f
   }
 }
 
 object FactorModel { 
   class Options extends Model.Options { 
-    var dim = 10
-    var uiter = 10
+    var dim = 100
+    var uiter = 1
     var weps = 1e-10f
     var uprior = 0.01f
     var mprior = 1e-4f
