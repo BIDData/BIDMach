@@ -9,16 +9,15 @@ case class Learner(datasource:DataSource, model:Model, regularizer:Regularizer, 
 		val opts:Learner.Options = new Learner.Options) {
   
   def run() = {
-    model.init(datasource)
-    updater.init(model)
-    if (regularizer != null) regularizer.init(model)
     flip 
     var done = false
     var ipass = 0
     var here = 0L
     while (ipass < opts.npasses && ! done) {
       datasource.reset
+      updater.clear
       var istep = 0
+      print("i=%2d" format ipass)
       while (datasource.hasNext) {
         val mats = datasource.next
         here += datasource.opts.blockSize
@@ -26,15 +25,24 @@ case class Learner(datasource:DataSource, model:Model, regularizer:Regularizer, 
         	model.doblock(mats, here)
         	if (regularizer != null) regularizer.compute(here)
         	updater.update(here)
+        	print(".")
         } else {
           val scores = model.evalblock(mats)
-          print("ll="); scores.data.foreach(v => (" %4.3f" format v)); println()
+          print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println()
         }   
         if (opts.putBack >= 0) datasource.putBack(mats, opts.putBack)
         istep += 1
       }
       updater.updateM
       ipass += 1
+    }
+    val gf = gflop
+    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+  }
+  
+  def copyMats(from:Array[Mat], to:Array[Mat]) = {
+    for (i <- 0 until from.length) {
+      to(i) <-- from(i)
     }
   }
 }
@@ -207,7 +215,7 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
 object Learner {
 	class Options {
 		var blocksize:Int = 8000
-		var npasses:Int = 100
+		var npasses:Int = 20
 	  var memwindow:Double = 40000
 		var convwindow:Double = 40000	
 		var convslope:Double = -1e-6
@@ -216,40 +224,13 @@ object Learner {
 		var putBack = 1
 		var numGPUthreads = 1
   }
-  
-  def fsqrt(v:Float):Float = math.sqrt(v).asInstanceOf[Float]
-  
-  def mapfun2x2(fn:(Float, Float)=>(Float, Float), in0:FMat, in1:FMat, out0:FMat, out1:FMat) = {
-    if (in0.nrows != in1.nrows || in0.nrows != out0.nrows || in0.nrows != out1.nrows ||
-        in0.ncols != in1.ncols || in0.ncols != out0.ncols || in0.ncols != out1.ncols) {
-      throw new RuntimeException("dimensions mismatch")
-    }
-    var i = 0
-    while (i < in0.length) {
-      val (v1, v2) = fn(in0.data(i), in1.data(i))
-      out0.data(i) = v1
-      out1.data(i) = v2
-      i += 1
-    }
-  }
-  def mapfun2x1(fn:(Float, Float)=>Float, in0:FMat, in1:FMat, out0:FMat) = {
-    if (in0.nrows != in1.nrows || in0.nrows != out0.nrows ||
-        in0.ncols != in1.ncols || in0.ncols != out0.ncols) {
-      throw new RuntimeException("dimensions mismatch")
-    }
-    var i = 0
-    while (i < in0.length) {
-      out0.data(i) = fn(in0.data(i), in1.data(i))
-      i += 1
-    }
-  }
 }
 
 class TestLDA {
   var fname:String = "/big/twitter/test/smat_20_100_400.lz4"
   var dd:MatDataSource = null
   var model:LDAModel = null
-  var updater:BatchMultUpdater = null
+  var updater:Updater = null
   var lda:Learner = null
   def setup = { 
     val aa = new Array[Mat](2)
@@ -257,11 +238,19 @@ class TestLDA {
     dd = new MatDataSource(aa)
     model = new LDAModel
     aa(1) = ones(model.opts.dim, aa(0).ncols)
-    updater = new BatchMultUpdater
+    updater = new IncNormUpdater
     dd.init
     model.init(dd)
     updater.init(model)
     lda = new Learner(dd, model, null, updater)   
   }
+  
+  def init = {
+    dd.mats(1) = ones(model.opts.dim, dd.mats(0).ncols)
+    dd.init
+    model.init(dd)
+    updater.init(model)
+  }
+  
   def run = lda.run
 }

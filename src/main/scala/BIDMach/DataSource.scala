@@ -13,13 +13,16 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
 }
 
 class MatDataSource(val mats:Array[Mat], override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
-  val sizeMargin = opts.sizeMargin
+  var sizeMargin = 0f 
   var here = 0
-  val blockSize = opts.blockSize
+  var there = 0
+  var blockSize = 0
   var omats:Array[Mat] = null
   
   def init = {
-    here = 0
+    sizeMargin = opts.sizeMargin
+    blockSize = opts.blockSize
+    here = -blockSize
     omats = new Array[Mat](mats.length)
     for (i <- 0 until mats.length) {
       omats(i) = mats(i) match {
@@ -31,23 +34,25 @@ class MatDataSource(val mats:Array[Mat], override val opts:DataSource.Options = 
   }
   
   def reset = {
-    here = 0
+    here = -blockSize
   }
   
   def next:Array[Mat] = {
-    val there = math.min(here+blockSize, mats(0).ncols)
+    here = math.min(here+blockSize, mats(0).ncols)
+    there = math.min(here+blockSize, mats(0).ncols)
   	for (i <- 0 until mats.length) {
   	  omats(i) = mats(i).colslice(here, there, omats(i))
   	}
-    here = math.min(here+blockSize, mats(0).ncols)
   	omats
   }
   
   def hasNext:Boolean = {
-    here < mats(0).ncols
+    here + blockSize < mats(0).ncols
   }
   
-  def putBack(mats:Array[Mat],i:Int) = {}
+  def putBack(tmats:Array[Mat],i:Int) = {
+    tmats(i).colslice(0, tmats(i).ncols, mats(i), here)
+  }
 
 }
 
@@ -380,7 +385,7 @@ object SFilesDataSource {
 
 object DataSource {
   class Options {
-    var blockSize = 100000
+    var blockSize = 500000
     var nusers  = 1000000L
     var sizeMargin = 5f
   }
