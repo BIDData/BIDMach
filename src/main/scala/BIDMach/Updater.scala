@@ -38,7 +38,11 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   	    step / firstStep
   	  }
   	}
-    modelmat ~ modelmat + updatemat / (sum(updatemat,2) * rr) 
+  	val su = sum(updatemat,2)
+  	su ~ su * rr
+  	updatemat ~ updatemat / su
+  	modelmat ~ modelmat * (1 - 1/rr)
+    modelmat ~ modelmat + updatemat 
     modelmat ~ modelmat / sum(modelmat,2)
   }
   

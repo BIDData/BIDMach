@@ -5,7 +5,11 @@ import BIDMat.SciFunctions._
 import BIDMat.Plotting._
 import scala.collection.immutable.List
 
-case class Learner(datasource:DataSource, model:Model, regularizer:Regularizer, updater:Updater, 
+case class Learner(
+    val datasource:DataSource, 
+    val model:Model, 
+    val regularizer:Regularizer, 
+    val updater:Updater, 
 		val opts:Learner.Options = new Learner.Options) {
   
   def run() = {
@@ -22,15 +26,15 @@ case class Learner(datasource:DataSource, model:Model, regularizer:Regularizer, 
         val mats = datasource.next
         here += datasource.opts.blockSize
         if (datasource.hasNext) {
-        	model.doblock(mats, here)
+        	model.doblockg(mats, here)
         	if (regularizer != null) regularizer.compute(here)
         	updater.update(here)
         	print(".")
         } else {
-          val scores = model.evalblock(mats)
-          print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println()
+          val scores = model.evalblockg(mats)
+          print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" mem=%f" format GPUmem._1)
         }   
-        if (opts.putBack >= 0) datasource.putBack(mats, opts.putBack)
+        if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
         istep += 1
       }
       updater.updateM
@@ -38,12 +42,6 @@ case class Learner(datasource:DataSource, model:Model, regularizer:Regularizer, 
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
-  }
-  
-  def copyMats(from:Array[Mat], to:Array[Mat]) = {
-    for (i <- 0 until from.length) {
-      to(i) <-- from(i)
-    }
   }
 }
 
@@ -214,14 +212,14 @@ case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat,
 
 object Learner {
 	class Options {
-		var blocksize:Int = 8000
+		var blockSize:Int = 100000
 		var npasses:Int = 20
 	  var memwindow:Double = 40000
 		var convwindow:Double = 40000	
 		var convslope:Double = -1e-6
 		var secprint:Double = 1
 		var eps:Float = 1e-8f
-		var putBack = 1
+		var useGPU = false
 		var numGPUthreads = 1
   }
 }
@@ -232,21 +230,24 @@ class TestLDA {
   var model:LDAModel = null
   var updater:Updater = null
   var lda:Learner = null
+  var lopts = new Learner.Options
+  var mopts = new LDAModel.Options
+  var dopts = new MatDataSource.Options
   def setup = { 
-    val aa = new Array[Mat](2)
+    val aa = if (mopts.putBack >= 0) new Array[Mat](2) else new Array[Mat](1)
     aa(0) = HMat.loadSMat(fname)
-    dd = new MatDataSource(aa)
-    model = new LDAModel
-    aa(1) = ones(model.opts.dim, aa(0).ncols)
+    dd = new MatDataSource(aa, dopts)
+    model = new LDAModel(mopts)
+    if (mopts.putBack >= 0) aa(1) = ones(model.opts.dim, aa(0).ncols)
     updater = new IncNormUpdater
     dd.init
     model.init(dd)
     updater.init(model)
-    lda = new Learner(dd, model, null, updater)   
+    lda = new Learner(dd, model, null, updater, lopts)   
   }
   
   def init = {
-    dd.mats(1) = ones(model.opts.dim, dd.mats(0).ncols)
+    if (dd.mats.length > 1) dd.mats(1) = ones(model.opts.dim, dd.mats(0).ncols)
     dd.init
     model.init(dd)
     updater.init(model)

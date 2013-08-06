@@ -10,9 +10,10 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def hasNext:Boolean
   def reset:Unit
   def putBack(mats:Array[Mat],i:Int)
+  def nmats:Int
 }
 
-class MatDataSource(val mats:Array[Mat], override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) { 
+class MatDataSource(val mats:Array[Mat], override val opts:MatDataSource.Options = new MatDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f 
   var here = 0
   var there = 0
@@ -32,6 +33,8 @@ class MatDataSource(val mats:Array[Mat], override val opts:DataSource.Options = 
       }      
     }    
   }
+  
+  def nmats = omats.length
   
   def reset = {
     here = -blockSize
@@ -120,6 +123,8 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
       }
     } 
   }
+  
+  def nmats = omats.length
   
   def next:Array[Mat] = {
     var donextfile = false
@@ -383,9 +388,15 @@ object SFilesDataSource {
   }
 }
 
+object MatDataSource {
+  class Options extends DataSource.Options {
+    
+  }
+}
+
 object DataSource {
   class Options {
-    var blockSize = 500000
+    var blockSize = 100000
     var nusers  = 1000000L
     var sizeMargin = 5f
   }
