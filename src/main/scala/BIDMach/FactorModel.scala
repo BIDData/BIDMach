@@ -26,12 +26,10 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  	val pc = preds.contents
 	  	max(opts.weps, pc, pc)
 	  	pc ~ dc / pc
-//	  	val unew = user *@ (mm * preds) + opts.alpha
-	  	val unew1 = mm * preds
-	  	Mat.useCache = true
+	  	val unew = user *@ (mm * preds) + opts.alpha
+/*	  	val unew1 = mm * preds
 	  	val unew2 = user *@ unew1
-	  	val unew = unew2 + opts.alpha 
-//	  	println("uupdate %d %d %d, %d %d %d %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, unew1.GUID, unew2.GUID, unew.GUID))
+	  	val unew = unew2 + opts.alpha */
 	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1))
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
