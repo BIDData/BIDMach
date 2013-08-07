@@ -30,7 +30,6 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   
   override def init(model0:Model) = {
     super.init(model0)
-    rm = modelmats(0).zeros(1,1)
   }
       
   def update(step:Long) = {
@@ -44,12 +43,10 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   	    step / firstStep
   	  }
   	}
-  	rm.set(rr)
   	val su = sum(updatemat,2)
-  	su ~ su * rm
+  	su ~ su * rr
   	updatemat ~ updatemat / su
-  	rm.set(1-1/rr)
-  	modelmat ~ modelmat * rm
+  	modelmat ~ modelmat * (1-1/rr)
     modelmat ~ modelmat + updatemat 
     modelmat ~ modelmat / sum(modelmat,2)
   }
