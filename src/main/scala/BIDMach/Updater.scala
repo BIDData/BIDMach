@@ -26,6 +26,12 @@ abstract class Updater {
 class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Options) extends Updater {
   
   var firstStep = 0f
+  var rm:Mat = null
+  
+  override def init(model0:Model) = {
+    super.init(model0)
+    rm = modelmats(0).zeros(1,1)
+  }
       
   def update(step:Long) = {
   	val modelmat = modelmats(0)
@@ -38,10 +44,12 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   	    step / firstStep
   	  }
   	}
+  	rm.set(rr)
   	val su = sum(updatemat,2)
-  	su ~ su * rr
+  	su ~ su * rm
   	updatemat ~ updatemat / su
-  	modelmat ~ modelmat * (1 - 1/rr)
+  	rm.set(1-1/rr)
+  	modelmat ~ modelmat * rm
     modelmat ~ modelmat + updatemat 
     modelmat ~ modelmat / sum(modelmat,2)
   }

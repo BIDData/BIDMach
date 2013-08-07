@@ -7,6 +7,7 @@ import BIDMat.SciFunctions._
 
 class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extends FactorModel(opts) { 
   var mm:Mat = null
+  var alpha:Mat = null
   
   var traceMem = false
   
@@ -15,6 +16,8 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
     updatemats = new Array[Mat](1)
     mm = modelmats(0)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
+    alpha = mm.zeros(1,1)
+    alpha.set(opts.alpha)
   }
   
   def uupdate(sdata:Mat, user:Mat):Unit = {
@@ -30,7 +33,7 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  	val unew1 = mm * preds
 	  	val unew = user *@ unew1
 	  	Mat.useCache=true
-	  	unew ~ unew + opts.alpha 
+	  	unew ~ unew + alpha 
 	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1))
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
