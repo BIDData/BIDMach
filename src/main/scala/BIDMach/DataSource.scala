@@ -11,14 +11,16 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def reset:Unit
   def putBack(mats:Array[Mat],i:Int)
   def nmats:Int
+  def init:Unit
+  var omats:Array[Mat] = null
 }
 
-class MatDataSource(val mats:Array[Mat], override val opts:MatDataSource.Options = new MatDataSource.Options) extends DataSource(opts) { 
+class MatDataSource(mats:Array[Mat], override val opts:MatDataSource.Options = new MatDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f 
   var here = 0
   var there = 0
   var blockSize = 0
-  var omats:Array[Mat] = null
+  omats = null
   
   def init = {
     sizeMargin = opts.sizeMargin
@@ -66,7 +68,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   var rowno = 0
   var nstart = 0
   var fnames:List[(Int)=>String] = null
-  var omats:Array[Mat] = null
+  omats = null
   var matqueue:Array[Array[Mat]] = null
   var ready:IMat = null
   var stop:Boolean = false
@@ -373,13 +375,13 @@ object SFilesDataSource {
   	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"),
   			                                           FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4"),
   			                                           FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4"))
-  	var fcounts = icol(10000,20000,100000)
+  	var fcounts = icol(20000,100000,400000)
   	lookahead = 8
   	sampleFiles = 1.0f
     nstart = FilesDataSource.encodeDate(2011,11,22,0)
     nend = FilesDataSource.encodeDate(2013,6,31,0)
-    blockSize = 10000
-    var sBlockSize = 500000
+    blockSize = 200000
+    var sBlockSize = 1000000
   }
   
   val singleOpts = new Options {
@@ -396,9 +398,9 @@ object MatDataSource {
 
 object DataSource {
   class Options {
-    var blockSize = 100000
+    var blockSize = 200000
     var nusers  = 1000000L
-    var sizeMargin = 5f
+    var sizeMargin = 2f
   }
   
 }
