@@ -16,8 +16,6 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
     updatemats = new Array[Mat](1)
     mm = modelmats(0)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    alpha = mm.zeros(1,1)
-    alpha.set(opts.alpha)
   }
   
   def uupdate(sdata:Mat, user:Mat):Unit = {
@@ -27,13 +25,16 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  	if (traceMem) println("uupdate %d %d %d, %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1))
 	  	val dc = sdata.contents
 	  	val pc = preds.contents
+//	  	println("preds %f" format sum(FMat(pc)).v)
 	  	max(opts.weps, pc, pc)
+//	  	println("mpreds %f" format sum(FMat(pc)).v)
 	  	pc ~ dc / pc
 //	  	val unew = user *@ (mm * preds) + opts.alpha
+//	  	println("qpreds %f" format sum(FMat(pc)).v)
 	  	val unew1 = mm * preds
 	  	val unew = user *@ unew1
-	  	Mat.useCache=true
-	  	unew ~ unew + alpha 
+	  	unew ~ unew + opts.alpha 
+//	  	println("unew %f" format sum(sum(FMat(pc))).v)
 	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1))
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
