@@ -143,8 +143,8 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
   
   def reuseuser(a:Mat):Mat = {
     val out = a match {
-      case aa:SMat => FMat.newOrCheckFMat(opts.dim, a.ncols, null, 0, "reuseuser".##)
-      case aa:GSMat => GMat.newOrCheckGMat(opts.dim, a.ncols, null, 0, "reuseuser".##)
+      case aa:SMat => FMat.newOrCheckFMat(opts.dim, a.ncols, null, a.GUID, "reuseuser".##)
+      case aa:GSMat => GMat.newOrCheckGMat(opts.dim, a.ncols, null, a.GUID, "reuseuser".##)
     }
     out.set(1f)
     out
