@@ -93,6 +93,7 @@ case class ParLearner(
         			if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
         		}
         		done(ithread) = 0   
+        		Mat.useCache = true
 //        	}
         }
       	while (mini(done).v > 0) Thread.sleep(1)
