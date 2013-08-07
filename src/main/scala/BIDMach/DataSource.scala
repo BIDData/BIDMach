@@ -398,7 +398,7 @@ object MatDataSource {
 
 object DataSource {
   class Options {
-    var blockSize = 200000
+    var blockSize = 100000
     var nusers  = 1000000L
     var sizeMargin = 2f
   }
