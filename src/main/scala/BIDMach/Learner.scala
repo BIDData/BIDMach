@@ -125,7 +125,7 @@ case class ParLearner(
 
 object Learner {
 	class Options {
-		var npasses:Int = 5
+		var npasses:Int = 3
 		var evalStep = 10
 		var useGPU = false
 		var nthreads = 1
