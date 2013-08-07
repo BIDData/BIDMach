@@ -34,10 +34,8 @@ abstract class Model(val opts:Model.Options = new Model.Options) {
   def evalblock(mats:Array[Mat]):FMat                                        // Scores (log likelihoods)
   
   def doblockg(amats:Array[Mat], i:Long) = {
-    if (opts.useGPU) copyMats(amats, gmats)
-            		
+    if (opts.useGPU) copyMats(amats, gmats)            		
     doblock(gmats, i)
-    Mat.useCache = true
     if (opts.useGPU && opts.putBack >= 0) amats(opts.putBack) <-- gmats(opts.putBack)
   }
   
