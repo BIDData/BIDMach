@@ -160,6 +160,7 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
   def doblock(gmats:Array[Mat], i:Long) = {
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else reuseuser(gmats(0))
+    Mat.useCache = true
     uupdate(sdata, user)
     mupdate(sdata, user)
   }
