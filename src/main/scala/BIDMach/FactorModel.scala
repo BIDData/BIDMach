@@ -9,7 +9,7 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   var mm:Mat = null
   var alpha:Mat = null
   
-  var traceMem = false
+  var traceMem = true
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
@@ -22,7 +22,7 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
     if (opts.putBack < 0) user.set(1f)
 	  for (i <- 0 until opts.uiter) {
 	  	val preds = DDS(mm, user, sdata)	
-	  	if (traceMem) println("uupdate %d %d %d, %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1))
+	  	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
 	  	val dc = sdata.contents
 	  	val pc = preds.contents
 	  	println("uupdate %d %d %d %d" format (sdata.nnz, preds.nnz, dc.nrows, pc.nrows))
@@ -33,7 +33,7 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 /*	  	val unew1 = mm * preds
 	  	val unew = user *@ unew1
 	  	unew ~ unew + opts.alpha */
-	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1))
+	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
 	  }	  
