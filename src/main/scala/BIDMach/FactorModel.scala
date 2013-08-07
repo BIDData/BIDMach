@@ -20,7 +20,8 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   def uupdate(sdata:Mat, user:Mat):Unit = {
     if (opts.putBack < 0) user.set(1f)
 	  for (i <- 0 until opts.uiter) {
-	  	val preds = DDS(mm, user, sdata)	  	
+	  	val preds = DDS(mm, user, sdata)	  
+	  	if (traceMem) println("uupdate %d %d %d, %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1))
 	  	val dc = sdata.contents
 	  	val pc = preds.contents
 	  	max(opts.weps, pc, pc)
