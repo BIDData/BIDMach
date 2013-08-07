@@ -118,6 +118,7 @@ case class ParLearner(
 	  	setGPU(i)
 	  	models(i).modelmats(0) <-- mm
 	  }
+	  setGPU(0)
   }
 }
 
