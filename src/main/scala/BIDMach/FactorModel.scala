@@ -20,7 +20,8 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   def uupdate(sdata:Mat, user:Mat):Unit = {
     if (opts.putBack < 0) user.set(1f)
 	  for (i <- 0 until opts.uiter) {
-	  	val preds = DDS(mm, user, sdata)	  
+	  	val preds = DDS(mm, user, sdata)	
+	  	Mat.useCache
 	  	if (traceMem) println("uupdate %d %d %d, %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1))
 	  	val dc = sdata.contents
 	  	val pc = preds.contents
@@ -161,7 +162,6 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else reuseuser(gmats(0))
     uupdate(sdata, user)
-    Mat.useCache = true
     mupdate(sdata, user)
   }
   
@@ -196,7 +196,7 @@ object LDAModel  {
 object FactorModel { 
   class Options extends Model.Options { 
     var dim = 100
-    var uiter = 10
+    var uiter = 1
     var weps = 1e-10f
     var minuser = 1e-8f
   }
