@@ -15,6 +15,7 @@ abstract class Model(val opts:Model.Options = new Model.Options) {
   
   def init(datasource:DataSource):Unit = {
 	  mats = datasource.next
+	  datasource.reset
 	  if (opts.useGPU) {
 	    gmats = new Array[Mat](mats.length)
 	    for (i <- 0 until mats.length) {
