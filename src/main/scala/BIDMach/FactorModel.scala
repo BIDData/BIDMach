@@ -28,9 +28,9 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  	pc ~ dc / pc
 //	  	val unew = user *@ (mm * preds) + opts.alpha
 	  	val unew1 = mm * preds
-	  	val unew2 = user *@ unew1
+	  	val unew = user *@ unew1
 	  	Mat.useCache=true
-	  	val unew = unew2 + opts.alpha 
+	  	unew ~ unew + opts.alpha 
 	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1))
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
