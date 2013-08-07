@@ -35,8 +35,9 @@ abstract class Model(val opts:Model.Options = new Model.Options) {
   
   def doblockg(amats:Array[Mat], i:Long) = {
     if (opts.useGPU) copyMats(amats, gmats)
-            		Mat.useCache = true
+            		
     doblock(gmats, i)
+    Mat.useCache = true
     if (opts.useGPU && opts.putBack >= 0) amats(opts.putBack) <-- gmats(opts.putBack)
   }
   
