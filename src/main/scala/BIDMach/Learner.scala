@@ -96,8 +96,8 @@ case class ParLearner(
 //        	}
         }
       	while (mini(done).v > 0) Thread.sleep(1)
-      	syncmodels(models)
       	istep += opts.nthreads
+      	if (istep % opts.updateStep == 0) syncmodels(models)
       }
       println
       for (i <- 0 until opts.nthreads) {setGPU(i); updaters(i).updateM}
@@ -127,8 +127,8 @@ case class ParLearner(
 object Learner {
 	class Options {
 		var npasses:Int = 3
-		var evalStep = 10
-		var useGPU = false
+		var evalStep = 16
+		var updateStep = 16
 		var nthreads = 1
   }
 }
