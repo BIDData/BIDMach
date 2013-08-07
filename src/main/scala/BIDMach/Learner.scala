@@ -67,6 +67,7 @@ case class ParLearner(
     var here = 0L
     while (ipass < opts.npasses) {     
       for (i <- 0 until opts.nthreads) {
+        setGPU(i)
       	datasources(i).reset
         updaters(i).clear
       }
@@ -76,7 +77,7 @@ case class ParLearner(
       	here += datasources(0).opts.blockSize
         for (ithread <- 0 until opts.nthreads) {
         	done(ithread) = 1
-        	Actor.actor {
+//        	Actor.actor {
         		setGPU(ithread) 
         		if (datasources(ithread).hasNext) {
         			val mats = datasources(ithread).next
@@ -92,14 +93,14 @@ case class ParLearner(
         			if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
         		}
         		done(ithread) = 0   
-        	}
+//        	}
         }
       	while (mini(done).v > 0) Thread.sleep(1)
       	syncmodels(models)
       	istep += opts.nthreads
       }
       println
-      for (i <- 0 until opts.nthreads) updaters(i).updateM
+      for (i <- 0 until opts.nthreads) {setGPU(i); updaters(i).updateM}
       ipass += 1
     }
     val gf = gflop
