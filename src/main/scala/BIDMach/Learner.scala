@@ -83,7 +83,7 @@ case class ParLearner(
         			val mats = datasources(ithread).next
         	  	if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasources(0).hasNext ) {
         	  		val scores = models(ithread).evalblockg(mats)
-        	  		print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" mem=%f" format GPUmem._1)
+        	  		print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
         	  	} else {
         	  		models(ithread).doblockg(mats, here)
         	  		if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
