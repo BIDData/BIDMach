@@ -147,12 +147,20 @@ case class ParLearnerx(
   var um:FMat = null
   var mm:FMat = null
   var results:FMat = null
+  var cmats:Array[Array[Mat]] = null
   
   def run() = {
     flip 
     val mm0 = models(0).modelmats(0)
     mm = zeros(mm0.nrows, mm0.ncols)
     um = zeros(mm0.nrows, mm0.ncols)
+    cmats = new Array[Array[Mat]](opts.nthreads)
+    for (i <- 0 until opts.nthreads) {
+    	cmats(i) = new Array[Mat](datasource.omats.length)
+    	for (j <- 0 until datasource.omats.length) {
+    	  cmats(i)(j) = datasource.omats(j).copy
+    	}
+    }
     
     val done = iones(opts.nthreads, 1)
     var ipass = 0
@@ -173,15 +181,16 @@ case class ParLearnerx(
         	if (datasource.hasNext) {
         	  done(ithread) = 0
         		val mats = datasource.next
+        		for (j <- 0 until mats.length) cmats(ithread)(j) <-- mats(j)
         		Actor.actor {
         			setGPU(ithread) 
         			if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasource.hasNext ) {
-        				val scores = models(ithread).evalblockg(mats)
+        				val scores = models(ithread).evalblockg(cmats(ithread))
         				print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
         				reslist.append(scores(0))
         				samplist.append(here)
         			} else {
-        				models(ithread).doblockg(mats, here)
+        				models(ithread).doblockg(cmats(ithread), here)
         				if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
         				updaters(ithread).update(here)
         				print(".")
