@@ -128,7 +128,7 @@ object Learner {
 	class Options {
 		var npasses:Int = 1
 		var evalStep = 15
-		var updateStep = 16
+		var updateStep = 32
 		var nthreads = 4
   }
 }
@@ -221,7 +221,7 @@ class TestParLDA(mat:Mat) {
 
 class TestFParLDA(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,4,1,0)) {
+		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)) {
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
@@ -238,6 +238,7 @@ class TestFParLDA(
     	val istart = nstart + i * (nend - nstart) / lopts.nthreads
     	val iend = nstart + (i+1) * (nend - nstart) / lopts.nthreads
     	val dopts = new SFilesDataSource.Options
+    	dopts.fcounts = icol(20000,100000)
     	dopts.nstart = istart
     	dopts.nend = iend
     	dds(i) = new SFilesDataSource(dopts)
