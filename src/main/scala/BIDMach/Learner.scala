@@ -75,7 +75,7 @@ case class ParLearner(
       println("i=%2d" format ipass)
       while (datasources(0).hasNext) {
       	here += datasources(0).opts.blockSize
-      	done.set(1)
+      	done.clear
         for (ithread <- 0 until opts.nthreads) {
         	Actor.actor {
         		setGPU(ithread) 
@@ -92,10 +92,10 @@ case class ParLearner(
         	  	}
         			if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
         		}
-        		done(ithread) = 0   
+        		done(ithread) = 1   
         	}
         }
-      	while (mini(done).v > 0) Thread.sleep(1)
+      	while (mini(done).v == 0) Thread.sleep(1)
       	istep += opts.nthreads
       	if (istep % opts.updateStep == 0) syncmodels(models)
       }
