@@ -218,3 +218,49 @@ class TestParLDA(mat:Mat) {
   
   def run = lda.run
 }
+
+class TestFParLDA(
+    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
+		nend:Int=FilesDataSource.encodeDate(2012,4,1,0)) {
+  var dds:Array[DataSource] = null
+  var models:Array[Model] = null
+  var updaters:Array[Updater] = null
+  var lda:ParLearner = null
+  var lopts = new Learner.Options
+  var mopts = new LDAModel.Options
+  
+  def setup = {
+    dds = new Array[DataSource](lopts.nthreads)
+    models = new Array[Model](lopts.nthreads)
+    updaters = new Array[Updater](lopts.nthreads)
+    for (i <- 0 until lopts.nthreads) {
+      setGPU(i)
+    	val istart = nstart + i * (nend - nstart) / lopts.nthreads
+    	val iend = nstart + (i+1) * (nend - nstart) / lopts.nthreads
+    	val dopts = new SFilesDataSource.Options
+    	dopts.nstart = istart
+    	dopts.nend = iend
+    	dds(i) = new SFilesDataSource(dopts)
+    	dds(i).init
+    	models(i) = new LDAModel(mopts)
+    	models(i).init(dds(i))
+    	updaters(i) = new IncNormUpdater()
+    	updaters(i).init(models(i))
+    }
+    setGPU(0)
+    lda = new ParLearner(dds, models, null, updaters, lopts)   
+  }
+  
+  def init = {
+  	for (i <- 0 until lopts.nthreads) {
+  	  setGPU(i)
+  		if (dds(i).omats.length > 1) dds(i).omats(1) = ones(mopts.dim, dds(i).omats(0).ncols)
+  		dds(i).init
+  		models(i).init(dds(i))
+  		updaters(i).init(models(i))
+  	}
+  	setGPU(0)
+  }
+  
+  def run = lda.run
+}

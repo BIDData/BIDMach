@@ -188,7 +188,7 @@ object LDAModel  {
   class Options extends FactorModel.Options {
     var LDAeps = 1e-9
     var exppsi = true
-    var alpha = 0.1f
+    var alpha = 0.01f
     putBack = -1
     useGPU = true
   }
@@ -196,8 +196,8 @@ object LDAModel  {
 
 object FactorModel { 
   class Options extends Model.Options { 
-    var dim = 100
-    var uiter = 1
+    var dim = 256
+    var uiter = 10
     var weps = 1e-10f
     var minuser = 1e-8f
   }
