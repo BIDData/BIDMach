@@ -13,7 +13,7 @@ case class Learner(
     val regularizer:Regularizer, 
     val updater:Updater, 
 		val opts:Learner.Options = new Learner.Options) {
-  var results:Array[Float] = null
+  var results:FMat = null
   
   def run() = {
     flip 
@@ -21,6 +21,7 @@ case class Learner(
     var ipass = 0
     var here = 0L
     val reslist = new ListBuffer[Float]
+    val samplist = new ListBuffer[Float]
     while (ipass < opts.npasses && ! done) {
       datasource.reset
       updater.clear
@@ -33,6 +34,7 @@ case class Learner(
         	val scores = model.evalblockg(mats)
         	print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" mem=%f" format GPUmem._1)
         	reslist.append(scores(0))
+        	samplist.append(here)
         } else {
         	model.doblockg(mats, here)
         	if (regularizer != null) regularizer.compute(here)
@@ -47,7 +49,7 @@ case class Learner(
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
-    results = reslist.toArray
+    results = row(reslist.toList) on row(samplist.toList)
   }
 }
 
@@ -72,6 +74,7 @@ case class ParLearner(
     var ipass = 0
     var here = 0L
     val reslist = new ListBuffer[Float]
+    val samplist = new ListBuffer[Float]
     while (ipass < opts.npasses) {     
       for (i <- 0 until opts.nthreads) {
         setGPU(i)
@@ -92,6 +95,7 @@ case class ParLearner(
         	  		val scores = models(ithread).evalblockg(mats)
         	  		print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
         	  		reslist.append(scores(0))
+        	  		samplist.append(here)
         	  	} else {
         	  		models(ithread).doblockg(mats, here)
         	  		if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
@@ -113,7 +117,7 @@ case class ParLearner(
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
-    results = row(reslist.toList)
+    results = row(reslist.toList) on row(samplist.toList)
   }
      
   def syncmodels(models:Array[Model]) = {
