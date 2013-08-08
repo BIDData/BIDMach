@@ -126,10 +126,10 @@ case class ParLearner(
 
 object Learner {
 	class Options {
-		var npasses:Int = 3
+		var npasses:Int = 1
 		var evalStep = 15
 		var updateStep = 16
-		var nthreads = 1
+		var nthreads = 4
   }
 }
 
