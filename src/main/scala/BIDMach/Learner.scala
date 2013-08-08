@@ -241,6 +241,7 @@ class TestFParLDA(
     	dopts.fcounts = icol(20000,100000)
     	dopts.nstart = istart
     	dopts.nend = iend
+    	dopts.lookahead = 3
     	dds(i) = new SFilesDataSource(dopts)
     	dds(i).init
     	models(i) = new LDAModel(mopts)
