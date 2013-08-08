@@ -137,6 +137,89 @@ case class ParLearner(
 }
 
 
+case class ParLearnerx(
+    val datasource:DataSource, 
+    val models:Array[Model], 
+    val regularizers:Array[Regularizer], 
+    val updaters:Array[Updater], 
+		val opts:Learner.Options = new Learner.Options) {
+  
+  var um:FMat = null
+  var mm:FMat = null
+  var results:FMat = null
+  
+  def run() = {
+    flip 
+    val mm0 = models(0).modelmats(0)
+    mm = zeros(mm0.nrows, mm0.ncols)
+    um = zeros(mm0.nrows, mm0.ncols)
+    
+    val done = iones(opts.nthreads, 1)
+    var ipass = 0
+    var here = 0L
+    val reslist = new ListBuffer[Float]
+    val samplist = new ListBuffer[Float]
+    while (ipass < opts.npasses) {
+    	datasource.reset
+      for (i <- 0 until opts.nthreads) {
+        setGPU(i)
+        updaters(i).clear
+      }
+      var istep = 0
+      println("i=%2d" format ipass)
+      while (datasource.hasNext) {
+      	here += datasource.opts.blockSize
+        for (ithread <- 0 until opts.nthreads) {
+        	if (datasource.hasNext) {
+        	  done(ithread) = 0
+        		val mats = datasource.next
+        		Actor.actor {
+        			setGPU(ithread) 
+        			if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasource.hasNext ) {
+        				val scores = models(ithread).evalblockg(mats)
+        				print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
+        				reslist.append(scores(0))
+        				samplist.append(here)
+        			} else {
+        				models(ithread).doblockg(mats, here)
+        				if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+        				updaters(ithread).update(here)
+        				print(".")
+        			}
+        			done(ithread) = 1 
+        		}  
+        	}
+        }
+      	while (mini(done).v == 0) Thread.sleep(1)
+      	istep += opts.nthreads
+      	if (istep % opts.updateStep == 0) syncmodels(models)
+      }
+      println
+      for (i <- 0 until opts.nthreads) {setGPU(i); updaters(i).updateM}
+      ipass += 1
+    }
+    val gf = gflop
+    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    results = row(reslist.toList) on row(samplist.toList)
+  }
+     
+  def syncmodels(models:Array[Model]) = {
+	  mm.clear
+	  for (i <- 0 until models.length) {
+	  	setGPU(i)
+	  	um <-- models(i).modelmats(0)
+	  	mm ~ mm + um
+	  }
+	  mm ~ mm * (1f/models.length)
+	  for (i <- 0 until models.length) {
+	  	setGPU(i)
+	  	models(i).modelmats(0) <-- mm
+	  }
+	  setGPU(0)
+  }
+}
+
+
 object Learner {
 	class Options {
 		var npasses:Int = 1
@@ -165,7 +248,7 @@ class TestLDA(mat:Mat) {
     dd.init
     model = new LDAModel(mopts)
     model.init(dd)
-    updater = new IncNormUpdater
+    updater = new IncNormUpdater()
     updater.init(model)
     lda = new Learner(dd, model, null, updater, lopts)   
   }
@@ -276,6 +359,55 @@ class TestFParLDA(
   		if (dds(i).omats.length > 1) dds(i).omats(1) = ones(mopts.dim, dds(i).omats(0).ncols)
   		dds(i).init
   		models(i).init(dds(i))
+  		updaters(i).init(models(i))
+  	}
+  	setGPU(0)
+  }
+  
+  def run = lda.run
+}
+
+
+class TestFParLDAx(
+    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
+		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)
+		) {
+  var dd:DataSource = null
+  var models:Array[Model] = null
+  var updaters:Array[Updater] = null
+  var lda:ParLearnerx = null
+  var lopts = new Learner.Options
+  var mopts = new LDAModel.Options
+  var dopts = new SFilesDataSource.Options
+  mopts.uiter = 8
+  dopts.fcounts = icol(50000)
+  dopts.lookahead = 8
+  dopts.blockSize = 100000
+  dopts.sBlockSize = 4000000
+  
+  def setup = {
+    models = new Array[Model](lopts.nthreads)
+    updaters = new Array[Updater](lopts.nthreads)
+    dd = new SFilesDataSource(dopts)
+    dd.init
+    for (i <- 0 until lopts.nthreads) {
+      setGPU(i)
+    	models(i) = new LDAModel(mopts)
+    	models(i).init(dd)
+    	updaters(i) = new IncNormUpdater()
+    	updaters(i).init(models(i))
+    }
+    setGPU(0)
+    lda = new ParLearnerx(dd, models, null, updaters, lopts)   
+  }
+  
+  def init = {
+	  dd.omats(1) = ones(mopts.dim, dd.omats(0).ncols)
+  	for (i <- 0 until lopts.nthreads) {
+  	  setGPU(i)
+  		if (dd.omats.length > 1) 
+  		dd.init
+  		models(i).init(dd)
   		updaters(i).init(models(i))
   	}
   	setGPU(0)
