@@ -60,6 +60,7 @@ case class ParLearner(
   
   var um:FMat = null
   var mm:FMat = null
+  var results:FMat = null
   
   def run() = {
     flip 
@@ -70,6 +71,7 @@ case class ParLearner(
     val done = izeros(opts.nthreads, 1)
     var ipass = 0
     var here = 0L
+    val reslist = new ListBuffer[Float]
     while (ipass < opts.npasses) {     
       for (i <- 0 until opts.nthreads) {
         setGPU(i)
@@ -89,6 +91,7 @@ case class ParLearner(
         	  	if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasources(0).hasNext ) {
         	  		val scores = models(ithread).evalblockg(mats)
         	  		print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
+        	  		reslist.append(scores(0))
         	  	} else {
         	  		models(ithread).doblockg(mats, here)
         	  		if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
@@ -110,6 +113,7 @@ case class ParLearner(
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    results = row(reslist.toList)
   }
      
   def syncmodels(models:Array[Model]) = {
