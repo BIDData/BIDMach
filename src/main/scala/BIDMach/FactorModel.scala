@@ -197,7 +197,7 @@ object LDAModel  {
 object FactorModel { 
   class Options extends Model.Options { 
     var dim = 256
-    var uiter = 10
+    var uiter = 16
     var weps = 1e-10f
     var minuser = 1e-8f
   }
