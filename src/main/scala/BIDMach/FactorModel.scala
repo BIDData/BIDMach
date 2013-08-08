@@ -25,7 +25,7 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
 	  	val dc = sdata.contents
 	  	val pc = preds.contents
-	  	println("uupdate %d %d %d %d %d" format (sdata.nnz, preds.nnz, dc.nrows, pc.nrows, getGPU))
+	  	println("uupdate1 %d %d %d %d %d" format (sdata.nnz, preds.nnz, dc.nrows, pc.nrows, getGPU))
 	  	max(opts.weps, pc, pc)
 	  	pc ~ dc / pc
 	  	println("uupdate2 %d %d %d %d %d" format (sdata.nnz, preds.nnz, dc.nrows, pc.nrows, getGPU))

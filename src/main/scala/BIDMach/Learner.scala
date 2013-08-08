@@ -75,8 +75,8 @@ case class ParLearner(
       println("i=%2d" format ipass)
       while (datasources(0).hasNext) {
       	here += datasources(0).opts.blockSize
+      	done.set(1)
         for (ithread <- 0 until opts.nthreads) {
-        	done(ithread) = 1
         	Actor.actor {
         		setGPU(ithread) 
         		if (datasources(ithread).hasNext) {
