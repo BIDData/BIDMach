@@ -242,6 +242,8 @@ class TestFParLDA(
     	dopts.nstart = istart
     	dopts.nend = iend
     	dopts.lookahead = 3
+    	dopts.blockSize = 100000
+    	dopts.sBlockSize = 4000000
     	dds(i) = new SFilesDataSource(dopts)
     	dds(i).init
     	models(i) = new LDAModel(mopts)
