@@ -4,6 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
 import scala.collection.immutable.List
+import scala.collection.mutable.ListBuffer
 import scala.actors.Actor
 
 case class Learner(
@@ -12,12 +13,14 @@ case class Learner(
     val regularizer:Regularizer, 
     val updater:Updater, 
 		val opts:Learner.Options = new Learner.Options) {
+  var results:Array[Float] = null
   
   def run() = {
     flip 
     var done = false
     var ipass = 0
     var here = 0L
+    val reslist = new ListBuffer[Float]
     while (ipass < opts.npasses && ! done) {
       datasource.reset
       updater.clear
@@ -29,6 +32,7 @@ case class Learner(
         if ((istep + 1) % opts.evalStep == 0 || ! datasource.hasNext) {
         	val scores = model.evalblockg(mats)
         	print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" mem=%f" format GPUmem._1)
+        	reslist.append(scores(0))
         } else {
         	model.doblockg(mats, here)
         	if (regularizer != null) regularizer.compute(here)
@@ -43,6 +47,7 @@ case class Learner(
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    results = reslist.toArray
   }
 }
 
@@ -221,13 +226,15 @@ class TestParLDA(mat:Mat) {
 
 class TestFParLDA(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)) {
+		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)
+		) {
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var lda:ParLearner = null
   var lopts = new Learner.Options
   var mopts = new LDAModel.Options
+  mopts.uiter = 8
   
   def setup = {
     dds = new Array[DataSource](lopts.nthreads)
@@ -238,7 +245,7 @@ class TestFParLDA(
     	val istart = nstart + i * (nend - nstart) / lopts.nthreads
     	val iend = nstart + (i+1) * (nend - nstart) / lopts.nthreads
     	val dopts = new SFilesDataSource.Options
-    	dopts.fcounts = icol(20000,100000)
+    	dopts.fcounts = icol(50000)
     	dopts.nstart = istart
     	dopts.nend = iend
     	dopts.lookahead = 3
