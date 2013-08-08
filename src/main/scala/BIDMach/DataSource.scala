@@ -376,7 +376,7 @@ object SFilesDataSource {
   			                                           FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4"),
   			                                           FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4"))
   	var fcounts = icol(20000,100000,400000)
-  	lookahead = 8
+  	lookahead = 4
   	sampleFiles = 1.0f
     nstart = FilesDataSource.encodeDate(2011,11,22,0)
     nend = FilesDataSource.encodeDate(2013,6,31,0)
