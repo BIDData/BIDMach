@@ -160,6 +160,7 @@ case class ParLearnerx(
     val done = iones(opts.nthreads, 1)
     var ipass = 0
     var here = 0L
+    var feats = 0L
     val reslist = new ListBuffer[Float]
     val samplist = new ListBuffer[Float]
     while (ipass < opts.npasses) {
@@ -171,11 +172,12 @@ case class ParLearnerx(
       var istep = 0
       println("i=%2d" format ipass)
       while (datasource.hasNext) {
-      	here += datasource.opts.blockSize
         for (ithread <- 0 until opts.nthreads) {
         	if (datasource.hasNext) {
         	  done(ithread) = 0
         		val mats = datasource.next
+        		here += datasource.opts.blockSize
+        		feats += mats(0).nnz
         		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
         		Actor.actor {
         			setGPU(ithread) 

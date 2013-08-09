@@ -74,6 +74,23 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   var stop:Boolean = false
   var permfn:(Int)=>Int = null
   
+  def softperm(nstart:Int, nend:Int) = {
+    val dd1 = nstart / 24
+    val hh1 = nstart % 24
+    val dd2 = nend / 24
+    val hh2 = nend % 24
+    val (dmy, ii) = sort2(rand(dd2-dd1+1+opts.lookahead))
+    (n:Int) => {
+    	val dd = n / 24
+    	val hh = n % 24
+    	val ddx = ii(dd-dd1)+dd1
+    	val ddx0 = ddx % 31
+    	val ddx1 = ddx / 31
+    	val hhdd = hh + 24 * (ddx0 - 1)
+    	(ddx1 * 31 + (hhdd % 31 + 1)) * 24 + hhdd / 31
+    }    
+  }
+  
   def initbase = {
     nstart = opts.nstart
     fnames = opts.fnames
@@ -85,7 +102,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     } else {
       permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
         val (yy, mm, dd, hh) = FilesDataSource.decodeDate(n)
-        val hhdd = hh + 24 * (mm - 1)
+        val hhdd = hh + 24 * (dd - 1)
         FilesDataSource.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
       } 
     }    
