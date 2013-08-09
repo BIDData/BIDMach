@@ -176,7 +176,7 @@ case class ParLearnerx(
         	if (datasource.hasNext) {
         	  done(ithread) = 0
         		val mats = datasource.next
-        		for (j <- 0 until mats.length) cmats(ithread)(j) = mats(j).copyTo(cmats(ithread)(j))
+        		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
         		Actor.actor {
         			setGPU(ithread) 
         			if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasource.hasNext ) {
@@ -205,6 +205,15 @@ case class ParLearnerx(
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
     results = row(reslist.toList) on row(samplist.toList)
+  }
+  
+  def safeCopy(m:Mat, ithread:Int):Mat = {
+    m match {
+      case ss:SMat => {
+        val out = SMat.newOrCheckSMat(ss.nrows, ss.ncols, ss.nnz, null, m.GUID, ithread, "safeCopy".##)
+        ss.copyTo(out)
+      }
+    }
   }
      
   def syncmodels(models:Array[Model]) = {
