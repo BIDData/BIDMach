@@ -155,12 +155,7 @@ case class ParLearnerx(
     mm = zeros(mm0.nrows, mm0.ncols)
     um = zeros(mm0.nrows, mm0.ncols)
     cmats = new Array[Array[Mat]](opts.nthreads)
-    for (i <- 0 until opts.nthreads) {
-    	cmats(i) = new Array[Mat](datasource.omats.length)
-    	for (j <- 0 until datasource.omats.length) {
-    	  cmats(i)(j) = datasource.omats(j).copy
-    	}
-    }
+    for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
     
     val done = iones(opts.nthreads, 1)
     var ipass = 0
@@ -181,7 +176,7 @@ case class ParLearnerx(
         	if (datasource.hasNext) {
         	  done(ithread) = 0
         		val mats = datasource.next
-        		for (j <- 0 until mats.length) cmats(ithread)(j) <-- mats(j)
+        		for (j <- 0 until mats.length) cmats(ithread)(j) = mats(j).copyTo(cmats(ithread)(j))
         		Actor.actor {
         			setGPU(ithread) 
         			if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasource.hasNext ) {
@@ -393,6 +388,8 @@ class TestFParLDAx(
   dopts.lookahead = 8
   dopts.blockSize = 100000
   dopts.sBlockSize = 4000000
+  dopts.nstart = nstart
+  dopts.nend = nend
   
   def setup = {
     models = new Array[Model](lopts.nthreads)
