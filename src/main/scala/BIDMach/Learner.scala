@@ -203,7 +203,7 @@ case class ParLearnerx(
       println
       for (i <- 0 until opts.nthreads) {setGPU(i); updaters(i).updateM}
       ipass += 1
-      saveAs("/big/twitter/test/results.mat", row(reslist.toList), "results")
+      saveAs("/big/twitter/test/results.mat", row(reslist.toList) on row(samplist.toList), "results")
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
