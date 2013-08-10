@@ -27,9 +27,12 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   
   var firstStep = 0f
   var rm:Mat = null
+  var restart:Mat = null
+  var started:Int = 0
   
   override def init(model0:Model) = {
     super.init(model0)
+    restart = modelmats(0) + 1f
   }
       
   def update(step:Long) = {
@@ -49,6 +52,18 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   	modelmat ~ modelmat * (1-1/rr)
     modelmat ~ modelmat + updatemat 
     modelmat ~ modelmat / sum(modelmat,2)
+    if (opts.warmup > 0) {
+      if (started == 0 && step > opts.warmup) {
+        restart <-- modelmat
+        started = 1
+      }
+      if (started == 1 && step > 2*opts.warmup) {
+        modelmat <-- modelmat - restart
+        max(modelmat, 0f, modelmat)
+        modelmat ~ modelmat / sum(modelmat,2)
+        started = 2
+      }
+    }
   }
   
   override def clear() = {
@@ -156,7 +171,7 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 
 object IncNormUpdater {
   class Options extends Updater.Options {
-    
+    var warmup = 200000000L 
   }
 }
 
