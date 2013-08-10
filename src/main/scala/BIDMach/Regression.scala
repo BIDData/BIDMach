@@ -4,43 +4,42 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-
-/*
-abstract class RegressionModel(opts:RegressionModel.Options) 
-  extends Model {
+abstract class RegressionModel(override val opts:RegressionModel.Options) extends Model {
   
-  val options = opts   
-  var lls:Mat = null
-
-  override def initmodel:Unit = {
-    modelmats = new Array[Mat](1)
-    modelmats(0) = if (opts.useGPU) GMat(opts.nrows, opts.nmodels) else FMat(opts.nrows, opts.nmodels)
-    lls = if (opts.useGPU) gzeros(opts.nmodels, 1) else zeros(opts.nmodels, 1)
-  }
-  
-  def derivfn(sdata:Mat, targ:Mat, lls:Mat):Mat 
-  
-  def llfun(sdata:Mat, targ:Mat):Mat
-  
-  override def doblock(datamats:Array[Mat]):Unit = {
-    val sdata = datamats(0)
-    val target = datamats(1)
-    val mupdate = updatemats(0)
+  override def init(datasource:DataSource) = {
+    super.init(datasource)
+    val data0 = mats(0)
+    val m = size(data0, 1)
+    val d = opts.targets.nrows
+    val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
+    val sp = sdat / sum(sdat)
+    println("initial perplexity=%f" format (sp ddot ln(sp)) )
     
-    val dd = derivfn(sdata, target, lls)    
-    mupdate ~ mupdate + dd *^ sdata
+    val rmat = rand(d,m) 
+    rmat ~ rmat *@ sdat
+    val msum = sum(rmat, 2)
+    rmat ~ rmat / msum
+    val modelmat = opts.targets on rmat
+    modelmats = Array[Mat](1)
+    modelmats(0) = if (opts.useGPU) GMat(modelmat) else modelmat    
+  } 
+  
+  def mupdate(data:Mat):FMat
+  
+  def doblock(gmats:Array[Mat], i:Long) = {
+    val sdata = gmats(0)
+    mupdate(sdata)
   }
   
-  def evalfun(datamats:Array[Mat]):Mat = {
-    val sdata = datamats(0)
-    val target = datamats(1)
-    llfun(sdata, target)
+  def evalblock(mats:Array[Mat]):FMat = {
+    val sdata = gmats(0)
+    mupdate(sdata)
   }
- 
 }
-*/
+
 object RegressionModel {
   class Options extends Model.Options {
+    var targets:FMat = null
     var nrows = 0
     var nmodels = 0
     var transpose:Boolean = false

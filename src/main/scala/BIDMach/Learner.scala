@@ -181,7 +181,7 @@ case class ParLearnerx(
         		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
         		Actor.actor {
         			setGPU(ithread) 
-        			if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasource.hasNext ) {
+        			if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
         				val scores = models(ithread).evalblockg(cmats(ithread))
         				print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
         				reslist.append(scores(0))
@@ -203,6 +203,7 @@ case class ParLearnerx(
       println
       for (i <- 0 until opts.nthreads) {setGPU(i); updaters(i).updateM}
       ipass += 1
+      saveAs("/big/twitter/test/results.mat", row(reslist.toList), "results")
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))

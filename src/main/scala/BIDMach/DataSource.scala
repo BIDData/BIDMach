@@ -397,8 +397,8 @@ object SFilesDataSource {
   	sampleFiles = 1.0f
     nstart = FilesDataSource.encodeDate(2011,11,22,0)
     nend = FilesDataSource.encodeDate(2013,6,31,0)
-    blockSize = 50000
-    var sBlockSize = 2000000
+    blockSize = 100000
+    var sBlockSize = 4000000
   }
   
   val singleOpts = new Options {
