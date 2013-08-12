@@ -1,26 +1,56 @@
 package BIDMach
-import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,GMat,GIMat,GSMat,HMat,IMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-abstract class Model {
+abstract class Model(val opts:Model.Options = new Model.Options) {
   
-  val options:Model.Options
+  var modelmats:Array[Mat] = null
   
-  var modelmat = blank
+  var updatemats:Array[Mat] = null
   
-  var updatemat = blank
+  var mats:Array[Mat] = null
   
-  def initmodel(data:Mat, target:Mat, datatest:Mat, testtarg:Mat):(Mat, Mat)
+  var gmats:Array[Mat] = null
   
-  def gradfun(data:Mat, target:Mat):Unit
+  def init(datasource:DataSource):Unit = {
+	  mats = datasource.next
+	  datasource.reset
+	  if (opts.useGPU) {
+	    gmats = new Array[Mat](mats.length)
+	    for (i <- 0 until mats.length) {
+	      gmats(i) = mats(i) match {
+	        case aa:FMat => GMat(aa)
+	        case aa:SMat => GSMat(aa)
+	      }
+	    }
+	  } else {
+	    gmats = mats
+	  }
+  }
   
-  def eval(data:Mat, target:Mat):(Double, Double)
+  def doblock(mats:Array[Mat], i:Long)                                       // Calculate an update for the updater
   
-  def make(opts:Model.Options):Model
+  def evalblock(mats:Array[Mat]):FMat                                        // Scores (log likelihoods)
   
-  var nusers = 0
+  def doblockg(amats:Array[Mat], i:Long) = {
+    if (opts.useGPU) copyMats(amats, gmats)            		
+    doblock(gmats, i)
+    if (opts.useGPU && opts.putBack >= 0) amats(opts.putBack) <-- gmats(opts.putBack)
+  }
+  
+  def evalblockg(amats:Array[Mat]):FMat = {
+	  if (opts.useGPU) copyMats(amats, gmats)
+	  val v = evalblock(gmats)
+	  if (opts.useGPU && opts.putBack >= 0) amats(opts.putBack) <-- gmats(opts.putBack)
+	  v
+  }
 
+  def copyMats(from:Array[Mat], to:Array[Mat]) = {
+	  for (i <- 0 until from.length) {
+		  to(i) = to(i) <-- from(i)
+	  }
+}
 }
 
 
@@ -29,42 +59,6 @@ object Model {
 	  var nzPerColumn:Int = 0
 	  var startBlock = 8000
 	  var useGPU = false
-  }
-	
-  def checkSize(a:Mat, nr:Int, nc:Int, b:Mat):Mat = {
-    if (a.asInstanceOf[AnyRef] != null && a.nrows == nr && a.ncols == nc) {
-      a
-    } else {
-      b.zeros(nr, nc)
-    }
-  }
-  
-  def checkSize(a:Mat, b:Mat):Mat = checkSize(a, b.nrows, b.ncols, b)
-  
-  def fsqrt(v:Float):Float = math.sqrt(v).asInstanceOf[Float]
-  
-  def mapfun2x2(fn:(Float, Float)=>(Float, Float), in0:FMat, in1:FMat, out0:FMat, out1:FMat) = {
-    if (in0.nrows != in1.nrows || in0.nrows != out0.nrows || in0.nrows != out1.nrows ||
-        in0.ncols != in1.ncols || in0.ncols != out0.ncols || in0.ncols != out1.ncols) {
-      throw new RuntimeException("dimensions mismatch")
-    }
-    var i = 0
-    while (i < in0.length) {
-      val (v1, v2) = fn(in0.data(i), in1.data(i))
-      out0.data(i) = v1
-      out1.data(i) = v2
-      i += 1
-    }
-  }
-  def mapfun2x1(fn:(Float, Float)=>Float, in0:FMat, in1:FMat, out0:FMat) = {
-    if (in0.nrows != in1.nrows || in0.nrows != out0.nrows ||
-        in0.ncols != in1.ncols || in0.ncols != out0.ncols) {
-      throw new RuntimeException("dimensions mismatch")
-    }
-    var i = 0
-    while (i < in0.length) {
-      out0.data(i) = fn(in0.data(i), in1.data(i))
-      i += 1
-    }
+	  var putBack = -1
   }
 }

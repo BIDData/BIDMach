@@ -3,209 +3,433 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
-import Learner._
 import scala.collection.immutable.List
+import scala.collection.mutable.ListBuffer
+import scala.actors.Actor
 
-case class Learner(datamat0:Mat, targetmat0:Mat, datatest0:Mat, targtest0:Mat, 
-		model:Model, regularizer:Regularizer, updater:Updater, val opts:Learner.Options = new Learner.Options) {
-
-  val n = datamat0.ncols
-  val options = opts
-  var tscores:List[Double] = List()
-  var tscorex:List[Double] = List()
-  var tsteps:List[Double] = List()
-  var targetmat:Mat = null
-
+case class Learner(
+    val datasource:DataSource, 
+    val model:Model, 
+    val regularizer:Regularizer, 
+    val updater:Updater, 
+		val opts:Learner.Options = new Learner.Options) {
+  var results:FMat = null
+  
   def run() = {
+    flip 
+    var done = false
+    var ipass = 0
+    var here = 0L
+    val reslist = new ListBuffer[Float]
+    val samplist = new ListBuffer[Float]
+    while (ipass < opts.npasses && ! done) {
+      datasource.reset
+      updater.clear
+      var istep = 0
+      println("i=%2d" format ipass)
+      while (datasource.hasNext) {
+        val mats = datasource.next
+        here += datasource.opts.blockSize
+        if ((istep + 1) % opts.evalStep == 0 || ! datasource.hasNext) {
+        	val scores = model.evalblockg(mats)
+        	print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" mem=%f" format GPUmem._1)
+        	reslist.append(scores(0))
+        	samplist.append(here)
+        } else {
+        	model.doblockg(mats, here)
+        	if (regularizer != null) regularizer.compute(here)
+        	updater.update(here)
+        	print(".")
+        }   
+        if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
+        istep += 1
+      }
+      updater.updateM
+      ipass += 1
+    }
+    val gf = gflop
+    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    results = row(reslist.toList) on row(samplist.toList)
+  }
+}
 
-  	var done:Boolean = false
-  	var ipass = 0
-  	var llest = 0.0
-  	var llder = 0.0
-  	var llold = 0.0
-  	var tsecs:Double = options.secprint
-  	var nsteps:Long = 0
-  	val (targetm, targettest) = model.initmodel(datamat0, targetmat0, datatest0, targtest0)
-  	targetmat = targetm
-  	updater.initupdater(model)
-  	if (regularizer != null) regularizer.initregularizer
-  	var blocksize = options.blocksize
-  	tic
-  	while (ipass < options.npasses && ! done) {
-  		ipass += 1
-//  		if (ipass > 2) blocksize = size(datamat0, 2) //math.min(size(datamat0, 2), 2*blocksize)
-  		var i = 0
-  		val nw = math.round(options.memwindow/blocksize).asInstanceOf[Double]
-  		val nww = options.convwindow/blocksize
-  		while (i < n && ! done) {
-  			var iend = math.min(n, i+blocksize)
-  			nsteps += iend - i
-  			var dslice = datamat0(?, i->iend)
-  			var tslice = targetmat(?, i->iend)
-  			val nmodel = model.asInstanceOf[FactorModel]
- // 	    val (v0,x0) = model.eval(dslice, tslice)
-  			model.gradfun(dslice, tslice)
-  			val (tll, tllx) = model.eval(dslice, tslice)
-  			targetmat(?, i->iend) = tslice
-  			if (regularizer != null) regularizer.compute(1.0f*(iend-i)/n)
-//  			val (v1,x1) = model.eval(dslice, tslice) 			
-  			updater.update(iend-i)
-//  			val (v2,x2) = model.eval(dslice, tslice)
-//  			println("i=%d, delta = %f, %f, %f, %f" format (i, tll, v0, v1, v2))
+case class ParLearner(
+    val datasources:Array[DataSource], 
+    val models:Array[Model], 
+    val regularizers:Array[Regularizer], 
+    val updaters:Array[Updater], 
+		val opts:Learner.Options = new Learner.Options) {
+  
+  var um:FMat = null
+  var mm:FMat = null
+  var results:FMat = null
+  
+  def run() = {
+    flip 
+    val mm0 = models(0).modelmats(0)
+    mm = zeros(mm0.nrows, mm0.ncols)
+    um = zeros(mm0.nrows, mm0.ncols)
+    
+    val done = izeros(opts.nthreads, 1)
+    var ipass = 0
+    var here = 0L
+    val reslist = new ListBuffer[Float]
+    val samplist = new ListBuffer[Float]
+    while (ipass < opts.npasses) {     
+      for (i <- 0 until opts.nthreads) {
+        setGPU(i)
+      	datasources(i).reset
+        updaters(i).clear
+      }
+      var istep = 0
+      println("i=%2d" format ipass)
+      while (datasources(0).hasNext) {
+      	here += datasources(0).opts.blockSize
+      	done.clear
+        for (ithread <- 0 until opts.nthreads) {
+        	Actor.actor {
+        		setGPU(ithread) 
+        		if (datasources(ithread).hasNext) {
+        			val mats = datasources(ithread).next
+        	  	if ((istep + ithread + 1) % opts.evalStep == 0 || ithread == 0 && !datasources(0).hasNext ) {
+        	  		val scores = models(ithread).evalblockg(mats)
+        	  		print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
+        	  		reslist.append(scores(0))
+        	  		samplist.append(here)
+        	  	} else {
+        	  		models(ithread).doblockg(mats, here)
+        	  		if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+        	  		updaters(ithread).update(here)
+        	  		print(".")
+        	  	}
+        			if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
+        		}
+        		done(ithread) = 1   
+        	}
+        }
+      	while (mini(done).v == 0) Thread.sleep(1)
+      	istep += opts.nthreads
+      	if (istep % opts.updateStep == 0) syncmodels(models)
+      }
+      println
+      for (i <- 0 until opts.nthreads) {setGPU(i); updaters(i).updateM}
+      ipass += 1
+    }
+    val gf = gflop
+    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    results = row(reslist.toList) on row(samplist.toList)
+  }
+     
+  def syncmodels(models:Array[Model]) = {
+	  mm.clear
+	  for (i <- 0 until models.length) {
+	  	setGPU(i)
+	  	um <-- models(i).modelmats(0)
+	  	mm ~ mm + um
+	  }
+	  mm ~ mm * (1f/models.length)
+	  for (i <- 0 until models.length) {
+	  	setGPU(i)
+	  	models(i).modelmats(0) <-- mm
+	  }
+	  setGPU(0)
+  }
+}
 
-  			llest = (1/(nw+1))*(tll + nw*llest)
-  			llder = (1/(nww+1))*(tll-llold + nww*llder)
-  			llold = tll
-  			i += blocksize
-  			if (llder > 0 && llder < options.convslope) {
-  				done = true
-  			}
-  			if (toc >= tsecs || done || (i >= n)) {
-  			  val tmp = model.asInstanceOf[FactorModel].options.uiter
-  			  model.asInstanceOf[FactorModel].options.uiter = 10
-  			  model.gradfun(datatest0, targettest)
-  			  val (llx, llxa) = model.eval(datatest0, targettest)
-  			  model.asInstanceOf[FactorModel].options.uiter = tmp
-  				println("pass=%d, n=%dk t=%3.1f secs, ll=%5.4f, llx=%5.4f(u%5.4f)" format (ipass, nsteps/1000, toc, llest, llx, llxa))
-//  				println("normu=%f, normm=%f, block=%d" format (norm(targetmat), norm(model.modelmat), blocksize))
-  				tscores = tscores :+ -llest
-  				tscorex = tscorex :+ -llx
-  				tsteps = tsteps :+ nsteps.asInstanceOf[Double]
-  			  tsecs += options.secprint
-  			}
-  		}
-  	}
+
+case class ParLearnerx(
+    val datasource:DataSource, 
+    val models:Array[Model], 
+    val regularizers:Array[Regularizer], 
+    val updaters:Array[Updater], 
+		val opts:Learner.Options = new Learner.Options) {
+  
+  var um:FMat = null
+  var mm:FMat = null
+  var results:FMat = null
+  var cmats:Array[Array[Mat]] = null
+  
+  def run() = {
+    flip 
+    val mm0 = models(0).modelmats(0)
+    mm = zeros(mm0.nrows, mm0.ncols)
+    um = zeros(mm0.nrows, mm0.ncols)
+    cmats = new Array[Array[Mat]](opts.nthreads)
+    for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
+    
+    val done = iones(opts.nthreads, 1)
+    var ipass = 0
+    var here = 0L
+    var feats = 0L
+    val reslist = new ListBuffer[Float]
+    val samplist = new ListBuffer[Float]
+    while (ipass < opts.npasses) {
+    	datasource.reset
+      for (i <- 0 until opts.nthreads) {
+        setGPU(i)
+        updaters(i).clear
+      }
+      var istep = 0
+      println("i=%2d" format ipass)
+      while (datasource.hasNext) {
+        for (ithread <- 0 until opts.nthreads) {
+        	if (datasource.hasNext) {
+        	  done(ithread) = 0
+        		val mats = datasource.next
+        		here += datasource.opts.blockSize
+        		feats += mats(0).nnz
+        		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
+        		Actor.actor {
+        			setGPU(ithread) 
+        			if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
+        				val scores = models(ithread).evalblockg(cmats(ithread))
+        				print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" %d mem=%f" format (getGPU, GPUmem._1))
+        				reslist.append(scores(0))
+        				samplist.append(here)
+        			} else {
+        				models(ithread).doblockg(cmats(ithread), here)
+        				if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+        				updaters(ithread).update(here)
+        				print(".")
+        			}
+        			done(ithread) = 1 
+        		}  
+        	}
+        }
+      	while (mini(done).v == 0) Thread.sleep(1)
+      	istep += opts.nthreads
+      	if (istep % opts.updateStep == 0) syncmodels(models)
+      }
+      println
+      for (i <- 0 until opts.nthreads) {setGPU(i); updaters(i).updateM}
+      ipass += 1
+      saveAs("/big/twitter/test/results.mat", row(reslist.toList) on row(samplist.toList), "results")
+    }
+    val gf = gflop
+    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    results = row(reslist.toList) on row(samplist.toList)
   }
   
-   def runpar() = {
-
-  	val numthreads = options.numGPUthreads
-  	var ipass = 0
-  	var llest = 0.0
-  	var llder = 0.0
-  	var llold = 0.0
-  	var tsecs:Double = options.secprint
-  	var nsteps:Long = 0
-  	val curdevice = 0
-  	setGPU(0)
-  	val (targetm, targettest) = model.initmodel(datamat0, targetmat0, datatest0, targtest0) 
-  	targetmat = targetm
-  	updater.initupdater(model)
-  	val models = new Array[FactorModel](numthreads)
-//  	println("got here 1, device=%d" format curdevice)
-  	val nmodel = model.asInstanceOf[FactorModel]
-  	models(0) = nmodel
-  	for (i <- 1 until numthreads) {
-  	  setGPU(i)
-  	  if (curdevice != i) connect(curdevice)
-  	  models(i) = model.make(model.options).asInstanceOf[FactorModel]
-      models(i).initmodel(datamat0, ones(1,1), datatest0, ones(1,1))
-  	}
-//    println("got here 2")
-  	setGPU(curdevice)
-  	updater.initupdater(model)
-  	if (regularizer != null) regularizer.initregularizer
-  	var blocksize = options.blocksize
-  	tic
-  	while (ipass < options.npasses) {
-  		ipass += 1
-  		var ipos = 0
-  		val nw = math.round(options.memwindow/blocksize).asInstanceOf[Double]
-  		val nww = options.convwindow/blocksize
-  		while (ipos < n) {
-//  			println("got here 3")
-  			val ind = math.min(n, ipos+numthreads*blocksize)
-  			nsteps += ind - ipos
-  			val tlls = zeros(numthreads,1)
-  			val tllxs = zeros(numthreads,1)
-  			val done = zeros(numthreads,1) 
-//  			var ithread = 0
-  			for (ithread <- 0 until numthreads) {
-  			  scala.actors.Actor.actor {
-  			    setGPU(ithread)
-  			    if (ithread == curdevice) models(ithread).modelmat <-- model.modelmat
-  			  	val iloc = ipos + ithread*blocksize
-  			  	var iend = math.min(n, iloc+blocksize)
-  			  	if (iloc < iend) {
-  			  		var dslice = datamat0(?, iloc->iend)
-  			  		var tslice = targetmat(?, iloc->iend)
-  			  		models(ithread).gradfun(dslice, tslice)
-  			  		val (tll, tllx) = models(ithread).eval(dslice, tslice)
-  			  		tlls(ithread) = tll
-  			  		tllxs(ithread) = tllx
-  			  		targetmat(?, iloc->iend) = tslice
-  			  		if (regularizer != null) regularizer.compute(1.0f*(iend-iloc)/n)	
-  			  	}
-  			    done(ithread) = 1
-//  			  	println("done %d" format ithread)
-  			  }
-  			}
-// 			println("got here 5")
-  			while (sum(done).dv < numthreads) {Thread.sleep(10)}
- 			  setGPU(curdevice)
-//  			println("got here 6")
-  			for (ithread <- 1 until numthreads) {
-  				model.updatemat ~ model.updatemat + models(ithread).updatemat
-  				nmodel.updateDenom ~ nmodel.updateDenom + models(ithread).updateDenom
-  			}
- 			  val iend = math.min(n, ipos+4*blocksize)
-  			updater.update(iend-ipos)
-  			llest = (1/(nw+1))*(mean(tlls).dv + nw*llest)
-  			ipos += numthreads*blocksize
-  			if (toc >= tsecs || (ipos >= n)) {
-  			  val tmp = model.asInstanceOf[FactorModel].options.uiter
-  			  model.asInstanceOf[FactorModel].options.uiter = 20
-  			  val (llx, llxa) = model.eval(datatest0, targettest)
-  			  model.asInstanceOf[FactorModel].options.uiter = tmp
-  				println("pass=%d, n=%dk t=%3.1f secs, ll=%5.4f, llx=%5.4f(u%5.4f)" format (ipass, nsteps/1000, toc, llest, llx, llxa))
-//  				println("normu=%f, normm=%f, block=%d" format (norm(targetmat), norm(model.modelmat), blocksize))
-  				tscores = tscores :+ -llest
-  				tscorex = tscorex :+ -llx
-  				tsteps = tsteps :+ nsteps.asInstanceOf[Double]
-  			  tsecs += options.secprint
-  			}
-  		}
-  	}
+  def safeCopy(m:Mat, ithread:Int):Mat = {
+    m match {
+      case ss:SMat => {
+        val out = SMat.newOrCheckSMat(ss.nrows, ss.ncols, ss.nnz, null, m.GUID, ithread, "safeCopy".##)
+        ss.copyTo(out)
+      }
+    }
+  }
+     
+  def syncmodels(models:Array[Model]) = {
+	  mm.clear
+	  for (i <- 0 until models.length) {
+	  	setGPU(i)
+	  	um <-- models(i).modelmats(0)
+	  	mm ~ mm + um
+	  }
+	  mm ~ mm * (1f/models.length)
+	  for (i <- 0 until models.length) {
+	  	setGPU(i)
+	  	models(i).modelmats(0) <-- mm
+	  }
+	  setGPU(0)
   }
 }
 
 
 object Learner {
 	class Options {
-		var blocksize:Int = 8000
-		var npasses:Int = 100
-	  var memwindow:Double = 40000
-		var convwindow:Double = 40000	
-		var convslope:Double = -1e-6
-		var secprint:Double = 1
-		var eps:Float = 1e-8f
-		var numGPUthreads = 1
+		var npasses:Int = 1
+		var evalStep = 15
+		var updateStep = 32
+		var nthreads = 4
+  }
+}
+
+class TestLDA(mat:Mat) {
+  var dd:MatDataSource = null
+  var model:LDAModel = null
+  var updater:Updater = null
+  var lda:Learner = null
+  var lopts = new Learner.Options
+  var mopts = new LDAModel.Options
+  var dopts = new MatDataSource.Options
+  def setup = { 
+    val aa = if (mopts.putBack >= 0) {
+    	val a = new Array[Mat](2); a(1) = ones(mopts.dim, mat.ncols); a
+    } else {
+      new Array[Mat](1)
+    }
+    aa(0) = mat
+    dd = new MatDataSource(aa, dopts)
+    dd.init
+    model = new LDAModel(mopts)
+    model.init(dd)
+    updater = new IncNormUpdater()
+    updater.init(model)
+    lda = new Learner(dd, model, null, updater, lopts)   
   }
   
-  def fsqrt(v:Float):Float = math.sqrt(v).asInstanceOf[Float]
+  def init = {
+    if (dd.omats.length > 1) dd.omats(1) = ones(model.opts.dim, dd.omats(0).ncols)
+    dd.init
+    model.init(dd)
+    updater.init(model)
+  }
   
-  def mapfun2x2(fn:(Float, Float)=>(Float, Float), in0:FMat, in1:FMat, out0:FMat, out1:FMat) = {
-    if (in0.nrows != in1.nrows || in0.nrows != out0.nrows || in0.nrows != out1.nrows ||
-        in0.ncols != in1.ncols || in0.ncols != out0.ncols || in0.ncols != out1.ncols) {
-      throw new RuntimeException("dimensions mismatch")
+  def run = lda.run
+}
+
+
+class TestParLDA(mat:Mat) {
+  var dds:Array[DataSource] = null
+  var models:Array[Model] = null
+  var updaters:Array[Updater] = null
+  var lda:ParLearner = null
+  var lopts = new Learner.Options
+  var mopts = new LDAModel.Options
+  var dopts = new MatDataSource.Options
+  
+  def setup = {
+    dds = new Array[DataSource](lopts.nthreads)
+    models = new Array[Model](lopts.nthreads)
+    updaters = new Array[Updater](lopts.nthreads)
+    for (i <- 0 until lopts.nthreads) {
+      setGPU(i)
+    	val istart = i * mat.ncols / lopts.nthreads
+    	val iend = (i+1) * mat.ncols / lopts.nthreads
+    	val mm = mat(?, istart->iend)
+    	val aa = if (mopts.putBack >= 0) {
+    		val a = new Array[Mat](2); 
+    		a(1) = ones(mopts.dim, mm.ncols); 
+    		a
+    	} else {
+    		new Array[Mat](1)
+    	}
+    	aa(0) = mm
+    	dds(i) = new MatDataSource(aa, dopts)
+    	dds(i).init
+    	models(i) = new LDAModel(mopts)
+    	models(i).init(dds(i))
+    	updaters(i) = new IncNormUpdater()
+    	updaters(i).init(models(i))
     }
-    var i = 0
-    while (i < in0.length) {
-      val (v1, v2) = fn(in0.data(i), in1.data(i))
-      out0.data(i) = v1
-      out1.data(i) = v2
-      i += 1
-    }
+    setGPU(0)
+    lda = new ParLearner(dds, models, null, updaters, lopts)   
   }
-  def mapfun2x1(fn:(Float, Float)=>Float, in0:FMat, in1:FMat, out0:FMat) = {
-    if (in0.nrows != in1.nrows || in0.nrows != out0.nrows ||
-        in0.ncols != in1.ncols || in0.ncols != out0.ncols) {
-      throw new RuntimeException("dimensions mismatch")
-    }
-    var i = 0
-    while (i < in0.length) {
-      out0.data(i) = fn(in0.data(i), in1.data(i))
-      i += 1
-    }
+  
+  def init = {
+  	for (i <- 0 until lopts.nthreads) {
+  	  setGPU(i)
+  		if (dds(i).omats.length > 1) dds(i).omats(1) = ones(mopts.dim, dds(i).omats(0).ncols)
+  		dds(i).init
+  		models(i).init(dds(i))
+  		updaters(i).init(models(i))
+  	}
+  	setGPU(0)
   }
+  
+  def run = lda.run
+}
+
+class TestFParLDA(
+    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
+		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)
+		) {
+  var dds:Array[DataSource] = null
+  var models:Array[Model] = null
+  var updaters:Array[Updater] = null
+  var lda:ParLearner = null
+  var lopts = new Learner.Options
+  var mopts = new LDAModel.Options
+  mopts.uiter = 8
+  
+  def setup = {
+    dds = new Array[DataSource](lopts.nthreads)
+    models = new Array[Model](lopts.nthreads)
+    updaters = new Array[Updater](lopts.nthreads)
+    for (i <- 0 until lopts.nthreads) {
+      setGPU(i)
+    	val istart = nstart + i * (nend - nstart) / lopts.nthreads
+    	val iend = nstart + (i+1) * (nend - nstart) / lopts.nthreads
+    	val dopts = new SFilesDataSource.Options
+    	dopts.fcounts = icol(50000)
+    	dopts.nstart = istart
+    	dopts.nend = iend
+    	dopts.lookahead = 3
+    	dopts.blockSize = 100000
+    	dopts.sBlockSize = 4000000
+    	dds(i) = new SFilesDataSource(dopts)
+    	dds(i).init
+    	models(i) = new LDAModel(mopts)
+    	models(i).init(dds(i))
+    	updaters(i) = new IncNormUpdater()
+    	updaters(i).init(models(i))
+    }
+    setGPU(0)
+    lda = new ParLearner(dds, models, null, updaters, lopts)   
+  }
+  
+  def init = {
+  	for (i <- 0 until lopts.nthreads) {
+  	  setGPU(i)
+  		if (dds(i).omats.length > 1) dds(i).omats(1) = ones(mopts.dim, dds(i).omats(0).ncols)
+  		dds(i).init
+  		models(i).init(dds(i))
+  		updaters(i).init(models(i))
+  	}
+  	setGPU(0)
+  }
+  
+  def run = lda.run
+}
+
+
+class TestFParLDAx(
+    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
+		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)
+		) {
+  var dd:DataSource = null
+  var models:Array[Model] = null
+  var updaters:Array[Updater] = null
+  var lda:ParLearnerx = null
+  var lopts = new Learner.Options
+  var mopts = new LDAModel.Options
+  var dopts = new SFilesDataSource.Options
+  mopts.uiter = 8
+  dopts.fcounts = icol(50000)
+  dopts.lookahead = 8
+  dopts.blockSize = 100000
+  dopts.sBlockSize = 4000000
+  dopts.nstart = nstart
+  dopts.nend = nend
+  
+  def setup = {
+    models = new Array[Model](lopts.nthreads)
+    updaters = new Array[Updater](lopts.nthreads)
+    dd = new SFilesDataSource(dopts)
+    dd.init
+    for (i <- 0 until lopts.nthreads) {
+      setGPU(i)
+    	models(i) = new LDAModel(mopts)
+    	models(i).init(dd)
+    	updaters(i) = new IncNormUpdater()
+    	updaters(i).init(models(i))
+    }
+    setGPU(0)
+    lda = new ParLearnerx(dd, models, null, updaters, lopts)   
+  }
+  
+  def init = {
+	  dd.omats(1) = ones(mopts.dim, dd.omats(0).ncols)
+  	for (i <- 0 until lopts.nthreads) {
+  	  setGPU(i)
+  		if (dd.omats.length > 1) 
+  		dd.init
+  		models(i).init(dd)
+  		updaters(i).init(models(i))
+  	}
+  	setGPU(0)
+  }
+  
+  def run = lda.run
 }
