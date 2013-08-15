@@ -153,7 +153,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   }
   
   def progress = {
-    fileno*1f / totalSize
+    (fileno-nstart)*1f / totalSize
   }
   
   def nmats = omats.length

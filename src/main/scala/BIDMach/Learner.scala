@@ -107,12 +107,14 @@ case class ParLearner(
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
 	  					lastp += opts.pstep
 	  					val gf = gflop
-	  					print("%4.2f%%, ll=%5.3f, gf=%5.3f, MB/s=%5.2f, GB=%4.2f" format (
-	  					    100f*lastp, 
-	  					    mean(row(reslist.slice(lasti, reslist.length).toList)).dv, 
-	  					    gf._1, 
-	  					    bytes/gf._2*1e-6,
-	  					    bytes*1e-9))     				 
+	  					if (reslist.length > lasti) {
+	  						print("%4.2f%%, ll=%5.3f, gf=%5.3f, MB/s=%5.2f, GB=%4.2f" format (
+	  								100f*lastp, 
+	  								mean(row(reslist.slice(lasti, reslist.length).toList)).dv, 
+	  								gf._1, 
+	  								bytes/gf._2*1e-6,
+	  								bytes*1e-9))     	
+	  					}
 	  					lasti = reslist.length
 	  				}
 	  			}
