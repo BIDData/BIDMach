@@ -382,7 +382,7 @@ object FilesDataSource {
     var nstart:Int = encodeDate(2011,11,22,0)
     var nend:Int = encodeDate(2013,6,31,0)
     var dorows:Boolean = true
-    var order:Int = 0                           // 0 = sequential order, 1 = random
+    var order:Int = 1                           // 0 = sequential order, 1 = random
   }
 }
 
@@ -405,6 +405,44 @@ object SFilesDataSource {
     override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
     fcounts = icol(100000)
   }
+  
+  
+  def testSources(typ:String="lz4") = { 
+    val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+    val nstart0 = FilesDataSource.encodeDate(2011,11,22,0)
+    val nend0 = FilesDataSource.encodeDate(2013,7,1,0)
+    var bytes = 0L
+    var done = 0L
+    var step = 10000000000L
+    tic
+    val nthreads = 8
+    for (i <- 0 until nthreads) { 
+      scala.actors.Actor.actor { 
+      val opts = new SFilesDataSource.Options { 
+        override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d."+typ))
+        fcounts = icol(1000000)
+        nstart = nstart0 + i * (nend0 - nstart0) / nthreads
+        nend = nstart0 + (i+1) * (nend0 - nstart0) / nthreads
+        order = 1
+        blockSize = 100000
+        sBlockSize = 2000000
+        lookahead = 3
+      }
+      val ss = new SFilesDataSource(opts)
+      ss.init
+      while (ss.hasNext) { 
+        val a = ss.next
+        bytes += 12L*a(0).nnz
+        if (bytes > done + step) { 
+          done += step
+          val t=toc
+          println("GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
+        }
+      }
+    }
+    }
+  }
+
 }
 
 object MatDataSource {
