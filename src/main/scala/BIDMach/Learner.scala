@@ -94,31 +94,32 @@ case class ParLearner(
 	  				for (j <- 0 until mats.length) bytes += 12L * mats(j).nnz
 	  				istep += 1
 	  				if (istep % opts.evalStep == 0) {
-	  					val scores = models(ithread).evalblockg(mats)
+	  					val scores = models(ithread).synchronized {models(ithread).evalblockg(mats)}
 	  					reslist.append(scores(0))
 	  					samplist.append(here)
 	  				} else {
-	  					models(ithread).doblockg(mats, here)
+	  					models(ithread).synchronized {models(ithread).doblockg(mats, here)}
 	  					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
-	  					updaters(ithread).update(here)
+	  					models(ithread).synchronized {updaters(ithread).update(here)}
 	  				}
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
-	  				if (istep % opts.syncStep == 0) syncmodel(models, ithread)
+	  				if (istep % opts.syncStep == 0) syncmodels(models)
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
 	  					lastp += opts.pstep
 	  					val gf = gflop
 	  					if (reslist.length > lasti) {
-	  						println("%4.2f%%, ll=%5.3f, gf=%5.3f, MB/s=%5.2f, GB=%4.2f" format (
+	  						println("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
 	  								100f*lastp, 
-	  								mean(row(reslist.slice(lasti, reslist.length).toList)).dv, 
-	  								gf._1, 
-	  								bytes/gf._2*1e-6,
-	  								bytes*1e-9))     	
+	  								mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
+	  								gf._1,
+	  								gf._2, 
+	  								bytes*1e-9,
+	  								bytes/gf._2*1e-6))     	
 	  					}
 	  					lasti = reslist.length
 	  				}
 	  			}
-	  			updaters(ithread).updateM
+	  			models(ithread).synchronized {updaters(ithread).updateM}
 	  			done(ithread) = ipass + 1
 	  			while (done(ithread) > ipass) Thread.sleep(1)
 	  		}
@@ -138,13 +139,17 @@ case class ParLearner(
 	  mm.clear
 	  for (i <- 0 until models.length) {
 	  	if (i < Mat.hasCUDA) setGPU(i)
-	  	um <-- models(i).modelmats(0)
+	  	models(i).synchronized {
+	  		um <-- models(i).modelmats(0)
+	  	}
 	  	mm ~ mm + um
 	  }
 	  mm ~ mm * (1f/models.length)
 	  for (i <- 0 until models.length) {
 	  	if (i < Mat.hasCUDA) setGPU(i)
-	  	models(i).modelmats(0) <-- mm
+	  	models(i).synchronized {
+	  		models(i).modelmats(0) <-- mm
+	  	}
 	  }
 	  if (0 < Mat.hasCUDA) setGPU(0)
   }
