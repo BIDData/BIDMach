@@ -12,6 +12,7 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def putBack(mats:Array[Mat],i:Int)
   def nmats:Int
   def init:Unit
+  def progress:Float
   var omats:Array[Mat] = null
 }
 
@@ -20,12 +21,14 @@ class MatDataSource(mats:Array[Mat], override val opts:MatDataSource.Options = n
   var here = 0
   var there = 0
   var blockSize = 0
+  var totalSize = 0
   omats = null
   
   def init = {
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
     here = -blockSize
+    totalSize = mats(0).ncols
     omats = new Array[Mat](mats.length)
     for (i <- 0 until mats.length) {
       omats(i) = mats(i) match {
@@ -58,6 +61,10 @@ class MatDataSource(mats:Array[Mat], override val opts:MatDataSource.Options = n
   def putBack(tmats:Array[Mat],i:Int) = {
     tmats(i).colslice(0, tmats(i).ncols, mats(i), here)
   }
+  
+  def progress = {
+    math.min((here+blockSize)*1f/totalSize, 1f)
+  }
 
 }
 
@@ -73,6 +80,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   var ready:IMat = null
   var stop:Boolean = false
   var permfn:(Int)=>Int = null
+  var totalSize = 0
   
   def softperm(nstart:Int, nend:Int) = {
     val dd1 = nstart / 24
@@ -108,6 +116,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     }    
     fileno = nstart                                                            // Number of the current output file
     rowno = 0                                                                  // row number in the current output file
+    totalSize = opts.nend - nstart
     matqueue = new Array[Array[Mat]](opts.lookahead)                           // Queue of matrices for each output matrix
     ready = -iones(opts.lookahead, 1)                                          // Numbers of files currently loaded in queue
     for (i <- 0 until opts.lookahead) {
@@ -141,6 +150,10 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
       	omats(i) = mm.zeros(mm.nrows, blockSize)
       }
     } 
+  }
+  
+  def progress = {
+    fileno*1f / totalSize
   }
   
   def nmats = omats.length
