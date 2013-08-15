@@ -206,7 +206,7 @@ case class ParLearnerx(
       saveAs("/big/twitter/test/results.mat", row(reslist.toList) on row(samplist.toList), "results")
     }
     val gf = gflop
-    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    println("Time=%5.4f secs, gflops=%4.2f, samples=%d, feats=%d" format (gf._2, gf._1, here, feats))
     results = row(reslist.toList) on row(samplist.toList)
   }
   
