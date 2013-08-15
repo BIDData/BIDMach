@@ -271,7 +271,7 @@ object Learner {
 		var evalStep = 15
 		var syncStep = 32
 		var nthreads = 4
-		var pstep = 0.001f
+		var pstep = 0.01f
   }
 }
 
@@ -382,8 +382,11 @@ class TestFParLDA(
       if (i < Mat.hasCUDA) setGPU(i)
     	val istart = nstart + i * (nend - nstart) / lopts.nthreads
     	val iend = nstart + (i+1) * (nend - nstart) / lopts.nthreads
-    	val dopts = new SFilesDataSource.Options
-    	dopts.fcounts = icol(50000)
+    	val dopts = new SFilesDataSource.Options {
+      	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+        override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
+      }
+    	dopts.fcounts = icol(100000)
     	dopts.nstart = istart
     	dopts.nend = iend
     	dopts.lookahead = 3
