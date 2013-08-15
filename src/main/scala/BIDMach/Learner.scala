@@ -70,7 +70,7 @@ case class ParLearner(
 	  mm = zeros(mm0.nrows, mm0.ncols)
 	  um = zeros(mm0.nrows, mm0.ncols)
 
-	  val done = izeros(opts.nthreads, 1)
+	  @volatile var done = izeros(opts.nthreads, 1)
 	  var ipass = 0
 	  var here = 0L
 	  var bytes = 0L
@@ -324,6 +324,7 @@ class TestParLDA(mat:Mat) {
   var lopts = new Learner.Options
   var mopts = new LDAModel.Options
   var dopts = new MatDataSource.Options
+  var uopts = new IncNormUpdater.Options
   
   def setup = {
     dds = new Array[DataSource](lopts.nthreads)
@@ -346,7 +347,7 @@ class TestParLDA(mat:Mat) {
     	dds(i).init
     	models(i) = new LDAModel(mopts)
     	models(i).init(dds(i))
-    	updaters(i) = new IncNormUpdater()
+    	updaters(i) = new IncNormUpdater(uopts)
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
@@ -377,6 +378,7 @@ class TestFParLDA(
   var lda:ParLearner = null
   var lopts = new Learner.Options
   var mopts = new LDAModel.Options
+  var uopts = new IncNormUpdater.Options
   mopts.uiter = 8
   
   def setup = {
@@ -401,7 +403,7 @@ class TestFParLDA(
     	dds(i).init
     	models(i) = new LDAModel(mopts)
     	models(i).init(dds(i))
-    	updaters(i) = new IncNormUpdater()
+    	updaters(i) = new IncNormUpdater(uopts)
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
@@ -434,6 +436,7 @@ class TestFParLDAx(
   var lopts = new Learner.Options
   var mopts = new LDAModel.Options
   var dopts = new SFilesDataSource.Options
+  var uopts = new IncNormUpdater.Options
   mopts.uiter = 8
   dopts.fcounts = icol(50000)
   dopts.lookahead = 8
@@ -451,7 +454,7 @@ class TestFParLDAx(
       if (i < Mat.hasCUDA) setGPU(i)
     	models(i) = new LDAModel(mopts)
     	models(i).init(dd)
-    	updaters(i) = new IncNormUpdater()
+    	updaters(i) = new IncNormUpdater(uopts)
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
