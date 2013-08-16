@@ -552,6 +552,36 @@ object SFilesDataSource {
     }
     }
   }
+  
+   
+  def testBlender = { 
+    val nstart0 = FilesDataSource.encodeDate(2011,11,22,0)
+    val nend0 = FilesDataSource.encodeDate(2013,7,1,0) 
+    val opts1 = new SFilesDataSource.Options { 
+    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
+    	fcounts = icol(1000000)
+    	nstart = nstart0 
+    	nend = nend0 
+    	order = 1
+    	blockSize = 100000
+    	sBlockSize = 2000000
+    	lookahead = 3
+    }
+    val ds1 = new SFilesDataSource(opts1)
+    val opts2 = new SFilesDataSource.Options { 
+    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
+    	fcounts = icol(1000000)
+    	nstart = nstart0 
+    	nend = nend0 
+    	order = 1
+    	blockSize = 100000
+    	sBlockSize = 2000000
+    	lookahead = 3
+    }
+    val opts3 = new DataSource.Options
+    val ds2 = new SFilesDataSource(opts2)
+    val ds3 = new BlendedDataSource(ds1, ds2, 0.1f, opts3)
+  }
 
 }
 
