@@ -165,7 +165,7 @@ case class ParLearner(
 	  	um ~ um * (1f/opts.nthreads)
 	  	mm ~ mm * (1 - 1f/opts.nthreads)
 	  	mm ~ mm + um
-	  	models(ithread).modelmats(0) <-- um
+	  	models(ithread).modelmats(0) <-- mm
 	  }
   }
 }
