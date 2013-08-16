@@ -100,12 +100,14 @@ case class ParLearner(
 	  					reslist.append(scores(0))
 	  					samplist.append(here)
 	  				} else {
-	  					models(ithread).synchronized {models(ithread).doblockg(mats, here)}
-	  					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
-	  					models(ithread).synchronized {updaters(ithread).update(here)}
+	  					models(ithread).synchronized {
+	  					  models(ithread).doblockg(mats, here)
+	  					  if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+	  					  updaters(ithread).update(here)
+	  					  }
 	  				}
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
-	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
+//	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
 	  					lastp += opts.pstep
 	  					val gf = gflop
@@ -130,7 +132,7 @@ case class ParLearner(
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		while (istep0 < ilast0 + opts.syncStep) Thread.sleep(1)
-//	  		syncmodels(models)
+	  		syncmodels(models)
 	  		ilast0 += opts.syncStep
 	  	}
 	  	ipass += 1
