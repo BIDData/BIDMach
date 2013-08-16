@@ -9,7 +9,7 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def next:Array[Mat]  
   def hasNext:Boolean
   def reset:Unit
-  def putBack(mats:Array[Mat],i:Int)
+  def putBack(mats:Array[Mat],i:Int):Unit = {throw new RuntimeException("putBack not implemented")}
   def nmats:Int
   def init:Unit
   def progress:Float
@@ -58,7 +58,7 @@ class MatDataSource(mats:Array[Mat], override val opts:MatDataSource.Options = n
     here + blockSize < mats(0).ncols
   }
   
-  def putBack(tmats:Array[Mat],i:Int) = {
+  override def putBack(tmats:Array[Mat],i:Int):Unit = {
     tmats(i).colslice(0, tmats(i).ncols, mats(i), here)
   }
   
@@ -227,8 +227,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
   def hasNext:Boolean = {
     (fileno < opts.nend)
   }
-  
-  def putBack(mats:Array[Mat],i:Int) = {}
+
 }
 
 class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDataSource.Options) extends FilesDataSource(opts) {
@@ -359,6 +358,104 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
       fillup(omats(0), todo)
     }
     omats
+  }
+
+}
+
+class BlendedDataSource(s1:DataSource, s2:DataSource, alpha:Float, override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) {
+  var sizeMargin = 0f 
+  var here = 0L
+  var there = 0
+  var iptr1 = 0
+  var iptr2 = 0
+  var blockSize = 0
+  var totalSize = 0
+  var randv:FMat = null
+  var mats1:Array[Mat] = null
+  var mats2:Array[Mat] = null
+  omats = null
+  
+  def init = {
+    sizeMargin = opts.sizeMargin
+    blockSize = opts.blockSize
+    randv = zeros(1, blockSize)
+    here = -blockSize
+    s1.init
+    s2.init
+    mats1 = s1.next
+    mats2 = s2.next
+    totalSize = mats1(0).ncols
+    omats = new Array[Mat](mats1.length)
+    for (i <- 0 until mats1.length) {
+      omats(i) = mats1(i) match {
+        case mm:SMat => SMat(mats1(i).nrows, blockSize, (mats1(i).nnz * sizeMargin).toInt)
+        case mm:SDMat => SDMat(mats1(i).nrows, blockSize, (mats1(i).nnz * sizeMargin).toInt)
+        case _ => mats1(i).zeros(mats1(i).nrows, blockSize)
+      }      
+    }    
+  }
+  
+  def nmats = omats.length
+  
+  def reset = {
+    s1.reset
+    s2.reset
+    here = -blockSize
+  }
+  
+  def next:Array[Mat] = {
+    rand(1, blockSize, randv)
+    var i = 0
+    while (i < blockSize && hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)) {
+      if (randv.data(i) < alpha) {
+        if (iptr1 >= mats1(0).ncols) {
+          mats1 = s1.next
+          iptr1 = 0
+        }
+        copycol(mats1, iptr1, omats, i)
+        iptr1 += 1
+      } else {
+      	if (iptr2 >= mats2(0).ncols) {
+          mats2 = s2.next
+          iptr2 = 0
+        }
+        copycol(mats2, iptr2, omats, i)
+        iptr2 += 1
+      }
+      i += 1
+    }
+    here += i
+    if (i == blockSize) {
+      omats
+    } else {
+      shrinkmats(omats, i)
+    }
+  }
+  
+  def hascol(mats:Array[Mat], iptr:Int, ss:DataSource):Boolean = {
+    (iptr < mats(0).ncols) || ss.hasNext
+  }
+    
+  def hasNext:Boolean = {
+    hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)
+  }
+  
+  def copycol(inmats:Array[Mat], iptr:Int, omats:Array[Mat], here:Int) = {
+    for (imat <- 0 until inmats.length) {
+      inmats(imat).colslice(iptr, iptr+1, omats(imat), here)
+    }
+  }
+  
+  def shrinkmats(xmats:Array[Mat], n:Int) = {
+    val outarr = new Array[Mat](omats.length)
+    for (imat <- 0 until omats.length) {
+      outarr(imat) = xmats(imat).colslice(0, n, null)
+    }
+    outarr
+  }
+    
+  def progress = {
+    math.max(s1.progress, s2.progress)
   }
 
 }
