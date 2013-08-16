@@ -104,8 +104,9 @@ case class ParLearner(
 	  					  models(ithread).doblockg(mats, here)
 	  					  if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
 	  					  updaters(ithread).update(here)
-	  					  }
+	  					}
 	  				}
+	  				Thread.sleep(opts.coolit)
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
@@ -236,6 +237,7 @@ case class ParLearnerx(
         	}
         }
       	while (mini(done).v == 0) Thread.sleep(1)
+      	Thread.sleep(opts.coolit)
       	istep += opts.nthreads
       	if (istep % opts.syncStep == 0) syncmodels(models)
       	if (datasource.progress > lastp + opts.pstep) {
@@ -300,6 +302,7 @@ object Learner {
 		var syncStep = 32
 		var nthreads = 4
 		var pstep = 0.01f
+		var coolit = 10
   }
 }
 
