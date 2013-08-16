@@ -105,7 +105,7 @@ case class ParLearner(
 	  					models(ithread).synchronized {updaters(ithread).update(here)}
 	  				}
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
-	  				if (istep % opts.syncStep == 0) syncmodel(models, ithread)
+	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
 	  					lastp += opts.pstep
 	  					val gf = gflop
