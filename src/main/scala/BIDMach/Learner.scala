@@ -450,7 +450,7 @@ class TestFParLDA(
 
 class TestFParLDAx(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) {
   var dd:DataSource = null
   var models:Array[Model] = null
