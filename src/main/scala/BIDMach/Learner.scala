@@ -105,6 +105,7 @@ case class ParLearner(
 	  					models(ithread).synchronized {updaters(ithread).update(here)}
 	  				}
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
+	  				if (istep % opts.syncStep == 0) syncmodel(models, ithread)
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
 	  					lastp += opts.pstep
 	  					val gf = gflop
@@ -115,7 +116,7 @@ case class ParLearner(
 	  								gf._1,
 	  								gf._2, 
 	  								bytes*1e-9,
-	  								bytes/gf._2*1e-6))     	
+	  								bytes/gf._2*1e-6))   
 	  					}
 	  					lasti = reslist.length
 	  				}
@@ -129,7 +130,7 @@ case class ParLearner(
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		while (istep0 < ilast0 + opts.syncStep) Thread.sleep(1)
-	  		syncmodels(models)
+//	  		syncmodels(models)
 	  		ilast0 += opts.syncStep
 	  	}
 	  	ipass += 1
@@ -445,7 +446,7 @@ class TestFParLDAx(
     }
   var uopts = new IncNormUpdater.Options
   mopts.uiter = 8
-  dopts.fcounts = icol(50000)
+  dopts.fcounts = icol(100000)
   dopts.lookahead = 8
   dopts.blockSize = 100000
   dopts.sBlockSize = 4000000
