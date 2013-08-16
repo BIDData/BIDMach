@@ -439,7 +439,10 @@ class TestFParLDAx(
   var lda:ParLearnerx = null
   var lopts = new Learner.Options
   var mopts = new LDAModel.Options
-  var dopts = new SFilesDataSource.Options
+  var dopts = new SFilesDataSource.Options {
+    	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
+    }
   var uopts = new IncNormUpdater.Options
   mopts.uiter = 8
   dopts.fcounts = icol(50000)
@@ -452,7 +455,7 @@ class TestFParLDAx(
   def setup = {
     models = new Array[Model](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads)
-    dd = new SFilesDataSource(dopts)
+    dd = new SFilesDataSource(dopts) 
     dd.init
     for (i <- 0 until lopts.nthreads) {
       if (i < Mat.hasCUDA) setGPU(i)
