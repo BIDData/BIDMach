@@ -74,7 +74,6 @@ case class ParLearner(
 	  var ipass = 0
 	  var istep0 = 0L
 	  var ilast0 = 0L	
-	  var here = 0L
 	  var bytes = 0L
 	  val reslist = new ListBuffer[Float]
 	  val samplist = new ListBuffer[Float]    	  	
@@ -83,6 +82,7 @@ case class ParLearner(
 	  for (ithread <- 0 until opts.nthreads) {
 	  	Actor.actor {
 	  		if (ithread < Mat.hasCUDA) setGPU(ithread)
+	  		var here = 0L
 	  		while (ipass < opts.npasses) {
 	  			if (ithread == 0) println("i=%2d" format ipass) 
 	  			datasources(ithread).reset
