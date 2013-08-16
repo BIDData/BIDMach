@@ -393,7 +393,7 @@ class TestParLDA(mat:Mat) {
 
 class TestFParLDA(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,9,1,0)
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) {
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
