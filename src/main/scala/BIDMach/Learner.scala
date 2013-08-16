@@ -72,11 +72,12 @@ case class ParLearner(
 
 	  @volatile var done = izeros(opts.nthreads, 1)
 	  var ipass = 0
+	  var istep0 = 0L
+	  var ilast0 = 0L	
 	  var here = 0L
 	  var bytes = 0L
 	  val reslist = new ListBuffer[Float]
-	  val samplist = new ListBuffer[Float]    
-	  	
+	  val samplist = new ListBuffer[Float]    	  	
 	  var lastp = 0f
 	  done.clear
 	  for (ithread <- 0 until opts.nthreads) {
@@ -93,6 +94,7 @@ case class ParLearner(
 	  				here += datasources(ithread).opts.blockSize
 	  				for (j <- 0 until mats.length) bytes += 12L * mats(j).nnz
 	  				istep += 1
+	  				istep0 += 1
 	  				if (istep % opts.evalStep == 0) {
 	  					val scores = models(ithread).synchronized {models(ithread).evalblockg(mats)}
 	  					reslist.append(scores(0))
@@ -103,7 +105,6 @@ case class ParLearner(
 	  					models(ithread).synchronized {updaters(ithread).update(here)}
 	  				}
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
-	  				if (istep % opts.syncStep == 0) syncmodels(models)
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
 	  					lastp += opts.pstep
 	  					val gf = gflop
@@ -126,8 +127,11 @@ case class ParLearner(
 	  	}
 	  }
 	  while (ipass < opts.npasses) {
-	  	while (mini(done).v == ipass) Thread.sleep(1)
-	  	syncmodels(models)
+	  	while (mini(done).v == ipass) {
+	  		while (istep0 < ilast0 + opts.syncStep) Thread.sleep(1)
+	  		syncmodels(models)
+	  		ilast0 += opts.syncStep
+	  	}
 	  	ipass += 1
 	  }
 	  val gf = gflop
