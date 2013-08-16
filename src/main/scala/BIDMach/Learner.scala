@@ -83,10 +83,10 @@ case class ParLearner(
 	  	Actor.actor {
 	  		if (ithread < Mat.hasCUDA) setGPU(ithread)
 	  		var here = 0L
+	  		updaters(ithread).clear
 	  		while (ipass < opts.npasses) {
 	  			if (ithread == 0) println("i=%2d" format ipass) 
 	  			datasources(ithread).reset
-	  			updaters(ithread).clear
 	  			var istep = 0
 	  			var lasti = 0
 	  			while (datasources(ithread).hasNext) {
@@ -196,15 +196,18 @@ case class ParLearnerx(
     var ipass = 0
     var here = 0L
     var feats = 0L
+    var lasti = 0
+    var bytes = 0L
     val reslist = new ListBuffer[Float]
     val samplist = new ListBuffer[Float]
+    for (i <- 0 until opts.nthreads) {
+    	if (i < Mat.hasCUDA) setGPU(i)
+    	updaters(i).clear
+    }
     while (ipass < opts.npasses) {
     	datasource.reset
-      for (i <- 0 until opts.nthreads) {
-        if (i < Mat.hasCUDA) setGPU(i)
-        updaters(i).clear
-      }
       var istep = 0
+      var lastp = 0f
       println("i=%2d" format ipass)
       while (datasource.hasNext) {
         for (ithread <- 0 until opts.nthreads) {
@@ -213,20 +216,19 @@ case class ParLearnerx(
         		val mats = datasource.next
         		here += datasource.opts.blockSize
         		feats += mats(0).nnz
+        		bytes += 12L*mats(0).nnz
         		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
         		Actor.actor {
         			if (ithread < Mat.hasCUDA) setGPU(ithread) 
         			if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
         				val scores = models(ithread).evalblockg(cmats(ithread))
-        				print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); if (0 < Mat.hasCUDA) println(" %d mem=%f" format (getGPU, GPUmem._1))
-        				reslist.append(scores(0))
+         				reslist.append(scores(0))
         				samplist.append(here)
         			} else {
         				models(ithread).doblockg(cmats(ithread), here)
         				if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
         				updaters(ithread).update(here)
-        				print(".")
-        			}
+         			}
         			done(ithread) = 1 
         		}  
         	}
@@ -234,6 +236,20 @@ case class ParLearnerx(
       	while (mini(done).v == 0) Thread.sleep(1)
       	istep += opts.nthreads
       	if (istep % opts.syncStep == 0) syncmodels(models)
+      	if (datasource.progress > lastp + opts.pstep) {
+      		lastp += opts.pstep
+      		val gf = gflop
+      		if (reslist.length > lasti) {
+      			println("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+      					100f*lastp, 
+      					mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
+      					gf._1,
+      					gf._2, 
+      					bytes*1e-9,
+      					bytes/gf._2*1e-6))   
+      		}
+      		lasti = reslist.length
+      	}
       }
       println
       for (i <- 0 until opts.nthreads) {
@@ -244,7 +260,7 @@ case class ParLearnerx(
       saveAs("/big/twitter/test/results.mat", row(reslist.toList) on row(samplist.toList), "results")
     }
     val gf = gflop
-    println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, bytes/sec=%4.2g" format (gf._2, gf._1, 1.0*here, 12.0*feats/gf._2))
+    println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*here, bytes/gf._2/1e6))
     results = row(reslist.toList) on row(samplist.toList)
     if (0 < Mat.hasCUDA) setGPU(0)
   }
