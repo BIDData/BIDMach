@@ -171,7 +171,7 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 
 object IncNormUpdater {
   class Options extends Updater.Options {
-    var warmup = 200000000L 
+    var warmup = 0L 
   }
 }
 
