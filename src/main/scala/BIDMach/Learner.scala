@@ -95,17 +95,25 @@ case class ParLearner(
 	  				for (j <- 0 until mats.length) bytes += 12L * mats(j).nnz
 	  				istep += 1
 	  				istep0 += 1
-	  				if (istep % opts.evalStep == 0) {
-	  					val scores = models(ithread).synchronized {models(ithread).evalblockg(mats)}
-	  					reslist.append(scores(0))
-	  					samplist.append(here)
-	  				} else {
-	  					models(ithread).synchronized {
-	  					  models(ithread).doblockg(mats, here)
-	  					  if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
-	  					  updaters(ithread).update(here)
+	  				try {
+	  					if (istep % opts.evalStep == 0) {
+	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats)}
+	  						reslist.append(scores(0))
+	  						samplist.append(here)
+	  					} else {
+	  						models(ithread).synchronized {
+	  							models(ithread).doblockg(mats, here)
+	  							if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+	  							updaters(ithread).update(here)
+	  						}
 	  					}
+	  				} catch {
+	  				case e:Exception => {
+	  					print("Caught exception in thread %d %s\nTrying restart..." format (ithread, e.toString))
+	  					restart(ithread)
+	  					println("Keep on truckin...")
 	  				}
+	  				} 
 	  				Thread.sleep(opts.coolit)
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
@@ -113,7 +121,7 @@ case class ParLearner(
 	  					lastp += opts.pstep
 	  					val gf = gflop
 	  					if (reslist.length > lasti) {
-	  						print("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+	  						print("%5.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
 	  								100f*lastp, 
 	  								mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
 	  								gf._1,
@@ -178,9 +186,17 @@ case class ParLearner(
 	  	models(ithread).modelmats(0) <-- mm
 	  }
   }
+  
+  def restart(ithread:Int) = {
+    if (models(0).opts.useGPU) {
+      resetGPU
+      Mat.trimCache2(ithread)
+    }
+    models(ithread).init(datasources(ithread))
+    models(ithread).modelmats(0) <-- mm
+    updaters(ithread).init(models(ithread))      
+  }
 }
-
-
 
 case class ParLearnerx(
     val datasource:DataSource, 
@@ -229,16 +245,24 @@ case class ParLearnerx(
         		bytes += 12L*mats(0).nnz
         		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
         		Actor.actor {
-        			if (ithread < Mat.hasCUDA) setGPU(ithread) 
-        			if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
-        				val scores = models(ithread).evalblockg(cmats(ithread))
-         				reslist.append(scores(0))
-        				samplist.append(here)
-        			} else {
-        				models(ithread).doblockg(cmats(ithread), here)
-        				if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
-        				updaters(ithread).update(here)
-         			}
+        			if (ithread < Mat.hasCUDA) setGPU(ithread)
+        			try {
+        				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
+        					val scores = models(ithread).evalblockg(cmats(ithread))
+        					reslist.append(scores(0))
+        					samplist.append(here)
+        				} else {
+        					models(ithread).doblockg(cmats(ithread), here)
+        					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+        					updaters(ithread).update(here)
+        				}
+        			} catch {
+        			  case e:Exception => {
+        			    print("Caught exception in thread %d %s\nTrying restart..." format (ithread, e.toString))
+        			    restart(ithread)
+        			    println("Keep on truckin...")
+        			  }
+        			} 
         			done(ithread) = 1 
         		}  
         	}
@@ -251,7 +275,7 @@ case class ParLearnerx(
       		lastp += opts.pstep
       		val gf = gflop
       		if (reslist.length > lasti) {
-      			print("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+      			print("%5.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
       					100f*lastp, 
       					mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
       					gf._1,
@@ -305,6 +329,16 @@ case class ParLearnerx(
 	  	models(i).modelmats(0) <-- mm
 	  }
 	  if (0 < Mat.hasCUDA) setGPU(0)
+  }
+  
+  def restart(ithread:Int) = {
+    if (models(0).opts.useGPU) {
+      resetGPU
+      Mat.trimCaches(ithread)
+    }
+    models(ithread).init(datasource)
+    models(ithread).modelmats(0) <-- mm
+    updaters(ithread).init(models(ithread))      
   }
 }
 
