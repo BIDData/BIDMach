@@ -113,7 +113,7 @@ case class ParLearner(
 	  					lastp += opts.pstep
 	  					val gf = gflop
 	  					if (reslist.length > lasti) {
-	  						println("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+	  						print("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
 	  								100f*lastp, 
 	  								mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
 	  								gf._1,
@@ -126,6 +126,7 @@ case class ParLearner(
 	  					  		if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
 	  					  	}
 	  					  }
+	  						println
 	  					}
 	  					lasti = reslist.length
 	  				}
@@ -263,6 +264,7 @@ case class ParLearnerx(
       		      if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
       		    }
       		  }
+      			println
       		}
       		lasti = reslist.length
       	}
