@@ -119,7 +119,13 @@ case class ParLearner(
 	  								gf._1,
 	  								gf._2, 
 	  								bytes*1e-9,
-	  								bytes/gf._2*1e-6))   
+	  								bytes/gf._2*1e-6))  
+	  					  if (models(0).opts.useGPU) {
+	  					  	for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
+	  					  		setGPU(i)
+	  					  		if (i==0) print(", GPUmem=%3.2f" format GPUmem) else print(", %3.2f" format GPUmem)
+	  					  	}
+	  					  }
 	  					}
 	  					lasti = reslist.length
 	  				}
@@ -244,13 +250,19 @@ case class ParLearnerx(
       		lastp += opts.pstep
       		val gf = gflop
       		if (reslist.length > lasti) {
-      			println("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+      			print("%4.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
       					100f*lastp, 
       					mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
       					gf._1,
       					gf._2, 
       					bytes*1e-9,
-      					bytes/gf._2*1e-6))   
+      					bytes/gf._2*1e-6))  
+      		  if (models(0).opts.useGPU) {
+      		    for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
+      		      setGPU(i)
+      		      if (i==0) print(", GPUmem=%3.2f" format GPUmem) else print(", %3.2f" format GPUmem)
+      		    }
+      		  }
       		}
       		lasti = reslist.length
       	}
