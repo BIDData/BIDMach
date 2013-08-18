@@ -123,7 +123,7 @@ case class ParLearner(
 	  					  if (models(0).opts.useGPU) {
 	  					  	for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
 	  					  		setGPU(i)
-	  					  		if (i==0) print(", GPUmem=%3.2f" format GPUmem) else print(", %3.2f" format GPUmem)
+	  					  		if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
 	  					  	}
 	  					  }
 	  					}
@@ -260,7 +260,7 @@ case class ParLearnerx(
       		  if (models(0).opts.useGPU) {
       		    for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
       		      setGPU(i)
-      		      if (i==0) print(", GPUmem=%3.2f" format GPUmem) else print(", %3.2f" format GPUmem)
+      		      if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
       		    }
       		  }
       		}
