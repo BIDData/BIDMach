@@ -4,158 +4,6 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-
-class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extends FactorModel(opts) { 
-  var mm:Mat = null
-  var alpha:Mat = null
-  
-  var traceMem = false
-  
-  override def init(datasource:DataSource) = {
-    super.init(datasource)
-    mm = modelmats(0)
-    modelmats = new Array[Mat](2)
-    modelmats(0) = mm
-    modelmats(1) = mm.ones(mm.nrows, 1)
-    updatemats = new Array[Mat](2)
-    updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    updatemats(1) = mm.zeros(mm.nrows, 1)
-  }
-  
-  def uupdate(sdata:Mat, user:Mat):Unit = {
-    if (opts.putBack < 0) user.set(1f)
-	  for (i <- 0 until opts.uiter) {
-	  	val preds = DDS(mm, user, sdata)	
-	  	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
-	  	val dc = sdata.contents
-	  	val pc = preds.contents
-	  	max(opts.weps, pc, pc)
-	  	pc ~ dc / pc
-	  	val unew = user *@ (mm * preds) + opts.alpha
-	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
-	  	if (opts.exppsi) exppsi(unew, unew)
-	  	user <-- unew   
-	  }	
-//    println("user %g %g" format (mini(mini(user,1),2).dv, maxi(maxi(user,1),2).dv))
-  }
-  
-  def mupdate(sdata:Mat, user:Mat):Unit = {
-    val preds = DDS(mm, user, sdata)
-    val dc = sdata.contents
-    val pc = preds.contents
-    max(opts.weps, pc, pc)
-    pc ~ dc / pc
-    val ud = user *^ preds
-    ud ~ ud *@ mm
-    ud ~ ud + opts.beta
-  	updatemats(0) <-- ud  
-  	sum(user, 2, updatemats(1))
-  	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
-  }
-  
-  def evalfun(sdata:Mat, user:Mat):FMat = {  
-  	val preds = DDS(mm, user, sdata)
-  	val dc = sdata.contents
-  	val pc = preds.contents
-  	max(opts.weps, pc, pc)
-  	ln(pc, pc)
-  	val sdat = sum(sdata,1)
-  	val mms = sum(mm,2)
-  	val suu = ln(mms ^* user)
-  	if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1))
-  	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
-  	row(vv, math.exp(-vv))
-  }
-}
-
-class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel(opts) { 
-  
-  var mm:Mat = null
-  var mdiag:Mat = null
-  var udiag:Mat = null
-  
-  override def init(datasource:DataSource) = {
-  	super.init(datasource)
-  	mm = modelmats(0)
-    modelmats = new Array[Mat](2)
-    modelmats(0) = mm
-    modelmats(1) = mm.zeros(mm.nrows, mm.ncols)
-  	updatemats = new Array[Mat](2)
-    mm = modelmats(0)
-    updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    updatemats(1) = mm.zeros(mm.nrows, mm.ncols)
-    udiag = mkdiag(opts.uprior*ones(opts.dim,1))
-  	mdiag = mkdiag(opts.mprior*ones(opts.dim,1))
-    if (opts.useGPU) {
-      udiag = GMat(udiag)
-      mdiag = GMat(mdiag)
-    }
-  }
-  
-  override def uupdate(sdata:Mat, user:Mat) = {
-	  val modeldata = mm * sdata
-  	val mmu = mm *^ mm + udiag
-    for (i <- 0 until opts.uiter) {
-    	val quot =  modeldata / (mmu * user)               
-    	min(10.0f, max(0.1f, quot, quot), quot)
-    	user ~ user *@ quot
-    	max(opts.minuser, user, user)
-    }
-  }  
-  
-  override def mupdate(sdata:Mat, user:Mat):Unit = {
-    val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
-    val udata = user *^ sdata 
-    updatemats(0) ~ udata *@ mm
-    updatemats(1) ~ uu * mm
-  }
-
-  override def mupdate2(sdata:Mat, user:Mat):Unit = {
-    val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
-    updatemats(0) ~ user *^ sdata
-    updatemats(1) ~ uu * mm
-  }
-  
-  override def evalfun(sdata:Mat, user:Mat):FMat = {
-    if (opts.doubleScore) {
-      evalfunx(sdata, user)
-    } else {
-    	val modeldata =  mm * sdata
-    	val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
-    	val mmm = mm *^ mm
-
-    	val ll0 =  sdata.contents ddot sdata.contents
-    	val ll1 =  modeldata ddot user
-    	val ll2 =  uu ddot mmm
-    	//    println("ll %f %f %f" format (ll0, ll1, ll2))
-    	val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
-    	val v2 =               -opts.uprior*(user ddot user)/sdata.nnz
-    	row(v1,v2)
-    }
-  }
-  
-  def evalfunx(sdata0:Mat, user0:Mat):FMat = { 
-    val sdata = SDMat(sdata0)
-    val user = DMat(user0)
-    val mmf = DMat(mm)
-    val mdiagf = DMat(mdiag)
-
-	  val modeldata =  mmf * sdata
-    val uu = user *^ user + mdiagf *@ (1.0f*size(user,2)/opts.nusers)
-    val mmm = mmf *^ mmf
-
-    val ll0 =  sdata.contents ddot sdata.contents
-    val ll1 =  modeldata ddot user
-    val ll2 =  uu ddot mmm
-//    println("ll %f %f %f" format (ll0, ll1, ll2))
-    val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
-    val v2 =               -opts.uprior*(user ddot user)/sdata.nnz
-    row(v1,v2)
-  }
-}
-
-
-
 abstract class FactorModel(override val opts:FactorModel.Options) extends Model(opts) {
   
   override def init(datasource:DataSource) = {
@@ -165,14 +13,14 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
     val d = opts.dim
     val sdat = (sum(data0,2).t + 1.0f).asInstanceOf[FMat]
     val sp = sdat / sum(sdat)
-    println("initial perplexity=%f" format (sp ddot ln(sp)) )
+    println("initial perplexity=%f" format math.exp(- (sp ddot ln(sp))) )
     
     val modelmat = rand(d,m) 
     modelmat ~ modelmat *@ sdat
     val msum = sum(modelmat, 2)
     modelmat ~ modelmat / msum
     modelmats = new Array[Mat](1)
-    modelmats(0) = if (opts.useGPU) GMat(modelmat) else modelmat
+    modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat
     datasource.reset
     
     if (mats.size > 1) {
@@ -214,27 +62,7 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
     val user = if (gmats.length > 1) gmats(1) else reuseuser(gmats(0))
     uupdate(sdata, user)
     evalfun(sdata, user)
-  }
-  
-}
-
-object NMFModel  {
-  class Options extends FactorModel.Options {
-    var NMFeps = 1e-9
-    var uprior = 0.01f
-    var mprior = 1e-4f
-    var nusers = 100000
-  }
-} 
-
-object LDAModel  {
-  class Options extends FactorModel.Options {
-    var LDAeps = 1e-9
-    var exppsi = true
-    var alpha = 0.001f
-    var beta = 0.0001f
-    putBack = -1
-  }
+  } 
 }
 
 object FactorModel { 
@@ -243,7 +71,6 @@ object FactorModel {
     var uiter = 8
     var weps = 1e-10f
     var minuser = 1e-8f
-    useGPU = true
   }
 } 
 
