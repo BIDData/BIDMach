@@ -39,9 +39,20 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  }	  
   }
   
-  def mupdate(sdata:Mat, user:Mat):Unit = {
+  override def mupdate2(sdata:Mat, user:Mat):Unit = {
     val ud = user *^ sdata
   	updatemats(0) <-- ud         
+  	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
+  }
+  
+  def mupdate(sdata:Mat, user:Mat):Unit = {
+    val preds = DDS(mm, user, sdata)
+    val dc = sdata.contents
+    val pc = preds.contents
+    max(opts.weps, pc, pc)
+    pc ~ dc / pc
+    val ud = user *^ preds
+  	updatemats(0) ~ ud *@ mm         
   	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
   
@@ -71,7 +82,7 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
   	updatemats = new Array[Mat](2)
     mm = modelmats(0)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    updatemats(0) = mm.zeros(mm.nrows, 1)
+    updatemats(1) = mm.zeros(mm.nrows, mm.ncols)
     udiag = mkdiag(opts.uprior*ones(opts.dim,1))
   	mdiag = mkdiag(opts.mprior*ones(opts.dim,1))
     if (opts.useGPU) {
@@ -91,10 +102,27 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
     }
   }
    
-  override def mupdate(sdata:Mat, user:Mat):Unit = {
-    updatemats(0) <-- user *^ sdata
+  
+  override def mupdate2(sdata:Mat, user:Mat):Unit = {
     val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
-    updatemats(1) <-- uu * mm    
+//    val numer = user *^ sdata - uu * mm 
+    val numer = user *^ sdata 
+//    val denom = getdiag(uu) *@ mm - numer
+    val denom = uu * mm
+    val dscale = min(numer, denom)
+    max(dscale, opts.NMFeps, dscale)
+    val diff = (numer - denom)/dscale   
+//    max(opts.NMFeps, denom, denom)
+//    val diff = numer / denom
+    max(diff, -5f, diff)
+    min(diff, 5f, diff)
+    updatemats(0) <-- diff
+  }
+
+  override def mupdate(sdata:Mat, user:Mat):Unit = {
+    val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
+    updatemats(0) ~ user *^ sdata
+    updatemats(1) ~ uu * mm
   }
   
   override def evalfun(sdata:Mat, user:Mat):FMat = {
@@ -157,6 +185,8 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
   
   def mupdate(data:Mat, user:Mat)
   
+  def mupdate2(data:Mat, user:Mat) = {}
+  
   def evalfun(data:Mat, user:Mat):FMat
   
   def doblock(gmats:Array[Mat], i:Long) = {
@@ -190,7 +220,6 @@ object LDAModel  {
     var exppsi = true
     var alpha = 0.01f
     putBack = -1
-    useGPU = true
   }
 }
 
@@ -200,6 +229,7 @@ object FactorModel {
     var uiter = 8
     var weps = 1e-10f
     var minuser = 1e-8f
+    useGPU = true
   }
 } 
 

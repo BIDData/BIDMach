@@ -43,7 +43,7 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   	    firstStep = step
   	    1f
   	  } else {
-  	    step / firstStep
+  	    math.pow(step / firstStep, opts.power).toFloat
   	  }
   	}
   	val su = sum(updatemat,2)
@@ -92,6 +92,76 @@ class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.
     modelmat ~ accumulator / sum(accumulator,2)
   }
 }
+
+
+class IncMultUpdater(val opts:IncMultUpdater.Options = new IncMultUpdater.Options) extends Updater {
+  
+  var firstStep = 0f
+  var rm:Mat = null
+  
+  override def init(model0:Model) = {
+    super.init(model0)
+    rm = model0.modelmats(0).zeros(1,1)
+  }
+      
+  def update(step:Long) = {
+    val mm = modelmats(0)
+    val um = updatemats(0)
+    val rr = if (step == 0) 1f else {
+	    if (firstStep == 0f) {
+	    	firstStep = step
+	    	1f
+	    } else {
+	    	math.pow(firstStep / step, opts.power).toFloat
+	    }
+  	}
+//    println("rr=%g, %g %g" format (rr, mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
+    um ~ um * rm.set(rr)
+//    println("rr=%g, %g %g" format (rr, mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
+    ln(mm, mm)
+//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
+    mm ~ mm * rm.set(1-rr)
+//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
+    mm ~ mm + um 
+//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
+    exp(mm, mm)
+//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
+    mm ~ mm / sum(mm,2)
+  }
+  
+  override def clear() = {
+	  firstStep = 0f
+  }
+}
+
+class BatchMultUpdater(val opts:BatchMultUpdater.Options = new BatchMultUpdater.Options) extends Updater {
+  var accumulators:Array[Mat] = null
+  
+  override def init(model0:Model) = {
+    super.init(model0)
+    accumulators = new Array[Mat](updatemats.length)
+    for (i <- 0 until updatemats.length)
+    	accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
+  }
+     
+  def update(step:Long) = {
+    for (i <- 0 until updatemats.length)
+	accumulators(i) ~ accumulators(i) + updatemats(i) 
+  }
+  
+  override def clear() = {
+    for (i <- 0 until updatemats.length)
+	accumulators(i).clear
+  }
+  
+  override def updateM():Unit = {
+    val mm = modelmats(0)
+    accumulators(0) ~ accumulators(0) / accumulators(1)
+    min(max(accumulators(0), 0.1f, accumulators(0)), 10f, accumulators(0))
+    mm ~ mm ∘ accumulators(0)
+  }
+}
+
 
 class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
   
@@ -172,10 +242,24 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 object IncNormUpdater {
   class Options extends Updater.Options {
     var warmup = 0L 
+    var power = 0.98f
+  }
+}
+
+object IncMultUpdater {
+  class Options extends Updater.Options {
+    var warmup = 0L 
+    var power = 0.98f
   }
 }
 
 object BatchNormUpdater {
+  class Options extends Updater.Options {
+    
+  }
+}
+
+object BatchMultUpdater {
   class Options extends Updater.Options {
     
   }
@@ -195,6 +279,6 @@ object ADAGradUpdater {
 
 object Updater {
   class Options {
-
+    
   }
 }
