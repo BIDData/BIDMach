@@ -14,7 +14,7 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   override def init(datasource:DataSource) = {
     super.init(datasource)
     mm = modelmats(0)
-    modelmats = Array[Mat](2)
+    modelmats = new Array[Mat](2)
     modelmats(0) = mm
     modelmats(1) = mm.zeros(mm.ncols, 1)
     updatemats = new Array[Mat](2)
