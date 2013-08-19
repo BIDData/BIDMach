@@ -52,7 +52,9 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
     max(opts.weps, pc, pc)
     pc ~ dc / pc
     val ud = user *^ preds
-  	updatemats(0) ~ ud *@ mm         
+    ud ~ ud *@ mm
+    ud ~ ud + opts.beta
+  	updatemats(0) <-- ud      
   	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
   
@@ -218,7 +220,8 @@ object LDAModel  {
   class Options extends FactorModel.Options {
     var LDAeps = 1e-9
     var exppsi = true
-    var alpha = 0.01f
+    var alpha = 0.001f
+    var beta = 0.0001f
     putBack = -1
   }
 }
