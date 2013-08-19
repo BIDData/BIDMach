@@ -39,10 +39,10 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   def update(step:Long) = {
   	val mm = modelmats(0)
   	val um = updatemats(0)
-  	val rr = if (step == 0) 1f else {
+  	val rr = if (step == 0) 0.9f else {
   	  if (firstStep == 0f) {
   	    firstStep = step
-  	    1f
+  	    0.9f
   	  } else {
   	    math.pow(firstStep / step, opts.power).toFloat
   	  }
