@@ -351,6 +351,7 @@ object Learner {
 		var nthreads = 4
 		var pstep = 0.01f
 		var coolit = 10
+		var batch = false
   }
 }
 
@@ -362,6 +363,7 @@ class TestLDA(mat:Mat) {
   var lopts = new Learner.Options
   var mopts = new LDAModel.Options
   var dopts = new MatDataSource.Options
+  var uoptsb = new BatchMultUpdater.Options 
   var uopts = new IncNormUpdater.Options
   def setup = { 
     val aa = if (mopts.putBack >= 0) {
@@ -374,7 +376,7 @@ class TestLDA(mat:Mat) {
     dd.init
     model = new LDAModel(mopts)
     model.init(dd)
-    updater = new IncNormUpdater(uopts)
+    updater = if (lopts.batch) new BatchMultUpdater(uoptsb) else new IncNormUpdater(uopts)
     updater.init(model)
     lda = new Learner(dd, model, null, updater, lopts)   
   }
@@ -398,7 +400,7 @@ class TestNMF(mat:Mat) {
   var lopts = new Learner.Options
   var mopts = new NMFModel.Options
   var dopts = new MatDataSource.Options
-//  var uopts = new BatchMultUpdater.Options
+  var uoptsb = new BatchMultUpdater.Options
   var uopts = new IncNormUpdater.Options
   def setup = { 
     val aa = if (mopts.putBack >= 0) {
@@ -411,8 +413,7 @@ class TestNMF(mat:Mat) {
     dd.init
     model = new NMFModel(mopts)
     model.init(dd)
-//    updater = new BatchMultUpdater(uopts)
-    updater = new IncNormUpdater(uopts)
+    updater = if (lopts.batch) new BatchMultUpdater(uoptsb) else new IncNormUpdater(uopts)
     updater.init(model)
     nmf = new Learner(dd, model, null, updater, lopts)   
   }

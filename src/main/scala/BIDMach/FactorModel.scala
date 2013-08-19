@@ -25,24 +25,13 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
 	  	val dc = sdata.contents
 	  	val pc = preds.contents
-//	  	println("uupdate1 %d %d %d %d %d" format (sdata.nnz, preds.nnz, dc.nrows, pc.nrows, getGPU))
 	  	max(opts.weps, pc, pc)
 	  	pc ~ dc / pc
-//	  	println("uupdate2 %d %d %d %d %d" format (sdata.nnz, preds.nnz, dc.nrows, pc.nrows, getGPU))
 	  	val unew = user *@ (mm * preds) + opts.alpha
-/*	  	val unew1 = mm * preds
-	  	val unew = user *@ unew1
-	  	unew ~ unew + opts.alpha */
 	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
 	  	if (opts.exppsi) exppsi(unew, unew)
 	  	user <-- unew                                                     
 	  }	  
-  }
-  
-  override def mupdate2(sdata:Mat, user:Mat):Unit = {
-    val ud = user *^ sdata
-  	updatemats(0) <-- ud         
-  	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
   
   def mupdate(sdata:Mat, user:Mat):Unit = {
@@ -52,6 +41,7 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
     max(opts.weps, pc, pc)
     pc ~ dc / pc
     val ud = user *^ preds
+    ud ~ ud / sum(user, 2)
     ud ~ ud *@ mm
     ud ~ ud + opts.beta
   	updatemats(0) <-- ud      
@@ -70,6 +60,29 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   	if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1))
   	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
   	row(vv, math.exp(-vv))
+  }
+}
+
+class BatchLDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extends LDAModel(opts) {
+  
+  override def init(datasource:DataSource) = {
+    this.asInstanceOf[FactorModel].init(datasource)
+    updatemats = new Array[Mat](2)
+    mm = modelmats(0)
+    updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
+    updatemats(1) = mm.zeros(mm.nrows, 1)
+  }
+  
+  override def mupdate(sdata:Mat, user:Mat):Unit = {
+    val preds = DDS(mm, user, sdata)
+    val dc = sdata.contents
+    val pc = preds.contents
+    max(opts.weps, pc, pc)
+    pc ~ dc / pc
+    val ud = user *^ preds
+  	updatemats(0) <-- ud  
+  	sum(user, 2, updatemats(1)) 
+  	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
 }
 
