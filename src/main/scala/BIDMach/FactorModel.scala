@@ -102,26 +102,17 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
     	user ~ user *@ quot
     	max(opts.minuser, user, user)
     }
-  }
-   
+  }  
   
-  override def mupdate2(sdata:Mat, user:Mat):Unit = {
+  override def mupdate(sdata:Mat, user:Mat):Unit = {
     val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
-//    val numer = user *^ sdata - uu * mm 
-    val numer = user *^ sdata 
-//    val denom = getdiag(uu) *@ mm - numer
-    val denom = uu * mm
-    val dscale = min(numer, denom)
-    max(dscale, opts.NMFeps, dscale)
-    val diff = (numer - denom)/dscale   
-//    max(opts.NMFeps, denom, denom)
-//    val diff = numer / denom
-    max(diff, -5f, diff)
-    min(diff, 5f, diff)
-    updatemats(0) <-- diff
+    val udata = user *^ sdata 
+    val quot = udata / (uu * mm)
+    min(10.0f, max(0.1f, quot, quot), quot)
+    updatemats(0) ~ quot *@ mm
   }
 
-  override def mupdate(sdata:Mat, user:Mat):Unit = {
+  override def mupdate2(sdata:Mat, user:Mat):Unit = {
     val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
     updatemats(0) ~ user *^ sdata
     updatemats(1) ~ uu * mm
