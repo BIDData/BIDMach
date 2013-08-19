@@ -43,6 +43,7 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
     val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers) 
     updatemats(0) ~ (user *^ sdata) *@ mm
     updatemats(1) ~ uu * mm
+    max(updatemats(1), opts.NMFeps, updatemats(1))
   }
 
   override def mupdate2(sdata:Mat, user:Mat):Unit = {
