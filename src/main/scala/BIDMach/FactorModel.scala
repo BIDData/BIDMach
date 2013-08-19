@@ -34,8 +34,9 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 	  	val unew = user *@ (mm * preds) + opts.alpha
 	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
 	  	if (opts.exppsi) exppsi(unew, unew)
-	  	user <-- unew                                                     
-	  }	  
+	  	user <-- unew   
+	  }	
+//    println("user %g %g" format (mini(mini(user,1),2).dv, maxi(maxi(user,1),2).dv))
   }
   
   def mupdate(sdata:Mat, user:Mat):Unit = {
@@ -75,6 +76,10 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
   
   override def init(datasource:DataSource) = {
   	super.init(datasource)
+  	mm = modelmats(0)
+    modelmats = new Array[Mat](2)
+    modelmats(0) = mm
+    modelmats(1) = mm.zeros(mm.nrows, mm.ncols)
   	updatemats = new Array[Mat](2)
     mm = modelmats(0)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
@@ -101,9 +106,8 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
   override def mupdate(sdata:Mat, user:Mat):Unit = {
     val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
     val udata = user *^ sdata 
-    val quot = udata / (uu * mm)
-    min(10.0f, max(0.1f, quot, quot), quot)
-    updatemats(0) ~ quot *@ mm
+    updatemats(0) ~ udata *@ mm
+    updatemats(1) ~ uu * mm
   }
 
   override def mupdate2(sdata:Mat, user:Mat):Unit = {
