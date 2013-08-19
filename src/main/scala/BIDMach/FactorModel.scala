@@ -104,14 +104,14 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
   }  
   
   override def mupdate(sdata:Mat, user:Mat):Unit = {
-    val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
+    val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
     val udata = user *^ sdata 
     updatemats(0) ~ udata *@ mm
     updatemats(1) ~ uu * mm
   }
 
   override def mupdate2(sdata:Mat, user:Mat):Unit = {
-    val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
+    val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
     updatemats(0) ~ user *^ sdata
     updatemats(1) ~ uu * mm
   }
@@ -119,7 +119,7 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
   override def evalfun(sdata:Mat, user:Mat):FMat = {
 
 	  val modeldata =  mm * sdata
-    val uu = user *^ user + mdiag * (1.0f*size(user,2)/opts.nusers)
+    val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
     val mmm = mm *^ mm
 
     val ll0 =  sdata.contents ddot sdata.contents
