@@ -7,14 +7,10 @@ import BIDMat.SciFunctions._
 
 abstract class Updater {
   var model:Model = null
-  var modelmats:Array[Mat] = null
-  var updatemats:Array[Mat] = null
 
   
   def init(model0:Model) = {
-    model = model0
-    modelmats = model.modelmats
-    updatemats = model.updatemats
+    model = model0 
   }
   
   def update(step:Long):Unit
@@ -31,12 +27,16 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   var started:Int = 0
   
   override def init(model0:Model) = {
-    super.init(model0)
+  	super.init(model0)
+    val modelmats = model0.modelmats
+    val updatemats = model0.updatemats
     restart = modelmats(0) + 1f
     rm = model0.modelmats(0).zeros(1,1)
   }
       
   def update(step:Long) = {
+  	val modelmats = model.modelmats
+  	val updatemats = model.updatemats
   	val mm = modelmats(0)
   	val um = updatemats(0)
   	val rr = if (step == 0) 0.9f else {
@@ -50,13 +50,18 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   	if (modelmats.length > 1) {
   		val ms = modelmats(1)
   		val ums = updatemats(1)
-  		ums ~ ums * rm.set(rr)
-  		ms ~ ms * rm.set(1-rr)
+//  		println("ums0 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
+  		ums ~ ums *@ rm.set(rr)
+//  		println("ums1 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
+  		ms ~ ms *@ rm.set(1-rr)
+//  		println("ums2 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
   		ms ~ ms + ums
+//  		println("ums3 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
   		um ~ um / ms
+//  		println("um %g %g" format (mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
   	}
-  	um ~ um * rm.set(rr)
-  	mm ~ mm * rm.set(1-rr)
+  	um ~ um *@ rm.set(rr)
+  	mm ~ mm *@ rm.set(1-rr)
     mm ~ mm + um 
     mm ~ mm / sum(mm,2)
     if (opts.warmup > 0) {
@@ -83,8 +88,8 @@ class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.
   
   override def init(model0:Model) = {
     super.init(model0)
-    modelmats = model.modelmats
-    updatemats = model.updatemats
+    val modelmats = model.modelmats
+    val updatemats = model.updatemats
     accumulators = new Array[Mat](updatemats.length)
     for (i <- 0 until accumulators.length) {
     	accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
@@ -92,6 +97,7 @@ class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.
   }
      
   def update(step:Long) = {
+  	val updatemats = model.updatemats
     for (i <- 0 until accumulators.length) {
     	accumulators(i) ~ accumulators(i) + updatemats(i) 
     }
@@ -104,6 +110,7 @@ class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.
   }
   
   override def updateM():Unit = {
+ 		val modelmats = model.modelmats
     val mm = modelmats(0)
     mm ~ accumulators(0) / sum(accumulators(0),2)
   }
@@ -121,6 +128,8 @@ class IncMultUpdater(val opts:IncMultUpdater.Options = new IncMultUpdater.Option
   }
       
   def update(step:Long) = {
+    val modelmats = model.modelmats
+    val updatemats = model.updatemats
     val mm = modelmats(0)
     val ms = modelmats(1)
     val um = updatemats(0)
@@ -157,26 +166,31 @@ class BatchMultUpdater(val opts:BatchMultUpdater.Options = new BatchMultUpdater.
   
   override def init(model0:Model) = {
     super.init(model0)
+    val updatemats = model.updatemats
     accumulators = new Array[Mat](updatemats.length)
     for (i <- 0 until updatemats.length)
     	accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
   }
      
   def update(step:Long) = {
+	  val updatemats = model.updatemats
     for (i <- 0 until updatemats.length)
-	accumulators(i) ~ accumulators(i) + updatemats(i) 
+	    accumulators(i) ~ accumulators(i) + updatemats(i) 
   }
   
   override def clear() = {
+	  val updatemats = model.updatemats
     for (i <- 0 until updatemats.length)
-	accumulators(i).clear
+     	accumulators(i).clear
   }
   
   override def updateM():Unit = {
+  	val updatemats = model.updatemats
+  	val modelmats = model.modelmats
     val mm = modelmats(0)
-    accumulators(0) ~ accumulators(0) / accumulators(1)
-    min(max(accumulators(0), 0.1f, accumulators(0)), 10f, accumulators(0))
-    mm ~ mm ∘ accumulators(0)
+    max(accumulators(1), opts.eps, accumulators(1))
+    modelmats(0) ~ accumulators(0) / accumulators(1)
+    clear
   }
 }
 
@@ -279,6 +293,7 @@ object BatchNormUpdater {
 
 object BatchMultUpdater {
   class Options extends Updater.Options {
+    var eps = 1e-12
     
   }
 }
