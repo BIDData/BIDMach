@@ -32,7 +32,9 @@ case class Learner(
         here += datasource.opts.blockSize
         if ((istep + 1) % opts.evalStep == 0 || ! datasource.hasNext) {
         	val scores = model.evalblockg(mats)
-        	print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); if (model.opts.useGPU) println(" mem=%f" format GPUmem._1) else println()
+        	print("ll=")
+        	scores.data.foreach(v => print(" %4.3f" format v))
+        	if (model.opts.useGPU && Mat.hasCUDA > 0) println(" mem=%f" format GPUmem._1) else println()
         	reslist.append(scores(0))
         	samplist.append(here)
         } else {
@@ -347,62 +349,12 @@ case class ParLearnerx(
 }
 
 
-object Learner {
-	class Options {
-		var npasses:Int = 1
-		var evalStep = 15
-		var syncStep = 32
-		var nthreads = 4
-		var pstep = 0.01f
-		var coolit = 10
-		var batch = false
-  }
-}
-
-class TestLDA(mat:Mat) {
+class LearnFactorModel(mat:Mat, val mopts:FactorModel.Options, mkmodel:(FactorModel.Options)=>FactorModel) {
   var dd:MatDataSource = null
-  var model:LDAModel = null
+  var model:Model = null
   var updater:Updater = null
-  var lda:Learner = null
+  var learner:Learner = null
   var lopts = new Learner.Options
-  var mopts = new LDAModel.Options
-  var dopts = new MatDataSource.Options
-  var uoptsb = new BatchMultUpdater.Options 
-  var uopts = new IncNormUpdater.Options
-  def setup = { 
-    val aa = if (mopts.putBack >= 0) {
-    	val a = new Array[Mat](2); a(1) = ones(mopts.dim, mat.ncols); a
-    } else {
-      new Array[Mat](1)
-    }
-    aa(0) = mat
-    dd = new MatDataSource(aa, dopts)
-    dd.init
-    model = new LDAModel(mopts)
-    model.init(dd)
-    updater = if (lopts.batch) new BatchMultUpdater(uoptsb) else new IncNormUpdater(uopts)
-    updater.init(model)
-    lda = new Learner(dd, model, null, updater, lopts)   
-  }
-  
-  def init = {
-    if (dd.omats.length > 1) dd.omats(1) = ones(model.opts.dim, dd.omats(0).ncols)
-    dd.init
-    model.init(dd)
-    updater.init(model)
-  }
-  
-  def run = lda.run
-}
-
-
-class TestNMF(mat:Mat) {
-  var dd:MatDataSource = null
-  var model:NMFModel = null
-  var updater:Updater = null
-  var nmf:Learner = null
-  var lopts = new Learner.Options
-  var mopts = new NMFModel.Options
   var dopts = new MatDataSource.Options
   var uoptsb = new BatchMultUpdater.Options
   var uopts = new IncNormUpdater.Options
@@ -415,85 +367,35 @@ class TestNMF(mat:Mat) {
     aa(0) = mat
     dd = new MatDataSource(aa, dopts)
     dd.init
-    model = new NMFModel(mopts)
+    model = mkmodel(mopts)
     model.init(dd)
     updater = if (lopts.batch) new BatchMultUpdater(uoptsb) else new IncNormUpdater(uopts)
     updater.init(model)
-    nmf = new Learner(dd, model, null, updater, lopts)   
+    learner = new Learner(dd, model, null, updater, lopts)   
   }
   
   def init = {
-    if (dd.omats.length > 1) dd.omats(1) = ones(model.opts.dim, dd.omats(0).ncols)
+    if (dd.omats.length > 1) dd.omats(1) = ones(mopts.dim, dd.omats(0).ncols)
     dd.init
     model.init(dd)
     updater.init(model)
   }
   
-  def run = nmf.run
+  def run = learner.run
 }
 
-class TestParLDA(mat:Mat) {
-  var dds:Array[DataSource] = null
-  var models:Array[Model] = null
-  var updaters:Array[Updater] = null
-  var lda:ParLearner = null
-  var lopts = new Learner.Options
-  var mopts = new LDAModel.Options
-  var dopts = new MatDataSource.Options
-  var uopts = new IncNormUpdater.Options
-  
-  def setup = {
-    dds = new Array[DataSource](lopts.nthreads)
-    models = new Array[Model](lopts.nthreads)
-    updaters = new Array[Updater](lopts.nthreads)
-    for (i <- 0 until lopts.nthreads) {
-      if (i < Mat.hasCUDA) setGPU(i)
-    	val istart = i * mat.ncols / lopts.nthreads
-    	val iend = (i+1) * mat.ncols / lopts.nthreads
-    	val mm = mat(?, istart->iend)
-    	val aa = if (mopts.putBack >= 0) {
-    		val a = new Array[Mat](2); 
-    		a(1) = ones(mopts.dim, mm.ncols); 
-    		a
-    	} else {
-    		new Array[Mat](1)
-    	}
-    	aa(0) = mm
-    	dds(i) = new MatDataSource(aa, dopts)
-    	dds(i).init
-    	models(i) = new LDAModel(mopts)
-    	models(i).init(dds(i))
-    	updaters(i) = new IncNormUpdater(uopts)
-    	updaters(i).init(models(i))
-    }
-    if (0 < Mat.hasCUDA) setGPU(0)
-    lda = new ParLearner(dds, models, null, updaters, lopts)   
-  }
-  
-  def init = {
-  	for (i <- 0 until lopts.nthreads) {
-  	  if (i < Mat.hasCUDA) setGPU(i)
-  		if (dds(i).omats.length > 1) dds(i).omats(1) = ones(mopts.dim, dds(i).omats(0).ncols)
-  		dds(i).init
-  		models(i).init(dds(i))
-  		updaters(i).init(models(i))
-  	}
-  	if (0 < Mat.hasCUDA) setGPU(0)
-  }
-  
-  def run = lda.run
-}
 
-class TestFParLDA(
+class LearnFParFactorModel(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+		val mopts:FactorModel.Options,
+		mkmodel:(FactorModel.Options)=>FactorModel
 		) {
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var lda:ParLearner = null
   var lopts = new Learner.Options
-  var mopts = new LDAModel.Options
   var uopts = new IncNormUpdater.Options
   mopts.uiter = 8
   
@@ -517,7 +419,7 @@ class TestFParLDA(
     	dopts.sBlockSize = 4000000
     	dds(i) = new SFilesDataSource(dopts)
     	dds(i).init
-    	models(i) = new LDAModel(mopts)
+    	models(i) = mkmodel(mopts)
     	models(i).init(dds(i))
     	updaters(i) = new IncNormUpdater(uopts)
     	updaters(i).init(models(i))
@@ -541,16 +443,17 @@ class TestFParLDA(
 }
 
 
-class TestFParLDAx(
+class LearnFParFactorModelx(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+		mopts:FactorModel.Options,
+		mkmodel:(FactorModel.Options)=>FactorModel
 		) {
   var dd:DataSource = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var lda:ParLearnerx = null
   var lopts = new Learner.Options
-  var mopts = new LDAModel.Options
   var dopts = new SFilesDataSource.Options {
     	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
     	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
@@ -571,7 +474,7 @@ class TestFParLDAx(
     dd.init
     for (i <- 0 until lopts.nthreads) {
       if (i < Mat.hasCUDA) setGPU(i)
-    	models(i) = new LDAModel(mopts)
+    	models(i) = mkmodel(mopts)
     	models(i).init(dd)
     	updaters(i) = new IncNormUpdater(uopts)
     	updaters(i).init(models(i))
@@ -595,58 +498,15 @@ class TestFParLDAx(
   def run = lda.run
 }
 
-
-class TestFParNMFx(
-    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
-		) {
-  var dd:DataSource = null
-  var models:Array[Model] = null
-  var updaters:Array[Updater] = null
-  var nmf:ParLearnerx = null
-  var lopts = new Learner.Options
-  var mopts = new NMFModel.Options
-  var dopts = new SFilesDataSource.Options {
-    	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
-    }
-  var uopts = new IncNormUpdater.Options
-  lopts.npasses = 5
-  mopts.uiter = 8
-  dopts.fcounts = icol(100000)
-  dopts.lookahead = 8
-  dopts.blockSize = 100000
-  dopts.sBlockSize = 4000000
-  dopts.nstart = nstart
-  dopts.nend = nend
-  
-  def setup = {
-    models = new Array[Model](lopts.nthreads)
-    updaters = new Array[Updater](lopts.nthreads)
-    dd = new SFilesDataSource(dopts) 
-    dd.init
-    for (i <- 0 until lopts.nthreads) {
-      if (i < Mat.hasCUDA) setGPU(i)
-    	models(i) = new NMFModel(mopts)
-    	models(i).init(dd)
-    	updaters(i) = new IncNormUpdater(uopts)
-    	updaters(i).init(models(i))
-    }
-    if (0 < Mat.hasCUDA) setGPU(0)
-    nmf = new ParLearnerx(dd, models, null, updaters, lopts)   
+object Learner {
+	class Options {
+		var npasses = 10
+		var evalStep = 15
+		var syncStep = 32
+		var nthreads = 4
+		var pstep = 0.01f
+		var coolit = 10
+		var batch = false
   }
-  
-  def init = {
-	  dd.omats(1) = ones(mopts.dim, dd.omats(0).ncols)
-  	for (i <- 0 until lopts.nthreads) {
-  	  if (i < Mat.hasCUDA) setGPU(i)
-  		if (dd.omats.length > 1) 
-  		dd.init
-  		models(i).init(dd)
-  		updaters(i).init(models(i))
-  	}
-  	if (0 < Mat.hasCUDA) setGPU(0)
-  }
-  
-  def run = nmf.run
 }
+

@@ -16,7 +16,7 @@ abstract class Model(val opts:Model.Options = new Model.Options) {
   def init(datasource:DataSource):Unit = {
 	  mats = datasource.next
 	  datasource.reset
-	  if (opts.useGPU) {
+	  if (opts.useGPU && Mat.hasCUDA > 0) {
 	    gmats = new Array[Mat](mats.length)
 	    for (i <- 0 until mats.length) {
 	      gmats(i) = mats(i) match {
@@ -58,7 +58,7 @@ object Model {
 	class Options {
 	  var nzPerColumn:Int = 0
 	  var startBlock = 8000
-	  var useGPU = false
+	  var useGPU = true
 	  var putBack = -1
 	  var doubleScore = false
   }
