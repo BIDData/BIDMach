@@ -143,11 +143,11 @@ class IncMultUpdater(val opts:IncMultUpdater.Options = new IncMultUpdater.Option
 	    }
   	}
 //    println("rr=%g, %g %g" format (rr, mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
-    um ~ um * rm.set(rr)
+    um ~ um *@ rm.set(rr)
 //    println("rr=%g, %g %g" format (rr, mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
     ln(mm, mm)
 //    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
-    mm ~ mm * rm.set(1-rr)
+    mm ~ mm *@ rm.set(1-rr)
 //    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
     mm ~ mm + um 
 //    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
@@ -210,7 +210,7 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	  updatemat = model.updatemats(0)
     nsteps = options.initnsteps 
     if (sumSq.asInstanceOf[AnyRef] == null) {
-      sumSq = modelmat.ones(size(modelmat,1), size(modelmat,2)) * options.initsumsq
+      sumSq = modelmat.ones(size(modelmat,1), size(modelmat,2)) *@ options.initsumsq
     } else {
     	sumSq(?) = options.initsumsq
     }
@@ -223,10 +223,10 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	  val nw = (options.gradwindow/step)
 	  val ee = options.exponent
 	  val alpham = options.alpha
-	  sumSq  ~ (sumSq * (nw-1) + updatemat *@ updatemat) * (1/nw)
+	  sumSq  ~ (sumSq *@ (nw-1) + updatemat *@ updatemat) *@ (1/nw)
 	  if (nsteps > options.waitsteps) {
 	  	val tmp = (sumSq*nsteps) ^ ee
-	  	modelmat ~ modelmat + ((updatemat / tmp) * alpham)
+	  	modelmat ~ modelmat + ((updatemat / tmp) *@ alpham)
 	  }
 	  nsteps += step
 	}
@@ -247,7 +247,7 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	  	  val indx = j + i * modelmat.nrows
 	  	  val nw = if (nwm.length > 1) nwm(i) else nwm(0)
 	  		fsumSq.data(indx) = 1/nw*(fupdate.data(indx)*fupdate.data(indx) + (nw-1)*fsumSq.data(indx))
-	  		ftmp0.data(indx) = nsteps * fsumSq.data(indx)
+	  		ftmp0.data(indx) = fsumSq.data(indx) * nsteps
 	  		j += 1
 	  	}
 	    i += 1

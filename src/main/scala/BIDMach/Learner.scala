@@ -159,19 +159,21 @@ case class ParLearner(
   }
      
   def syncmodels(models:Array[Model]) = {
-	  mm.clear
-	  for (i <- 0 until models.length) {
-	  	if (i < Mat.hasCUDA) setGPU(i)
-	  	models(i).synchronized {
-	  		um <-- models(i).modelmats(0)
+	  for (j <- 0 until models(0).modelmats.length) {
+	  	mm.clear
+	  	for (i <- 0 until models.length) {
+	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		models(i).synchronized {
+	  			um <-- models(i).modelmats(j)
+	  		}
+	  		mm ~ mm + um
 	  	}
-	  	mm ~ mm + um
-	  }
-	  mm ~ mm * (1f/models.length)
-	  for (i <- 0 until models.length) {
-	  	if (i < Mat.hasCUDA) setGPU(i)
-	  	models(i).synchronized {
-	  		models(i).modelmats(0) <-- mm
+	  	mm ~ mm *@ (1f/models.length)
+	  	for (i <- 0 until models.length) {
+	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		models(i).synchronized {
+	  			models(i).modelmats(j) <-- mm
+	  		}
 	  	}
 	  }
 	  if (0 < Mat.hasCUDA) setGPU(0)
@@ -180,8 +182,8 @@ case class ParLearner(
   def syncmodel(models:Array[Model], ithread:Int) = {
 	  mm.synchronized {
 	  	um <-- models(ithread).modelmats(0)
-	  	um ~ um * (1f/opts.nthreads)
-	  	mm ~ mm * (1 - 1f/opts.nthreads)
+	  	um ~ um *@ (1f/opts.nthreads)
+	  	mm ~ mm *@ (1 - 1f/opts.nthreads)
 	  	mm ~ mm + um
 	  	models(ithread).modelmats(0) <-- mm
 	  }
@@ -317,16 +319,18 @@ case class ParLearnerx(
   }
      
   def syncmodels(models:Array[Model]) = {
-	  mm.clear
-	  for (i <- 0 until models.length) {
-	  	if (i < Mat.hasCUDA) setGPU(i)
-	  	um <-- models(i).modelmats(0)
-	  	mm ~ mm + um
-	  }
-	  mm ~ mm * (1f/models.length)
-	  for (i <- 0 until models.length) {
-	  	if (i < Mat.hasCUDA) setGPU(i)
-	  	models(i).modelmats(0) <-- mm
+	  for (j <- 0 until models(0).modelmats.length) {
+	  	mm.clear
+	  	for (i <- 0 until models.length) {
+	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		um <-- models(i).modelmats(j)
+	  		mm ~ mm + um
+	  	}
+	  	mm ~ mm *@ (1f/models.length)
+	  	for (i <- 0 until models.length) {
+	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		models(i).modelmats(j) <-- mm
+	  	}
 	  }
 	  if (0 < Mat.hasCUDA) setGPU(0)
   }
