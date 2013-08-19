@@ -394,7 +394,7 @@ class LearnFParFactorModel(
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
-  var lda:ParLearner = null
+  var learner:ParLearner = null
   var lopts = new Learner.Options
   var uopts = new IncNormUpdater.Options
   mopts.uiter = 8
@@ -425,7 +425,7 @@ class LearnFParFactorModel(
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
-    lda = new ParLearner(dds, models, null, updaters, lopts)   
+    learner = new ParLearner(dds, models, null, updaters, lopts)   
   }
   
   def init = {
@@ -439,7 +439,7 @@ class LearnFParFactorModel(
   	if (0 < Mat.hasCUDA) setGPU(0)
   }
   
-  def run = lda.run
+  def run = learner.run
 }
 
 
@@ -460,7 +460,7 @@ class LearnFParFactorModelx(
   var dd:DataSource = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
-  var lda:ParLearnerx = null
+  var learner:ParLearnerx = null
   var lopts = new Learner.Options
 
   var uopts = new IncNormUpdater.Options
@@ -481,7 +481,7 @@ class LearnFParFactorModelx(
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
-    lda = new ParLearnerx(dd, models, null, updaters, lopts)   
+    learner = new ParLearnerx(dd, models, null, updaters, lopts)   
   }
   
   def init = {
@@ -496,7 +496,7 @@ class LearnFParFactorModelx(
   	if (0 < Mat.hasCUDA) setGPU(0)
   }
   
-  def run = lda.run
+  def run = learner.run
 }
 
 object Learner {
@@ -506,7 +506,7 @@ object Learner {
 		var syncStep = 32
 		var nthreads = 4
 		var pstep = 0.01f
-		var coolit = 10
+		var coolit = 100
 		var batch = false
   }
 }

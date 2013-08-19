@@ -114,7 +114,7 @@ object NMFModel  {
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = {  	
-  	new LearnFParFactorModelx(nstart, nend, new LDAModel.Options, mkNMFmodel _)
+  	new LearnFParFactorModelx(nstart, nend, new NMFModel.Options, mkNMFmodel _)
   }
 } 
 
