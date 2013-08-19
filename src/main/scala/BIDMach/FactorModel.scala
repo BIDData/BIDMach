@@ -116,11 +116,31 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
     updatemats(1) ~ uu * mm
   }
   
-  override def evalfun(sdata:Mat, user:Mat):FMat = {
+  def evalfunx(sdata:Mat, user:Mat):FMat = {
 
 	  val modeldata =  mm * sdata
     val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
     val mmm = mm *^ mm
+
+    val ll0 =  sdata.contents ddot sdata.contents
+    val ll1 =  modeldata ddot user
+    val ll2 =  uu ddot mmm
+//    println("ll %f %f %f" format (ll0, ll1, ll2))
+    val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
+    val v2 =               -opts.uprior*(user ddot user)/sdata.nnz
+    row(v1,v2)
+  }
+  
+  override def evalfun(sdata0:Mat, user0:Mat):FMat = {
+    
+    val sdata = SDMat(sdata0)
+    val user = DMat(user0)
+    val mmf = DMat(mm)
+    val mdiagf = DMat(mdiag)
+
+	  val modeldata =  mmf * sdata
+    val uu = user *^ user + mdiagf *@ (1.0f*size(user,2)/opts.nusers)
+    val mmm = mmf *^ mmf
 
     val ll0 =  sdata.contents ddot sdata.contents
     val ll1 =  modeldata ddot user
