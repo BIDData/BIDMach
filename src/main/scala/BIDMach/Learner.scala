@@ -386,8 +386,8 @@ class LearnFactorModel(mat:Mat, val mopts:FactorModel.Options, mkmodel:(FactorMo
 
 
 class LearnFParFactorModel(
-    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+    nstart:Int,
+		nend:Int,
 		val mopts:FactorModel.Options,
 		mkmodel:(FactorModel.Options)=>FactorModel
 		) {
@@ -444,26 +444,27 @@ class LearnFParFactorModel(
 
 
 class LearnFParFactorModelx(
-    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+    nstart:Int,
+		nend:Int,
 		mopts:FactorModel.Options,
-		mkmodel:(FactorModel.Options)=>FactorModel
+		mkmodel:(FactorModel.Options)=>FactorModel,
+		val dopts:SFilesDataSource.Options = new SFilesDataSource.Options {
+			override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+				override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
+				fcounts = icol(100000)
+				lookahead = 8
+				blockSize = 100000
+				sBlockSize = 4000000
+		}
 		) {
   var dd:DataSource = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var lda:ParLearnerx = null
   var lopts = new Learner.Options
-  var dopts = new SFilesDataSource.Options {
-    	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
-    }
+
   var uopts = new IncNormUpdater.Options
   mopts.uiter = 8
-  dopts.fcounts = icol(100000)
-  dopts.lookahead = 8
-  dopts.blockSize = 100000
-  dopts.sBlockSize = 4000000
   dopts.nstart = nstart
   dopts.nend = nend
   
