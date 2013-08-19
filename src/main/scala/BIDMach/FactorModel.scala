@@ -145,6 +145,7 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
     modelmat ~ modelmat *@ sdat
     val msum = sum(modelmat, 2)
     modelmat ~ modelmat / msum
+    modelmats = new Array[Mat](1)
     modelmats(0) = if (opts.useGPU) GMat(modelmat) else modelmat
     datasource.reset
     
