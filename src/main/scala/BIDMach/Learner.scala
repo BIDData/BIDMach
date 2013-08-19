@@ -590,3 +590,59 @@ class TestFParLDAx(
   
   def run = lda.run
 }
+
+
+class TestFParNMFx(
+    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
+		) {
+  var dd:DataSource = null
+  var models:Array[Model] = null
+  var updaters:Array[Updater] = null
+  var nmf:ParLearnerx = null
+  var lopts = new Learner.Options
+  var mopts = new NMFModel.Options
+  var dopts = new SFilesDataSource.Options {
+    	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
+    }
+  var uopts = new IncNormUpdater.Options
+  lopts.npasses = 5
+  mopts.uiter = 8
+  dopts.fcounts = icol(100000)
+  dopts.lookahead = 8
+  dopts.blockSize = 100000
+  dopts.sBlockSize = 4000000
+  dopts.nstart = nstart
+  dopts.nend = nend
+  
+  def setup = {
+    models = new Array[Model](lopts.nthreads)
+    updaters = new Array[Updater](lopts.nthreads)
+    dd = new SFilesDataSource(dopts) 
+    dd.init
+    for (i <- 0 until lopts.nthreads) {
+      if (i < Mat.hasCUDA) setGPU(i)
+    	models(i) = new NMFModel(mopts)
+    	models(i).init(dd)
+    	updaters(i) = new IncNormUpdater(uopts)
+    	updaters(i).init(models(i))
+    }
+    if (0 < Mat.hasCUDA) setGPU(0)
+    nmf = new ParLearnerx(dd, models, null, updaters, lopts)   
+  }
+  
+  def init = {
+	  dd.omats(1) = ones(mopts.dim, dd.omats(0).ncols)
+  	for (i <- 0 until lopts.nthreads) {
+  	  if (i < Mat.hasCUDA) setGPU(i)
+  		if (dd.omats.length > 1) 
+  		dd.init
+  		models(i).init(dd)
+  		updaters(i).init(models(i))
+  	}
+  	if (0 < Mat.hasCUDA) setGPU(0)
+  }
+  
+  def run = nmf.run
+}
