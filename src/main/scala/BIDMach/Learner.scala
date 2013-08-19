@@ -463,7 +463,8 @@ class LearnFParFactorModelx(
   var learner:ParLearnerx = null
   var lopts = new Learner.Options
 
-  var uopts = new IncNormUpdater.Options
+//  var uopts = new IncNormUpdater.Options
+  var uopts = new TelescopingUpdater.Options
   mopts.uiter = 8
   dopts.nstart = nstart
   dopts.nend = nend
@@ -477,7 +478,8 @@ class LearnFParFactorModelx(
       if (i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
     	models(i).init(dd)
-    	updaters(i) = new IncNormUpdater(uopts)
+//    	updaters(i) = new IncNormUpdater(uopts)
+    	updaters(i) = new TelescopingUpdater(uopts)
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
@@ -506,7 +508,7 @@ object Learner {
 		var syncStep = 32
 		var nthreads = 4
 		var pstep = 0.01f
-		var coolit = 100
+		var coolit = 50
 		var batch = false
   }
 }
