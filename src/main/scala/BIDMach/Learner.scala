@@ -398,8 +398,8 @@ class TestNMF(mat:Mat) {
   var lopts = new Learner.Options
   var mopts = new NMFModel.Options
   var dopts = new MatDataSource.Options
-  var uopts = new BatchMultUpdater.Options
-//  var uopts = new IncMultUpdater.Options
+//  var uopts = new BatchMultUpdater.Options
+  var uopts = new IncNormUpdater.Options
   def setup = { 
     val aa = if (mopts.putBack >= 0) {
     	val a = new Array[Mat](2); a(1) = ones(mopts.dim, mat.ncols); a
@@ -411,8 +411,8 @@ class TestNMF(mat:Mat) {
     dd.init
     model = new NMFModel(mopts)
     model.init(dd)
-    updater = new BatchMultUpdater(uopts)
-//    updater = new IncMultUpdater(uopts)
+//    updater = new BatchMultUpdater(uopts)
+    updater = new IncNormUpdater(uopts)
     updater.init(model)
     nmf = new Learner(dd, model, null, updater, lopts)   
   }
