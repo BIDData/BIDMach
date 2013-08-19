@@ -20,11 +20,11 @@ case class Learner(
     var done = false
     var ipass = 0
     var here = 0L
+    updater.clear
     val reslist = new ListBuffer[Float]
     val samplist = new ListBuffer[Float]
     while (ipass < opts.npasses && ! done) {
       datasource.reset
-      updater.clear
       var istep = 0
       println("i=%2d" format ipass)
       while (datasource.hasNext) {
@@ -32,7 +32,7 @@ case class Learner(
         here += datasource.opts.blockSize
         if ((istep + 1) % opts.evalStep == 0 || ! datasource.hasNext) {
         	val scores = model.evalblockg(mats)
-        	print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); println(" mem=%f" format GPUmem._1)
+        	print("ll="); scores.data.foreach(v => print(" %4.3f" format v)); if (model.opts.useGPU) println(" mem=%f" format GPUmem._1) else println()
         	reslist.append(scores(0))
         	samplist.append(here)
         } else {
@@ -389,6 +389,43 @@ class TestLDA(mat:Mat) {
   def run = lda.run
 }
 
+
+class TestNMF(mat:Mat) {
+  var dd:MatDataSource = null
+  var model:NMFModel = null
+  var updater:Updater = null
+  var nmf:Learner = null
+  var lopts = new Learner.Options
+  var mopts = new NMFModel.Options
+  var dopts = new MatDataSource.Options
+  var uopts = new BatchMultUpdater.Options
+//  var uopts = new IncMultUpdater.Options
+  def setup = { 
+    val aa = if (mopts.putBack >= 0) {
+    	val a = new Array[Mat](2); a(1) = ones(mopts.dim, mat.ncols); a
+    } else {
+      new Array[Mat](1)
+    }
+    aa(0) = mat
+    dd = new MatDataSource(aa, dopts)
+    dd.init
+    model = new NMFModel(mopts)
+    model.init(dd)
+    updater = new BatchMultUpdater(uopts)
+//    updater = new IncMultUpdater(uopts)
+    updater.init(model)
+    nmf = new Learner(dd, model, null, updater, lopts)   
+  }
+  
+  def init = {
+    if (dd.omats.length > 1) dd.omats(1) = ones(model.opts.dim, dd.omats(0).ncols)
+    dd.init
+    model.init(dd)
+    updater.init(model)
+  }
+  
+  def run = nmf.run
+}
 
 class TestParLDA(mat:Mat) {
   var dds:Array[DataSource] = null
