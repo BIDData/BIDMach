@@ -33,34 +33,41 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   override def init(model0:Model) = {
     super.init(model0)
     restart = modelmats(0) + 1f
+    rm = model0.modelmats(0).zeros(1,1)
   }
       
   def update(step:Long) = {
-  	val modelmat = modelmats(0)
-  	val updatemat = updatemats(0)
+  	val mm = modelmats(0)
+  	val um = updatemats(0)
   	val rr = if (step == 0) 1f else {
   	  if (firstStep == 0f) {
   	    firstStep = step
   	    1f
   	  } else {
-  	    math.pow(step / firstStep, opts.power).toFloat
+  	    math.pow(firstStep / step, opts.power).toFloat
   	  }
   	}
-  	val su = sum(updatemat,2)
-  	su ~ su * rr
-  	updatemat ~ updatemat / su
-  	modelmat ~ modelmat * (1-1/rr)
-    modelmat ~ modelmat + updatemat 
-    modelmat ~ modelmat / sum(modelmat,2)
+  	if (modelmats.length > 1) {
+  		val ms = modelmats(1)
+  		val ums = updatemats(1)
+  		ums ~ ums * rm.set(rr)
+  		ms ~ ms * rm.set(1-rr)
+  		ms ~ ms + ums
+  		um ~ um / ms
+  	}
+  	um ~ um * rm.set(rr)
+  	mm ~ mm * rm.set(1-rr)
+    mm ~ mm + um 
+    mm ~ mm / sum(mm,2)
     if (opts.warmup > 0) {
       if (started == 0 && step > opts.warmup) {
-        restart <-- modelmat
+        restart <-- mm
         started = 1
       }
       if (started == 1 && step > 2*opts.warmup) {
-        modelmat <-- modelmat - restart
-        max(modelmat, 0f, modelmat)
-        modelmat ~ modelmat / sum(modelmat,2)
+        mm <-- mm - restart
+        max(mm, 0f, mm)
+        mm ~ mm / sum(mm,2)
         started = 2
       }
     }
@@ -72,24 +79,33 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
 }
 
 class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.Options) extends Updater {
-  var accumulator:Mat = null
+  var accumulators:Array[Mat] = null
   
   override def init(model0:Model) = {
     super.init(model0)
-    accumulator = updatemats(0).zeros(updatemats(0).nrows, updatemats(0).ncols)
+    modelmats = model.modelmats
+    updatemats = model.updatemats
+    accumulators = new Array[Mat](updatemats.length)
+    for (i <- 0 until accumulators.length) {
+    	accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
+    }
   }
      
   def update(step:Long) = {
-    accumulator ~ accumulator + updatemats(0) 
+    for (i <- 0 until accumulators.length) {
+    	accumulators(i) ~ accumulators(i) + updatemats(i) 
+    }
   }
   
   override def clear() = {
-	  accumulator.clear
+	  for (i <- 0 until accumulators.length) {
+	  	accumulators(i).clear
+	  }
   }
   
   override def updateM():Unit = {
-    val modelmat = modelmats(0)
-    modelmat ~ accumulator / sum(accumulator,2)
+    val mm = modelmats(0)
+    mm ~ accumulators(0) / sum(accumulators(0),2)
   }
 }
 
@@ -106,7 +122,9 @@ class IncMultUpdater(val opts:IncMultUpdater.Options = new IncMultUpdater.Option
       
   def update(step:Long) = {
     val mm = modelmats(0)
+    val ms = modelmats(1)
     val um = updatemats(0)
+    val ums = updatemats(1)
     val rr = if (step == 0) 1f else {
 	    if (firstStep == 0f) {
 	    	firstStep = step

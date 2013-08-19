@@ -13,9 +13,13 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
-    updatemats = new Array[Mat](1)
     mm = modelmats(0)
+    modelmats = Array[Mat](2)
+    modelmats(0) = mm
+    modelmats(1) = mm.zeros(mm.ncols, 1)
+    updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
+    updatemats(1) = mm.zeros(mm.nrows, 1)
   }
   
   def uupdate(sdata:Mat, user:Mat):Unit = {
@@ -41,10 +45,10 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
     max(opts.weps, pc, pc)
     pc ~ dc / pc
     val ud = user *^ preds
-    ud ~ ud / sum(user, 2)
     ud ~ ud *@ mm
     ud ~ ud + opts.beta
-  	updatemats(0) <-- ud      
+  	updatemats(0) <-- ud  
+  	sum(user, 2, updatemats(1))
   	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
   
@@ -60,29 +64,6 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
   	if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1))
   	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
   	row(vv, math.exp(-vv))
-  }
-}
-
-class BatchLDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extends LDAModel(opts) {
-  
-  override def init(datasource:DataSource) = {
-    this.asInstanceOf[FactorModel].init(datasource)
-    updatemats = new Array[Mat](2)
-    mm = modelmats(0)
-    updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    updatemats(1) = mm.zeros(mm.nrows, 1)
-  }
-  
-  override def mupdate(sdata:Mat, user:Mat):Unit = {
-    val preds = DDS(mm, user, sdata)
-    val dc = sdata.contents
-    val pc = preds.contents
-    max(opts.weps, pc, pc)
-    pc ~ dc / pc
-    val ud = user *^ preds
-  	updatemats(0) <-- ud  
-  	sum(user, 2, updatemats(1)) 
-  	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
 }
 
@@ -164,7 +145,6 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
     modelmat ~ modelmat *@ sdat
     val msum = sum(modelmat, 2)
     modelmat ~ modelmat / msum
-    modelmats = Array[Mat](1)
     modelmats(0) = if (opts.useGPU) GMat(modelmat) else modelmat
     datasource.reset
     
