@@ -60,5 +60,6 @@ object Model {
 	  var startBlock = 8000
 	  var useGPU = false
 	  var putBack = -1
+	  var doubleScore = false
   }
 }
