@@ -356,7 +356,7 @@ class LearnFactorModel(mat:Mat, val mopts:FactorModel.Options, mkmodel:(FactorMo
   var learner:Learner = null
   var lopts = new Learner.Options
   var dopts = new MatDataSource.Options
-  var uoptsb = new BatchMultUpdater.Options
+  var uoptsb = new BatchNormUpdater.Options
   var uopts = new IncNormUpdater.Options
   def setup = { 
     val aa = if (mopts.putBack >= 0) {
@@ -369,7 +369,7 @@ class LearnFactorModel(mat:Mat, val mopts:FactorModel.Options, mkmodel:(FactorMo
     dd.init
     model = mkmodel(mopts)
     model.init(dd)
-    updater = if (lopts.batch) new BatchMultUpdater(uoptsb) else new IncNormUpdater(uopts)
+    updater = if (lopts.batch) new BatchNormUpdater(uoptsb) else new IncNormUpdater(uopts)
     updater.init(model)
     learner = new Learner(dd, model, null, updater, lopts)   
   }

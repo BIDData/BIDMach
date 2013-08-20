@@ -32,6 +32,7 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
     val updatemats = model0.updatemats
     restart = modelmats(0) + 1f
     rm = model0.modelmats(0).zeros(1,1)
+    firstStep = 0f
   }
       
   def update(step:Long) = {
@@ -39,10 +40,10 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   	val updatemats = model.updatemats
   	val mm = modelmats(0)
   	val um = updatemats(0)
-  	val rr = if (step == 0) 0.9f else {
+  	val rr = if (step == 0) 0.99f else {
   	  if (firstStep == 0f) {
   	    firstStep = step
-  	    0.9f
+  	    0.99f
   	  } else {
   	    math.pow(firstStep / step, opts.power).toFloat
   	  }
@@ -70,7 +71,7 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
         started = 1
       }
       if (started == 1 && step > 2*opts.warmup) {
-        mm <-- mm - restart
+        mm ~ mm - restart
         max(mm, 0f, mm)
         mm ~ mm / sum(mm,2)
         started = 2
@@ -110,9 +111,10 @@ class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.
   }
   
   override def updateM():Unit = {
- 		val modelmats = model.modelmats
-    val mm = modelmats(0)
-    mm ~ accumulators(0) / sum(accumulators(0),2)
+    val mm = model.modelmats(0)
+    mm ~ accumulators(0) / accumulators(1)
+    mm ~ mm / sum(mm,2)
+    clear
   }
 }
 
@@ -158,37 +160,6 @@ class IncMultUpdater(val opts:IncMultUpdater.Options = new IncMultUpdater.Option
   
   override def clear() = {
 	  firstStep = 0f
-  }
-}
-
-class BatchMultUpdater(val opts:BatchMultUpdater.Options = new BatchMultUpdater.Options) extends Updater {
-  var accumulators:Array[Mat] = null
-  
-  override def init(model0:Model) = {
-    super.init(model0)
-    val updatemats = model.updatemats
-    accumulators = new Array[Mat](updatemats.length)
-    for (i <- 0 until updatemats.length)
-    	accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
-  }
-     
-  def update(step:Long) = {
-	  val updatemats = model.updatemats
-    for (i <- 0 until updatemats.length)
-	    accumulators(i) ~ accumulators(i) + updatemats(i) 
-  }
-  
-  override def clear() = {
-	  val updatemats = model.updatemats
-    for (i <- 0 until updatemats.length)
-     	accumulators(i).clear
-  }
-  
-  override def updateM():Unit = {
-  	val modelmats = model.modelmats
-    val mm = modelmats(0)
-    modelmats(0) ~ accumulators(0) / accumulators(1)
-    clear
   }
 }
 
