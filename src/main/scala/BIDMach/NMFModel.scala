@@ -90,7 +90,7 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
 
 object NMFModel  {
   class Options extends FactorModel.Options {
-    var NMFeps = 1e-9
+    var NMFeps = 1e-12
     var uprior = 0.01f
     var mprior = 1e-4f
     var nusers = 100000
