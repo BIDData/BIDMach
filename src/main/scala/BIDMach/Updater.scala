@@ -195,7 +195,7 @@ class BatchMultUpdater(val opts:BatchMultUpdater.Options = new BatchMultUpdater.
 class TelescopingUpdater(val opts:TelescopingUpdater.Options = new TelescopingUpdater.Options) extends Updater {
 	var accumulators:Array[Mat] = null
   var firstStep = 0L
-  var nextStep = 0L
+  var nextStep = 10L
   var nextCount = 0L
   var rm:Mat = null
   
@@ -209,15 +209,13 @@ class TelescopingUpdater(val opts:TelescopingUpdater.Options = new TelescopingUp
     	accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
     }
   	firstStep = 0L
-    nextStep = 0L
+    nextStep = 10L
     nextCount = 0L
   }
 	
 	def update(step:Long) = {
 	  if (firstStep == 0 && step > 0) {
 	    firstStep = step
-	    nextStep = step
-	    nextCount = step
 	  }
 	  val updatemats = model.updatemats
     for (i <- 0 until updatemats.length) {
@@ -226,7 +224,7 @@ class TelescopingUpdater(val opts:TelescopingUpdater.Options = new TelescopingUp
 	  if (step >= nextCount) {
 	    model.modelmats(0) ~ accumulators(0) / accumulators(1)
 	    nextStep = (nextStep * opts.factor).toLong
-	    nextCount += nextStep
+	    nextCount = step + nextStep
 	  }
   }
   
