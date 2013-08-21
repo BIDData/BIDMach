@@ -97,8 +97,7 @@ object Twitter {
     Dict(bd, bc)
 	}
 	
-	def findEmoticons(n:Int) = {
-    val dict = getDict
+	def findEmoticons(n:Int, dict:Dict) = {
     val smiles = csrow(":-)", ":)", ":o)", ":]", ":3", ":c)", ":>", "=]", "8)", "=)", ":}", ":^)", ":っ)")
     val laughs = csrow(":-D", ":D", "8-D", "8D", "x-D", "xD", "X-D", "XD", "=-D", "=D", "=-3", "=3", "B^D")
     val frowns = csrow(">:[", ":-(", ":(", "", ":-c", ":c", ":-<", "", ":っC", ":<", ":-[", ":[", ":{")
