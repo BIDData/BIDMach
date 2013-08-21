@@ -501,9 +501,9 @@ object SFilesDataSource {
   def twitterWords(
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
-  	val opts1 = new SFilesDataSource.Options { 
+  	val opts = new SFilesDataSource.Options { 
   		override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
+  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
   		fcounts = icol(100000)
   		nstart = nstart0 
   		nend = nend0 
@@ -512,15 +512,15 @@ object SFilesDataSource {
   		eltsPerSample = 40
   		lookahead = 3
   	}
-  	new SFilesDataSource(opts1)
+  	new SFilesDataSource(opts)
   }
   
   def twitterSmileyWords(
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
-  	val opts1 = new SFilesDataSource.Options { 
+  	val opts = new SFilesDataSource.Options { 
   		override val localDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
-  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
+  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
   		fcounts = icol(100000)
   		nstart = nstart0 
   		nend = nend0 
@@ -529,18 +529,18 @@ object SFilesDataSource {
   		eltsPerSample = 40
   		lookahead = 3
   	}
-  	new SFilesDataSource(opts1)
+  	new SFilesDataSource(opts)
   }
   
   def twitterNgrams(
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
-  	val opts1 = new SFilesDataSource.Options { 
+  	val opts = new SFilesDataSource.Options { 
   		override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
   		override def fnames:List[(Int)=>String] = List(
-  				FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"),
-  				FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/bifeats%02d.lz4"),
-  				FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/trifeats%02d.lz4")
+  				FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"),
+  				FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4"),
+  				FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4")
   		    )
   		fcounts = icol(50000,100000,400000)
   		nstart = nstart0 
@@ -550,9 +550,47 @@ object SFilesDataSource {
   		eltsPerSample = 40
   		lookahead = 3
   	}
-  	new SFilesDataSource(opts1)
+  	new SFilesDataSource(opts)
   }
   
+  def twitterSmileyNgrams(
+      nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
+  	val opts = new SFilesDataSource.Options { 
+  		override val localDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
+  		override def fnames:List[(Int)=>String] = List(
+  				FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"),
+  				FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4"),
+  				FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4")
+  		    )
+  		fcounts = icol(50000,100000,400000)
+  		nstart = nstart0 
+  		nend = nend0 
+  		order = 1
+  		blockSize = 100000
+  		eltsPerSample = 40
+  		lookahead = 3
+  	}
+  	new SFilesDataSource(opts)
+  }
+   
+  def twitterWordBlend = { 
+    val nstart0 = FilesDataSource.encodeDate(2012,3,1,0)
+    val nend0 = FilesDataSource.encodeDate(2012,12,1,0) 
+    val ds1 = twitterWords(nstart0, nend0)
+    val ds2 = twitterSmileyWords(nstart0, nend0)
+    val opts3 = new DataSource.Options
+    new BlendedDataSource(ds1, ds2, 0.1f, opts3)
+  }
+  
+  def twitterNgramBlend = { 
+    val nstart0 = FilesDataSource.encodeDate(2012,3,1,0)
+    val nend0 = FilesDataSource.encodeDate(2012,12,1,0) 
+    val ds1 = twitterNgrams(nstart0, nend0)
+    val ds2 = twitterSmileyNgrams(nstart0, nend0)
+    val opts3 = new DataSource.Options
+    new BlendedDataSource(ds1, ds2, 0.1f, opts3)
+  }
   
   def testSources(typ:String="lz4") = { 
   	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
@@ -581,17 +619,6 @@ object SFilesDataSource {
       }
     }
   }
-  
-   
-  def twitterBlend = { 
-    val nstart0 = FilesDataSource.encodeDate(2012,3,1,0)
-    val nend0 = FilesDataSource.encodeDate(2012,12,1,0) 
-    val ds1 = twitterWords(nstart0, nend0)
-    val ds2 = twitterSmileyWords(nstart0, nend0)
-    val opts3 = new DataSource.Options
-    new BlendedDataSource(ds1, ds2, 0.1f, opts3)
-  }
-
 }
 
 object MatDataSource {

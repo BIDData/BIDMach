@@ -90,4 +90,15 @@ object Twitter {
   	HMat.saveDMat(outfname + "wcount.gz", dyy.counts)
   	dyy
 	}
+	
+	def getDict = {
+  	val bd = loadBMat("/big/twitter/tokenized/alldict.gz")
+    val bc = loadDMat("/big/twitter/tokenized/allwcount.gz")
+    Dict(bd, bc)
+	}
+	
+	def findEmoticons = {
+    val dict = getDict
+    val ems = List(List(":-)"))
+	}
 }
