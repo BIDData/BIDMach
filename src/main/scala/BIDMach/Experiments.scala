@@ -99,14 +99,14 @@ object Twitter {
 	
 	def findEmoticons(n:Int, dict:Dict) = {
     val smiles = csrow(":-)", ":)", ":o)", ":]", ":3", ":c)", ":>", "=]", "8)", "=)", ":}", ":^)", ":っ)")
-    val laughs = csrow(":-D", ":D", "8-D", "8D", "x-D", "xD", "X-D", "XD", "=-D", "=D", "=-3", "=3", "B^D")
-    val frowns = csrow(">:[", ":-(", ":(", "", ":-c", ":c", ":-<", "", ":っC", ":<", ":-[", ":[", ":{")
+    val laughs = csrow(":-d", ":d", "8-d", "8d", "x-d", "xd", "x-x", "=-d", "=d", "=-3", "=3", "b^d")
+    val frowns = csrow(">:[", ":-(", ":(", "", ":-c", ":c", ":-<", "", ":っc", ":<", ":-[", ":[", ":{")
     val angry = csrow(":-||", ":@", ">:(")
-    val crying = csrow(":'-(", ":'(", "QQ")
-    val horror = csrow("D:<", "D:", "D8", "D;", "D=", "DX", "v.v", "D-':")
-    val surprise = csrow(">:O", ":-O", ":O", "°o°", "°O°", ":O", "o_O", "o_0", "o.O", "8-0")
+    val crying = csrow(":'-(", ":'(", "qq")
+    val horror = csrow("d:<", "d:", "d8", "d;", "d=", "dx", "v.v", "d-':")
+    val surprise = csrow(">:o", ":-o", ":o", "°o°", "°o°", ":o", "o_o", "o_0", "o.o", "8-0")
     val kiss = csrow(":*", ":^*", "'}{'")
-    val wink = csrow(";-)", ";)", "*-)", "*)", ";-]", ";]", ";D", ";^)", ":-,")
+    val wink = csrow(";-)", ";)", "*-)", "*)", ";-]", ";]", ";d", ";^)", ":-,")
     val all = List(smiles, laughs, frowns, angry, crying, horror, surprise, kiss, wink)
     val dd = getDict
     val out = zeros(all.length, n)
