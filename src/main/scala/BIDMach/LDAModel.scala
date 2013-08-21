@@ -78,7 +78,11 @@ object LDAModel  {
   
   def mkLDAmodel(fopts:FactorModel.Options) = {
   	new LDAModel(fopts.asInstanceOf[LDAModel.Options])
-  }  	
+  }
+  
+  def mkUpdater(nopts:Updater.Options) = {
+  	new IncNormUpdater(nopts.asInstanceOf[IncNormUpdater.Options])
+  } 
   
   def learn(mat0:Mat) = {
   	new LearnFactorModel(mat0, new LDAModel.Options, mkLDAmodel _)
@@ -95,7 +99,10 @@ object LDAModel  {
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = {	
-  	new LearnFParFactorModelx(nstart, nend, new LDAModel.Options, mkLDAmodel _)
+  	new LearnFParFactorModelx(
+  	    new LDAModel.Options, mkLDAmodel _, 
+  	    new IncNormUpdater.Options, mkUpdater _, 
+  	    SFilesDataSource.twitterWords(nstart, nend))
   }
 }
 
