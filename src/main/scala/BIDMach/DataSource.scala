@@ -362,7 +362,7 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
 
 }
 
-class BlendedDataSource(s1:DataSource, s2:DataSource, alpha:Float, override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) {
+class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) {
   var sizeMargin = 0f 
   var here = 0L
   var there = 0
@@ -442,7 +442,7 @@ class BlendedDataSource(s1:DataSource, s2:DataSource, alpha:Float, override val 
   
   def copycol(inmats:Array[Mat], iptr:Int, omats:Array[Mat], here:Int) = {
     for (imat <- 0 until inmats.length) {
-      inmats(imat).colslice(iptr, iptr+1, omats(imat), here)
+      omats(imat) = inmats(imat).colslice(iptr, iptr+1, omats(imat), here)
     }
   }
   
