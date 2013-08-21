@@ -97,8 +97,27 @@ object Twitter {
     Dict(bd, bc)
 	}
 	
-	def findEmoticons = {
+	def findEmoticons(n:Int) = {
     val dict = getDict
-    val ems = List(List(":-)"))
+    val smiles = csrow(":-)", ":)", ":o)", ":]", ":3", ":c)", ":>", "=]", "8)", "=)", ":}", ":^)", ":っ)")
+    val laughs = csrow(":-D", ":D", "8-D", "8D", "x-D", "xD", "X-D", "XD", "=-D", "=D", "=-3", "=3", "B^D")
+    val frowns = csrow(">:[", ":-(", ":(", "", ":-c", ":c", ":-<", "", ":っC", ":<", ":-[", ":[", ":{")
+    val angry = csrow(":-||", ":@", ">:(")
+    val crying = csrow(":'-(", ":'(", "QQ")
+    val horror = csrow("D:<", "D:", "D8", "D;", "D=", "DX", "v.v", "D-':")
+    val surprise = csrow(">:O", ":-O", ":O", "°o°", "°O°", ":O", "o_O", "o_0", "o.O", "8-0")
+    val kiss = csrow(":*", ":^*", "'}{'")
+    val wink = csrow(";-)", ";)", "*-)", "*)", ";-]", ";]", ";D", ";^)", ":-,")
+    val all = List(smiles, laughs, frowns, angry, crying, horror, surprise, kiss, wink)
+    val dd = getDict
+    val out = zeros(all.length, n)
+    for (i <- 0 until all.length) {
+      val mm = all(i)
+      for (j <- 0 until mm.length) {
+        val k = dd(mm(j))
+        if (k >= 0 && k < n) out(i, k) = 1
+      }      
+    }
+    out    
 	}
 }
