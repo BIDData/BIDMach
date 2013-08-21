@@ -404,7 +404,7 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, o
   }
   
   def next:Array[Mat] = {
-    rand(1, blockSize, randv)
+    rand(0, 1f, randv)
     var i = 0
     while (i < blockSize && hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)) {
       if (randv.data(i) < alpha) {
