@@ -239,7 +239,7 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
     initbase
     var totsize = sum(opts.fcounts).v
     omats = new Array[Mat](1)
-    omats(0) = SMat(totsize, opts.blockSize, opts.sBlockSize)
+    omats(0) = SMat(totsize, opts.blockSize, opts.blockSize * opts.eltsPerSample)
     inptrs = izeros(opts.fcounts.length, 1)
     offsets = 0 on cumsum(opts.fcounts)
   }
@@ -480,17 +480,13 @@ object FilesDataSource {
     }    
   }
   
-  def filexx = sampleFun("/disk%02d/twitter/tokenized/%04d/%02d/%02d/tweet%02d.gz")
-  
   class Options extends DataSource.Options {
-  	val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-  	def fnames:List[(Int)=>String] = List(sampleFun(localDir + "unifeats%02d.lz4"),
-  			                                  sampleFun(localDir + "bifeats%02d.lz4"),
-  			                                  sampleFun(localDir + "trifeats%02d.lz4"))
+  	val localDir:String = ""
+  	def fnames:List[(Int)=>String] = null
   	var lookahead = 8
   	var sampleFiles = 1.0f
-    var nstart:Int = encodeDate(2011,11,22,0)
-    var nend:Int = encodeDate(2013,6,31,0)
+    var nstart:Int = 0
+    var nend:Int = 0
     var dorows:Boolean = true
     var order:Int = 1                           // 0 = sequential order, 1 = random
   }
@@ -498,29 +494,69 @@ object FilesDataSource {
 
 object SFilesDataSource {
   class Options extends FilesDataSource.Options {
-  	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-  	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"),
-  			                                           FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4"),
-  			                                           FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4"))
-  	var fcounts = icol(20000,100000,400000)
-  	lookahead = 8
-  	sampleFiles = 1.0f
-    nstart = FilesDataSource.encodeDate(2011,11,22,0)
-    nend = FilesDataSource.encodeDate(2013,6,31,0)
-    blockSize = 100000
-    var sBlockSize = 4000000
+  	var fcounts:IMat = null
+    var eltsPerSample = 0
   }
   
-  val singleOpts = new Options {
-    override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
-    fcounts = icol(100000)
+  def twitterWords(
+      nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
+  	val opts1 = new SFilesDataSource.Options { 
+  		override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
+  		fcounts = icol(100000)
+  		nstart = nstart0 
+  		nend = nend0 
+  		order = 1
+  		blockSize = 100000
+  		eltsPerSample = 40
+  		lookahead = 3
+  	}
+  	new SFilesDataSource(opts1)
+  }
+  
+  def twitterSmileyWords(
+      nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
+  	val opts1 = new SFilesDataSource.Options { 
+  		override val localDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
+  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
+  		fcounts = icol(100000)
+  		nstart = nstart0 
+  		nend = nend0 
+  		order = 1
+  		blockSize = 100000
+  		eltsPerSample = 40
+  		lookahead = 3
+  	}
+  	new SFilesDataSource(opts1)
+  }
+  
+  def twitterNgrams(
+      nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
+  	val opts1 = new SFilesDataSource.Options { 
+  		override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+  		override def fnames:List[(Int)=>String] = List(
+  				FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"),
+  				FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/bifeats%02d.lz4"),
+  				FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/trifeats%02d.lz4")
+  		    )
+  		fcounts = icol(50000,100000,400000)
+  		nstart = nstart0 
+  		nend = nend0 
+  		order = 1
+  		blockSize = 100000
+  		eltsPerSample = 40
+  		lookahead = 3
+  	}
+  	new SFilesDataSource(opts1)
   }
   
   
   def testSources(typ:String="lz4") = { 
-    val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-    val nstart0 = FilesDataSource.encodeDate(2011,11,22,0)
-    val nend0 = FilesDataSource.encodeDate(2013,7,1,0)
+  	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
+    val nend0 = FilesDataSource.encodeDate(2012,11,1,0)
     var bytes = 0L
     var done = 0L
     var step = 10000000000L
@@ -528,59 +564,32 @@ object SFilesDataSource {
     val nthreads = 8
     for (i <- 0 until nthreads) { 
       scala.actors.Actor.actor { 
-      val opts = new SFilesDataSource.Options { 
-        override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d."+typ))
-        fcounts = icol(1000000)
-        nstart = nstart0 + i * (nend0 - nstart0) / nthreads
-        nend = nstart0 + (i+1) * (nend0 - nstart0) / nthreads
-        order = 1
-        blockSize = 100000
-        sBlockSize = 2000000
-        lookahead = 3
-      }
-      val ss = new SFilesDataSource(opts)
-      ss.init
-      while (ss.hasNext) { 
-        val a = ss.next
-        bytes += 12L*a(0).nnz
-        if (bytes > done + step) { 
-          done += step
-          val t=toc
-          println("GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
+        val nstart = nstart0 + i * (nend0 - nstart0) / nthreads
+        val nend = nstart0 + (i+1) * (nend0 - nstart0) / nthreads
+        val ss = twitterWords(nstart, nend)
+        ss.opts.lookahead = 3
+        ss.init
+        while (ss.hasNext) { 
+        	val a = ss.next
+        	bytes += 12L*a(0).nnz
+        	if (bytes > done + step) { 
+        		done += step
+        		val t=toc
+        		println("GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
+        	}
         }
       }
-    }
     }
   }
   
    
-  def testBlender = { 
-    val nstart0 = FilesDataSource.encodeDate(2011,11,22,0)
-    val nend0 = FilesDataSource.encodeDate(2013,7,1,0) 
-    val opts1 = new SFilesDataSource.Options { 
-    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
-    	fcounts = icol(1000000)
-    	nstart = nstart0 
-    	nend = nend0 
-    	order = 1
-    	blockSize = 100000
-    	sBlockSize = 2000000
-    	lookahead = 3
-    }
-    val ds1 = new SFilesDataSource(opts1)
-    val opts2 = new SFilesDataSource.Options { 
-    	override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun("/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/unifeats%02d.lz4"))
-    	fcounts = icol(1000000)
-    	nstart = nstart0 
-    	nend = nend0 
-    	order = 1
-    	blockSize = 100000
-    	sBlockSize = 2000000
-    	lookahead = 3
-    }
+  def twitterBlend = { 
+    val nstart0 = FilesDataSource.encodeDate(2012,3,1,0)
+    val nend0 = FilesDataSource.encodeDate(2012,12,1,0) 
+    val ds1 = twitterWords(nstart0, nend0)
+    val ds2 = twitterSmileyWords(nstart0, nend0)
     val opts3 = new DataSource.Options
-    val ds2 = new SFilesDataSource(opts2)
-    val ds3 = new BlendedDataSource(ds1, ds2, 0.1f, opts3)
+    new BlendedDataSource(ds1, ds2, 0.1f, opts3)
   }
 
 }

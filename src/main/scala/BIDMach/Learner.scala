@@ -20,6 +20,9 @@ case class Learner(
     var done = false
     var ipass = 0
     var here = 0L
+    var lastp = 0f
+    var lasti = 0
+    var bytes = 0L
     updater.clear
     val reslist = new ListBuffer[Float]
     val samplist = new ListBuffer[Float]
@@ -30,21 +33,37 @@ case class Learner(
       while (datasource.hasNext) {
         val mats = datasource.next
         here += datasource.opts.blockSize
+        bytes += 12L*mats(0).nnz
         if ((istep + 1) % opts.evalStep == 0 || ! datasource.hasNext) {
         	val scores = model.evalblockg(mats)
-        	print("ll=")
-        	scores.data.foreach(v => print(" %4.3f" format v))
-        	if (model.opts.useGPU && Mat.hasCUDA > 0) println(" mem=%f" format GPUmem._1) else println()
         	reslist.append(scores(0))
         	samplist.append(here)
         } else {
         	model.doblockg(mats, here)
         	if (regularizer != null) regularizer.compute(here)
         	updater.update(here)
-        	print(".")
         }   
         if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
         istep += 1
+        val dsp = datasource.progress
+        if (dsp > lastp + opts.pstep) {
+        	lastp = dsp - (dsp % opts.pstep)
+        	val gf = gflop
+        	if (reslist.length > lasti) {
+        		print("%5.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        				100f*lastp, 
+        				mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
+        				gf._1,
+        				gf._2, 
+        				bytes*1e-9,
+        				bytes/gf._2*1e-6))  
+        				if (model.opts.useGPU) {
+        					print(", GPUmem=%3.2f" format GPUmem._1) 
+        				}
+        	}
+        	println
+        }
+        lasti = reslist.length
       }
       updater.updateM
       ipass += 1
@@ -407,16 +426,8 @@ class LearnFParFactorModel(
       if (i < Mat.hasCUDA) setGPU(i)
     	val istart = nstart + i * (nend - nstart) / lopts.nthreads
     	val iend = nstart + (i+1) * (nend - nstart) / lopts.nthreads
-    	val dopts = new SFilesDataSource.Options {
-      	override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-        override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
-      }
-    	dopts.fcounts = icol(100000)
-    	dopts.nstart = istart
-    	dopts.nend = iend
+    	val dopts = SFilesDataSource.twitterWords(istart, iend).opts
     	dopts.lookahead = 3
-    	dopts.blockSize = 100000
-    	dopts.sBlockSize = 4000000
     	dds(i) = new SFilesDataSource(dopts)
     	dds(i).init
     	models(i) = mkmodel(mopts)
@@ -444,42 +455,26 @@ class LearnFParFactorModel(
 
 
 class LearnFParFactorModelx(
-    nstart:Int,
-		nend:Int,
 		mopts:FactorModel.Options,
 		mkmodel:(FactorModel.Options)=>FactorModel,
-		val dopts:SFilesDataSource.Options = new SFilesDataSource.Options {
-			override val localDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-				override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
-				fcounts = icol(100000)
-				lookahead = 8
-				blockSize = 100000
-				sBlockSize = 4000000
-		}
-		) {
-  var dd:DataSource = null
+		uopts:Updater.Options,
+		mkupdater:(Updater.Options)=>Updater,
+		dd:DataSource) {
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null
   var lopts = new Learner.Options
-
-  var uopts = new IncNormUpdater.Options
-//  var uopts = new TelescopingUpdater.Options
   mopts.uiter = 8
-  dopts.nstart = nstart
-  dopts.nend = nend
   
   def setup = {
     models = new Array[Model](lopts.nthreads)
-    updaters = new Array[Updater](lopts.nthreads)
-    dd = new SFilesDataSource(dopts) 
+    updaters = new Array[Updater](lopts.nthreads) 
     dd.init
     for (i <- 0 until lopts.nthreads) {
       if (i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
     	models(i).init(dd)
-    	updaters(i) = new IncNormUpdater(uopts)
-//    	updaters(i) = new TelescopingUpdater(uopts)
+    	updaters(i) = mkupdater(uopts)
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)

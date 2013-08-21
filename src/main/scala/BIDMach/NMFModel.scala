@@ -103,6 +103,10 @@ object NMFModel  {
    def learn(mat0:Mat) = {	
   	new LearnFactorModel(mat0, new NMFModel.Options, mkNMFmodel _)
   }
+   
+  def mkUpdater(nopts:Updater.Options) = {
+  	new IncNormUpdater(nopts.asInstanceOf[IncNormUpdater.Options])
+  }
   
   def learnFPar(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
@@ -115,7 +119,10 @@ object NMFModel  {
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = {  	
-  	new LearnFParFactorModelx(nstart, nend, new NMFModel.Options, mkNMFmodel _)
+  	 	new LearnFParFactorModelx(
+  	    new NMFModel.Options, mkNMFmodel _, 
+  	    new IncNormUpdater.Options, mkUpdater _, 
+  	    SFilesDataSource.twitterWords(nstart, nend))
   }
 } 
 
