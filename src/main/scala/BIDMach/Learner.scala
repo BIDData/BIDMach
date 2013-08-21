@@ -20,13 +20,13 @@ case class Learner(
     var done = false
     var ipass = 0
     var here = 0L
-    var lastp = 0f
     var lasti = 0
     var bytes = 0L
     updater.clear
     val reslist = new ListBuffer[Float]
     val samplist = new ListBuffer[Float]
     while (ipass < opts.npasses && ! done) {
+    	var lastp = 0f
       datasource.reset
       var istep = 0
       println("i=%2d" format ipass)
@@ -60,8 +60,8 @@ case class Learner(
         				if (model.opts.useGPU) {
         					print(", GPUmem=%3.2f" format GPUmem._1) 
         				}
+        		println
         	}
-        	println
         }
         lasti = reslist.length
       }
