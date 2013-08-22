@@ -559,7 +559,7 @@ object SFilesDataSource {
   
   def twitterSmileyWords(
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
-  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
+  		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0)) = {
   	val opts = new SFilesDataSource.Options { 
   		override val localDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
   		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4"))
@@ -597,7 +597,7 @@ object SFilesDataSource {
   
   def twitterSmileyNgrams(
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
-  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
+  		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0)) = {
   	val opts = new SFilesDataSource.Options { 
   		override val localDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
   		override def fnames:List[(Int)=>String] = List(
@@ -618,7 +618,7 @@ object SFilesDataSource {
    
   def twitterWordBlend(
   		nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
-  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0))= {  
+  		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0))= {  
     val ds1 = twitterWords(nstart0, nend0)
     val ds2 = twitterSmileyWords(nstart0, nend0)
     ds1.opts.lookahead = 6
@@ -629,16 +629,16 @@ object SFilesDataSource {
   
   def twitterNgramBlend( 
   		nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
-  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
+  		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0)) = {
     val ds1 = twitterNgrams(nstart0, nend0)
     val ds2 = twitterSmileyNgrams(nstart0, nend0)
     val opts3 = new BlendedDataSource.Options
-    new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
+    new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
   }
   
   def testSources(nthreads:Int=8,ff:(Int,Int)=>DataSource = twitterWords):IMat = { 
   	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
-    val nend0 = FilesDataSource.encodeDate(2012,11,1,0)
+    val nend0 = FilesDataSource.encodeDate(2013,7,1,0)
     var bytes = 0L
     var done = 0L
     var step = 10000000000L
@@ -659,7 +659,8 @@ object SFilesDataSource {
         		println("GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
         	}
         }
-        println("Thread %d done" format i)
+        val t = toc
+        println("Thread %d done, GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
       }
     }
   	stop
