@@ -621,15 +621,16 @@ object SFilesDataSource {
   		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0))= {  
     val ds1 = twitterWords(nstart0, nend0)
     val ds2 = twitterSmileyWords(nstart0, nend0)
+    ds1.opts.lookahead = 6
+    ds2.opts.lookahead = 6
     val opts3 = new BlendedDataSource.Options
     new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
   }
   
-  def twitterNgramBlend = { 
-    val nstart0 = FilesDataSource.encodeDate(2012,3,1,0)
-    val nend0 = FilesDataSource.encodeDate(2012,12,1,0) 
+  def twitterNgramBlend( 
+  		nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0)) = {
     val ds1 = twitterNgrams(nstart0, nend0)
-    ds1.opts.lookahead = 6
     val ds2 = twitterSmileyNgrams(nstart0, nend0)
     val opts3 = new BlendedDataSource.Options
     new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
@@ -658,6 +659,7 @@ object SFilesDataSource {
         		println("GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
         	}
         }
+        println("Thread %d done" format i)
       }
     }
   	stop
