@@ -639,6 +639,10 @@ object SFilesDataSource {
   		i:Int = 0) = {  
     val ds1 = twitterWords(nstart0, nend0, n, i)
     val ds2 = twitterSmileyWords(nstart0, nend0, n, i)
+    if (n > 1) {
+    	ds1.opts.lookahead = 2
+    	ds2.opts.lookahead = 2
+    }
     val opts3 = new BlendedDataSource.Options
     new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
   }
@@ -650,6 +654,10 @@ object SFilesDataSource {
   		i:Int = 0) = {
     val ds1 = twitterNgrams(nstart0, nend0, n, i)
     val ds2 = twitterSmileyNgrams(nstart0, nend0, n, i)
+    if (n > 1) {
+    	ds1.opts.lookahead = 2
+    	ds2.opts.lookahead = 2
+    }
     val opts3 = new BlendedDataSource.Options
     new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
   }
