@@ -550,7 +550,7 @@ object SFilesDataSource {
   }
   
   val twitterFeatureDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
-  val twitterSmileyFeatureDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+  val twitterSmileyFeatureDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
   
   def twitterWords(
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
