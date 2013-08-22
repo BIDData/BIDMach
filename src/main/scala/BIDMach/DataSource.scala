@@ -659,7 +659,7 @@ object SFilesDataSource {
     	ds2.opts.lookahead = 2
     }
     val opts3 = new BlendedDataSource.Options
-    new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
+    new BlendedDataSource(ds1, ds2, 0.7f, 1f, 1f, opts3)
   }
   
   def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int)=>DataSource = twitterWords):IMat = { 
