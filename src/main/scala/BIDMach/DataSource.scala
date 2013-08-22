@@ -363,13 +363,14 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
 }
 
 class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1:Float, var samp2:Float,
-    override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) {
+    override val opts:BlendedDataSource.Options = new BlendedDataSource.Options) extends DataSource(opts) {
   var sizeMargin = 0f 
   var here = 0L
   var there = 0
   var iptr1 = 0
   var iptr2 = 0
   var blockSize = 0
+  var bBlock = 0
   var totalSize = 0
   var randv:FMat = null
   var rands1:FMat = null
@@ -381,9 +382,10 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
   def init = {
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
-    randv = rand(1, blockSize)
-    rands1 = rand(1, blockSize)
-    rands2 = rand(1, blockSize)
+    bBlock = opts.bBlock
+    randv = rand(1, blockSize/bBlock + 1)
+    rands1 = rand(1, blockSize/bBlock + 1)
+    rands2 = rand(1, blockSize/bBlock + 1)
     here = -blockSize
     s1.init
     s2.init
@@ -408,10 +410,10 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
     here = -blockSize
   }
   
-  @inline def copycol(inmats:Array[Mat], iptr:Int, omats:Array[Mat], here:Int) = {
+  @inline def copycol(inmats:Array[Mat], iptr:Int, jptr:Int, omats:Array[Mat], here:Int) = {
     var imat = 0
     while (imat < inmats.length) {
-      omats(imat) = inmats(imat).colslice(iptr, iptr+1, omats(imat), here)
+      omats(imat) = inmats(imat).colslice(iptr, jptr, omats(imat), here)
       imat += 1
     }
   }
@@ -419,28 +421,35 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
   def next:Array[Mat] = {
     rand(0, 1f, randv)
     var i = 0
-    while (i < blockSize && hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)) {
+    var xptr = 0
+    while (xptr < blockSize && hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)) {
       if (randv.data(i) < alpha) {
-        while (iptr1 < mats1(0).ncols && rands1.data(iptr1) > samp1) iptr1 += 1
+        while (iptr1 < mats1(0).ncols && rands1.data(iptr1/bBlock) > samp1) iptr1 += bBlock
         if (iptr1 >= mats1(0).ncols) {
           mats1 = s1.next
           iptr1 = 0
+          rand(0, 1f, samp1)
         }
-        copycol(mats1, iptr1, omats, i)
-        iptr1 += 1
+        val jptr1 = math.min(mats1(0).ncols, iptr1 + math.min(bBlock, math.min(blockSize, omats(0).ncols) - xptr))
+        copycol(mats1, iptr1, jptr1,  omats, xptr)
+        xptr += jptr1 - iptr1
+        iptr1 = jptr1
       } else {
-        while (iptr2 < mats2(0).ncols && rands2.data(iptr2) > samp2) iptr2 += 1
+        while (iptr2 < mats2(0).ncols && rands2.data(iptr2/bBlock) > samp2) iptr2 += bBlock
       	if (iptr2 >= mats2(0).ncols) {
           mats2 = s2.next
           iptr2 = 0
+          rand(0, 1f, samp2)
         }
-        copycol(mats2, iptr2, omats, i)
-        iptr2 += 1
+        val jptr2 = math.min(mats1(0).ncols, iptr2 + math.min(bBlock, math.min(blockSize, omats(0).ncols) - xptr))
+        copycol(mats1, iptr2, jptr2,  omats, xptr)
+        xptr += jptr2 - iptr2
+        iptr2 = jptr2
       }
       i += 1
     }
-    here += i
-    if (i == blockSize) {
+    here += xptr
+    if (xptr == blockSize) {
       omats
     } else {
       shrinkmats(omats, i)
@@ -516,6 +525,12 @@ object FilesDataSource {
     var nend:Int = 0
     var dorows:Boolean = true
     var order:Int = 1                           // 0 = sequential order, 1 = random
+  }
+}
+
+object BlendedDataSource {
+  class Options extends DataSource.Options {
+  	var bBlock = 1000
   }
 }
 
@@ -606,7 +621,7 @@ object SFilesDataSource {
   		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0))= {  
     val ds1 = twitterWords(nstart0, nend0)
     val ds2 = twitterSmileyWords(nstart0, nend0)
-    val opts3 = new DataSource.Options
+    val opts3 = new BlendedDataSource.Options
     new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
   }
   
@@ -616,7 +631,7 @@ object SFilesDataSource {
     val ds1 = twitterNgrams(nstart0, nend0)
     ds1.opts.lookahead = 6
     val ds2 = twitterSmileyNgrams(nstart0, nend0)
-    val opts3 = new DataSource.Options
+    val opts3 = new BlendedDataSource.Options
     new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
   }
   
@@ -638,7 +653,7 @@ object SFilesDataSource {
         	val a = ss.next
         	bytes += 12L*a(0).nnz
         	if (bytes > done + step) { 
-        		done += step
+        		done = (bytes/step)*step
         		val t=toc
         		println("GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
         	}
