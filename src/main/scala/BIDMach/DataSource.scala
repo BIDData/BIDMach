@@ -601,25 +601,26 @@ object SFilesDataSource {
   	new SFilesDataSource(opts)
   }
    
-  def twitterWordBlend = { 
-    val nstart0 = FilesDataSource.encodeDate(2012,3,1,0)
-    val nend0 = FilesDataSource.encodeDate(2012,12,1,0) 
+  def twitterWordBlend(
+  		nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+  		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0))= {  
     val ds1 = twitterWords(nstart0, nend0)
     val ds2 = twitterSmileyWords(nstart0, nend0)
     val opts3 = new DataSource.Options
-    new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
+    new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
   }
   
   def twitterNgramBlend = { 
     val nstart0 = FilesDataSource.encodeDate(2012,3,1,0)
     val nend0 = FilesDataSource.encodeDate(2012,12,1,0) 
     val ds1 = twitterNgrams(nstart0, nend0)
+    ds1.opts.lookahead = 6
     val ds2 = twitterSmileyNgrams(nstart0, nend0)
     val opts3 = new DataSource.Options
     new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
   }
   
-  def testSources(nthreads:Int=8,lookahead:Int=3):IMat = { 
+  def testSources(nthreads:Int=8,lookahead:Int=3,ff:(Int,Int)=>FilesDataSource = twitterWords):IMat = { 
   	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
     val nend0 = FilesDataSource.encodeDate(2012,11,1,0)
     var bytes = 0L
@@ -631,7 +632,7 @@ object SFilesDataSource {
       scala.actors.Actor.actor { 
         val nstart = nstart0 + i * (nend0 - nstart0) / nthreads
         val nend = nstart0 + (i+1) * (nend0 - nstart0) / nthreads
-        val ss = twitterWords(nstart, nend)
+        val ss = ff(nstart, nend)
         ss.opts.lookahead = lookahead
         ss.init
         while (ss.hasNext && stop.v != 1) { 
