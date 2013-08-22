@@ -22,7 +22,7 @@ class NMFModel(opts:NMFModel.Options = new NMFModel.Options) extends FactorModel
     updatemats(1) = mm.zeros(mm.nrows, mm.ncols)
     udiag = mkdiag(opts.uprior*ones(opts.dim,1))
   	mdiag = mkdiag(opts.mprior*ones(opts.dim,1))
-    if (opts.useGPU && Mat.hasCUDA > 0) {
+    if (useGPU) {
       udiag = GMat(udiag)
       mdiag = GMat(mdiag)
     }

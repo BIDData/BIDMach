@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,BMat,CMat,CSMat,Dict,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,BMat,CMat,CSMat,Dict,DMat,FMat,IDict,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.actors._
@@ -97,6 +97,18 @@ object Twitter {
     Dict(bd, bc)
 	}
 	
+  def getBiDict = {
+  	val bd = loadIMat("/big/twitter/tokenized/allbdict.lz4")
+    val bc = loadDMat("/big/twitter/tokenized/allbcnts.lz4")
+    IDict(bd, bc)
+	}
+  
+  def getTriDict = {
+  	val bd = loadIMat("/big/twitter/tokenized/alltdict.lz4")
+    val bc = loadDMat("/big/twitter/tokenized/alltcnts.lz4")
+    IDict(bd, bc)
+	}
+	
 	def findEmoticons(n:Int, dd:Dict) = {
     val smiles = csrow(":-)", ":)", ":o)", ":]", ":3", ":c)", ":>", "=]", "8)", "=)", ":}", ":^)", ":っ)")
     val laughs = csrow(":-d", ":d", "8-d", "8d", "x-d", "xd", "x-x", "=-d", "=d", "=-3", "=3", "b^d")
@@ -116,5 +128,15 @@ object Twitter {
       }      
     }
     out    
+	}
+	
+	def buildGramDict(nuni:Int, nbi:Int, ntri:Int) = {
+	  val ud = getDict
+	  val bd = getBiDict
+	  val td = getTriDict
+	  val dd = IDict.gramDict(nuni, nbi, ntri, ud, bd, td)
+	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni, nbi, ntri)
+	  saveBMat(fname + "_bmat.lz4", BMat(dd.cstr))
+	  saveDMat(fname + "_dmat.lz4", dd.counts)	  
 	}
 }

@@ -57,7 +57,7 @@ case class Learner(
         				gf._2, 
         				bytes*1e-9,
         				bytes/gf._2*1e-6))  
-        				if (model.opts.useGPU) {
+        				if (model.useGPU) {
         					print(", GPUmem=%3.2f" format GPUmem._1) 
         				}
         		println
@@ -149,7 +149,7 @@ case class ParLearner(
 	  								gf._2, 
 	  								bytes*1e-9,
 	  								bytes/gf._2*1e-6))  
-	  					  if (models(0).opts.useGPU) {
+	  					  if (models(0).useGPU) {
 	  					  	for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
 	  					  		setGPU(i)
 	  					  		if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
@@ -211,7 +211,7 @@ case class ParLearner(
   }
   
   def restart(ithread:Int) = {
-    if (models(0).opts.useGPU) {
+    if (models(0).useGPU) {
       resetGPU
       Mat.trimCache2(ithread)
     }
@@ -305,7 +305,7 @@ case class ParLearnerx(
       					gf._2, 
       					bytes*1e-9,
       					bytes/gf._2*1e-6))  
-      		  if (models(0).opts.useGPU) {
+      		  if (models(0).useGPU) {
       		    for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
       		      setGPU(i)
       		      if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
@@ -357,7 +357,7 @@ case class ParLearnerx(
   }
   
   def restart(ithread:Int) = {
-    if (models(0).opts.useGPU) {
+    if (models(0).useGPU) {
       resetGPU
       Mat.trimCaches(ithread)
     }
