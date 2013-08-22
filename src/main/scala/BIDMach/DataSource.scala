@@ -660,7 +660,7 @@ object SFilesDataSource {
         	}
         }
         val t = toc
-        println("Thread %d done, GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
+        println("Thread %d done, GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (i, bytes/1e9, t, bytes/t/1e6))
       }
     }
   	stop
