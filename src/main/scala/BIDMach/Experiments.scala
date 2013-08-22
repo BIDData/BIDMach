@@ -135,7 +135,7 @@ object Twitter {
 	  val bd = getBiDict
 	  val td = getTriDict
 	  val dd = IDict.gramDict(nuni, nbi, ntri, ud, bd, td)
-	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni, nbi, ntri)
+	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni/1000, nbi/1000, ntri/1000)
 	  saveBMat(fname + "_bmat.lz4", BMat(dd.cstr))
 	  saveDMat(fname + "_dmat.lz4", dd.counts)	  
 	}
