@@ -362,7 +362,8 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
 
 }
 
-class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) {
+class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1:Float, var samp2:Float,
+    override val opts:DataSource.Options = new DataSource.Options) extends DataSource(opts) {
   var sizeMargin = 0f 
   var here = 0L
   var there = 0
@@ -371,6 +372,8 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, o
   var blockSize = 0
   var totalSize = 0
   var randv:FMat = null
+  var rands1:FMat = null
+  var rands2:FMat = null
   var mats1:Array[Mat] = null
   var mats2:Array[Mat] = null
   omats = null
@@ -379,9 +382,13 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, o
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
     randv = zeros(1, blockSize)
+    rands1 = zeros(1, blockSize)
+    rands2 = zeros(1, blockSize)
     here = -blockSize
     s1.init
     s2.init
+    rand(0, 1f, rands1)
+    rand(0, 1f, rands2)
     mats1 = s1.next
     mats2 = s2.next
     totalSize = mats1(0).ncols
@@ -408,15 +415,19 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, o
     var i = 0
     while (i < blockSize && hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)) {
       if (randv.data(i) < alpha) {
+        while (iptr1 < mats1(0).ncols && rands1.data(iptr1) > samp1) iptr1 += 1
         if (iptr1 >= mats1(0).ncols) {
           mats1 = s1.next
+          rand(0, 1f, rands1)
           iptr1 = 0
         }
         copycol(mats1, iptr1, omats, i)
         iptr1 += 1
       } else {
+        while (iptr2 < mats2(0).ncols && rands2.data(iptr2) > samp2) iptr2 += 1
       	if (iptr2 >= mats2(0).ncols) {
           mats2 = s2.next
+          rand(0, 1f, rands2)
           iptr2 = 0
         }
         copycol(mats2, iptr2, omats, i)
@@ -457,8 +468,24 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, o
   def progress = {
     math.max(s1.progress, s2.progress)
   }
-
 }
+
+
+object DataSource {
+  class Options {
+    var blockSize = 100000
+    var nusers  = 1000000L
+    var sizeMargin = 2f
+    var sample = 1f
+  } 
+}
+
+object MatDataSource {
+  class Options extends DataSource.Options {
+    
+  }
+}
+
 
 object FilesDataSource {
   
@@ -580,7 +607,7 @@ object SFilesDataSource {
     val ds1 = twitterWords(nstart0, nend0)
     val ds2 = twitterSmileyWords(nstart0, nend0)
     val opts3 = new DataSource.Options
-    new BlendedDataSource(ds1, ds2, 0.1f, opts3)
+    new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
   }
   
   def twitterNgramBlend = { 
@@ -589,7 +616,7 @@ object SFilesDataSource {
     val ds1 = twitterNgrams(nstart0, nend0)
     val ds2 = twitterSmileyNgrams(nstart0, nend0)
     val opts3 = new DataSource.Options
-    new BlendedDataSource(ds1, ds2, 0.1f, opts3)
+    new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
   }
   
   def testSources(typ:String="lz4") = { 
@@ -621,17 +648,3 @@ object SFilesDataSource {
   }
 }
 
-object MatDataSource {
-  class Options extends DataSource.Options {
-    
-  }
-}
-
-object DataSource {
-  class Options {
-    var blockSize = 100000
-    var nusers  = 1000000L
-    var sizeMargin = 2f
-  }
-  
-}
