@@ -620,7 +620,7 @@ object SFilesDataSource {
     new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
   }
   
-  def testSources(nthreads:Int=8,lookahead:Int=3,ff:(Int,Int)=>FilesDataSource = twitterWords):IMat = { 
+  def testSources(nthreads:Int=8,ff:(Int,Int)=>DataSource = twitterWords):IMat = { 
   	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
     val nend0 = FilesDataSource.encodeDate(2012,11,1,0)
     var bytes = 0L
@@ -633,7 +633,6 @@ object SFilesDataSource {
         val nstart = nstart0 + i * (nend0 - nstart0) / nthreads
         val nend = nstart0 + (i+1) * (nend0 - nstart0) / nthreads
         val ss = ff(nstart, nend)
-        ss.opts.lookahead = lookahead
         ss.init
         while (ss.hasNext && stop.v != 1) { 
         	val a = ss.next
