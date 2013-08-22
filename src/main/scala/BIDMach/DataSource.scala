@@ -381,14 +381,12 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
   def init = {
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
-    randv = zeros(1, blockSize)
-    rands1 = zeros(1, blockSize)
-    rands2 = zeros(1, blockSize)
+    randv = rand(1, blockSize)
+    rands1 = rand(1, blockSize)
+    rands2 = rand(1, blockSize)
     here = -blockSize
     s1.init
     s2.init
-    rand(0, 1f, rands1)
-    rand(0, 1f, rands2)
     mats1 = s1.next
     mats2 = s2.next
     totalSize = mats1(0).ncols
@@ -410,6 +408,14 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
     here = -blockSize
   }
   
+  @inline def copycol(inmats:Array[Mat], iptr:Int, omats:Array[Mat], here:Int) = {
+    var imat = 0
+    while (imat < inmats.length) {
+      omats(imat) = inmats(imat).colslice(iptr, iptr+1, omats(imat), here)
+      imat += 1
+    }
+  }
+  
   def next:Array[Mat] = {
     rand(0, 1f, randv)
     var i = 0
@@ -418,7 +424,6 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
         while (iptr1 < mats1(0).ncols && rands1.data(iptr1) > samp1) iptr1 += 1
         if (iptr1 >= mats1(0).ncols) {
           mats1 = s1.next
-          rand(0, 1f, rands1)
           iptr1 = 0
         }
         copycol(mats1, iptr1, omats, i)
@@ -427,7 +432,6 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
         while (iptr2 < mats2(0).ncols && rands2.data(iptr2) > samp2) iptr2 += 1
       	if (iptr2 >= mats2(0).ncols) {
           mats2 = s2.next
-          rand(0, 1f, rands2)
           iptr2 = 0
         }
         copycol(mats2, iptr2, omats, i)
@@ -451,16 +455,12 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
     hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)
   }
   
-  def copycol(inmats:Array[Mat], iptr:Int, omats:Array[Mat], here:Int) = {
-    for (imat <- 0 until inmats.length) {
-      omats(imat) = inmats(imat).colslice(iptr, iptr+1, omats(imat), here)
-    }
-  }
-  
   def shrinkmats(xmats:Array[Mat], n:Int) = {
     val outarr = new Array[Mat](omats.length)
-    for (imat <- 0 until omats.length) {
+    var imat = 0
+    while (imat < omats.length) {
       outarr(imat) = xmats(imat).colslice(0, n, null)
+      imat += 1
     }
     outarr
   }
