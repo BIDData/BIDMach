@@ -619,22 +619,22 @@ object SFilesDataSource {
     new BlendedDataSource(ds1, ds2, 0.5f, 0.1f, 1f, opts3)
   }
   
-  def testSources(typ:String="lz4") = { 
+  def testSources(nthreads:Int=8,lookahead:Int=3):IMat = { 
   	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
     val nend0 = FilesDataSource.encodeDate(2012,11,1,0)
     var bytes = 0L
     var done = 0L
     var step = 10000000000L
+    var stop = izeros(1,1)
     tic
-    val nthreads = 8
     for (i <- 0 until nthreads) { 
       scala.actors.Actor.actor { 
         val nstart = nstart0 + i * (nend0 - nstart0) / nthreads
         val nend = nstart0 + (i+1) * (nend0 - nstart0) / nthreads
         val ss = twitterWords(nstart, nend)
-        ss.opts.lookahead = 3
+        ss.opts.lookahead = lookahead
         ss.init
-        while (ss.hasNext) { 
+        while (ss.hasNext && stop.v != 1) { 
         	val a = ss.next
         	bytes += 12L*a(0).nnz
         	if (bytes > done + step) { 
@@ -645,6 +645,7 @@ object SFilesDataSource {
         }
       }
     }
+  	stop
   }
 }
 
