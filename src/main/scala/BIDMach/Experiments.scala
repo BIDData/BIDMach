@@ -130,13 +130,14 @@ object Twitter {
     out    
 	}
 	
-	def buildGramDict(nuni:Int, nbi:Int, ntri:Int) = {
+	def buildGramDict(nuni:Int, nbi:Int, ntri:Int):Dict = {
 	  val ud = getDict
 	  val bd = getBiDict
 	  val td = getTriDict
 	  val dd = IDict.gramDict(nuni, nbi, ntri, ud, bd, td)
 	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni/1000, nbi/1000, ntri/1000)
 	  saveBMat(fname + "_bmat.lz4", BMat(dd.cstr))
-	  saveDMat(fname + "_dmat.lz4", dd.counts)	  
+	  saveDMat(fname + "_dmat.lz4", dd.counts)
+	  dd
 	}
 }
