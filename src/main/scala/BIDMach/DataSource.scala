@@ -558,8 +558,7 @@ object SFilesDataSource {
   		n:Int = 1,
   		i:Int = 0) = {
   	val opts = new SFilesDataSource.Options { 
-  		override val localDir = twitterFeatureDir
-  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4", n, i))
+  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
   		fcounts = icol(100000)
   		nstart = nstart0/n
   		nend = nend0/n
@@ -577,8 +576,7 @@ object SFilesDataSource {
   		n:Int = 1,
   		i:Int = 0) = {
   	val opts = new SFilesDataSource.Options { 
-  		override val localDir = twitterSmileyFeatureDir
-  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4", n, i))
+  		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
   		fcounts = icol(100000)
   		nstart = nstart0/n
   		nend = nend0/n
@@ -596,11 +594,10 @@ object SFilesDataSource {
   		n:Int = 1,
   		i:Int = 0) = {
   	val opts = new SFilesDataSource.Options { 
-  		override val localDir = twitterFeatureDir
   		override def fnames:List[(Int)=>String] = List(
-  				FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4", n, i),
-  				FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4", n, i),
-  				FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4", n, i)
+  				FilesDataSource.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i),
+  				FilesDataSource.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
+  				FilesDataSource.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
   		    )
   		fcounts = icol(50000,100000,400000)
   		nstart = nstart0/n
@@ -619,11 +616,10 @@ object SFilesDataSource {
   		n:Int = 1,
   		i:Int = 0) = {
   	val opts = new SFilesDataSource.Options { 
-  		override val localDir = twitterSmileyFeatureDir
   		override def fnames:List[(Int)=>String] = List(
-  				FilesDataSource.sampleFun(localDir + "unifeats%02d.lz4", n, i),
-  				FilesDataSource.sampleFun(localDir + "bifeats%02d.lz4", n, i),
-  				FilesDataSource.sampleFun(localDir + "trifeats%02d.lz4", n, i)
+  				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i),
+  				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
+  				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)
   		    )
   		fcounts = icol(50000,100000,400000)
   		nstart = nstart0/n
@@ -658,7 +654,7 @@ object SFilesDataSource {
     new BlendedDataSource(ds1, ds2, 0.5f, 1f, 1f, opts3)
   }
   
-  def testSources(nthreads:Int=8,ff:(Int,Int,Int,Int)=>DataSource = twitterWords):IMat = { 
+  def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int)=>DataSource = twitterWords):IMat = { 
   	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
     val nend0 = FilesDataSource.encodeDate(2013,7,1,0)
     var bytes = 0L
