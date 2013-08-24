@@ -368,33 +368,33 @@ case class ParLearnerx(
 }
 
 
-class LearnFactorModel(mat:Mat, val mopts:FactorModel.Options, mkmodel:(FactorModel.Options)=>FactorModel) {
-  var dd:MatDataSource = null
-  var model:Model = null
-  var updater:Updater = null
+class LearnModel(
+		val dd:DataSource,
+		val model:Model,
+		var updater:Updater,
+		var lopts:Learner.Options
+		) {
+	val dopts:DataSource.Options = dd.opts
+	val mopts:Model.Options	= model.opts
+	val uopts:Updater.Options = updater.opts
   var learner:Learner = null
-  var lopts = new Learner.Options
-  var dopts = new MatDataSource.Options
-  var uoptsb = new BatchNormUpdater.Options
-  var uopts = new IncNormUpdater.Options
   def setup = { 
-    val aa = if (mopts.putBack >= 0) {
-    	val a = new Array[Mat](2); a(1) = ones(mopts.dim, mat.ncols); a
-    } else {
-      new Array[Mat](1)
+    dd match {
+      case ddm:MatDataSource => {
+      	if (mopts.putBack >= 0) {
+      		ddm.setupPutBack(mopts.putBack+1, mopts.dim)
+      	}
+      }
+      case _ => {}
     }
-    aa(0) = mat
-    dd = new MatDataSource(aa, dopts)
     dd.init
-    model = mkmodel(mopts)
     model.init(dd)
-    updater = if (lopts.batch) new BatchNormUpdater(uoptsb) else new IncNormUpdater(uopts)
     updater.init(model)
     learner = new Learner(dd, model, null, updater, lopts)   
   }
   
   def init = {
-    if (dd.omats.length > 1) dd.omats(1) = ones(mopts.dim, dd.omats(0).ncols)
+    if (dd.omats.length > 1) dd.omats(1) = ones(model.opts.dim, dd.omats(0).ncols)
     dd.init
     model.init(dd)
     updater.init(model)
@@ -404,19 +404,18 @@ class LearnFactorModel(mat:Mat, val mopts:FactorModel.Options, mkmodel:(FactorMo
 }
 
 
-class LearnFParFactorModel(
-    nstart:Int,
-		nend:Int,
-		val mopts:FactorModel.Options,
-		mkmodel:(FactorModel.Options)=>FactorModel
+class LearnFParModel(
+		val mopts:Model.Options,
+		mkmodel:(Model.Options)=>Model,
+		val uopts:Updater.Options,
+		mkupdater:(Updater.Options)=>Updater,
+		ddfun:(Int,Int)=>DataSource
 		) {
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var learner:ParLearner = null
   var lopts = new Learner.Options
-  var uopts = new IncNormUpdater.Options
-  mopts.uiter = 8
   
   def setup = {
     dds = new Array[DataSource](lopts.nthreads)
@@ -424,15 +423,11 @@ class LearnFParFactorModel(
     updaters = new Array[Updater](lopts.nthreads)
     for (i <- 0 until lopts.nthreads) {
       if (i < Mat.hasCUDA) setGPU(i)
-    	val istart = nstart + i * (nend - nstart) / lopts.nthreads
-    	val iend = nstart + (i+1) * (nend - nstart) / lopts.nthreads
-    	val dopts = SFilesDataSource.twitterWords(istart, iend).opts
-    	dopts.lookahead = 3
-    	dds(i) = new SFilesDataSource(dopts)
+    	dds(i) = ddfun(lopts.nthreads, i)
     	dds(i).init
     	models(i) = mkmodel(mopts)
     	models(i).init(dds(i))
-    	updaters(i) = new IncNormUpdater(uopts)
+    	updaters(i) = mkupdater(uopts)
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
@@ -454,9 +449,9 @@ class LearnFParFactorModel(
 }
 
 
-class LearnFParFactorModelx(
-		mopts:FactorModel.Options,
-		mkmodel:(FactorModel.Options)=>FactorModel,
+class LearnFParModelx(
+		mopts:Model.Options,
+		mkmodel:(Model.Options)=>Model,
 		uopts:Updater.Options,
 		mkupdater:(Updater.Options)=>Updater,
 		dd:DataSource) {
@@ -464,7 +459,6 @@ class LearnFParFactorModelx(
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null
   var lopts = new Learner.Options
-  mopts.uiter = 8
   
   def setup = {
     models = new Array[Model](lopts.nthreads)

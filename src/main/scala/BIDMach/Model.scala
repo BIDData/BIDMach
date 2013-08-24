@@ -64,5 +64,6 @@ object Model {
 	  var useGPU = true
 	  var putBack = -1
 	  var doubleScore = false
+	  var dim = 256
   }
 }

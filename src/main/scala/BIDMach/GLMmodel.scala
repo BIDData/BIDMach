@@ -8,13 +8,20 @@ import BIDMat.SciFunctions._
 class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
   
   var mylinks:IMat = null
+  var targmap:Mat = null
   
   val linkArray = Array(LinearLink, LogisticLink)
+  
+  override def init(datasource:DataSource) = {
+    super.init(datasource)
+    mylinks = opts.links
+    targmap = opts.targmap
+  }
     
   def mupdate(in:Mat):FMat = {
     val prod = modelmats(0) * in
-    val targ = prod.rowslice(0, prod.nrows/2, null)
-    val eta = prod.rowslice(prod.nrows/2, prod.nrows/2, null)
+    val targ = targmap * prod.rowslice(0, targmap.ncols, null)
+    val eta = prod.rowslice(targmap.ncols, prod.nrows - targmap.ncols, null)
     val pred = applylinks(eta)
     val update = (targ - pred) *^ in   
     updatemats(0) <-- update
@@ -27,7 +34,7 @@ class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
     		var i = 0
     		val out = (feta + 1f)
     		while (i < feta.nrows) {
-    			val fun = linkArray(mylinks(i)).dlinkfn
+    			val fun = linkArray(mylinks(i)).invlinkfn
     		  var j = 0
     		  while (j < feta.ncols) {     			
     		  	out.data(i + j * out.nrows) = fun(feta.data(i + j * feta.nrows))
@@ -128,10 +135,14 @@ abstract class GLMlink {
   val likelihoodfn:((Float,Float) => Float)
 }
 
-
 object GLMmodel {
   class Options extends RegressionModel.Options {
-
+    var links:IMat = null
+    var targmap:Mat = null
+  }
+  
+  def learn = {
+    
   }
 }
 
