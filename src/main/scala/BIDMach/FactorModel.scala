@@ -67,7 +67,6 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
 
 object FactorModel { 
   class Options extends Model.Options { 
-    var dim = 256
     var uiter = 8
     var weps = 1e-10f
     var minuser = 1e-8f

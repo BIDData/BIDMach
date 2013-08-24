@@ -10,18 +10,21 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def hasNext:Boolean
   def reset:Unit
   def putBack(mats:Array[Mat],i:Int):Unit = {throw new RuntimeException("putBack not implemented")}
+  def setupPutBack(n:Int,dim:Int):Unit = {throw new RuntimeException("putBack not implemented")}
   def nmats:Int
   def init:Unit
   def progress:Float
   var omats:Array[Mat] = null
 }
 
-class MatDataSource(mats:Array[Mat], override val opts:MatDataSource.Options = new MatDataSource.Options) extends DataSource(opts) { 
+class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options = new MatDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f 
   var here = 0
   var there = 0
   var blockSize = 0
   var totalSize = 0
+  var umat:Mat = null
+  
   omats = null
   
   def init = {
@@ -56,6 +59,17 @@ class MatDataSource(mats:Array[Mat], override val opts:MatDataSource.Options = n
   
   def hasNext:Boolean = {
     here + blockSize < mats(0).ncols
+  }
+  
+  override def setupPutBack(n:Int, dim:Int) = {
+    if (mats.length < n) {
+      val newmats = new Array[Mat](n)
+      for (i <- 0 until n-1) {
+        newmats(i) = mats(i)
+      }
+      newmats(n-1) = ones(dim, mats(0).ncols)
+      mats = newmats
+    }
   }
   
   override def putBack(tmats:Array[Mat],i:Int):Unit = {

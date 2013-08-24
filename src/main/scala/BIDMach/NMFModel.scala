@@ -96,30 +96,42 @@ object NMFModel  {
     var nusers = 100000
   }
   
-  def mkNMFmodel(fopts:FactorModel.Options) = {
+  def mkNMFmodel(fopts:Model.Options) = {
   	new NMFModel(fopts.asInstanceOf[NMFModel.Options])
   } 
-  
-   def learn(mat0:Mat) = {	
-  	new LearnFactorModel(mat0, new NMFModel.Options, mkNMFmodel _)
-  }
    
   def mkUpdater(nopts:Updater.Options) = {
   	new IncNormUpdater(nopts.asInstanceOf[IncNormUpdater.Options])
+  }
+      
+  def learn(mat0:Mat) = {	
+    val mats = new Array[Mat](1)
+    mats(0) = mat0
+  	new LearnModel(new MatDataSource(mats), new NMFModel, new IncNormUpdater, new Learner.Options)
+  }
+  
+  def learnBatch(mat0:Mat) = {	
+    val mats = new Array[Mat](1)
+    mats(0) = mat0
+  	new LearnModel(new MatDataSource(mats), new NMFModel, new BatchNormUpdater, new Learner.Options)
   }
   
   def learnFPar(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = { 	
-  	new LearnFParFactorModel(nstart, nend, new NMFModel.Options, mkNMFmodel _)
+  	new LearnFParModel(
+  			new NMFModel.Options, mkNMFmodel _, 
+  	    new IncNormUpdater.Options, mkUpdater _, 
+  	    (n:Int, i:Int) => SFilesDataSource.twitterWords(nstart, nend, n, i)
+  	    )
   }
   
   def learnFParx(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = {  	
-  	 	new LearnFParFactorModelx(
+  	 	new LearnFParModelx(
   	    new NMFModel.Options, mkNMFmodel _, 
   	    new IncNormUpdater.Options, mkUpdater _, 
   	    SFilesDataSource.twitterWords(nstart, nend))

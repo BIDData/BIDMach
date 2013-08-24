@@ -42,6 +42,5 @@ object RegressionModel {
     var targets:FMat = null
     var nrows = 0
     var nmodels = 0
-    var transpose:Boolean = false
   }
 }

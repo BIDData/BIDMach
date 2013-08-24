@@ -5,9 +5,8 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 
-abstract class Updater {
+abstract class Updater(val opts:Updater.Options = new Updater.Options) {
   var model:Model = null
-
   
   def init(model0:Model) = {
     model = model0 
@@ -19,7 +18,7 @@ abstract class Updater {
 }
 
 
-class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Options) extends Updater {
+class IncNormUpdater(override val opts:IncNormUpdater.Options = new IncNormUpdater.Options) extends Updater {
   
   var firstStep = 0f
   var rm:Mat = null
@@ -84,7 +83,7 @@ class IncNormUpdater(val opts:IncNormUpdater.Options = new IncNormUpdater.Option
   }
 }
 
-class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.Options) extends Updater {
+class BatchNormUpdater(override val opts:BatchNormUpdater.Options = new BatchNormUpdater.Options) extends Updater {
   var accumulators:Array[Mat] = null
   
   override def init(model0:Model) = {
@@ -119,7 +118,7 @@ class BatchNormUpdater(val opts:BatchNormUpdater.Options = new BatchNormUpdater.
 }
 
 
-class IncMultUpdater(val opts:IncMultUpdater.Options = new IncMultUpdater.Options) extends Updater {
+class IncMultUpdater(override val opts:IncMultUpdater.Options = new IncMultUpdater.Options) extends Updater {
   
   var firstStep = 0f
   var rm:Mat = null
@@ -163,7 +162,7 @@ class IncMultUpdater(val opts:IncMultUpdater.Options = new IncMultUpdater.Option
   }
 }
 
-class TelescopingUpdater(val opts:TelescopingUpdater.Options = new TelescopingUpdater.Options) extends Updater {
+class TelescopingUpdater(override val opts:TelescopingUpdater.Options = new TelescopingUpdater.Options) extends Updater {
 	var accumulators:Array[Mat] = null
   var firstStep = 0L
   var nextStep = 10L
@@ -211,36 +210,48 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
   
   val options = opts
   var nsteps = 0f
+  var firstStep = 0f
   var modelmat:Mat = null
-  var updatemat:Mat = null
-  
+  var updatemat:Mat = null  
   var sumSq:Mat = null 
+  var stepn:Mat = null
 
   override def init(model0:Model) = {
     model = model0
 	  modelmat = model.modelmats(0)
-	  updatemat = model.updatemats(0)
-    nsteps = options.initnsteps 
+	  updatemat = model.updatemats(0) 
     if (sumSq.asInstanceOf[AnyRef] == null) {
       sumSq = modelmat.ones(size(modelmat,1), size(modelmat,2)) *@ options.initsumsq
     } else {
     	sumSq(?) = options.initsumsq
     }
+    nsteps = options.initnsteps
+    stepn = modelmat.zeros(1,1)
   } 
   
-	def update(step:Long):Unit = update1(step)
-	
-	def update1(step:Long):Unit =	{
-
-	  val nw = (options.gradwindow/step)
-	  val ee = options.exponent
+	def update(step:Long):Unit = {
+	  val nsteps = if (step == 0) 1f else {
+  	  if (firstStep == 0f) {
+  	    firstStep = step
+  	    1f
+  	  } else {
+  	    step / firstStep
+  	  }
+  	}
+	  stepn.set(nsteps)
+	  val ve = options.vecExponent
+	  val te = options.timeExponent
 	  val alpham = options.alpha
-	  sumSq  ~ (sumSq *@ (nw-1) + updatemat *@ updatemat) *@ (1/nw)
-	  if (nsteps > options.waitsteps) {
-	  	val tmp = (sumSq*nsteps) ^ ee
+	  val nw = 1f / stepn
+	  val newsquares = updatemat *@ updatemat
+	  newsquares ~ newsquares *@ nw
+	  sumSq  ~ sumSq *@ (1f - nw)
+	  sumSq ~ sumSq + newsquares
+	  if (options.waitsteps < nsteps) {
+	  	val tmp = sumSq ^ ve
+	  	tmp ~ tmp *@ (stepn ^ te)
 	  	modelmat ~ modelmat + ((updatemat / tmp) *@ alpham)
 	  }
-	  nsteps += step
 	}
 	
   def update2(step:Long):Unit =	{
@@ -265,7 +276,7 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	    i += 1
 	  }	  
 	  if (nsteps > options.waitsteps) {
-	  	ftmp1 ~ ftmp0 ^ options.exponent
+	  	ftmp1 ~ ftmp0 ^ options.vecExponent
 	  	i = 0 
 	  	while (i < modelmat.ncols) {
 	  		var j = 0
@@ -320,11 +331,11 @@ object ADAGradUpdater {
   class Options extends Updater.Options {
     var gradwindow:FMat = 1e6f
     var alpha:FMat = 100f
-    var exponent:FMat = 0.5f
-    var initnsteps:Float = 1000f
-    var initsumsq:Float = 1e-4f
+    var vecExponent:FMat = 0.5f
+    var timeExponent:FMat = 0.5f
+    var initsumsq:FMat = 1e-8f
+    var initnsteps = 1000f
     var waitsteps = 200000
-    var minmodel = 1e-7f
   }
 }
 

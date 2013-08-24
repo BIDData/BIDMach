@@ -76,7 +76,7 @@ object LDAModel  {
     var beta = 0.0001f
   }
   
-  def mkLDAmodel(fopts:FactorModel.Options) = {
+  def mkLDAmodel(fopts:Model.Options) = {
   	new LDAModel(fopts.asInstanceOf[LDAModel.Options])
   }
   
@@ -85,21 +85,33 @@ object LDAModel  {
   } 
   
   def learn(mat0:Mat) = {
-  	new LearnFactorModel(mat0, new LDAModel.Options, mkLDAmodel _)
+    val mats = new Array[Mat](1)
+    mats(0) = mat0
+  	new LearnModel(new MatDataSource(mats), new LDAModel, new IncNormUpdater, new Learner.Options)
+  }
+  
+  def learnBatch(mat0:Mat) = {	
+    val mats = new Array[Mat](1)
+    mats(0) = mat0
+  	new LearnModel(new MatDataSource(mats), new LDAModel, new BatchNormUpdater, new Learner.Options)
   }
   
   def learnFPar(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = { 	
-  	new LearnFParFactorModel(nstart, nend, new LDAModel.Options, mkLDAmodel _)
+  	new LearnFParModel(
+  			new LDAModel.Options, mkLDAmodel _, 
+  	    new IncNormUpdater.Options, mkUpdater _, 
+  	    (n:Int, i:Int) => SFilesDataSource.twitterWords(nstart, nend, n, i)
+  	    )
   }
   
   def learnFParx(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = {	
-  	new LearnFParFactorModelx(
+  	new LearnFParModelx(
   	    new LDAModel.Options, mkLDAmodel _, 
   	    new IncNormUpdater.Options, mkUpdater _, 
   	    SFilesDataSource.twitterWords(nstart, nend))
