@@ -498,7 +498,6 @@ object Learner {
 		var nthreads = 4
 		var pstep = 0.01f
 		var coolit = 60
-		var batch = false
   }
 }
 
