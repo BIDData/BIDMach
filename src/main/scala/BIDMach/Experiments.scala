@@ -155,8 +155,8 @@ object Twitter {
   	   loadFMat(fname + "_emos.lz4")
   	 } else {
   		 val ud = getDict
-  		 val bdt = getBiDict.grams
-  		 val tdt = getTriDict.grams
+  		 val bdt = getBiDict.grams(0->nbi,?)
+  		 val tdt = getTriDict.grams(0->ntri,?)
   		 val em = findEmoticons(maxi(irow(nuni) \ maxi(bdt) \ maxi(tdt)).v, ud)
   		 val bv = zeros(em.nrows, nbi)
   		 val tv = zeros(em.nrows, ntri)
