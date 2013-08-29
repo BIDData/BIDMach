@@ -157,7 +157,7 @@ object Twitter {
   		 val ud = getDict
   		 val bdt = getBiDict.grams
   		 val tdt = getTriDict.grams
-  		 val em = findEmoticons(math.max(nuni, math.max(nbi, ntri)), ud)
+  		 val em = findEmoticons(maxi(irow(nuni) \ maxi(bdt) \ maxi(tdt)).v, ud)
   		 val bv = zeros(em.nrows, nbi)
   		 val tv = zeros(em.nrows, ntri)
   		 for (i <- 0 until em.nrows) {
