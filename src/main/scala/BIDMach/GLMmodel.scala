@@ -24,6 +24,7 @@ class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
     val eta = prod.rowslice(targmap.ncols, prod.nrows - targmap.ncols, null)
     val pred = applylinks(eta)
     val update = (targ - pred) *^ in   
+    if (opts.mask != null) update ~ update ∘ opts.mask
     updatemats(0) <-- update
     llfun(pred, targ)
   }
@@ -139,6 +140,7 @@ object GLMmodel {
   class Options extends RegressionModel.Options {
     var links:IMat = null
     var targmap:Mat = null
+    var mask:Mat = null
   }
   
   def learn = {

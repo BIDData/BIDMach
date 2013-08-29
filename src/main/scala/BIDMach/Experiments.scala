@@ -108,6 +108,18 @@ object Twitter {
     val bc = loadDMat("/big/twitter/tokenized/alltcnts.lz4")
     IDict(bd, bc)
 	}
+  
+  def junk:CSMat = {
+    csrow("<id>", "</id>", "<status>", "</status>", "<user>", "</user>", "<created_at>",
+        "</created_at>", "<screen_name>", "</screen_name>", "<lang>", "</lang>", "<statuses_count>", "</statuses_count>",
+        "<followers_count>", "</followers_count>", "<friends_count>", "</friends_count>", "<favorites_count>", "</favorites_count>" +
+        "<listed_count>", "</listed_count>", "<location>", "</location>", "<text>", "</text>", "<url>", "</url>", 
+        "<in_reply_to_user_id>", "</in_reply_to_user_id>", "<in_reply_to_screen_name>", "</in_reply_to_screen_name>",
+        "<in_reply_to_status_id>", "</in_reply_to_status_id>", "<retweet>", "</retweet>", "<retweet_count>", "</retweet_count>",
+        "<type>", "</type>", "<name>", "</name>", "<full_name>", "</full_name>", "<country>", "</country>", "<place>", "</place>",
+        "<country_code>", "</country_code>", "<bounding_box>", "</bounding_box>", "<coordinates>", "</coordinates>", 
+        "http", "https", "apos", "kml", "amp", "www", "quot", "id", "latitude", "longitude", "latlonbox", "geo", "json")
+  }
 	
 	def findEmoticons(n:Int, dd:Dict) = {
     val smiles = csrow(":-)", ":)", ":o)", ":]", ":3", ":c)", ":>", "=]", "8)", "=)", ":}", ":^)", ":っ)")
@@ -118,7 +130,7 @@ object Twitter {
     val horror = csrow("d:<", "d:", "d8", "d;", "d=", "dx", "v.v", "d-':")
     val surprise = csrow(">:o", ":-o", ":o", "°o°", "°o°", ":o", "o_o", "o_0", "o.o", "8-0")
     val wink = csrow(";-)", ";)", "*-)", "*)", ";-]", ";]", ";d", ";^)", ":-,")
-    val all = List(smiles, laughs, frowns, angry, crying, horror, surprise, wink)
+    val all = List(smiles, laughs, frowns, angry, crying, horror, surprise, wink, junk)
     val out = zeros(all.length, n)
     for (i <- 0 until all.length) {
       val mm = all(i)
@@ -132,8 +144,11 @@ object Twitter {
     out    
 	}
 	
-	def getGramDict(nuni:Int, nbi:Int, ntri:Int, rebuild:Boolean=false):Dict = {
-	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni/1000, nbi/1000, ntri/1000)
+	def getGramDict(nuni0:Int, nbi0:Int, ntri0:Int, rebuild:Boolean=false):Dict = {
+	  val nuni = nuni0 * 1000
+	  val nbi = nbi0 * 1000
+	  val ntri = ntri0 * 1000
+	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni0, nbi0, ntri0)
 	  if (!rebuild && (new File(fname + "_bmat.lz4").exists) && (new File(fname + "_dmat.lz4").exists)) {
 	    val bm = loadBMat(fname + "_bmat.lz4")
 	    val dm = loadDMat(fname + "_dmat.lz4")
@@ -149,8 +164,11 @@ object Twitter {
 	  }
 	}
 	
-	def findEmoticonsAll(nuni:Int, nbi:Int, ntri:Int, rebuild:Boolean=false):FMat = {
-  	 val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni/1000, nbi/1000, ntri/1000)
+	def getEmoticonsAll(nuni0:Int, nbi0:Int, ntri0:Int, rebuild:Boolean=false):FMat = {
+	   val nuni = nuni0 * 1000
+	   val nbi = nbi0 * 1000
+	   val ntri = ntri0 * 1000
+  	 val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni0, nbi0, ntri0)
   	 if (!rebuild && (new File(fname + "_emos.lz4").exists)) {
   	   loadFMat(fname + "_emos.lz4")
   	 } else {
