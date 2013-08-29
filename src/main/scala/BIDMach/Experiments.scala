@@ -122,22 +122,51 @@ object Twitter {
     val out = zeros(all.length, n)
     for (i <- 0 until all.length) {
       val mm = all(i)
-      for (j <- 0 until mm.length) {
+      var j = 0
+      while (j < mm.length) {
         val k = dd(mm(j))
         if (k >= 0 && k < n) out(i, k) = 1
+        j += 1
       }      
     }
     out    
 	}
 	
-	def buildGramDict(nuni:Int, nbi:Int, ntri:Int):Dict = {
-	  val ud = getDict
-	  val bd = getBiDict
-	  val td = getTriDict
-	  val dd = IDict.gramDict(nuni, nbi, ntri, ud, bd, td)
+	def getGramDict(nuni:Int, nbi:Int, ntri:Int, rebuild:Boolean=false):Dict = {
 	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni/1000, nbi/1000, ntri/1000)
-	  saveBMat(fname + "_bmat.lz4", BMat(dd.cstr))
-	  saveDMat(fname + "_dmat.lz4", dd.counts)
-	  dd
+	  if (!rebuild && (new File(fname + "_bmat.lz4").exists) && (new File(fname + "_dmat.lz4").exists)) {
+	    val bm = loadBMat(fname + "_bmat.lz4")
+	    val dm = loadDMat(fname + "_dmat.lz4")
+	    Dict(bm, dm)
+	  } else {
+	  	val ud = getDict
+	  	val bd = getBiDict
+	  	val td = getTriDict
+	  	val dd = IDict.gramDict(nuni, nbi, ntri, ud, bd, td)
+	  	saveBMat(fname + "_bmat.lz4", BMat(dd.cstr))
+	  	saveDMat(fname + "_dmat.lz4", dd.counts)
+	  	dd
+	  }
 	}
+	
+	def findEmoticonsAll(nuni:Int, nbi:Int, ntri:Int, rebuild:Boolean=false):FMat = {
+  	 val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni/1000, nbi/1000, ntri/1000)
+  	 if (!rebuild && (new File(fname + "_emos.lz4").exists)) {
+  	   loadFMat(fname + "_emos.lz4")
+  	 } else {
+  		 val ud = getDict
+  		 val bdt = getBiDict.grams
+  		 val tdt = getTriDict.grams
+  		 val em = findEmoticons(math.max(nuni, math.max(nbi, ntri)), ud)
+  		 val bv = zeros(em.nrows, nbi)
+  		 val tv = zeros(em.nrows, ntri)
+  		 for (i <- 0 until em.nrows) {
+  			 bv(i, ?) = max(em(i, bdt(?, 0)), em(i, bdt(?, 1)))
+  			 tv(i, ?) = max(em(i, tdt(?, 0)), max(em(i, tdt(?, 1)), em(i, tdt(?, 2))))
+  		 }
+  		 em(?, 0->nuni) \ bv(?, 0->nbi) \ tv(?, 0->ntri)
+  	 }
+	}
+	
+
 }
