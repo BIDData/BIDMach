@@ -157,14 +157,16 @@ object Twitter {
   		 val ud = getDict
   		 val bdt = getBiDict.grams(0->nbi,?)
   		 val tdt = getTriDict.grams(0->ntri,?)
-  		 val em = findEmoticons(maxi(irow(nuni) \ maxi(bdt) \ maxi(tdt)).v, ud)
+  		 val em = findEmoticons(1 + maxi(irow(nuni) \ maxi(bdt) \ maxi(tdt)).v, ud)
   		 val bv = zeros(em.nrows, nbi)
   		 val tv = zeros(em.nrows, ntri)
   		 for (i <- 0 until em.nrows) {
   			 bv(i, ?) = max(em(i, bdt(?, 0)), em(i, bdt(?, 1)))
   			 tv(i, ?) = max(em(i, tdt(?, 0)), max(em(i, tdt(?, 1)), em(i, tdt(?, 2))))
   		 }
-  		 em(?, 0->nuni) \ bv(?, 0->nbi) \ tv(?, 0->ntri)
+  		 val emos = em(?, 0->nuni) \ bv(?, 0->nbi) \ tv(?, 0->ntri)
+  		 saveFMat(fname + "_emos.lz4", emos)
+  		 emos
   	 }
 	}
 	
