@@ -209,7 +209,6 @@ class TelescopingUpdater(override val opts:TelescopingUpdater.Options = new Tele
 class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
   
   val options = opts
-  var nsteps = 0f
   var firstStep = 0f
   var modelmat:Mat = null
   var updatemat:Mat = null  
@@ -225,7 +224,6 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
     } else {
     	sumSq(?) = options.initsumsq
     }
-    nsteps = options.initnsteps
     stepn = modelmat.zeros(1,1)
   } 
   
@@ -252,45 +250,6 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	  	tmp ~ tmp *@ (stepn ^ te)
 	  	modelmat ~ modelmat + ((updatemat / tmp) *@ alpham)
 	  }
-	}
-	
-  def update2(step:Long):Unit =	{
-	  val nwm = options.gradwindow/step
-	  val alpham = options.alpha
-	  val fmodel = modelmat.asInstanceOf[FMat]
-	  val fsumSq = sumSq.asInstanceOf[FMat]
-	  val fupdate = updatemat.asInstanceOf[FMat]
-	  val ftmp0 = fmodel + 0
-	  val ftmp1 = fmodel + 1
-
-	  var i = 0 
-	  while (i < modelmat.ncols) {
-	  	var j = 0
-	  	while (j < modelmat.nrows) {
-	  	  val indx = j + i * modelmat.nrows
-	  	  val nw = if (nwm.length > 1) nwm(i) else nwm(0)
-	  		fsumSq.data(indx) = 1/nw*(fupdate.data(indx)*fupdate.data(indx) + (nw-1)*fsumSq.data(indx))
-	  		ftmp0.data(indx) = fsumSq.data(indx) * nsteps
-	  		j += 1
-	  	}
-	    i += 1
-	  }	  
-	  if (nsteps > options.waitsteps) {
-	  	ftmp1 ~ ftmp0 ^ options.vecExponent
-	  	i = 0 
-	  	while (i < modelmat.ncols) {
-	  		var j = 0
-	  		while (j < modelmat.nrows) {
-	  			val indx = j + i * modelmat.nrows
-	  			val alpha = if (alpham.length > 1) alpham(i) else alpham(0)
-	  			fmodel.data(indx) = fmodel.data(indx) + alpha*fupdate.data(indx)/ftmp1.data(indx)
-	  			j += 1
-	  		}
-	  		i += 1
-	  	}	
-	  }
-	  Mat.nflops += 8L * modelmat.length 
-	  nsteps += step
 	}
 }
 
@@ -334,8 +293,7 @@ object ADAGradUpdater {
     var vecExponent:FMat = 0.5f
     var timeExponent:FMat = 0.5f
     var initsumsq:FMat = 1e-8f
-    var initnsteps = 1000f
-    var waitsteps = 10000
+    var waitsteps = 2
   }
 }
 
