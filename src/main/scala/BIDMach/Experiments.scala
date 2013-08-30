@@ -195,9 +195,10 @@ object Twitter {
 	  val mask = (sum(em) == 0f)
 	  val targets = em(0->(em.nrows-1), ?)
 	  val ntargets = targets.nrows
-	  val expts = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
-	  val expts1 = ones(ntargets, 1) ⊗ expts ⊗ ones(6, 1)
-	  val expts2 = ones(6*ntargets, 1) ⊗ expts 
+//	  val expts = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+	  val expts = col(0.5)
+	  val expts1 = ones(ntargets, 1) ⊗ expts ⊗ ones(expts.length, 1)
+	  val expts2 = ones(expts.length*ntargets, 1) ⊗ expts 
 	  val aopts = new ADAGradUpdater.Options
 	  aopts.vecExponent = expts1
 	  aopts.timeExponent = expts2
