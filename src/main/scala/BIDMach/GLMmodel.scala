@@ -8,22 +8,24 @@ import BIDMat.SciFunctions._
 class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
+  var targslice:Mat = null
+  var prodslice:Mat = null
   
   val linkArray = Array(LinearLink, LogisticLink)
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
+    targslice = modelmats(0).zeros(targmap.ncols, datasource.opts.blockSize)
+    prodslice = modelmats(0).zeros(modelmats(0).nrows - targmap.ncols, datasource.opts.blockSize)
   }
     
   def mupdate(in:Mat):FMat = {
     val prod = modelmats(0) * in
-    val targ = targmap * prod.rowslice(0, targmap.ncols, null)
-    val eta = prod.rowslice(targmap.ncols, prod.nrows, null)
+    val targ = targmap * prod.rowslice(0, targmap.ncols, targslice)
+    val eta = prod.rowslice(targmap.ncols, prod.nrows, prodslice)
     val pred = applylinks(eta, mylinks)
-
     val update = (targ - pred) *^ in
-    println("%d %d %d %d %d %d %d %d" format (in.nrows, in.ncols, in.GUID, prod.GUID, targ.GUID, eta.GUID, pred.GUID, update.GUID))
     if (opts.mask != null) update ~ update ∘ opts.mask
     updatemats(0) <-- update
     llfun(pred, targ, mylinks)
