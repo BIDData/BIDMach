@@ -205,6 +205,7 @@ object Twitter {
 	  gopts.links = izeros(expts1.length, 1)
 	  gopts.mask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
+	  gopts.targets = targets
 	  
 	  val mats = new Array[Mat](1)
     mats(0) = a
