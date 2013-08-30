@@ -335,7 +335,7 @@ object ADAGradUpdater {
     var timeExponent:FMat = 0.5f
     var initsumsq:FMat = 1e-8f
     var initnsteps = 1000f
-    var waitsteps = 200000
+    var waitsteps = 10000
   }
 }
 
