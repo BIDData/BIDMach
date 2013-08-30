@@ -164,7 +164,7 @@ object Twitter {
 	  }
 	}
 	
-	def getEmoticonsAll(nuni0:Int=40, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):FMat = {
+	def getEmoticonMap(nuni0:Int=40, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):FMat = {
 	   val nuni = nuni0 * 1000
 	   val nbi = nbi0 * 1000
 	   val ntri = ntri0 * 1000
@@ -186,6 +186,30 @@ object Twitter {
   		 saveFMat(fname + "_emos.lz4", emos)
   		 emos
   	 }
+	}
+	
+	def logisticModel(a:SMat, nuni0:Int=40, nbi0:Int=100, ntri0:Int=400) = {
+	  val gd = getGramDict(nuni0, nbi0, ntri0)
+	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
+	  val nfeats = gd.length
+	  val mask = (sum(em) == 0f)
+	  val targets = em(0->(em.nrows-1), ?)
+	  val ntargets = targets.nrows
+	  val expts = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+	  val expts1 = ones(ntargets, 1) ⊗ expts ⊗ ones(6, 1)
+	  val expts2 = ones(6*ntargets, 1) ⊗ expts 
+	  val aopts = new ADAGradUpdater.Options
+	  aopts.vecExponent = expts1
+	  aopts.timeExponent = expts2
+	  val gopts = new GLMmodel.Options
+	  gopts.links = izeros(expts1.length, 1)
+	  gopts.mask = mask
+	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
+	  
+	  val mats = new Array[Mat](1)
+    mats(0) = a
+  	new LearnModel(new MatDataSource(mats), new GLMmodel(gopts), new ADAGradUpdater(aopts), new Learner.Options)
+	  
 	}
 	
 

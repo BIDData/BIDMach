@@ -5,12 +5,15 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 abstract class RegressionModel(override val opts:RegressionModel.Options) extends Model {
+  var targmap:Mat = null
+  var mask:Mat = null
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
+    useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = size(data0, 1)
-    val d = opts.targets.nrows
+    val d = opts.targmap.ncols
     val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
     val sp = sdat / sum(sdat)
     println("initial perplexity=%f" format (sp ddot ln(sp)) )
@@ -21,7 +24,9 @@ abstract class RegressionModel(override val opts:RegressionModel.Options) extend
     rmat ~ rmat / msum
     val modelmat = opts.targets on rmat
     modelmats = Array[Mat](1)
-    modelmats(0) = if (opts.useGPU) GMat(modelmat) else modelmat    
+    modelmats(0) = if (useGPU) GMat(modelmat) else modelmat    
+    targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
+    mask = if (useGPU) GMat(opts.mask) else opts.mask
   } 
   
   def mupdate(data:Mat):FMat
@@ -40,7 +45,7 @@ abstract class RegressionModel(override val opts:RegressionModel.Options) extend
 object RegressionModel {
   class Options extends Model.Options {
     var targets:FMat = null
-    var nrows = 0
-    var nmodels = 0
+    var targmap:FMat = null
+    var mask:FMat = null
   }
 }
