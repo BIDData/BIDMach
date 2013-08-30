@@ -19,12 +19,15 @@ class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
     
   def mupdate(in:Mat):FMat = {
     val eta = modelmats(0) * in
+//    println("model %f" format (mean(mean(modelmats(0)))).dv)
     val targ = targmap * (targets * in)
     val pred = applylinks(eta, mylinks)
+//    println("pred %f" format (mean(mean(pred))).dv)
     val update = (targ - pred) *^ in
     if (mask != null) update ~ update ∘ mask
     updatemats(0) <-- update
-    mean(llfun(pred, targ, mylinks), 2)
+    val lls = llfun(pred, targ, mylinks)
+    mean(lls, 2)
   }
   
   def applylinks(eta:Mat, links:Mat):Mat = {
@@ -33,11 +36,11 @@ class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
         Mat.nflops += 10L * feta.length
     		var i = 0
     		val out = (feta + 1f)
-    		while (i < feta.nrows) {
-    			val fun = linkArray(ilinks(i)).invlinkfn
+    		while (i < feta.ncols) {
     		  var j = 0
-    		  while (j < feta.ncols) {     			
-    		  	out.data(i + j * out.nrows) = fun(feta.data(i + j * feta.nrows))
+    		  while (j < feta.nrows) { 
+    		  	val fun = linkArray(ilinks(j)).invlinkfn
+    		  	out.data(j + i * out.nrows) = fun(feta.data(j + i * feta.nrows))
     		  	j += 1 
     		  }
     			i += 1
@@ -53,11 +56,11 @@ class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
       	Mat.nflops += 10L * ftarg.length
     		var i = 0
     		val out = (ftarg + 1f)
-    		while (i < ftarg.nrows) {
-    			val fun = linkArray(ilinks(i)).likelihoodfn
+    		while (i < ftarg.ncols) {
     			var j = 0
-    			while (j < ftarg.ncols) {
-    				out.data(i + j * out.nrows) = fun(fpred.data(i + j * ftarg.nrows),  ftarg.data(i + j * ftarg.nrows))
+    			while (j < ftarg.nrows) {
+    				val fun = linkArray(ilinks(j)).likelihoodfn
+    				out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
     				j += 1
     			}
     			i += 1

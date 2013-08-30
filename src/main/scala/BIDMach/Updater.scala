@@ -18,7 +18,7 @@ abstract class Updater(val opts:Updater.Options = new Updater.Options) {
 }
 
 
-class IncNormUpdater(override val opts:IncNormUpdater.Options = new IncNormUpdater.Options) extends Updater {
+class IncNormUpdater(override val opts:IncNormUpdater.Options = new IncNormUpdater.Options) extends Updater(opts) {
   
   var firstStep = 0f
   var rm:Mat = null
@@ -206,7 +206,7 @@ class TelescopingUpdater(override val opts:TelescopingUpdater.Options = new Tele
 }
 
 
-class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
+class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
   
   val options = opts
   var firstStep = 0f
@@ -248,6 +248,7 @@ class ADAGradUpdater(opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) e
 	  if (options.waitsteps < nsteps) {
 	  	val tmp = sumSq ^ ve
 	  	tmp ~ tmp *@ (stepn ^ te)
+	  	tmp ~ tmp + opts.epsilon
 	  	modelmat ~ modelmat + ((updatemat / tmp) *@ alpham)
 	  }
 	}
@@ -289,10 +290,11 @@ object TelescopingUpdater {
 object ADAGradUpdater {
   class Options extends Updater.Options {
     var gradwindow:FMat = 1e6f
-    var alpha:FMat = 100f
+    var alpha:FMat = 1f
     var vecExponent:FMat = 0.5f
     var timeExponent:FMat = 0.5f
     var initsumsq:FMat = 1e-8f
+    var epsilon = 1e-12f
     var waitsteps = 2
   }
 }
