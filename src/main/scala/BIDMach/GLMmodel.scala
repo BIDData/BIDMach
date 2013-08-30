@@ -8,32 +8,29 @@ import BIDMat.SciFunctions._
 class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
-  var targslice:Mat = null
-  var prodslice:Mat = null
   
   val linkArray = Array(LinearLink, LogisticLink)
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
-    targslice = modelmats(0).zeros(targmap.ncols, datasource.opts.blockSize)
-    prodslice = modelmats(0).zeros(modelmats(0).nrows - targmap.ncols, datasource.opts.blockSize)
+    modelmats(0) ~ modelmats(0) ∘ mask
   }
     
   def mupdate(in:Mat):FMat = {
-    val prod = modelmats(0) * in
-    val targ = targmap * prod.rowslice(0, targmap.ncols, targslice)
-    val eta = prod.rowslice(targmap.ncols, prod.nrows, prodslice)
+    val eta = modelmats(0) * in
+    val targ = targmap * (targets * in)
     val pred = applylinks(eta, mylinks)
     val update = (targ - pred) *^ in
-    if (opts.mask != null) update ~ update ∘ opts.mask
+    if (mask != null) update ~ update ∘ mask
     updatemats(0) <-- update
-    llfun(pred, targ, mylinks)
+    mean(llfun(pred, targ, mylinks), 2)
   }
   
   def applylinks(eta:Mat, links:Mat):Mat = {
     (eta, links) match {
       case (feta:FMat, ilinks:IMat) => {
+        Mat.nflops += 10L * feta.length
     		var i = 0
     		val out = (feta + 1f)
     		while (i < feta.nrows) {
@@ -51,8 +48,9 @@ class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
   }
   
   def llfun(pred:Mat, targ:Mat, links:Mat):FMat = {
-    (targ, pred, links) match {
-      case (ftarg:FMat, fpred:FMat, ilinks:IMat) => {
+    (pred, targ, links) match {
+      case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
+      	Mat.nflops += 10L * ftarg.length
     		var i = 0
     		val out = (ftarg + 1f)
     		while (i < ftarg.nrows) {
