@@ -188,7 +188,7 @@ object Twitter {
   	 }
 	}
 	
-	def logisticModel(a:SMat, nuni0:Int=40, nbi0:Int=100, ntri0:Int=400) = {
+	def logisticModel(a:SMat, nuni0:Int=50, nbi0:Int=100, ntri0:Int=400) = {
 	  val gd = getGramDict(nuni0, nbi0, ntri0)
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length
