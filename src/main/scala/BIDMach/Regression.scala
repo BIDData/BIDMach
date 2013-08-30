@@ -6,6 +6,7 @@ import BIDMat.SciFunctions._
 
 abstract class RegressionModel(override val opts:RegressionModel.Options) extends Model {
   var targmap:Mat = null
+  var targets:Mat = null
   var mask:Mat = null
   
   override def init(datasource:DataSource) = {
@@ -22,11 +23,12 @@ abstract class RegressionModel(override val opts:RegressionModel.Options) extend
     rmat ~ rmat *@ sdat
     val msum = sum(rmat, 2)
     rmat ~ rmat / msum
-    val mm = opts.targets on rmat
+    val mm = rmat
     modelmats = Array[Mat](1)
     modelmats(0) = if (useGPU) GMat(mm) else mm 
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
+    targets = if (useGPU) GMat(opts.targets) else opts.targets
     targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
     mask = if (useGPU) GMat(opts.mask) else opts.mask
   } 
