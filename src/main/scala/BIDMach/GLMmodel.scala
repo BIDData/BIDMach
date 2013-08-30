@@ -7,35 +7,33 @@ import BIDMat.SciFunctions._
 
 class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
   
-  var mylinks:IMat = null
-  var targmap:Mat = null
+  var mylinks:Mat = null
   
   val linkArray = Array(LinearLink, LogisticLink)
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
-    mylinks = opts.links
-    targmap = opts.targmap
+    mylinks = if (useGPU) GIMat(opts.links) else opts.links
   }
     
   def mupdate(in:Mat):FMat = {
     val prod = modelmats(0) * in
     val targ = targmap * prod.rowslice(0, targmap.ncols, null)
     val eta = prod.rowslice(targmap.ncols, prod.nrows - targmap.ncols, null)
-    val pred = applylinks(eta)
+    val pred = applylinks(eta, mylinks)
     val update = (targ - pred) *^ in   
     if (opts.mask != null) update ~ update ∘ opts.mask
     updatemats(0) <-- update
-    llfun(pred, targ)
+    llfun(pred, targ, mylinks)
   }
   
-  def applylinks(eta:Mat):Mat = {
-    eta match {
-      case feta:FMat => {
+  def applylinks(eta:Mat, links:Mat):Mat = {
+    (eta, links) match {
+      case (feta:FMat, ilinks:IMat) => {
     		var i = 0
     		val out = (feta + 1f)
     		while (i < feta.nrows) {
-    			val fun = linkArray(mylinks(i)).invlinkfn
+    			val fun = linkArray(ilinks(i)).invlinkfn
     		  var j = 0
     		  while (j < feta.ncols) {     			
     		  	out.data(i + j * out.nrows) = fun(feta.data(i + j * feta.nrows))
@@ -48,13 +46,13 @@ class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
     }
   }
   
-  def llfun(pred:Mat, targ:Mat):FMat = {
-    (targ, pred) match {
-      case (ftarg:FMat, fpred:FMat) => {
+  def llfun(pred:Mat, targ:Mat, links:Mat):FMat = {
+    (targ, pred, links) match {
+      case (ftarg:FMat, fpred:FMat, ilinks:IMat) => {
     		var i = 0
     		val out = (ftarg + 1f)
     		while (i < ftarg.nrows) {
-    			val fun = linkArray(mylinks(i)).likelihoodfn
+    			val fun = linkArray(ilinks(i)).likelihoodfn
     			var j = 0
     			while (j < ftarg.ncols) {
     				out.data(i + j * out.nrows) = fun(fpred.data(i + j * ftarg.nrows),  ftarg.data(i + j * ftarg.nrows))
@@ -139,12 +137,7 @@ abstract class GLMlink {
 object GLMmodel {
   class Options extends RegressionModel.Options {
     var links:IMat = null
-    var targmap:Mat = null
-    var mask:Mat = null
   }
   
-  def learn = {
-    
-  }
 }
 
