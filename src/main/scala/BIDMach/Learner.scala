@@ -14,6 +14,30 @@ case class Learner(
     val updater:Updater, 
 		val opts:Learner.Options = new Learner.Options) {
   var results:FMat = null
+  val dopts:DataSource.Options = datasource.opts
+	val mopts:Model.Options	= model.opts
+	val ropts:Regularizer.Options = if (regularizer != null) regularizer.opts else null
+	val uopts:Updater.Options = updater.opts
+	
+	def setup = { 
+    datasource match {
+      case ddm:MatDataSource => {
+      	if (mopts.putBack >= 0) {
+      		ddm.setupPutBack(mopts.putBack+1, mopts.dim)
+      	}
+      }
+      case _ => {}
+    }
+    datasource.init
+    model.init(datasource)
+    updater.init(model)   
+  }
+  
+  def init = {
+    datasource.init
+    model.init(datasource)
+    updater.init(model)
+  }
   
   def run() = {
     flip 
@@ -365,42 +389,6 @@ case class ParLearnerx(
     models(ithread).modelmats(0) <-- mm
     updaters(ithread).init(models(ithread))      
   }
-}
-
-
-class LearnModel(
-		val dd:DataSource,
-		val model:Model,
-		var updater:Updater,
-		var lopts:Learner.Options
-		) {
-	val dopts:DataSource.Options = dd.opts
-	val mopts:Model.Options	= model.opts
-	val uopts:Updater.Options = updater.opts
-  var learner:Learner = null
-  def setup = { 
-    dd match {
-      case ddm:MatDataSource => {
-      	if (mopts.putBack >= 0) {
-      		ddm.setupPutBack(mopts.putBack+1, mopts.dim)
-      	}
-      }
-      case _ => {}
-    }
-    dd.init
-    model.init(dd)
-    updater.init(model)
-    learner = new Learner(dd, model, null, updater, lopts)   
-  }
-  
-  def init = {
-    if (dd.omats.length > 1) dd.omats(1) = ones(model.opts.dim, dd.omats(0).ncols)
-    dd.init
-    model.init(dd)
-    updater.init(model)
-  }
-  
-  def run = learner.run
 }
 
 

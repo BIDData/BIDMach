@@ -3,7 +3,7 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-abstract class Regularizer(opts:Regularizer.Options = new Regularizer.Options) { 
+abstract class Regularizer(val opts:Regularizer.Options = new Regularizer.Options) { 
   val options = opts
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null
@@ -16,7 +16,7 @@ abstract class Regularizer(opts:Regularizer.Options = new Regularizer.Options) {
   }
 }
 
-class L1Regularizer(opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(opts) { 
+class L1Regularizer(override val opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(opts) { 
    def compute(step:Float) = {
      for (i <- 0 until modelmats.length) {
        updatemats(i) ~ updatemats(i) + (sign(modelmats(i)) * (-step*options.mprior)) 
@@ -24,7 +24,7 @@ class L1Regularizer(opts:Regularizer.Options = new Regularizer.Options) extends 
    }
 }
 
-class L2Regularizer(opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(opts) { 
+class L2Regularizer(override val opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(opts) { 
    def compute(step:Float) = {
   	 for (i <- 0 until modelmats.length) {
   		 updatemats(i) ~ updatemats(i) + (modelmats(i) * (-options.mprior * step))

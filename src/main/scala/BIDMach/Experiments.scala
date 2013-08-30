@@ -193,7 +193,8 @@ object Twitter {
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length
 	  val mask = (sum(em) == 0f)
-	  val targets = em(0->(em.nrows-1), ?)
+//	  val targets = em(0->(em.nrows-1), ?)
+	  val targets = em(0->1, ?)
 	  val ntargets = targets.nrows
 //	  val expts = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 	  val expts = col(0.5)
@@ -211,7 +212,7 @@ object Twitter {
 	  
 	  val mats = new Array[Mat](1)
     mats(0) = a
-  	new LearnModel(new MatDataSource(mats), new GLMmodel(gopts), new ADAGradUpdater(aopts), new Learner.Options)
+  	new Learner(new MatDataSource(mats), new GLMmodel(gopts), null, new ADAGradUpdater(aopts), new Learner.Options)
 	  
 	}
 	
