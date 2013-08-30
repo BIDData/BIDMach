@@ -13,7 +13,7 @@ abstract class RegressionModel(override val opts:RegressionModel.Options) extend
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = size(data0, 1)
-    val d = opts.targmap.ncols
+    val d = opts.targmap.nrows
     val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
     val sp = sdat / sum(sdat)
     println("initial perplexity=%f" format (sp ddot ln(sp)) )
