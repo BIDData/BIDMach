@@ -144,7 +144,7 @@ object Twitter {
     out    
 	}
 	
-	def getGramDict(nuni0:Int=40, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):Dict = {
+	def getGramDict(nuni0:Int=50, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):Dict = {
 	  val nuni = nuni0 * 1000
 	  val nbi = nbi0 * 1000
 	  val ntri = ntri0 * 1000
@@ -164,7 +164,7 @@ object Twitter {
 	  }
 	}
 	
-	def getEmoticonMap(nuni0:Int=40, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):FMat = {
+	def getEmoticonMap(nuni0:Int=50, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):FMat = {
 	   val nuni = nuni0 * 1000
 	   val nbi = nbi0 * 1000
 	   val ntri = ntri0 * 1000
@@ -191,27 +191,27 @@ object Twitter {
 	def logisticModel(a:SMat, nuni0:Int=50, nbi0:Int=100, ntri0:Int=400) = {
 	  val gd = getGramDict(nuni0, nbi0, ntri0)
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
-	  val nfeats = gd.length
-	  val mask = (sum(em) == 0f)
-//	  val targets = em(0->(em.nrows-1), ?)
-	  val targets = em(0->1, ?)
+	  val nfeats = gd.length + 1
+	  val mask = (sum(em) == 0f) \ 1
+	  val targets = em(0->(em.nrows-1), ?) \ zeros(em.nrows-1,1)
+//	  val targets = em(0->1, ?) \ 0
 	  val ntargets = targets.nrows
-//	  val expts = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
-	  val expts = col(0.5)
+	  val expts = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+//	  val expts = col(0.5)
 	  val expts1 = ones(ntargets, 1) ⊗ expts ⊗ ones(expts.length, 1)
 	  val expts2 = ones(expts.length*ntargets, 1) ⊗ expts 
 	  val aopts = new ADAGradUpdater.Options
 	  aopts.vecExponent = expts1
 	  aopts.timeExponent = expts2
+	  aopts.mask = mask
 	  val gopts = new GLMmodel.Options
-	  gopts.links = izeros(expts1.length, 1)
+	  gopts.links = iones(expts1.length, 1)
 	  gopts.mask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-	  gopts.useGPU = false
 	  
 	  val mats = new Array[Mat](1)
-    mats(0) = a
+    mats(0) = a on sparse(ones(1, a.ncols))
   	new Learner(new MatDataSource(mats), new GLMmodel(gopts), null, new ADAGradUpdater(aopts), new Learner.Options)
 	  
 	}
