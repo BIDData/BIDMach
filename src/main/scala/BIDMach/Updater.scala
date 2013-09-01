@@ -208,25 +208,59 @@ class TelescopingUpdater(override val opts:TelescopingUpdater.Options = new Tele
 
 class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
   
-  val options = opts
   var firstStep = 0f
   var modelmat:Mat = null
   var updatemat:Mat = null  
   var sumSq:Mat = null 
   var stepn:Mat = null
+  var mask:Mat = null
+  var ve:Mat = null
+	var te:Mat = null
+	var alpha:Mat = null
 
   override def init(model0:Model) = {
     model = model0
 	  modelmat = model.modelmats(0)
 	  updatemat = model.updatemats(0) 
+	  mask = opts.mask
     if (sumSq.asInstanceOf[AnyRef] == null) {
-      sumSq = modelmat.ones(size(modelmat,1), size(modelmat,2)) *@ options.initsumsq
+      sumSq = modelmat.ones(size(modelmat,1), size(modelmat,2)) *@ opts.initsumsq
     } else {
-    	sumSq(?) = options.initsumsq
+    	sumSq.set(opts.initsumsq)
     }
     stepn = modelmat.zeros(1,1)
+    ve = modelmat.zeros(opts.vecExponent.nrows, opts.vecExponent.ncols)
+    te = modelmat.zeros(opts.timeExponent.nrows, opts.timeExponent.ncols)
+    alpha = modelmat.zeros(opts.alpha.nrows, opts.alpha.ncols)
+    ve <-- opts.vecExponent
+    te <-- opts.timeExponent
+    alpha <-- opts.alpha
   } 
   
+	def update2(step:Long):Unit = {
+	  val nsteps = if (step == 0) 1f else {
+  	  if (firstStep == 0f) {
+  	    firstStep = step
+  	    1f
+  	  } else {
+  	    step / firstStep
+  	  }
+  	}
+	  stepn.set(nsteps)
+	  val nw = 1f / stepn
+	  val newsquares = updatemat *@ updatemat
+	  newsquares ~ newsquares *@ nw
+	  sumSq  ~ sumSq *@ (1f - nw)
+	  sumSq ~ sumSq + newsquares
+	  if (opts.waitsteps < nsteps) {
+	  	val tmp = sumSq ^ ve
+	  	tmp ~ tmp *@ (stepn ^ te)
+	  	tmp ~ tmp + opts.epsilon
+	  	modelmat ~ modelmat + ((updatemat / tmp) *@ alpha)
+	  	if (mask != null) modelmat ~ modelmat *@ mask
+	  }
+	}
+	
 	def update(step:Long):Unit = {
 	  val nsteps = if (step == 0) 1f else {
   	  if (firstStep == 0f) {
@@ -237,19 +271,19 @@ class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdat
   	  }
   	}
 	  stepn.set(nsteps)
-	  val ve = options.vecExponent
-	  val te = options.timeExponent
-	  val alpham = options.alpha
 	  val nw = 1f / stepn
 	  val newsquares = updatemat *@ updatemat
 	  newsquares ~ newsquares *@ nw
 	  sumSq  ~ sumSq *@ (1f - nw)
 	  sumSq ~ sumSq + newsquares
-	  if (options.waitsteps < nsteps) {
+	  if (opts.waitsteps < nsteps) {
 	  	val tmp = sumSq ^ ve
 	  	tmp ~ tmp *@ (stepn ^ te)
 	  	tmp ~ tmp + opts.epsilon
-	  	modelmat ~ modelmat + ((updatemat / tmp) *@ alpham)
+	  	tmp ~ updatemat / tmp
+	  	tmp ~ tmp *@ alpha
+	  	modelmat ~ modelmat + tmp
+	  	if (mask != null) modelmat ~ modelmat *@ mask
 	  }
 	}
 }
@@ -289,13 +323,13 @@ object TelescopingUpdater {
 
 object ADAGradUpdater {
   class Options extends Updater.Options {
-    var gradwindow:FMat = 1e6f
     var alpha:FMat = 1f
     var vecExponent:FMat = 0.5f
     var timeExponent:FMat = 0.5f
-    var initsumsq:FMat = 1e-8f
+    var initsumsq = 1e-8f
     var epsilon = 1e-12f
     var waitsteps = 2
+    var mask:FMat = null
   }
 }
 

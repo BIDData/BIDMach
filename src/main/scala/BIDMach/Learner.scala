@@ -38,7 +38,7 @@ case class Learner(
     model.init(datasource)
     updater.init(model)
   }
-  
+   
   def run() = {
     flip 
     var done = false
