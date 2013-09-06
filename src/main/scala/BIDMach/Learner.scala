@@ -495,7 +495,7 @@ object Learner {
       sum += reslist(i)(0)
       i += 1
     }
-    ("ll=%5.4" format sum/(length-lasti))    
+    ("ll=%5.4f" format sum/(length-lasti))    
   }
   
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
