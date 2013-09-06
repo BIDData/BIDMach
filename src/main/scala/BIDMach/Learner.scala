@@ -438,7 +438,7 @@ class LearnFParModel(
 
 
 class LearnFParModelx(
-		dd:DataSource,
+		val ds:DataSource,
 		mopts:Model.Options,
 		mkmodel:(Model.Options)=>Model,
 		uopts:Updater.Options,
@@ -451,25 +451,25 @@ class LearnFParModelx(
   def setup = {
     models = new Array[Model](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads) 
-    dd.init
+    ds.init
     for (i <- 0 until lopts.nthreads) {
       if (i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
-    	models(i).init(dd)
+    	models(i).init(ds)
     	updaters(i) = mkupdater(uopts)
     	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
-    learner = new ParLearnerx(dd, models, null, updaters, lopts)   
+    learner = new ParLearnerx(ds, models, null, updaters, lopts)   
   }
   
   def init = {
-	  dd.omats(1) = ones(mopts.dim, dd.omats(0).ncols)
+	  ds.omats(1) = ones(mopts.dim, ds.omats(0).ncols)
   	for (i <- 0 until lopts.nthreads) {
   	  if (i < Mat.hasCUDA) setGPU(i)
-  		if (dd.omats.length > 1) 
-  		dd.init
-  		models(i).init(dd)
+  		if (ds.omats.length > 1) 
+  		ds.init
+  		models(i).init(ds)
   		updaters(i).init(models(i))
   	}
   	if (0 < Mat.hasCUDA) setGPU(0)
