@@ -120,7 +120,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
     if (opts.order == 1) {
     	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-nstart,1))         // Randomize the file read order
-    	permfn = (a:Int) => rr(a-opts.nstart)+nstart
+    	permfn = (a:Int) => rr(a-nstart)+nstart
     } else {
       permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
         val (yy, mm, dd, hh) = FilesDataSource.decodeDate(n)
