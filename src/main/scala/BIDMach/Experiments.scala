@@ -195,7 +195,7 @@ object Twitter {
 	  val nuni0 = 50
 	  val nbi0 = 100
 	  val ntri0 = 200
-	  val ds = SFilesDataSource.twitterNgrams(nstart0, nend0)
+	  val ds = SFilesDataSource.twitterNgramBlend(nstart0, nend0)
 //	  val ds = SFilesDataSource.twitterWords(nstart0, nend0)
 	  ds.opts.addConstFeat = true
 	  ds.opts.featType = 0
