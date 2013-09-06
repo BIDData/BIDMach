@@ -439,9 +439,9 @@ class LearnFParModel(
 
 class LearnFParModelx(
 		val ds:DataSource,
-		mopts:Model.Options,
+		val mopts:Model.Options,
 		mkmodel:(Model.Options)=>Model,
-		uopts:Updater.Options,
+		val uopts:Updater.Options,
 		mkupdater:(Updater.Options)=>Updater) {
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
