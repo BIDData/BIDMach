@@ -144,7 +144,7 @@ object Twitter {
     out    
 	}
 	
-	def getGramDict(nuni0:Int=50, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):Dict = {
+	def getGramDict(nuni0:Int=50, nbi0:Int=100, ntri0:Int=200, rebuild:Boolean=false):Dict = {
 	  val nuni = nuni0 * 1000
 	  val nbi = nbi0 * 1000
 	  val ntri = ntri0 * 1000
@@ -164,7 +164,7 @@ object Twitter {
 	  }
 	}
 	
-	def getEmoticonMap(nuni0:Int=50, nbi0:Int=100, ntri0:Int=400, rebuild:Boolean=false):FMat = {
+	def getEmoticonMap(nuni0:Int=50, nbi0:Int=100, ntri0:Int=200, rebuild:Boolean=false):FMat = {
 	   val nuni = nuni0 * 1000
 	   val nbi = nbi0 * 1000
 	   val ntri = ntri0 * 1000
@@ -202,8 +202,8 @@ object Twitter {
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length + 1
 	  val mask = (sum(em) == 0f) \ 1
-	  val targets = em(0->(em.nrows-1), ?) \ zeros(em.nrows-1,1)
-//	  val targets = em(0->1, ?) \ 0
+//	  val targets = em(0->(em.nrows-1), ?) \ zeros(em.nrows-1,1)
+	  val targets = em(0->1, ?) \ 0
 	  val ntargets = targets.nrows
 	  val expts = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 //	  val expts = col(0.5)
