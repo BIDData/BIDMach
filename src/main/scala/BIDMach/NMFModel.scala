@@ -132,9 +132,9 @@ object NMFModel  {
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = {  	
   	 	new LearnFParModelx(
+  	 		SFilesDataSource.twitterWords(nstart, nend),
   	    new NMFModel.Options, mkNMFmodel _, 
-  	    new IncNormUpdater.Options, mkUpdater _, 
-  	    SFilesDataSource.twitterWords(nstart, nend))
+  	    new IncNormUpdater.Options, mkUpdater _)
   }
 } 
 
