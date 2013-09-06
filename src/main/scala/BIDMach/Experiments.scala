@@ -188,7 +188,16 @@ object Twitter {
   	 }
 	}
 	
-	def logisticModel(a:SMat, nuni0:Int=50, nbi0:Int=100, ntri0:Int=400) = {
+	def logisticModel(
+	    nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+			nend0:Int = FilesDataSource.encodeDate(2013,7,1,0)
+			) = {
+	  val nuni0 = 50
+	  val nbi0 = 100
+	  val ntri0 = 200
+	  val ds = SFilesDataSource.twitterNgramBlend(nstart0, nend0)
+	  ds.opts.addConstFeat = true
+	  ds.opts.featType = 0
 	  val gd = getGramDict(nuni0, nbi0, ntri0)
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length + 1
@@ -209,10 +218,7 @@ object Twitter {
 	  gopts.mask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-	  
-	  val mats = new Array[Mat](1)
-    mats(0) = a on sparse(ones(1, a.ncols))
-  	new Learner(new MatDataSource(mats), new GLMmodel(gopts), null, new ADAGradUpdater(aopts), new Learner.Options)
+  	new LearnFParModelx(ds, gopts, GLMmodel.mkGLMmodel _, aopts, GLMmodel.mkUpdater _)
 	  
 	}
 	

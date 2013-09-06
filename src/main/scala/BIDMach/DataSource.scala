@@ -409,6 +409,10 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
     rands1 = rand(1, blockSize/bBlock + 1)
     rands2 = rand(1, blockSize/bBlock + 1)
     here = -blockSize
+    s1.opts.addConstFeat = opts.addConstFeat
+    s2.opts.addConstFeat = opts.addConstFeat
+    s1.opts.featType = opts.featType
+    s2.opts.featType = opts.featType
     s1.init
     s2.init
     mats1 = s1.next
@@ -623,7 +627,7 @@ object SFilesDataSource {
   				FilesDataSource.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
   				FilesDataSource.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
   		    )
-  		fcounts = icol(50000,100000,400000)
+  		fcounts = icol(50000,100000,200000)
   		nstart = nstart0/n
   		nend = nend0/n
   		order = 1
@@ -645,7 +649,7 @@ object SFilesDataSource {
   				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
   				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)
   		    )
-  		fcounts = icol(50000,100000,400000)
+  		fcounts = icol(50000,100000,200000)
   		nstart = nstart0/n
   		nend = nend0/n 
   		order = 1

@@ -438,11 +438,11 @@ class LearnFParModel(
 
 
 class LearnFParModelx(
+		dd:DataSource,
 		mopts:Model.Options,
 		mkmodel:(Model.Options)=>Model,
 		uopts:Updater.Options,
-		mkupdater:(Updater.Options)=>Updater,
-		dd:DataSource) {
+		mkupdater:(Updater.Options)=>Updater) {
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null

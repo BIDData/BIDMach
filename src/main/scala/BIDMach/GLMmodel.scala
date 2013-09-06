@@ -174,5 +174,22 @@ object GLMmodel {
     var links:IMat = null
   }
   
+  def mkGLMmodel(fopts:Model.Options) = {
+  	new GLMmodel(fopts.asInstanceOf[GLMmodel.Options])
+  }
+  
+  def mkUpdater(nopts:Updater.Options) = {
+  	new ADAGradUpdater(nopts.asInstanceOf[ADAGradUpdater.Options])
+  }
+  
+  def learnFParx(
+    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
+		) = {	
+  	new LearnFParModelx(
+  	    SFilesDataSource.twitterNgramBlend(nstart, nend),
+  	    new GLMmodel.Options, mkGLMmodel _, 
+  	    new ADAGradUpdater.Options, mkUpdater _)
+  }
 }
 
