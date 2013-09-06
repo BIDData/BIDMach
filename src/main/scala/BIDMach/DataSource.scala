@@ -509,7 +509,6 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
 object DataSource {
   class Options {
     var blockSize = 100000
-    var nusers  = 1000000L
     var sizeMargin = 3f
     var sample = 1f
     var addConstFeat:Boolean = false
