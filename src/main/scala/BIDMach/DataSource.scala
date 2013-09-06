@@ -252,6 +252,7 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
   override def init = {
     initbase
     var totsize = sum(opts.fcounts).v
+    if (opts.addConstFeat) totsize += 1
     omats = new Array[Mat](1)
     omats(0) = SMat(totsize, opts.blockSize, opts.blockSize * opts.eltsPerSample)
     inptrs = izeros(opts.fcounts.length, 1)
@@ -281,6 +282,8 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
     var innz = omat.nnz
     val lims = opts.fcounts
     val nfiles = opts.fcounts.length
+    val addConstFeat = opts.addConstFeat
+    val featType = opts.featType
     var j = 0
     while (j < nfiles) {
     	inptrs(j, 0) = binFind(rowno, inmat(j))
@@ -299,7 +302,7 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
         val yoff = offsets(j) + ioff
         while (k < mat.nrows && mat.data(k) == irow && mat.data(k+mrows) < lims(j)) {
           omat.ir(xoff + k) = mat.data(k+mrows) + yoff
-          omat.data(xoff + k) = mat.data(k+2*mrows)
+          omat.data(xoff + k) = if (featType == 0) 1f else mat.data(k+2*mrows)
           k += 1
         }
         innz = xoff + k
@@ -308,6 +311,11 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
       }
       irow += 1
       idone += 1
+      if (addConstFeat) {
+        omat.ir(innz) = omat.nrows - 1 + ioff
+        omat.data(innz) = 1
+        innz += 1
+      }
       omat.jc(idone) = innz + ioff
     }
     omat.nnz0 = innz
@@ -500,6 +508,8 @@ object DataSource {
     var nusers  = 1000000L
     var sizeMargin = 3f
     var sample = 1f
+    var addConstFeat:Boolean = false
+    var featType:Int = 1                 // 0 = binary features, 1 = linear features
   } 
 }
 
