@@ -47,7 +47,7 @@ case class Learner(
     var lasti = 0
     var bytes = 0L
     updater.clear
-    val reslist = new ListBuffer[Float]
+    val reslist = new ListBuffer[FMat]
     val samplist = new ListBuffer[Float]
     while (ipass < opts.npasses && ! done) {
     	var lastp = 0f
@@ -60,7 +60,7 @@ case class Learner(
         bytes += 12L*mats(0).nnz
         if ((istep + 1) % opts.evalStep == 0 || ! datasource.hasNext) {
         	val scores = model.evalblockg(mats)
-        	reslist.append(scores(0))
+        	reslist.append(scores.newcopy)
         	samplist.append(here)
         } else {
         	model.doblockg(mats, here)
@@ -74,9 +74,9 @@ case class Learner(
         	lastp = dsp - (dsp % opts.pstep)
         	val gf = gflop
         	if (reslist.length > lasti) {
-        		print("%5.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        		print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
         				100f*lastp, 
-        				mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
+        				Learner.scoreSummary(reslist, lasti, reslist.length),
         				gf._1,
         				gf._2, 
         				bytes*1e-9,
@@ -94,7 +94,7 @@ case class Learner(
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
-    results = row(reslist.toList) on row(samplist.toList)
+    results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
 }
 
@@ -120,7 +120,7 @@ case class ParLearner(
 	  var istep0 = 0L
 	  var ilast0 = 0L	
 	  var bytes = 0L
-	  val reslist = new ListBuffer[Float]
+	  val reslist = new ListBuffer[FMat]
 	  val samplist = new ListBuffer[Float]    	  	
 	  var lastp = 0f
 	  done.clear
@@ -143,7 +143,7 @@ case class ParLearner(
 	  				try {
 	  					if (istep % opts.evalStep == 0) {
 	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats)}
-	  						reslist.append(scores(0))
+	  						reslist.append(scores)
 	  						samplist.append(here)
 	  					} else {
 	  						models(ithread).synchronized {
@@ -166,9 +166,9 @@ case class ParLearner(
 	  					lastp += opts.pstep
 	  					val gf = gflop
 	  					if (reslist.length > lasti) {
-	  						print("%5.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+	  						print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
 	  								100f*lastp, 
-	  								mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
+	  								Learner.scoreSummary(reslist, lasti, reslist.length),
 	  								gf._1,
 	  								gf._2, 
 	  								bytes*1e-9,
@@ -200,7 +200,7 @@ case class ParLearner(
 	  }
 	  val gf = gflop
 	  println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
-	  results = row(reslist.toList) on row(samplist.toList)
+	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
      
   def syncmodels(models:Array[Model]) = {
@@ -271,7 +271,7 @@ case class ParLearnerx(
     var feats = 0L
     var lasti = 0
     var bytes = 0L
-    val reslist = new ListBuffer[Float]
+    val reslist = new ListBuffer[FMat]
     val samplist = new ListBuffer[Float]
     for (i <- 0 until opts.nthreads) {
     	if (i < Mat.hasCUDA) setGPU(i)
@@ -322,9 +322,9 @@ case class ParLearnerx(
       		lastp += opts.pstep
       		val gf = gflop
       		if (reslist.length > lasti) {
-      			print("%5.2f%%, ll=%5.3f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+      			print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
       					100f*lastp, 
-      					mean(row(reslist.slice(lasti, reslist.length).toList)).dv,
+      					Learner.scoreSummary(reslist, lasti, reslist.length),
       					gf._1,
       					gf._2, 
       					bytes*1e-9,
@@ -346,11 +346,11 @@ case class ParLearnerx(
         updaters(i).updateM
       }
       ipass += 1
-      saveAs("/big/twitter/test/results.mat", row(reslist.toList) on row(samplist.toList), "results")
+      saveAs("/big/twitter/test/results.mat", Learner.scores2FMat(reslist) on row(samplist.toList), "results")
     }
     val gf = gflop
     println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*here, bytes/gf._2/1e6))
-    results = row(reslist.toList) on row(samplist.toList)
+    results = Learner.scores2FMat(reslist) on row(samplist.toList)
     if (0 < Mat.hasCUDA) setGPU(0)
   }
   
@@ -473,19 +473,39 @@ class LearnFParModelx(
   		updaters(i).init(models(i))
   	}
   	if (0 < Mat.hasCUDA) setGPU(0)
-  }
-  
+  }  
   def run = learner.run
 }
 
 object Learner {
-	class Options {
+  
+  class Options {
 		var npasses = 10
 		var evalStep = 15
 		var syncStep = 32
 		var nthreads = 4
 		var pstep = 0.01f
 		var coolit = 60
+  }
+  
+  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, length:Int):String = {
+    var i = lasti
+    var sum = 0.0
+    while (i < length) {
+      sum += reslist(i)(0)
+      i += 1
+    }
+    ("ll=%5.4" format sum/(length-lasti))    
+  }
+  
+  def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
+    val out = FMat(reslist(0).length, reslist.length)
+    var i = 0
+    while (i < reslist.length) {
+      out(?, i) = reslist(i)
+      i += 1
+    }
+    out
   }
 }
 

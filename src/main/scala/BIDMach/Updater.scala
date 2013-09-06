@@ -206,6 +206,49 @@ class TelescopingUpdater(override val opts:TelescopingUpdater.Options = new Tele
 }
 
 
+class GradUpdater(override val opts:GradUpdater.Options = new GradUpdater.Options) extends Updater {
+  
+  var firstStep = 0f
+  var modelmat:Mat = null
+  var updatemat:Mat = null  
+  var sumSq:Mat = null 
+  var stepn:Mat = null
+  var mask:Mat = null
+  var ve:Mat = null
+	var te:Mat = null
+	var alpha:Mat = null
+
+  override def init(model0:Model) = {
+    model = model0
+	  modelmat = model.modelmats(0)
+	  updatemat = model.updatemats(0) 
+	  mask = opts.mask
+    stepn = modelmat.zeros(1,1)
+    te = modelmat.zeros(opts.timeExponent.nrows, opts.timeExponent.ncols)
+    alpha = modelmat.zeros(opts.alpha.nrows, opts.alpha.ncols)
+    te <-- opts.timeExponent
+    alpha <-- opts.alpha
+  } 
+  
+	def update(step:Long):Unit = {
+	  val nsteps = if (step == 0) 1f else {
+  	  if (firstStep == 0f) {
+  	    firstStep = step
+  	    1f
+  	  } else {
+  	    step / firstStep
+  	  }
+  	}
+	  stepn.set(1f/nsteps)
+	  if (opts.waitsteps < nsteps) {
+	  	val tmp = updatemat *@ (alpha *@ (stepn ^ te))
+ 	  	modelmat ~ modelmat + tmp
+	  	if (mask != null) modelmat ~ modelmat *@ mask
+	  }
+	}
+}
+
+
 class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
   
   var firstStep = 0f
@@ -288,17 +331,19 @@ class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdat
 	}
 }
 
+
+
 object IncNormUpdater {
   class Options extends Updater.Options {
     var warmup = 0L 
-    var power = 0.98f
+    var power = 0.9f
   }
 }
 
 object IncMultUpdater {
   class Options extends Updater.Options {
     var warmup = 0L 
-    var power = 0.98f
+    var power = 0.9f
   }
 }
 
@@ -321,15 +366,21 @@ object TelescopingUpdater {
   }
 }
 
-object ADAGradUpdater {
+object GradUpdater {
   class Options extends Updater.Options {
     var alpha:FMat = 1f
-    var vecExponent:FMat = 0.5f
     var timeExponent:FMat = 0.5f
-    var initsumsq = 1e-8f
-    var epsilon = 1e-12f
     var waitsteps = 2
     var mask:FMat = null
+  }
+}
+
+
+object ADAGradUpdater {
+  class Options extends GradUpdater.Options {
+    var vecExponent:FMat = 0.5f
+    var epsilon = 1e-15f
+    var initsumsq = 1e-8f
   }
 }
 
