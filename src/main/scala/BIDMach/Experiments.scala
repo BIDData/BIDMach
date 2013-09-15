@@ -250,7 +250,7 @@ object Twitter {
 	  val exptst = exptst0(0->nexpt,0)
 	  
 //	  val expts = col(0.5)
-	  val avalues0 = col(0.1f, 1f, 10f)
+	  val avalues0 = col(0.1f, 0.3f, 1f, 3f, 10f)
 	  val avalues = avalues0(0->navals,0)
 	  val expts1 = ones(avalues.length*ntargets, 1) ⊗ exptsv ⊗ ones(exptst.length, 1)
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
