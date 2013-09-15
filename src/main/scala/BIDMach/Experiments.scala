@@ -244,8 +244,8 @@ object Twitter {
 	  val targets0 = em(0->(em.nrows-1), ?) \ zeros(em.nrows-1,1)
 	  val targets = targets0(0->ntargs, ?)
 	  val ntargets = targets.nrows
-	  val exptsv0 = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
-	  val exptst0 = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+	  val exptsv0 = col(0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+	  val exptst0 = col(0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 	  val exptsv = exptsv0(0->nexpv,0)
 	  val exptst = exptst0(0->nexpt,0)
 	  
