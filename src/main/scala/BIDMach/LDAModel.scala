@@ -85,15 +85,11 @@ object LDAModel  {
   } 
   
   def learn(mat0:Mat) = {
-    val mats = new Array[Mat](1)
-    mats(0) = mat0
-  	new Learner(new MatDataSource(mats), new LDAModel, null, new IncNormUpdater, new Learner.Options)
+  	new Learner(new MatDataSource(Array(mat0:Mat)), new LDAModel(), null, new IncNormUpdater(), new Learner.Options)
   }
   
   def learnBatch(mat0:Mat) = {	
-    val mats = new Array[Mat](1)
-    mats(0) = mat0
-  	new Learner(new MatDataSource(mats), new LDAModel, null, new BatchNormUpdater, new Learner.Options)
+  	new Learner(new MatDataSource(Array(mat0:Mat)), new LDAModel(), null, new BatchNormUpdater(), new Learner.Options)
   }
   
   def learnFPar(
