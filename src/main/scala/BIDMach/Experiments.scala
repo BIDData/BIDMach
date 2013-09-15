@@ -233,9 +233,6 @@ object Twitter {
 			ntri0:Int = 200		
 			) = { 
 	  val ds = new MatDataSource(Array(mat:Mat))
-//	  val ds = SFilesDataSource.twitterWords(nstart0, nend0)
-	  ds.opts.addConstFeat = true
-	  ds.opts.featType = 0
 	  val gd = getGramDict(nuni0, nbi0, ntri0)
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length + 1

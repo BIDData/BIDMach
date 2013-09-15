@@ -31,7 +31,7 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
     if (opts.addConstFeat) {
-      mats(0) = sparse(ones(1, mats(0).ncols)) on mats(0)
+      mats(0) = mats(0) on sparse(ones(1, mats(0).ncols)) 
     }
     if (opts.featType == 0) {
       mats(0).contents.set(1)     
