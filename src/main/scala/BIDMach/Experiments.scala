@@ -237,8 +237,8 @@ object Twitter {
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length + 1
 	  val mask = (sum(em) == 0f) \ 1
-	  val targets = em(0->(em.nrows-1), ?) \ zeros(em.nrows-1,1)
-//	  val targets = em(0->1, ?) \ 0
+//	  val targets = em(0->(em.nrows-1), ?) \ zeros(em.nrows-1,1)
+	  val targets = em(0->1, ?) \ 0
 	  val ntargets = targets.nrows
 	  val exptsv = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 	  val exptst = col(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
