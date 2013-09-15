@@ -229,9 +229,9 @@ object Twitter {
 	def logisticModel(
 	    mat:SMat,
 	    ntargs:Int = 1,
-	    nexpv:Int = 6,
-	    nexpt:Int = 6,
-	    navals:Int = 3,
+	    exptsv:FMat = col(0.4, 0.5, 0.6),
+	    exptst:FMat = col(0.4, 0.5, 0.6),
+	    avalues:FMat = col(0.1, 0.3, 1),
 			nuni0:Int = 50,
 			nbi0:Int = 100,
 			ntri0:Int = 200		
@@ -244,14 +244,6 @@ object Twitter {
 	  val targets0 = em(0->(em.nrows-1), ?) \ zeros(em.nrows-1,1)
 	  val targets = targets0(0->ntargs, ?)
 	  val ntargets = targets.nrows
-	  val exptsv0 = col(0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
-	  val exptst0 = col(0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
-	  val exptsv = exptsv0(0->nexpv,0)
-	  val exptst = exptst0(0->nexpt,0)
-	  
-//	  val expts = col(0.5)
-	  val avalues0 = col(0.1f, 0.3f, 1f, 3f, 10f)
-	  val avalues = avalues0(0->navals,0)
 	  val expts1 = ones(avalues.length*ntargets, 1) ⊗ exptsv ⊗ ones(exptst.length, 1)
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
 	  val alphas = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
