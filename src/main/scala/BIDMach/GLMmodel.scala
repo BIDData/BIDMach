@@ -187,7 +187,7 @@ object GLMmodel {
 		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
 		) = {	
   	new LearnFParModelx(
-  	    SFilesDataSource.twitterNgramBlend(nstart, nend),
+  	    SFilesDataSource.twitterNgramBlend(nstart, nend, 1, 0),
   	    new GLMmodel.Options, mkGLMmodel _, 
   	    new ADAGradUpdater.Options, mkUpdater _)
   }

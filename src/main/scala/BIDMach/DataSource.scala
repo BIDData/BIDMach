@@ -30,6 +30,12 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options
   def init = {
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
+    if (opts.addConstFeat) {
+      mats(0) = sparse(ones(1, mats(0).ncols)) on mats(0)
+    }
+    if (opts.featType == 0) {
+      mats(0).contents.set(1)     
+    }
     here = -blockSize
     totalSize = mats(0).ncols
     omats = new Array[Mat](mats.length)
@@ -583,10 +589,11 @@ object SFilesDataSource {
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0),
   		n:Int = 1,
-  		i:Int = 0) = {
+  		i:Int = 0,
+  		nfeats:Int = 100000) = {
   	val opts = new SFilesDataSource.Options { 
   		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
-  		fcounts = icol(100000)
+  		fcounts = icol(nfeats)
   		nstart = nstart0/n
   		nend = nend0/n
   		order = 1
@@ -598,13 +605,14 @@ object SFilesDataSource {
   }
   
   def twitterSmileyWords(
-      nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
+  		nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0),
   		n:Int = 1,
-  		i:Int = 0) = {
+  		i:Int = 0,
+  		nfeats:Int = 100000) = {
   	val opts = new SFilesDataSource.Options { 
   		override def fnames:List[(Int)=>String] = List(FilesDataSource.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
-  		fcounts = icol(100000)
+  		fcounts = icol(nfeats)
   		nstart = nstart0/n
   		nend = nend0/n
   		order = 1
@@ -619,14 +627,17 @@ object SFilesDataSource {
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2012,12,1,0),
   		n:Int = 1,
-  		i:Int = 0) = {
+  		i:Int = 0,
+  		nuni0:Int = 50,
+  		nbi0:Int = 100,
+  		ntri0:Int = 200) = {
   	val opts = new SFilesDataSource.Options { 
   		override def fnames:List[(Int)=>String] = List(
   				FilesDataSource.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i),
   				FilesDataSource.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
   				FilesDataSource.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
   		    )
-  		fcounts = icol(50000,100000,200000)
+  		fcounts = icol(nuni0*1000,nbi0*1000,ntri0*1000)
   		nstart = nstart0/n
   		nend = nend0/n
   		order = 1
@@ -641,14 +652,17 @@ object SFilesDataSource {
       nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0),
   		n:Int = 1,
-  		i:Int = 0) = {
+  		i:Int = 0,
+  		nuni0:Int = 50,
+  		nbi0:Int = 100,
+  		ntri0:Int = 200) = {
   	val opts = new SFilesDataSource.Options { 
   		override def fnames:List[(Int)=>String] = List(
   				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i),
   				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
   				FilesDataSource.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)
   		    )
-  		fcounts = icol(50000,100000,200000)
+  		fcounts = icol(nuni0*1000,nbi0*1000,ntri0*1000)
   		nstart = nstart0/n
   		nend = nend0/n 
   		order = 1
@@ -663,9 +677,10 @@ object SFilesDataSource {
   		nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0),
   		n:Int = 1,
-  		i:Int = 0) = {  
-    val ds1 = twitterWords(nstart0, nend0, n, i)
-    val ds2 = twitterSmileyWords(nstart0, nend0, n, i)
+  		i:Int = 0,
+  		nfeats:Int = 10000) = {  
+    val ds1 = twitterWords(nstart0, nend0, n, i, nfeats)
+    val ds2 = twitterSmileyWords(nstart0, nend0, n, i, nfeats)
     if (n > 1) {
     	ds1.opts.lookahead = 2
     	ds2.opts.lookahead = 2
@@ -678,9 +693,12 @@ object SFilesDataSource {
   		nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
   		nend0:Int = FilesDataSource.encodeDate(2013,7,1,0),
   		n:Int = 1,
-  		i:Int = 0) = {
-    val ds1 = twitterNgrams(nstart0, nend0, n, i)
-    val ds2 = twitterSmileyNgrams(nstart0, nend0, n, i)
+  		i:Int = 0,
+  		nuni0:Int = 50,
+  		nbi0:Int = 100,
+  		ntri0:Int = 200) = {
+    val ds1 = twitterNgrams(nstart0, nend0, n, i, nuni0, nbi0, ntri0)
+    val ds2 = twitterSmileyNgrams(nstart0, nend0, n, i, nuni0, nbi0, ntri0)
     if (n > 1) {
     	ds1.opts.lookahead = 2
     	ds2.opts.lookahead = 2
@@ -689,7 +707,7 @@ object SFilesDataSource {
     new BlendedDataSource(ds1, ds2, 0.7f, 1f, 1f, opts3)
   }
   
-  def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int)=>DataSource = twitterWords):IMat = { 
+  def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int,Int)=>DataSource = twitterWords, nfeats:Int=100000):IMat = { 
   	val nstart0 = FilesDataSource.encodeDate(2012,3,22,0)
     val nend0 = FilesDataSource.encodeDate(2013,7,1,0)
     var bytes = 0L
@@ -699,7 +717,7 @@ object SFilesDataSource {
     tic
     for (i <- 0 until nthreads) { 
       scala.actors.Actor.actor { 
-        val ss = ff(nstart0, nend0, nthreads, i)
+        val ss = ff(nstart0, nend0, nthreads, i, nfeats)
         ss.init
         while (ss.hasNext && stop.v != 1) { 
         	val a = ss.next
