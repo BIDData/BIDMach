@@ -70,24 +70,22 @@ case class Learner(
         if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
         istep += 1
         val dsp = datasource.progress
-        if (dsp > lastp + opts.pstep) {
-        	lastp = dsp - (dsp % opts.pstep)
+        if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         	val gf = gflop
-        	if (reslist.length > lasti) {
-        		print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-        				100f*lastp, 
-        				Learner.scoreSummary(reslist, lasti, reslist.length),
-        				gf._1,
-        				gf._2, 
-        				bytes*1e-9,
-        				bytes/gf._2*1e-6))  
-        				if (model.useGPU) {
-        					print(", GPUmem=%3.2f" format GPUmem._1) 
-        				}
-        		println
-        	}
+        	lastp = dsp - (dsp % opts.pstep)
+        	print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        			100f*lastp, 
+        			Learner.scoreSummary(reslist, lasti, reslist.length),
+        			gf._1,
+        			gf._2, 
+        			bytes*1e-9,
+        			bytes/gf._2*1e-6))  
+        			if (model.useGPU) {
+        				print(", GPUmem=%3.2f" format GPUmem._1) 
+        			}
+        	println
+        	lasti = reslist.length
         }
-        lasti = reslist.length
       }
       updater.updateM
       ipass += 1
