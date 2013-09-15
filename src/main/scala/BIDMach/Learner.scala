@@ -58,7 +58,7 @@ case class Learner(
         val mats = datasource.next
         here += datasource.opts.blockSize
         bytes += 12L*mats(0).nnz
-        if ((istep + 1) % opts.evalStep == 0 || ! datasource.hasNext) {
+        if ((istep - 1) % opts.evalStep == 0 || ! datasource.hasNext) {
         	val scores = model.evalblockg(mats)
         	reslist.append(scores.newcopy)
         	samplist.append(here)
