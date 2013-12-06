@@ -54,7 +54,7 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
     var dimclu = zeros(length(icenters),1) // Size of each cluster
     for( i <- 0 to nsamps-1 ) { dimclu(lab(i))+=1 }
     
-    val ncache = size(iss,1)
+    //val ncache = size(iss,1)
     val centmap = accum(icenters, icol(1 to length(icenters)), size(ds,2), 1)
     var i = 0
     while (i < length(isamps)) {
@@ -224,8 +224,6 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
 
 
       if(ncache < nsamps){
-        //smat = smat(0 until ncache-1,?)
-        //imat = imat(0 until ncache-1,?)
         smat = smat(0 until ncache,?)
         imat = imat(0 until ncache,?)
       }
@@ -242,8 +240,6 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
       if(ncache < nsamps){
         smat = smat(0 until ncache,?)
         imat = imat(0 until ncache,?)
-        //smat = smat(0 until ncache-1,?)
-        //imat = imat(0 until ncache-1,?)
       }
 
       (smat, imat)
@@ -280,7 +276,6 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
       val (rs,irs) = sort2(rr,1)
       val icenters = irs(0->ncenters,0)                                  // Pick centers from the permutation
       val ics = icol(0->nsamps)                            
-      //val (vdists, imin) = mindists(ds, iss, ics, icenters)              // Get min distances from points to centers, and best center ids
       mindists(ds, iss, ics, icenters, vdists, imin)              // Get min distances from points to centers, and best center ids
       println("  pass=0, mean dist=%f" format mean(vdists,1).v)
       val vtmp = vdists.copy
@@ -326,7 +321,7 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
 
     val ics = icol(0->nsamps)
     flip
-    //sil= medoidSilhouette(ds, iss, ics, bestc)
+
     sil= silhouetteScore(ds, iss, ics, bestc,imin)
     val t4=gflop
     mss = mean(sil,2)(0,0)
@@ -338,7 +333,6 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
 }
 
 object PAMmodel { 
-
   
   class Options { 
     var ncenters = 1000
