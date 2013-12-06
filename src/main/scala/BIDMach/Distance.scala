@@ -39,6 +39,7 @@ class euclidDistance(override val opts:euclidDistance.Options = new euclidDistan
     ab ~ aa - ab + (bb.t)
     max(ab, 0f, ab)
     sqrt(ab, ab)
+
     ab
   }
 }

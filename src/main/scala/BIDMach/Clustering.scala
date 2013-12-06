@@ -140,16 +140,18 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
     if(spills>0)
     {
 
-      ispills = ispills(0,0 until spills-1)
+      ispills = ispills(0,0 until spills)
 
       //val dspill = dists(a)(icenters(?,0),ispills)    /// Something more clever here!!!
-      
+
+      println("Size of a %d %d" format (size(a(icenters(?,0),?),1),size(a(icenters(?,0),?),2)))
+      println("Size of a %d %d" format (size(a(ispills,?),1),size(a(ispills,?),2)))
       val dspill = dists(a(icenters(?,0),?),a(ispills,?))
 
       var (ddd,iii) = maxi2(dspill,1) 
 
       imin(ispills) = centmap(iii)
-      for (i <- 0 until spills-1){   vmin(ispills(i),0) = ddd(0,i)}
+      for (i <- 0 until spills){   vmin(ispills(i),0) = ddd(0,i)}
 
       }
 
@@ -192,13 +194,13 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
 
     if(spills > 0)
     {
-println("*")
-      ispills = ispills(?,0 until spills-1)
+
+      ispills = ispills(?,0 until spills)
       val threshold = ds(ncache-1,ispills)
 
       val dspill = dists(a)(?,ispills)
 
-      for (i <- 0 until spills-1){                                               // Calculate improvements over vd for new candidate centers
+      for (i <- 0 until spills){                                               // Calculate improvements over vd for new candidate centers
 
         var j = 0  
         val ii = ispills(0,i)
