@@ -142,10 +142,7 @@ class PAMmodel(opts:PAMmodel.Options = new PAMmodel.Options) {
 
       ispills = ispills(0,0 until spills)
 
-      //val dspill = dists(a)(icenters(?,0),ispills)    /// Something more clever here!!!
 
-      println("Size of a %d %d" format (size(a(icenters(?,0),?),1),size(a(icenters(?,0),?),2)))
-      println("Size of a %d %d" format (size(a(ispills,?),1),size(a(ispills,?),2)))
       val dspill = dists(a(icenters(?,0),?),a(ispills,?))
 
       var (ddd,iii) = maxi2(dspill,1) 
