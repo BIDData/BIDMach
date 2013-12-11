@@ -500,7 +500,7 @@ object Learner {
     val out = FMat(reslist(0).length, reslist.length)
     var i = 0
     while (i < reslist.length) {
-      out(?, i) = reslist(i)
+      out(?, i) = reslist(i).t
       i += 1
     }
     out
