@@ -84,8 +84,17 @@ object LDAModel  {
   	new IncNormUpdater(nopts.asInstanceOf[IncNormUpdater.Options])
   } 
   
-  def learn(mat0:Mat) = {
-  	new Learner(new MatDataSource(Array(mat0:Mat)), new LDAModel(), null, new IncNormUpdater(), new Learner.Options)
+  
+  def learn(mat0:Mat, d:Int = 256) = {
+    val opts = new LDAModel.Options
+    opts.dim = d
+    opts.putBack = 1
+    val mat1 = FMat(d, mat0.ncols)
+    val ds = new MatDataSource(Array(mat0:Mat, mat1:Mat))
+  	val nn =new Learner(ds, new LDAModel(opts), null, new IncNormUpdater(), new Learner.Options)
+    nn.init
+    nn.run
+    (nn.model.modelmats(0), ds.mats(1), nn)
   }
   
   def learnBatch(mat0:Mat) = {	
