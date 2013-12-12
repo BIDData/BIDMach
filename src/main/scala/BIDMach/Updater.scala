@@ -336,14 +336,14 @@ class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdat
 object IncNormUpdater {
   class Options extends Updater.Options {
     var warmup = 0L 
-    var power = 0.9f
+    var power = 0.3f
   }
 }
 
 object IncMultUpdater {
   class Options extends Updater.Options {
     var warmup = 0L 
-    var power = 0.9f
+    var power = 0.3f
   }
 }
 

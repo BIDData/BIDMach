@@ -479,7 +479,7 @@ object Learner {
   
   class Options {
 		var npasses = 10
-		var evalStep = 15
+		var evalStep = 11
 		var syncStep = 32
 		var nthreads = 4
 		var pstep = 0.01f

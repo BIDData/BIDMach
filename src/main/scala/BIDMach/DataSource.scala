@@ -524,7 +524,7 @@ object DataSource {
 
 object MatDataSource {
   class Options extends DataSource.Options {
-    
+    blockSize = 10000
   }
 }
 
