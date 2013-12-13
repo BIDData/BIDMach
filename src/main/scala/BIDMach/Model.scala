@@ -3,7 +3,7 @@ import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,GMat,GIMat,GSMat,HMat,IMat,SMat,SDM
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-abstract class Model(val opts:Model.Options = new Model.Options) {
+abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var modelmats:Array[Mat] = null
   
@@ -21,12 +21,6 @@ abstract class Model(val opts:Model.Options = new Model.Options) {
 	  useGPU = opts.useGPU && Mat.hasCUDA > 0
 	  if (useGPU) {
 	    gmats = new Array[Mat](mats.length)
-	    for (i <- 0 until mats.length) {
-	      gmats(i) = mats(i) match {
-	        case aa:FMat => GMat(aa)
-	        case aa:SMat => GSMat(aa)
-	      }
-	    }
 	  } else {
 	    gmats = mats
 	  }
@@ -51,14 +45,20 @@ abstract class Model(val opts:Model.Options = new Model.Options) {
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
 	  for (i <- 0 until from.length) {
-		  to(i) = to(i) <-- from(i)
+	    if (useGPU) {
+	    	to(i) = from(i) match {
+	    	case aa:FMat => GMat(aa)
+	    	case aa:SMat => GSMat(aa)
+	    	}
+	    }
+	  	to(i) = to(i) <-- from(i)
 	  }
 }
 }
 
 
 object Model {
-	class Options {
+	trait Opts {
 	  var nzPerColumn:Int = 0
 	  var startBlock = 8000
 	  var useGPU = true
@@ -66,4 +66,6 @@ object Model {
 	  var doubleScore = false
 	  var dim = 256
   }
+	
+	class Options extends Opts {}
 }

@@ -4,7 +4,7 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-abstract class FactorModel(override val opts:FactorModel.Options) extends Model(opts) {
+abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opts) {
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
@@ -66,11 +66,13 @@ abstract class FactorModel(override val opts:FactorModel.Options) extends Model(
 }
 
 object FactorModel { 
-  class Options extends Model.Options { 
+  trait Opts extends Model.Opts { 
     var uiter = 8
     var weps = 1e-10f
     var minuser = 1e-8f
   }
+  
+  class Options extends Opts {}
 } 
 
 

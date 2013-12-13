@@ -3,6 +3,7 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
+import BIDMat.about
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import scala.actors.Actor
@@ -14,10 +15,10 @@ case class Learner(
     val updater:Updater, 
 		val opts:Learner.Options = new Learner.Options) {
   var results:FMat = null
-  val dopts:DataSource.Options = datasource.opts
-	val mopts:Model.Options	= model.opts
-	val ropts:Regularizer.Options = if (regularizer != null) regularizer.opts else null
-	val uopts:Updater.Options = updater.opts
+  val dopts:DataSource.Opts = datasource.opts
+	val mopts:Model.Opts	= model.opts
+	val ropts:Regularizer.Opts = if (regularizer != null) regularizer.opts else null
+	val uopts:Updater.Opts = updater.opts
 	
 	def setup = { 
     datasource match {
@@ -28,9 +29,12 @@ case class Learner(
       }
       case _ => {}
     }
-    datasource.init
-    model.init(datasource)
-    updater.init(model)   
+    init   
+  }
+  
+  def run = {
+    setup
+    rerun
   }
   
   def init = {
@@ -39,7 +43,7 @@ case class Learner(
     updater.init(model)
   }
    
-  def run() = {
+  def rerun() = {
     flip 
     var done = false
     var ipass = 0
@@ -391,10 +395,10 @@ case class ParLearnerx(
 
 
 class LearnFParModel(
-		val mopts:Model.Options,
-		mkmodel:(Model.Options)=>Model,
-		val uopts:Updater.Options,
-		mkupdater:(Updater.Options)=>Updater,
+		val mopts:Model.Opts,
+		mkmodel:(Model.Opts)=>Model,
+		val uopts:Updater.Opts,
+		mkupdater:(Updater.Opts)=>Updater,
 		ddfun:(Int,Int)=>DataSource
 		) {
   var dds:Array[DataSource] = null
@@ -437,10 +441,10 @@ class LearnFParModel(
 
 class LearnFParModelx(
 		val ds:DataSource,
-		val mopts:Model.Options,
-		mkmodel:(Model.Options)=>Model,
-		val uopts:Updater.Options,
-		mkupdater:(Updater.Options)=>Updater) {
+		val mopts:Model.Opts,
+		mkmodel:(Model.Opts)=>Model,
+		val uopts:Updater.Opts,
+		mkupdater:(Updater.Opts)=>Updater) {
   var models:Array[Model] = null
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null
@@ -478,12 +482,12 @@ class LearnFParModelx(
 object Learner {
   
   class Options {
-		var npasses = 10
-		var evalStep = 11
-		var syncStep = 32
-		var nthreads = 4
-		var pstep = 0.01f
-		var coolit = 60
+  	var npasses = 10 
+  	var evalStep = 11
+  	var syncStep = 32
+  	var nthreads = 4
+  	var pstep = 0.01f
+  	var coolit = 60
   }
   
   def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, length:Int):String = {

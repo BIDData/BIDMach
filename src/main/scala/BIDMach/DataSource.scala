@@ -5,7 +5,7 @@ import BIDMat.SciFunctions._
 import scala.actors._
 import java.io._
 
-abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) {   
+abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) {   
   def next:Array[Mat]  
   def hasNext:Boolean
   def reset:Unit
@@ -15,9 +15,11 @@ abstract class DataSource(val opts:DataSource.Options = new DataSource.Options) 
   def init:Unit
   def progress:Float
   var omats:Array[Mat] = null
+  var endmats:Array[Mat] = null
+  var fullmats:Array[Mat] = null
 }
 
-class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options = new MatDataSource.Options) extends DataSource(opts) { 
+class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Opts = new MatDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f 
   var here = 0
   var there = 0
@@ -39,13 +41,8 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options
     here = -blockSize
     totalSize = mats(0).ncols
     omats = new Array[Mat](mats.length)
-    for (i <- 0 until mats.length) {
-      omats(i) = mats(i) match {
-        case mm:SMat => SMat(mats(i).nrows, blockSize, (mats(i).nnz * sizeMargin * blockSize / mats(i).ncols).toInt)
-        case mm:SDMat => SDMat(mats(i).nrows, blockSize, (mats(i).nnz * sizeMargin * blockSize / mats(i).ncols).toInt)
-        case _ => mats(i).zeros(mats(i).nrows, blockSize)
-      }      
-    }    
+    endmats = new Array[Mat](mats.length)
+    fullmats = new Array[Mat](mats.length)   
   }
   
   def nmats = omats.length
@@ -58,7 +55,13 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options
     here = math.min(here+blockSize, mats(0).ncols)
     there = math.min(here+blockSize, mats(0).ncols)
   	for (i <- 0 until mats.length) {
-  	  omats(i) = mats(i).colslice(here, there, omats(i))
+  	  if (there - here == blockSize) {
+  	    fullmats(i) = mats(i).colslice(here, there, fullmats(i))
+  	    omats(i) = fullmats(i)
+  	  } else {
+  	    endmats(i) = mats(i).colslice(here, there, endmats(i))
+  	    omats(i) = endmats(i) 	    
+  	  }
   	}
   	omats
   }
@@ -68,7 +71,7 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options
   }
   
   override def setupPutBack(n:Int, dim:Int) = {
-    if (mats.length < n) {
+    if (mats.length < n || mats(n-1).asInstanceOf[AnyRef] == null || mats(n-1).nrows != dim) {
       val newmats = new Array[Mat](n)
       for (i <- 0 until n-1) {
         newmats(i) = mats(i)
@@ -88,7 +91,7 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Options
 
 }
 
-class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataSource.Options) extends DataSource(opts) { 
+class FilesDataSource(override val opts:FilesDataSource.Opts = new FilesDataSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f
   var blockSize = 0 
   @volatile var fileno = 0
@@ -250,7 +253,7 @@ class FilesDataSource(override val opts:FilesDataSource.Options = new FilesDataS
 
 }
 
-class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDataSource.Options) extends FilesDataSource(opts) {
+class SFilesDataSource(override val opts:SFilesDataSource.Opts = new SFilesDataSource.Options) extends FilesDataSource(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null
@@ -391,7 +394,7 @@ class SFilesDataSource(override val opts:SFilesDataSource.Options = new SFilesDa
 }
 
 class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1:Float, var samp2:Float,
-    override val opts:BlendedDataSource.Options = new BlendedDataSource.Options) extends DataSource(opts) {
+    override val opts:BlendedDataSource.Opts = new BlendedDataSource.Options) extends DataSource(opts) {
   var sizeMargin = 0f 
   var here = 0L
   var there = 0
@@ -513,18 +516,22 @@ class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, v
 
 
 object DataSource {
-  class Options {
+  trait Opts {
     var blockSize = 100000
     var sizeMargin = 3f
     var sample = 1f
     var addConstFeat:Boolean = false
     var featType:Int = 1                 // 0 = binary features, 1 = linear features
   } 
+  
+  class Options extends Opts {}
 }
 
 object MatDataSource {
-  class Options extends DataSource.Options {
-    blockSize = 10000
+  trait Opts extends DataSource.Opts {
+  }
+  
+  class Options extends Opts {   
   }
 }
 
@@ -558,7 +565,7 @@ object FilesDataSource {
   }
   
  
-  class Options extends DataSource.Options {
+  trait Opts extends DataSource.Opts {
   	val localDir:String = ""
   	def fnames:List[(Int)=>String] = null
   	var lookahead = 8
@@ -568,19 +575,25 @@ object FilesDataSource {
     var dorows:Boolean = true
     var order:Int = 1                           // 0 = sequential order, 1 = random
   }
+  
+  class Options extends Opts {}
 }
 
 object BlendedDataSource {
-  class Options extends DataSource.Options {
+  trait Opts extends DataSource.Opts {
   	var bBlock = 1000
   }
+  
+  class Options extends Opts {}
 }
 
 object SFilesDataSource {
-  class Options extends FilesDataSource.Options {
+  trait Opts extends FilesDataSource.Opts {
   	var fcounts:IMat = null
     var eltsPerSample = 0
   }
+  
+  class Options extends Opts {}
   
   val twitterFeatureDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
   val twitterSmileyFeatureDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
