@@ -4,7 +4,7 @@ import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-abstract class RegressionModel(override val opts:RegressionModel.Options) extends Model {
+abstract class RegressionModel(override val opts:RegressionModel.Opts) extends Model {
   var targmap:Mat = null
   var targets:Mat = null
   var mask:Mat = null
@@ -47,9 +47,11 @@ abstract class RegressionModel(override val opts:RegressionModel.Options) extend
 }
 
 object RegressionModel {
-  class Options extends Model.Options {
+  trait Opts extends Model.Opts {
     var targets:FMat = null
     var targmap:FMat = null
     var mask:FMat = null
   }
+  
+  class Options extends Opts {}
 }

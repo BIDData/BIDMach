@@ -5,7 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 
-abstract class Updater(val opts:Updater.Options = new Updater.Options) {
+abstract class Updater(val opts:Updater.Opts = new Updater.Options) {
   var model:Model = null
   
   def init(model0:Model) = {
@@ -18,7 +18,7 @@ abstract class Updater(val opts:Updater.Options = new Updater.Options) {
 }
 
 
-class IncNormUpdater(override val opts:IncNormUpdater.Options = new IncNormUpdater.Options) extends Updater(opts) {
+class IncNormUpdater(override val opts:IncNormUpdater.Opts = new IncNormUpdater.Options) extends Updater(opts) {
   
   var firstStep = 0f
   var rm:Mat = null
@@ -83,7 +83,7 @@ class IncNormUpdater(override val opts:IncNormUpdater.Options = new IncNormUpdat
   }
 }
 
-class BatchNormUpdater(override val opts:BatchNormUpdater.Options = new BatchNormUpdater.Options) extends Updater {
+class BatchNormUpdater(override val opts:BatchNormUpdater.Opts = new BatchNormUpdater.Options) extends Updater {
   var accumulators:Array[Mat] = null
   
   override def init(model0:Model) = {
@@ -118,7 +118,7 @@ class BatchNormUpdater(override val opts:BatchNormUpdater.Options = new BatchNor
 }
 
 
-class IncMultUpdater(override val opts:IncMultUpdater.Options = new IncMultUpdater.Options) extends Updater {
+class IncMultUpdater(override val opts:IncMultUpdater.Opts = new IncMultUpdater.Options) extends Updater {
   
   var firstStep = 0f
   var rm:Mat = null
@@ -162,7 +162,7 @@ class IncMultUpdater(override val opts:IncMultUpdater.Options = new IncMultUpdat
   }
 }
 
-class TelescopingUpdater(override val opts:TelescopingUpdater.Options = new TelescopingUpdater.Options) extends Updater {
+class TelescopingUpdater(override val opts:TelescopingUpdater.Opts = new TelescopingUpdater.Options) extends Updater {
 	var accumulators:Array[Mat] = null
   var firstStep = 0L
   var nextStep = 10L
@@ -206,7 +206,7 @@ class TelescopingUpdater(override val opts:TelescopingUpdater.Options = new Tele
 }
 
 
-class GradUpdater(override val opts:GradUpdater.Options = new GradUpdater.Options) extends Updater {
+class GradUpdater(override val opts:GradUpdater.Opts = new GradUpdater.Options) extends Updater {
   
   var firstStep = 0f
   var modelmat:Mat = null
@@ -249,7 +249,7 @@ class GradUpdater(override val opts:GradUpdater.Options = new GradUpdater.Option
 }
 
 
-class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdater.Options) extends Updater {
+class ADAGradUpdater(override val opts:ADAGradUpdater.Opts = new ADAGradUpdater.Options) extends Updater {
   
   var firstStep = 0f
   var modelmat:Mat = null
@@ -334,58 +334,71 @@ class ADAGradUpdater(override val opts:ADAGradUpdater.Options = new ADAGradUpdat
 
 
 object IncNormUpdater {
-  class Options extends Updater.Options {
+  trait Opts extends Updater.Opts {
     var warmup = 0L 
     var power = 0.3f
   }
+  
+  class Options extends Opts {}
 }
 
 object IncMultUpdater {
-  class Options extends Updater.Options {
+  trait Opts extends Updater.Opts {
     var warmup = 0L 
     var power = 0.3f
   }
+  
+  class Options extends Opts {}
 }
 
 object BatchNormUpdater {
-  class Options extends Updater.Options {
-    
+  trait Opts extends Updater.Opts {
   }
+  
+  class Options extends Opts {}
 }
 
 object BatchMultUpdater {
-  class Options extends Updater.Options {
-    var eps = 1e-12
-    
+  trait Opts extends Updater.Opts {
+    var eps = 1e-12   
   }
+  
+  class Options extends Opts {}
 }
 
 object TelescopingUpdater {
-  class Options extends Updater.Options {
+  trait Opts extends Updater.Opts {
     val factor = 1.5f
   }
+  
+  class Options extends Opts {}
 }
 
 object GradUpdater {
-  class Options extends Updater.Options {
+  trait Opts extends Updater.Opts {
     var alpha:FMat = 1f
     var timeExponent:FMat = 0.5f
     var waitsteps = 2
     var mask:FMat = null
   }
+  
+  class Options extends Opts {}
 }
 
 
 object ADAGradUpdater {
-  class Options extends GradUpdater.Options {
+  trait Opts extends GradUpdater.Opts {
     var vecExponent:FMat = 0.5f
     var epsilon = 1e-15f
     var initsumsq = 1e-8f
   }
+  
+  class Options extends Opts {}
 }
 
 object Updater {
-  class Options {
-    
+  trait Opts {  
   }
+  
+  class Options extends Opts {}
 }

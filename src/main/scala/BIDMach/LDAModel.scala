@@ -5,7 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
 
-class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extends FactorModel(opts) { 
+class LDAModel(override val opts:LDAModel.Opts = new LDAModel.Options) extends FactorModel(opts) { 
   var mm:Mat = null
   var alpha:Mat = null
   
@@ -69,32 +69,36 @@ class LDAModel(override val opts:LDAModel.Options = new LDAModel.Options) extend
 }
 
 object LDAModel  {
-  class Options extends FactorModel.Options {
+  trait Opts extends FactorModel.Opts {
     var LDAeps = 1e-9
     var exppsi = true
     var alpha = 0.001f
     var beta = 0.0001f
   }
   
-  def mkLDAmodel(fopts:Model.Options) = {
-  	new LDAModel(fopts.asInstanceOf[LDAModel.Options])
+  class Options extends Opts {}
+  
+  def mkLDAmodel(fopts:Model.Opts) = {
+  	new LDAModel(fopts.asInstanceOf[LDAModel.Opts])
   }
   
-  def mkUpdater(nopts:Updater.Options) = {
-  	new IncNormUpdater(nopts.asInstanceOf[IncNormUpdater.Options])
+  def mkUpdater(nopts:Updater.Opts) = {
+  	new IncNormUpdater(nopts.asInstanceOf[IncNormUpdater.Opts])
   } 
   
   
   def learn(mat0:Mat, d:Int = 256) = {
-    val opts = new LDAModel.Options
+    class xopts extends Learner.Options with LDAModel.Opts with MatDataSource.Opts with IncNormUpdater.Opts
+    val opts = new xopts
     opts.dim = d
     opts.putBack = 1
-    val mat1 = FMat(d, mat0.ncols)
-    val ds = new MatDataSource(Array(mat0:Mat, mat1:Mat))
-  	val nn =new Learner(ds, new LDAModel(opts), null, new IncNormUpdater(), new Learner.Options)
-    nn.init
-    nn.run
-    (nn.model.modelmats(0), ds.mats(1), nn)
+    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+  	val nn = new Learner(
+  	    new MatDataSource(Array(mat0:Mat), opts), 
+  			new LDAModel(opts), 
+  			null, 
+  			new IncNormUpdater(opts), opts)
+    (nn, opts)
   }
   
   def learnBatch(mat0:Mat) = {	

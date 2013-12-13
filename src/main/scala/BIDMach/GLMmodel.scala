@@ -6,7 +6,7 @@ import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
 
 
-class GLMmodel(opts:GLMmodel.Options) extends RegressionModel(opts) {
+class GLMmodel(opts:GLMmodel.Opts) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
   
@@ -170,16 +170,18 @@ abstract class GLMlink {
 }
 
 object GLMmodel {
-  class Options extends RegressionModel.Options {
+  trait Opts extends RegressionModel.Opts {
     var links:IMat = null
   }
   
-  def mkGLMmodel(fopts:Model.Options) = {
-  	new GLMmodel(fopts.asInstanceOf[GLMmodel.Options])
+  class Options extends Opts {}
+  
+  def mkGLMmodel(fopts:Model.Opts) = {
+  	new GLMmodel(fopts.asInstanceOf[GLMmodel.Opts])
   }
   
-  def mkUpdater(nopts:Updater.Options) = {
-  	new ADAGradUpdater(nopts.asInstanceOf[ADAGradUpdater.Options])
+  def mkUpdater(nopts:Updater.Opts) = {
+  	new ADAGradUpdater(nopts.asInstanceOf[ADAGradUpdater.Opts])
   }
   
   def learnFParx(
