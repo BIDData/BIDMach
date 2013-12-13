@@ -17,7 +17,6 @@ abstract class Updater(val opts:Updater.Opts = new Updater.Options) {
   def clear():Unit = {}
 }
 
-
 class IncNormUpdater(override val opts:IncNormUpdater.Opts = new IncNormUpdater.Options) extends Updater(opts) {
   
   var firstStep = 0f
