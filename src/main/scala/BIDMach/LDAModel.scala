@@ -109,7 +109,7 @@ object LDAModel  {
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDataSource(Array(mat0:Mat), opts), 
-        new LDAModel(), 
+        new LDAModel(opts), 
         null, 
         new BatchNormUpdater(opts), 
         opts)

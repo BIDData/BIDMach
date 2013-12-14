@@ -27,8 +27,6 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Opts = 
   var totalSize = 0
   var umat:Mat = null
   
-  omats = null
-  
   def init = {
     sizeMargin = opts.sizeMargin
     blockSize = opts.blockSize
@@ -78,7 +76,7 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Opts = 
       }
       newmats(n-1) = ones(dim, mats(0).ncols)
       mats = newmats
-    }
+    } 
   }
   
   override def putBack(tmats:Array[Mat],i:Int):Unit = {
