@@ -20,7 +20,7 @@ case class Learner(
 	val ropts:Regularizer.Opts = if (regularizer != null) regularizer.opts else null
 	val uopts:Updater.Opts = updater.opts
 	
-	def setup = { 
+	def setup = {
     datasource match {
       case ddm:MatDataSource => {
       	if (mopts.putBack >= 0) {
@@ -59,7 +59,7 @@ case class Learner(
       var istep = 0
       println("i=%2d" format ipass)
       while (datasource.hasNext) {
-        val mats = datasource.next
+        val mats = datasource.next    
         here += datasource.opts.blockSize
         bytes += 12L*mats(0).nnz
         if ((istep - 1) % opts.evalStep == 0 || ! datasource.hasNext) {
@@ -481,7 +481,7 @@ class LearnFParModelx(
 
 object Learner {
   
-  class Options {
+  class Options extends BIDMat.Options {
   	var npasses = 10 
   	var evalStep = 11
   	var syncStep = 32

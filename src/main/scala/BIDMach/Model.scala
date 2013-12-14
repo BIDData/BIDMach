@@ -51,7 +51,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
 	    	case aa:SMat => GSMat(aa)
 	    	}
 	    }
-	  	to(i) = to(i) <-- from(i)
+//	  	to(i) = to(i) <-- from(i)
 	  }
 }
 }
