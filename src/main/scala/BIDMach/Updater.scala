@@ -331,6 +331,52 @@ class ADAGradUpdater(override val opts:ADAGradUpdater.Opts = new ADAGradUpdater.
 }
 
 
+class CGUpdater(override val opts:CGUpdater.Opts = new CGUpdater.Options) extends Updater(opts) {
+	var bm:Mat = null
+	var Ax:Mat = null
+	var Ap:Mat = null
+	var pm:Mat = null
+	var rm:Mat = null
+	var mm:Mat = null
+	
+	override def init(model0:Model) = {
+  	super.init(model0)
+  	mm = model0.modelmats(0)
+	  bm = mm.zeros(mm.nrows, mm.ncols)
+	  Ax = mm.zeros(mm.nrows, mm.ncols)
+	  Ap = mm.zeros(mm.nrows, mm.ncols)
+	  pm = mm.zeros(mm.nrows, mm.ncols)
+	  rm = mm.zeros(mm.nrows, mm.ncols)
+	  model.asInstanceOf[CGUpdateable].setpm(pm)
+  }
+	
+	def update(ipass:Int, step:Long) = {
+	  val updatemats = model.updatemats
+	  if (ipass == 0) {
+	    bm ~ bm + updatemats(0)
+	    Ax ~ Ax + updatemats(1)
+	  }
+	  Ap ~ Ap + updatemats(2)
+	}
+	
+	override def updateM(ipass:Int) = {  
+	  if (ipass == 0) {
+	  	rm ~ bm - Ax
+	  	pm <-- rm
+	  }
+	  CGUpdater.CGupdate(pm, rm, Ap, mm, opts.meps)
+	  Ap.clear
+  }
+	
+	override def clear = {  
+  }
+}
+
+trait CGUpdateable {
+  def setpm(pm:Mat)
+}
+
+
 
 object IncNormUpdater {
   trait Opts extends Updater.Opts {
@@ -393,6 +439,25 @@ object ADAGradUpdater {
   }
   
   class Options extends Opts {}
+}
+
+object CGUpdater {
+  trait Opts extends Updater.Opts {
+  	var meps = 1e-12f
+  }  
+  class Options extends Opts {}
+  
+  def CGupdate(p:Mat, r:Mat, Ap:Mat, x:Mat, weps:Float) = {
+  	val pAp = (p dot Ap)
+  	max(weps, pAp, pAp)
+  	val rsold = (r dot r) + 0   // Otherwise this will alias
+  	val alpha = rsold / pAp
+  	x ~ x + p *@ alpha
+  	r ~ r - (Ap *@ alpha)
+  	val rsnew = (r dot r)       // ...down here
+  	max(weps, rsold, rsold)
+  	p ~ r + (p *@ (rsnew/rsold))
+  }  
 }
 
 object Updater {
