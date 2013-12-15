@@ -26,20 +26,28 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
 	  }
   }
   
-  def doblock(mats:Array[Mat], i:Long)                                       // Calculate an update for the updater
+  def doblock(mats:Array[Mat], ipass:Int, i:Long)                                       // Calculate an update for the updater
   
-  def evalblock(mats:Array[Mat]):FMat                                        // Scores (log likelihoods)
+  def evalblock(mats:Array[Mat], ipass:Int):FMat                                        // Scores (log likelihoods)
   
-  def doblockg(amats:Array[Mat], i:Long) = {
+  def doblockg(amats:Array[Mat], ipass:Int, i:Long) = {
     if (useGPU) copyMats(amats, gmats)            		
-    doblock(gmats, i)
-    if (useGPU && opts.putBack >= 0) amats(opts.putBack) <-- gmats(opts.putBack)
+    doblock(gmats, ipass, i)
+    if (useGPU && opts.putBack >= 0) {
+    	for (i <- 1 to opts.putBack) {
+    		amats(i) <-- gmats(i)
+    	}
+    }
   }
   
-  def evalblockg(amats:Array[Mat]):FMat = {
+  def evalblockg(amats:Array[Mat], ipass:Int):FMat = {
 	  if (useGPU) copyMats(amats, gmats)
-	  val v = evalblock(gmats)
-	  if (useGPU && opts.putBack >= 0) amats(opts.putBack) <-- gmats(opts.putBack)
+	  val v = evalblock(gmats, ipass)
+	  if (useGPU && opts.putBack >= 0) {
+	    for (i <- 1 to opts.putBack) {
+	    	amats(i) <-- gmats(i)
+	    }
+	  }
 	  v
   }
 
@@ -51,9 +59,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
 	    	case aa:SMat => GSMat(aa)
 	    	}
 	    }
-//	  	to(i) = to(i) <-- from(i)
 	  }
-}
+  }
 }
 
 
