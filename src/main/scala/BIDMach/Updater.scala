@@ -12,8 +12,8 @@ abstract class Updater(val opts:Updater.Opts = new Updater.Options) {
     model = model0 
   }
   
-  def update(step:Long):Unit
-  def updateM():Unit = {}
+  def update(ipass:Int, step:Long):Unit
+  def updateM(ipass:Int):Unit = {}
   def clear():Unit = {}
 }
 
@@ -33,7 +33,7 @@ class IncNormUpdater(override val opts:IncNormUpdater.Opts = new IncNormUpdater.
     firstStep = 0f
   }
       
-  def update(step:Long) = {
+  def update(ipass:Int, step:Long) = {
   	val modelmats = model.modelmats
   	val updatemats = model.updatemats
   	val mm = modelmats(0)
@@ -95,7 +95,7 @@ class BatchNormUpdater(override val opts:BatchNormUpdater.Opts = new BatchNormUp
     }
   }
      
-  def update(step:Long) = {
+  def update(ipass:Int, step:Long) = {
   	val updatemats = model.updatemats
     for (i <- 0 until accumulators.length) {
     	accumulators(i) ~ accumulators(i) + updatemats(i) 
@@ -108,7 +108,7 @@ class BatchNormUpdater(override val opts:BatchNormUpdater.Opts = new BatchNormUp
 	  }
   }
   
-  override def updateM():Unit = {
+  override def updateM(ipass:Int):Unit = {
     val mm = model.modelmats(0)
     mm ~ accumulators(0) / accumulators(1)
     mm ~ mm / sum(mm,2)
@@ -127,7 +127,7 @@ class IncMultUpdater(override val opts:IncMultUpdater.Opts = new IncMultUpdater.
     rm = model0.modelmats(0).zeros(1,1)
   }
       
-  def update(step:Long) = {
+  def update(ipass:Int, step:Long) = {
     val modelmats = model.modelmats
     val updatemats = model.updatemats
     val mm = modelmats(0)
@@ -182,7 +182,7 @@ class TelescopingUpdater(override val opts:TelescopingUpdater.Opts = new Telesco
     nextCount = 0L
   }
 	
-	def update(step:Long) = {
+	def update(ipass:Int, step:Long) = {
 	  if (firstStep == 0 && step > 0) {
 	    firstStep = step
 	  }
@@ -229,7 +229,7 @@ class GradUpdater(override val opts:GradUpdater.Opts = new GradUpdater.Options) 
     alpha <-- opts.alpha
   } 
   
-	def update(step:Long):Unit = {
+	def update(ipass:Int, step:Long):Unit = {
 	  val nsteps = if (step == 0) 1f else {
   	  if (firstStep == 0f) {
   	    firstStep = step
@@ -279,7 +279,7 @@ class ADAGradUpdater(override val opts:ADAGradUpdater.Opts = new ADAGradUpdater.
     alpha <-- opts.alpha
   } 
   
-	def update2(step:Long):Unit = {
+	def update2(ipass:Int, step:Long):Unit = {
 	  val nsteps = if (step == 0) 1f else {
   	  if (firstStep == 0f) {
   	    firstStep = step
@@ -303,7 +303,7 @@ class ADAGradUpdater(override val opts:ADAGradUpdater.Opts = new ADAGradUpdater.
 	  }
 	}
 	
-	def update(step:Long):Unit = {
+	def update(ipass:Int, step:Long):Unit = {
 	  val nsteps = if (step == 0) 1f else {
   	  if (firstStep == 0f) {
   	    firstStep = step

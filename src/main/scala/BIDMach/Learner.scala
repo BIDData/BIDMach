@@ -63,13 +63,13 @@ case class Learner(
         here += datasource.opts.blockSize
         bytes += 12L*mats(0).nnz
         if ((istep - 1) % opts.evalStep == 0 || ! datasource.hasNext) {
-        	val scores = model.evalblockg(mats)
+        	val scores = model.evalblockg(mats, ipass)
         	reslist.append(scores.newcopy)
         	samplist.append(here)
         } else {
-        	model.doblockg(mats, here)
+        	model.doblockg(mats, ipass, here)
         	if (regularizer != null) regularizer.compute(here)
-        	updater.update(here)
+        	updater.update(ipass, here)
         }   
         if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
         istep += 1
@@ -91,7 +91,7 @@ case class Learner(
         	lasti = reslist.length
         }
       }
-      updater.updateM
+      updater.updateM(ipass)
       ipass += 1
     }
     val gf = gflop
@@ -144,14 +144,14 @@ case class ParLearner(
 	  				istep0 += 1
 	  				try {
 	  					if (istep % opts.evalStep == 0) {
-	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats)}
+	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats, ipass)}
 	  						reslist.append(scores)
 	  						samplist.append(here)
 	  					} else {
 	  						models(ithread).synchronized {
-	  							models(ithread).doblockg(mats, here)
+	  							models(ithread).doblockg(mats, ipass, here)
 	  							if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
-	  							updaters(ithread).update(here)
+	  							updaters(ithread).update(ipass, here)
 	  						}
 	  					}
 	  				} catch {
@@ -186,7 +186,7 @@ case class ParLearner(
 	  					lasti = reslist.length
 	  				}
 	  			}
-	  			models(ithread).synchronized {updaters(ithread).updateM}
+	  			models(ithread).synchronized {updaters(ithread).updateM(ipass)}
 	  			done(ithread) = ipass + 1
 	  			while (done(ithread) > ipass) Thread.sleep(1)
 	  		}
@@ -297,13 +297,13 @@ case class ParLearnerx(
         			if (ithread < Mat.hasCUDA) setGPU(ithread)
         			try {
         				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
-        					val scores = models(ithread).evalblockg(cmats(ithread))
+        					val scores = models(ithread).evalblockg(cmats(ithread), ipass)
         					reslist.append(scores(0))
         					samplist.append(here)
         				} else {
-        					models(ithread).doblockg(cmats(ithread), here)
+        					models(ithread).doblockg(cmats(ithread), ipass, here)
         					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
-        					updaters(ithread).update(here)
+        					updaters(ithread).update(ipass, here)
         				}
         			} catch {
         			  case e:Exception => {
@@ -345,7 +345,7 @@ case class ParLearnerx(
       println
       for (i <- 0 until opts.nthreads) {
         if (i < Mat.hasCUDA) setGPU(i); 
-        updaters(i).updateM
+        updaters(i).updateM(ipass)
       }
       ipass += 1
       saveAs("/big/twitter/test/results.mat", Learner.scores2FMat(reslist) on row(samplist.toList), "results")

@@ -35,12 +35,12 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   
   def mupdate(data:Mat):FMat
   
-  def doblock(gmats:Array[Mat], i:Long) = {
+  def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
     val sdata = gmats(0)
     mupdate(sdata)
   }
   
-  def evalblock(mats:Array[Mat]):FMat = {
+  def evalblock(mats:Array[Mat], ipass:Int):FMat = {
     val sdata = gmats(0)
     mupdate(sdata)
   }
