@@ -22,8 +22,8 @@ class LDAModel(override val opts:LDAModel.Opts = new LDAModel.Options) extends F
     updatemats(1) = mm.zeros(mm.nrows, 1)
   }
   
-  def uupdate(sdata:Mat, user:Mat):Unit = {
-    if (opts.putBack < 0) user.set(1f)
+  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+    if (opts.putBack < 0 || ipass == 0) user.set(1f)
 	  for (i <- 0 until opts.uiter) {
 	  	val preds = DDS(mm, user, sdata)	
 	  	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
@@ -39,7 +39,7 @@ class LDAModel(override val opts:LDAModel.Opts = new LDAModel.Options) extends F
 //    println("user %g %g" format (mini(mini(user,1),2).dv, maxi(maxi(user,1),2).dv))
   }
   
-  def mupdate(sdata:Mat, user:Mat):Unit = {
+  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val preds = DDS(mm, user, sdata)
     val dc = sdata.contents
     val pc = preds.contents

@@ -28,7 +28,8 @@ class NMFModel(opts:NMFModel.Opts = new NMFModel.Options) extends FactorModel(op
     }
   }
   
-  override def uupdate(sdata:Mat, user:Mat) = {
+  override def uupdate(sdata:Mat, user:Mat, ipass:Int) = {
+	if (opts.putBack < 0 || ipass == 0) user.set(1f)
 	  val modeldata = mm * sdata
   	val mmu = mm *^ mm + udiag
     for (i <- 0 until opts.uiter) {
@@ -39,14 +40,14 @@ class NMFModel(opts:NMFModel.Opts = new NMFModel.Options) extends FactorModel(op
     }
   }  
   
-  override def mupdate(sdata:Mat, user:Mat):Unit = {
+  override def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers) 
     updatemats(0) ~ (user *^ sdata) *@ mm
     updatemats(1) ~ uu * mm
     max(updatemats(1), opts.NMFeps, updatemats(1))
   }
 
-  override def mupdate2(sdata:Mat, user:Mat):Unit = {
+  override def mupdate2(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
     updatemats(0) ~ user *^ sdata
     updatemats(1) ~ uu * mm

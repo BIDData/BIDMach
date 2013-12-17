@@ -352,20 +352,20 @@ class CGUpdater(override val opts:CGUpdater.Opts = new CGUpdater.Options) extend
 	
 	def update(ipass:Int, step:Long) = {
 	  val updatemats = model.updatemats
-	  if (ipass == 0) {
-	    bm ~ bm + updatemats(0)
-	    Ax ~ Ax + updatemats(1)
-	  }
+	  bm ~ bm + updatemats(0)
+	  Ax ~ Ax + updatemats(1)
 	  Ap ~ Ap + updatemats(2)
 	}
 	
 	override def updateM(ipass:Int) = {  
-	  if (ipass == 0) {
+	  if (ipass < 4) {
 	  	rm ~ bm - Ax
 	  	pm <-- rm
 	  }
 	  CGUpdater.CGupdate(pm, rm, Ap, mm, opts.meps)
 	  Ap.clear
+	  bm.clear
+	  Ax.clear
   }
 	
 	override def clear = {  
