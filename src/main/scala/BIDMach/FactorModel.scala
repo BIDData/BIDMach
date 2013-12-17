@@ -42,25 +42,25 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     out
   }
   
-  def uupdate(data:Mat, user:Mat)
+  def uupdate(data:Mat, user:Mat, ipass:Int)
   
-  def mupdate(data:Mat, user:Mat)
+  def mupdate(data:Mat, user:Mat, ipass:Int)
   
-  def mupdate2(data:Mat, user:Mat) = {}
+  def mupdate2(data:Mat, user:Mat, ipass:Int) = {}
   
   def evalfun(data:Mat, user:Mat):FMat
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else reuseuser(gmats(0))
-    uupdate(sdata, user)
-    mupdate(sdata, user)
+    uupdate(sdata, user, ipass)
+    mupdate(sdata, user, ipass)
   }
   
   def evalblock(mats:Array[Mat], ipass:Int):FMat = {
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else reuseuser(gmats(0))
-    uupdate(sdata, user)
+    uupdate(sdata, user, ipass)
     evalfun(sdata, user)
   } 
 }
