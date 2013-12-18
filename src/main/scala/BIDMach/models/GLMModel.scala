@@ -1,9 +1,12 @@
-package BIDMach
+package BIDMach.models
 
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
+import BIDMach.datasources._
+import BIDMach.updaters._
+import BIDMach._
 
 
 class GLMmodel(opts:GLMmodel.Opts) extends RegressionModel(opts) {

@@ -4,6 +4,9 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
 import BIDMat.about
+import BIDMach.models._
+import BIDMach.updaters._
+import BIDMach.datasources._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import scala.actors.Actor
