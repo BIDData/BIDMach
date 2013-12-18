@@ -2,6 +2,7 @@ package BIDMach
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMach.models._
 
 abstract class Regularizer(val opts:Regularizer.Opts = new Regularizer.Options) { 
   val options = opts

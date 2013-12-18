@@ -4,6 +4,9 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.actors._
 import java.io._
+import BIDMach.datasources._
+import BIDMach.models._
+import BIDMach.updaters._
 
 
 object Twitter { 
@@ -214,8 +217,8 @@ object Twitter {
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
 	  val alphas = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
 	  val aopts = new ADAGradUpdater.Options
-	  aopts.vecExponent = expts1
-	  aopts.timeExponent = expts2
+	  aopts.vexp = expts1
+	  aopts.texp = expts2
 	  aopts.alpha = alphas
 	  aopts.mask = mask
 	  val gopts = new GLMmodel.Options
@@ -248,8 +251,8 @@ object Twitter {
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
 	  val alphas = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
 	  val aopts = new ADAGradUpdater.Options
-	  aopts.vecExponent = expts1
-	  aopts.timeExponent = expts2
+	  aopts.vexp = expts1
+	  aopts.texp = expts2
 	  aopts.alpha = alphas
 	  aopts.mask = mask
 	  val gopts = new GLMmodel.Options

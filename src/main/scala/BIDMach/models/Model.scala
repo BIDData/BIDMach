@@ -1,7 +1,8 @@
-package BIDMach
+package BIDMach.models
 import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,GMat,GIMat,GSMat,HMat,IMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMach.datasources._
 
 abstract class Model(val opts:Model.Opts = new Model.Options) {
   

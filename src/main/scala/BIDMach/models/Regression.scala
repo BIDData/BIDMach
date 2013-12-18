@@ -1,8 +1,11 @@
-package BIDMach
+package BIDMach.models
 
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMach.datasources._
+import BIDMach.updaters._
+import BIDMach._
 
 abstract class RegressionModel(override val opts:RegressionModel.Opts) extends Model {
   var targmap:Mat = null
