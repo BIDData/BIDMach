@@ -8,9 +8,9 @@ import BIDMach.models._
 
 object BatchMultUpdater {
   trait Opts extends Updater.Opts {
-    var eps = 1e-12   
+    var eps = 1e-12
   }
-  
+
   class Options extends Opts {}
 }
 

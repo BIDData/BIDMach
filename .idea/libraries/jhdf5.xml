@@ -1,0 +1,16 @@
+<component name="libraryTable">
+  <library name="jhdf5">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../BIDMat/lib/jhdf5.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../BIDMat/lib/lz4-1.1.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../BIDMat/lib/ptplot.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../BIDMat/lib/ptplotapplication.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../BIDMat/lib/commons-math3-3.1.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../BIDMat/BIDMat.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../BIDMat/BIDMat.jar!/" />
+    </SOURCES>
+  </library>
+</component>
