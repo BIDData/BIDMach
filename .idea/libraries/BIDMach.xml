@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="BIDMach">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/BIDMach.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>

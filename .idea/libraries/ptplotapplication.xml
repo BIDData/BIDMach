@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="ptplotapplication">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/../BIDMat/lib/ptplotapplication.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>
