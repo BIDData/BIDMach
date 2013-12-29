@@ -3,7 +3,9 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Plotting._
-import BIDMach.{MatDataSource,FilesDataSource,SFilesDataSource,Learner,LDAModel,NMFModel}
+import BIDMach.Learner
+import BIDMach.datasources.{MatDataSource,FilesDataSource,SFilesDataSource}
+import BIDMach.models.{LDAModel,NMFModel}
 
 Mat.checkMKL
 Mat.checkCUDA
