@@ -37,18 +37,16 @@ class GibbsLDAModel(override val opts:GibbsLDAModel.Options = new GibbsLDAModel.
     	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
     	val dc = sdata.contents
     	val pc = preds.contents
-    	//max(opts.weps, pc, pc)
-    	//pc ~ dc / pc
     	pc ~ pc / dc
-    	//val unew = gzeros(user.nrows, user.ncols)
+    	//preds ~ preds / sdata
     	val unew = user*0
-    	//val gmm = GMat(mm)
-        //val gum = GMat(updatemats(0))
-    	//gmm <-- mm
-    	//gum <-- updatemats(0)
-    	//LDAgibbs(opts.dim, sdata.nnz, modelmats(0).asInstanceOf[GMat].data, user.asInstanceOf[GMat].data, updatemats(0).asInstanceOf[GMat].data, unew.asInstanceOf[GMat].data, sdata.asInstanceOf[GSMat].ir, sdata.asInstanceOf[GSMat].ic, pc.asInstanceOf[GMat].data, opts.nsamps)
+  
     	LDAgibbs(opts.dim, sdata.nnz, mm.asInstanceOf[GMat].data, user.data, updatemats(0).asInstanceOf[GMat].data, unew.data, sdata.ir, sdata.ic, pc.asInstanceOf[GMat].data, opts.nsamps)
-        if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
+    	Mat.nflops += 2L * sdata.nnz * opts.dim
+    	//GSMat.LDAgibbs(mm.asInstanceOf[GMat], user, updatemats(0).asInstanceOf[GMat], unew, preds.asInstanceOf[GSMat], opts.nsamps)
+        
+    	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
+    	//if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, unew.GUID, GPUmem._1, getGPU))
     	user ~ unew + opts.alpha
     	}
     }
@@ -57,9 +55,7 @@ class GibbsLDAModel(override val opts:GibbsLDAModel.Options = new GibbsLDAModel.
   
   def mupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
 	val um = updatemats(0)
-	um ~ um + opts.beta
-	//um ~ um/sum(um,2)
-  	//updatemats(0) ~ updatemats(0) + opts.beta  
+	um ~ um + opts.beta 
   	sum(um, 2, updatemats(1))
   	//if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
