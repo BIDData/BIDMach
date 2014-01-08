@@ -3,7 +3,7 @@ package BIDMach.models
 import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import edu.berkeley.bid.CUMAT._
+//import edu.berkeley.bid.CUMAT
 
 import BIDMach.datasources._
 import BIDMach.updaters._
@@ -29,8 +29,8 @@ class GibbsLDAModel(override val opts:GibbsLDAModel.Options = new GibbsLDAModel.
   }
   
   // use case match to handle GMat and etc.
-  def uupdate(sdata:Mat, user:Mat, ipass: Int):Unit = (sdata, user) match {
-    case (sdata: GSMat, user: GMat) => {
+  def uupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
+    
     	if (opts.putBack < 0 || ipass == 0) user.set(1f)
         for (i <- 0 until opts.uiter) {
     	val preds = DDS(mm, user, sdata)	
@@ -38,26 +38,24 @@ class GibbsLDAModel(override val opts:GibbsLDAModel.Options = new GibbsLDAModel.
     	val dc = sdata.contents
     	val pc = preds.contents
     	pc ~ pc / dc
-    	//preds ~ preds / sdata
+    	
     	val unew = user*0
+    	val mnew = updatemats(0)
+    	mnew.set(0f)
   
-    	LDAgibbs(opts.dim, sdata.nnz, mm.asInstanceOf[GMat].data, user.data, updatemats(0).asInstanceOf[GMat].data, unew.data, sdata.ir, sdata.ic, pc.asInstanceOf[GMat].data, opts.nsamps)
-    	Mat.nflops += 2L * sdata.nnz * opts.dim
-    	//GSMat.LDAgibbs(mm.asInstanceOf[GMat], user, updatemats(0).asInstanceOf[GMat], unew, preds.asInstanceOf[GSMat], opts.nsamps)
+    	//CUMAT.LDAgibbs(opts.dim, sdata.asInstanceOf[GSMat].nnz, mm.asInstanceOf[GMat].data, user.asInstanceOf[GMat].data, updatemats(0).asInstanceOf[GMat].data, unew.asInstanceOf[GMat].data, sdata.asInstanceOf[GSMat].ir, sdata.asInstanceOf[GSMat].ic, pc.asInstanceOf[GMat].data, opts.nsamps)
+    	LDAgibbs(mm, user, mnew, unew, preds, opts.nsamps)
         
     	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
-    	//if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, unew.GUID, GPUmem._1, getGPU))
     	user ~ unew + opts.alpha
     	}
-    }
-
+  
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
 	val um = updatemats(0)
 	um ~ um + opts.beta 
   	sum(um, 2, updatemats(1))
-  	//if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
   
   def evalfun(sdata:Mat, user:Mat):FMat = {  
