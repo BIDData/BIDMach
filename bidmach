@@ -11,7 +11,7 @@ BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )"
 BIDMAT_ROOT="${BIDMACH_ROOT}/../BIDMat" # Change if needed
 # export JAVA_HOME="" # Set here if not set in environment
 # Fix these if needed
-JCUDA_VERSION="0.5.0"
+JCUDA_VERSION="0.5.5"
 JCUDA_LIBDIR="${BIDMAT_ROOT}/lib"
 BIDLIB="${BIDMAT_ROOT}/lib"
 LIBDIR=${BIDMACH_ROOT}/lib
