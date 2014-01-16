@@ -1,6 +1,7 @@
 #!/bin/bash
 # export JAVA_HOME="" # Set here if not set in environment
 # export CUDA_PATH="" # Set here if not set in environment
+JCUDA_VERSION="0.5.5" # Fix if needed
 export JAVA_OPTS="-Xmx12G -Xms128M" # Set as much memory as possible
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
@@ -12,8 +13,6 @@ BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
 BIDMAT_ROOT="${BIDMACH_ROOT}/../BIDMat" # Change if needed
 # export JAVA_HOME="" # Set here if not set in environment
-# Fix these if needed
-JCUDA_VERSION="0.5.5"
 JCUDA_LIBDIR="${BIDMAT_ROOT}/lib"
 BIDLIB="${BIDMAT_ROOT}/lib"
 LIBDIR=${BIDMACH_ROOT}/lib
@@ -31,9 +30,11 @@ export ALL_LIBS="${BIDMACH_ROOT}/BIDMach.jar;${BIDMAT_LIBS};${JCUDA_LIBS};${JAVA
 if [ ! "$OS" = "Windows_NT" ]; then
     export ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
 else
-    NEWPATH=`${BIDMAT_ROOT}/shortpath.bat "${CUDA_PATH}"`
-    NEWPATH=`echo $NEWPATH | sed 's_\\\\_/_g'`
-    export JAVA_OPTS="-Djava.library.path=${BIDMAT_ROOT}/lib;${NEWPATH}/bin "$JAVA_OPTS
+    if [ ! "${CUDA_PATH}" = "" ]; then
+	NEWPATH=`${BIDMAT_ROOT}/shortpath.bat "${CUDA_PATH}"`
+	NEWPATH=`echo $NEWPATH | sed 's_\\\\_/_g'`/bin
+    fi
+    export JAVA_OPTS="-Djava.library.path=${BIDMAT_ROOT}/lib;${NEWPATH} "$JAVA_OPTS
 fi
 
 scala -nobootcp -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala
