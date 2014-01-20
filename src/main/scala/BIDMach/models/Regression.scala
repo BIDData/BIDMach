@@ -33,7 +33,7 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     updatemats(0) = modelmats(0).zeros(mm.nrows, mm.ncols)
     targets = if (useGPU) GMat(opts.targets) else opts.targets
     targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
-    mask = if (useGPU) GMat(opts.mask) else opts.mask
+    mask = if (useGPU) GMat(opts.rmask) else opts.rmask
   } 
   
   def mupdate(data:Mat):FMat
@@ -53,7 +53,7 @@ object RegressionModel {
   trait Opts extends Model.Opts {
     var targets:FMat = null
     var targmap:FMat = null
-    var mask:FMat = null
+    var rmask:FMat = null
   }
   
   class Options extends Opts {}
