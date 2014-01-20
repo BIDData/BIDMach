@@ -9,7 +9,7 @@ import BIDMach.updaters._
 import BIDMach._
 
 
-class GLMmodel(opts:GLMmodel.Opts) extends RegressionModel(opts) {
+class GLMModel(opts:GLMModel.Opts) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
   
@@ -172,29 +172,99 @@ abstract class GLMlink {
   val fnflops:Int
 }
 
-object GLMmodel {
+object GLMModel {
   trait Opts extends RegressionModel.Opts {
     var links:IMat = null
   }
   
   class Options extends Opts {}
   
-  def mkGLMmodel(fopts:Model.Opts) = {
-  	new GLMmodel(fopts.asInstanceOf[GLMmodel.Opts])
+  def mkGLMModel(fopts:Model.Opts) = {
+  	new GLMModel(fopts.asInstanceOf[GLMModel.Opts])
   }
   
   def mkUpdater(nopts:Updater.Opts) = {
   	new ADAGradUpdater(nopts.asInstanceOf[ADAGradUpdater.Opts])
+  } 
+     
+  def learn(mat0:Mat, d:Int = 256) = {
+    class xopts extends Learner.Options with GLMModel.Opts with MatDataSource.Opts with ADAGradUpdater.Opts
+    val opts = new xopts
+    opts.putBack = 1
+    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+  	val nn = new Learner(
+  	    new MatDataSource(Array(mat0:Mat), opts), 
+  			new GLMModel(opts), 
+  			null, 
+  			new ADAGradUpdater(opts), opts)
+    (nn, opts)
+  }
+     
+  def learnBatch(mat0:Mat, d:Int = 256) = {
+    class xopts extends Learner.Options with GLMModel.Opts with MatDataSource.Opts with ADAGradUpdater.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = 1
+    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    val nn = new Learner(
+        new MatDataSource(Array(mat0:Mat), opts), 
+        new GLMModel(opts), 
+        null, 
+        new ADAGradUpdater(opts), 
+        opts)
+    (nn, opts)
+  }
+  
+  def learnParx(mat0:Mat, d:Int = 256) = {
+    class xopts extends ParLearner.Options with GLMModel.Opts with MatDataSource.Opts with ADAGradUpdater.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = 1
+    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+  	val nn = new ParLearnerxF(
+  	    new MatDataSource(Array(mat0:Mat), opts), 
+  	    opts, mkGLMModel _,
+  			null, null,
+  			opts, mkUpdater _, 
+  			opts)
+    (nn, opts)
+  }
+  
+  def learnFPar(
+    nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+		d:Int = 256
+		) = {
+  	class xopts extends ParLearner.Options with GLMModel.Opts with SFilesDataSource.Opts with ADAGradUpdater.Opts
+  	val opts = new xopts
+  	opts.dim = d
+  	val nn = new ParLearnerF(
+  	    null,
+  			(dopts:DataSource.Opts, i:Int) => SFilesDataSource.twitterWords(nstart, nend, opts.nthreads, i),
+  			opts, mkGLMModel _,
+  			null, null,
+  	    opts, mkUpdater _,
+  	    opts
+  	)
+  	(nn, opts)
   }
   
   def learnFParx(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+		d:Int = 256
 		) = {	
-  	new LearnFParModelx(
-  	    SFilesDataSource.twitterNgramBlend(nstart, nend, 1, 0),
-  	    new GLMmodel.Options, mkGLMmodel _, 
-  	    new ADAGradUpdater.Options, mkUpdater _)
+  	class xopts extends ParLearner.Options with GLMModel.Opts with SFilesDataSource.Opts with IncNormUpdater.Opts
+  	val opts = new xopts
+  	opts.dim = d
+  	val nn = new ParLearnerxF(
+  	    SFilesDataSource.twitterWords(nstart, nend),
+  	    opts, mkGLMModel _, 
+  	    null, null,
+  	    opts, mkUpdater _,
+  	    opts
+  	)
+  	(nn, opts)
   }
 }
 

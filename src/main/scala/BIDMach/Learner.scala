@@ -17,6 +17,7 @@ case class Learner(
     val regularizer:Regularizer, 
     val updater:Updater, 
 		val opts:Learner.Options = new Learner.Options) {
+  
   var results:FMat = null
   val dopts:DataSource.Opts = datasource.opts
 	val mopts:Model.Opts	= model.opts
@@ -24,26 +25,20 @@ case class Learner(
 	val uopts:Updater.Opts = updater.opts
 	
 	def setup = {
-    datasource match {
-      case ddm:MatDataSource => {
-      	if (mopts.putBack >= 0) {
-      		ddm.setupPutBack(mopts.putBack+1, mopts.dim)
-      	}
-      }
-      case _ => {}
-    }
+	  Learner.setupPB(datasource, mopts.putBack+1, mopts.dim)
     init   
-  }
-  
-  def run = {
-    setup
-    rerun
   }
   
   def init = {
     datasource.init
     model.init(datasource)
+    regularizer.init(model)
     updater.init(model)
+  }
+    
+  def run = {
+    setup
+    rerun
   }
    
   def rerun() = {
@@ -108,13 +103,37 @@ case class ParLearner(
     val models:Array[Model], 
     val regularizers:Array[Regularizer], 
     val updaters:Array[Updater], 
-		val opts:Learner.Options = new Learner.Options) {
+		val opts:ParLearner.Options = new ParLearner.Options) {
   
   var um:FMat = null
   var mm:FMat = null
   var results:FMat = null
   
-  def run() = {
+  def setup = {
+	  for (i <- 0 until opts.nthreads) {
+	  	val mopts	= models(i).opts
+	  	Learner.setupPB(datasources(i), mopts.putBack+1, mopts.dim)
+	  }
+	  init   
+  }
+  
+  def init = {
+  	for (i <- 0 until opts.nthreads) {
+  		if (i < Mat.hasCUDA) setGPU(i)
+  		datasources(i).init
+  		models(i).init(datasources(i))
+  		regularizers(i).init(models(i))
+  		updaters(i).init(models(i))
+  	}
+  	if (0 < Mat.hasCUDA) setGPU(0)
+  }
+  
+  def run = {
+    setup
+    rerun
+  }
+  
+  def rerun() = {
 	  flip 
 	  val mm0 = models(0).modelmats(0)
 	  mm = zeros(mm0.nrows, mm0.ncols)
@@ -250,17 +269,76 @@ case class ParLearner(
   }
 }
 
+class ParLearnerF(
+    dopts:DataSource.Opts,
+		ddfun:(DataSource.Opts, Int)=>DataSource,
+		mopts:Model.Opts,
+		mkmodel:(Model.Opts)=>Model,
+		ropts:Regularizer.Opts,
+		mkreg:(Regularizer.Opts)=>Regularizer,
+		uopts:Updater.Opts,
+		mkupdater:(Updater.Opts)=>Updater,
+		val lopts:ParLearner.Options = new ParLearner.Options) {
+
+  var dds:Array[DataSource] = null
+  var models:Array[Model] = null
+  var regularizers:Array[Regularizer] = null
+  var updaters:Array[Updater] = null
+  var learner:ParLearner = null
+  
+  def setup = {
+    dds = new Array[DataSource](lopts.nthreads)
+    models = new Array[Model](lopts.nthreads)
+    regularizers = new Array[Regularizer](lopts.nthreads)
+    updaters = new Array[Updater](lopts.nthreads)
+    for (i <- 0 until lopts.nthreads) {
+      if (i < Mat.hasCUDA) setGPU(i)
+    	dds(i) = ddfun(dopts, i)
+    	models(i) = mkmodel(mopts)
+    	if (mkreg != null) regularizers(i) = mkreg(ropts)
+    	updaters(i) = mkupdater(uopts)
+    }
+    if (0 < Mat.hasCUDA) setGPU(0)
+    learner = new ParLearner(dds, models, regularizers, updaters, lopts)
+    learner.setup
+  }
+  
+  def init = learner.init
+  
+  def run = {
+    setup
+    learner.run
+  }
+}
+
 case class ParLearnerx(
     val datasource:DataSource, 
     val models:Array[Model], 
     val regularizers:Array[Regularizer], 
     val updaters:Array[Updater], 
-		val opts:Learner.Options = new Learner.Options) {
+		val opts:ParLearner.Options = new ParLearner.Options) {
   
   var um:FMat = null
   var mm:FMat = null
   var results:FMat = null
   var cmats:Array[Array[Mat]] = null
+  
+  def setup = {
+	  val mopts	= models(0).opts
+	  Learner.setupPB(datasource, mopts.putBack+1, mopts.dim)
+	  init   
+  }
+  
+  def init = {
+    datasource.init
+    for (i <- 0 until opts.nthreads) {
+      if (i < Mat.hasCUDA) setGPU(i)
+    	models(i).init(datasource)
+    	regularizers(i).init(models(i))
+    	updaters(i).init(models(i))
+    }
+    if (0 < Mat.hasCUDA) setGPU(0)   
+  }
   
   def run() = {
     flip 
@@ -396,76 +474,33 @@ case class ParLearnerx(
   }
 }
 
-
-class LearnFParModel(
-		val mopts:Model.Opts,
-		mkmodel:(Model.Opts)=>Model,
-		val uopts:Updater.Opts,
-		mkupdater:(Updater.Opts)=>Updater,
-		ddfun:(Int,Int)=>DataSource
-		) {
-  var dds:Array[DataSource] = null
-  var models:Array[Model] = null
-  var updaters:Array[Updater] = null
-  var learner:ParLearner = null
-  var lopts = new Learner.Options
-  
-  def setup = {
-    dds = new Array[DataSource](lopts.nthreads)
-    models = new Array[Model](lopts.nthreads)
-    updaters = new Array[Updater](lopts.nthreads)
-    for (i <- 0 until lopts.nthreads) {
-      if (i < Mat.hasCUDA) setGPU(i)
-    	dds(i) = ddfun(lopts.nthreads, i)
-    	dds(i).init
-    	models(i) = mkmodel(mopts)
-    	models(i).init(dds(i))
-    	updaters(i) = mkupdater(uopts)
-    	updaters(i).init(models(i))
-    }
-    if (0 < Mat.hasCUDA) setGPU(0)
-    learner = new ParLearner(dds, models, null, updaters, lopts)   
-  }
-  
-  def init = {
-  	for (i <- 0 until lopts.nthreads) {
-  	  if (i < Mat.hasCUDA) setGPU(i)
-  		if (dds(i).omats.length > 1) dds(i).omats(1) = ones(mopts.dim, dds(i).omats(0).ncols)
-  		dds(i).init
-  		models(i).init(dds(i))
-  		updaters(i).init(models(i))
-  	}
-  	if (0 < Mat.hasCUDA) setGPU(0)
-  }
-  
-  def run = learner.run
-}
-
-
-class LearnFParModelx(
+class ParLearnerxF(
 		val ds:DataSource,
 		val mopts:Model.Opts,
 		mkmodel:(Model.Opts)=>Model,
+		ropts:Regularizer.Opts,
+		mkreg:(Regularizer.Opts)=>Regularizer,
 		val uopts:Updater.Opts,
-		mkupdater:(Updater.Opts)=>Updater) {
+		mkupdater:(Updater.Opts)=>Updater,
+		val lopts:ParLearner.Options = new ParLearner.Options) {
   var models:Array[Model] = null
+  var regularizers:Array[Regularizer] = null
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null
-  var lopts = new Learner.Options
   
   def setup = {
     models = new Array[Model](lopts.nthreads)
+    regularizers = new Array[Regularizer](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads) 
     ds.init
     for (i <- 0 until lopts.nthreads) {
       if (i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
-    	models(i).init(ds)
+    	if (mkreg != null) regularizers(i) = mkreg(ropts)
     	updaters(i) = mkupdater(uopts)
-    	updaters(i).init(models(i))
     }
     if (0 < Mat.hasCUDA) setGPU(0)
-    learner = new ParLearnerx(ds, models, null, updaters, lopts)   
+    learner = new ParLearnerx(ds, models, regularizers, updaters, lopts)   
   }
   
   def init = {
@@ -475,6 +510,7 @@ class LearnFParModelx(
   		if (ds.omats.length > 1) 
   		ds.init
   		models(i).init(ds)
+  		if (mkreg != null) regularizers(i) = mkreg(ropts)
   		updaters(i).init(models(i))
   	}
   	if (0 < Mat.hasCUDA) setGPU(0)
@@ -487,10 +523,18 @@ object Learner {
   class Options extends BIDMat.Options {
   	var npasses = 10 
   	var evalStep = 11
-  	var syncStep = 32
-  	var nthreads = 4
   	var pstep = 0.01f
-  	var coolit = 60
+  }
+  
+  def setupPB(ds:DataSource, npb:Int, dim:Int) = {
+    ds match {
+    case ddm:MatDataSource => {
+    	if (npb >= 0) {
+    		ddm.setupPutBack(npb, dim)
+    	}
+    }
+    case _ => {}
+    }
   }
   
   def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, length:Int):String = {
@@ -511,6 +555,15 @@ object Learner {
       i += 1
     }
     out
+  }
+}
+
+object ParLearner {
+  
+  class Options extends Learner.Options {
+  	var nthreads = 4
+  	var syncStep = 32
+  	var coolit = 60
   }
 }
 

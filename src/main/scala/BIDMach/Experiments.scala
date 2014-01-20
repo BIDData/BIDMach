@@ -221,12 +221,12 @@ object Twitter {
 	  aopts.texp = expts2
 	  aopts.alpha = alphas
 	  aopts.mask = mask
-	  val gopts = new GLMmodel.Options
+	  val gopts = new GLMModel.Options
 	  gopts.links = iones(expts1.length, 1)
-	  gopts.mask = mask
+	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	new LearnFParModelx(ds, gopts, GLMmodel.mkGLMmodel _, aopts, GLMmodel.mkUpdater _)	  
+  	new ParLearnerxF(ds, gopts, GLMModel.mkGLMModel _, null, null, aopts, GLMModel.mkUpdater _)	  
 	}
 	
 	def logisticModel(
@@ -255,12 +255,12 @@ object Twitter {
 	  aopts.texp = expts2
 	  aopts.alpha = alphas
 	  aopts.mask = mask
-	  val gopts = new GLMmodel.Options
+	  val gopts = new GLMModel.Options
 	  gopts.links = iones(expts1.length, 1)
-	  gopts.mask = mask
+	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	Learner(ds, new GLMmodel(gopts), null, new ADAGradUpdater(aopts))	  
+  	Learner(ds, new GLMModel(gopts), null, new ADAGradUpdater(aopts))	  
 	}
 	
 

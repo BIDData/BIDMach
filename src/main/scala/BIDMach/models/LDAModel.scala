@@ -87,8 +87,7 @@ object LDAModel  {
   def mkUpdater(nopts:Updater.Opts) = {
   	new IncNormUpdater(nopts.asInstanceOf[IncNormUpdater.Opts])
   } 
-  
-  
+   
   def learn(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with LDAModel.Opts with MatDataSource.Opts with IncNormUpdater.Opts
     val opts = new xopts
@@ -118,26 +117,56 @@ object LDAModel  {
     (nn, opts)
   }
   
+  def learnParx(mat0:Mat, d:Int = 256) = {
+    class xopts extends ParLearner.Options with LDAModel.Opts with MatDataSource.Opts with IncNormUpdater.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = 1
+    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+  	val nn = new ParLearnerxF(
+  	    new MatDataSource(Array(mat0:Mat), opts), 
+  	    opts, mkLDAmodel _,
+  			null, null,
+  			opts, mkUpdater _, 
+  			opts)
+    (nn, opts)
+  }
+  
   def learnFPar(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
-		) = { 	
-  	new LearnFParModel(
-  			new LDAModel.Options, mkLDAmodel _, 
-  	    new IncNormUpdater.Options, mkUpdater _, 
-  	    (n:Int, i:Int) => SFilesDataSource.twitterWords(nstart, nend, n, i)
-  	    )
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+		d:Int = 256
+		) = {
+  	class xopts extends ParLearner.Options with LDAModel.Opts with SFilesDataSource.Opts with IncNormUpdater.Opts
+  	val opts = new xopts
+  	opts.dim = d
+  	val nn = new ParLearnerF(
+  	    null,
+  			(dopts:DataSource.Opts, i:Int) => SFilesDataSource.twitterWords(nstart, nend, opts.nthreads, i),
+  			opts, mkLDAmodel _,
+  			null, null,
+  	    opts, mkUpdater _,
+  	    opts
+  	)
+  	(nn, opts)
   }
   
   def learnFParx(
     nstart:Int=FilesDataSource.encodeDate(2012,3,1,0),
-		nend:Int=FilesDataSource.encodeDate(2012,12,1,0)
+		nend:Int=FilesDataSource.encodeDate(2012,12,1,0),
+		d:Int = 256
 		) = {	
-  	new LearnFParModelx(
+  	class xopts extends ParLearner.Options with LDAModel.Opts with SFilesDataSource.Opts with IncNormUpdater.Opts
+  	val opts = new xopts
+  	opts.dim = d
+  	val nn = new ParLearnerxF(
   	    SFilesDataSource.twitterWords(nstart, nend),
-  	    new LDAModel.Options, mkLDAmodel _, 
-  	    new IncNormUpdater.Options, mkUpdater _ 
-  	    )
+  	    opts, mkLDAmodel _, 
+  	    null, null,
+  	    opts, mkUpdater _,
+  	    opts
+  	)
+  	(nn, opts)
   }
 }
 
