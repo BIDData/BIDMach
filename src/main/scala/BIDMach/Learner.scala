@@ -207,6 +207,7 @@ case class ParLearner(
 	  					  		setGPU(i)
 	  					  		if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
 	  					  	}
+	  					  	setGPU(ithread)
 	  					  }
 	  						println
 	  					}
