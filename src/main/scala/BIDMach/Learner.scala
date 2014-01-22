@@ -167,8 +167,10 @@ case class ParLearner(
 	  				val mats = datasources(ithread).next
 	  				here += datasources(ithread).opts.blockSize
 	  				for (j <- 0 until mats.length) bytes += 12L * mats(j).nnz
-	  				istep += 1
-	  				istep0 += 1
+	  				models(0).synchronized {
+	  					istep += 1
+	  					istep0 += 1
+	  				}
 	  				try {
 	  					if (istep % opts.evalStep == 0) {
 	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats, ipass)}
@@ -214,7 +216,7 @@ case class ParLearner(
 	  					lasti = reslist.length
 	  				}
 	  			}
-	  			models(ithread).synchronized {updaters(ithread).updateM(ipass)}
+	  			models(ithread).synchronized { updaters(ithread).updateM(ipass) }
 	  			done(ithread) = ipass + 1
 	  			while (done(ithread) > ipass) Thread.sleep(1)
 	  		}
@@ -222,7 +224,7 @@ case class ParLearner(
 	  }
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
-	  		while (istep0 < ilast0 + opts.syncStep) Thread.sleep(1)
+	  		while (istep0 < ilast0 + opts.syncStep && mini(done).v != ipass) Thread.sleep(1)
 	  		syncmodels(models)
 	  		ilast0 += opts.syncStep
 	  	}
