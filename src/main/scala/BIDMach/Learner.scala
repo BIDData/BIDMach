@@ -385,8 +385,8 @@ case class ParLearnerx(
         			try {
         				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
         					val scores = models(ithread).evalblockg(cmats(ithread), ipass)
-        					reslist.append(scores(0))
-        					samplist.append(here)
+        					reslist.synchronized { reslist.append(scores(0)) }
+        					samplist.synchronized { samplist.append(here) }
         				} else {
         					models(ithread).doblockg(cmats(ithread), ipass, here)
         					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
@@ -408,7 +408,7 @@ case class ParLearnerx(
       	istep += opts.nthreads
       	if (istep % opts.syncStep == 0) syncmodels(models)
       	if (datasource.progress > lastp + opts.pstep) {
-      		lastp += opts.pstep
+      		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
       		val gf = gflop
       		if (reslist.length > lasti) {
       			print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
