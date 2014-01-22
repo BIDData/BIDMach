@@ -585,7 +585,7 @@ object ParLearner {
 	  for (j <- 0 until models(0).modelmats.length) {
 	    val mg = mm.asInstanceOf[GMat].myGPU
 	    val ug = um.asInstanceOf[GMat].myGPU
-	    println("places %d %d" format (mg, ug))
+	    println("places %d %d %d" format (getGPU, mg, ug))
 	  	mm.clear
 	  	for (i <- 0 until models.length) {
 	  		um <-- models(i).modelmats(j)
