@@ -229,6 +229,7 @@ case class ParLearner(
 	  		ilast0 += opts.syncStep
 	  	}
 	  	ipass += 1
+	  	lastp = 0f
 	  }
 	  val gf = gflop
 	  Mat.useCache = cacheState
