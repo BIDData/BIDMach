@@ -43,6 +43,8 @@ case class Learner(
    
   def rerun() = {
     flip 
+    var cacheState = Mat.useCache
+    Mat.useCache = true
     var done = false
     var ipass = 0
     var here = 0L
@@ -93,6 +95,7 @@ case class Learner(
       ipass += 1
     }
     val gf = gflop
+    Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
@@ -135,6 +138,8 @@ case class ParLearner(
   
   def rerun() = {
 	  flip 
+	  var cacheState = Mat.useCache
+    Mat.useCache = true
 	  val mm0 = models(0).modelmats(0)
 	  mm = zeros(mm0.nrows, mm0.ncols)
 	  um = zeros(mm0.nrows, mm0.ncols)
@@ -223,6 +228,7 @@ case class ParLearner(
 	  	ipass += 1
 	  }
 	  val gf = gflop
+	  Mat.useCache = cacheState
 	  println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
 	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
@@ -347,7 +353,9 @@ case class ParLearnerx(
   }
   
   def rerun = {
-    flip 
+    flip
+    var cacheState = Mat.useCache
+    Mat.useCache = true
     val mm0 = models(0).modelmats(0)
     mm = zeros(mm0.nrows, mm0.ncols)
     um = zeros(mm0.nrows, mm0.ncols)
@@ -438,6 +446,7 @@ case class ParLearnerx(
       saveAs("/big/twitter/test/results.mat", Learner.scores2FMat(reslist) on row(samplist.toList), "results")
     }
     val gf = gflop
+    Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*here, bytes/gf._2/1e6))
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
     if (0 < Mat.hasCUDA) setGPU(0)
