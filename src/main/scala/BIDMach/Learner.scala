@@ -110,8 +110,8 @@ case class ParLearner(
     val updaters:Array[Updater], 
 		val opts:ParLearner.Options = new ParLearner.Options) {
   
-  var um:FMat = null
-  var mm:FMat = null
+  var um:Mat = null
+  var mm:Mat = null
   var results:FMat = null
   var useGPU = false
   
@@ -145,8 +145,14 @@ case class ParLearner(
 	  var cacheState = Mat.useCache
     Mat.useCache = true
 	  val mm0 = models(0).modelmats(0)
-	  mm = zeros(mm0.nrows, mm0.ncols)
-	  um = zeros(mm0.nrows, mm0.ncols)
+	  mm = mm0.zeros(mm0.nrows, mm0.ncols)
+	  um = mm0.zeros(mm0.nrows, mm0.ncols)
+	  val thisGPU = if (useGPU) getGPU else 0
+	  if (useGPU) {
+	    for (i <- 0 until opts.nthreads) {
+	      if (i != thisGPU) connect(i)
+	    }
+	  }
 
 	  @volatile var done = izeros(opts.nthreads, 1)
 	  var ipass = 0
@@ -203,11 +209,10 @@ case class ParLearner(
 	  	}
 	  }
 	  println("pass=%2d" format ipass) 
-	  val thisGPU = if (useGPU) getGPU else 0
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		if (istep0 >= ilast0 + opts.syncStep) {
-	  			syncmodels(models)
+	  			ParLearner.syncmodels(models, mm, um, useGPU)
 	  			ilast0 += opts.syncStep
 	  		}
 	  		if (dsProgress > lastp + opts.pstep) {
@@ -248,28 +253,6 @@ case class ParLearner(
 	  Mat.useCache = cacheState
 	  println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
 	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
-  }
-     
-  def syncmodels(models:Array[Model]) = {
-    val thisGPU = if (useGPU) getGPU else 0
-	  for (j <- 0 until models(0).modelmats.length) {
-	  	mm.clear
-	  	for (i <- 0 until models.length) {
-	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
-	  		models(i).synchronized {
-	  			um <-- models(i).modelmats(j)
-	  		}
-	  		mm ~ mm + um
-	  	}
-	  	mm ~ mm *@ (1f/models.length)
-	  	for (i <- 0 until models.length) {
-	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
-	  		models(i).synchronized {
-	  			models(i).modelmats(j) <-- mm
-	  		}
-	  	}
-	  }
-	  if (useGPU) setGPU(thisGPU)
   }
   
   def syncmodel(models:Array[Model], ithread:Int) = {
@@ -352,8 +335,8 @@ case class ParLearnerx(
     val updaters:Array[Updater], 
 		val opts:ParLearner.Options = new ParLearner.Options) {
   
-  var um:FMat = null
-  var mm:FMat = null
+  var um:Mat = null
+  var mm:Mat = null
   var results:FMat = null
   var cmats:Array[Array[Mat]] = null
   var useGPU = false
@@ -387,12 +370,16 @@ case class ParLearnerx(
     var cacheState = Mat.useCache
     Mat.useCache = true
     val mm0 = models(0).modelmats(0)
-    mm = zeros(mm0.nrows, mm0.ncols)
-    um = zeros(mm0.nrows, mm0.ncols)
+    mm = mm0.zeros(mm0.nrows, mm0.ncols)
+    um = mm0.zeros(mm0.nrows, mm0.ncols)
     cmats = new Array[Array[Mat]](opts.nthreads)
     for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
     val thisGPU = if (useGPU) getGPU else 0
-    
+	  if (useGPU) {
+	    for (i <- 0 until opts.nthreads) {
+	      if (i != thisGPU) connect(i)
+	    }
+	  }    
     val done = iones(opts.nthreads, 1)
     var ipass = 0
     var here = 0L
@@ -446,7 +433,7 @@ case class ParLearnerx(
       	while (mini(done).v == 0) Thread.sleep(1)
       	Thread.sleep(opts.coolit)
       	istep += opts.nthreads
-      	if (istep % opts.syncStep == 0) syncmodels(models)
+      	if (istep % opts.syncStep == 0) ParLearner.syncmodels(models, mm, um, useGPU)
       	if (datasource.progress > lastp + opts.pstep) {
       		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
       		val gf = gflop
@@ -491,24 +478,6 @@ case class ParLearnerx(
         ss.copyTo(out)
       }
     }
-  }
-     
-  def syncmodels(models:Array[Model]) = {
-    val thisGPU = if (useGPU) getGPU else 0
-	  for (j <- 0 until models(0).modelmats.length) {
-	  	mm.clear
-	  	for (i <- 0 until models.length) {
-	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
-	  		um <-- models(i).modelmats(j)
-	  		mm ~ mm + um
-	  	}
-	  	mm ~ mm *@ (1f/models.length)
-	  	for (i <- 0 until models.length) {
-	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
-	  		models(i).modelmats(j) <-- mm
-	  	}
-	  }
-	  if (useGPU) setGPU(thisGPU)
   }
   
   def restart(ithread:Int) = {
@@ -610,6 +579,24 @@ object ParLearner {
   	var nthreads = math.max(0, Mat.hasCUDA)
   	var syncStep = 32
   	var coolit = 60
+  }
+  
+  def syncmodels(models:Array[Model], mm:Mat, um:Mat, useGPU:Boolean) = {
+    val thisGPU = if (useGPU) getGPU else 0
+	  for (j <- 0 until models(0).modelmats.length) {
+	  	mm.clear
+	  	for (i <- 0 until models.length) {
+	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
+	  		um <-- models(i).modelmats(j)
+	  		mm ~ mm + um
+	  	}
+	  	mm ~ mm *@ (1f/models.length)
+	  	for (i <- 0 until models.length) {
+	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
+	  		models(i).modelmats(j) <-- mm
+	  	}
+	  }
+	  if (useGPU) setGPU(thisGPU)
   }
 }
 
