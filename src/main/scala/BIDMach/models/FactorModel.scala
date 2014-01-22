@@ -60,7 +60,7 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
 
 object FactorModel { 
   trait Opts extends Model.Opts { 
-    var uiter = 8
+    var uiter = 5
     var weps = 1e-10f
     var minuser = 1e-8f
   }
