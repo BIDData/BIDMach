@@ -194,7 +194,7 @@ case class ParLearner(
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
-	  					lastp += opts.pstep
+	  					while (datasources(0).progress > lastp + opts.pstep) lastp += opts.pstep
 	  					val gf = gflop
 	  					if (reslist.length > lasti) {
 	  						print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
