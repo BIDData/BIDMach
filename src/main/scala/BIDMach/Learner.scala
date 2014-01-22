@@ -370,8 +370,8 @@ case class ParLearnerx(
     var cacheState = Mat.useCache
     Mat.useCache = true
     val mm0 = models(0).modelmats(0)
-    mm = zeros(mm0.nrows, mm0.ncols)
-    um = zeros(mm0.nrows, mm0.ncols)
+    mm = mm0.zeros(mm0.nrows, mm0.ncols)
+    um = mm0.zeros(mm0.nrows, mm0.ncols)
     cmats = new Array[Array[Mat]](opts.nthreads)
     for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
     val thisGPU = if (useGPU) getGPU else 0
@@ -583,9 +583,14 @@ object ParLearner {
   
   def syncmodels(models:Array[Model], mm:Mat, um:Mat, useGPU:Boolean) = {
 	  for (j <- 0 until models(0).modelmats.length) {
+	    val mg = mm.asInstanceOf[GMat].myGPU
+	    val ug = um.asInstanceOf[GMat].myGPU
+	    println("places %d %d" format (mg, ug))
 	  	mm.clear
 	  	for (i <- 0 until models.length) {
 	  		um <-- models(i).modelmats(j)
+	  		val ug2 = um.asInstanceOf[GMat].myGPU
+	  		if (ug2 != ug) println("problem %d %d" format (ug2, ug))
 	  		mm ~ mm + um
 	  	}
 	  	mm ~ mm * (1f/models.length)
