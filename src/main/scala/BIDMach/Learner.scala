@@ -232,12 +232,12 @@ case class ParLearner(
 	  		  Thread.sleep(1)
 	  		}
 	  	}
-	  	ipass += 1
 	  	lastp = 0f
 	  	if (ipass < opts.npasses) {
 	  	  for (i <- 0 until opts.nthreads) datasources(i).reset
 	  	  println("i=%2d" format ipass) 
 	  	}
+	  	ipass += 1
 	  }
 	  val gf = gflop
 	  Mat.useCache = cacheState
