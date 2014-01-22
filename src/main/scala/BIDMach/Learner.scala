@@ -23,6 +23,7 @@ case class Learner(
 	val mopts:Model.Opts	= model.opts
 	val ropts:Regularizer.Opts = if (regularizer != null) regularizer.opts else null
 	val uopts:Updater.Opts = updater.opts
+	var useGPU = false
 	
 	def setup = {
 	  Learner.setupPB(datasource, mopts.putBack, mopts.dim)   
@@ -33,6 +34,7 @@ case class Learner(
     model.init(datasource)
     if (regularizer != null) regularizer.init(model)
     updater.init(model)
+    useGPU = model.useGPU
   }
     
   def run = {
@@ -84,7 +86,7 @@ case class Learner(
         			gf._2, 
         			bytes*1e-9,
         			bytes/gf._2*1e-6))  
-        			if (model.useGPU) {
+        			if (useGPU) {
         				print(", GPUmem=%3.2f" format GPUmem._1) 
         			}
         	println
@@ -111,6 +113,7 @@ case class ParLearner(
   var um:FMat = null
   var mm:FMat = null
   var results:FMat = null
+  var useGPU = false
   
   def setup = {
 	  for (i <- 0 until opts.nthreads) {
@@ -127,7 +130,8 @@ case class ParLearner(
   		if (regularizers != null) regularizers(i).init(models(i))
   		updaters(i).init(models(i))
   	}
-  	if (0 < Mat.hasCUDA) setGPU(0)
+  	useGPU = models(0).useGPU
+  	if (useGPU) setGPU(0)
   }
   
   def run = {
@@ -156,7 +160,7 @@ case class ParLearner(
 	  done.clear
 	  for (ithread <- 0 until opts.nthreads) {
 	  	Actor.actor {
-	  		if (ithread < Mat.hasCUDA) setGPU(ithread)
+	  		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
 	  		var here = 0L
 	  		updaters(ithread).clear
 	  		while (done(ithread) < opts.npasses) {
@@ -188,7 +192,7 @@ case class ParLearner(
 	  					println("Keep on truckin...")
 	  				}
 	  				} 
-	  				Thread.sleep(opts.coolit)
+	  				if (useGPU) Thread.sleep(opts.coolit)
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  			}
@@ -199,6 +203,7 @@ case class ParLearner(
 	  	}
 	  }
 	  println("pass=%2d" format ipass) 
+	  val thisGPU = if (useGPU) getGPU else 0
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		if (istep0 >= ilast0 + opts.syncStep) {
@@ -218,12 +223,12 @@ case class ParLearner(
 	  						gf._2, 
 	  						bytes*1e-9,
 	  						bytes/gf._2*1e-6))  
-	  						if (models(0).useGPU) {
+	  						if (useGPU) {
 	  							for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
 	  								setGPU(i)
 	  								if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
 	  							}
-	  							setGPU(0)
+	  							setGPU(thisGPU)
 	  						}
 	  				println
 	  			}
@@ -246,10 +251,11 @@ case class ParLearner(
   }
      
   def syncmodels(models:Array[Model]) = {
+    val thisGPU = if (useGPU) getGPU else 0
 	  for (j <- 0 until models(0).modelmats.length) {
 	  	mm.clear
 	  	for (i <- 0 until models.length) {
-	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
 	  		models(i).synchronized {
 	  			um <-- models(i).modelmats(j)
 	  		}
@@ -257,13 +263,13 @@ case class ParLearner(
 	  	}
 	  	mm ~ mm *@ (1f/models.length)
 	  	for (i <- 0 until models.length) {
-	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
 	  		models(i).synchronized {
 	  			models(i).modelmats(j) <-- mm
 	  		}
 	  	}
 	  }
-	  if (0 < Mat.hasCUDA) setGPU(0)
+	  if (useGPU) setGPU(thisGPU)
   }
   
   def syncmodel(models:Array[Model], ithread:Int) = {
@@ -277,7 +283,7 @@ case class ParLearner(
   }
   
   def restart(ithread:Int) = {
-    if (models(0).useGPU) {
+    if (useGPU) {
       resetGPU
       Mat.trimCache2(ithread)
     }
@@ -317,14 +323,15 @@ class ParLearnerF(
     models = new Array[Model](lopts.nthreads)
     if (mkreg != null) regularizers = new Array[Regularizer](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads)
+    val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
-      if (i < Mat.hasCUDA) setGPU(i)
+      if (models(0).opts.useGPU && i < Mat.hasCUDA) setGPU(i)
     	dds(i) = ddfun(dopts, i)
     	models(i) = mkmodel(mopts)
     	if (mkreg != null) regularizers(i) = mkreg(ropts)
     	updaters(i) = mkupdater(uopts)
     }
-    if (0 < Mat.hasCUDA) setGPU(0)
+    if (0 < Mat.hasCUDA) setGPU(thisGPU)
     learner = new ParLearner(dds, models, regularizers, updaters, lopts)
     learner.setup
   }
@@ -349,6 +356,7 @@ case class ParLearnerx(
   var mm:FMat = null
   var results:FMat = null
   var cmats:Array[Array[Mat]] = null
+  var useGPU = false
   
   def setup = {
 	  val mopts	= models(0).opts
@@ -357,13 +365,15 @@ case class ParLearnerx(
   
   def init = {
     datasource.init
+    useGPU = models(0).opts.useGPU
+    val thisGPU = if (useGPU) getGPU else 0
     for (i <- 0 until opts.nthreads) {
-      if (i < Mat.hasCUDA) setGPU(i)
+      if (useGPU && i < Mat.hasCUDA) setGPU(i)
     	models(i).init(datasource)
     	if (regularizers != null) regularizers(i).init(models(i))
     	updaters(i).init(models(i))
     }
-    if (0 < Mat.hasCUDA) setGPU(0)   
+    if (useGPU) setGPU(thisGPU)   
   }
   
   def run = {
@@ -381,6 +391,7 @@ case class ParLearnerx(
     um = zeros(mm0.nrows, mm0.ncols)
     cmats = new Array[Array[Mat]](opts.nthreads)
     for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
+    val thisGPU = if (useGPU) getGPU else 0
     
     val done = iones(opts.nthreads, 1)
     var ipass = 0
@@ -391,9 +402,10 @@ case class ParLearnerx(
     val reslist = new ListBuffer[FMat]
     val samplist = new ListBuffer[Float]
     for (i <- 0 until opts.nthreads) {
-    	if (i < Mat.hasCUDA) setGPU(i)
+    	if (useGPU && i < Mat.hasCUDA) setGPU(i)
     	updaters(i).clear
     }
+    setGPU(thisGPU)
     while (ipass < opts.npasses) {
     	datasource.reset
       var istep = 0
@@ -409,7 +421,7 @@ case class ParLearnerx(
         		bytes += 12L*mats(0).nnz
         		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
         		Actor.actor {
-        			if (ithread < Mat.hasCUDA) setGPU(ithread)
+        			if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
         			try {
         				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
         					val scores = models(ithread).evalblockg(cmats(ithread), ipass)
@@ -446,11 +458,12 @@ case class ParLearnerx(
       					gf._2, 
       					bytes*1e-9,
       					bytes/gf._2*1e-6))  
-      		  if (models(0).useGPU) {
+      		  if (useGPU) {
       		    for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
       		      setGPU(i)
       		      if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
       		    }
+      		    setGPU(thisGPU)
       		  }
       			println
       		}
@@ -458,9 +471,10 @@ case class ParLearnerx(
       	}
       }
       for (i <- 0 until opts.nthreads) {
-        if (i < Mat.hasCUDA) setGPU(i); 
+        if (useGPU && i < Mat.hasCUDA) setGPU(i); 
         updaters(i).updateM(ipass)
       }
+      setGPU(thisGPU)
       ipass += 1
       saveAs("/big/twitter/test/results.mat", Learner.scores2FMat(reslist) on row(samplist.toList), "results")
     }
@@ -468,7 +482,6 @@ case class ParLearnerx(
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*here, bytes/gf._2/1e6))
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
-    if (0 < Mat.hasCUDA) setGPU(0)
   }
   
   def safeCopy(m:Mat, ithread:Int):Mat = {
@@ -481,24 +494,25 @@ case class ParLearnerx(
   }
      
   def syncmodels(models:Array[Model]) = {
+    val thisGPU = if (useGPU) getGPU else 0
 	  for (j <- 0 until models(0).modelmats.length) {
 	  	mm.clear
 	  	for (i <- 0 until models.length) {
-	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
 	  		um <-- models(i).modelmats(j)
 	  		mm ~ mm + um
 	  	}
 	  	mm ~ mm *@ (1f/models.length)
 	  	for (i <- 0 until models.length) {
-	  		if (i < Mat.hasCUDA) setGPU(i)
+	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
 	  		models(i).modelmats(j) <-- mm
 	  	}
 	  }
-	  if (0 < Mat.hasCUDA) setGPU(0)
+	  if (useGPU) setGPU(thisGPU)
   }
   
   def restart(ithread:Int) = {
-    if (models(0).useGPU) {
+    if (useGPU) {
       resetGPU
       Mat.trimCaches(ithread)
     }
@@ -526,13 +540,14 @@ class ParLearnerxF(
     models = new Array[Model](lopts.nthreads)
     if (mkreg != null) regularizers = new Array[Regularizer](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads) 
+    val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
-      if (i < Mat.hasCUDA) setGPU(i)
+      if (models(0).opts.useGPU && i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
     	if (mkreg != null) regularizers(i) = mkreg(ropts)
     	updaters(i) = mkupdater(uopts)
     }
-    if (0 < Mat.hasCUDA) setGPU(0)
+    if (0 < Mat.hasCUDA) setGPU(thisGPU)
     learner = new ParLearnerx(ds, models, regularizers, updaters, lopts)   
     learner.setup
   }
