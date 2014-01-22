@@ -172,8 +172,8 @@ case class ParLearner(
 	  				try {
 	  					if (istep % opts.evalStep == 0) {
 	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats, ipass)}
-	  						reslist.append(scores)
-	  						samplist.append(here)
+	  						reslist.synchronized { reslist.append(scores) }
+	  						samplist.synchronized { samplist.append(here) }
 	  					} else {
 	  						models(ithread).synchronized {
 	  							models(ithread).doblockg(mats, ipass, here)
