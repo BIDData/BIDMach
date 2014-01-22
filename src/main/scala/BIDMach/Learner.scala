@@ -325,7 +325,7 @@ class ParLearnerF(
     updaters = new Array[Updater](lopts.nthreads)
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
-      if (models(0).opts.useGPU && i < Mat.hasCUDA) setGPU(i)
+      if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
     	dds(i) = ddfun(dopts, i)
     	models(i) = mkmodel(mopts)
     	if (mkreg != null) regularizers(i) = mkreg(ropts)
@@ -542,7 +542,7 @@ class ParLearnerxF(
     updaters = new Array[Updater](lopts.nthreads) 
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
-      if (models(0).opts.useGPU && i < Mat.hasCUDA) setGPU(i)
+      if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
     	if (mkreg != null) regularizers(i) = mkreg(ropts)
     	updaters(i) = mkupdater(uopts)
