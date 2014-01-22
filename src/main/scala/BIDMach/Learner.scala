@@ -110,8 +110,8 @@ case class ParLearner(
     val updaters:Array[Updater], 
 		val opts:ParLearner.Options = new ParLearner.Options) {
   
-  var um:Mat = null
-  var mm:Mat = null
+  var um:Array[Mat] = null
+  var mm:Array[Mat] = null
   var results:FMat = null
   var useGPU = false
   
@@ -123,6 +123,7 @@ case class ParLearner(
   }
   
   def init = {
+    val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
   	for (i <- 0 until opts.nthreads) {
   		if (i < Mat.hasCUDA) setGPU(i)
   		datasources(i).init
@@ -131,7 +132,15 @@ case class ParLearner(
   		updaters(i).init(models(i))
   	}
   	useGPU = models(0).useGPU
-  	if (useGPU) setGPU(0)
+  	if (Mat.hasCUDA > 0) setGPU(thisGPU)
+  	val mml = models(0).modelmats.length
+    um = new Array[Mat](mml)
+    mm = new Array[Mat](mml)
+    for (i <- 0 until mml) {
+    	val mm0 = models(0).modelmats(i)
+    	mm(i) = mm0.zeros(mm0.nrows, mm0.ncols)
+    	um(i) = mm0.zeros(mm0.nrows, mm0.ncols)
+    }
   }
   
   def run = {
@@ -144,9 +153,6 @@ case class ParLearner(
 	  flip 
 	  var cacheState = Mat.useCache
     Mat.useCache = true
-	  val mm0 = models(0).modelmats(0)
-	  mm = mm0.zeros(mm0.nrows, mm0.ncols)
-	  um = mm0.zeros(mm0.nrows, mm0.ncols)
 	  val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
@@ -255,13 +261,14 @@ case class ParLearner(
 	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
+  // Doesnt work for multiple model matrices
   def syncmodel(models:Array[Model], ithread:Int) = {
 	  mm.synchronized {
-	  	um <-- models(ithread).modelmats(0)
-	  	um ~ um *@ (1f/opts.nthreads)
-	  	mm ~ mm *@ (1 - 1f/opts.nthreads)
-	  	mm ~ mm + um
-	  	models(ithread).modelmats(0) <-- mm
+	  	um(0) <-- models(ithread).modelmats(0)
+	  	um(0) ~ um(0) *@ (1f/opts.nthreads)
+	  	mm(0) ~ mm(0) *@ (1 - 1f/opts.nthreads)
+	  	mm(0) ~ mm(0) + um(0)
+	  	models(ithread).modelmats(0) <-- mm(0)
 	  }
   }
   
@@ -271,7 +278,7 @@ case class ParLearner(
       Mat.trimCache2(ithread)
     }
     models(ithread).init(datasources(ithread))
-    models(ithread).modelmats(0) <-- mm
+    models(ithread).modelmats(0) <-- mm(0)
     updaters(ithread).init(models(ithread))      
   }
   
@@ -335,8 +342,8 @@ case class ParLearnerx(
     val updaters:Array[Updater], 
 		val opts:ParLearner.Options = new ParLearner.Options) {
   
-  var um:Mat = null
-  var mm:Mat = null
+  var um:Array[Mat] = null
+  var mm:Array[Mat] = null
   var results:FMat = null
   var cmats:Array[Array[Mat]] = null
   var useGPU = false
@@ -356,7 +363,15 @@ case class ParLearnerx(
     	if (regularizers != null) regularizers(i).init(models(i))
     	updaters(i).init(models(i))
     }
-    if (useGPU) setGPU(thisGPU)   
+    if (useGPU) setGPU(thisGPU) 
+    val mml = models(0).modelmats.length
+    um = new Array[Mat](mml)
+    mm = new Array[Mat](mml)
+    for (i <- 0 until mml) {
+    	val mm0 = models(0).modelmats(i)
+    	mm(i) = mm0.zeros(mm0.nrows, mm0.ncols)
+    	um(i) = mm0.zeros(mm0.nrows, mm0.ncols)
+    }
   }
   
   def run = {
@@ -367,11 +382,9 @@ case class ParLearnerx(
   
   def rerun = {
     flip
+    val mm0 = models(0).modelmats(0)
     var cacheState = Mat.useCache
     Mat.useCache = true
-    val mm0 = models(0).modelmats(0)
-    mm = mm0.zeros(mm0.nrows, mm0.ncols)
-    um = mm0.zeros(mm0.nrows, mm0.ncols)
     cmats = new Array[Array[Mat]](opts.nthreads)
     for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
     val thisGPU = if (useGPU) getGPU else 0
@@ -486,7 +499,7 @@ case class ParLearnerx(
       Mat.trimCaches(ithread)
     }
     models(ithread).init(datasource)
-    models(ithread).modelmats(0) <-- mm
+    models(ithread).modelmats(0) <-- mm(0)
     updaters(ithread).init(models(ithread))      
   }
 }
@@ -581,21 +594,16 @@ object ParLearner {
   	var coolit = 60
   }
   
-  def syncmodels(models:Array[Model], mm:Mat, um:Mat, useGPU:Boolean) = {
+  def syncmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], useGPU:Boolean) = {
 	  for (j <- 0 until models(0).modelmats.length) {
-	    val mg = mm.asInstanceOf[GMat].myGPU
-	    val ug = um.asInstanceOf[GMat].myGPU
-	    println("places %d %d %d %d" format (models(0).modelmats.length, getGPU, mg, ug))
-	  	mm.clear
+	  	mm(j).clear
 	  	for (i <- 0 until models.length) {
-	  		um <-- models(i).modelmats(j)
-	  		val ug2 = um.asInstanceOf[GMat].myGPU
-	  		if (ug2 != ug) println("problem %d %d" format (ug2, ug))
-	  		mm ~ mm + um
+	  		um(j) <-- models(i).modelmats(j)
+	  		mm(j) ~ mm(j) + um(j)
 	  	}
-	  	mm ~ mm * (1f/models.length)
+	  	mm(j) ~ mm(j) * (1f/models.length)
 	  	for (i <- 0 until models.length) {
-	  		models(i).modelmats(j) <-- mm
+	  		models(i).modelmats(j) <-- mm(j)
 	  	}
 	  }
   }
