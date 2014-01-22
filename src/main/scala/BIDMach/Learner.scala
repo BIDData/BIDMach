@@ -582,21 +582,17 @@ object ParLearner {
   }
   
   def syncmodels(models:Array[Model], mm:Mat, um:Mat, useGPU:Boolean) = {
-    val thisGPU = if (useGPU) getGPU else 0
 	  for (j <- 0 until models(0).modelmats.length) {
 	  	mm.clear
 	  	for (i <- 0 until models.length) {
-	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
 	  		um <-- models(i).modelmats(j)
 	  		mm ~ mm + um
 	  	}
 	  	mm ~ mm *@ (1f/models.length)
 	  	for (i <- 0 until models.length) {
-	  		if (useGPU && i < Mat.hasCUDA) setGPU(i)
 	  		models(i).modelmats(j) <-- mm
 	  	}
 	  }
-	  if (useGPU) setGPU(thisGPU)
   }
 }
 
