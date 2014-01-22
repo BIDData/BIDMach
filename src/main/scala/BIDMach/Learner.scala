@@ -145,8 +145,8 @@ case class ParLearner(
 	  var cacheState = Mat.useCache
     Mat.useCache = true
 	  val mm0 = models(0).modelmats(0)
-	  mm = zeros(mm0.nrows, mm0.ncols)
-	  um = zeros(mm0.nrows, mm0.ncols)
+	  mm = mm0.zeros(mm0.nrows, mm0.ncols)
+	  um = mm0.zeros(mm0.nrows, mm0.ncols)
 	  val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
