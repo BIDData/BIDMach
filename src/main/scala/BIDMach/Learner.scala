@@ -57,7 +57,7 @@ case class Learner(
     	var lastp = 0f
       datasource.reset
       var istep = 0
-      println("i=%2d" format ipass)
+      println("pass=%2d" format ipass)
       while (datasource.hasNext) {
         val mats = datasource.next    
         here += datasource.opts.blockSize
@@ -198,7 +198,7 @@ case class ParLearner(
 	  		}
 	  	}
 	  }
-	  println("i=%2d" format ipass) 
+	  println("pass=%2d" format ipass) 
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		if (istep0 >= ilast0 + opts.syncStep) {
@@ -235,7 +235,7 @@ case class ParLearner(
 	  	lastp = 0f
 	  	if (ipass < opts.npasses) {
 	  	  for (i <- 0 until opts.nthreads) datasources(i).reset
-	  	  println("i=%2d" format ipass+1) 
+	  	  println("pass=%2d" format ipass+1) 
 	  	}
 	  	ipass += 1
 	  }
@@ -398,7 +398,7 @@ case class ParLearnerx(
     	datasource.reset
       var istep = 0
       var lastp = 0f
-      println("i=%2d" format ipass)
+      println("pass=%2d" format ipass)
       while (datasource.hasNext) {
         for (ithread <- 0 until opts.nthreads) {
         	if (datasource.hasNext) {
@@ -457,7 +457,6 @@ case class ParLearnerx(
       		lasti = reslist.length
       	}
       }
-      println
       for (i <- 0 until opts.nthreads) {
         if (i < Mat.hasCUDA) setGPU(i); 
         updaters(i).updateM(ipass)
