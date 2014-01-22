@@ -159,7 +159,7 @@ case class ParLearner(
 	  		if (ithread < Mat.hasCUDA) setGPU(ithread)
 	  		var here = 0L
 	  		updaters(ithread).clear
-	  		while (ipass < opts.npasses) {
+	  		while (done(ithread) < opts.npasses) {
 	  			var istep = 0
 	  			while (datasources(ithread).hasNext) {
 	  				val mats = datasources(ithread).next
@@ -193,7 +193,7 @@ case class ParLearner(
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  			}
 	  			models(ithread).synchronized { updaters(ithread).updateM(ipass) }
-	  			done(ithread) = ipass + 1
+	  			done(ithread) += 1
 	  			while (done(ithread) > ipass) Thread.sleep(1)
 	  		}
 	  	}
@@ -234,7 +234,6 @@ case class ParLearner(
 	  	}
 	  	ipass += 1
 	  	lastp = 0f
-	  	lasti = 0
 	  	if (ipass < opts.npasses) {
 	  	  for (i <- 0 until opts.nthreads) datasources(i).reset
 	  	  println("i=%2d" format ipass) 
