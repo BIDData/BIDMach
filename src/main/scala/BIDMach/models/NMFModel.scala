@@ -114,6 +114,7 @@ object NMFModel  {
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
+    opts.uiter = 2
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDataSource(Array(mat0:Mat), opts), 
@@ -128,6 +129,7 @@ object NMFModel  {
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
+    opts.uiter = 1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDataSource(Array(mat0:Mat), opts), 
@@ -142,8 +144,9 @@ object NMFModel  {
     class xopts extends ParLearner.Options with NMFModel.Opts with MatDataSource.Opts with IncNormUpdater.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.putBack = -1
+    opts.uiter = 5
+    opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerxF(
   	    new MatDataSource(Array(mat0:Mat), opts), 
