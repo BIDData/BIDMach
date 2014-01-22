@@ -235,7 +235,7 @@ case class ParLearner(
 	  	lastp = 0f
 	  	if (ipass < opts.npasses) {
 	  	  for (i <- 0 until opts.nthreads) datasources(i).reset
-	  	  println("i=%2d" format ipass) 
+	  	  println("i=%2d" format ipass+1) 
 	  	}
 	  	ipass += 1
 	  }
