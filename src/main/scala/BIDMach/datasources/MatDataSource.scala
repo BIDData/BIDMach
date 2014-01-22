@@ -56,12 +56,12 @@ class MatDataSource(var mats:Array[Mat], override val opts:MatDataSource.Opts = 
   }
   
   override def setupPutBack(n:Int, dim:Int) = {
-    if (mats.length < n || mats(n-1).asInstanceOf[AnyRef] == null || mats(n-1).nrows != dim) {
-      val newmats = new Array[Mat](n)
+    if (mats.length <= n || mats(n).asInstanceOf[AnyRef] == null || mats(n).nrows != dim) {
+      val newmats = new Array[Mat](n+1)
       for (i <- 0 until mats.length) {
         newmats(i) = mats(i)
       }
-      for (i <- mats.length until n) {
+      for (i <- mats.length until n+1) {
       	newmats(i) = zeros(dim, mats(0).ncols)
       }
       mats = newmats
