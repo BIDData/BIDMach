@@ -202,7 +202,7 @@ case class ParLearner(
 	  }
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
-	  		if (istep0 >= ilast0 + opts.syncStep || mini(done).v == ipass) {
+	  		if (istep0 >= ilast0 + opts.syncStep) {
 	  			syncmodels(models)
 	  			ilast0 += opts.syncStep
 	  		}
