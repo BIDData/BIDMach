@@ -295,7 +295,7 @@ class ParLearnerF(
   def setup = {
     dds = new Array[DataSource](lopts.nthreads)
     models = new Array[Model](lopts.nthreads)
-    regularizers = new Array[Regularizer](lopts.nthreads)
+    if (mkreg != null) regularizers = new Array[Regularizer](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads)
     for (i <- 0 until lopts.nthreads) {
       if (i < Mat.hasCUDA) setGPU(i)
