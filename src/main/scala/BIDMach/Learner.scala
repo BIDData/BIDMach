@@ -124,7 +124,7 @@ case class ParLearner(
   		if (i < Mat.hasCUDA) setGPU(i)
   		datasources(i).init
   		models(i).init(datasources(i))
-  		regularizers(i).init(models(i))
+  		if (regularizers != null) regularizers(i).init(models(i))
   		updaters(i).init(models(i))
   	}
   	if (0 < Mat.hasCUDA) setGPU(0)
