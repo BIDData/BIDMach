@@ -31,7 +31,7 @@ case class Learner(
   def init = {
     datasource.init
     model.init(datasource)
-    regularizer.init(model)
+    if (regularizer != null) regularizer.init(model)
     updater.init(model)
   }
     
@@ -562,7 +562,8 @@ object Learner {
 
 object ParLearner {
   
-  class Options extends Learner.Options {
+  class Options extends 
+  Learner.Options {
   	var nthreads = math.max(0, Mat.hasCUDA)
   	var syncStep = 32
   	var coolit = 60
