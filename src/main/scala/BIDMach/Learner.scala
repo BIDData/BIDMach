@@ -160,7 +160,6 @@ case class ParLearner(
 	  		var here = 0L
 	  		updaters(ithread).clear
 	  		while (ipass < opts.npasses) {
-	  			if (ithread == 0) println("i=%2d" format ipass) 
 	  			datasources(ithread).reset
 	  			var istep = 0
 	  			while (datasources(ithread).hasNext) {
@@ -200,6 +199,7 @@ case class ParLearner(
 	  		}
 	  	}
 	  }
+	  println("i=%2d" format ipass) 
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		if (istep0 >= ilast0 + opts.syncStep) {
@@ -236,6 +236,7 @@ case class ParLearner(
 	  	ipass += 1
 	  	lastp = 0f
 	  	lasti = 0
+	  	if (ipass < opts.npasses) println("i=%2d" format ipass) 
 	  }
 	  val gf = gflop
 	  Mat.useCache = cacheState
