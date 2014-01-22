@@ -370,8 +370,8 @@ case class ParLearnerx(
     var cacheState = Mat.useCache
     Mat.useCache = true
     val mm0 = models(0).modelmats(0)
-    mm = mm0.zeros(mm0.nrows, mm0.ncols)
-    um = mm0.zeros(mm0.nrows, mm0.ncols)
+    mm = zeros(mm0.nrows, mm0.ncols)
+    um = zeros(mm0.nrows, mm0.ncols)
     cmats = new Array[Array[Mat]](opts.nthreads)
     for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
     val thisGPU = if (useGPU) getGPU else 0
