@@ -152,6 +152,7 @@ case class ParLearner(
 	  val reslist = new ListBuffer[FMat]
 	  val samplist = new ListBuffer[Float]    	  	
 	  var lastp = 0f
+	  var lasti = 0
 	  done.clear
 	  for (ithread <- 0 until opts.nthreads) {
 	  	Actor.actor {
@@ -162,7 +163,6 @@ case class ParLearner(
 	  			if (ithread == 0) println("i=%2d" format ipass) 
 	  			datasources(ithread).reset
 	  			var istep = 0
-	  			var lasti = 0
 	  			while (datasources(ithread).hasNext) {
 	  				val mats = datasources(ithread).next
 	  				here += datasources(ithread).opts.blockSize
@@ -193,28 +193,6 @@ case class ParLearner(
 	  				Thread.sleep(opts.coolit)
 	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
-	  				if (ithread == 0 && datasources(0).progress > lastp + opts.pstep) {
-	  					while (datasources(0).progress > lastp + opts.pstep) lastp += opts.pstep
-	  					val gf = gflop
-	  					if (reslist.length > lasti) {
-	  						print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-	  								100f*lastp, 
-	  								Learner.scoreSummary(reslist, lasti, reslist.length),
-	  								gf._1,
-	  								gf._2, 
-	  								bytes*1e-9,
-	  								bytes/gf._2*1e-6))  
-	  					  if (models(0).useGPU) {
-	  					  	for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
-	  					  		setGPU(i)
-	  					  		if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
-	  					  	}
-	  					  	setGPU(ithread)
-	  					  }
-	  						println
-	  					}
-	  					lasti = reslist.length
-	  				}
 	  			}
 	  			models(ithread).synchronized { updaters(ithread).updateM(ipass) }
 	  			done(ithread) = ipass + 1
@@ -224,12 +202,40 @@ case class ParLearner(
 	  }
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
-	  		while (istep0 < ilast0 + opts.syncStep && mini(done).v != ipass) Thread.sleep(1)
-	  		syncmodels(models)
-	  		ilast0 += opts.syncStep
+	  		if (istep0 >= ilast0 + opts.syncStep || mini(done).v == ipass) {
+	  			syncmodels(models)
+	  			ilast0 += opts.syncStep
+	  		}
+	  		if (dsProgress > lastp + opts.pstep) {
+	  			while (dsProgress > lastp + opts.pstep) lastp += opts.pstep
+	  			val gf = gflop
+	  			if (reslist.length > lasti) {
+	  				print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+	  						100f*lastp, 
+	  						reslist.synchronized {
+	  							Learner.scoreSummary(reslist, lasti, reslist.length)
+	  						},
+	  						gf._1,
+	  						gf._2, 
+	  						bytes*1e-9,
+	  						bytes/gf._2*1e-6))  
+	  						if (models(0).useGPU) {
+	  							for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
+	  								setGPU(i)
+	  								if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
+	  							}
+	  							setGPU(0)
+	  						}
+	  				println
+	  			}
+	  			lasti = reslist.length
+	  		} else {
+	  		  Thread.sleep(1)
+	  		}
 	  	}
 	  	ipass += 1
 	  	lastp = 0f
+	  	lasti = 0
 	  }
 	  val gf = gflop
 	  Mat.useCache = cacheState
@@ -276,6 +282,14 @@ case class ParLearner(
     models(ithread).init(datasources(ithread))
     models(ithread).modelmats(0) <-- mm
     updaters(ithread).init(models(ithread))      
+  }
+  
+  def dsProgress:Float = {
+    var sum = 0f
+    for (i <- 0 until datasources.length) {
+      sum += datasources(i).progress
+    }
+    sum / datasources.length
   }
 }
 
