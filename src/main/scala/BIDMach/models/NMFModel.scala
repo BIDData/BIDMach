@@ -144,8 +144,7 @@ object NMFModel  {
     class xopts extends ParLearner.Options with NMFModel.Opts with MatDataSource.Opts with IncNormUpdater.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
-    opts.uiter = 5
+    opts.npasses = 4
     opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerxF(
@@ -165,6 +164,7 @@ object NMFModel  {
   	class xopts extends ParLearner.Options with NMFModel.Opts with SFilesDataSource.Opts with IncNormUpdater.Opts
   	val opts = new xopts
   	opts.dim = d
+  	opts.npasses = 4
   	val nn = new ParLearnerF(
   	    null,
   			(dopts:DataSource.Opts, i:Int) => SFilesDataSource.twitterWords(nstart, nend, opts.nthreads, i),

@@ -144,6 +144,7 @@ object LDAModel  {
   	class xopts extends ParLearner.Options with LDAModel.Opts with SFilesDataSource.Opts with IncNormUpdater.Opts
   	val opts = new xopts
   	opts.dim = d
+  	opts.npasses = 4
   	val nn = new ParLearnerF(
   	    null,
   			(dopts:DataSource.Opts, i:Int) => SFilesDataSource.twitterWords(nstart, nend, opts.nthreads, i),
@@ -163,6 +164,7 @@ object LDAModel  {
   	class xopts extends ParLearner.Options with LDAModel.Opts with SFilesDataSource.Opts with IncNormUpdater.Opts
   	val opts = new xopts
   	opts.dim = d
+  	opts.npasses = 4
   	val nn = new ParLearnerxF(
   	    SFilesDataSource.twitterWords(nstart, nend),
   	    opts, mkLDAmodel _, 
