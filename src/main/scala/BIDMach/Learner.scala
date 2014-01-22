@@ -588,7 +588,7 @@ object ParLearner {
 	  		um <-- models(i).modelmats(j)
 	  		mm ~ mm + um
 	  	}
-	  	mm ~ mm *@ (1f/models.length)
+	  	mm ~ mm * (1f/models.length)
 	  	for (i <- 0 until models.length) {
 	  		models(i).modelmats(j) <-- mm
 	  	}
