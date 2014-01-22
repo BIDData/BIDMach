@@ -144,6 +144,7 @@ object NMFModel  {
     opts.dim = d
     opts.putBack = 1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerxF(
   	    new MatDataSource(Array(mat0:Mat), opts), 
   	    opts, mkNMFmodel _,
