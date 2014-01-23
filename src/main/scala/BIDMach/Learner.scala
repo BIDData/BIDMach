@@ -9,7 +9,7 @@ import BIDMach.updaters._
 import BIDMach.datasources._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
-import scala.actors.Actor
+import scala.concurrent.ops._
 
 case class Learner(
     val datasource:DataSource, 
@@ -171,7 +171,7 @@ case class ParLearner(
 	  var lasti = 0
 	  done.clear
 	  for (ithread <- 0 until opts.nthreads) {
-	  	Actor.actor {
+	  	spawn {
 	  		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
 	  		var here = 0L
 	  		updaters(ithread).clear
@@ -261,14 +261,15 @@ case class ParLearner(
 	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
-  // Doesnt work for multiple model matrices
   def syncmodel(models:Array[Model], ithread:Int) = {
 	  mm.synchronized {
-	  	um(0) <-- models(ithread).modelmats(0)
-	  	um(0) ~ um(0) *@ (1f/opts.nthreads)
-	  	mm(0) ~ mm(0) *@ (1 - 1f/opts.nthreads)
-	  	mm(0) ~ mm(0) + um(0)
-	  	models(ithread).modelmats(0) <-- mm(0)
+	    for (i <- 0 until models(ithread).modelmats.length) {
+	    	um(i) <-- models(ithread).modelmats(i)
+	    	um(i) ~ um(i) *@ (1f/opts.nthreads)
+	    	mm(i) ~ mm(i) *@ (1 - 1f/opts.nthreads)
+	    	mm(i) ~ mm(i) + um(i)
+	    	models(ithread).modelmats(i) <-- mm(i)
+	    }
 	  }
   }
   
@@ -278,7 +279,9 @@ case class ParLearner(
       Mat.trimCache2(ithread)
     }
     models(ithread).init(datasources(ithread))
-    models(ithread).modelmats(0) <-- mm(0)
+    for (i <- 0 until models(ithread).modelmats.length) {
+    	models(ithread).modelmats(i) <-- mm(i)
+    }
     updaters(ithread).init(models(ithread))      
   }
   
@@ -420,7 +423,7 @@ case class ParLearnerx(
         		feats += mats(0).nnz
         		bytes += 12L*mats(0).nnz
         		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
-        		Actor.actor {
+        		spawn {
         			if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
         			try {
         				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
