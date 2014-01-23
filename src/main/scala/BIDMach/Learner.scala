@@ -396,7 +396,7 @@ case class ParLearnerx(
 	      if (i != thisGPU) connect(i)
 	    }
 	  }    
-    val done = iones(opts.nthreads, 1)
+    @volatile var done = iones(opts.nthreads, 1)
     var ipass = 0
     var here = 0L
     var feats = 0L
@@ -448,11 +448,13 @@ case class ParLearnerx(
     		for (ithread <- 0 until opts.nthreads) {
     			if (datasource.hasNext) {
     				val mats = datasource.next
+    				for (j <- 0 until mats.length) {
+    				  cmats(ithread)(j) = safeCopy(mats(j), ithread) 
+    				}
     				here += datasource.opts.blockSize
     				feats += mats(0).nnz
+    				done(ithread) = 0;
     				bytes += 12L*mats(0).nnz
-    				for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread) 
-    				done(ithread) = 0
     			} 
     		}
       	while (mini(done).v == 0) Thread.sleep(1)
