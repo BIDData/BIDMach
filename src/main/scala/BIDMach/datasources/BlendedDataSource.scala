@@ -2,7 +2,6 @@ package BIDMach.datasources
 import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.actors._
 import java.io._
 
 class BlendedDataSource(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1:Float, var samp2:Float,

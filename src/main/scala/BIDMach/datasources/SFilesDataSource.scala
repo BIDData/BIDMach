@@ -2,7 +2,7 @@ package BIDMach.datasources
 import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.actors._
+import scala.concurrent.ops._
 import java.io._
 
 
@@ -288,7 +288,7 @@ object SFilesDataSource {
     var stop = izeros(1,1)
     tic
     for (i <- 0 until nthreads) { 
-      scala.actors.Actor.actor { 
+      spawn { 
         val ss = ff(nstart0, nend0, nthreads, i, nfeats)
         ss.init
         while (ss.hasNext && stop.v != 1) { 

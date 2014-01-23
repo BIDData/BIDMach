@@ -2,7 +2,6 @@ package BIDMach
 import BIDMat.{Mat,BMat,CMat,CSMat,Dict,DMat,FMat,IDict,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.actors._
 import java.io._
 import BIDMach.datasources._
 import BIDMach.models._
