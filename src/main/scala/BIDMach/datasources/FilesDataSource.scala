@@ -60,7 +60,7 @@ class FilesDataSource(override val opts:FilesDataSource.Opts = new FilesDataSour
       matqueue(i) = new Array[Mat](fnames.size)
     }
     for (i <- 0 until opts.lookahead) {
-      spawn {
+      future {
         prefetch(nstart + i)
       }
     }

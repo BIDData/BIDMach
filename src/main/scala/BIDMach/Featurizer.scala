@@ -177,7 +177,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     println("Building daily IDicts")
     val done = izeros(nthreads,1)
     for (ithread <- 0 until nthreads) {
-      spawn {
+      future {
         if (Mat.hasCUDA > 0) setGPU(ithread+Mat.hasCUDA-nthreads)
       	val bigramsx = IMat(opts.guessSize, 3)                                 // Temp storage for grams
       	val trigramsx = IMat(opts.guessSize, 4)
@@ -264,7 +264,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
     val nthreads = math.min(opts.nthreads, math.max(1, Mat.hasCUDA))
     val done = izeros(nthreads,1)
     for (ithread <- 0 until nthreads) {
-      spawn {
+      future {
         if (Mat.hasCUDA > 0) setGPU(ithread+Mat.hasCUDA-nthreads)
         val unigramsx = IMat(opts.guessSize, 2)
       	val bigramsx = IMat(opts.guessSize, 3)

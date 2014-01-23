@@ -288,7 +288,7 @@ object SFilesDataSource {
     var stop = izeros(1,1)
     tic
     for (i <- 0 until nthreads) { 
-      spawn { 
+      future { 
         val ss = ff(nstart0, nend0, nthreads, i, nfeats)
         ss.init
         while (ss.hasNext && stop.v != 1) { 

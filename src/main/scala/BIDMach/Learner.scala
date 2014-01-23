@@ -171,7 +171,7 @@ case class ParLearner(
 	  var lasti = 0
 	  done.clear
 	  for (ithread <- 0 until opts.nthreads) {
-	  	spawn {
+	  	future {
 	  		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
 	  		var here = 0L
 	  		updaters(ithread).clear
@@ -409,43 +409,52 @@ case class ParLearnerx(
     	updaters(i).clear
     }
     setGPU(thisGPU)
+    var istep = 0
+    var lastp = 0f
+    var running = true
+
+    for (ithread <- 0 until opts.nthreads) {
+    	future {
+    		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
+    		while (running) {
+    			while (done(ithread) == 1) Thread.sleep(1)
+    			try {
+    				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
+    					val scores = models(ithread).evalblockg(cmats(ithread), ipass)
+    					reslist.synchronized { reslist.append(scores(0)) }
+    					samplist.synchronized { samplist.append(here) }
+    				} else {
+    					models(ithread).doblockg(cmats(ithread), ipass, here)
+    					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+    					updaters(ithread).update(ipass, here)
+    				}
+    			} catch {
+    			case e:Exception => {
+    				print("Caught exception in thread %d %s\nTrying restart..." format (ithread, e.toString))
+    				restart(ithread)
+    				println("Keep on truckin...")
+    			}
+    			} 
+    			done(ithread) = 1 
+    		}  
+    	}
+    }
     while (ipass < opts.npasses) {
     	datasource.reset
-      var istep = 0
-      var lastp = 0f
+      istep = 0
+      lastp = 0f
       println("pass=%2d" format ipass)
-      while (datasource.hasNext) {
-        for (ithread <- 0 until opts.nthreads) {
-        	if (datasource.hasNext) {
-        	  done(ithread) = 0
-        		val mats = datasource.next
-        		here += datasource.opts.blockSize
-        		feats += mats(0).nnz
-        		bytes += 12L*mats(0).nnz
-        		for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread)
-        		spawn {
-        			if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
-        			try {
-        				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
-        					val scores = models(ithread).evalblockg(cmats(ithread), ipass)
-        					reslist.synchronized { reslist.append(scores(0)) }
-        					samplist.synchronized { samplist.append(here) }
-        				} else {
-        					models(ithread).doblockg(cmats(ithread), ipass, here)
-        					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
-        					updaters(ithread).update(ipass, here)
-        				}
-        			} catch {
-        			  case e:Exception => {
-        			    print("Caught exception in thread %d %s\nTrying restart..." format (ithread, e.toString))
-        			    restart(ithread)
-        			    println("Keep on truckin...")
-        			  }
-        			} 
-        			done(ithread) = 1 
-        		}  
-        	}
-        }
+    	while (datasource.hasNext) {
+    		for (ithread <- 0 until opts.nthreads) {
+    			if (datasource.hasNext) {
+    				val mats = datasource.next
+    				here += datasource.opts.blockSize
+    				feats += mats(0).nnz
+    				bytes += 12L*mats(0).nnz
+    				for (j <- 0 until mats.length) cmats(ithread)(j) = safeCopy(mats(j), ithread) 
+    				done(ithread) = 0
+    			} 
+    		}
       	while (mini(done).v == 0) Thread.sleep(1)
       	Thread.sleep(opts.coolit)
       	istep += opts.nthreads
@@ -481,6 +490,7 @@ case class ParLearnerx(
       ipass += 1
       saveAs("/big/twitter/test/results.mat", Learner.scores2FMat(reslist) on row(samplist.toList), "results")
     }
+    running = false
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*here, bytes/gf._2/1e6))
