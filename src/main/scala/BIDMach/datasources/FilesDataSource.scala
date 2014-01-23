@@ -2,7 +2,7 @@ package BIDMach.datasources
 import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.actors._
+import scala.concurrent.ops._
 import java.io._
 
 class FilesDataSource(override val opts:FilesDataSource.Opts = new FilesDataSource.Options) extends DataSource(opts) { 
@@ -60,7 +60,7 @@ class FilesDataSource(override val opts:FilesDataSource.Opts = new FilesDataSour
       matqueue(i) = new Array[Mat](fnames.size)
     }
     for (i <- 0 until opts.lookahead) {
-      Actor.actor {
+      spawn {
         prefetch(nstart + i)
       }
     }

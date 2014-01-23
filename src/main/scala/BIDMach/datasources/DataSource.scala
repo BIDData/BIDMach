@@ -2,7 +2,6 @@ package BIDMach.datasources
 import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.actors._
 import java.io._
 
 abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) {   
