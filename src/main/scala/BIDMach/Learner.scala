@@ -9,7 +9,8 @@ import BIDMach.updaters._
 import BIDMach.datasources._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.ops._
+import scala.concurrent.future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 case class Learner(
     val datasource:DataSource, 

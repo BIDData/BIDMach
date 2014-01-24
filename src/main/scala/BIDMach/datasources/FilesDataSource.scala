@@ -2,7 +2,8 @@ package BIDMach.datasources
 import BIDMat.{Mat,BMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.concurrent.ops._
+import scala.concurrent.future
+import scala.concurrent.ExecutionContext.Implicits.global
 import java.io._
 
 class FilesDataSource(override val opts:FilesDataSource.Opts = new FilesDataSource.Options) extends DataSource(opts) { 
