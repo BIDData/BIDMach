@@ -253,6 +253,9 @@ case class ParLearner(
 	  	  for (i <- 0 until opts.nthreads) datasources(i).reset
 	  	  println("pass=%2d" format ipass+1) 
 	  	}
+	  	if (opts.resFile != null) {
+      	saveAs(opts.resFile, Learner.scores2FMat(reslist) on row(samplist.toList), "results")
+      }
 	  	ipass += 1
 	  }
 	  val gf = gflop
@@ -490,7 +493,9 @@ case class ParLearnerx(
       }
       setGPU(thisGPU)
       ipass += 1
-      saveAs("/big/twitter/test/results.mat", Learner.scores2FMat(reslist) on row(samplist.toList), "results")
+      if (opts.resFile != null) {
+      	saveAs(opts.resFile, Learner.scores2FMat(reslist) on row(samplist.toList), "results")
+      }
     }
     running = false
     val gf = gflop
@@ -566,6 +571,7 @@ object Learner {
   	var npasses = 10 
   	var evalStep = 11
   	var pstep = 0.01f
+  	var resFile:String = null
   }
   
   def setupPB(ds:DataSource, npb:Int, dim:Int) = {
