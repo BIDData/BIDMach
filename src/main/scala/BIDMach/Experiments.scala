@@ -191,13 +191,13 @@ object Twitter {
 	}
 	
 	def logisticModelPar(
-	    nstart0:Int = FilesDataSource.encodeDate(2012,3,1,0),
-			nend0:Int = FilesDataSource.encodeDate(2013,7,1,0),
+	    nstart0:Int = FilesDS.encodeDate(2012,3,1,0),
+			nend0:Int = FilesDS.encodeDate(2013,7,1,0),
 			nuni0:Int = 50,
 			nbi0:Int = 100,
 			ntri0:Int = 200		
 			) = {
-	  val ds = SFilesDataSource.twitterNgramBlend(nstart0, nend0)
+	  val ds = SFilesDS.twitterNgramBlend(nstart0, nend0)
 //	  val ds = SFilesDataSource.twitterWords(nstart0, nend0)
 	  ds.opts.addConstFeat = true
 	  ds.opts.featType = 0
@@ -215,17 +215,17 @@ object Twitter {
 	  val expts1 = ones(avalues.length*ntargets, 1) ⊗ exptsv ⊗ ones(exptst.length, 1)
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
 	  val alphas = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
-	  val aopts = new ADAGradUpdater.Options
+	  val aopts = new ADAGrad.Options
 	  aopts.vexp = expts1
 	  aopts.texp = expts2
 	  aopts.alpha = alphas
 	  aopts.mask = mask
-	  val gopts = new GLMModel.Options
+	  val gopts = new GLM.Options
 	  gopts.links = iones(expts1.length, 1)
 	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	new ParLearnerxF(ds, gopts, GLMModel.mkGLMModel _, null, null, aopts, GLMModel.mkUpdater _)	  
+  	new ParLearnerxF(ds, gopts, GLM.mkGLMModel _, null, null, aopts, GLM.mkUpdater _)	  
 	}
 	
 	def logisticModel(
@@ -238,7 +238,7 @@ object Twitter {
 			nbi0:Int = 100,
 			ntri0:Int = 200		
 			) = { 
-	  val ds = new MatDataSource(Array(mat:Mat))
+	  val ds = new MatDS(Array(mat:Mat))
 	  val gd = getGramDict(nuni0, nbi0, ntri0)
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length + 1
@@ -249,17 +249,17 @@ object Twitter {
 	  val expts1 = ones(avalues.length*ntargets, 1) ⊗ exptsv ⊗ ones(exptst.length, 1)
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
 	  val alphas = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
-	  val aopts = new ADAGradUpdater.Options
+	  val aopts = new ADAGrad.Options
 	  aopts.vexp = expts1
 	  aopts.texp = expts2
 	  aopts.alpha = alphas
 	  aopts.mask = mask
-	  val gopts = new GLMModel.Options
+	  val gopts = new GLM.Options
 	  gopts.links = iones(expts1.length, 1)
 	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	Learner(ds, new GLMModel(gopts), null, new ADAGradUpdater(aopts))	  
+  	Learner(ds, new GLM(gopts), null, new ADAGrad(aopts))	  
 	}
 	
 

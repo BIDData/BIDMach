@@ -577,7 +577,7 @@ object Learner {
   
   def setupPB(ds:DataSource, npb:Int, dim:Int) = {
     ds match {
-    case ddm:MatDataSource => {
+    case ddm:MatDS => {
     	if (npb >= 0) {
     		ddm.setupPutBack(npb, dim)
     	}
