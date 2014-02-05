@@ -17,7 +17,8 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = size(data0, 1)
-    val d = opts.targmap.nrows
+    val targetData = mats.length > 1
+    val d = if (targetData) mats(1).nrows else opts.targmap.nrows
     val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
     val sp = sdat / sum(sdat)
     println("initial perplexity=%f" format (sp ddot ln(sp)) )
@@ -31,21 +32,31 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     modelmats(0) = if (useGPU) GMat(mm) else mm 
     updatemats = new Array[Mat](1)
     updatemats(0) = modelmats(0).zeros(mm.nrows, mm.ncols)
-    targets = if (useGPU) GMat(opts.targets) else opts.targets
-    targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
-    mask = if (useGPU) GMat(opts.rmask) else opts.rmask
+    if (! targetData) {
+      targets = if (useGPU) GMat(opts.targets) else opts.targets
+      targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
+      mask = if (useGPU) GMat(opts.rmask) else opts.rmask
+    }
   } 
   
   def mupdate(data:Mat):FMat
   
+  def mupdate2(data:Mat, targ:Mat):FMat
+  
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
-    val sdata = gmats(0)
-    mupdate(sdata)
+    if (gmats.length == 1) {
+      mupdate(gmats(0))
+    } else {
+      mupdate2(gmats(0), gmats(1))
+    }
   }
   
   def evalblock(mats:Array[Mat], ipass:Int):FMat = {
-    val sdata = gmats(0)
-    mupdate(sdata)
+    if (gmats.length == 1) {
+      mupdate(gmats(0))
+    } else {
+      mupdate2(gmats(0), gmats(1))
+    }
   }
 }
 
