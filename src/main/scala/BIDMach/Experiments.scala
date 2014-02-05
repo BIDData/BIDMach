@@ -225,7 +225,7 @@ object Twitter {
 	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	new ParLearnerxF(ds, gopts, GLM.mkGLMModel _, null, null, aopts, GLM.mkUpdater _)	  
+  	new ParLearnerF(ds, gopts, GLM.mkGLMModel _, null, null, aopts, GLM.mkUpdater _)	  
 	}
 	
 	def logisticModel(

@@ -7,6 +7,39 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
 
+/**
+ * Non-negative Matrix Factorization (NMF) with L2 loss
+ * 
+ * '''Parameters'''
+ - dim(256): Model dimension
+ - uiter(5): Number of iterations on one block of data
+ - uprior: Prior on the user (data) factor
+ - mprior: Prior on the model
+ - NMFeps(1e-9):  A safety floor constant
+ *
+ * Other key parameters inherited from the learner, datasource and updater:
+ - blockSize: the number of samples processed in a block
+ - power(0.3f): the exponent of the moving average model' = a dmodel + (1-a)*model, a = 1/nblocks^power
+ - npasses(10): number of complete passes over the dataset
+ *
+ * '''Example:'''
+ * 
+ * a is a sparse word x document matrix
+ * {{{
+ * val (nn, opts) = NMF.learn(a)
+ * opts.what             // prints the available options
+ * opts.uiter=2          // customize options
+ * nn.run                // run the learner
+ * nn.modelmat           // get the final model
+ * nn.datamat            // get the other factor (requires opts.putBack=1)
+ * 
+ * val (nn, opts) = NMF.learnPar(a) // Build a parallel learner
+ * opts.nthreads=2       // number of threads (defaults to number of GPUs)
+ * nn.run                // run the learner
+ * nn.modelmat           // get the final model
+ * nn.datamat            // get the other factor
+ * }}}
+ */
 class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   
   var mm:Mat = null
@@ -32,7 +65,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   
   override def uupdate(sdata:Mat, user:Mat, ipass:Int) = {
 	if (opts.putBack < 0 || ipass == 0) user.set(1f)
-	  val modeldata = mm * sdata
+	val modeldata = mm * sdata
   	val mmu = mm *^ mm + udiag
     for (i <- 0 until opts.uiter) {
     	val quot =  modeldata / (mmu * user)               
@@ -140,14 +173,14 @@ object NMF  {
     (nn, opts)
   }
   
-  def learnParx(mat0:Mat, d:Int = 256) = {
+  def learnPar(mat0:Mat, d:Int = 256) = {
     class xopts extends ParLearner.Options with NMF.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.npasses = 4
     opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
-  	val nn = new ParLearnerxF(
+  	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    opts, mkNMFmodel _, 
   			null, null, 
@@ -156,7 +189,7 @@ object NMF  {
     (nn, opts)
   }
   
-  def learnFPar(
+  def learnFParx(
     nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
 		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
 		d:Int = 256
@@ -166,7 +199,7 @@ object NMF  {
   	opts.dim = d
   	opts.npasses = 4
   	opts.resFile = "/big/twitter/test/results.mat"
-  	val nn = new ParLearnerF(
+  	val nn = new ParLearnerxF(
   	    null, 
   			(dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i), 
   			opts, mkNMFmodel _, 
@@ -177,7 +210,7 @@ object NMF  {
   	(nn, opts)
   }
   
-  def learnFParx(
+  def learnFPar(
     nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
 		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
 		d:Int = 256
@@ -187,7 +220,7 @@ object NMF  {
   	opts.dim = d
   	opts.npasses = 4
   	opts.resFile = "/big/twitter/test/results.mat"
-  	val nn = new ParLearnerxF(
+  	val nn = new ParLearnerF(
   	    SFilesDS.twitterWords(nstart, nend), 
   	    opts, mkNMFmodel _, 
   	    null, null, 
