@@ -215,13 +215,13 @@ object GLM {
     (nn, opts)
   }
   
-  def learnParx(mat0:Mat, d:Int = 256) = {
+  def learnPar(mat0:Mat, d:Int = 256) = {
     class xopts extends ParLearner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
-  	val nn = new ParLearnerxF(
+  	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    opts, mkGLMModel _,
   			null, null,
@@ -230,7 +230,7 @@ object GLM {
     (nn, opts)
   }
   
-  def learnFPar(
+  def learnFParx(
     nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
 		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
 		d:Int = 256
@@ -238,7 +238,7 @@ object GLM {
   	class xopts extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with ADAGrad.Opts
   	val opts = new xopts
   	opts.dim = d
-  	val nn = new ParLearnerF(
+  	val nn = new ParLearnerxF(
   	    null,
   			(dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i),
   			opts, mkGLMModel _,
@@ -249,7 +249,7 @@ object GLM {
   	(nn, opts)
   }
   
-  def learnFParx(
+  def learnFPar(
     nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
 		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
 		d:Int = 256
@@ -257,7 +257,7 @@ object GLM {
   	class xopts extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with IncNorm.Opts
   	val opts = new xopts
   	opts.dim = d
-  	val nn = new ParLearnerxF(
+  	val nn = new ParLearnerF(
   	    SFilesDS.twitterWords(nstart, nend),
   	    opts, mkGLMModel _, 
   	    null, null,

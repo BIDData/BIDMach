@@ -10,29 +10,44 @@ import BIDMach.updaters._
 import BIDMach._
 
 /**
- * Latent Dirichlet Model using repeated sampling. 
+ * Latent Dirichlet Model using repeated Gibbs sampling. 
  * 
  * Extends Factor Model Options with:
+ - dim(256): Model dimension
+ - uiter(5): Number of iterations on one block of data
  - alpha(0.001f) Dirichlet prior on document-topic weights
  - beta(0.0001f) Dirichlet prior on word-topic weights
  - nsamps(100) the number of repeated samples to take
+ *
+ * Other key parameters inherited from the learner, datasource and updater:
+ - blockSize: the number of samples processed in a block
+ - power(0.3f): the exponent of the moving average model' = a dmodel + (1-a)*model, a = 1/nblocks^power
+ - npasses(10): number of complete passes over the dataset
  *     
  * '''Example:'''
  * 
  * a is a sparse word x document matrix
  * {{{
- * val (nn, opts) = LDA.learn(a)
- * opts.what
- * opts.uiter=2
- * nn.run
+ * val (nn, opts) = LDAgibbs.learn(a)
+ * opts.what             // prints the available options
+ * opts.uiter=2          // customize options
+ * nn.run                // run the learner
+ * nn.modelmat           // get the final model
+ * nn.datamat            // get the other factor (requires opts.putBack=1)
+ *  
+ * val (nn, opts) = LDAgibbs.learnPar(a) // Build a parallel learner
+ * opts.nthreads = 2     // number of threads (defaults to number of GPUs)
+ * nn.run                // run the learner
+ * nn.modelmat           // get the final model
+ * nn.datamat            // get the other factor
  * }}}
+ * 
  */
 
 class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends FactorModel(opts) {
  
   var mm:Mat = null
-  var alpha:Mat = null
-  
+  var alpha:Mat = null 
   var traceMem = false
   
   override def init(datasource:DataSource) = {
@@ -44,11 +59,8 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
     updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     updatemats(1) = mm.zeros(mm.nrows, 1)
-    
-
   }
   
-  // use case match to handle GMat and etc.
   def uupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
     
     	if (opts.putBack < 0 || ipass == 0) user.set(1f)
@@ -61,9 +73,8 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
     	
     	val unew = user*0
     	val mnew = updatemats(0)
-    	//mnew.set(0f)
+    	mnew.set(0f)
   
-    	//CUMAT.LDAgibbs(opts.dim, sdata.asInstanceOf[GSMat].nnz, mm.asInstanceOf[GMat].data, user.asInstanceOf[GMat].data, updatemats(0).asInstanceOf[GMat].data, unew.asInstanceOf[GMat].data, sdata.asInstanceOf[GSMat].ir, sdata.asInstanceOf[GSMat].ic, pc.asInstanceOf[GMat].data, opts.nsamps)
     	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, opts.nsamps)
         
     	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
@@ -118,11 +129,12 @@ object LDAgibbs  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
   
-  
+  /*
+   * This learner uses stochastic updates (like the standard LDA model)
+   */
   def learn(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with LDAgibbs.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
-    opts.uiter = 2
     opts.dim = d
     opts.putBack = 1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
@@ -131,6 +143,92 @@ object LDAgibbs  {
   			new LDAgibbs(opts), 
   			null,
   			new IncNorm(opts), opts)
+    (nn, opts)
+  }
+  
+  /*
+   * Batch learner
+   */
+  def learnBatch(mat0:Mat, d:Int = 256) = {
+    class xopts extends Learner.Options with LDAgibbs.Opts with MatDS.Opts with BatchNorm.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = 1
+    opts.uiter = 2
+    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    val nn = new Learner(
+        new MatDS(Array(mat0:Mat), opts), 
+        new LDAgibbs(opts), 
+        null, 
+        new BatchNorm(opts),
+        opts)
+    (nn, opts)
+  }
+  
+  /*
+   * Parallel learner with matrix source
+   */ 
+  def learnPar(mat0:Mat, d:Int = 256) = {
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with MatDS.Opts with IncNorm.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = -1
+    opts.uiter = 5
+    opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
+    opts.coolit = 0 // Assume we dont need cooling on a matrix input
+    val nn = new ParLearnerF(
+        new MatDS(Array(mat0:Mat), opts), 
+        opts, mkGibbsLDAmodel _, 
+            null, null, 
+            opts, mkUpdater _,
+            opts)
+    (nn, opts)
+  }
+  
+  /*
+   * Parallel learner with multiple file datasources
+   */
+  def learnFParx(
+      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+      d:Int = 256
+      ) = {
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesDS.Opts with IncNorm.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.npasses = 4
+    opts.resFile = "/big/twitter/test/results.mat"
+    val nn = new ParLearnerxF(
+        null, 
+            (dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i), 
+            opts, mkGibbsLDAmodel _, 
+            null, null, 
+        opts, mkUpdater _,
+        opts
+    )
+    (nn, opts)
+  }
+  
+  /* 
+   * Parallel learner with single file datasource
+   */ 
+  def learnFPar(
+      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+      d:Int = 256
+      ) = {   
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesDS.Opts with IncNorm.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.npasses = 4
+    opts.resFile = "/big/twitter/test/results.mat"
+    val nn = new ParLearnerF(
+        SFilesDS.twitterWords(nstart, nend), 
+        opts, mkGibbsLDAmodel _, 
+        null, null, 
+        opts, mkUpdater _,
+        opts
+    )
     (nn, opts)
   }
   
