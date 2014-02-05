@@ -20,7 +20,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   override def init(datasource:DataSource) = {
     super.init(datasource)
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
-    modelmats(0) ~ modelmats(0) ∘ mask
+    if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask
     totflops = 0L
     for (i <- 0 until opts.links.length) {
       totflops += linkArray(opts.links(i)).fnflops
