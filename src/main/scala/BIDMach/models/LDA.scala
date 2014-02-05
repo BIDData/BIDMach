@@ -8,7 +8,7 @@ import BIDMach.updaters._
 import BIDMach._
 
 /**
- * LDA model using online updates (Hoffman, Blei and Bach, 2010)
+ * LDA model using online Variational Bayes (Hoffman, Blei and Bach, 2010)
  * 
  * '''Parameters'''
  - dim(256): Model dimension
@@ -45,8 +45,7 @@ import BIDMach._
 class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts) {
 
   var mm:Mat = null
-  var alpha:Mat = null
-  
+  var alpha:Mat = null 
   var traceMem = false
   
   override def init(datasource:DataSource) = {
@@ -62,19 +61,18 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     if (opts.putBack < 0 || ipass == 0) user.set(1f)
-	  for (i <- 0 until opts.uiter) {
-	  	val preds = DDS(mm, user, sdata)	
-	  	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
-	  	val dc = sdata.contents
-	  	val pc = preds.contents
-	  	max(opts.weps, pc, pc)
-	  	pc ~ dc / pc
-	  	val unew = user ∘ (mm * preds) + opts.alpha
-	  	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
-	  	if (opts.exppsi) exppsi(unew, unew)
-	  	user <-- unew   
-	  }	
-//    println("user %g %g" format (mini(mini(user,1),2).dv, maxi(maxi(user,1),2).dv))
+    for (i <- 0 until opts.uiter) {
+      val preds = DDS(mm, user, sdata)	
+      if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
+      val dc = sdata.contents
+      val pc = preds.contents
+      max(opts.weps, pc, pc)
+      pc ~ dc / pc
+      val unew = user ∘ (mm * preds) + opts.alpha
+      if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
+      if (opts.exppsi) exppsi(unew, unew)
+      user <-- unew   
+    }	
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
@@ -124,8 +122,8 @@ object LDA  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
    
-  /*
-   * Online LDA algorithm
+  /**
+   * Online Variational Bayes LDA algorithm
    */
   def learn(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
@@ -136,12 +134,15 @@ object LDA  {
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
-  			new LDA(opts), 
-  			null,
-  			new IncNorm(opts), opts)
+  	    new LDA(opts), 
+  	    null,
+  	    new IncNorm(opts), opts)
     (nn, opts)
   }
      
+  /**
+   * Batch Variational Bayes LDA algorithm
+   */
   def learnBatch(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with BatchNorm.Opts
     val opts = new xopts
@@ -158,6 +159,9 @@ object LDA  {
     (nn, opts)
   }
   
+  /**
+   * Parallel online LDA algorithm
+   */ 
   def learnPar(mat0:Mat, d:Int = 256) = {
     class xopts extends ParLearner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
@@ -169,17 +173,20 @@ object LDA  {
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    opts, mkLDAmodel _, 
-  			null, null, 
-  			opts, mkUpdater _,
-  			opts)
+  	    null, null, 
+  	    opts, mkUpdater _,
+  	    opts)
     (nn, opts)
   }
   
+  /**
+   * Parallel online LDA algorithm with multiple file datasources
+   */ 
   def learnFParx(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-		d:Int = 256
-		) = {
+      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+      d:Int = 256
+      ) = {
   	class xopts extends ParLearner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
   	val opts = new xopts
   	opts.dim = d
@@ -187,20 +194,23 @@ object LDA  {
   	opts.resFile = "/big/twitter/test/results.mat"
   	val nn = new ParLearnerxF(
   	    null, 
-  			(dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i), 
-  			opts, mkLDAmodel _, 
-  			null, null, 
+  	    (dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i), 
+  	    opts, mkLDAmodel _, 
+  	    null, null, 
   	    opts, mkUpdater _,
   	    opts
   	)
-  	(nn, opts)
+  	(nn, opts) 
   }
   
+  /**
+   * Parallel online LDA algorithm with one file datasource
+   */
   def learnFPar(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-		d:Int = 256
-		) = {	
+      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+      d:Int = 256
+      ) = {	
   	class xopts extends ParLearner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
   	val opts = new xopts
   	opts.dim = d

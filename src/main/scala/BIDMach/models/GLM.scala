@@ -28,17 +28,18 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
     
   def mupdate(in:Mat):FMat = {
-//    println("model %f" format (mean(mean(modelmats(0)))).dv)
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = targmap * targs
+    mupdate2(in, alltargs)
+  }
+  
+  def mupdate2(in:Mat, targ:Mat):FMat = {
     val eta = modelmats(0) * in
     applymeans(eta, mylinks, eta)
-//    println("pred %f" format (mean(mean(pred))).dv)
-//    println("%s %s %s %s %s" format (modelmats(0).mytype, updatemats(0).mytype, alltargs.mytype, pred.mytype, in.mytype))
-    val lls = llfun(eta, alltargs, mylinks)
-    alltargs ~ alltargs - eta
-    updatemats(0) ~ alltargs *^ in
+    val lls = llfun(eta, targ, mylinks)
+    eta ~ targ - eta
+    updatemats(0) ~ eta *^ in
     lls
   }
   
@@ -187,16 +188,31 @@ object GLM {
   	new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
   } 
      
-  def learn(mat0:Mat, d:Int = 256) = {
+  def learn(mat0:Mat, d:Int = 0) = {
     class xopts extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
-    opts.putBack = 1
+    opts.putBack = -1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
-  			new GLM(opts), 
-  			null,
-  			new ADAGrad(opts), opts)
+  	    new GLM(opts), 
+  	    null,
+  	    new ADAGrad(opts), opts)
+    (nn, opts)
+  }
+  
+  def learn2(mat0:Mat, targ:Mat, d:Int = 0) = {
+    class xopts extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts
+    val opts = new xopts
+    opts.putBack = -1
+    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.links = izeros(targ.nrows,1)
+    opts.links.set(d)
+    val nn = new Learner(
+        new MatDS(Array(mat0, targ), opts), 
+        new GLM(opts), 
+        null,
+        new ADAGrad(opts), opts)
     (nn, opts)
   }
      
@@ -204,7 +220,7 @@ object GLM {
     class xopts extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
+    opts.putBack = -1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
@@ -224,9 +240,9 @@ object GLM {
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    opts, mkGLMModel _,
-  			null, null,
-  			opts, mkUpdater _, 
-  			opts)
+  	    null, null,
+  	    opts, mkUpdater _, 
+  	    opts)
     (nn, opts)
   }
   
@@ -240,9 +256,9 @@ object GLM {
   	opts.dim = d
   	val nn = new ParLearnerxF(
   	    null,
-  			(dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i),
-  			opts, mkGLMModel _,
-  			null, null,
+  	    (dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i),
+  	    opts, mkGLMModel _,
+  	    null, null,
   	    opts, mkUpdater _,
   	    opts
   	)
