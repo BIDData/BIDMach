@@ -87,9 +87,9 @@ object RCV1 {
     val catids=loadIMat("/big/RCV1/v2/topics.catname")
     val docids=loadIMat("/big/RCV1/v2/topics.docid")
     val nd = math.max(maxi(lkup).v,maxi(docids).v)+1
-    val nc = maxi(catids).v+1
+    val nc = maxi(catids).v
     val cmat = izeros(nc,nd)
-    val indx = catids + nc*docids
+    val indx = catids - 1 + nc*docids
     cmat(indx) = 1
     val cm = FMat(cmat(?,lkup))
     saveFMat("/big/RCV1/v2/tokenized/cats.fmat.lz4", cm) 
