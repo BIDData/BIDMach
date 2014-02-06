@@ -520,6 +520,10 @@ case class ParLearner(
         val out = SMat.newOrCheckSMat(ss.nrows, ss.ncols, ss.nnz, null, m.GUID, ithread, "safeCopy".##)
         ss.copyTo(out)
       }
+      case ss:FMat => {
+        val out = FMat.newOrCheckFMat(ss.nrows, ss.ncols, null, m.GUID, ithread, "safeCopy".##)
+        ss.copyTo(out)
+      }
     }
   }
   
