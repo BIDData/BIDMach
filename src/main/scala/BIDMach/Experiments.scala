@@ -27,6 +27,14 @@ object Experiments {
       i += 1
     }
   }
+  
+  def clearbit(a:IMat) {
+    var i = 0 
+    while (i < a.length) {
+      a.data(i) = a.data(i) & 0x7fffffff
+      i += 1
+    }
+  }
 }
 
 object RCV1 {
@@ -52,14 +60,6 @@ object RCV1 {
 
   }
   
-  def clearbit(a:IMat) {
-    var i = 0 
-    while (i < a.length) {
-      a.data(i) = a.data(i) & 0x7fffffff
-      i += 1
-    }
-  }
-  
   def mksparse {
     val a = loadIMat("/big/RCV1/v2/tokenized/tokens.imat.lz4")
     val dict = Dict(loadBMat("/big/RCV1/v2/tokenized/sdict.bmat.lz4"))
@@ -71,7 +71,7 @@ object RCV1 {
     tab(ii,1) = -1
     tab(wi,1) = -1
     val lkup = a(ii+1)
-    clearbit(lkup)
+    Experiments.clearbit(lkup)
     tab(ii,0) = 1
     tab(0,0) = 0
     tab(?,0) = cumsum(tab(?,0))
