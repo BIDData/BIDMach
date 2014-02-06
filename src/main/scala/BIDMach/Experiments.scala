@@ -8,7 +8,7 @@ import BIDMach.models._
 import BIDMach.updaters._
 
 object Experiments {
-  def partition(indx:FMat, vv:FMat, mats:Array[FMat], locs:IMat, left:Int, right:Int) {
+  def partition(indx:FMat, vv:IMat, mats:Array[IMat], locs:IMat, left:Int, right:Int) {
     if (indx.nrows != vv.nrows || vv.ncols != mats(0).ncols)
       throw new RuntimeException("Partition: dimensions mismatch")
     var i = 0
