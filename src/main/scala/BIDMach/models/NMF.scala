@@ -70,7 +70,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
     for (i <- 0 until opts.uiter) {
     	val quot =  modeldata / (mmu * user)               
     	min(10.0f, max(0.1f, quot, quot), quot)
-    	user ~ user *@ quot
+    	user ~ user ∘ quot
     	max(opts.minuser, user, user)
     }
   }  

@@ -7,6 +7,27 @@ import BIDMach.datasources._
 import BIDMach.models._
 import BIDMach.updaters._
 
+object Experiments {
+  def partition(indx:FMat, vv:FMat, mats:Array[FMat], locs:IMat, left:Int, right:Int) {
+    if (indx.nrows != vv.nrows || vv.ncols != mats(0).ncols)
+      throw new RuntimeException("Partition: dimensions mismatch")
+    var i = 0
+    while (i < indx.nrows) {
+      val ind = indx.data(i).toInt
+      if (ind >= left && ind < right) {
+        val ix = ind - left
+        val m = mats(ix)
+        var j = 0
+        while (j < vv.ncols) { 
+          m.data(locs.data(ix) + j * m.nrows) = vv.data(i + j * vv.nrows)
+          j += 1
+        }
+        locs.data(j) = locs.data(j) + 1
+      }      
+      i += 1
+    }
+  }
+}
 
 object Twitter { 
   
