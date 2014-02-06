@@ -100,8 +100,7 @@ case class Learner(
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
-    (reslist,samplist)
-    //results = Learner.scores2FMat(reslist) on row(samplist.toList)
+    results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
   def datamats = datasource.asInstanceOf[MatDS].mats
@@ -605,17 +604,19 @@ object Learner {
     var i = lasti
     var sum = 0.0
     while (i < length) {
-      sum += reslist(i)(0)
+      val scoremat = reslist(i)
+      sum += mean(scoremat(?,0)).v
       i += 1
     }
     ("ll=%5.3f" format sum/(length-lasti))    
   }
   
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
-    val out = FMat(reslist(0).length, reslist.length)
+    val out = FMat(reslist(0).nrows, reslist.length)
     var i = 0
     while (i < reslist.length) {
-      out(?, i) = reslist(i).t
+      val scoremat = reslist(i)
+      out(?, i) = scoremat(?,0)
       i += 1
     }
     out
