@@ -100,7 +100,8 @@ case class Learner(
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
-    results = Learner.scores2FMat(reslist) on row(samplist.toList)
+    (reslist,samplist)
+    //results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
   def datamats = datasource.asInstanceOf[MatDS].mats

@@ -29,6 +29,73 @@ object Experiments {
   }
 }
 
+object RCV1 {
+  def preprocess {
+    val dict = CSMat(loadBMat("/big/RCV1/v2/tokenized/dict.gz"))
+    val wc = loadIMat("/big/RCV1/v2/tokenized/wcount.gz")
+    val a0 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt0.dat.gz")
+    val a1 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt1.dat.gz")
+    val a2 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt2.dat.gz")
+    val a3 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt3.dat.gz")
+    val a = (a0 on a1) on (a2 on a3)
+    val (swc, ii) = sortdown2(wc)
+    val sdict = dict(ii)
+    val bdict = BMat(sdict)
+    val n = ii.length
+    val iinv = izeros(n, 1)
+    iinv(ii) = icol(0->n)
+    val jj = find(a > 0)
+    a(jj,0) = iinv(a(jj,0)-1)
+    saveIMat("/big/RCV1/v2/tokenized/tokens.imat.lz4", a)
+    saveBMat("/big/RCV1/v2/tokenized/sdict.bmat.lz4", bdict)
+    saveIMat("/big/RCV1/v2/tokenized/swcount.imat.lz4", swc)
+
+  }
+  
+  def clearbit(a:IMat) {
+    var i = 0 
+    while (i < a.length) {
+      a.data(i) = a.data(i) & 0x7fffffff
+      i += 1
+    }
+  }
+  
+  def mksparse {
+    val a = loadIMat("/big/RCV1/v2/tokenized/tokens.imat.lz4")
+    val dict = Dict(loadBMat("/big/RCV1/v2/tokenized/sdict.bmat.lz4"))
+    val swc = loadIMat("/big/RCV1/v2/tokenized/swcount.imat.lz4")
+    val tab = izeros(a.nrows,2)
+    tab(?,1) = a
+    val ii = find(a == dict(".i"))
+    val wi = find(a == dict(".w"))
+    tab(ii,1) = -1
+    tab(wi,1) = -1
+    val lkup = a(ii+1)
+    clearbit(lkup)
+    tab(ii,0) = 1
+    tab(0,0) = 0
+    tab(?,0) = cumsum(tab(?,0))
+    val iikeep = find(tab(?,1) >= 0)
+    val ntab = tab(iikeep,?)
+    val sm = sparse(ntab(?,1), ntab(?,0), ones(ntab.nrows,1), swc.length, ii.length)
+    saveSMat("/big/RCV1/v2/tokenized/docs.smat.lz4", sm)
+    saveIMat("/big/RCV1/v2/tokenized/lkup.imat.lz4", lkup)    
+  }
+  
+  def mkcats {
+    val lkup = loadIMat("/big/RCV1/v2/tokenized/lkup.imat.lz4")
+    val catids=loadIMat("/big/RCV1/v2/topics.catname")
+    val docids=loadIMat("/big/RCV1/v2/topics.docid")
+    val nd = math.max(maxi(lkup).v,maxi(docids).v)+1
+    val nc = maxi(catids).v+1
+    val cmat = izeros(nc,nd)
+    val indx = catids + nc*docids
+    cmat(indx) = 1
+    val cm = FMat(cmat(?,lkup))
+    saveFMat("/big/RCV1/v2/tokenized/cats.fmat.lz4", cm) 
+  }
+}
+
 object Twitter { 
   
    def dodicts(threshold:Int=10, rebuild:Boolean=false):Unit = {
