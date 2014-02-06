@@ -22,7 +22,7 @@ object Experiments {
           m.data(locs.data(ix) + j * m.nrows) = vv.data(i + j * vv.nrows)
           j += 1
         }
-        locs.data(j) = locs.data(j) + 1
+        locs.data(ix) = locs.data(ix) + 1
       }      
       i += 1
     }
