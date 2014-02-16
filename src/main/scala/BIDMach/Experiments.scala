@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,BMat,CMat,CSMat,Dict,DMat,FMat,IDict,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,Dict,DMat,FMat,IDict,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
@@ -8,25 +8,6 @@ import BIDMach.models._
 import BIDMach.updaters._
 
 object Experiments {
-  def partition(indx:FMat, vv:IMat, mats:Array[IMat], locs:IMat, left:Int, right:Int) {
-    if (indx.nrows != vv.nrows || vv.ncols != mats(0).ncols)
-      throw new RuntimeException("Partition: dimensions mismatch")
-    var i = 0
-    while (i < indx.nrows) {
-      val ind = indx.data(i).toInt
-      if (ind >= left && ind < right) {
-        val ix = ind - left
-        val m = mats(ix)
-        var j = 0
-        while (j < vv.ncols) { 
-          m.data(locs.data(ix) + j * m.nrows) = vv.data(i + j * vv.nrows)
-          j += 1
-        }
-        locs.data(ix) = locs.data(ix) + 1
-      }      
-      i += 1
-    }
-  }
   
   def clearbit(a:IMat) {
     var i = 0 
@@ -39,7 +20,7 @@ object Experiments {
 
 object RCV1 {
   def preprocess {
-    val dict = CSMat(loadBMat("/big/RCV1/v2/tokenized/dict.gz"))
+    val dict = CSMat(loadSBMat("/big/RCV1/v2/tokenized/dict.gz"))
     val wc = loadIMat("/big/RCV1/v2/tokenized/wcount.gz")
     val a0 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt0.dat.gz")
     val a1 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt1.dat.gz")
@@ -48,21 +29,21 @@ object RCV1 {
     val a = (a0 on a1) on (a2 on a3)
     val (swc, ii) = sortdown2(wc)
     val sdict = dict(ii)
-    val bdict = BMat(sdict)
+    val bdict = SBMat(sdict)
     val n = ii.length
     val iinv = izeros(n, 1)
     iinv(ii) = icol(0->n)
     val jj = find(a > 0)
     a(jj,0) = iinv(a(jj,0)-1)
     saveIMat("/big/RCV1/v2/tokenized/tokens.imat.lz4", a)
-    saveBMat("/big/RCV1/v2/tokenized/sdict.bmat.lz4", bdict)
+    saveSBMat("/big/RCV1/v2/tokenized/sdict.SBMat.lz4", bdict)
     saveIMat("/big/RCV1/v2/tokenized/swcount.imat.lz4", swc)
 
   }
   
   def mksparse {
     val a = loadIMat("/big/RCV1/v2/tokenized/tokens.imat.lz4")
-    val dict = Dict(loadBMat("/big/RCV1/v2/tokenized/sdict.bmat.lz4"))
+    val dict = Dict(loadSBMat("/big/RCV1/v2/tokenized/sdict.SBMat.lz4"))
     val swc = loadIMat("/big/RCV1/v2/tokenized/swcount.imat.lz4")
     val tab = izeros(a.nrows,2)
     tab(?,1) = a
@@ -105,7 +86,7 @@ object Twitter {
   		 val dy2 = mergedicts(2011, 2013, "/disk%02d" + tokdir, "/big" + tokdir, threshold, rebuild)
   		 val dy = Dict.union(dy1, dy2)
   		 val (sv, iv) = sortdown2(dy.counts)
-  		 HMat.saveBMat("/big"+tokdir+"alldict.gz", BMat(dy.cstr(iv)))
+  		 HMat.saveSBMat("/big"+tokdir+"alldict.gz", SBMat(dy.cstr(iv)))
   		 HMat.saveDMat("/big"+tokdir+"allwcount.gz", sv)
 	}
   
@@ -127,7 +108,7 @@ object Twitter {
 	  				val fname = (infname + "%04d/%02d/%02d/" format (idisk, yy, mm, id))
 	  				val ff = new File(fname + "wcount.gz")
 	  				if (ff.exists) {
-	  					val bb = HMat.loadBMat(fname + "dict.gz")
+	  					val bb = HMat.loadSBMat(fname + "dict.gz")
 	  					val cc = HMat.loadIMat(fname + "wcount.gz")
 	  					dd(ndone % 6) = Dict(bb, cc, threshold)
 	  					ndone = ndone + 1
@@ -146,14 +127,14 @@ object Twitter {
 	  				val dx = Dict.union(md.slice(0, (ndone-1)/6+1):_*)
 	  				val (sv, iv) = sortdown2(dx.counts)
 	  				val dxx = Dict(dx.cstr(iv), sv)
-	  				HMat.saveBMat(outfname + "%04d/%02d/dict.gz" format (yy, mm), BMat(dxx.cstr))
+	  				HMat.saveSBMat(outfname + "%04d/%02d/dict.gz" format (yy, mm), SBMat(dxx.cstr))
 	  				HMat.saveDMat(outfname + "%04d/%02d/wcount.gz" format (yy, mm), dxx.counts)
 	  			}
 //	  			println("")
 	  		}
 	  		val f2 = new File(outfname + "%04d/%02d/wcount.gz" format (yy, mm))
 	  		if (f2.exists) {
-	  			val bb = HMat.loadBMat(outfname + "%04d/%02d/dict.gz" format (yy, mm))
+	  			val bb = HMat.loadSBMat(outfname + "%04d/%02d/dict.gz" format (yy, mm))
 	  			val cc = HMat.loadDMat(outfname + "%04d/%02d/wcount.gz" format (yy, mm))
 	  			yd(nmerged % 5) = Dict(bb, cc, 4*threshold)
 	  			nmerged += 1
@@ -176,13 +157,13 @@ object Twitter {
   	println
   	val (sv, iv) = sortdown2(dy.counts)
   	val dyy = Dict(dy.cstr(iv), sv)
-  	HMat.saveBMat(outfname + "dict.gz", BMat(dyy.cstr))
+  	HMat.saveSBMat(outfname + "dict.gz", SBMat(dyy.cstr))
   	HMat.saveDMat(outfname + "wcount.gz", dyy.counts)
   	dyy
 	}
 	
 	def getDict = {
-  	val bd = loadBMat("/big/twitter/tokenized/alldict.gz")
+  	val bd = loadSBMat("/big/twitter/tokenized/alldict.gz")
     val bc = loadDMat("/big/twitter/tokenized/allwcount.gz")
     Dict(bd, bc)
 	}
@@ -239,8 +220,8 @@ object Twitter {
 	  val nbi = nbi0 * 1000
 	  val ntri = ntri0 * 1000
 	  val fname = "/big/twitter/tokenized/dict_%d_%d_%d" format (nuni0, nbi0, ntri0)
-	  if (!rebuild && (new File(fname + "_bmat.lz4").exists) && (new File(fname + "_dmat.lz4").exists)) {
-	    val bm = loadBMat(fname + "_bmat.lz4")
+	  if (!rebuild && (new File(fname + "_SBMat.lz4").exists) && (new File(fname + "_dmat.lz4").exists)) {
+	    val bm = loadSBMat(fname + "_SBMat.lz4")
 	    val dm = loadDMat(fname + "_dmat.lz4")
 	    Dict(bm, dm)
 	  } else {
@@ -248,7 +229,7 @@ object Twitter {
 	  	val bd = getBiDict
 	  	val td = getTriDict
 	  	val dd = IDict.gramDict(nuni, nbi, ntri, ud, bd, td)
-	  	saveBMat(fname + "_bmat.lz4", BMat(dd.cstr))
+	  	saveSBMat(fname + "_SBMat.lz4", SBMat(dd.cstr))
 	  	saveDMat(fname + "_dmat.lz4", dd.counts)
 	  	dd
 	  }

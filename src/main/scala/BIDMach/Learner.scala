@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,BMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
