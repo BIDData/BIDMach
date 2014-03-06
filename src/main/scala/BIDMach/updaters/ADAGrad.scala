@@ -8,85 +8,97 @@ import BIDMach.models._
 class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Updater {
   
   var firstStep = 0f
-  var modelmat:Mat = null
-  var updatemat:Mat = null  
-  var sumSq:Mat = null 
+  var modelmats:Array[Mat] = null
+  var updatemats:Array[Mat] = null  
+  var sumSq:Array[Mat] = null 
   var stepn:Mat = null
   var mask:Mat = null
   var ve:Mat = null
-	var te:Mat = null
-	var alpha:Mat = null
-	var one:Mat = null
+  var te:Mat = null
+  var alpha:Mat = null
+  var one:Mat = null
 
   override def init(model0:Model) = {
     model = model0
-    modelmat = model.modelmats(0)
-	  mask = opts.mask
-    if (sumSq.asInstanceOf[AnyRef] == null) {
-      sumSq = modelmat.ones(size(modelmat,1), size(modelmat,2)) *@ opts.initsumsq
-    } else {
-    	sumSq.set(opts.initsumsq)
+    modelmats = model.modelmats
+    val mm = modelmats(0)
+	mask = opts.mask
+	val nmats = modelmats.length
+	sumSq = new Array[Mat](nmats)
+	for (i <- 0 until nmats) {
+      sumSq(i) = modelmats(i).ones(modelmats(i).nrows, modelmats(i).ncols) *@ opts.initsumsq
     }
-    stepn = modelmat.zeros(1,1)
-    one = modelmat.ones(1,1)
-    ve = modelmat.zeros(opts.vexp.nrows, opts.vexp.ncols)
-    te = modelmat.zeros(opts.texp.nrows, opts.texp.ncols)
-    alpha = modelmat.zeros(opts.alpha.nrows, opts.alpha.ncols)
+    stepn = mm.zeros(1,1)
+    one = mm.ones(1,1)
+    ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols)
+    te = mm.zeros(opts.texp.nrows, opts.texp.ncols)
+    alpha = mm.zeros(opts.alpha.nrows, opts.alpha.ncols)
     ve <-- opts.vexp
     te <-- opts.texp
     alpha <-- opts.alpha
   } 
   
-	def update2(ipass:Int, step:Long):Unit = {
-	  val nsteps = if (step == 0) 1f else {
-  	  if (firstStep == 0f) {
-  	    firstStep = step
-  	    1f
+  def update2(ipass:Int, step:Long):Unit = {
+	val nsteps = if (step == 0) 1f else {
+	  if (firstStep == 0f) {
+	    firstStep = step
+	    1f
   	  } else {
   	    step / firstStep
   	  }
   	}
-	  stepn.set(nsteps)
-	  val nw = one / stepn
-	  val newsquares = updatemat *@ updatemat
+	stepn.set(nsteps)
+	val nw = one / stepn
+	val nmats = modelmats.length
+	for (i <- 0 until nmats) {
+	  val um = updatemats(i)
+	  val mm = modelmats(i)
+	  val ss = sumSq(i)
+	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
-	  sumSq  ~ sumSq *@ (one - nw)
-	  sumSq ~ sumSq + newsquares
+	  ss  ~ ss *@ (one - nw)
+	  ss ~ ss + newsquares
 	  if (opts.waitsteps < nsteps) {
-	  	val tmp = sumSq ^ ve
+	  	val tmp = ss ^ ve
 	  	tmp ~ tmp *@ (stepn ^ te)
 	  	tmp ~ tmp + opts.epsilon
-	  	modelmat ~ modelmat + ((updatemat / tmp) *@ alpha)
-	  	if (mask != null) modelmat ~ modelmat *@ mask
+	  	mm ~ mm + ((um / tmp) *@ alpha)
+	  	if (mask != null) mm ~ mm *@ mask
 	  }
 	}
+  }
 	
-	def update(ipass:Int, step:Long):Unit = {
-	  updatemat = model.updatemats(0) 
-	  val nsteps = if (step == 0) 1f else {
-  	  if (firstStep == 0f) {
-  	    firstStep = step
-  	    1f
-  	  } else {
-  	    step / firstStep
-  	  }
-  	}
-	  stepn.set(nsteps)
-	  val nw = 1f / stepn
-	  val newsquares = updatemat *@ updatemat
+  def update(ipass:Int, step:Long):Unit = { 
+    val nsteps = if (step == 0) 1f else {
+      if (firstStep == 0f) {
+        firstStep = step
+            1f
+      } else {
+        step / firstStep
+      }
+    }
+    stepn.set(nsteps)
+    val nw = 1f / stepn
+    val nmats = modelmats.length
+    for (i <- 0 until nmats) {
+      val mm = modelmats(i)
+      val um = updatemats(i)
+      val ss = sumSq(i)
+	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
-	  sumSq  ~ sumSq *@ (1f - nw)
-	  sumSq ~ sumSq + newsquares
+	  ss  ~ ss *@ (one - nw)
+	  ss ~ ss + newsquares
 	  if (opts.waitsteps < nsteps) {
-	  	val tmp = sumSq ^ ve
-	  	tmp ~ tmp *@ (stepn ^ te)
-	  	tmp ~ tmp + opts.epsilon
-	  	tmp ~ updatemat / tmp
-	  	tmp ~ tmp *@ alpha
-	  	modelmat ~ modelmat + tmp
-	  	if (mask != null) modelmat ~ modelmat *@ mask
+	    val tmp = ss ^ ve
+	    tmp ~ tmp *@ (stepn ^ te)
+	    tmp ~ tmp + opts.epsilon
+	    tmp ~ um / tmp
+	    tmp ~ tmp *@ alpha
+	    mm ~ mm + tmp
+	    if (mask != null) mm ~ mm *@ mask
 	  }
 	}
+  }
 }
 
 
