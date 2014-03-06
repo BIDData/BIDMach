@@ -129,8 +129,6 @@ object LDA  {
     class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
-    opts.uiter = 2
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
@@ -147,8 +145,6 @@ object LDA  {
     class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with BatchNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
-    opts.uiter = 2
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
@@ -166,8 +162,6 @@ object LDA  {
     class xopts extends ParLearner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
-    opts.uiter = 5
     opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(

@@ -36,64 +36,12 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   def mupdate2(in:Mat, targ:Mat):FMat = {
     val eta = modelmats(0) * in
-    applymeans(eta, mylinks, eta)
-    val lls = llfun(eta, targ, mylinks)
+    GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
+    val lls = GLM.llfun(eta, targ, mylinks, linkArray, totflops)
     eta ~ targ - eta
     updatemats(0) ~ eta *^ in
     lls
   }
-  
-  def applymeans(eta:Mat, links:Mat, out:Mat):Mat = {
-    (eta, links, out) match {
-      case (feta:FMat, ilinks:IMat, fout:FMat) => {
-        Mat.nflops += totflops * feta.ncols
-    		var i = 0
-    		val out = (feta + 3f)
-    		while (i < feta.ncols) {
-    		  var j = 0
-    		  while (j < feta.nrows) { 
-    		  	val fun = linkArray(ilinks(j)).invlinkfn
-    		  	fout.data(j + i * out.nrows) = fun(feta.data(j + i * feta.nrows))
-    		  	j += 1 
-    		  }
-    			i += 1
-    		}
-    		out
-      }
-      case (geta:GMat, gilinks:GIMat, gout:GMat) => {
-      	Mat.nflops += totflops * geta.ncols
-      	CUMAT.applymeans(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
-      	out
-      }
-    }
-  }
-  
-  def llfun(pred:Mat, targ:Mat, links:Mat):FMat = {
-    (pred, targ, links) match {
-      case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
-      	Mat.nflops += 10L * ftarg.length
-    		var i = 0
-    		val out = (ftarg + 5f)
-    		while (i < ftarg.ncols) {
-    			var j = 0
-    			while (j < ftarg.nrows) {
-    				val fun = linkArray(ilinks(j)).likelihoodfn
-    				out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
-    				j += 1
-    			}
-    			i += 1
-    		}
-    		mean(out,2)
-      }
-      case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
-      	Mat.nflops += totflops * gpred.ncols
-      	val out = (gpred + 3f)
-      	CUMAT.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
-      	FMat(mean(out,2))
-      }
-    }
-  }
-
 }
 
 
@@ -179,6 +127,57 @@ object GLM {
   }
   
   class Options extends Opts {}
+  
+  def applymeans(eta:Mat, links:Mat, out:Mat, linkArray:Array[GLMlink], totflops:Long):Mat = {
+    (eta, links, out) match {
+      case (feta:FMat, ilinks:IMat, fout:FMat) => {
+        Mat.nflops += totflops * feta.ncols
+            var i = 0
+            val out = (feta + 3f)
+            while (i < feta.ncols) {
+              var j = 0
+              while (j < feta.nrows) { 
+                val fun = linkArray(ilinks(j)).invlinkfn
+                fout.data(j + i * out.nrows) = fun(feta.data(j + i * feta.nrows))
+                j += 1 
+              }
+                i += 1
+            }
+            out
+      }
+      case (geta:GMat, gilinks:GIMat, gout:GMat) => {
+        Mat.nflops += totflops * geta.ncols
+        CUMAT.applymeans(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        out
+      }
+    }
+  }
+  
+  def llfun(pred:Mat, targ:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long):FMat = {
+    (pred, targ, links) match {
+      case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
+        Mat.nflops += 10L * ftarg.length
+            var i = 0
+            val out = (ftarg + 5f)
+            while (i < ftarg.ncols) {
+                var j = 0
+                while (j < ftarg.nrows) {
+                    val fun = linkArray(ilinks(j)).likelihoodfn
+                    out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
+                    j += 1
+                }
+                i += 1
+            }
+            mean(out,2)
+      }
+      case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
+        Mat.nflops += totflops * gpred.ncols
+        val out = (gpred + 3f)
+        CUMAT.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
+        FMat(mean(out,2))
+      }
+    }
+  }
   
   def mkGLMModel(fopts:Model.Opts) = {
   	new GLM(fopts.asInstanceOf[GLM.Opts])
