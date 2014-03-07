@@ -187,7 +187,11 @@ object GLM {
   	new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
   } 
   
-  class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts
+  def mkRegularizer(nopts:Regularizer.Opts) = {
+    new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts])
+  }
+  
+  class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
      
   def learn(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
@@ -195,7 +199,7 @@ object GLM {
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new GLM(opts), 
-  	    null,
+  	    new L1Regularizer(opts),
   	    new ADAGrad(opts), opts)
     (nn, opts)
   }
@@ -210,7 +214,7 @@ object GLM {
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
         new GLM(opts), 
-        null,
+        new L1Regularizer(opts),
         new ADAGrad(opts), opts)
     (nn, opts)
   }
@@ -223,13 +227,13 @@ object GLM {
     val nn = new Learner(
         new MatDS(Array(mat0), opts), 
         new GLM(opts), 
-        null, 
+        new L1Regularizer(opts), 
         new ADAGrad(opts),
         opts)
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts
+  class LearnParOptions extends ParLearner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
@@ -237,7 +241,7 @@ object GLM {
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0), opts), 
   	    opts, mkGLMModel _,
-  	    null, null,
+  	    opts, mkRegularizer _,
   	    opts, mkUpdater _, 
   	    opts)
     (nn, opts)
@@ -253,7 +257,7 @@ object GLM {
     val nn = new ParLearnerF(
         new MatDS(Array(mat0, targ), opts), 
         opts, mkGLMModel _,
-        null, null,
+        opts, mkRegularizer _,
         opts, mkUpdater _, 
         opts)
     (nn, opts)
@@ -261,18 +265,20 @@ object GLM {
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
+  class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with ADAGrad.Opts with Regularizer.Opts
+  
   def learnFParx(
     nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
 		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {
-  	class xopts extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with ADAGrad.Opts
-  	val opts = new xopts
+  	
+  	val opts = new LearnFParOptions
   	val nn = new ParLearnerxF(
   	    null,
   	    (dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i),
   	    opts, mkGLMModel _,
-  	    null, null,
+  	    opts, mkRegularizer _,
   	    opts, mkUpdater _,
   	    opts
   	)
@@ -284,12 +290,11 @@ object GLM {
 		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {	
-  	class xopts extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with IncNorm.Opts
-  	val opts = new xopts
+  	val opts = new LearnFParOptions
   	val nn = new ParLearnerF(
   	    SFilesDS.twitterWords(nstart, nend),
   	    opts, mkGLMModel _, 
-  	    null, null,
+        opts, mkRegularizer _,
   	    opts, mkUpdater _,
   	    opts
   	)
