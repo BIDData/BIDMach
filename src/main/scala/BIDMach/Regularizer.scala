@@ -17,25 +17,31 @@ abstract class Regularizer(val opts:Regularizer.Opts = new Regularizer.Options) 
   }
 }
 
-class L1Regularizer(override val opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(opts) { 
+class L1Regularizer(override val opts:Regularizer.Opts = new Regularizer.Options) extends Regularizer(opts) { 
    def compute(step:Float) = {
      for (i <- 0 until modelmats.length) {
-       updatemats(i) ~ updatemats(i) + (sign(modelmats(i)) * (-step*options.mprior)) 
+       val v = if (opts.regweight.length == 1) - opts.regweight(0) else - opts.regweight(i)
+       if (v != 0) {
+         updatemats(i) ~ updatemats(i) + (sign(modelmats(i)) * v) 
+       }
      }
    }
 }
 
-class L2Regularizer(override val opts:Regularizer.Options = new Regularizer.Options) extends Regularizer(opts) { 
+class L2Regularizer(override val opts:Regularizer.Opts = new Regularizer.Options) extends Regularizer(opts) { 
    def compute(step:Float) = {
   	 for (i <- 0 until modelmats.length) {
-  		 updatemats(i) ~ updatemats(i) + (modelmats(i) * (-options.mprior * step))
+  	   val v = if (opts.regweight.length == 1) - opts.regweight(0) else - opts.regweight(i)
+  	   if (v != 0) {
+  	     updatemats(i) ~ updatemats(i) + (modelmats(i) * v)
+  	   }
   	 }
    }
 }
 
 object Regularizer {
 	trait Opts {
-		var mprior:FMat = 1e-7f 
+		var regweight:FMat = 1e-7f 
 	}
 	
 	class Options extends Opts {}

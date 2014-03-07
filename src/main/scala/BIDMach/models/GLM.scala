@@ -191,7 +191,6 @@ object GLM {
      
   def learn(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
-    opts.putBack = -1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
@@ -205,9 +204,8 @@ object GLM {
   
   def learn(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
-    opts.putBack = -1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
-    opts.links = izeros(targ.nrows,1)
+    if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
@@ -221,7 +219,6 @@ object GLM {
      
   def learnBatch(mat0:Mat, d:Int) = {
     val opts = new LearnOptions
-    opts.putBack = -1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0), opts), 
@@ -236,7 +233,6 @@ object GLM {
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
-    opts.putBack = -1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0), opts), 
@@ -251,9 +247,8 @@ object GLM {
   
   def learnPar(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnParOptions
-    opts.putBack = -1
     opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
-    opts.links = izeros(targ.nrows,1)
+    if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new ParLearnerF(
         new MatDS(Array(mat0, targ), opts), 

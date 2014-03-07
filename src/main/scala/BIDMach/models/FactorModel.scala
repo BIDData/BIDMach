@@ -9,12 +9,13 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
+    mats = datasource.next
     val data0 = mats(0)
     val m = size(data0, 1)
     val d = opts.dim
     val sdat = (sum(data0,2).t + 1.0f).asInstanceOf[FMat]
     val sp = sdat / sum(sdat)
-    println("initial perplexity=%f" format math.exp(- (sp ddot ln(sp))) )
+    println("corpus perplexity=%f" format math.exp(- (sp ddot ln(sp))) )
     
     val modelmat = rand(d,m) 
     modelmat ~ modelmat *@ sdat
