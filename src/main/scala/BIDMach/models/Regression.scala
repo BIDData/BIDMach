@@ -11,23 +11,25 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   var targmap:Mat = null
   var targets:Mat = null
   var mask:Mat = null
+  var sp:Mat = null
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
+    mats = datasource.next
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = size(data0, 1)
     val targetData = mats.length > 1
     val d = if (targetData) mats(1).nrows else opts.targmap.nrows
     val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
-    val sp = sdat / sum(sdat)
-    println("initial perplexity=%f" format (sp ddot ln(sp)) )
+    sp = sdat / sum(sdat)
+    println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
-    val rmat = rand(d,m) 
+    val rmat = rand(d,m) - 0.5f 
     rmat ~ rmat *@ sdat
     val msum = sum(rmat, 2)
     rmat ~ rmat / msum
-    val mm = rmat
+    val mm = zeros(d,m)
     modelmats = Array[Mat](1)
     modelmats(0) = if (useGPU) GMat(mm) else mm 
     updatemats = new Array[Mat](1)
@@ -37,6 +39,7 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
       targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
       mask = if (useGPU) GMat(opts.rmask) else opts.rmask
     }
+    datasource.reset
   } 
   
   def mupdate(data:Mat):FMat

@@ -21,6 +21,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   override def init(model0:Model) = {
     model = model0
     modelmats = model.modelmats
+    updatemats = model.updatemats
     val mm = modelmats(0)
 	mask = opts.mask
 	val nmats = modelmats.length
@@ -32,13 +33,14 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     one = mm.ones(1,1)
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols)
     te = mm.zeros(opts.texp.nrows, opts.texp.ncols)
-    alpha = mm.zeros(opts.alpha.nrows, opts.alpha.ncols)
+    alpha = mm.zeros(1, 1)
     ve <-- opts.vexp
     te <-- opts.texp
-    alpha <-- opts.alpha
   } 
   
   def update2(ipass:Int, step:Long):Unit = {
+    modelmats = model.modelmats
+    updatemats = model.updatemats
 	val nsteps = if (step == 0) 1f else {
 	  if (firstStep == 0f) {
 	    firstStep = step
@@ -47,28 +49,39 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   	    step / firstStep
   	  }
   	}
-	stepn.set(nsteps)
+	stepn.set(nsteps+1)
 	val nw = one / stepn
 	val nmats = modelmats.length
+//	println("u2 sumsq %g" format mini(sumSq(0)).dv)
 	for (i <- 0 until nmats) {
 	  val um = updatemats(i)
 	  val mm = modelmats(i)
 	  val ss = sumSq(i)
+	  if (opts.alpha.length > 1) {
+	    alpha.set(opts.alpha(i))
+	  } else {
+	    alpha.set(opts.alpha(0))
+	  }
 	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
 	  ss  ~ ss *@ (one - nw)
 	  ss ~ ss + newsquares
 	  if (opts.waitsteps < nsteps) {
 	  	val tmp = ss ^ ve
+	  	if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA0 1 "+i)
 	  	tmp ~ tmp *@ (stepn ^ te)
+	  	if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA0 2 "+i)
 	  	tmp ~ tmp + opts.epsilon
 	  	mm ~ mm + ((um / tmp) *@ alpha)
+	  	if (java.lang.Double.isNaN(sum(sum(mm)).dv)) throw new RuntimeException("ADA0 3 "+i)
 	  	if (mask != null) mm ~ mm *@ mask
 	  }
 	}
   }
 	
   def update(ipass:Int, step:Long):Unit = { 
+    modelmats = model.modelmats
+    updatemats = model.updatemats
     val nsteps = if (step == 0) 1f else {
       if (firstStep == 0f) {
         firstStep = step
@@ -77,22 +90,33 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
         step / firstStep
       }
     }
-    stepn.set(nsteps)
-    val nw = 1f / stepn
+    stepn.set(nsteps+1)
+    val nw = one / stepn
     val nmats = modelmats.length
+//    println("u sumsq %g" format mini(sumSq(0)).dv)
     for (i <- 0 until nmats) {
       val mm = modelmats(i)
       val um = updatemats(i)
       val ss = sumSq(i)
+      if (opts.alpha.length > 1) {
+        alpha.set(opts.alpha(i))
+      } else {
+        alpha.set(opts.alpha(0))
+      }
 	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
 	  ss  ~ ss *@ (one - nw)
 	  ss ~ ss + newsquares
 	  if (opts.waitsteps < nsteps) {
+	    if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADA 0 "+i)
 	    val tmp = ss ^ ve
+	    if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 1 "+i)
+
 	    tmp ~ tmp *@ (stepn ^ te)
+	           if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 2 "+i)
 	    tmp ~ tmp + opts.epsilon
 	    tmp ~ um / tmp
+	           if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 3 "+i)
 	    tmp ~ tmp *@ alpha
 	    mm ~ mm + tmp
 	    if (mask != null) mm ~ mm *@ mask
@@ -105,8 +129,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 object ADAGrad {
   trait Opts extends Grad.Opts {
     var vexp:FMat = 0.5f
-    var epsilon = 1e-15f
-    var initsumsq = 1e-8f
+    var epsilon = 1e-5f
+    var initsumsq = 1e-5f
   }
   
   class Options extends Opts {}
