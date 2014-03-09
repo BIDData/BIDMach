@@ -74,8 +74,8 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
     	val unew = user*0
     	val mnew = updatemats(0)
     	mnew.set(0f)
-  
-    	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, opts.nsamps)
+    	val nsamps = GMat(opts.tempfunc(opts.nsampsi, ipass))
+    	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, nsamps)
         
     	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
     	user ~ unew + opts.alpha
@@ -109,7 +109,9 @@ object LDAgibbs  {
   trait Opts extends FactorModel.Opts {
     var alpha = 0.001f
     var beta = 0.0001f
-    var nsamps = 100
+    var nsamps = 1
+    var nsampsi = nsamps * ones(dim, 1)
+    var tempfunc = (nsamps: FMat, ipass: Int) => nsamps * ipass
   }
   
   class Options extends Opts {}
@@ -117,6 +119,14 @@ object LDAgibbs  {
    def LDAsample(A:Mat, B:Mat, AN:Mat, BN:Mat, C:Mat, nsamps:Float):Unit = {
     (A, B, AN, BN, C) match {
      case (a:GMat, b:GMat, an:GMat, bn:GMat, c:GSMat) => GSMat.LDAgibbs(a, b, an, bn, c, nsamps):Unit
+     case _ => throw new RuntimeException("LDAgibbs: arguments not recognized")
+    }
+  }
+   
+   def LDAsample(A:Mat, B:Mat, AN:Mat, BN:Mat, C:Mat, nsamps:Mat):Unit = {
+     
+    (A, B, AN, BN, C, nsamps) match {
+     case (a:GMat, b:GMat, an:GMat, bn:GMat, c:GSMat, nsamps:GMat) => GSMat.LDAgibbsv(a, b, an, bn, c, nsamps):Unit
      case _ => throw new RuntimeException("LDAgibbs: arguments not recognized")
     }
   }
