@@ -74,7 +74,8 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
     	val unew = user*0
     	val mnew = updatemats(0)
     	mnew.set(0f)
-    	val nsamps = GMat(opts.tempfunc(opts.nsampsi, ipass))
+    	//val nsamps = GMat(opts.tempfunc(opts.nsampsi, ipass))
+    	val nsamps = GMat(100 * ones(mm.ncols, 1))
     	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, nsamps)
         
     	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
