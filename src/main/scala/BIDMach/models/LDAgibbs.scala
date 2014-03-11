@@ -53,9 +53,11 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   override def init(datasource:DataSource) = {
     super.init(datasource)
     mm = modelmats(0)
-    modelmats = new Array[Mat](2)
+    //modelmats = new Array[Mat](2)
+    modelmats = new Array[Mat](3)
     modelmats(0) = mm
     modelmats(1) = mm.ones(mm.nrows, 1)
+    modelmats(2) = mm.ones(mm.nrows, mm.ncols)
     updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     updatemats(1) = mm.zeros(mm.nrows, 1)
@@ -64,18 +66,23 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   def uupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
     
     	if (opts.putBack < 0 || ipass == 0) user.set(1f)
+    	
+    	val mnew = updatemats(0)
+    	mnew.set(0f)
+    	
         for (i <- 0 until opts.uiter) yield {
-    	val preds = DDS(mm, user, sdata)	
-    	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
+        val preds = DDS(mm, user, sdata)	
+        if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
     	val dc = sdata.contents
     	val pc = preds.contents
     	pc ~ pc / dc
     	
     	val unew = user*0
-    	val mnew = updatemats(0)
-    	mnew.set(0f)
+
     	//val nsamps = GMat(opts.tempfunc(opts.nsampsi, ipass))
-    	val nsamps = GMat(100 * ones(mm.ncols, 1))
+    	//val nsamps = GMat(100 * ones(mm.ncols, 1))
+    	val nsamps = modelmats(2);
+        
     	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, nsamps)
         
     	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
@@ -111,8 +118,8 @@ object LDAgibbs  {
     var alpha = 0.001f
     var beta = 0.0001f
     var nsamps = 1
-    var nsampsi = nsamps * ones(dim, 1)
-    var tempfunc = (nsamps: FMat, ipass: Int) => nsamps * ipass
+    //var nsampsi = nsamps * ones(dim, 1)
+    var tempfunc = (nsamps: Mat, ipass: Int) => nsamps * ipass
   }
   
   class Options extends Opts {}
