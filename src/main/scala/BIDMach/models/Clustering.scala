@@ -24,7 +24,7 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
   } 
   
   def mupdate(data:Mat, ipass:Int):Unit
-  
+   
   def evalfun(data:Mat):FMat
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {

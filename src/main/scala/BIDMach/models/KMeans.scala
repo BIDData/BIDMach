@@ -26,29 +26,42 @@ import BIDMach._
 class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends ClusteringModel(opts) {
 
   var mm:Mat = null
+  var mmnorm:Mat = null
   var um:Mat = null
-  var mone:Mat = null
+  var umcount:Mat = null
   
   override def init(datasource:DataSource) = {
     super.init(datasource)
     mm = modelmats(0)
+    umcount = mm.zeros(mm.nrows, 1)
+    mmnorm = mm dotr mm
     um = updatemats(0)
-    mone = mm.ones(1,1)
+    updatemats = Array(um, umcount)
+    modelmats = Array(mm, mmnorm)
   }
   
   def mupdate(sdata:Mat, ipass:Int):Unit = {
-    val vmatch = mm * sdata 
-    val bestm = vmatch >= maxi(vmatch)
+    val vmatch = -2 * mm * sdata + mmnorm + colnorm(sdata)
+    val bestm = vmatch <= mini(vmatch)
     bestm ~ bestm / sum(bestm)
     um ~ um + bestm *^ sdata     
+    umcount ~ umcount + sum(bestm, 2)
   }
     
   def evalfun(sdata:Mat):FMat = {  
-    val vmatch = mm * sdata 
-    val maxv = maxi(vmatch)
-    val diff = 1f - maxv / max(colnorm(sdata),opts.eps) 
-  	val vv = mean(sqrt(diff)).dv
+    val vmatch = -2 * mm * sdata + mmnorm + colnorm(sdata)  
+    val vm = mini(vmatch)
+    max(vm, 0f, vm)
+    val vv = mean(sqrt(vm)).dv
   	row(-vv, math.exp(vv))
+  }
+  
+  override def updatePass = {
+    max(umcount, 1f, umcount)
+    mm ~ um / umcount
+    mmnorm ~ mm dotr mm
+    um.clear
+    umcount.clear
   }
 }
 
