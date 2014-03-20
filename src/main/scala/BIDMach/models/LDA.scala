@@ -84,7 +84,6 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
     ud ~ ud + opts.beta
   	updatemats(0) <-- ud  
   	sum(ud, 2, updatemats(1))
-  	if (traceMem) println("mupdate %d %d %d %d" format (sdata.GUID, user.GUID, ud.GUID, updatemats(0).GUID))
   }
   
   def evalfun(sdata:Mat, user:Mat):FMat = {  
@@ -96,8 +95,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   	val sdat = sum(sdata,1)
   	val mms = sum(mm,2)
   	val suu = ln(mms ^* user)
-  	if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1))
-  	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
+ 	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
   	row(vv, math.exp(-vv))
   }
 }

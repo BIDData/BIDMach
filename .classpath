@@ -7,7 +7,7 @@
 	<classpathentry kind="lib" path="C:/code/BIDMat/lib/jhdf5.jar"/>
 	<classpathentry kind="lib" path="C:/code/BIDMat/lib/ptplot.jar"/>
 	<classpathentry kind="lib" path="C:/code/BIDMat/lib/ptplotapplication.jar"/>
-	<classpathentry kind="lib" path="C:/Users/jfc.EECS/.ivy2/cache/org.scala-lang/jline/jars/jline-2.10.3.jar"/>
+	<classpathentry kind="lib" path="C:/code/BIDMat/lib/jline-2.10.3.jar"/>
 	<classpathentry kind="lib" path="/BIDMat/lib/jcublas-0.5.5.jar"/>
 	<classpathentry kind="lib" path="/BIDMat/lib/jcuda-0.5.5.jar"/>
 	<classpathentry kind="lib" path="/BIDMat/lib/jcufft-0.5.5.jar"/>
