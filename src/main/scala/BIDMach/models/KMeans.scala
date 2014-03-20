@@ -33,11 +33,11 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   override def init(datasource:DataSource) = {
     super.init(datasource)
     mm = modelmats(0)
-    umcount = mm.zeros(mm.nrows, 1)
     mmnorm = mm dotr mm
-    um = updatemats(0)
-    updatemats = Array(um, umcount)
     modelmats = Array(mm, mmnorm)
+    um = updatemats(0)
+    umcount = mm.zeros(mm.nrows, 1)
+    updatemats = Array(um, umcount)
   }
   
   def mupdate(sdata:Mat, ipass:Int):Unit = {

@@ -63,13 +63,11 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
     if (opts.putBack < 0 || ipass == 0) user.set(1f)
     for (i <- 0 until opts.uiter) {
       val preds = DDS(mm, user, sdata)	
-      if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
       val dc = sdata.contents
       val pc = preds.contents
       max(opts.weps, pc, pc)
       pc ~ dc / pc
       val unew = user ∘ (mm * preds) + opts.alpha
-      if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
       if (opts.exppsi) exppsi(unew, unew)
       user <-- unew   
     }	
