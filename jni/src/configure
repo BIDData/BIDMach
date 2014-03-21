@@ -1,0 +1,214 @@
+#!/bin/bash
+
+OS=`uname -a`
+PARLIB=$1
+ARCH=`arch`
+ 
+VERSION="dev"
+
+# standardise the OS and ARCH names
+if [[ "$OS" == Darwin* ]] ; then
+    if [[ "$OS" == *x86_64 ]] ; then
+	    ARCH="x86_64"
+    fi
+    OS="apple"
+elif [[ "$OS" == Linux* ]] ; then
+    OS="linux"
+elif [[ "$OS" == CYGWIN* ]] ; then
+    if [[ "$OS" == *WOW64* ]] ; then
+        ARCH="x86_64"
+    fi
+	OS="windows"
+else
+    echo "OS not supported" $OS
+    exit 1
+fi
+
+if [ "$ARCH" = "x86" ] || [ "$ARCH" = "i686" ] || [ "$ARCH" = "i586" ] \
+	|| [ "$ARCH" = "i486" ] || [ "$ARCH" = "i386" ] ; then
+    ARCH="x86"
+    ARCHD=ia32
+    SUBDIR=""
+    PTYPE=""
+    MBITS=32
+elif [ "$ARCH" = "amd64" ] || [ "$ARCH" = "x86_64" ] ; then
+    ARCH="x86_64"
+    ARCHD=intel64
+    SUBDIR=/lp64
+    PTYPE=_lp64
+    MBITS=64
+else
+	echo "ARCH not supported"
+	exit 1
+fi
+
+echo "Creating config for $OS $ARCH"
+
+BIDMACH_ROOT="${BASH_SOURCE[0]}"
+if [ ! `uname` = "Darwin" ]; then
+  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
+else 
+  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
+fi
+BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
+BIDMACH_ROOT=`cd "$BIDMACH_ROOT/../..";pwd`
+BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
+
+if [ "$OS" = "apple" ] ; then
+    MKL_ROOT="/opt/intel/mkl"
+    COMPOSER_ROOT="/opt/intel/composerxe"
+    JAVA_HOME="/System/Library/Frameworks/JavaVM.framework"
+    CUDA_HOME="/usr/local/cuda"
+    CC="icc"
+    GCC="gcc"
+    NVCC="nvcc"
+    NVCCFLAGS="-c -use_fast_math -gencode arch=compute_20,code=sm_20 \
+          -gencode arch=compute_30,code=sm_30 \
+          --machine ${MBITS}  -Xcompiler \"-fPIC -c -O2 -g -DNDEBUG\""
+    OBJ="o"
+    OUTFLG="-o "
+    CPPFLAGS="-fPIC -c -O2 -fopenmp -DNDEBUG -I$JAVA_HOME/Headers -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include"
+    CFLAGS="-fPIC -c -O2 -openmp -std=c99 -DNDEBUG -I$JAVA_HOME/Headers -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    LB="ar rc"    
+    GLD="icc -bundle -static-intel"
+    LD="icc -bundle -static-intel"
+    LDFLAGS="$LDFLAGS"
+    LIBPREPEND="lib"
+    LIBAPPEND="-${OS}-${ARCH}.dylib"
+    FC="gfortran"
+    FFLAGS="$CFLAGS"
+    LAPACK_INCLUDES=""
+    FORTRAN_LIBS="-lgfortran"
+    if [ "$PARLIB" = "sequential" ] ; then
+	    MKL_LIBS="-L$JAVA_HOME/Libraries -L${COMPOSER_ROOT}/lib/${ARCHD} \ 
+            $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_sequential.a \
+            $MKL_ROOT/lib/libmkl_core.a \
+            $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_sequential.a \
+            $MKL_ROOT/lib/libmkl_core.a \
+            -lpthread -lm  -framework JavaVM"
+    else 
+	    MKL_LIBS="-L$JAVA_HOME/Libraries -L${COMPOSER_ROOT}/lib/${ARCHD} \
+            $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_intel_thread.a \
+            $MKL_ROOT/lib/libmkl_core.a \
+            $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_intel_thread.a \
+            $MKL_ROOT/lib/libmkl_core.a ${COMPOSER_ROOT}/lib/libiomp5.a \
+            -lpthread -lm  -framework JavaVM"
+    fi
+    INSTALL_DIR=${BIDMACH_ROOT}/lib
+    CUDA_LIBS="-L${CUDA_HOME}/lib -L${INSTALL_DIR} -lcudart -lCommonJNI_mac"
+elif [ "$OS" = "linux" ] ; then
+    MKL_ROOT="/opt/intel/mkl"
+    if [ "$JAVA_HOME" = "" ]; then
+    JAVA_HOME="/usr/java/default"
+    fi
+    CUDA_HOME="/usr/local/cuda"
+    CC="gcc"
+    GCC="g++"
+    NVCC="nvcc"
+    NVCCFLAGS="-c -use_fast_math -gencode arch=compute_20,code=sm_20 \
+          -gencode arch=compute_30,code=sm_30 \
+          --machine ${MBITS}  -Xcompiler \"-fPIC -c -O2 -g -DNDEBUG\""
+    OBJ="o"
+    OUTFLG="-o "
+    CPPFLAGS="-fPIC -c -O2 -fopenmp -DNDEBUG  -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include" 
+    CFLAGS="-fPIC -c -O2 -fopenmp -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    LB="ar rc"    
+    GLD="g++ -shared"
+    LD="icc -shared -static-intel -z noexecstack"
+    LDFLAGS="$LDFLAGS"
+    LIBPREPEND="lib"
+    LIBAPPEND="-${OS}-${ARCH}.so"
+    FC="gfortran"
+    FFLAGS="$CFLAGS"
+    LAPACK_INCLUDES=""
+    FORTRAN_LIBS="-lgfortran"
+    if [ "$PARLIB" = "sequential" ] ; then
+	    MKL_LIBS="-L$JAVA_HOME/lib -L${COMPOSER_ROOT}/lib/${ARCHD} \
+            $MKL_ROOT/lib/${ARCHD}/libmkl_intel${PTYPE}.a -Wl,--start-group  \
+            $MKL_ROOT/lib/${ARCHD}/libmkl_sequential.a $MKL_ROOT/lib/${ARCHD}/libmkl_core.a \
+            -Wl,--end-group -liomp5 -lpthread -lm"
+    else 
+	    MKL_LIBS="-L$JAVA_HOME/lib -L${COMPOSER_ROOT}/lib/${ARCHD} \
+            $MKL_ROOT/lib/${ARCHD}/libmkl_intel${PTYPE}.a -Wl,--start-group  \
+            $MKL_ROOT/lib/${ARCHD}/libmkl_gnu_thread.a $MKL_ROOT/lib/${ARCHD}/libmkl_core.a \
+            -Wl,--end-group -liomp5 -lpthread -lm"
+    fi
+    if [ "$ARCH" = "x86" ] ; then
+        CULIB="lib"
+    else
+        CULIB="lib64"
+    fi
+    INSTALL_DIR=${BIDMACH_ROOT}/lib
+    CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${INSTALL_DIR} -lcudart -lCommonJNI"
+elif [ "$OS" = "windows" ] ; then
+    CUDA_HOME="$CUDA_PATH"
+    MKL_ROOT="$MKLROOT"
+    CC="icl"
+    GCC="icl"
+    NVCC="nvcc"
+    OBJ="obj"
+    OUTFLG="/OUT:"
+    CPPFLAGS="/c /MT /DNDEBUG /O2 /Qstd=c99 /Qopenmp $CFLAGS"    # static linking
+    NVCCFLAGS="-c -use_fast_math -gencode arch=compute_20,code=sm_20 \
+          -gencode arch=compute_30,code=sm_30 \
+          --machine ${MBITS}  -Xcompiler \"/EHsc /W3 /nologo /O2 /Zi  /MT\""
+    CFLAGS="/c /MT /DNDEBUG /O2 /Qstd=c99 /Qopenmp $CFLAGS"    # static linking
+    LB="lib"    
+    LD="link"
+    GLD="link"
+    if [ "$ARCH" = "x86" ] ; then
+        WINARCH=x86
+        CULIB="Win32"
+        PTYPE="_c"
+    else
+        WINARCH=amd64
+        CULIB="x64"
+        PTYPE="_lp64"
+    fi
+    LDFLAGS="/DLL /MACHINE:${WINARCH} $LDFLAGS"
+    LIBPREPEND=""
+    LIBAPPEND="-${OS}-${ARCH}.dll"
+    FC="ifort"
+    FFLAGS="-c $FFLAGS"
+    LAPACK_INCLUDES=""
+    FORTRAN_LIBS=""
+    if [ "$PARLIB" = "sequential" ] ; then
+	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_sequential.lib mkl_core.lib libiomp5mt.lib"   
+    else
+	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_intel_thread.lib mkl_core.lib libiomp5mt.lib" 
+    fi
+    INSTALL_DIR=${BIDMACH_ROOT}/lib
+    CUDA_LIBS="cudart.lib CommonJNI.lib"
+    LIB="$MKL_ROOT/lib/${ARCHD};$JAVA_HOME/lib;$CUDA_HOME/lib/${CULIB};${INSTALL_DIR};$LIB"
+    INCLUDE="$JAVA_HOME/include;$JAVA_HOME/include/win32;$MKL_ROOT/include;${BIDMACH_ROOT}/jni/include;$CUDA_HOME/include;$INCLUDE"
+else
+    echo "OS not supported"
+    exit 1
+fi
+
+echo "CC=$CC" > Makefile.incl
+echo "GCC=$GCC" >> Makefile.incl
+echo "NVCC=$NVCC" >> Makefile.incl
+echo "NVCCFLAGS=$NVCCFLAGS" >> Makefile.incl
+echo "SUBLIB=$SUBLIB" >> Makefile.incl
+echo "OBJ=$OBJ" >> Makefile.incl
+echo "OUTFLG=$OUTFLG" >> Makefile.incl
+echo "CPPFLAGS=$CPPFLAGS" >> Makefile.incl
+echo "CFLAGS=$CFLAGS" >> Makefile.incl
+echo "LB=$LB" >> Makefile.incl
+echo "LD=$LD" >> Makefile.incl
+echo "GLD=$GLD" >> Makefile.incl
+echo "LDFLAGS=$LDFLAGS" >> Makefile.incl
+echo "LIBPREPEND=$LIBPREPEND" >> Makefile.incl
+echo "LIBAPPEND=$LIBAPPEND" >> Makefile.incl
+echo "LAPACK_INCLUDES=$LAPACK_INCLUDES" >> Makefile.incl
+echo "MKL_LIBS=$MKL_LIBS" >> Makefile.incl
+echo "CUDA_LIBS=$CUDA_LIBS" >> Makefile.incl
+echo "FORTRAN_LIBS=$FORTRAN_LIBS" >> Makefile.incl
+echo "FC=$FC" >> Makefile.incl
+echo "FFLAGS=$FFLAGS" >> Makefile.incl
+echo "LIB=$LIB" >> Makefile.incl
+echo "INSTALL_DIR=$INSTALL_DIR" >> Makefile.incl
+echo "INCLUDE=$INCLUDE" >> Makefile.incl
+
+

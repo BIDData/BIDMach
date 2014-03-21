@@ -3,7 +3,6 @@ package BIDMach.models
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-//import edu.berkeley.bid.CUMAT
 
 import BIDMach.datasources._
 import BIDMach.updaters._
@@ -116,7 +115,7 @@ object LDAgibbs  {
   
    def LDAsample(A:Mat, B:Mat, AN:Mat, BN:Mat, C:Mat, nsamps:Float):Unit = {
     (A, B, AN, BN, C) match {
-     case (a:GMat, b:GMat, an:GMat, bn:GMat, c:GSMat) => GSMat.LDAgibbs(a, b, an, bn, c, nsamps):Unit
+     case (a:GMat, b:GMat, an:GMat, bn:GMat, c:GSMat) => doLDAgibbs(a, b, an, bn, c, nsamps):Unit
      case _ => throw new RuntimeException("LDAgibbs: arguments not recognized")
     }
   }
@@ -231,6 +230,32 @@ object LDAgibbs  {
     )
     (nn, opts)
   }
+
+import edu.berkeley.bid.CUMACH
+import jcuda.runtime.JCuda._
+import jcuda.runtime.cudaError._
+import jcuda.runtime._
+
+  def doLDAgibbs(A:GMat, B:GMat, AN:GMat, BN:GMat, C:GSMat, nsamps:Float):Unit = {
+    if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || 
+        A.nrows != AN.nrows || A.ncols != AN.ncols || B.nrows != BN.nrows || B.ncols != BN.ncols) {
+      throw new RuntimeException("LDAgibbs dimensions mismatch")
+    }
+    var err = CUMACH.LDAgibbs(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, C.data, nsamps)
+    if (err != 0) throw new RuntimeException(("GPU %d LDAgibbs kernel error "+cudaGetErrorString(err)) format getGPU)
+    Mat.nflops += 12L * C.nnz * A.nrows   // Charge 10 for Poisson RNG
+  }
+  
+  def doLDAgibbsx(A:GMat, B:GMat, C:GSMat, Ms:GIMat, Us:GIMat):Unit = {
+    if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || C.nnz != Ms.ncols || C.nnz != Us.ncols || Ms.nrows != Us.nrows) {
+      throw new RuntimeException("LDAgibbsx dimensions mismatch")
+    }
+
+
+    Mat.nflops += 12L * C.nnz * A.nrows    // Charge 10 for Poisson RNG
+  }
+  
+
   
 }
 
