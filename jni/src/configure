@@ -94,7 +94,7 @@ if [ "$OS" = "apple" ] ; then
             $MKL_ROOT/lib/libmkl_core.a ${COMPOSER_ROOT}/lib/libiomp5.a \
             -lpthread -lm  -framework JavaVM"
     fi
-    INSTALL_DIR=${BIDMACH_ROOT}/lib
+    INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="-L${CUDA_HOME}/lib -L${INSTALL_DIR} -lcudart -lCommonJNI_mac"
 elif [ "$OS" = "linux" ] ; then
     MKL_ROOT="/opt/intel/mkl"
@@ -138,7 +138,7 @@ elif [ "$OS" = "linux" ] ; then
     else
         CULIB="lib64"
     fi
-    INSTALL_DIR=${BIDMACH_ROOT}/lib
+    INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${INSTALL_DIR} -lcudart -lCommonJNI"
 elif [ "$OS" = "windows" ] ; then
     CUDA_HOME="$CUDA_PATH"
@@ -177,7 +177,7 @@ elif [ "$OS" = "windows" ] ; then
     else
 	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_intel_thread.lib mkl_core.lib libiomp5mt.lib" 
     fi
-    INSTALL_DIR=${BIDMACH_ROOT}/lib
+    INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="cudart.lib CommonJNI.lib"
     LIB="$MKL_ROOT/lib/${ARCHD};$JAVA_HOME/lib;$CUDA_HOME/lib/${CULIB};${INSTALL_DIR};$LIB"
     INCLUDE="$JAVA_HOME/include;$JAVA_HOME/include/win32;$MKL_ROOT/include;${BIDMACH_ROOT}/jni/include;$CUDA_HOME/include;$INCLUDE"

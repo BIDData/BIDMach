@@ -6,7 +6,8 @@ CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ)
 
 .SUFFIXES: .$(OBJ) .c .cpp .cu
 
-all: $(LIBPREPEND)bidmachmkl$(LIBAPPEND) $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
+all: $(LIBPREPEND)bidmachcuda$(LIBAPPEND) 
+#all: $(LIBPREPEND)bidmachmkl$(LIBAPPEND) 
 
 $(LIBPREPEND)bidmachmkl$(LIBAPPEND): $(MKL_OBJS)
 	$(LD) $(LDFLAGS) $(MKL_OBJS) $(MKL_LIBS) $(OUTFLG)$@
@@ -27,8 +28,8 @@ Devel.$(OBJ) : Devel.cu
 	$(NVCC) $(NVCCFLAGS) $*.cu
 
 install: all
-	cp $(LIBPREPEND)bidmachmkl$(LIBAPPEND)  $(INSTALL_DIR)
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
+#	cp $(LIBPREPEND)bidmachmkl$(LIBAPPEND)  $(INSTALL_DIR)
 
 clean:
 	rm -f *.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib
