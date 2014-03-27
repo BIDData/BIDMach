@@ -6,6 +6,7 @@ import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
 import scala.concurrent.future
 import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent.CountDownLatch
 import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
@@ -162,16 +163,16 @@ object GLM {
            meanHelper(feta, fout, linkArray, ilinks, 0, feta.ncols)
         } else {
           val nthreads = Mat.numThreads
-          var done = zeros(nthreads,1)
+          val latch = new CountDownLatch(nthreads)
           for (i <- 0 until nthreads) {
             future {
              val istart = (1L * feta.ncols * i / nthreads).toInt
              val iend = (1L * feta.ncols * (i + 1) / nthreads).toInt
              meanHelper(feta, fout, linkArray, ilinks, istart, iend)
-             done(i) = 1
+             latch.countDown()
             }
           }
-          while (mini(done).v == 0) Thread.`yield`
+          latch.await
         }
         out
       }
