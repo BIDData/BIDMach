@@ -159,21 +159,7 @@ object GLM {
     (eta, links, out) match {
       case (feta:FMat, ilinks:IMat, fout:FMat) => {
         Mat.nflops += totflops * feta.ncols
-        if (Mat.numThreads < 2 || feta.ncols < 128) {
-           meanHelper(feta, fout, linkArray, ilinks, 0, feta.ncols)
-        } else {
-          val nthreads = Mat.numThreads
-          val latch = new CountDownLatch(nthreads)
-          for (i <- 0 until nthreads) {
-            future {
-             val istart = (1L * feta.ncols * i / nthreads).toInt
-             val iend = (1L * feta.ncols * (i + 1) / nthreads).toInt
-             meanHelper(feta, fout, linkArray, ilinks, istart, iend)
-             latch.countDown()
-            }
-          }
-          latch.await
-        }
+        meanHelper(feta, fout, linkArray, ilinks, 0, feta.ncols)
         out
       }
       case (geta:GMat, gilinks:GIMat, gout:GMat) => {
