@@ -38,9 +38,13 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     datasource.reset
   } 
   
-  def mupdate(data:Mat):FMat
+  def mupdate(data:Mat)
   
-  def mupdate2(data:Mat, targ:Mat):FMat
+  def mupdate2(data:Mat, targ:Mat)
+  
+  def meval(data:Mat):FMat
+  
+  def meval2(data:Mat, targ:Mat):FMat
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
     if (gmats.length == 1) {
@@ -52,9 +56,9 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   
   def evalblock(mats:Array[Mat], ipass:Int):FMat = {
     if (gmats.length == 1) {
-      mupdate(gmats(0))
+      meval(gmats(0))
     } else {
-      mupdate2(gmats(0), gmats(1))
+      meval2(gmats(0), gmats(1))
     }
   }
 }

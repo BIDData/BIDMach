@@ -4,6 +4,8 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
+import scala.concurrent.future
+import scala.concurrent.ExecutionContext.Implicits.global
 import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
@@ -27,20 +29,31 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     }
   }
     
-  def mupdate(in:Mat):FMat = {
+  def mupdate(in:Mat) = {
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = targmap * targs
     mupdate2(in, alltargs)
   }
   
-  def mupdate2(in:Mat, targ:Mat):FMat = {
+  def mupdate2(in:Mat, targ:Mat) = {
     val eta = modelmats(0) * in
     GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
-    val lls = GLM.llfun(eta, targ, mylinks, linkArray, totflops)
     eta ~ targ - eta
     updatemats(0) ~ eta *^ in
-    lls
+  }
+  
+  def meval(in:Mat):FMat = {
+    val targs = targets * in
+    min(targs, 1f, targs)
+    val alltargs = targmap * targs
+    meval2(in, alltargs)
+  }
+  
+  def meval2(in:Mat, targ:Mat):FMat = {
+    val eta = modelmats(0) * in
+    GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
+    GLM.llfun(eta, targ, mylinks, linkArray, totflops)
   }
 }
 
@@ -128,22 +141,39 @@ object GLM {
   
   class Options extends Opts {}
   
+  def meanHelper(feta:FMat, fout:FMat, linkArray:Array[GLMlink], ilinks:IMat, istart:Int, iend:Int) {
+    var i = istart
+    while (i < iend) {
+      var j = 0
+      while (j < feta.nrows) { 
+        val fun = linkArray(ilinks(j)).invlinkfn
+        fout.data(j + i * fout.nrows) = fun(feta.data(j + i * feta.nrows))
+        j += 1 
+      }
+      i += 1
+    }     
+  }
+  
   def applymeans(eta:Mat, links:Mat, out:Mat, linkArray:Array[GLMlink], totflops:Long):Mat = {
     (eta, links, out) match {
       case (feta:FMat, ilinks:IMat, fout:FMat) => {
         Mat.nflops += totflops * feta.ncols
-            var i = 0
-            val out = (feta + 3f)
-            while (i < feta.ncols) {
-              var j = 0
-              while (j < feta.nrows) { 
-                val fun = linkArray(ilinks(j)).invlinkfn
-                fout.data(j + i * out.nrows) = fun(feta.data(j + i * feta.nrows))
-                j += 1 
-              }
-                i += 1
+        if (Mat.numThreads < 2 || feta.ncols < 128) {
+           meanHelper(feta, fout, linkArray, ilinks, 0, feta.ncols)
+        } else {
+          val nthreads = Mat.numThreads
+          var done = zeros(nthreads,1)
+          for (i <- 0 until nthreads) {
+            future {
+             val istart = (1L * feta.ncols * i / nthreads).toInt
+             val iend = (1L * feta.ncols * (i + 1) / nthreads).toInt
+             meanHelper(feta, fout, linkArray, ilinks, istart, iend)
+             done(i) = 1
             }
-            out
+          }
+          while (mini(done).v == 0) Thread.`yield`
+        }
+        out
       }
       case (geta:GMat, gilinks:GIMat, gout:GMat) => {
         Mat.nflops += totflops * geta.ncols

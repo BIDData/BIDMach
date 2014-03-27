@@ -46,24 +46,37 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     }
   }
     
-  def mupdate(in:Mat):FMat = {
+  def mupdate(in:Mat) = {
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = targmap * targs
     mupdate2(in, alltargs)
   }
   
-  def mupdate2(in:Mat, targ:Mat):FMat = {
+  def mupdate2(in:Mat, targ:Mat) = {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
     GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
-    val lls = GLM.llfun(eta, targ, mylinks, linkArray, totflops)
     eta ~ targ - eta
     uv ~ eta *^ in
     um1 ~ (vt1 ∘ (eta * 2f)) *^ in
     um2 ~ (vt2 ∘ (eta * -2f)) *^ in
-    lls
+  }
+  
+  def meval(in:Mat):FMat = {
+    val targs = targets * in
+    min(targs, 1f, targs)
+    val alltargs = targmap * targs
+    meval2(in, alltargs)
+  }
+  
+  def meval2(in:Mat, targ:Mat):FMat = {
+    val vt1 = mm1 * in
+    val vt2 = mm2 * in
+    val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
+    GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
+    GLM.llfun(eta, targ, mylinks, linkArray, totflops)
   }
 
 }
