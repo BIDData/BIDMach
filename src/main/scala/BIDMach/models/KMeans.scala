@@ -84,7 +84,7 @@ object KMeans  {
     class xopts extends Learner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
     val opts = new xopts
     opts.dim = d
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new KMeans(opts), 
@@ -97,7 +97,7 @@ object KMeans  {
     class xopts extends ParLearner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
     val opts = new xopts
     opts.dim = d
-    opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 

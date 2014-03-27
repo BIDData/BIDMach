@@ -19,7 +19,7 @@ import BIDMach._
  - nsamps(100) the number of repeated samples to take
  *
  * Other key parameters inherited from the learner, datasource and updater:
- - blockSize: the number of samples processed in a block
+ - batchSize: the number of samples processed in a block
  - power(0.3f): the exponent of the moving average model' = a dmodel + (1-a)*model, a = 1/nblocks^power
  - npasses(10): number of complete passes over the dataset
  *     
@@ -104,6 +104,10 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
 }
 
 object LDAgibbs  {
+  import edu.berkeley.bid.CUMACH
+  import jcuda.runtime.JCuda._
+  import jcuda.runtime.cudaError._
+  import jcuda.runtime._
   
   trait Opts extends FactorModel.Opts {
     var alpha = 0.001f
@@ -118,6 +122,25 @@ object LDAgibbs  {
      case (a:GMat, b:GMat, an:GMat, bn:GMat, c:GSMat) => doLDAgibbs(a, b, an, bn, c, nsamps):Unit
      case _ => throw new RuntimeException("LDAgibbs: arguments not recognized")
     }
+  }
+
+  def doLDAgibbs(A:GMat, B:GMat, AN:GMat, BN:GMat, C:GSMat, nsamps:Float):Unit = {
+    if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || 
+        A.nrows != AN.nrows || A.ncols != AN.ncols || B.nrows != BN.nrows || B.ncols != BN.ncols) {
+      throw new RuntimeException("LDAgibbs dimensions mismatch")
+    }
+    var err = CUMACH.LDAgibbs(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, C.data, nsamps)
+    if (err != 0) throw new RuntimeException(("GPU %d LDAgibbs kernel error "+cudaGetErrorString(err)) format getGPU)
+    Mat.nflops += 12L * C.nnz * A.nrows   // Charge 10 for Poisson RNG
+  }
+  
+  def doLDAgibbsx(A:GMat, B:GMat, C:GSMat, Ms:GIMat, Us:GIMat):Unit = {
+    if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || C.nnz != Ms.ncols || C.nnz != Us.ncols || Ms.nrows != Us.nrows) {
+      throw new RuntimeException("LDAgibbsx dimensions mismatch")
+    }
+
+
+    Mat.nflops += 12L * C.nnz * A.nrows    // Charge 10 for Poisson RNG
   }
   
   def mkGibbsLDAmodel(fopts:Model.Opts) = {
@@ -136,7 +159,7 @@ object LDAgibbs  {
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   			new LDAgibbs(opts), 
@@ -154,7 +177,7 @@ object LDAgibbs  {
     opts.dim = d
     opts.putBack = 1
     opts.uiter = 2
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
         new LDAgibbs(opts), 
@@ -173,7 +196,7 @@ object LDAgibbs  {
     opts.dim = d
     opts.putBack = -1
     opts.uiter = 5
-    opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
     val nn = new ParLearnerF(
         new MatDS(Array(mat0:Mat), opts), 
@@ -230,32 +253,6 @@ object LDAgibbs  {
     )
     (nn, opts)
   }
-
-import edu.berkeley.bid.CUMACH
-import jcuda.runtime.JCuda._
-import jcuda.runtime.cudaError._
-import jcuda.runtime._
-
-  def doLDAgibbs(A:GMat, B:GMat, AN:GMat, BN:GMat, C:GSMat, nsamps:Float):Unit = {
-    if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || 
-        A.nrows != AN.nrows || A.ncols != AN.ncols || B.nrows != BN.nrows || B.ncols != BN.ncols) {
-      throw new RuntimeException("LDAgibbs dimensions mismatch")
-    }
-    var err = CUMACH.LDAgibbs(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, C.data, nsamps)
-    if (err != 0) throw new RuntimeException(("GPU %d LDAgibbs kernel error "+cudaGetErrorString(err)) format getGPU)
-    Mat.nflops += 12L * C.nnz * A.nrows   // Charge 10 for Poisson RNG
-  }
-  
-  def doLDAgibbsx(A:GMat, B:GMat, C:GSMat, Ms:GIMat, Us:GIMat):Unit = {
-    if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || C.nnz != Ms.ncols || C.nnz != Us.ncols || Ms.nrows != Us.nrows) {
-      throw new RuntimeException("LDAgibbsx dimensions mismatch")
-    }
-
-
-    Mat.nflops += 12L * C.nnz * A.nrows    // Charge 10 for Poisson RNG
-  }
-  
-
   
 }
 

@@ -105,7 +105,7 @@ object ALS  {
     val opts = new xopts
     opts.dim = d
     opts.putBack = 2
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   			new ALS(opts), 

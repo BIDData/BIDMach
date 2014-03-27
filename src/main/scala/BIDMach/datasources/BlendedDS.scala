@@ -24,7 +24,7 @@ class BlendedDS(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1
   
   def init = {
     sizeMargin = opts.sizeMargin
-    blockSize = opts.blockSize
+    blockSize = opts.batchSize
     bBlock = opts.bBlock
     randv = rand(1, blockSize/bBlock + 1)
     rands1 = rand(1, blockSize/bBlock + 1)

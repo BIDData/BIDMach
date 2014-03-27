@@ -195,7 +195,8 @@ object GLM {
      
   def learn(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.alpha = 0.1f
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new GLM(opts), 
@@ -208,7 +209,8 @@ object GLM {
   
   def learn(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.alpha = 0.1f
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new Learner(
@@ -221,11 +223,13 @@ object GLM {
   
   def learn(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learn(mat0, targ, 0)
      
-  def learnBatch(mat0:Mat, d:Int) = {
+  def learnBatch(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.alpha = 0.1f
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    if (opts.links == null) opts.links = izeros(targ.nrows,1)
     val nn = new Learner(
-        new MatDS(Array(mat0), opts), 
+        new MatDS(Array(mat0, targ), opts), 
         new GLM(opts), 
         new L1Regularizer(opts), 
         new ADAGrad(opts),
@@ -237,7 +241,8 @@ object GLM {
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.alpha = 0.1f
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0), opts), 
   	    opts, mkGLMModel _,
@@ -251,7 +256,8 @@ object GLM {
   
   def learnPar(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnParOptions
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.alpha = 0.1f
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new ParLearnerF(
@@ -274,6 +280,7 @@ object GLM {
 		) = {
   	
   	val opts = new LearnFParOptions
+  	opts.alpha = 0.1f
   	val nn = new ParLearnerxF(
   	    null,
   	    (dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i),
@@ -291,6 +298,7 @@ object GLM {
 		d:Int = 0
 		) = {	
   	val opts = new LearnFParOptions
+  	opts.alpha = 0.1f
   	val nn = new ParLearnerF(
   	    SFilesDS.twitterWords(nstart, nend),
   	    opts, mkGLMModel _, 

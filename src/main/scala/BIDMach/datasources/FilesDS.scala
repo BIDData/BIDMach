@@ -40,7 +40,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options) extends Data
   def initbase = {
     nstart = opts.nstart
     fnames = opts.fnames
-    blockSize = opts.blockSize
+    blockSize = opts.batchSize
     while (!fileExists(fnames(0)(nstart))) {nstart += 1}
     if (opts.order == 1) {
       	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-nstart,1))         // Randomize the file read order

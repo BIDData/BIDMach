@@ -18,7 +18,7 @@ import BIDMach._
  - NMFeps(1e-9):  A safety floor constant
  *
  * Other key parameters inherited from the learner, datasource and updater:
- - blockSize: the number of samples processed in a block
+ - batchSize: the number of samples processed in a block
  - power(0.3f): the exponent of the moving average model' = a dmodel + (1-a)*model, a = 1/nblocks^power
  - npasses(10): number of complete passes over the dataset
  *
@@ -148,7 +148,7 @@ object NMF  {
     opts.dim = d
     opts.putBack = 1
     opts.uiter = 2
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   			new NMF(opts), 
@@ -163,7 +163,7 @@ object NMF  {
     opts.dim = d
     opts.putBack = 1
     opts.uiter = 1
-    opts.blockSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
         new NMF(opts), 
@@ -178,7 +178,7 @@ object NMF  {
     val opts = new xopts
     opts.dim = d
     opts.npasses = 4
-    opts.blockSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 

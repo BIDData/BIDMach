@@ -15,7 +15,7 @@ class MatDS(var mats:Array[Mat], override val opts:MatDS.Opts = new MatDS.Option
   
   def init = {
     sizeMargin = opts.sizeMargin
-    blockSize = opts.blockSize
+    blockSize = opts.batchSize
     if (opts.addConstFeat) {
       mats(0) = mats(0) on sparse(ones(1, mats(0).ncols)) 
     }

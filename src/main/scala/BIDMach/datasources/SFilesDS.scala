@@ -17,7 +17,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
     var totsize = sum(opts.fcounts).v
     if (opts.addConstFeat) totsize += 1
     omats = new Array[Mat](1)
-    omats(0) = SMat(totsize, opts.blockSize, opts.blockSize * opts.eltsPerSample)
+    omats(0) = SMat(totsize, opts.batchSize, opts.batchSize * opts.eltsPerSample)
     inptrs = izeros(opts.fcounts.length, 1)
     offsets = 0 on cumsum(opts.fcounts)
   }
@@ -115,7 +115,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
   
   override def next:Array[Mat] = {
     var donextfile = false
-    var todo = blockSize
+    var todo = opts.batchSize
     flushMat(omats(0))
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
@@ -125,7 +125,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
     	nrow = math.min(rowno + todo, spm)
     	val matq = matqueue(filex)
     	if (matq(0) != null) {
-    		omats(0) = sprowslice(matq, rowno, nrow, omats(0), blockSize - todo)
+    		omats(0) = sprowslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
     		if (spm == nrow) donextfile = true
     	} else {
     		donextfile = true
@@ -170,7 +170,7 @@ object SFilesDS {
   		nstart = nstart0/n
   		nend = nend0/n
   		order = 1
-  		blockSize = 100000
+  		batchSize = 100000
   		eltsPerSample = 40
   		lookahead = 3
   	}
@@ -189,7 +189,7 @@ object SFilesDS {
   		nstart = nstart0/n
   		nend = nend0/n
   		order = 1
-  		blockSize = 100000
+  		batchSize = 100000
   		eltsPerSample = 40
   		lookahead = 3
   	}
@@ -214,7 +214,7 @@ object SFilesDS {
   		nstart = nstart0/n
   		nend = nend0/n
   		order = 1
-  		blockSize = 100000
+  		batchSize = 100000
   		eltsPerSample = 40
   		lookahead = 3
   	}
@@ -239,7 +239,7 @@ object SFilesDS {
   		nstart = nstart0/n
   		nend = nend0/n 
   		order = 1
-  		blockSize = 100000
+  		batchSize = 100000
   		eltsPerSample = 40
   		lookahead = 3
   	}

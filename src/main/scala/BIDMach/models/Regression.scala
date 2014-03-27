@@ -25,10 +25,6 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     sp = sdat / sum(sdat)
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
-    val rmat = rand(d,m) - 0.5f 
-    rmat ~ rmat *@ sdat
-    val msum = sum(rmat, 2)
-    rmat ~ rmat / msum
     val mm = zeros(d,m)
     modelmats = Array[Mat](1)
     modelmats(0) = if (useGPU) GMat(mm) else mm 

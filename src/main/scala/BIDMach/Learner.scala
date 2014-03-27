@@ -63,7 +63,7 @@ case class Learner(
       println("pass=%2d" format ipass)
       while (datasource.hasNext) {
         val mats = datasource.next    
-        here += datasource.opts.blockSize
+        here += datasource.opts.batchSize
         bytes += 12L*mats(0).nnz
         if ((istep - 1) % opts.evalStep == 0 || ! datasource.hasNext) {
         	val scores = model.evalblockg(mats, ipass)
@@ -185,7 +185,7 @@ case class ParLearnerx(
 	  			var istep = 0
 	  			while (datasources(ithread).hasNext) {
 	  				val mats = datasources(ithread).next
-	  				here += datasources(ithread).opts.blockSize
+	  				here += datasources(ithread).opts.batchSize
 	  				for (j <- 0 until mats.length) bytes += 12L * mats(j).nnz
 	  				models(0).synchronized {
 	  					istep += 1
@@ -464,7 +464,7 @@ case class ParLearner(
     				for (j <- 0 until mats.length) {
     				  cmats(ithread)(j) = safeCopy(mats(j), ithread) 
     				}
-    				here += datasource.opts.blockSize
+    				here += datasource.opts.batchSize
     				feats += mats(0).nnz
     				done(ithread) = 0;
     				bytes += 12L*mats(0).nnz
