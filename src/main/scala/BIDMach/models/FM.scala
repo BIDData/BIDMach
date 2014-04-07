@@ -6,6 +6,7 @@ import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
 import BIDMach.datasources._
 import BIDMach.updaters._
+import BIDMach.mixins._
 import BIDMach._
 
 
@@ -98,8 +99,8 @@ object FM {
   	new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
   }
   
-  def mkRegularizer(nopts:Regularizer.Opts) = {
-    new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts])
+  def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts]))
   } 
   
   class LearnOptions extends Learner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
@@ -110,7 +111,7 @@ object FM {
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new FM(opts), 
-  	    new L1Regularizer(opts),
+  	    mkRegularizer(opts),
   	    new ADAGrad(opts), opts)
     (nn, opts)
   }
@@ -125,7 +126,7 @@ object FM {
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
         new FM(opts), 
-        new L1Regularizer(opts),
+        mkRegularizer(opts),
         new ADAGrad(opts), opts)
     (nn, opts)
   }
@@ -139,7 +140,7 @@ object FM {
     val nn = new Learner(
         new MatDS(Array(mat0), opts), 
         new FM(opts), 
-        new L1Regularizer(opts),
+        mkRegularizer(opts),
         new ADAGrad(opts),
         opts)
     (nn, opts)

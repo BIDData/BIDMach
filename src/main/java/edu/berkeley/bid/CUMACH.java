@@ -7,7 +7,7 @@ public final class CUMACH {
 
     static {
         jcuda.LibUtils.loadLibrary("bidmachcuda");
-    }
+    } 
     
     public static native int LDAgibbs(int nr, int nnz, Pointer A, Pointer B, Pointer AN, Pointer BN, Pointer Cir, Pointer Cic, Pointer P, float nsamps);
 

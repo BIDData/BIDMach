@@ -9,6 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.CountDownLatch
 import BIDMach.datasources._
 import BIDMach.updaters._
+import BIDMach.mixins._
 import BIDMach._
 
 
@@ -204,8 +205,8 @@ object GLM {
   	new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
   } 
   
-  def mkRegularizer(nopts:Regularizer.Opts) = {
-    new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts])
+  def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts]))
   }
   
   class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
@@ -217,7 +218,7 @@ object GLM {
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new GLM(opts), 
-  	    new L1Regularizer(opts),
+  	    mkRegularizer(opts),
   	    new ADAGrad(opts), opts)
     (nn, opts)
   }
@@ -233,7 +234,7 @@ object GLM {
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
         new GLM(opts), 
-        new L1Regularizer(opts),
+        mkRegularizer(opts),
         new ADAGrad(opts), opts)
     (nn, opts)
   }
@@ -248,7 +249,7 @@ object GLM {
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
         new GLM(opts), 
-        new L1Regularizer(opts), 
+        mkRegularizer(opts), 
         new ADAGrad(opts),
         opts)
     (nn, opts)

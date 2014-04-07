@@ -18,7 +18,7 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
   	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)          // Big enough to hold log2(num months)
   	println("Building monthly dicts for "+opts.thisDir)
-	  for (d <- opts.nstart to opts.nend) {                                      // Conditional on rebuild, merge the dictionaries for each month
+	  for (d <- opts.nstart to opts.nend) {                                    // Conditional on rebuild, merge the dictionaries for each month
 	    val (year, month, day) = Featurizer.decodeDate(d)
 	  	val fm = new File(opts.fromMonthDir(d) + wcountname)
 	    if (rebuild > 1 || ! fm.exists) {

@@ -7,6 +7,7 @@ import BIDMat.about
 import BIDMach.models._
 import BIDMach.updaters._
 import BIDMach.datasources._
+import BIDMach.mixins._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.future
@@ -15,14 +16,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 case class Learner(
     val datasource:DataSource, 
     val model:Model, 
-    val regularizer:Regularizer, 
+    val mixins:Array[Mixin], 
     val updater:Updater, 
-		val opts:Learner.Options = new Learner.Options) {
+    val opts:Learner.Options = new Learner.Options) {
   
   var results:FMat = null
   val dopts:DataSource.Opts = datasource.opts
 	val mopts:Model.Opts	= model.opts
-	val ropts:Regularizer.Opts = if (regularizer != null) regularizer.opts else null
+	val ropts:Mixin.Opts = if (mixins != null) mixins(0).opts else null
 	val uopts:Updater.Opts = updater.opts
 	var useGPU = false
 	
@@ -33,7 +34,7 @@ case class Learner(
   def init = {
     datasource.init
     model.init(datasource)
-    if (regularizer != null) regularizer.init(model)
+    if (mixins != null) mixins map (_ init(model))
     updater.init(model)
     useGPU = model.useGPU
   }
@@ -71,7 +72,7 @@ case class Learner(
         	samplist.append(here)
         } else {
         	model.doblockg(mats, ipass, here)
-        	if (regularizer != null) regularizer.compute(here)
+        	if (mixins != null) mixins map (_ compute(mats, here))
         	updater.update(ipass, here)
         }   
         if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
@@ -112,7 +113,7 @@ case class Learner(
 case class ParLearnerx(
     val datasources:Array[DataSource], 
     val models:Array[Model], 
-    val regularizers:Array[Regularizer], 
+    val mixins:Array[Array[Mixin]], 
     val updaters:Array[Updater], 
 		val opts:ParLearner.Options = new ParLearner.Options) {
   
@@ -134,7 +135,7 @@ case class ParLearnerx(
   		if (i < Mat.hasCUDA) setGPU(i)
   		datasources(i).init
   		models(i).init(datasources(i))
-  		if (regularizers != null) regularizers(i).init(models(i))
+  		if (mixins != null) mixins(i) map(_ init(models(i)))
   		updaters(i).init(models(i))
   	}
   	useGPU = models(0).useGPU
@@ -199,7 +200,7 @@ case class ParLearnerx(
 	  					} else {
 	  						models(ithread).synchronized {
 	  							models(ithread).doblockg(mats, ipass, here)
-	  							if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+	  							if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(mats, here))
 	  							updaters(ithread).update(ipass, here)
 	  						}
 	  					}
@@ -312,33 +313,33 @@ class ParLearnerxF(
 		ddfun:(DataSource.Opts, Int)=>DataSource,
 		mopts:Model.Opts,
 		mkmodel:(Model.Opts)=>Model,
-		ropts:Regularizer.Opts,
-		mkreg:(Regularizer.Opts)=>Regularizer,
+		ropts:Mixin.Opts,
+		mkreg:(Mixin.Opts)=>Array[Mixin],
 		uopts:Updater.Opts,
 		mkupdater:(Updater.Opts)=>Updater,
 		val lopts:ParLearner.Options = new ParLearner.Options) {
 
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
-  var regularizers:Array[Regularizer] = null
+  var mixins:Array[Array[Mixin]] = null
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null
   
   def setup = {
     dds = new Array[DataSource](lopts.nthreads)
     models = new Array[Model](lopts.nthreads)
-    if (mkreg != null) regularizers = new Array[Regularizer](lopts.nthreads)
+    if (mkreg != null) mixins = new Array[Array[Mixin]](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads)
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
       if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
     	dds(i) = ddfun(dopts, i)
     	models(i) = mkmodel(mopts)
-    	if (mkreg != null) regularizers(i) = mkreg(ropts)
+    	if (mkreg != null) mixins(i) = mkreg(ropts)
     	updaters(i) = mkupdater(uopts)
     }
     if (0 < Mat.hasCUDA) setGPU(thisGPU)
-    learner = new ParLearnerx(dds, models, regularizers, updaters, lopts)
+    learner = new ParLearnerx(dds, models, mixins, updaters, lopts)
     learner.setup
   }
   
@@ -354,9 +355,9 @@ class ParLearnerxF(
 case class ParLearner(
     val datasource:DataSource, 
     val models:Array[Model], 
-    val regularizers:Array[Regularizer], 
+    val mixins:Array[Array[Mixin]], 
     val updaters:Array[Updater], 
-		val opts:ParLearner.Options = new ParLearner.Options) {
+	val opts:ParLearner.Options = new ParLearner.Options) {
   
   var um:Array[Mat] = null
   var mm:Array[Mat] = null
@@ -376,7 +377,7 @@ case class ParLearner(
     for (i <- 0 until opts.nthreads) {
       if (useGPU && i < Mat.hasCUDA) setGPU(i)
     	models(i).init(datasource)
-    	if (regularizers != null) regularizers(i).init(models(i))
+    	if (mixins != null) mixins(i) map (_ init(models(i)))
     	updaters(i).init(models(i))
     }
     if (useGPU) setGPU(thisGPU) 
@@ -438,7 +439,7 @@ case class ParLearner(
     					samplist.synchronized { samplist.append(here) }
     				} else {
     					models(ithread).doblockg(cmats(ithread), ipass, here)
-    					if (regularizers != null && regularizers(ithread) != null) regularizers(ithread).compute(here)
+    					if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here))
     					updaters(ithread).update(ipass, here)
     				}
     			} catch {
@@ -548,28 +549,28 @@ class ParLearnerF(
 		val mopts:Model.Opts,
 		mkmodel:(Model.Opts)=>Model,
 		ropts:Regularizer.Opts,
-		mkreg:(Regularizer.Opts)=>Regularizer,
+		mkreg:(Mixin.Opts)=>Array[Mixin],
 		val uopts:Updater.Opts,
 		mkupdater:(Updater.Opts)=>Updater,
 		val lopts:ParLearner.Options = new ParLearner.Options) {
   var models:Array[Model] = null
-  var regularizers:Array[Regularizer] = null
+  var mixins:Array[Array[Mixin]] = null
   var updaters:Array[Updater] = null
   var learner:ParLearner = null
   
   def setup = {
     models = new Array[Model](lopts.nthreads)
-    if (mkreg != null) regularizers = new Array[Regularizer](lopts.nthreads)
+    if (mkreg != null) mixins = new Array[Array[Mixin]](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads) 
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
       if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
-    	if (mkreg != null) regularizers(i) = mkreg(ropts)
+    	if (mkreg != null) mixins(i) = mkreg(ropts)
     	updaters(i) = mkupdater(uopts)
     }
     if (0 < Mat.hasCUDA) setGPU(thisGPU)
-    learner = new ParLearner(ds, models, regularizers, updaters, lopts)   
+    learner = new ParLearner(ds, models, mixins, updaters, lopts)   
     learner.setup
   }
   

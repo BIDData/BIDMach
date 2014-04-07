@@ -16,7 +16,5 @@ abstract class Sampler {
 
 
 object Sampler {
-	class Options {
-	
-  }
+	class Options {}
 }
