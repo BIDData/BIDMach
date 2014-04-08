@@ -18,37 +18,53 @@ object Experiments {
   }
 }
 
+object NYTIMES {
+  def preprocess(dict:String, fname:String) {
+    val cols = loadIMat(dict+"docword."+fname+".txt")
+    val nrows = maxi(cols(?,1)).v
+    val ncols = maxi(cols(?,0)).v
+    val m = sparse(cols(?,1) - 1, cols(?,0) - 1, FMat(cols(?,2)), nrows, ncols)
+    saveSMat(dict+fname+".smat.lz4", m)
+  }
+}
+
 object RCV1 {
-  def preprocess {
-    val dict = CSMat(loadSBMat("/big/RCV1/v2/tokenized/dict.gz"))
-    val wc = loadIMat("/big/RCV1/v2/tokenized/wcount.gz")
-    val a0 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt0.dat.gz")
-    val a1 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt1.dat.gz")
-    val a2 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt2.dat.gz")
-    val a3 = loadIMat("/big/RCV1/v2/tokenized/lyrl2004_tokens_test_pt3.dat.gz")
+  
+  def prepare(dict:String) {
+    println("Preprocessing"); preprocess(dict)
+    println("Making Sparse Data Matrix"); mksparse(dict)
+    println("Making Category Matrix"); mkcats(dict)
+  }
+  
+  def preprocess(dict:String) {
+    val dictm = CSMat(loadSBMat(dict+"dict.gz"))
+    val wc = loadIMat(dict+"wcount.gz")
+    val a0 = loadIMat(dict+"lyrl2004_tokens_test_pt0.dat.gz")
+    val a1 = loadIMat(dict+"lyrl2004_tokens_test_pt1.dat.gz")
+    val a2 = loadIMat(dict+"lyrl2004_tokens_test_pt2.dat.gz")
+    val a3 = loadIMat(dict+"lyrl2004_tokens_test_pt3.dat.gz")
     val a = (a0 on a1) on (a2 on a3)
     val (swc, ii) = sortdown2(wc)
-    val sdict = dict(ii)
+    val sdict = dictm(ii)
     val bdict = SBMat(sdict)
     val n = ii.length
     val iinv = izeros(n, 1)
     iinv(ii) = icol(0->n)
     val jj = find(a > 0)
     a(jj,0) = iinv(a(jj,0)-1)
-    saveIMat("/big/RCV1/v2/tokenized/tokens.imat.lz4", a)
-    saveSBMat("/big/RCV1/v2/tokenized/sdict.SBMat.lz4", bdict)
-    saveIMat("/big/RCV1/v2/tokenized/swcount.imat.lz4", swc)
-
+    saveIMat(dict+"tokens.imat.lz4", a)
+    saveSBMat(dict+"../sdict.sbmat.lz4", bdict)
+    saveIMat(dict+"../swcount.imat.lz4", swc)
   }
   
-  def mksparse {
-    val a = loadIMat("/big/RCV1/v2/tokenized/tokens.imat.lz4")
-    val dict = Dict(loadSBMat("/big/RCV1/v2/tokenized/sdict.SBMat.lz4"))
-    val swc = loadIMat("/big/RCV1/v2/tokenized/swcount.imat.lz4")
+  def mksparse(dict:String) {
+    val a = loadIMat(dict+"tokens.imat.lz4")
+    val dictm = Dict(loadSBMat(dict+"../sdict.sbmat.lz4"))
+    val swc = loadIMat(dict+"../swcount.imat.lz4")
     val tab = izeros(a.nrows,2)
     tab(?,1) = a
-    val ii = find(a == dict(".i"))
-    val wi = find(a == dict(".w"))
+    val ii = find(a == dictm(".i"))
+    val wi = find(a == dictm(".w"))
     tab(ii,1) = -1
     tab(wi,1) = -1
     val lkup = a(ii+1)
@@ -59,21 +75,21 @@ object RCV1 {
     val iikeep = find(tab(?,1) >= 0)
     val ntab = tab(iikeep,?)
     val sm = sparse(ntab(?,1), ntab(?,0), ones(ntab.nrows,1), swc.length, ii.length)
-    saveSMat("/big/RCV1/v2/tokenized/docs.smat.lz4", sm)
-    saveIMat("/big/RCV1/v2/tokenized/lkup.imat.lz4", lkup)    
+    saveSMat(dict+"../docs.smat.lz4", sm)
+    saveIMat(dict+"../lkup.imat.lz4", lkup)    
   }
   
-  def mkcats {
-    val lkup = loadIMat("/big/RCV1/v2/tokenized/lkup.imat.lz4")
-    val catids=loadIMat("/big/RCV1/v2/topics.catname")
-    val docids=loadIMat("/big/RCV1/v2/topics.docid")
+  def mkcats(dict:String) {
+    val lkup = loadIMat(dict+"../lkup.imat.lz4")
+    val catids=loadIMat(dict+"../catname.imat")
+    val docids=loadIMat(dict+"../docid.imat")
     val nd = math.max(maxi(lkup).v,maxi(docids).v)+1
     val nc = maxi(catids).v
     val cmat = izeros(nc,nd)
     val indx = catids - 1 + nc*docids
     cmat(indx) = 1
     val cm = FMat(cmat(?,lkup))
-    saveFMat("/big/RCV1/v2/tokenized/cats.fmat.lz4", cm) 
+    saveFMat(dict+"../cats.fmat.lz4", cm) 
   }
 }
 

@@ -37,4 +37,8 @@ else
     export JAVA_OPTS="-Djava.library.path=${BIDMAT_ROOT}/lib;${BIDMACH_ROOT}/lib;${NEWPATH} "$JAVA_OPTS
 fi
 
-scala -nobootcp -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala
+if [ ! "${1}" = "" ]; then
+    suffix="-e ${1}"
+fi
+
+scala -nobootcp -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala ${suffix}
