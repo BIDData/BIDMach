@@ -39,9 +39,10 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
   
   def mupdate2(in:Mat, targ:Mat) = {
+    val ftarg = full(targ)
     val eta = modelmats(0) * in
     GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
-    eta ~ targ - eta
+    eta ~ ftarg - eta
     updatemats(0) ~ eta *^ in
   }
   
@@ -53,9 +54,10 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
   
   def meval2(in:Mat, targ:Mat):FMat = {
+    val ftarg = full(targ)
     val eta = modelmats(0) * in
     GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
-    GLM.llfun(eta, targ, mylinks, linkArray, totflops)
+    GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
   }
 }
 
