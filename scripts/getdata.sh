@@ -14,5 +14,7 @@ ${BIDMACH_SCRIPTS}/getuci.sh nytimes
 
 ${BIDMACH_SCRIPTS}/getuci.sh nips
 
+${BIDMACH_SCRIPTS}/getdigits.sh
+
 
 

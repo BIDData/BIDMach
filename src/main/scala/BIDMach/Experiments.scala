@@ -28,6 +28,21 @@ object NYTIMES {
   }
 }
 
+object DIGITS {
+  def preprocess(dict:String, fname:String) {
+    val mat = loadFMat(dict+fname+".txt")
+    val srow = sum(abs(mat),2)
+    val inds = IMat((cumsum(srow==0)-1)/660)
+    val ii = find(srow > 0)
+    val mm = mat(ii,?)
+    val inn = inds(ii,?)
+    saveFMat(dict+fname+".fmat.lz4", mm.t)
+    val cats = zeros(mm.nrows, maxi(inn).v + 1)
+    cats(icol(0->(inn.nrows)) + inn*mm.nrows) = 1f
+    saveFMat(dict+fname+"_cats.fmat.lz4", cats.t)
+  }
+}
+
 object RCV1 {
   
   def prepare(dict:String) {
