@@ -7,7 +7,7 @@ else
   BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
 fi
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
-BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed s+/cygdrive/c+c:+ )" 
+BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 
 echo "Loading arabic digits data"
 

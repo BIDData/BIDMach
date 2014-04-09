@@ -7,8 +7,8 @@ else
   BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
 fi
 BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
-BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed s+/cygdrive/c+c:+ )" 
-
+BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
+echo $BIDMACH_SCRIPTS
 echo "Loading RCV1 v2 data"
 
 RCV1=${BIDMACH_SCRIPTS}/../data/rcv1
