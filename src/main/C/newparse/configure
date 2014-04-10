@@ -1,12 +1,11 @@
 #!/bin/sh
 
 if [[ "$1" == win* ]]; then 
-    ZLIB="\\\\\\\\code/zlib"
     MYDEFS="/D WITHGZS"
     RELOPTS="/O2 /I . ${MYDEFS} /EHsc /D NDEBUG /Gd /GF /MT"
     DBGOPTS="/EHsc /I . ${MYDEFS} /D _DEBUG /Gd /GF /MTd /W4 /wd4996"
-    RELLINK="zlib.lib /MACHINE:AMD64"
-    DBGLINK="zlib.lib /NODEFAULTLIB:LIBCMT /MACHINE:AMD64"
+    RELLINK="zlib-x86_64.lib /MACHINE:AMD64"
+    DBGLINK="zlib-x86_64.lib /NODEFAULTLIB:LIBCMT /MACHINE:AMD64"
     CC="cl"
     CPP="cl"
     LD="link"
