@@ -3,6 +3,7 @@
 // or matlab binary form. 
 
 #include <time.h>
+#include <limits.h>
 #include "utils.h"
 
 #define BUFSIZE 1048576
@@ -531,7 +532,7 @@ int main(int argc, char ** argv) {
     linebuf[membuf-1] = 0;
     if (ifstr->fail()) {
       ifstr->clear();
-      ifstr->ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+      ifstr->ignore(LONG_MAX,'\n');
     }
     if (strlen(linebuf) > 0) {
       jmax++;
