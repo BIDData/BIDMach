@@ -6,3 +6,7 @@ ifeq ($(CC),gcc)
 else
 	include makefile.w32
 endif
+
+install: all
+	mkdir -p ../../../../bin
+	cp *.exe ../../../../bin
