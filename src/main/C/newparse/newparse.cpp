@@ -49,7 +49,7 @@ int main(int argc, char ** argv) {
   here = strtok(ifname, " ,");
   while (here != NULL) {
     if (strstr(here, ".gz") - here == strlen(here) - 3) {
-#ifdef __CYGWIN__
+#if defined __CYGWIN__ || ! defined __GNUC__
       printf("cant use compressed files in cygwin\n");
       exit(1);
 #else 
@@ -61,7 +61,7 @@ int main(int argc, char ** argv) {
     fprintf(stderr, "\nScanning %s\n", here);
     yylex();
     if (strstr(here, ".gz") - here == strlen(here) - 3) {
-#ifndef __CYGWIN__
+#if ! defined __CYGWIN__ && defined __GNUC__
       pclose(yyin);
 #endif
     } else {

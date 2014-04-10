@@ -20,7 +20,7 @@ PUNCT	   [;:,.?!]
 %% 
 
 -?{DIGIT}+    {
-#if (__GNUC__ > 3 && __GNUC_MINOR__ > 6)
+#if ( ! defined __GNUC__ || (__GNUC__ > 3 && __GNUC_MINOR__ > 6))
   long long iv = strtoll(yytext, NULL, 10);
 #else
   long iv = strtol(yytext, NULL, 10);

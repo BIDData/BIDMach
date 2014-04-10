@@ -48,7 +48,7 @@ struct strhashfn {
   }
 };
 
-#if (__GNUC__ < 4 || __GNUC_MINOR__ < 4)
+#if defined __GNUC__ && (__GNUC__ < 4 || __GNUC_MINOR__ < 4)
 #include <ext/hash_map>
 typedef __gnu_cxx::hash_map<const char*, int, __gnu_cxx::hash<const char*>, eqstr> strhash;
 #else

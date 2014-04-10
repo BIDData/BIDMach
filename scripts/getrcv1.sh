@@ -47,7 +47,7 @@ if [ ! -e tokenized/dict.gz ]; then
         allfiles=`echo $allfiles | sed s/\.dat\.gz/.dat/g`
     fi
 
-    ${BIDMACH_SCRIPTS}/../../BIDMat/src/main/C/newparse/trec.exe -i $allfiles -o tokenized/
+    ${BIDMACH_SCRIPTS}/../src/main/C/newparse/trec.exe -i $allfiles -o tokenized/
 
     if [ "$OS" = "Windows_NT" ]; then
         echo "Compressing"
@@ -62,7 +62,7 @@ if [ ! -e tokenized/dict.gz ]; then
 fi
 
 if [ ! -e "catname.imat" ]; then
-    ${BIDMACH_SCRIPTS}/../../BIDMat/src/main/C/newparse/tparse.exe -i rcv1-v2.topics.qrels.gz -f ${RCV1}/fmt.txt -o ./ -m ./ -d " "
+    ${BIDMACH_SCRIPTS}/../src/main/C/newparse/tparse.exe -i rcv1-v2.topics.qrels.gz -f ${RCV1}/fmt.txt -o ./ -m ./ -d " "
 fi
 
 if [ ! -e "docs.smat.lz4" ]; then
