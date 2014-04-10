@@ -2,17 +2,18 @@
 // Output integer matrices with lookup maps in either ascii text 
 // or matlab binary form. 
 
-#include <time.h>
-#include <string.h>
-#include <iostream>
-#include <fstream>
-#include <vector>
+#include <assert.h>
+#include <math.h>
+#include <string>
+#include <iostream> 
+#include <iomanip>
+#include <fstream> 
+#include <sstream> 
+#include <vector> 
 #include <algorithm>
 #include <stdexcept>
-#include <limits>
-#include <gzstream.h>
-
-using namespace std;
+#include <time.h>
+#include "gzstream.h"
 
 #ifdef __GNUC__
 #include <stdint.h>
@@ -82,6 +83,7 @@ bool valult(const vpair<T> & v1, const vpair<T> & v2) {
   return (v1.val < v2.val);
 }
 
+using namespace std;
 
 typedef vector<char *> unhash;
 typedef vpair<float> fpair;

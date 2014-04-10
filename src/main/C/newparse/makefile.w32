@@ -1,14 +1,16 @@
+ZLIB=\\\\\\\\code/zlib
 
+MYDEFS=/D WITHGZS
 
-LDFLAGS=/DLL /MACHINE:amd64 
-RELOPTS=/c /MT /EHsc /DNDEBUG /O2 
-DBGOPTS=/c /MTD /EHsc /DDEBUG /O2
-RELLINK=
-DBGLINK=-lz
+RELOPTS=/O2 /I $(ZLIB) $(MYDEFS) /EHsc /D NDEBUG /Gd /GF /MT
+DBGOPTS=/EHsc /I $(ZLIB) $(MYDEFS) /D _DEBUG /Gd /GF /MTd /W4 /wd4996
+RELLINK=$(ZLIB)/zdll.lib /MACHINE:AMD64
+DBGLINK=$(ZLIB)/zdll.lib /NODEFAULTLIB:LIBCMT /MACHINE:AMD64
+RELSTLINK=$(ZLIB)/zlib.lib /MACHINE:AMD64
+DBGSTLINK=$(ZLIB)/zlib.lib /NODEFAULTLIB:LIBCMT /MACHINE:AMD64
 CC_OPTS=$(DBGOPTS)
-LINK_OPTS=/MACHINE:amd64 
+LINK_OPTS=$(DBGLINK)
 CC=cl
-CPP=cl
 LD=link
 
 include gmake.options
@@ -29,13 +31,13 @@ tparse.exe: gzstream.obj utils.obj tparse.obj utils.h
 	$(LD) tparse.obj utils.obj gzstream.obj $(LINK_OPTS) /OUT:tparse.exe
 
 .obj.exe: $(OBJS)
-	$(LD) $(OBJS) $< $(LINK_OPTS) /OUT:$@
+	$(LD) $(OBJS) $< $(LINK_OPTS) /OUT:"$@"
 
 .cpp.obj: utils.h gzstream.h
-	$(CPP) $(CC_OPTS) /Fo$@ $<
+	$(CPP) $(CC_OPTS) /Fo"$@" /c $<
 
 .lxc.obj: 
-	$(CPP) $(CC_OPTS) /DYY_NO_UNISTD_H /Fo$@ /c $<
+	$(CPP) $(CC_OPTS) /DYY_NO_UNISTD_H /Fo"$@" /c $<
 
 $(EXES): $(OBJS)
 
