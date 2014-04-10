@@ -22,20 +22,11 @@ tparse.exe: gzstream.obj utils.obj tparse.obj utils.h
 	$(CPP) $(CC_OPTS) /Fo"$@" /c $<
 
 .lxc.obj: 
-	$(CPP) $(CC_OPTS) /DYY_NO_UNISTD_H /Fo"$@" /c /Tc$<
+	$(CPP) $(CC_OPTS) /DYY_NO_UNISTD_H /Fo"$@" /c /Tc"$<"
 
 $(EXES): $(OBJS)
 
 gzstream.obj: gzstream.h
-
-debug: clean
-	echo -e CC_OPTS=$(DBGOPTS)\\nLINK_OPTS=$(DBGLINK) > gmake.options
-
-release: clean
-	echo -e CC_OPTS=$(RELOPTS)\\nLINK_OPTS=$(RELLINK) > gmake.options
-
-gmake.options:
-	touch gmake.options
 
 clean:
 	rm -f $(EXES) *.obj *.lxc
