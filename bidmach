@@ -11,30 +11,28 @@ else
 fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
-BIDMAT_ROOT="${BIDMACH_ROOT}/../BIDMat" # Change if needed
 # export JAVA_HOME="" # Set here if not set in environment
-JCUDA_LIBDIR="${BIDMAT_ROOT}/lib"
-BIDLIB="${BIDMAT_ROOT}/lib"
-LIBDIR=${BIDMACH_ROOT}/lib
+JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
+LIBDIR="${BIDMACH_ROOT}/lib"
 if [ `uname` = "Darwin" ]; then
-  export DYLD_LIBRARY_PATH="${BIDMAT_ROOT}/lib:${BIDMACH_ROOT}/lib:/usr/local/cuda/lib:${LD_LIBRARY_PATH}"
+  export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${LD_LIBRARY_PATH}"
 else
-  export LD_LIBRARY_PATH="${BIDMAT_ROOT}/lib:${BIDMACH_ROOT}/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
+  export LD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
 fi
 
-BIDMAT_LIBS="${BIDMAT_ROOT}/BIDMat.jar;${BIDLIB}/ptplot.jar;${BIDLIB}/ptplotapplication.jar;${BIDLIB}/jhdf5.jar;${BIDLIB}/commons-math3-3.1.1.jar;${BIDLIB}/lz4-1.1.2.jar"
+BIDMACH_LIBS="${LIBDIR}/BIDMat.jar;${LIBDIR}/ptplot.jar;${LIBDIR}/ptplotapplication.jar;${LIBDIR}/jhdf5.jar;${LIBDIR}/commons-math3-3.1.1.jar;${LIBDIR}/lz4-1.1.2.jar"
 JCUDA_LIBS="${JCUDA_LIBDIR}/jcuda-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcublas-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcufft-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcurand-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcusparse-${JCUDA_VERSION}.jar"
 
-export ALL_LIBS="${BIDMACH_ROOT}/BIDMach.jar;${BIDMAT_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
+export ALL_LIBS="${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
 
 if [ ! "$OS" = "Windows_NT" ]; then
     export ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
 else
     if [ ! "${CUDA_PATH}" = "" ]; then
-	NEWPATH=`${BIDMAT_ROOT}/shortpath.bat "${CUDA_PATH}"`
+	NEWPATH=`${BIDMACH_ROOT}/shortpath.bat "${CUDA_PATH}"`
 	NEWPATH=`echo $NEWPATH | sed 's_\\\\_/_g'`/bin
     fi
-    export JAVA_OPTS="-Djava.library.path=${BIDMAT_ROOT}/lib;${BIDMACH_ROOT}/lib;${NEWPATH} "$JAVA_OPTS
+    export JAVA_OPTS="-Djava.library.path=${LIBDIR};${NEWPATH} "$JAVA_OPTS
 fi
 
 if [ ! "${1}" = "" ]; then
