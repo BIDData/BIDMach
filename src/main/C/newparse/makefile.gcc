@@ -19,10 +19,10 @@ tparse.exe: gzstream.o utils.o tparse.o utils.h
 	$(LD) -o $@ $(OBJS) $< $(LINK_OPTS)
 
 .cpp.o: utils.h gzstream.h
-	$(CPP) $(CC_OPTS) -o $@ -c $<
+	$(CPP) $(CPPFLAGS) $(CC_OPTS) -o $@ -c $<
 
 .lxc.o: 
-	$(CPP) $(CC_OPTS) -DYY_NO_UNISTD_H -o $@ -c -x c $<
+	$(CC) $(CC_OPTS) -DYY_NO_UNISTD_H -o $@ -c -x c $<
 
 $(EXES): $(OBJS)
 

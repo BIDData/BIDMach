@@ -8,21 +8,24 @@
 #include "utils.h"
 #include "gzstream.h"
 
-extern int yylex(void);
-extern FILE*   yyin;
-
 ivector wcount;
 ivector tokens;
 unhash unh;
 strhash htab;
+
+extern "C" {
+extern int yylex(void);
+extern FILE*   yyin;
+
 int numlines=0;
+}
 
 int checkword(char *str) {
   return checkword(str, htab, wcount, tokens, unh);
 }
 
 void addtok(int tok) {
-   addtok(tok, tokens);
+  addtok(tok, tokens);
 }
 
 int main(int argc, char ** argv) {

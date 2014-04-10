@@ -22,7 +22,7 @@ tparse.exe: gzstream.obj utils.obj tparse.obj utils.h
 	$(CPP) $(CC_OPTS) /Fo"$@" /c $<
 
 .lxc.obj: 
-	$(CPP) $(CC_OPTS) /DYY_NO_UNISTD_H /Fo"$@" /c $<
+	$(CPP) $(CC_OPTS) /DYY_NO_UNISTD_H /Fo"$@" /c /Tc$<
 
 $(EXES): $(OBJS)
 

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <time.h>
+#include <cstring>
 #include "gzstream.h"
 
 #ifdef __GNUC__
@@ -104,11 +105,7 @@ void strtoupper(char * str);
 
 void strtolower(char * str);
 
-int checkword(char * str);
-
 int checkword(char * str, strhash &htab, ivector &wcount, ivector &tokens, unhash &unh);
-
-int parsedate(char * str);
 
 int parsedt(char * str);
 
@@ -143,6 +140,15 @@ int writeDIntVecs(dimatrix & im, string fname, int buffsize);
 
 int writeSBVecs(unhash & unh, string fname, int buffsize);
 
+void addtok(int tok, ivector &tokens);
+
+extern "C" {
+
 void addtok(int tok);
 
-void addtok(int tok, ivector &tokens);
+int checkword(char * str);
+
+int parsedate(char * str);
+
+}
+

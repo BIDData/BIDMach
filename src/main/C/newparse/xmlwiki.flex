@@ -20,7 +20,7 @@ PUNCT	   [;:,.?!]
 %% 
 
 -?{DIGIT}+    {
-#if ( ! defined __GNUC__ || (__GNUC__ > 3 && __GNUC_MINOR__ > 6))
+#if __STDC_VERSION__ >= 199901L
   long long iv = strtoll(yytext, NULL, 10);
 #else
   long iv = strtol(yytext, NULL, 10);
@@ -33,7 +33,7 @@ PUNCT	   [;:,.?!]
 }	     
      
 -?{DIGIT}+"."{DIGIT}*   {
-  float f = strtof(yytext, NULL);
+  float f = (float)strtod(yytext, NULL);
   int iv = *((int *)(&f));
   addtok(iv >> 1);
 }

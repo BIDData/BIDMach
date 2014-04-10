@@ -3,10 +3,10 @@
 if [[ "$1" == win* ]]; then 
     ZLIB="\\\\\\\\code/zlib"
     MYDEFS="/D WITHGZS"
-    RELOPTS="/O2 /I ${ZLIB} ${MYDEFS} /EHsc /D NDEBUG /Gd /GF /MT"
-    DBGOPTS="/EHsc /I ${ZLIB} ${MYDEFS} /D _DEBUG /Gd /GF /MTd /W4 /wd4996"
-    RELLINK="${ZLIB}/zlib.lib /MACHINE:AMD64"
-    DBGLINK="${ZLIB}/zlib.lib /NODEFAULTLIB:LIBCMT /MACHINE:AMD64"
+    RELOPTS="/O2 /I . ${MYDEFS} /EHsc /D NDEBUG /Gd /GF /MT"
+    DBGOPTS="/EHsc /I . ${MYDEFS} /D _DEBUG /Gd /GF /MTd /W4 /wd4996"
+    RELLINK="zlib.lib /MACHINE:AMD64"
+    DBGLINK="zlib.lib /NODEFAULTLIB:LIBCMT /MACHINE:AMD64"
     CC="cl"
     CPP="cl"
     LD="link"
@@ -39,5 +39,9 @@ else
 fi 
 
 echo "CC=$CC" > makefile.incl
-echo "CFLAGS=$CFLAGS" >> makefile.incl
+echo "CPP=$CPP" >> makefile.incl
+echo "LD=$LD" >> makefile.incl
+echo "CC_OPTS=$CC_OPTS" >> makefile.incl
+echo "CPPFLAGS=$CPPFLAGS" >> makefile.incl
+echo "LINK_OPTS=$LINK_OPTS" >> makefile.incl
 
