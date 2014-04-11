@@ -47,18 +47,7 @@ if [ ! -e tokenized/dict.gz ]; then
         allfiles=`echo $allfiles | sed s/\.dat\.gz/.dat/g`
     fi
 
-    ${BIDMACH_SCRIPTS}/../src/main/C/newparse/trec.exe -i $allfiles -o tokenized/
-
-    if [ "$OS" = "Windows_NT" ]; then
-        echo "Compressing"
-        cd tokenized
-        for i in `seq 0 3`; do 
-            gzip lyrl2004_tokens_test_pt${i}.dat
-        done
-        gzip lyrl2004_tokens_train.dat
-        cd ..
-        rm -rf lyrl*.dat
-    fi
+    ${BIDMACH_SCRIPTS}/../src/main/C/newparse/trec.exe -i $allfiles -o tokenized/ -c
 fi
 
 if [ ! -e "catname.imat" ]; then

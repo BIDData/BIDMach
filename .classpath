@@ -5,11 +5,11 @@
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/BIDMat"/>
-	<classpathentry kind="lib" path="/BIDMat/lib/jcublas-0.5.5.jar"/>
-	<classpathentry kind="lib" path="/BIDMat/lib/jcuda-0.5.5.jar"/>
-	<classpathentry kind="lib" path="/BIDMat/lib/jcufft-0.5.5.jar"/>
-	<classpathentry kind="lib" path="/BIDMat/lib/jcurand-0.5.5.jar"/>
-	<classpathentry kind="lib" path="/BIDMat/lib/jcusparse-0.5.5.jar"/>
-	<classpathentry kind="lib" path="/BIDMat/lib/jline-2.10.3.jar"/>
+	<classpathentry kind="lib" path="lib/jcublas-0.5.5.jar"/>
+	<classpathentry kind="lib" path="lib/jcuda-0.5.5.jar"/>
+	<classpathentry kind="lib" path="lib/jcufft-0.5.5.jar"/>
+	<classpathentry kind="lib" path="lib/jcurand-0.5.5.jar"/>
+	<classpathentry kind="lib" path="lib/jcusparse-0.5.5.jar"/>
+	<classpathentry kind="lib" path="lib/jline-2.10.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
