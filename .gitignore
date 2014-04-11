@@ -1,0 +1,14 @@
+*.jar
+*.so
+*.o
+*.dylib
+*.jnilib
+*.incl
+*.dll
+*.a
+
+project/
+target/
+
+._.DS_Store
+.DS_Store
