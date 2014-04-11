@@ -50,12 +50,46 @@ struct strhashfn {
   }
 };
 
-#if defined __GNUC__ && (__GNUC__ < 4 || __GNUC_MINOR__ < 4)
+class hashcompare {
+ public :
+  static const size_t bucket_size = 4;
+  static const size_t min_buckets = 1 << 10;
+
+  hashcompare() {}
+
+  hashcompare(size_t t) {}
+
+  size_t operator()(const char* str) const {
+    unsigned long hash = 5381;
+    int c;
+    while (c = *str++) {
+      hash = ((hash << 5) + hash) + c;
+    }
+    return hash;
+  }
+  
+  bool operator()(const char *left, const char *right) const
+  {
+    return (strcmp(left, right) < 0);
+  }
+};
+
+#if defined __GNUC__ 
+#if (__GNUC__ < 4 || __GNUC_MINOR__ < 4)
 #include <ext/hash_map>
 typedef __gnu_cxx::hash_map<const char*, int, __gnu_cxx::hash<const char*>, eqstr> strhash;
 #else
 #include <unordered_map>
 typedef std::unordered_map<const char*, int, strhashfn, eqstr> strhash;
+#endif
+#else // no __GNUC__
+#if _MSC_VER >= 1600
+#include <unordered_map>
+typedef std::unordered_map<const char*, int, strhashfn, eqstr> strhash;
+#else // _MSC_VER < 1600
+#include <hash_map>
+typedef stdext::hash_map<const char*, int, hashcompare> strhash;
+#endif
 #endif
 
 typedef struct quadint {

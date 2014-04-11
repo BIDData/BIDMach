@@ -341,7 +341,7 @@ int writeIntVec(ivector & im, string fname, int buffsize) {
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)im.data(), 4 * nrows);
+  ofstr->write((const char *)&im[0], 4 * nrows);
   closeos(ofstr);
   return 0;
 }
@@ -357,7 +357,7 @@ int writeDIntVec(divector & im, string fname, int buffsize) {
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)im.data(), 8 * nrows);
+  ofstr->write((const char *)&im[0], 8 * nrows);
   closeos(ofstr);
   return 0;
 }
@@ -373,7 +373,7 @@ int writeQIntVec(qvector & im, string fname, int buffsize) {
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)im.data(), 16 * nrows);
+  ofstr->write((const char *)&im[0], 16 * nrows);
   closeos(ofstr);
   return 0;
 }
@@ -389,7 +389,7 @@ int writeFVec(fvector & im, string fname, int buffsize) {
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)im.data(), 4 * nrows);
+  ofstr->write((const char *)&im[0], 4 * nrows);
   closeos(ofstr);
   return 0;
 }
@@ -405,7 +405,7 @@ int writeDVec(dvector & im, string fname, int buffsize) {
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)im.data(), 8 * nrows);
+  ofstr->write((const char *)&im[0], 8 * nrows);
   closeos(ofstr);
   return 0;
 }
@@ -484,7 +484,7 @@ int writeSBVecs(unhash & unh, string fname, int buffsize) {
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)cols.data(), 4 * (ncols+1));
+  ofstr->write((const char *)&cols[0], 4 * (ncols+1));
   for (i=0; i<ncols; i++) {
     ofstr->write(unh[i], cols[i+1] - cols[i]);
   }
