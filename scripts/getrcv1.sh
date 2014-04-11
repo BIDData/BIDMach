@@ -11,6 +11,7 @@ BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )
 echo "Loading RCV1 v2 data"
 
 RCV1=${BIDMACH_SCRIPTS}/../data/rcv1
+mkdir -p ${RCV1}/tokenized
 cd $RCV1
 
 # Get test and training sets
@@ -55,7 +56,7 @@ fi
 
 # Parse the topic assignment file
 if [ ! -e "catname.imat" ]; then
-    ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels -f "${RCV1}/fmt.txt" -o "./" -m "./" -d " "
+    ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/fmt.txt" -o "./" -m "./" -d " "
 fi
 
 # Call bidmach to put the data together

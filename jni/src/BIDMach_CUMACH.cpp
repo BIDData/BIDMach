@@ -1,10 +1,10 @@
 
 #include <jni.h>
 #include <cuda_runtime.h>
-#include "Logger.hpp"
-#include "JNIUtils.hpp"
-#include "PointerUtils.hpp"
-#include "MatKernel.hpp"
+#include <Logger.hpp>
+#include <JNIUtils.hpp>
+#include <PointerUtils.hpp>
+#include <MatKernel.hpp>
 
 
 extern "C" {

@@ -251,7 +251,7 @@ istream * open_in(string ifname) {
   istream * ifstr = NULL;
   int opened = 0;
   if (ifname.rfind(".gz") == ifname.length() - 3) {
-    ifstr = new igzstream(ifname.c_str());
+    ifstr = new igzstream(ifname.c_str(), ios_base::in);
     opened = ((igzstream *)ifstr)->rdbuf()->is_open(); 
   }
   else {
@@ -286,7 +286,7 @@ istream * open_in_buf(string ifname, char * buffer, int buffsize) {
   istream * ifstr = NULL;
   int opened = 0;
   if (ifname.rfind(".gz") == ifname.length() - 3) {
-    ifstr = new igzstream(ifname.c_str());
+    ifstr = new igzstream(ifname.c_str(), ios_base::in);
     opened = ((igzstream *)ifstr)->rdbuf()->is_open(); 
     ((igzstream *)ifstr)->rdbuf()->pubsetbuf(buffer, buffsize);
   }
@@ -307,7 +307,7 @@ ostream * open_out_buf(string ofname, int buffsize) {
   ostream * ofstr = NULL;
   int opened = 0;
   if (ofname.rfind(".gz") == ofname.length() - 3) {
-    ofstr = new ogzstream(ofname.c_str());
+    ofstr = new ogzstream(ofname.c_str(), ios_base::out);
     opened = ((ogzstream *)ofstr)->rdbuf()->is_open(); 
     ((ogzstream *)ofstr)->rdbuf()->pubsetbuf(buffer, buffsize);
   } else {
