@@ -1,6 +1,6 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
-#include "MatKernel.hpp"
+#include <MatKernel.hpp>
 
 #if __CUDA_ARCH__ > 200
 
