@@ -95,7 +95,7 @@ int main(int argc, char ** argv) {
     if (strstr(here, ".gz") - here == strlen(here) - 3) {
       rname = rname.substr(0, strlen(here) - 3);
     } 
-    writeIntVec(tokens, odname+here+suffix, membuf);
+    writeIntVec(tokens, odname+rname+suffix, membuf);
     tokens.clear();
     numlines = 0;
     here = strtok(NULL, " ,");
