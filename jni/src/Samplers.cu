@@ -2,6 +2,7 @@
 #include <curand_kernel.h>
 //#include <curand.h>
 #include <stdio.h>
+#include <MatKernel.hpp>
 
 #ifdef __CUDA_ARCH__ 
 #if __CUDA_ARCH__ > 200

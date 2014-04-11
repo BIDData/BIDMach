@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <stdio.h>
+#include <MatKernel.hpp>
 
 #define NEG_INFINITY 0xff800000
 
