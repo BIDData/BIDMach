@@ -52,8 +52,8 @@ object RCV1 {
   }
   
   def preprocess(dict:String) {
-    val dictm = CSMat(loadSBMat(dict+"dict.gz"))
-    val wc = loadIMat(dict+"wcount.gz")
+    val dictm = CSMat(loadSBMat(dict+"dict.sbmat.gz"))
+    val wc = loadIMat(dict+"dict.imat.gz")
     val a0 = loadIMat(dict+"lyrl2004_tokens_test_pt0.dat.gz")
     val a1 = loadIMat(dict+"lyrl2004_tokens_test_pt1.dat.gz")
     val a2 = loadIMat(dict+"lyrl2004_tokens_test_pt2.dat.gz")

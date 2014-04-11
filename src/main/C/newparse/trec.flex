@@ -76,6 +76,7 @@ PUNCT	   [;:,.?!]
 	  numlines++;
 	  if (numlines % 1000000 == 0) {
 	  fprintf(stderr, "\r%05d lines", numlines);
+      fflush(stderr);
 	  }	  
 	  }
 

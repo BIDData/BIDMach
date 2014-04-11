@@ -383,7 +383,7 @@ int parseLine(char * line, int lineno, const char * delim1, ivector & tvec,
 string getfield(char * line, const char * delim1, int k);
 
 int parseFormat(string ffname, ivector & tvec, svector & dnames, svector & delims, int *grpsize) {
-  ifstream ifstr(ffname.c_str(), ios_base::in);
+  ifstream ifstr(ffname.c_str());
   if (ifstr.bad() || ifstr.eof()) {
     cerr << "couldnt open format file" << endl;
     throw;
@@ -514,9 +514,9 @@ int main(int argc, char ** argv) {
   ftvector ftv(nfields);
   istream * ifstr;
   if (ifname.rfind(".gz") == ifname.length() - 3) 
-    ifstr = new igzstream(ifname.c_str(), ios_base::in);
+    ifstr = new igzstream(ifname.c_str());
   else
-    ifstr = new ifstream(ifname.c_str(), ios_base::in);
+    ifstr = new ifstream(ifname.c_str());
   if (!ifstr) {
     cerr << "Couldnt open input stream" << endl;
     return 1;
@@ -543,13 +543,14 @@ int main(int argc, char ** argv) {
       }
     }
     if ((jmax % 100000) == 0) {
-      cerr<<"\r"<<jmax<<" lines processed";
-      cerr.flush();
+      cout<<"\r"<<jmax<<" lines processed";
+      cout.flush();
     }
   }
   if (ifstr) delete ifstr;
-  cerr<<"\r"<<jmax<<" lines processed";
-  cerr.flush();
+  cout<<"\r"<<jmax<<" lines processed";
+  cout.flush();
+
   for (i = 0; i < nfields; i++) {
     switch (tvec[i]) {
     case ftype_int: case ftype_dt: case ftype_mdt: case ftype_date: case ftype_mdate:

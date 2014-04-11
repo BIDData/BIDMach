@@ -8,7 +8,6 @@ else
 fi
 BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
-echo $BIDMACH_SCRIPTS
 echo "Loading RCV1 v2 data"
 
 RCV1=${BIDMACH_SCRIPTS}/../data/rcv1
@@ -36,7 +35,7 @@ if [ ! -e rcv1-v2.topics.qrels.gz ]; then
 fi
 
 # Tokenize the text files
-if [ ! -e tokenized/dict.gz ]; then
+if [ ! -e tokenized/dict.sbmat.gz ]; then
 # Windows cant use an uncompression pipe so uncompress here
     if [ "$OS" = "Windows_NT" ]; then
         for i in `seq 0 3`; do 
@@ -56,7 +55,7 @@ fi
 
 # Parse the topic assignment file
 if [ ! -e "catname.imat" ]; then
-    ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f ${RCV1}/fmt.txt -o ./ -m ./ -d " "
+    ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels -f "${RCV1}/fmt.txt" -o "./" -m "./" -d " "
 fi
 
 # Call bidmach to put the data together
