@@ -20,15 +20,12 @@ object Experiments {
 
 object NYTIMES {
   def preprocess(dict:String, fname:String) {
-    print("Processing text "); 
-    tic;
-    val mat = loadIMat(dict+"docword."+fname+".txt.gz")
-    val tt=toc
-    println("%f secs" format tt)
-    val cols = mat(?,0)
-    val rows = mat(?,1)
-    val values = FMat(mat(?,2))
-    val nnz = mat.nrows
+    print("Processing "+fname); 
+    tic; 
+    val cols = loadIMat(dict+fname+".cols.imat.gz")
+    val rows = loadIMat(dict+fname+".rows.imat.gz")
+    val values = loadFMat(dict+fname+".vals.fmat.gz")
+    val nnz = cols.nrows
     val nrows = maxi(rows).v
     val ncols = maxi(cols).v
     val cc = izeros(ncols+1,1).data
