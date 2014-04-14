@@ -20,16 +20,24 @@ object Experiments {
 
 object NYTIMES {
   def preprocess(dict:String, fname:String) {
-    val cols = loadIMat(dict+"docword."+fname+".txt")
-    val nrows = maxi(cols(?,1)).v
-    val ncols = maxi(cols(?,0)).v
-    val m = sparse(cols(?,1) - 1, cols(?,0) - 1, FMat(cols(?,2)), nrows, ncols)
+    println("Processing text"); 
+    val mat = loadIMat(dict+"docword."+fname+".txt.gz")
+    val cols = mat(?,0)
+    val rows = mat(?,1)
+    val values = FMat(mat(?,2))
+    val nnz = mat.nrows
+    val nrows = maxi(rows).v
+    val ncols = maxi(cols).v
+    val cc = izeros(ncols+1,1).data
+    val ccols = BIDMat.SparseMat.compressInds((cols - 1).data, ncols, cc, nnz)
+    val m = new SMat(nrows, ncols, nnz, rows.data, ccols, values.data)
     saveSMat(dict+fname+".smat.lz4", m)
   }
 }
 
 object DIGITS {
   def preprocess(dict:String, fname:String) {
+    println("Processing digits");
     val mat = loadFMat(dict+fname+".txt")
     val srow = sum(abs(mat),2)
     val inds = IMat((cumsum(srow==0)-1)/660)
