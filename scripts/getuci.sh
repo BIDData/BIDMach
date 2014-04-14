@@ -19,13 +19,6 @@ if [ ! -e docword.${1}.txt.gz ]; then
 fi 
 
 if [ ! -e "${1}.smat.lz4" ]; then
-    if [ ! -e "docword.${1}.txt" ]; then
-        echo "Uncompressing docword.${1}.txt.gz"
-        gunzip -c "docword.${1}.txt.gz" | tail -n +4 > "docword.${1}.txt"
-    fi
     bidmach "BIDMach.NYTIMES.preprocess(\"${UCI}/\",\"${1}\")"
 fi
 
-if [ -e "docword.${1}.txt" ]; then
-    rm docword.${1}.txt
-fi
