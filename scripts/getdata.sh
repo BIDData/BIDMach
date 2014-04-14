@@ -12,6 +12,8 @@ ${BIDMACH_SCRIPTS}/getrcv1.sh
 
 ${BIDMACH_SCRIPTS}/getuci.sh nytimes
 
+${BIDMACH_SCRIPTS}/getuci.sh pubmed
+
 ${BIDMACH_SCRIPTS}/getuci.sh nips
 
 ${BIDMACH_SCRIPTS}/getdigits.sh
