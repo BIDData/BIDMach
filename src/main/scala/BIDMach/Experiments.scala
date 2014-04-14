@@ -20,8 +20,11 @@ object Experiments {
 
 object NYTIMES {
   def preprocess(dict:String, fname:String) {
-    println("Processing text"); 
+    print("Processing text "); 
+    tic;
     val mat = loadIMat(dict+"docword."+fname+".txt.gz")
+    val tt=toc
+    println("%f secs" format tt)
     val cols = mat(?,0)
     val rows = mat(?,1)
     val values = FMat(mat(?,2))
