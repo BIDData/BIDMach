@@ -27,5 +27,6 @@ if [ ! -e "${1}.smat.lz4" ]; then
 fi
 
 if [ -e "docword.${1}.txt" ]; then
+    echo "clearing up"
 #    rm docword.${1}.txt
 fi
