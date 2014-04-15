@@ -12,55 +12,53 @@ object RForest {
   import jcuda.runtime.JCuda._
   import jcuda.runtime.cudaError._
   import jcuda.runtime.cudaMemcpyKind._
+  import scala.util.hashing.MurmurHash3._
   import edu.berkeley.bid.CUMACH
+  
+  def rhash(v1:Int, v2:Int, nb:Int):Int = {
+    mix(v1, v2) % nb
+  }
+  
+  def packFields(itree:Int, irfeat:Int, inode:Int, ivfeat:Int, icat:Int, fieldlengths:IMat):Long = {
+    icat.toLong + 
+    ((ivfeat.toLong + ((inode.toLong + ((irfeat.toLong + (itree.toLong 
+        << fieldlengths(1))) 
+        << fieldlengths(2))) 
+        << fieldlengths(3)))
+        << fieldlengths(4))
+  }
    
-  def treeProd(treesArray:Mat, feats:Mat, treePos:Mat, oTreeVal:Mat) {
-    val nrows = feats.nrows;
-    val ncols = feats.ncols;
-    val ns = treesArray.nrows - 1;
-    val ntrees = treePos.nrows;
-    if (treePos.ncols != ncols || oTreeVal.ncols != ncols) {
-      throw new RuntimeException("treeProd mismatch in ncols")
+  def treePack(fdata:FMat, fbounds:FMat, treenodes:IMat, cats:SMat, nr:Int, fieldlengths:IMat) {
+    val nfeats = fdata.nrows
+    val nsamples = fdata.ncols
+    val ntrees = treenodes.nrows
+    val ncats = cats.nrows
+    val nnzcats = cats.nnz
+    val out = new Array[Long](ntrees * nr * nnzcats)
+    var i = 0
+    var ioff = Mat.ioneBased
+    val nifeats = 2 ^ fieldlengths(3)
+    while (i < ntrees) {
+       var j = 0
+       while (j < nr) {
+         var k = 0
+         while (k < nsamples) {
+           val inode = treenodes(i, k)
+           val ifeat = rhash(inode, j, nfeats)
+           val vfeat = fdata(ifeat, k)
+           val ivfeat = math.min(nifeats-1, math.floor((vfeat - fbounds(ifeat,0))/(fbounds(ifeat,1) - fbounds(ifeat,0))*nifeats).toInt)
+           var jc = cats.jc(k) - ioff
+           val jcn = cats.jc(k+1) - ioff
+           while (jc < jcn) {
+             out(j + nr * (i + ntrees * jc)) = packFields(i, j, inode, ivfeat, cats.data(jc).toInt, fieldlengths)
+             jc += 1
+           }
+           k += 1
+         }
+         j += 1
+       }
+       i += 1
     }
-    if (oTreeVal.nrows != ntrees) {
-      throw new RuntimeException("treeProd mismatch in ntrees")
-    }
-    val tstride = (ns + 1) * (treesArray.ncols / ntrees);
-    (treesArray, feats, treePos, oTreeVal) match {
-      case (tA : GIMat, fs : GMat, tP : GIMat, oTV : GMat) => treeProd(tA, fs, tP, oTV, nrows, ncols, ns, tstride, ntrees)
-      case (tA : GIMat, fs : GMat, tP : GIMat, oTI : GIMat) => treeSteps(tA, fs, tP, oTI, nrows, ncols, ns, tstride, ntrees, 1)
-    }
-  }
-  
-  def treeSearch(treesArray:Mat, feats:Mat, treePos:Mat, oTreeVal:Mat) {
-    val nrows = feats.nrows;
-    val ncols = feats.ncols;
-    val ns = treesArray.nrows - 1;
-    val ntrees = treePos.nrows;
-    if (treePos.ncols != ncols || oTreeVal.ncols != ncols) {
-      throw new RuntimeException("treeProd mismatch in ncols")
-    }
-    if (oTreeVal.nrows != ntrees) {
-      throw new RuntimeException("treeProd mismatch in ntrees")
-    }
-    val tsize = (treesArray.ncols / ntrees);
-    val tstride = (ns + 1) * tsize;
-    val tdepth = (math.round(math.log(tsize)/math.log(2))).toInt
-    (treesArray, feats, treePos, oTreeVal) match {
-      case (tA : GIMat, fs : GMat, tP : GIMat, oTI : GIMat) => treeSteps(tA, fs, tP, oTI, nrows, ncols, ns, tstride, ntrees, tdepth)
-    }
-  }
-  
-  def treeProd(treesArray:GIMat, feats:GMat, treePos:GIMat, oTreeVal:GMat, nrows:Int, ncols:Int, ns: Int, tstride:Int, ntrees: Int) {
-    val err = CUMACH.treeprod(treesArray.data, feats.data, treePos.data, oTreeVal.data, nrows, ncols, ns, tstride, ntrees);
-    Mat.nflops += 1L * ncols * ntrees * ns
-    if (err != 0) throw new RuntimeException("treeProd error %d: " + cudaGetErrorString(err) format err);
-  }
-
-  def treeSteps(treesArray:GIMat, feats:GMat, treePos:GIMat, oTreeI:GIMat, nrows:Int, ncols:Int, ns: Int, tstride:Int, ntrees: Int, tdepth:Int) {
-    val err = CUMACH.treesteps(treesArray.data, feats.data, treePos.data, oTreeI.data, nrows, ncols, ns, tstride, ntrees, tdepth);
-    Mat.nflops += 1L * ncols * ntrees * ns * tdepth
-    if (err != 0) throw new RuntimeException("treeProd error %d: " + cudaGetErrorString(err) format err);
   }
   
 }

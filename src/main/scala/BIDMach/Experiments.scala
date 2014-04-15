@@ -20,7 +20,7 @@ object Experiments {
 
 object NYTIMES {
   def preprocess(dict:String, fname:String) {
-    print("Processing "+fname); 
+    println("Processing "+fname); 
     tic; 
     val cols = loadIMat(dict+fname+".cols.imat.gz")
     val rows = loadIMat(dict+fname+".rows.imat.gz")
