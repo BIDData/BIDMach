@@ -21,11 +21,13 @@ object RForest {
   
   def packFields(itree:Int, irfeat:Int, inode:Int, ivfeat:Int, icat:Int, fieldlengths:IMat):Long = {
     icat.toLong + 
-    ((ivfeat.toLong + ((inode.toLong + ((irfeat.toLong + (itree.toLong 
-        << fieldlengths(1))) 
-        << fieldlengths(2))) 
-        << fieldlengths(3)))
-        << fieldlengths(4))
+    ((ivfeat.toLong + 
+        ((inode.toLong + 
+            ((irfeat.toLong + 
+                (itree.toLong << fieldlengths(1))
+             ) << fieldlengths(2))
+          ) << fieldlengths(3))
+      ) << fieldlengths(4))
   }
    
   def treePack(fdata:FMat, fbounds:FMat, treenodes:IMat, cats:SMat, nr:Int, fieldlengths:IMat) {
@@ -35,29 +37,30 @@ object RForest {
     val ncats = cats.nrows
     val nnzcats = cats.nnz
     val out = new Array[Long](ntrees * nr * nnzcats)
-    var i = 0
     var ioff = Mat.ioneBased
     val nifeats = 2 ^ fieldlengths(3)
-    while (i < ntrees) {
-       var j = 0
-       while (j < nr) {
-         var k = 0
-         while (k < nsamples) {
-           val inode = treenodes(i, k)
-           val ifeat = rhash(inode, j, nfeats)
-           val vfeat = fdata(ifeat, k)
-           val ivfeat = math.min(nifeats-1, math.floor((vfeat - fbounds(ifeat,0))/(fbounds(ifeat,1) - fbounds(ifeat,0))*nifeats).toInt)
-           var jc = cats.jc(k) - ioff
-           val jcn = cats.jc(k+1) - ioff
-           while (jc < jcn) {
-             out(j + nr * (i + ntrees * jc)) = packFields(i, j, inode, ivfeat, cats.data(jc).toInt, fieldlengths)
-             jc += 1
-           }
-           k += 1
-         }
-         j += 1
-       }
-       i += 1
+    var icol = 0
+    while (icol < nsamples) {
+      var jci = cats.jc(icol) - ioff
+      val jcn = cats.jc(icol+1) - ioff
+      var itree = 0
+      while (itree < ntrees) {
+        val inode = treenodes(itree, icol)
+        var j = 0
+        while (j < nr) {
+          val ifeat = rhash(inode, j, nfeats)
+          val vfeat = fdata(ifeat, icol)
+          val ivfeat = math.min(nifeats-1, math.floor((vfeat - fbounds(ifeat,0))/(fbounds(ifeat,1) - fbounds(ifeat,0))*nifeats).toInt)
+          var jc = jci
+          while (jc < jcn) {
+            out(j + nr * (itree + ntrees * jc)) = packFields(itree, j, inode, ivfeat, cats.data(jc).toInt, fieldlengths)
+            jc += 1
+          }
+          itree += 1
+        }
+        j += 1
+      }
+      icol += 1
     }
   }
   
