@@ -22,10 +22,10 @@ case class Learner(
   
   var results:FMat = null
   val dopts:DataSource.Opts = datasource.opts
-	val mopts:Model.Opts	= model.opts
-	val ropts:Mixin.Opts = if (mixins != null) mixins(0).opts else null
-	val uopts:Updater.Opts = updater.opts
-	var useGPU = false
+  val mopts:Model.Opts	= model.opts
+  val ropts:Mixin.Opts = if (mixins != null) mixins(0).opts else null
+  val uopts:Updater.Opts = if (updater != null) updater.opts else null
+  var useGPU = false
 	
   def setup = {
 	Learner.setupPB(datasource, mopts.putBack, mopts.dim)   
@@ -674,7 +674,7 @@ object Learner {
     out
   }
   
-  def predictor(mm:Model, mat0:Mat, targ:Mat) = {
+  def predict(mm:Model, mat0:Mat, targ:Mat) = {
     val opts = new Options with MatDS.Opts
     opts.npasses = 1
     val mopts = mm.opts
