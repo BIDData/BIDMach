@@ -27,8 +27,8 @@ case class Learner(
 	val uopts:Updater.Opts = updater.opts
 	var useGPU = false
 	
-	def setup = {
-	  Learner.setupPB(datasource, mopts.putBack, mopts.dim)   
+  def setup = {
+	Learner.setupPB(datasource, mopts.putBack, mopts.dim)   
   }
   
   def init = {
@@ -39,13 +39,13 @@ case class Learner(
     useGPU = model.useGPU
   }
     
-  def run = {
+  def train = {
     setup
     init
-    rerun
+    retrain
   }
    
-  def rerun() = {
+  def retrain() = {
     flip 
     var cacheState = Mat.useCache
     Mat.useCache = true
@@ -104,6 +104,53 @@ case class Learner(
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
+  def predict() = {
+    flip 
+    Learner.setupPB(datasource, mopts.putBack, mopts.dim)
+    datasource.init
+    datasource.reset
+    useGPU = model.useGPU
+    var cacheState = Mat.useCache
+    Mat.useCache = true
+    var here = 0L
+    var lasti = 0
+    var bytes = 0L
+    var lastp = 0f
+    val reslist = new ListBuffer[FMat]
+    val samplist = new ListBuffer[Float]
+    println("Predicting")
+    while (datasource.hasNext) {
+      val mats = datasource.next    
+      here += datasource.opts.batchSize
+      bytes += 12L*mats(0).nnz
+      val scores = model.evalblockg(mats, 0)
+      reslist.append(scores.newcopy)
+      samplist.append(here)
+      if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
+      val dsp = datasource.progress
+      if (dsp > lastp + opts.pstep && reslist.length > lasti) {
+        val gf = gflop
+        lastp = dsp - (dsp % opts.pstep)
+        print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+            100f*lastp, 
+            Learner.scoreSummary(reslist, lasti, reslist.length),
+            gf._1,
+            gf._2, 
+            bytes*1e-9,
+            bytes/gf._2*1e-6))  
+            if (useGPU) {
+              print(", GPUmem=%3.2f" format GPUmem._1) 
+            }
+        println
+        lasti = reslist.length
+      }
+    }
+    val gf = gflop
+    Mat.useCache = cacheState
+    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    results = Learner.scores2FMat(reslist) on row(samplist.toList)
+  }
+  
   def datamats = datasource.asInstanceOf[MatDS].mats
   def modelmats = model.modelmats
   def datamat = datasource.asInstanceOf[MatDS].mats(0)
@@ -150,13 +197,13 @@ case class ParLearnerx(
     }
   }
   
-  def run = {
+  def train = {
     setup
     init
-    rerun
+    retrain
   }
   
-  def rerun() = {
+  def retrain() = {
 	  flip 
 	  var cacheState = Mat.useCache
     Mat.useCache = true
@@ -345,10 +392,10 @@ class ParLearnerxF(
   
   def init = learner.init
   
-  def run = {
+  def train = {
     setup
     init
-    learner.rerun
+    learner.retrain
   }
 }
 
@@ -391,13 +438,13 @@ case class ParLearner(
     }
   }
   
-  def run = {
+  def train = {
     setup 
     init
-    rerun
+    retrain
   }
   
-  def rerun = {
+  def retrain = {
     flip
     val mm0 = models(0).modelmats(0)
     var cacheState = Mat.useCache
@@ -576,13 +623,13 @@ class ParLearnerF(
   
   def init =	learner.init
   
-  def run = {
+  def train = {
     setup
     init
-    rerun
+    retrain
   }
   
-  def rerun = learner.rerun
+  def retrain = learner.retrain
 }
 
 object Learner {
@@ -649,6 +696,19 @@ object ParLearner {
 	  		models(i).modelmats(j) <-- mm(j)
 	  	}
 	  }
+  }
+  
+  def predictor(mm:Model, mat0:Mat, targ:Mat) = {
+    val opts = new Options with MatDS.Opts
+    opts.npasses = 1
+    val mopts = mm.opts
+    mopts.putBack = 1
+    val nn = new Learner(
+        new MatDS(Array(mat0, targ), opts), 
+        mm, 
+        null,
+        null, opts)  
+    (nn, opts, mopts)
   }
 }
 

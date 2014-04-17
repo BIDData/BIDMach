@@ -57,7 +57,9 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val ftarg = full(targ)
     val eta = modelmats(0) * in
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
+    val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
+    if (opts.putBack >= 0) {ftarg <-- eta}
+    v
   }
 }
 
