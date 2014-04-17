@@ -673,6 +673,19 @@ object Learner {
     }
     out
   }
+  
+  def predictor(mm:Model, mat0:Mat, targ:Mat) = {
+    val opts = new Options with MatDS.Opts
+    opts.npasses = 1
+    val mopts = mm.opts
+    mopts.putBack = 1
+    val nn = new Learner(
+        new MatDS(Array(mat0, targ), opts), 
+        mm, 
+        null,
+        null, opts)  
+    (nn, opts, mopts)
+  }
 }
 
 object ParLearner {
@@ -698,17 +711,5 @@ object ParLearner {
 	  }
   }
   
-  def predictor(mm:Model, mat0:Mat, targ:Mat) = {
-    val opts = new Options with MatDS.Opts
-    opts.npasses = 1
-    val mopts = mm.opts
-    mopts.putBack = 1
-    val nn = new Learner(
-        new MatDS(Array(mat0, targ), opts), 
-        mm, 
-        null,
-        null, opts)  
-    (nn, opts, mopts)
-  }
 }
 
