@@ -1,0 +1,76 @@
+
+val dir = "/big/RCV1/v2/"
+val a = loadSMat(dir + "docs.smat.lz4")
+val c = loadFMat(dir + "cats.fmat.lz4")
+val d = CSMat(loadSBMat(dir + "sdict.sbmat.lz4"))
+val icat = 6
+val as = sum(a,2)
+val ass = sortdown(as)
+val ii = find(as > ass(1000))
+val (dmy, jj) = sort2(rand(1,a.ncols))
+val itrain = jj(0->100000)
+val itest = jj(100000->200000)
+val atrain=full(a(ii,itrain))
+val atest=full(a(ii,itest))
+val atrains=a(?,itrain)
+val atests=a(?,itest)
+val ctrain = c(?,itrain)
+val ctest = c(?,itest)
+
+saveFMat(dir+"spark_train.fmat.lz4", atrain)
+saveFMat(dir+"spark_test.fmat.lz4", atest)
+saveSMat(dir+"spark_train.smat.lz4", atrains)
+saveSMat(dir+"spark_test.smat.lz4", atests)
+saveFMat(dir+"spark_cattrain.fmat.lz4", ctrain)
+saveFMat(dir+"spark_cattest.fmat.lz4", ctest)
+
+import java.io._
+val output = new PrintWriter(dir+"spark_train.dat")
+
+for (i <- 0 until atrain.ncols) { 
+  val ic = ctrain(icat,i)
+  output.write("%d ," format ic.toInt)
+  var k = 0
+  while (k < atrain.nrows) { 
+    output.write(" " + atrain(k,i))
+    k += 1
+  }
+  output.write("\n")
+}
+output.close
+
+val out = new PrintWriter(dir+"vw_dense_train.dat")
+for (i <- 0 until atrain.ncols) { 
+  val ic = find(c(?,i))
+  val (ii, jj, vv) = find3(atrain(?,i))
+  var j = 0
+  while (j < ic.length) { 
+    out.write("%d |" format ic(j)+1)
+    var k = 0 
+    while (k < ii.length) { 
+      out.write(" " + d(ii(k)) + ":" + vv(k))
+      k += 1
+    }
+    out.write("\n")
+    j += 1
+  }
+}
+out.close
+
+val outn = new PrintWriter(dir+"vw_sparse_train.dat")
+for (i <- 0 until atrain.ncols) { 
+  val ic = find(c(?,i))
+  val (ii, jj, vv) = find3(atrains(?,i))
+  var j = 0
+  while (j < ic.length) { 
+    outn.write("%d |" format ic(j)+1)
+    var k = 0 
+    while (k < ii.length) { 
+      outn.write(" " + d(ii(k)) + ":" + vv(k))
+      k += 1
+    }
+    outn.write("\n")
+    j += 1
+  }
+}
+outn.close

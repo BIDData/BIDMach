@@ -1,0 +1,25 @@
+
+val m = loadFMat("/code/spark/modelx.txt")
+val m2 = loadFMat("/code/spark/modelx.fmat.lz4")
+
+val dd = loadFMat("/big/RCV1/v2/spark_test.fmat.lz4")
+
+val cc = loadFMat("/big/RCV1/v2/spark_cattest.fmat.lz4")
+
+val c6 = cc(6,?)
+
+val ddi = dd on ones(1,dd.ncols)
+val prod = m * ddi
+val prod2 = m2 * ddi
+
+val px = 1 / (1 + exp(- prod))
+val px2 = 1 / (1 + exp(- prod2))
+
+val ii = find(c6)
+val jj = find(c6 == 0)
+
+val vv = px(jj) on (1 - px(ii))
+val score = mean(vv)
+
+val vv2 = px2(jj) on (1 - px2(ii))
+val score = mean(vv2)
