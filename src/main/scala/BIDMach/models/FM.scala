@@ -58,7 +58,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
-    GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
+    GLM.preds(eta, mylinks, eta, linkArray, totflops)
     eta ~ targ - eta
     uv ~ eta *^ in
     um1 ~ (vt1 ∘ (eta * 2f)) *^ in
@@ -76,7 +76,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
-    GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
+    GLM.preds(eta, mylinks, eta, linkArray, totflops)
     GLM.llfun(eta, targ, mylinks, linkArray, totflops)
   }
 

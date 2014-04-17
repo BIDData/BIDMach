@@ -59,32 +59,6 @@ extern "C" {
     return LDA_Gibbs1(nrows, nnz, A, B, Cir, Cic, P, Ms, Us, k);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_treeprod
-  (JNIEnv *env, jobject obj, jobject jtrees, jobject jfeats, jobject jtpos, jobject jotv, 
-   jint nrows, jint ncols, jint ns, jint tstride, jint ntrees)
-  {
-    int *trees = (int*)getPointer(env, jtrees);
-    float *feats = (float*)getPointer(env, jfeats);
-    int *tpos = (int*)getPointer(env, jtpos);
-    float *otv = (float*)getPointer(env, jotv);
-
-    return treeprod(trees, feats, tpos, otv, nrows, ncols, ns, tstride, ntrees);
-  }
-
-
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_treesteps
-  (JNIEnv *env, jobject obj, jobject jtrees, jobject jfeats, jobject jtpos, jobject jotpos, 
-   jint nrows, jint ncols, jint ns, jint tstride, jint ntrees, jint tdepth)
-  {
-    int *trees = (int*)getPointer(env, jtrees);
-    float *feats = (float*)getPointer(env, jfeats);
-    int *tpos = (int*)getPointer(env, jtpos);
-    int *otpos = (int*)getPointer(env, jotpos);
-
-    return treesteps(trees, feats, tpos, otpos, nrows, ncols, ns, tstride, ntrees, tdepth);
-  }
-
-
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_veccmp
   (JNIEnv *env, jobject obj, jobject ja, jobject jb, jobject jc)
   {
@@ -105,6 +79,48 @@ extern "C" {
     int *ow = (int*)getPointer(env, jow);
 
     return hammingdists(a, b, w, op, ow, n);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applylinks
+  (JNIEnv *env, jobject obj, jobject jA, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    float *nativeA = (float*)getPointer(env, jA);
+    int *nativeL = (int*)getPointer(env, jL);
+    float *nativeC = (float*)getPointer(env, jC);
+
+    return apply_links(nativeA, nativeL, nativeC, nrows, ncols);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applypreds
+  (JNIEnv *env, jobject obj, jobject jA, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    float *nativeA = (float*)getPointer(env, jA);
+    int *nativeL = (int*)getPointer(env, jL);
+    float *nativeC = (float*)getPointer(env, jC);
+
+    return apply_preds(nativeA, nativeL, nativeC, nrows, ncols);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applylls
+  (JNIEnv *env, jobject obj, jobject jA, jobject jB, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    float *nativeA = (float*)getPointer(env, jA);
+    float *nativeB = (float*)getPointer(env, jB);
+    int *nativeL = (int*)getPointer(env, jL);
+    float *nativeC = (float*)getPointer(env, jC);
+
+    return apply_lls(nativeA, nativeB, nativeL, nativeC, nrows, ncols);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applyderivs
+  (JNIEnv *env, jobject obj, jobject jA, jobject jB, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    float *nativeA = (float*)getPointer(env, jA);
+    float *nativeB = (float*)getPointer(env, jB);
+    int *nativeL = (int*)getPointer(env, jL);
+    float *nativeC = (float*)getPointer(env, jC);
+
+    return apply_derivs(nativeA, nativeB, nativeL, nativeC, nrows, ncols);
   }
 
 }

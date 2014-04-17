@@ -9,6 +9,14 @@ public final class CUMACH {
         jcuda.LibUtils.loadLibrary("bidmachcuda");
     } 
     
+    public static native int applylinks(Pointer A, Pointer L, Pointer C, int nrows, int ncols);
+    
+    public static native int applypreds(Pointer A, Pointer L, Pointer C, int nrows, int ncols);
+    
+    public static native int applylls(Pointer A, Pointer B, Pointer L, Pointer C, int nrows, int ncols);
+    
+    public static native int applyderivs(Pointer A, Pointer B, Pointer L, Pointer C, int nrows, int ncols);
+    
     public static native int LDAgibbs(int nr, int nnz, Pointer A, Pointer B, Pointer AN, Pointer BN, Pointer Cir, Pointer Cic, Pointer P, float nsamps);
 
     public static native int LDAgibbsx(int nr, int nnz, Pointer A, Pointer B, Pointer Cir, Pointer Cic, Pointer P, Pointer Ms, Pointer Us, int k);

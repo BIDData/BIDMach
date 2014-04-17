@@ -1,7 +1,11 @@
 
-int treeprod(int *trees, float *feats, int *tpos, float *otv, int nrows, int ncols, int ns, int tstride, int ntrees);
+int apply_links(float *A, int *L, float *C, int nrows, int ncols);
 
-int treesteps(int *trees, float *feats, int *tpos, int *otpos, int nrows, int ncols, int ns, int tstride, int ntrees, int tdepth);
+int apply_preds(float *A, int *L, float *C, int nrows, int ncols);
+
+int apply_lls(float *A, float *B, int *L, float *C, int nrows, int ncols);
+
+int apply_derivs(float *A, float *B, int *L, float *C, int nrows, int ncols);
 
 int veccmp(int *A, int *B, int *C);
 

@@ -3,7 +3,7 @@ package BIDMach.models
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import edu.berkeley.bid.CUMAT
+import edu.berkeley.bid.CUMACH
 import scala.concurrent.future
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.CountDownLatch
@@ -17,7 +17,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
   
-  val linkArray = Array[GLMlink](LinearLink, LogisticLink)
+  val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink)
   
   var totflops = 0L
   
@@ -41,8 +41,8 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def mupdate2(in:Mat, targ:Mat) = {
     val ftarg = full(targ)
     val eta = modelmats(0) * in
-    GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
-    eta ~ ftarg - eta
+    GLM.preds(eta, eta, mylinks, linkArray, totflops)
+    GLM.derivs(eta, ftarg, eta, mylinks, linkArray, totflops)
     updatemats(0) ~ eta *^ in
   }
   
@@ -56,7 +56,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def meval2(in:Mat, targ:Mat):FMat = {
     val ftarg = full(targ)
     val eta = modelmats(0) * in
-    GLM.applymeans(eta, mylinks, eta, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, linkArray, totflops)
     GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
   }
 }
@@ -67,12 +67,16 @@ object LinearLink extends GLMlink {
     in
   }
   
-  def invlink(in:Float) = {
+  def predlink(in:Float) = {
     in
   }
   
   def dlink(in:Float) = {
     1.0f
+  }
+  
+  def derivlink(in:Float, targ:Float) = {
+    targ - in
   }
   
   def likelihood(pred:Float, targ:Float) = {
@@ -82,9 +86,11 @@ object LinearLink extends GLMlink {
      
   override val linkfn = link _
   
-  override val dlinkfn = dlink _
+  override val dfn = dlink _
   
-  override val invlinkfn = invlink _
+  override val derivfn = derivlink _
+    
+  override val predfn = predlink _
   
   override val likelihoodfn = likelihood _
   
@@ -96,7 +102,7 @@ object LogisticLink extends GLMlink {
     math.log(in / (1.0f - in)).toFloat
   }
   
-  def invlink(in:Float) = {
+  def predlink(in:Float) = {
     if (in > 0) {
     	val tmp = math.exp(-in)
     	(1.0 / (1.0 + tmp)).toFloat    
@@ -110,15 +116,62 @@ object LogisticLink extends GLMlink {
     1 / (in * (1 - in))
   }
   
+  def derivlink(in:Float, targ:Float) = {
+    targ - in
+  }
+  
   def likelihood(pred:Float, targ:Float) = {
     math.log(targ * pred + (1.0f - targ) * (1.0f - pred) + 1e-20).toFloat
   }
   
   override val linkfn = link _
   
-  override val dlinkfn = dlink _
+  override val dfn = dlink _
   
-  override val invlinkfn = invlink _
+  override val derivfn = derivlink _
+  
+  override val predfn = predlink _
+  
+  override val likelihoodfn = likelihood _
+  
+  val fnflops = 20
+}
+
+
+object MaxpLink extends GLMlink {
+  def link(in:Float) = {
+    math.log(in / (1.0f - in)).toFloat
+  }
+  
+  def predlink(in:Float) = {
+    if (in > 0) {
+        val tmp = math.exp(-in)
+        (1.0 / (1.0 + tmp)).toFloat    
+    } else {
+        val tmp = math.exp(in)
+        (tmp / (1.0 + tmp)).toFloat
+    }
+  }
+  
+  def dlink(in:Float) = {
+    1 / (in * (1 - in))
+  }
+  
+  def derivlink(p:Float, targ:Float) = {
+    (2.0f * targ - 1.0f) * p * (1.0f - p)
+  }
+  
+  def likelihood(pred:Float, targ:Float) = {
+    targ * pred + (1.0f - targ) * (1.0f - pred) -1.0f
+  }
+  
+  override val linkfn = link _
+  
+  override val dfn = dlink _
+  
+  override val derivfn = derivlink _
+  
+  override val predfn = predlink _
   
   override val likelihoodfn = likelihood _
   
@@ -127,13 +180,14 @@ object LogisticLink extends GLMlink {
 
 object LinkEnum extends Enumeration {
   type LinkEnum = Value
-  val Linear, Logistic = Value
+  val Linear, Logistic, Maxp = Value
 }
 
 abstract class GLMlink {
   val linkfn:(Float => Float)
-  val dlinkfn:(Float => Float)
-  val invlinkfn:(Float => Float)
+  val dfn:(Float => Float)
+  val derivfn:((Float,Float) => Float)
+  val predfn:(Float => Float)
   val likelihoodfn:((Float,Float) => Float)
   val fnflops:Int
 }
@@ -150,7 +204,7 @@ object GLM {
     while (i < iend) {
       var j = 0
       while (j < feta.nrows) { 
-        val fun = linkArray(ilinks(j)).invlinkfn
+        val fun = linkArray(ilinks(j)).predfn
         fout.data(j + i * fout.nrows) = fun(feta.data(j + i * feta.nrows))
         j += 1 
       }
@@ -158,7 +212,7 @@ object GLM {
     }     
   }
   
-  def applymeans(eta:Mat, links:Mat, out:Mat, linkArray:Array[GLMlink], totflops:Long):Mat = {
+  def preds(eta:Mat, out:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long):Mat = {
     (eta, links, out) match {
       case (feta:FMat, ilinks:IMat, fout:FMat) => {
         Mat.nflops += totflops * feta.ncols
@@ -167,7 +221,7 @@ object GLM {
       }
       case (geta:GMat, gilinks:GIMat, gout:GMat) => {
         Mat.nflops += totflops * geta.ncols
-        CUMAT.applymeans(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
         out
       }
     }
@@ -193,8 +247,32 @@ object GLM {
       case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         val out = (gpred + 3f)
-        CUMAT.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
+        CUMACH.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
         FMat(mean(out,2))
+      }
+    }
+  }
+  
+   def derivs(pred:Mat, targ:Mat, out:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long) = {
+    (pred, targ, out, links) match {
+      case (fpred:FMat, ftarg:FMat, fout:FMat, ilinks:IMat) => {
+        Mat.nflops += 10L * ftarg.length
+            var i = 0
+            while (i < ftarg.ncols) {
+                var j = 0
+                while (j < ftarg.nrows) {
+                    val fun = linkArray(ilinks(j)).derivfn
+                    fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
+                    j += 1
+                }
+                i += 1
+            }
+            mean(out,2)
+      }
+      case (gpred:GMat, gtarg:GMat, gout:GMat, gilinks:GIMat) => {
+        Mat.nflops += totflops * gpred.ncols
+        CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        gout
       }
     }
   }
