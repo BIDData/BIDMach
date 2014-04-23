@@ -16,15 +16,27 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var useGPU = false
   
+  var putBack = -1
+  
+  var putBackPred = -1
+  
   def init(datasource:DataSource):Unit = {
 	  mats = datasource.next
 	  datasource.reset
+	  putBack = datasource.opts.putBack
 	  useGPU = opts.useGPU && Mat.hasCUDA > 0
 	  if (useGPU) {
 	    gmats = new Array[Mat](mats.length)
 	  } else {
 	    gmats = mats
 	  }
+  }
+  
+  def init(datasource:DataSource, pdatasource:DataSource):Unit = {
+      pdatasource.reset
+      putBackPred = pdatasource.opts.putBack
+      useGPU = opts.useGPU && Mat.hasCUDA > 0
+      init(datasource)
   }
   
   def doblock(mats:Array[Mat], ipass:Int, i:Long)                                       // Calculate an update for the updater
@@ -34,22 +46,32 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   def doblockg(amats:Array[Mat], ipass:Int, i:Long) = {
     if (useGPU) copyMats(amats, gmats)            		
     doblock(gmats, ipass, i)
-    if (useGPU && opts.putBack >= 0) {
-    	for (i <- 1 to opts.putBack) {
+    if (useGPU && putBack >= 0) {
+    	for (i <- 1 to putBack) {
     		amats(i) <-- gmats(i)
     	}
+    }
+    if (useGPU && putBackPred >= 0) {
+        for (i <- 1 to putBackPred) {
+            amats(i) <-- gmats(i)
+        }
     }
   }
   
   def evalblockg(amats:Array[Mat], ipass:Int):FMat = {
-	  if (useGPU) copyMats(amats, gmats)
-	  val v = evalblock(gmats, ipass)
-	  if (useGPU && opts.putBack >= 0) {
-	    for (i <- 1 to opts.putBack) {
-	    	amats(i) <-- gmats(i)
-	    }
-	  }
-	  v
+    if (useGPU) copyMats(amats, gmats)
+    val v = evalblock(gmats, ipass)
+    if (useGPU && putBack >= 0) {
+      for (i <- 1 to putBack) {
+        amats(i) <-- gmats(i)
+      }
+    }
+    if (useGPU && putBackPred >= 0) {
+      for (i <- 1 to putBackPred) {
+        amats(i) <-- gmats(i)
+      }
+    }
+	v
   }
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
@@ -73,7 +95,6 @@ object Model {
 	  var nzPerColumn:Int = 0
 	  var startBlock = 8000
 	  var useGPU = true
-	  var putBack = -1
 	  var doubleScore = false
 	  var dim = 256
   }

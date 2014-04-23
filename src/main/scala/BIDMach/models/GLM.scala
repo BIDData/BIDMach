@@ -58,7 +58,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val eta = modelmats(0) * in
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
-    if (opts.putBack >= 0) {ftarg <-- eta}
+    if (putBack >= 0) {ftarg <-- eta}
     v
   }
 }
@@ -299,6 +299,7 @@ object GLM {
     opts.alpha = 1f
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
+  	    null,
   	    new GLM(opts), 
   	    mkRegularizer(opts),
   	    new ADAGrad(opts), opts)
@@ -307,21 +308,26 @@ object GLM {
   
   def learn(mat0:Mat):(Learner, LearnOptions) = learn(mat0, 0)
   
-  def learn(mat0:Mat, targ:Mat, d:Int) = {
+  def learn(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
     val opts = new LearnOptions
+    val dopts = new MatDS.Options
+    dopts.putBack = 1
     opts.alpha = 1f
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
+        if (mat1 != null ) new MatDS(Array(mat1, preds), dopts) else null,
         new GLM(opts), 
         mkRegularizer(opts),
         new ADAGrad(opts), opts)
     (nn, opts)
   }
   
-  def learn(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learn(mat0, targ, 0)
+  def learn(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = learn(mat0, targ, null, null, d)
+  
+  def learn(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learn(mat0, targ, null, null, 0)
      
   def learnBatch(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
@@ -330,6 +336,7 @@ object GLM {
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
+        null,
         new GLM(opts), 
         mkRegularizer(opts), 
         new ADAGrad(opts),

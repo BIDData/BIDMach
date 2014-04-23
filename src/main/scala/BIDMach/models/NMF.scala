@@ -64,7 +64,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   }
   
   override def uupdate(sdata:Mat, user:Mat, ipass:Int) = {
-	if (opts.putBack < 0 || ipass == 0) user.set(1f)
+	if (putBack < 0 || ipass == 0) user.set(1f)
 	val modeldata = mm * sdata
   	val mmu = mm *^ mm + udiag
     for (i <- 0 until opts.uiter) {
@@ -151,6 +151,7 @@ object NMF  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
+  	    null,
   			new NMF(opts), 
   			null,
   			new IncNorm(opts), opts)
@@ -166,6 +167,7 @@ object NMF  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
+        null,
         new NMF(opts), 
         null, 
         new BatchNorm(opts),

@@ -60,7 +60,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   }
   
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    if (opts.putBack < 0 || ipass == 0) user.set(1f)
+    if (putBack < 0 || ipass == 0) user.set(1f)
     for (i <- 0 until opts.uiter) {
       val preds = DDS(mm, user, sdata)	
       val dc = sdata.contents
@@ -128,6 +128,7 @@ object LDA  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
+  	    null,
   	    new LDA(opts), 
   	    null,
   	    new IncNorm(opts), opts)
@@ -144,6 +145,7 @@ object LDA  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
+        null,
         new LDA(opts), 
         null, 
         new BatchNorm(opts),

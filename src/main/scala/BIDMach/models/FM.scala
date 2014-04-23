@@ -110,6 +110,7 @@ object FM {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
+  	    null,
   	    new FM(opts), 
   	    mkRegularizer(opts),
   	    new ADAGrad(opts), opts)
@@ -125,6 +126,7 @@ object FM {
     opts.links.set(d)
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
+        null,
         new FM(opts), 
         mkRegularizer(opts),
         new ADAGrad(opts), opts)
@@ -139,6 +141,7 @@ object FM {
     opts.links.set(d)
     val nn = new Learner(
         new MatDS(Array(mat0), opts), 
+        null,
         new FM(opts), 
         mkRegularizer(opts),
         new ADAGrad(opts),

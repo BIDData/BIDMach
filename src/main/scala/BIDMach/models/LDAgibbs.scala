@@ -62,7 +62,7 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   
   def uupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
     
-    	if (opts.putBack < 0 || ipass == 0) user.set(1f)
+    	if (putBack < 0 || ipass == 0) user.set(1f)
         for (i <- 0 until opts.uiter) yield {
     	val preds = DDS(mm, user, sdata)	
     	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
@@ -162,6 +162,7 @@ object LDAgibbs  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
+  	    null,
   			new LDAgibbs(opts), 
   			null,
   			new IncNorm(opts), opts)
@@ -180,6 +181,7 @@ object LDAgibbs  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
+        null,
         new LDAgibbs(opts), 
         null, 
         new BatchNorm(opts),

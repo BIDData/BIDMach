@@ -14,7 +14,8 @@ import scala.concurrent.future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 case class Learner(
-    val datasource:DataSource, 
+    val datasource:DataSource,
+    val pdatasource:DataSource,
     val model:Model, 
     val mixins:Array[Mixin], 
     val updater:Updater, 
@@ -28,7 +29,7 @@ case class Learner(
   var useGPU = false
 	
   def setup = {
-	Learner.setupPB(datasource, mopts.putBack, mopts.dim)   
+	Learner.setupPB(datasource, dopts.putBack, mopts.dim)   
   }
   
   def init = {
@@ -75,7 +76,7 @@ case class Learner(
         	if (mixins != null) mixins map (_ compute(mats, here))
         	updater.update(ipass, here)
         }   
-        if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
+        if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
         istep += 1
         val dsp = datasource.progress
         if (dsp > lastp + opts.pstep && reslist.length > lasti) {
@@ -106,7 +107,7 @@ case class Learner(
   
   def predict() = {
     flip 
-    Learner.setupPB(datasource, mopts.putBack, mopts.dim)
+    Learner.setupPB(datasource, dopts.putBack, mopts.dim)
     datasource.init
     datasource.reset
     useGPU = model.useGPU
@@ -126,7 +127,7 @@ case class Learner(
       val scores = model.evalblockg(mats, 0)
       reslist.append(scores.newcopy)
       samplist.append(here)
-      if (model.opts.putBack >= 0) datasource.putBack(mats, model.opts.putBack)
+      if (dopts.putBack >= 0) datasource.putBack(mats, dopts.putBack)
       val dsp = datasource.progress
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
@@ -171,8 +172,7 @@ case class ParLearnerx(
   
   def setup = {
 	  for (i <- 0 until opts.nthreads) {
-	  	val mopts	= models(i).opts
-	  	Learner.setupPB(datasources(i), mopts.putBack, mopts.dim)
+	  	Learner.setupPB(datasources(i), datasources(i).opts.putBack, models(i).opts.dim)
 	  }   
   }
   
@@ -259,7 +259,7 @@ case class ParLearnerx(
 	  				}
 	  				} 
 	  				if (useGPU) Thread.sleep(opts.coolit)
-	  				if (models(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, models(ithread).opts.putBack)
+	  				if (datasources(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, datasources(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  			}
 	  			models(ithread).synchronized { updaters(ithread).updateM(ipass) }
@@ -413,8 +413,8 @@ case class ParLearner(
   var useGPU = false
   
   def setup = {
-	  val mopts	= models(0).opts
-	  Learner.setupPB(datasource, mopts.putBack, mopts.dim)  
+	  val dopts	= datasource.opts
+	  Learner.setupPB(datasource, datasource.opts.putBack, models(0).opts.dim)  
   }
   
   def init = {
@@ -672,19 +672,6 @@ object Learner {
       i += 1
     }
     out
-  }
-  
-  def predict(mm:Model, mat0:Mat, targ:Mat) = {
-    val opts = new Options with MatDS.Opts
-    opts.npasses = 1
-    val mopts = mm.opts
-    mopts.putBack = 1
-    val nn = new Learner(
-        new MatDS(Array(mat0, targ), opts), 
-        mm, 
-        null,
-        null, opts)  
-    (nn, opts, mopts)
   }
 }
 

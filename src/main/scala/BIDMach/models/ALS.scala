@@ -41,7 +41,7 @@ class ALS(override val opts:ALS.Opts = new ALS.Options) extends FactorModel(opts
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
 	  val slu = opts.lambdau
 	  val b = mm * sdata
-	  val r = if (ipass < opts.startup || opts.putBack < 0) {
+	  val r = if (ipass < opts.startup || putBack < 0) {
 	    // Setup CG on the first pass, or if no saved state
 	  	user.clear
 	  	b
@@ -107,7 +107,8 @@ object ALS  {
     opts.putBack = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatDS(Array(mat0:Mat), opts),
+  	    null,
   			new ALS(opts), 
   			null,
   			new ADAGrad(opts), opts)

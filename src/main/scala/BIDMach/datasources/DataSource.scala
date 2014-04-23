@@ -26,6 +26,7 @@ object DataSource {
     var sample = 1f
     var addConstFeat:Boolean = false
     var featType:Int = 1                 // 0 = binary features, 1 = linear features
+    var putBack = -1
   } 
   
   class Options extends Opts {}
