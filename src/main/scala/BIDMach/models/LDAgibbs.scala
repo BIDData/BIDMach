@@ -162,7 +162,6 @@ object LDAgibbs  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
-  	    null,
   			new LDAgibbs(opts), 
   			null,
   			new IncNorm(opts), opts)
@@ -181,7 +180,6 @@ object LDAgibbs  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
-        null,
         new LDAgibbs(opts), 
         null, 
         new BatchNorm(opts),

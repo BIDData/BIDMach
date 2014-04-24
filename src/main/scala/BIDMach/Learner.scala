@@ -15,7 +15,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 case class Learner(
     val datasource:DataSource,
-    val pdatasource:DataSource,
     val model:Model, 
     val mixins:Array[Mixin], 
     val updater:Updater, 

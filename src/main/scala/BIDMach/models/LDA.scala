@@ -128,7 +128,6 @@ object LDA  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
-  	    null,
   	    new LDA(opts), 
   	    null,
   	    new IncNorm(opts), opts)
@@ -145,7 +144,6 @@ object LDA  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
-        null,
         new LDA(opts), 
         null, 
         new BatchNorm(opts),

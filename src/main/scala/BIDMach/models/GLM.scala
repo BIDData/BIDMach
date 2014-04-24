@@ -293,41 +293,78 @@ object GLM {
   
   class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
      
+  // Basic in-memory learner with generated target
   def learn(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.alpha = 1f
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
-  	    null,
   	    new GLM(opts), 
   	    mkRegularizer(opts),
   	    new ADAGrad(opts), opts)
     (nn, opts)
-  }
-  
+  }  
+    
   def learn(mat0:Mat):(Learner, LearnOptions) = learn(mat0, 0)
   
-  def learn(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
-    val opts = new LearnOptions
-    val dopts = new MatDS.Options
-    dopts.putBack = 1
-    opts.alpha = 1f
-    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    if (opts.links == null) opts.links = izeros(targ.nrows,1)
-    opts.links.set(d)
-    val nn = new Learner(
-        new MatDS(Array(mat0, targ), opts), 
-        if (mat1 != null ) new MatDS(Array(mat1, preds), dopts) else null,
-        new GLM(opts), 
-        mkRegularizer(opts),
-        new ADAGrad(opts), opts)
-    (nn, opts)
+  // Basic in-memory learner with explicit target
+  def learn(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = {
+    val mopts = new LearnOptions;
+    mopts.alpha = 1f
+    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    mopts.links.set(d)
+    val model = new GLM(mopts)
+    val mm = new Learner(
+        new MatDS(Array(mat0, targ), mopts), 
+        model, 
+        mkRegularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    (mm, mopts)
   }
   
-  def learn(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = learn(mat0, targ, null, null, d)
+  def learn(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learn(mat0, targ, 0)
   
-  def learn(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learn(mat0, targ, null, null, 0)
+  // This function constructs a learner and a predictor. 
+  def learn(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
+    val mopts = new LearnOptions;
+    val nopts = new LearnOptions;
+    mopts.alpha = 1f
+    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    nopts.links = mopts.links
+    mopts.links.set(d)
+    nopts.batchSize = mopts.batchSize
+    nopts.putBack = 1
+    val model = new GLM(mopts)
+    val mm = new Learner(
+        new MatDS(Array(mat0, targ), mopts), 
+        model, 
+        mkRegularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        model, 
+        mkRegularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    (mm, mopts, nn, nopts)
+  }
+  
+   // This function constructs a predictor from an existing model 
+  def learn(model:GLM, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
+    val nopts = new LearnOptions;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
+    nopts.links.set(d)
+    nopts.putBack = 1
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        model, 
+        null,
+        null)
+    (nn, nopts)
+  }
      
   def learnBatch(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
@@ -336,7 +373,6 @@ object GLM {
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     val nn = new Learner(
         new MatDS(Array(mat0, targ), opts), 
-        null,
         new GLM(opts), 
         mkRegularizer(opts), 
         new ADAGrad(opts),

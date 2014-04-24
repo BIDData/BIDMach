@@ -108,10 +108,9 @@ object ALS  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts),
+  	    new ALS(opts), 
   	    null,
-  			new ALS(opts), 
-  			null,
-  			new ADAGrad(opts), opts)
+  	    new ADAGrad(opts), opts)
     (nn, opts)
   }
 }
