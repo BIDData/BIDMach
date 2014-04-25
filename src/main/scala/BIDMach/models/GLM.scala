@@ -327,6 +327,10 @@ object GLM {
     Array(new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts]))
   }
   
+  def mkL2Regularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L2Regularizer(nopts.asInstanceOf[Regularizer.Opts]))
+  }
+  
   class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
      
   // Basic in-memory learner with generated target
@@ -338,7 +342,8 @@ object GLM {
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new GLM(opts), 
   	    mkRegularizer(opts),
-  	    new ADAGrad(opts), opts)
+  	    new ADAGrad(opts), 
+  	    opts)
     (nn, opts)
   }  
     
@@ -356,11 +361,14 @@ object GLM {
         new MatDS(Array(mat0, targ), mopts), 
         model, 
         mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts), 
+        mopts)
     (mm, mopts)
   }
   
-  def learner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 0)
+  def LinLearner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 0)
+  
+  def LogLearner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 2)
   
   // This function constructs a learner and a predictor. 
   def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
@@ -382,13 +390,14 @@ object GLM {
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
         model, 
-        mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
+        null,
+        null, 
+        nopts)
     (mm, mopts, nn, nopts)
   }
   
-   // This function constructs a predictor from an existing model 
-  def learner(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
+  // This function constructs a predictor from an existing model 
+  def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
     val nopts = new LearnOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
@@ -398,7 +407,68 @@ object GLM {
         new MatDS(Array(mat1, preds), nopts), 
         model.asInstanceOf[GLM], 
         null,
-        null)
+        null,
+        nopts)
+    (nn, nopts)
+  }
+  
+   // Basic in-memory SVM learner with explicit target
+  def SVMlearner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = {
+    val mopts = new LearnOptions;
+    mopts.alpha = 1f
+    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    mopts.links.set(3)
+    mopts.regweight = 1f
+    val model = new GLM(mopts)
+    val mm = new Learner(
+        new MatDS(Array(mat0, targ), mopts), 
+        model, 
+        mkL2Regularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    (mm, mopts)
+  }
+  
+  // This function constructs a learner and a predictor. 
+  def SVMlearner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat):(Learner, LearnOptions, Learner, LearnOptions) = {
+    val mopts = new LearnOptions;
+    val nopts = new LearnOptions;
+    mopts.alpha = 1f
+    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    nopts.links = mopts.links
+    mopts.links.set(2)
+    mopts.regweight = 1f
+    nopts.batchSize = mopts.batchSize
+    nopts.putBack = 1
+    val model = new GLM(mopts)
+    val mm = new Learner(
+        new MatDS(Array(mat0, targ), mopts), 
+        model, 
+        mkL2Regularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        model, 
+        null,
+        null,
+        nopts)
+    (mm, mopts, nn, nopts)
+  }
+  
+   // This function constructs a predictor from an existing model 
+  def SVMpredictor(model:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
+    val nopts = new LearnOptions;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
+    nopts.links.set(3)
+    nopts.putBack = 1
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        model.asInstanceOf[GLM], 
+        null,
+        null,
+        nopts)
     (nn, nopts)
   }
      
