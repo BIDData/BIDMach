@@ -105,7 +105,7 @@ object FM {
   
   class LearnOptions extends Learner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
      
-  def learn(mat0:Mat, d:Int = 0) = { 
+  def learner(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
@@ -116,9 +116,9 @@ object FM {
     (nn, opts)
   }
   
-  def learn(mat0:Mat):(Learner, LearnOptions) = learn(mat0, 0)
+  def learner(mat0:Mat):(Learner, LearnOptions) = learner(mat0, 0)
   
-  def learn(mat0:Mat, targ:Mat, d:Int) = {
+  def learner(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
@@ -131,7 +131,7 @@ object FM {
     (nn, opts)
   }
   
-  def learn(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learn(mat0, targ, 0)
+  def learner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 0)
      
   def learnBatch(mat0:Mat, d:Int) = {
     val opts = new LearnOptions

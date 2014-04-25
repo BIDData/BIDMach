@@ -100,7 +100,7 @@ object ALS  {
   }  
   class Options extends Opts {} 
   
-  def learn(mat0:Mat, d:Int = 256) = {
+  def learner(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with ALS.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d

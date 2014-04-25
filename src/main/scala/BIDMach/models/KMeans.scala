@@ -80,7 +80,7 @@ object KMeans  {
   	new Batch(nopts.asInstanceOf[Batch.Opts])
   } 
    
-  def learn(mat0:Mat, d:Int = 256) = {
+  def learner(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
     val opts = new xopts
     opts.dim = d

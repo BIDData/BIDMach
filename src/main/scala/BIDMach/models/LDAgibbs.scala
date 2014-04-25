@@ -153,7 +153,7 @@ object LDAgibbs  {
   /*
    * This learner uses stochastic updates (like the standard LDA model)
    */
-  def learn(mat0:Mat, d:Int = 256) = {
+  def learner(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with LDAgibbs.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d

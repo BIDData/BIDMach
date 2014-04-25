@@ -17,7 +17,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
   
-  val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink)
+  val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
   
   var totflops = 0L
   
@@ -180,9 +180,45 @@ object MaxpLink extends GLMlink {
   val fnflops = 20
 }
 
+object SVMLink extends GLMlink {
+  def link(in:Float) = {
+    in
+  }
+  
+  def predlink(in:Float) = {
+    in
+  }
+  
+  def dlink(in:Float) = {
+    1.0f
+  }
+  
+  def derivlink(pred:Float, targ:Float) = {
+    val ttarg = 2 * targ - 1
+    if (pred * ttarg < 1f) ttarg else 0f
+  }
+  
+  def likelihood(pred:Float, targ:Float) = {
+    val ttarg = 2 * targ - 1
+    scala.math.min(0f, ttarg * pred - 1f)
+  }
+     
+  override val linkfn = link _
+  
+  override val dfn = dlink _
+  
+  override val derivfn = derivlink _
+    
+  override val predfn = predlink _
+  
+  override val likelihoodfn = likelihood _
+  
+  val fnflops = 2
+}
+
 object LinkEnum extends Enumeration {
   type LinkEnum = Value
-  val Linear, Logistic, Maxp = Value
+  val Linear, Logistic, Maxp, SVMLink = Value
 }
 
 abstract class GLMlink {
@@ -294,7 +330,7 @@ object GLM {
   class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
      
   // Basic in-memory learner with generated target
-  def learn(mat0:Mat, d:Int = 0) = { 
+  def learner(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.alpha = 1f
@@ -306,10 +342,10 @@ object GLM {
     (nn, opts)
   }  
     
-  def learn(mat0:Mat):(Learner, LearnOptions) = learn(mat0, 0)
+  def learner(mat0:Mat):(Learner, LearnOptions) = learner(mat0, 0)
   
   // Basic in-memory learner with explicit target
-  def learn(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = {
+  def learner(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = {
     val mopts = new LearnOptions;
     mopts.alpha = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
@@ -324,10 +360,10 @@ object GLM {
     (mm, mopts)
   }
   
-  def learn(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learn(mat0, targ, 0)
+  def learner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 0)
   
   // This function constructs a learner and a predictor. 
-  def learn(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
+  def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
     val mopts = new LearnOptions;
     val nopts = new LearnOptions;
     mopts.alpha = 1f
@@ -352,7 +388,7 @@ object GLM {
   }
   
    // This function constructs a predictor from an existing model 
-  def learn(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
+  def learner(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
     val nopts = new LearnOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     if (nopts.links == null) nopts.links = izeros(preds.nrows,1)

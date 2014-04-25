@@ -23,32 +23,44 @@ __device__ float mean_logistic(float a) {
 __device__ float deriv_linear(float a, float b) {return b-a;}
 __device__ float deriv_logistic(float a, float b) {return b-a;}
 __device__ float deriv_maxp(float p, float t) {return (2.0f*t - 1.0f)*p*(1.0f-p);}
+__device__ float deriv_svm(float p, float t) {
+  float tt = 2 * t - 1;
+  return (p * tt < 1.0f) ? tt : 0.0f;
+}
 
 
 #define eps 1.0e-10f
 __device__ float ll_linear(float a, float t) {return (t-a)*(a-t);}
 __device__ float ll_logistic(float a, float b) {return log(a * b + (1.0f - a) * (1.0f - b) + eps);}
 __device__ float ll_maxp(float a, float t) {return a * t + (1.0f - a) * (1.0f - t) - 1.0f;}
+__device__ float ll_svm(float p, float t) {
+  float tt = 2 * t - 1;
+  return min(0.0f, tt * p - 1);
+}
 
 __device__ const fntype linkfns[] = {
   link_linear,
   link_logistic,
-  link_logistic};
+  link_logistic,
+  link_linear};
 
 __device__ const fntype meanfns[] = {
   mean_linear,
   mean_logistic,
-  mean_logistic};
+  mean_logistic,
+  mean_linear};
 
 __device__ const optype derivfns[] = {
   deriv_linear,
   deriv_logistic,
-  deriv_maxp};
+  deriv_maxp,
+  deriv_svm};
 
 __device__ const optype llfns[] = {
   ll_linear,
   ll_logistic,
-  ll_maxp};
+  ll_maxp,
+  ll_svm};
 
 
 void setsizes(int N, dim3 *gridp, int *nthreadsp) {

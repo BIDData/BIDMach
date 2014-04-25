@@ -142,7 +142,7 @@ object NMF  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   }
     
-  def learn(mat0:Mat, d:Int = 256) = {
+  def learner(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with NMF.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
