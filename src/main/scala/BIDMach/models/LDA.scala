@@ -130,7 +130,8 @@ object LDA  {
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new LDA(opts), 
   	    null,
-  	    new IncNorm(opts), opts)
+  	    new IncNorm(opts), 
+  	    opts)
     (nn, opts)
   }
      

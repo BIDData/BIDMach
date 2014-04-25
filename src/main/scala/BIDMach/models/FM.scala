@@ -127,7 +127,8 @@ object FM {
         new MatDS(Array(mat0, targ), opts), 
         new FM(opts), 
         mkRegularizer(opts),
-        new ADAGrad(opts), opts)
+        new ADAGrad(opts),
+        opts)
     (nn, opts)
   }
   
