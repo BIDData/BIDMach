@@ -33,9 +33,10 @@ case class Learner(
   
   def init = {
     datasource.init
-    model.init(datasource)
+    model.bind(datasource)
+    model.init
     if (mixins != null) mixins map (_ init(model))
-    updater.init(model)
+    if (updater != null) updater.init(model)
     useGPU = model.useGPU
   }
     
@@ -105,10 +106,14 @@ case class Learner(
   }
   
   def predict() = {
-    flip 
-    Learner.setupPB(datasource, dopts.putBack, mopts.dim)
+    setup
     datasource.init
-    datasource.reset
+    model.bind(datasource)
+    repredict
+  }
+  
+  def repredict() = {
+    flip 
     useGPU = model.useGPU
     var cacheState = Mat.useCache
     Mat.useCache = true
@@ -180,7 +185,8 @@ case class ParLearnerx(
   	for (i <- 0 until opts.nthreads) {
   		if (i < Mat.hasCUDA) setGPU(i)
   		datasources(i).init
-  		models(i).init(datasources(i))
+  		models(i).bind(datasources(i))
+  		models(i).init
   		if (mixins != null) mixins(i) map(_ init(models(i)))
   		updaters(i).init(models(i))
   	}
@@ -334,7 +340,8 @@ case class ParLearnerx(
       resetGPU
       Mat.trimCache2(ithread)
     }
-    models(ithread).init(datasources(ithread))
+    models(ithread).bind(datasources(ithread))
+    models(ithread).init
     for (i <- 0 until models(ithread).modelmats.length) {
     	models(ithread).modelmats(i) <-- mm(i)
     }
@@ -422,7 +429,8 @@ case class ParLearner(
     val thisGPU = if (useGPU) getGPU else 0
     for (i <- 0 until opts.nthreads) {
       if (useGPU && i < Mat.hasCUDA) setGPU(i)
-    	models(i).init(datasource)
+    	models(i).bind(datasource)
+    	models(i).init
     	if (mixins != null) mixins(i) map (_ init(models(i)))
     	updaters(i).init(models(i))
     }
@@ -579,7 +587,8 @@ case class ParLearner(
       resetGPU
       Mat.trimCaches(ithread)
     }
-    models(ithread).init(datasource)
+    models(ithread).bind(datasource)
+    models(ithread).init
     models(ithread).modelmats(0) <-- mm(0)
     updaters(ithread).init(models(ithread))      
   }

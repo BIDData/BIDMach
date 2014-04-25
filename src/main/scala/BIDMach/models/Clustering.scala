@@ -9,8 +9,8 @@ import BIDMach._
 
 abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends Model {
   
-  override def init(datasource:DataSource) = {
-    super.init(datasource)
+  def init() = {
+
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = size(data0, 1)

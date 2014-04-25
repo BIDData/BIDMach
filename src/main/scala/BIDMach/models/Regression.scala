@@ -13,9 +13,8 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   var mask:Mat = null
   var sp:Mat = null
   
-  override def init(datasource:DataSource) = {
-    super.init(datasource)
-    mats = datasource.next
+ 
+  def init() = {
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = size(data0, 1)
@@ -35,7 +34,6 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
       targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
       mask = if (useGPU) GMat(opts.rmask) else opts.rmask
     }
-    datasource.reset
   } 
   
   def mupdate(data:Mat)

@@ -25,8 +25,8 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   var um1:Mat = null
   var um2:Mat = null
   
-  override def init(datasource:DataSource) = {
-    super.init(datasource)
+  override def init() = {
+    super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
     mv = modelmats(0)
     if (mask.asInstanceOf[AnyRef] != null) mv ~ mv ∘ mask

@@ -46,8 +46,8 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   var mdiag:Mat = null
   var udiag:Mat = null
   
-  override def init(datasource:DataSource) = {
-  	super.init(datasource)
+  override def init() = {
+  	super.init()
   	mm = modelmats(0)
     modelmats = new Array[Mat](2)
     modelmats(0) = mm

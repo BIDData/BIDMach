@@ -14,10 +14,10 @@ class ALS(override val opts:ALS.Opts = new ALS.Options) extends FactorModel(opts
   var pm:Mat = null
   var mzero:Mat = null
   
-  override def init(datasource:DataSource) = {
+  override def init() = {
     mats = datasource.next
-	  datasource.reset
-	  val m = size(mats(0), 1)
+	datasource.reset
+	val m = size(mats(0), 1)
     val d = opts.dim    
     modelmats = new Array[Mat](1)
     mm = rand(d,m) - 0.5f

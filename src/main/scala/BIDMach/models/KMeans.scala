@@ -30,8 +30,8 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   var um:Mat = null
   var umcount:Mat = null
   
-  override def init(datasource:DataSource) = {
-    super.init(datasource)
+  override def init() = {
+    super.init()
     mm = modelmats(0)
     mmnorm = mm dotr mm
     modelmats = Array(mm, mmnorm)
