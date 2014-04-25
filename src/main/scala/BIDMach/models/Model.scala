@@ -6,6 +6,8 @@ import BIDMach.datasources._
 
 abstract class Model(val opts:Model.Opts = new Model.Options) {
   
+  var datasource:DataSource = null
+  
   var modelmats:Array[Mat] = null
   
   var updatemats:Array[Mat] = null
@@ -18,9 +20,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var putBack = -1
   
-  var putBackPred = -1
-  
-  def init(datasource:DataSource):Unit = {
+  def bind(ds:DataSource):Unit = {
+      datasource = ds;
 	  mats = datasource.next
 	  datasource.reset
 	  putBack = datasource.opts.putBack
@@ -32,12 +33,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
 	  }
   }
   
-  def init(datasource:DataSource, pdatasource:DataSource):Unit = {
-      pdatasource.reset
-      putBackPred = pdatasource.opts.putBack
-      useGPU = opts.useGPU && Mat.hasCUDA > 0
-      init(datasource)
-  }
+  def init():Unit
   
   def doblock(mats:Array[Mat], ipass:Int, i:Long)                                       // Calculate an update for the updater
   
@@ -51,11 +47,6 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     		amats(i) <-- gmats(i)
     	}
     }
-    if (useGPU && putBackPred >= 0) {
-        for (i <- 1 to putBackPred) {
-            amats(i) <-- gmats(i)
-        }
-    }
   }
   
   def evalblockg(amats:Array[Mat], ipass:Int):FMat = {
@@ -63,11 +54,6 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     val v = evalblock(gmats, ipass)
     if (useGPU && putBack >= 0) {
       for (i <- 1 to putBack) {
-        amats(i) <-- gmats(i)
-      }
-    }
-    if (useGPU && putBackPred >= 0) {
-      for (i <- 1 to putBackPred) {
         amats(i) <-- gmats(i)
       }
     }

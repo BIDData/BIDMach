@@ -7,9 +7,7 @@ import BIDMach.datasources._
 
 abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opts) {
   
-  override def init(datasource:DataSource) = {
-    super.init(datasource)
-    mats = datasource.next
+  def init() = {
     val data0 = mats(0)
     val m = size(data0, 1)
     val d = opts.dim
@@ -23,7 +21,6 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     modelmat ~ modelmat / msum
     modelmats = new Array[Mat](1)
     modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat
-    datasource.reset
     
     if (mats.size > 1) {
       while (datasource.hasNext) {

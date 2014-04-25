@@ -48,8 +48,8 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   var alpha:Mat = null 
   var traceMem = false
   
-  override def init(datasource:DataSource) = {
-    super.init(datasource)
+  override def init() = {
+    super.init()
     mm = modelmats(0)
     modelmats = new Array[Mat](2)
     modelmats(0) = mm
