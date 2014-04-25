@@ -124,6 +124,7 @@ case class Learner(
     val reslist = new ListBuffer[FMat]
     val samplist = new ListBuffer[Float]
     println("Predicting")
+    datasource.reset
     while (datasource.hasNext) {
       val mats = datasource.next    
       here += datasource.opts.batchSize
