@@ -22,16 +22,11 @@ object NYTIMES {
   def preprocess(dict:String, fname:String) {
     println("Processing "+fname); 
     tic; 
-    val cols = loadIMat(dict+fname+".cols.imat.gz")
-    val rows = loadIMat(dict+fname+".rows.imat.gz")
-    val values = loadFMat(dict+fname+".vals.fmat.gz")
-    val nnz = cols.nrows
-    val nrows = maxi(rows).v
-    val ncols = maxi(cols).v
-    val cc = izeros(ncols+1,1).data
-    val ccols = BIDMat.SparseMat.compressInds((cols - 1).data, ncols, cc, nnz)
-    val m = new SMat(nrows, ncols, nnz, rows.data, ccols, values.data)
-    saveSMat(dict+fname+".smat.lz4", m)
+    val cols = loadIMat(dict+fname+"cols.imat.gz")
+    val rows = loadIMat(dict+fname+"rows.imat.gz")
+    val values = loadFMat(dict+fname+"vals.fmat.gz")
+    val m = cols2sparse(rows, cols, values, true, 1)
+    saveSMat(dict+fname+"smat.lz4", m)
   }
 }
 

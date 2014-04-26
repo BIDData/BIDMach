@@ -20,8 +20,8 @@ else
             CPPFLAGS="-std=c++0x"
         fi
     fi
-    RELOPTS="${CFLAGS} -O2 -DNDEBUG -Wno-deprecated -I."
-    DBGOPTS="${CFLAGS} -O2 -DDEBUG -g -I."
+    RELOPTS="${CFLAGS} -O2 -DNDEBUG -DWITHGZS -Wno-deprecated -I."
+    DBGOPTS="${CFLAGS} -O2 -DDEBUG -DWITHGZS -g -I."
     RELLINK="-lz"
     DBGLINK="-lz"
     CC="gcc"
