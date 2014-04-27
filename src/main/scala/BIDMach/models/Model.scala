@@ -21,7 +21,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   var putBack = -1
   
   def bind(ds:DataSource):Unit = {
-      datasource = ds;
+    datasource = ds;
 	  mats = datasource.next
 	  datasource.reset
 	  putBack = datasource.opts.putBack
