@@ -50,6 +50,7 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   var traceMem = false
   
   override def init() = {
+    super.init
     mm = modelmats(0)
     modelmats = new Array[Mat](2)
     modelmats(0) = mm
