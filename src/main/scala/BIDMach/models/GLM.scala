@@ -235,6 +235,11 @@ object GLM {
     var links:IMat = null
   }
   
+  val linear = 0
+  val logistic = 1
+  val maxp = 2
+  val svm = 3
+  
   class Options extends Opts {}
   
   def meanHelper(feta:FMat, fout:FMat, linkArray:Array[GLMlink], ilinks:IMat, istart:Int, iend:Int) {
@@ -337,7 +342,7 @@ object GLM {
   def learner(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.alpha = 1f
+    opts.lrate = 1f
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new GLM(opts), 
@@ -352,9 +357,9 @@ object GLM {
   // Basic in-memory learner with explicit target
   def learner(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = {
     val mopts = new LearnOptions;
-    mopts.alpha = 1f
+    mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    if (mopts.links == null) mopts.links = izeros(1,targ.nrows)
     mopts.links.set(d)
     val model = new GLM(mopts)
     val mm = new Learner(
@@ -374,7 +379,7 @@ object GLM {
   def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
     val mopts = new LearnOptions;
     val nopts = new LearnOptions;
-    mopts.alpha = 1f
+    mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     nopts.links = mopts.links
@@ -415,7 +420,7 @@ object GLM {
    // Basic in-memory SVM learner with explicit target
   def SVMlearner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = {
     val mopts = new LearnOptions;
-    mopts.alpha = 1f
+    mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     mopts.links.set(3)
@@ -433,7 +438,7 @@ object GLM {
   def SVMlearner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat):(Learner, LearnOptions, Learner, LearnOptions) = {
     val mopts = new LearnOptions;
     val nopts = new LearnOptions;
-    mopts.alpha = 1f
+    mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     nopts.links = mopts.links
@@ -474,7 +479,7 @@ object GLM {
      
   def learnBatch(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
-    opts.alpha = 1f
+    opts.lrate = 1f
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     val nn = new Learner(
@@ -491,7 +496,7 @@ object GLM {
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.alpha = 1f
+    opts.lrate = 1f
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0), opts), 
   	    opts, mkGLMModel _,
@@ -506,7 +511,7 @@ object GLM {
   def learnPar(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnParOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.alpha = 1f
+    opts.lrate = 1f
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new ParLearnerF(
@@ -529,7 +534,7 @@ object GLM {
 		) = {
   	
   	val opts = new LearnFParOptions
-  	opts.alpha = 1f
+  	opts.lrate = 1f
   	val nn = new ParLearnerxF(
   	    null,
   	    (dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i),
@@ -547,7 +552,7 @@ object GLM {
 		d:Int = 0
 		) = {	
   	val opts = new LearnFParOptions
-  	opts.alpha = 1f
+  	opts.lrate = 1f
   	val nn = new ParLearnerF(
   	    SFilesDS.twitterWords(nstart, nend),
   	    opts, mkGLMModel _, 

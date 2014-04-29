@@ -15,7 +15,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   var mask:Mat = null
   var ve:Mat = null
   var te:Mat = null
-  var alpha:Mat = null
+  var lrate:Mat = null
   var one:Mat = null
 
   override def init(model0:Model) = {
@@ -33,7 +33,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     one = mm.ones(1,1)
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols)
     te = mm.zeros(opts.texp.nrows, opts.texp.ncols)
-    alpha = mm.zeros(1, 1)
+    lrate = mm.zeros(1, 1)
     ve <-- opts.vexp
     te <-- opts.texp
   } 
@@ -57,10 +57,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 	  val um = updatemats(i)
 	  val mm = modelmats(i)
 	  val ss = sumSq(i)
-	  if (opts.alpha.length > 1) {
-	    alpha.set(opts.alpha(i))
+	  if (opts.lrate.length > 1) {
+	    lrate.set(opts.lrate(i))
 	  } else {
-	    alpha.set(opts.alpha(0))
+	    lrate.set(opts.lrate(0))
 	  }
 	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
@@ -72,7 +72,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 	  	tmp ~ tmp *@ (stepn ^ te)
 	  	if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA0 2 "+i)
 	  	tmp ~ tmp + opts.epsilon
-	  	mm ~ mm + ((um / tmp) *@ alpha)
+	  	mm ~ mm + ((um / tmp) *@ lrate)
 	  	if (java.lang.Double.isNaN(sum(sum(mm)).dv)) throw new RuntimeException("ADA0 3 "+i)
 	  	if (mask != null) mm ~ mm *@ mask
 	  }
@@ -98,10 +98,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
       val mm = modelmats(i)
       val um = updatemats(i)
       val ss = sumSq(i)
-      if (opts.alpha.length > 1) {
-        alpha.set(opts.alpha(i))
+      if (opts.lrate.length > 1) {
+        lrate.set(opts.lrate(i))
       } else {
-        alpha.set(opts.alpha(0))
+        lrate.set(opts.lrate(0))
       }
 	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
@@ -117,7 +117,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 	    tmp ~ tmp + opts.epsilon
 	    tmp ~ um / tmp
 	           if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 3 "+i)
-	    tmp ~ tmp *@ alpha
+	    tmp ~ tmp *@ lrate
 	    mm ~ mm + tmp
 	    if (mask != null) mm ~ mm *@ mask
 	  }

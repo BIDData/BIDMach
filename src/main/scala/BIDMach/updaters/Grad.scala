@@ -24,9 +24,9 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  mask = opts.mask
     stepn = modelmat.zeros(1,1)
     te = modelmat.zeros(opts.texp.nrows, opts.texp.ncols)
-    alpha = modelmat.zeros(opts.alpha.nrows, opts.alpha.ncols)
+    alpha = modelmat.zeros(opts.lrate.nrows, opts.lrate.ncols)
     te <-- opts.texp
-    alpha <-- opts.alpha
+    alpha <-- opts.lrate
   } 
   
 	def update(ipass:Int, step:Long):Unit = {
@@ -50,7 +50,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 
 object Grad {
   trait Opts extends Updater.Opts {
-    var alpha:FMat = 1f
+    var lrate:FMat = 1f
     var texp:FMat = 0.5f
     var waitsteps = 2
     var mask:FMat = null

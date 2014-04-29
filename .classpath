@@ -26,6 +26,6 @@
 	<classpathentry kind="lib" path="lib/ptplotapplication.jar"/>
 	<classpathentry kind="lib" path="lib/scalacheck_2.10-1.10.0.jar"/>
 	<classpathentry kind="lib" path="lib/scalatest_2.10-2.0.jar"/>
-	<classpathentry kind="lib" path="C:/code/BIDMat/BIDMat.jar"/>
+	<classpathentry kind="lib" path="lib/BIDMat.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

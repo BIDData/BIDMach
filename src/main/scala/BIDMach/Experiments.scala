@@ -61,6 +61,7 @@ object RCV1 {
     val a1 = loadIMat(dict+"lyrl2004_tokens_test_pt1.dat.gz")
     val a2 = loadIMat(dict+"lyrl2004_tokens_test_pt2.dat.gz")
     val a3 = loadIMat(dict+"lyrl2004_tokens_test_pt3.dat.gz")
+    val a4 = loadIMat(dict+"lyrl2004_tokens_train.dat.gz")
     val a = (a0 on a1) on (a2 on a3)
     val (swc, ii) = sortdown2(wc)
     val sdict = dictm(ii)
@@ -317,11 +318,11 @@ object Twitter {
 	  val avalues = col(0.1f, 1f, 10f)
 	  val expts1 = ones(avalues.length*ntargets, 1) ⊗ exptsv ⊗ ones(exptst.length, 1)
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
-	  val alphas = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
+	  val lrates = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
 	  val aopts = new ADAGrad.Options
 	  aopts.vexp = expts1
 	  aopts.texp = expts2
-	  aopts.alpha = alphas
+	  aopts.lrate = lrates
 	  aopts.mask = mask
 	  val gopts = new GLM.Options
 	  gopts.links = iones(expts1.length, 1)
@@ -351,11 +352,11 @@ object Twitter {
 	  val ntargets = targets.nrows
 	  val expts1 = ones(avalues.length*ntargets, 1) ⊗ exptsv ⊗ ones(exptst.length, 1)
 	  val expts2 = ones(avalues.length*exptsv.length*ntargets, 1) ⊗ exptst 
-	  val alphas = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
+	  val lrates = ones(ntargets, 1) ⊗ avalues ⊗ ones(exptst.length*exptsv.length, 1)
 	  val aopts = new ADAGrad.Options
 	  aopts.vexp = expts1
 	  aopts.texp = expts2
-	  aopts.alpha = alphas
+	  aopts.lrate = lrates
 	  aopts.mask = mask
 	  val gopts = new GLM.Options
 	  gopts.links = iones(expts1.length, 1)

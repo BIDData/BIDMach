@@ -56,12 +56,12 @@ fi
 
 # Parse the topic assignment file
 if [ ! -e "catname.imat" ]; then
-    ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/fmt.txt" -o "./" -m "./" -d " "
+    ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/../rcv1_fmt.txt" -o "./" -m "./" -d " "
 fi
 
 # Call bidmach to put the data together
 if [ ! -e "docs.smat.lz4" ]; then
-    bidmach "BIDMach.RCV1.prepare(\"${RCV1}/tokenized/\")"
+    bidmach "-e" "BIDMach.RCV1.prepare(\"${RCV1}/tokenized/\")"
 fi
 
 
