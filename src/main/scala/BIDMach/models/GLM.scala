@@ -69,7 +69,7 @@ object LinearLink extends GLMlink {
     in
   }
   
-  def predlink(in:Float) = {
+  def mean(in:Float) = {
     in
   }
   
@@ -92,7 +92,7 @@ object LinearLink extends GLMlink {
   
   override val derivfn = derivlink _
     
-  override val predfn = predlink _
+  override val meanfn = mean _
   
   override val likelihoodfn = likelihood _
   
@@ -104,7 +104,7 @@ object LogisticLink extends GLMlink {
     math.log(in / (1.0f - in)).toFloat
   }
   
-  def predlink(in:Float) = {
+  def mean(in:Float) = {
     if (in > 0) {
     	val tmp = math.exp(-in)
     	(1.0 / (1.0 + tmp)).toFloat    
@@ -132,7 +132,7 @@ object LogisticLink extends GLMlink {
   
   override val derivfn = derivlink _
   
-  override val predfn = predlink _
+  override val meanfn = mean _
   
   override val likelihoodfn = likelihood _
   
@@ -145,7 +145,7 @@ object MaxpLink extends GLMlink {
     math.log(in / (1.0f - in)).toFloat
   }
   
-  def predlink(in:Float) = {
+  def mean(in:Float) = {
     if (in > 0) {
         val tmp = math.exp(-in)
         (1.0 / (1.0 + tmp)).toFloat    
@@ -173,7 +173,7 @@ object MaxpLink extends GLMlink {
   
   override val derivfn = derivlink _
   
-  override val predfn = predlink _
+  override val meanfn = mean _
   
   override val likelihoodfn = likelihood _
   
@@ -185,7 +185,7 @@ object SVMLink extends GLMlink {
     in
   }
   
-  def predlink(in:Float) = {
+  def mean(in:Float) = {
     in
   }
   
@@ -209,7 +209,7 @@ object SVMLink extends GLMlink {
   
   override val derivfn = derivlink _
     
-  override val predfn = predlink _
+  override val meanfn = mean _
   
   override val likelihoodfn = likelihood _
   
@@ -225,7 +225,7 @@ abstract class GLMlink {
   val linkfn:(Float => Float)
   val dfn:(Float => Float)
   val derivfn:((Float,Float) => Float)
-  val predfn:(Float => Float)
+  val meanfn:(Float => Float)
   val likelihoodfn:((Float,Float) => Float)
   val fnflops:Int
 }
@@ -247,7 +247,7 @@ object GLM {
     while (i < iend) {
       var j = 0
       while (j < feta.nrows) { 
-        val fun = linkArray(ilinks(j)).predfn
+        val fun = linkArray(ilinks(j)).meanfn
         fout.data(j + i * fout.nrows) = fun(feta.data(j + i * feta.nrows))
         j += 1 
       }
