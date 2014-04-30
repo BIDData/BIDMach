@@ -35,7 +35,7 @@ __device__ inline unsigned int mmhash(unsigned int v1, unsigned int v2, unsigned
   hash *= 0xc2b2ae35;
   hash ^= (hash >> 16);
  
-  return hash;
+  return (hash % mod);
 }
 
 #define DBSIZE (8*1024)
@@ -44,6 +44,7 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
 			   int nrows, int ncols, int ntrees, int nsamps) {
   __shared__ int dbuff[DBSIZE];
   __shared__ int fl[32];
+  int j, k, ic, ival;
   int seed = 45123421;
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
@@ -63,12 +64,11 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
   int tmask = (1 << fl[4]) - 1;
   
   int nc = (DBSIZE / nrows);
-  int j, k, ic, ival;
   int itree = threadIdx.y;
   int jfeat = threadIdx.x;
 
   for (int i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
-    int ctodo = min(nc, ncols - i + 1);
+    int ctodo = min(nc, ncols - i);
     for (j = tid; j < nrows * ctodo; j += blockDim.x*blockDim.y) {
       dbuff[j] = idata[j + i * nrows];
     }
@@ -96,7 +96,7 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
   int ntx = 32 * (1 + (nsamps - 1)/32);
   int nty = min(1024 / ntx, ntrees);
   dim3 bdim(ntx, nty, 1);
-  int nb = max(32, ncols/32);
+  int nb = min(32, 1 + (ncols-1)/32);
   __treePack<<<nb,bdim>>>(fdata, treenodes, icats, jc, out, fieldlens, nrows, ncols, ntrees, nsamps);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();

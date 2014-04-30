@@ -1,0 +1,27 @@
+
+val ntrees = 32
+val nrows = 1024
+val ncols = 64*1024
+val nsamps = 32
+
+val idata = IMat(256*rand(nrows,ncols))
+
+val treenodes = IMat(256*rand(ntrees,ncols))
+
+val icats = IMat(16*rand(1,ncols))
+
+val jc = irow(0->(ncols+1))
+
+val out = gizeros(2*ntrees*nsamps, ncols)
+
+// icat, vfeat, ifeat, nnodes, ntrees
+val fieldlens = irow(4, 8, 10, 8, 6)
+
+val gid = GIMat(idata)
+val gtn = GIMat(treenodes)
+val gic = GIMat(icats)
+val gjc = GIMat(jc)
+val gout = GIMat(out)
+val gfln = GIMat(fieldlens)
+
+tic;val err=edu.berkeley.bid.CUMACH.treePack(gid.data, gtn.data, gic.data, gjc.data, gout.data, gfln.data, nrows, ncols, ntrees, nsamps); val tt=toc
