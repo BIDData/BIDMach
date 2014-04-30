@@ -11,11 +11,10 @@ else
 fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
-# export JAVA_HOME="" # Set here if not set in environment
 JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
 if [ `uname` = "Darwin" ]; then
-  export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${LD_LIBRARY_PATH}"
+  export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${DYLD_LIBRARY_PATH}"
 else
   export LD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
 fi
