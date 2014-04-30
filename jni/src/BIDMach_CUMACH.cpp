@@ -123,4 +123,16 @@ extern "C" {
     return apply_derivs(nativeA, nativeB, nativeL, nativeC, nrows, ncols);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_treePack
+  (JNIEnv *env, jobject obj, jobject jidata, jobject jtreenodes, jobject jicats, jobject jjc, jobject jout, jobject jfieldlens, jint nrows, jint ncols, jint ntrees, jint nsamps) 
+  {
+    int *idata = (int*)getPointer(env, jidata);
+    int *treenodes = (int*)getPointer(env, jtreenodes);
+    int *icats = (int*)getPointer(env, jicats);
+    int *jc = (int*)getPointer(env, jjc);
+    long long *out = (long long*)getPointer(env, jout);
+    int *fieldlens = (int*)getPointer(env, jfieldlens);
+
+    return treePack(idata, treenodes, icats, jc, out, fieldlens, nrows, ncols, ntrees, nsamps);
+  }
 }
