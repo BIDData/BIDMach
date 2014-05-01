@@ -73,10 +73,6 @@ object LinearLink extends GLMlink {
     in
   }
   
-  def dlink(in:Float) = {
-    1.0f
-  }
-  
   def derivlink(in:Float, targ:Float) = {
     targ - in
   }
@@ -87,8 +83,6 @@ object LinearLink extends GLMlink {
   }
      
   override val linkfn = link _
-  
-  override val dfn = dlink _
   
   override val derivfn = derivlink _
     
@@ -114,10 +108,6 @@ object LogisticLink extends GLMlink {
     }
   }
   
-  def dlink(in:Float) = {
-    1 / (in * (1 - in))
-  }
-  
   def derivlink(in:Float, targ:Float) = {
     targ - in
   }
@@ -127,8 +117,6 @@ object LogisticLink extends GLMlink {
   }
   
   override val linkfn = link _
-  
-  override val dfn = dlink _
   
   override val derivfn = derivlink _
   
@@ -155,10 +143,6 @@ object MaxpLink extends GLMlink {
     }
   }
   
-  def dlink(in:Float) = {
-    1 / (in * (1 - in))
-  }
-  
   def derivlink(p:Float, targ:Float) = {
     (2.0f * targ - 1.0f) * p * (1.0f - p)
   }
@@ -168,8 +152,6 @@ object MaxpLink extends GLMlink {
   }
   
   override val linkfn = link _
-  
-  override val dfn = dlink _
   
   override val derivfn = derivlink _
   
@@ -189,10 +171,6 @@ object SVMLink extends GLMlink {
     in
   }
   
-  def dlink(in:Float) = {
-    1.0f
-  }
-  
   def derivlink(pred:Float, targ:Float) = {
     val ttarg = 2 * targ - 1
     if (pred * ttarg < 1f) ttarg else 0f
@@ -204,8 +182,6 @@ object SVMLink extends GLMlink {
   }
      
   override val linkfn = link _
-  
-  override val dfn = dlink _
   
   override val derivfn = derivlink _
     
@@ -223,7 +199,6 @@ object LinkEnum extends Enumeration {
 
 abstract class GLMlink {
   val linkfn:(Float => Float)
-  val dfn:(Float => Float)
   val derivfn:((Float,Float) => Float)
   val meanfn:(Float => Float)
   val likelihoodfn:((Float,Float) => Float)

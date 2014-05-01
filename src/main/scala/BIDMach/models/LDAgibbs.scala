@@ -110,9 +110,9 @@ object LDAgibbs  {
   import jcuda.runtime._
   
   trait Opts extends FactorModel.Opts {
-    var alpha = 0.001f
-    var beta = 0.0001f
-    var nsamps = 100
+    var alpha = 0.1f
+    var beta = 0.1f
+    var nsamps = 100f
   }
   
   class Options extends Opts {}
