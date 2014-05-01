@@ -137,9 +137,8 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
 
   int i, j, k, h, jc0, jc1, jtodo;
   long long key;
-  int cnt, ival, icat, lastival;
-  int ccnt, ctot, cnew, bestival, tmp;
-  float update, tmpx, clogc, impty, minimpty, lastimpty;
+  int ccnt, ctot, cnew, cnt, ival, icat, lastival, bestival, tmp;
+  float update, cacc, impty, minimpty, lastimpty, tmpx;
 
   for (i = threadIdx.y + blockDim.y * blockIdx.x; i < ntrees*nnodes*nsamps; i += blockDim.y * gridDim.x) {
     // Process a group with fixed itree, inode, and ifeat
@@ -155,10 +154,10 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
 
 
     lastival = -1;
-    lastimpty = -1e7f;
-    minimpty = -1e7f;
+    lastimpty = 1e7f;
+    minimpty = 1e7f;
     ctot = 0;
-    clogc = 0.0f;
+    cacc = 0.0f;
     for (j = jc0; j < jc1; j += blockDim.x) {
       if (j + threadIdx.x < jc1) {                         // Read a block of (32) keys and counts
         key = keys[j + threadIdx.x];                       // Each (x) thread handles a different input
@@ -169,7 +168,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
       jtodo = min(32, jc1 - j);
       for (k = 0; k < jtodo; k++) {                        // Sequentially update counts so that each thread
         if (threadIdx.x == k) {                            // in this warp gets the old and new counts
-          ccnt = catcnt[icat + ncats * threadIdx.y];
+          ccnt = catcnt[icat + ncats * threadIdx.y];       // save data for item k in thread k
           cnew = ccnt + cnt;
           catcnt[icat + ncats * threadIdx.y] = cnew;
         }
@@ -186,9 +185,9 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
         }        
       }  
       ctot += cnt;                                        // Now update the total c and total ci log ci sums
-      clogc += update;
+      cacc += update;
       ctot = max(1, ctot);
-      impty = T::ffinal(clogc, (float)ctot);              // And the impurity for this input
+      impty = T::ffinal(cacc, (float)ctot);              // And the impurity for this input
 
       tmp = __shfl_up(ival, 1);
       tmpx = __shfl_up(impty, 1);                         // Need the last impurity and ival in order
@@ -196,7 +195,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
         lastival = tmp;
         lastimpty = tmpx;
       }
-      if (ival == lastival) lastimpty = -1e7f;            // Eliminate values which are not at value boundaries
+      if (ival == lastival) lastimpty = 1e7f;             // Eliminate values which are not at value boundaries
       if (lastimpty < minimpty) {
         minimpty = lastimpty;
         bestival = lastival;
@@ -214,13 +213,13 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
       minimpty = __shfl(minimpty, jtodo-1);               // Carefully copy the last active thread to all threads, needed outside this loop     
       bestival = __shfl(bestival, jtodo-1);
       ctot = __shfl(ctot, jtodo-1);                
-      clogc = __shfl(clogc, jtodo-1);
+      cacc = __shfl(cacc, jtodo-1);
       lastival = __shfl(ival, jtodo-1);             
       lastimpty = __shfl(impty, jtodo-1);
     }
     if (threadIdx.x == 0) {
       out[i] = bestival;                                  // Output the best split feature value
-      outv[i] = minimpty - T::ffinal(clogc, (float)ctot); // And the impurity gain
+      outv[i] = minimpty - T::ffinal(cacc, (float)ctot);  // And the impurity gain
     }
   }
 }
