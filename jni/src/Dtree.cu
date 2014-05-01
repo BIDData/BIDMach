@@ -122,18 +122,18 @@ template<typename T>
 __global__ void __minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
                               int ntrees, int nnodes, int ncats, int nsamps) {
   __shared__ int catcnt[DBSIZE];
-  __shared__ int fl[32];
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
 
   if (tid < 5) {
-    fl[tid] = fieldlens[tid];
+    catcnt[tid] = fieldlens[tid];
   }
   __syncthreads();
-  int vshift = fl[0];
+  int vshift = catcnt[0];
 
-  int cmask = (1 << fl[0]) - 1;
-  int vmask = (1 << fl[1]) - 1;
+  int cmask = (1 << catcnt[0]) - 1;
+  int vmask = (1 << catcnt[1]) - 1;
+  __syncthreads();
 
   int i, j, k, h, jc0, jc1, jtodo;
   long long key;
