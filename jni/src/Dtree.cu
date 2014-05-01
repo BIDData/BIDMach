@@ -104,3 +104,124 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
 }
 
 
+#if __CUDA_ARCH__ >= 300
+
+__global__ void __maxImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
+                              int ntrees, int nnodes, int ncats, int nsamps) {
+  __shared__ int catcnt[DBSIZE];
+  __shared__ int fl[32];
+
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+
+  if (tid < 5) {
+    fl[tid] = fieldlens[tid];
+  }
+  __syncthreads();
+  int vshift = fl[0];
+
+  int cmask = (1 << fl[0]) - 1;
+  int vmask = (1 << fl[1]) - 1;
+
+  int i, j, k, h, jc0, jc1, jtodo;
+  long long key;
+  int cnt, ival, icat, lastival;
+  int ccnt, ctot, cnew, bestival, tmp;
+  float update, tmpx, clogc, impty, maximpty, lastimpty;
+
+  for (i = threadIdx.y + blockDim.y * blockIdx.x; i < ntrees*nnodes*nsamps; i += blockDim.y * gridDim.x) {
+    // Process a group with fixed itree, inode, and ifeat
+
+    jc0 = jc[i];                                            // The range of indices for this group
+    jc1 = jc[i+1];
+    
+    // Clear the cat counts for this group
+    for (j = tid; j < DBSIZE; j += blockDim.x * blockDim.y) {
+      catcnt[j] = 0;
+    }
+    __syncthreads();
+
+
+    lastival = -1;
+    lastimpty = -1e7f;
+    maximpty = -1e7f;
+    ctot = 0;
+    clogc = 0.0f;
+    for (j = jc0; j < jc1; j += blockDim.x) {
+      if (j + threadIdx.x < jc1) {                         // Read a block of (32) keys and counts
+        key = keys[j + threadIdx.x];                       // Each (x) thread handles a different input
+        cnt = counts[j + threadIdx.x];
+        icat = (int)(key & cmask);                         // Extract the cat id and integer value
+        ival = ((int)(key >> vshift)) & vmask;
+      }
+      jtodo = min(32, jc1 - j);
+      for (k = 0; k < jtodo; k++) {                        // Sequentially update counts so that each thread
+        if (threadIdx.x == k) {                            // in this warp gets the old and new counts
+          ccnt = catcnt[icat + ncats * threadIdx.y];
+          cnew = ccnt + cnt;
+          catcnt[icat + ncats * threadIdx.y] = cnew;
+        }
+      }
+      update = cnew * log((float)cnew);                    // Compute the impurity update for this input
+      if (ccnt > 0) update -= ccnt * log((float)ccnt);
+
+#pragma unroll
+      for (h = 1; h < 32; h = h + h) {                     // Form the cumsums of updates and counts
+        tmpx = __shfl_up(update, h);
+        tmp = __shfl_up(cnt, h);
+        if (threadIdx.x >=h) {
+          update += tmpx;
+          cnt += tmp;
+        }        
+      }  
+      ctot += cnt;                                        // Now update the total c and total ci log ci sums
+      clogc += update;
+      ctot = max(1, ctot);
+      impty = (clogc) / ctot - log((float)ctot);          // And the impurity for this input
+
+      tmp = __shfl_up(ival, 1);
+      tmpx = __shfl_up(impty, 1);                         // Need the last impurity and ival in order
+      if (threadIdx.x > 0) {                              // to restrict the partition feature to a value boundary
+        lastival = tmp;
+        lastimpty = tmpx;
+      }
+      if (ival == lastival) lastimpty = -1e7f;            // Eliminate values which are not at value boundaries
+      if (lastimpty > maximpty) {
+        maximpty = lastimpty;
+        bestival = lastival;
+      }
+
+#pragma unroll
+      for (h = 1; h < 32; h = h + h) {                    // Find the cumulative max impurity and corresponding ival
+        tmpx = __shfl_up(maximpty, h);
+        tmp = __shfl_up(bestival, h);
+        if (threadIdx.x >= h && tmpx > maximpty) {
+          maximpty = tmpx;
+          bestival = tmp;
+        }        
+      }
+      maximpty = __shfl(maximpty, jtodo-1);               // Carefully copy the last active thread to all threads, needed outside this loop     
+      bestival = __shfl(bestival, jtodo-1);
+      ctot = __shfl(ctot, jtodo-1);                
+      clogc = __shfl(clogc, jtodo-1);
+      lastival = __shfl(ival, jtodo-1);             
+      lastimpty = __shfl(impty, jtodo-1);
+    }
+    if (threadIdx.x == 0) {
+      out[i] = bestival;                                  // Output the best split feature value
+      outv[i] = maximpty - (clogc) / ctot + log((float)ctot);    // And the impurity gain
+    }
+  }
+}
+#else
+__global__ void __maxImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, int ntrees, int nnodes, int ncats, int nsamps) {}
+#endif
+
+int maxImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, int ntrees, int nnodes, int ncats, int nsamps) {
+  int ny = min(32, DBSIZE/ncats);
+  dim3 tdim(32, ny, 1);
+  int ng = min(64, 1L*ntrees*nnodes*nsamps);
+  __maxImpurity<<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
