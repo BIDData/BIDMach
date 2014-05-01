@@ -104,8 +104,21 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
 }
 
 
+class entImpty {
+ public:
+  static __device__ inline float fupdate(float v) { return v * log((float)v); }
+  static __device__ inline float ffinal(float vacc, float vsum) { return log(vsum) - vacc / vsum; }
+};
+
+class giniImpty {
+ public:
+  static __device__ inline float fupdate(float v) { return v * v; }
+  static __device__ inline float ffinal(float vacc, float vsum) { return 1 - vacc / (vsum*vsum); }
+};
+
 #if __CUDA_ARCH__ >= 300
 
+template<typename T>
 __global__ void __minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
                               int ntrees, int nnodes, int ncats, int nsamps) {
   __shared__ int catcnt[DBSIZE];
@@ -161,9 +174,8 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
           catcnt[icat + ncats * threadIdx.y] = cnew;
         }
       }
-      update = cnew * log((float)cnew);                    // Compute the impurity update for this input
-      if (ccnt > 0) update -= ccnt * log((float)ccnt);
-
+      update = T::fupdate((float)cnew);                    // Compute the impurity update for this input
+      if (ccnt > 0) update -= T::fupdate((float)ccnt);
 #pragma unroll
       for (h = 1; h < 32; h = h + h) {                     // Form the cumsums of updates and counts
         tmpx = __shfl_up(update, h);
@@ -176,7 +188,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
       ctot += cnt;                                        // Now update the total c and total ci log ci sums
       clogc += update;
       ctot = max(1, ctot);
-      impty = log((float)ctot) - (clogc) / ctot;          // And the impurity for this input
+      impty = T::ffinal(clogc, (float)ctot);              // And the impurity for this input
 
       tmp = __shfl_up(ival, 1);
       tmpx = __shfl_up(impty, 1);                         // Need the last impurity and ival in order
@@ -208,20 +220,26 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
     }
     if (threadIdx.x == 0) {
       out[i] = bestival;                                  // Output the best split feature value
-      outv[i] = minimpty + (clogc) / ctot - log((float)ctot);    // And the impurity gain
+      outv[i] = minimpty - T::ffinal(clogc, (float)ctot); // And the impurity gain
     }
   }
 }
 #else
+template<class T>
 __global__ void __minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
                               int ntrees, int nnodes, int ncats, int nsamps) {}
 #endif
 
-int minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, int ntrees, int nnodes, int ncats, int nsamps) {
+int minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
+                int ntrees, int nnodes, int ncats, int nsamps, int impType) {
   int ny = min(32, DBSIZE/ncats);
   dim3 tdim(32, ny, 1);
   int ng = min(64, 1L*ntrees*nnodes*nsamps);
-  __minImpurity<<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
+  if (impType == 0) {
+    __minImpurity<entImpty><<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
+  } else {
+    __minImpurity<giniImpty><<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
+  }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
