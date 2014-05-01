@@ -1,0 +1,34 @@
+
+val m = loadFMat("/code/spark/modelx.txt")
+val m2 = loadFMat("/code/spark/modelx.fmat.lz4")
+
+val prod = m * ddi
+val prod2 = m2 * ddi
+
+val px = 1 / (1 + exp(- prod))
+val px2 = 1 / (1 + exp(- prod2))
+
+val vv = px(jj) on (1 - px(ii))
+val vv2 = px2(jj) on (1 - px2(ii))
+
+val uu = c6 *@ px + (1.0f - c6) *@ (1.0f - px)
+val uu2 = c6 *@ px2 + (1.0f - c6) *@ (1.0f - px2)
+
+val llv = ln(uu)
+val ii1 = find(prod > 10f)
+llv(ii1) = 0
+val jj1 = find(prod < -10f)
+llv(jj1) = prod(jj1)
+
+val llv2 = ln(uu2)
+val ii2 = find(prod2 > 10f)
+llv2(ii2) = 0
+val jj2 = find(prod2 < -10f)
+llv2(jj2) = prod2(jj2)
+
+val score = mean(vv)
+val score2 = mean(vv2)
+
+val ll = mean(llv)
+val ll2 = mean(llv2)
+
