@@ -168,7 +168,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
       jtodo = min(32, jc1 - j);
       for (k = 0; k < jtodo; k++) {                        // Sequentially update counts so that each thread
         if (threadIdx.x == k) {                            // in this warp gets the old and new counts
-          ccnt = catcnt[icat + ncats * threadIdx.y];       // save data for item k in thread k
+          ccnt = catcnt[icat + ncats * threadIdx.y];       // i.e. data for item k is in thread k
           cnew = ccnt + cnt;
           catcnt[icat + ncats * threadIdx.y] = cnew;
         }
@@ -187,7 +187,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
       ctot += cnt;                                        // Now update the total c and total ci log ci sums
       cacc += update;
       ctot = max(1, ctot);
-      impty = T::ffinal(cacc, (float)ctot);              // And the impurity for this input
+      impty = T::ffinal(cacc, (float)ctot);               // And the impurity for this input
 
       tmp = __shfl_up(ival, 1);
       tmpx = __shfl_up(impty, 1);                         // Need the last impurity and ival in order
@@ -195,6 +195,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
         lastival = tmp;
         lastimpty = tmpx;
       }
+
       if (ival == lastival) lastimpty = 1e7f;             // Eliminate values which are not at value boundaries
       if (lastimpty < minimpty) {
         minimpty = lastimpty;
@@ -231,6 +232,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
 
 int minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
                 int ntrees, int nnodes, int ncats, int nsamps, int impType) {
+  // Note: its safe to round ncats up to a multiple of 32, since its only used to split shmem
   int ny = min(32, DBSIZE/ncats);
   dim3 tdim(32, ny, 1);
   int ng = min(64, 1L*ntrees*nnodes*nsamps);
