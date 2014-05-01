@@ -106,7 +106,7 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
 
 #if __CUDA_ARCH__ >= 300
 
-__global__ void __maxImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
+__global__ void __minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
                               int ntrees, int nnodes, int ncats, int nsamps) {
   __shared__ int catcnt[DBSIZE];
   __shared__ int fl[32];
@@ -126,7 +126,7 @@ __global__ void __maxImpurity(long long *keys, int *counts, int *out, float *out
   long long key;
   int cnt, ival, icat, lastival;
   int ccnt, ctot, cnew, bestival, tmp;
-  float update, tmpx, clogc, impty, maximpty, lastimpty;
+  float update, tmpx, clogc, impty, minimpty, lastimpty;
 
   for (i = threadIdx.y + blockDim.y * blockIdx.x; i < ntrees*nnodes*nsamps; i += blockDim.y * gridDim.x) {
     // Process a group with fixed itree, inode, and ifeat
@@ -143,7 +143,7 @@ __global__ void __maxImpurity(long long *keys, int *counts, int *out, float *out
 
     lastival = -1;
     lastimpty = -1e7f;
-    maximpty = -1e7f;
+    minimpty = -1e7f;
     ctot = 0;
     clogc = 0.0f;
     for (j = jc0; j < jc1; j += blockDim.x) {
@@ -176,7 +176,7 @@ __global__ void __maxImpurity(long long *keys, int *counts, int *out, float *out
       ctot += cnt;                                        // Now update the total c and total ci log ci sums
       clogc += update;
       ctot = max(1, ctot);
-      impty = (clogc) / ctot - log((float)ctot);          // And the impurity for this input
+      impty = log((float)ctot) - (clogc) / ctot;          // And the impurity for this input
 
       tmp = __shfl_up(ival, 1);
       tmpx = __shfl_up(impty, 1);                         // Need the last impurity and ival in order
@@ -185,21 +185,21 @@ __global__ void __maxImpurity(long long *keys, int *counts, int *out, float *out
         lastimpty = tmpx;
       }
       if (ival == lastival) lastimpty = -1e7f;            // Eliminate values which are not at value boundaries
-      if (lastimpty > maximpty) {
-        maximpty = lastimpty;
+      if (lastimpty < minimpty) {
+        minimpty = lastimpty;
         bestival = lastival;
       }
 
 #pragma unroll
-      for (h = 1; h < 32; h = h + h) {                    // Find the cumulative max impurity and corresponding ival
-        tmpx = __shfl_up(maximpty, h);
+      for (h = 1; h < 32; h = h + h) {                    // Find the cumulative min impurity and corresponding ival
+        tmpx = __shfl_up(minimpty, h);
         tmp = __shfl_up(bestival, h);
-        if (threadIdx.x >= h && tmpx > maximpty) {
-          maximpty = tmpx;
+        if (threadIdx.x >= h && tmpx < minimpty) {
+          minimpty = tmpx;
           bestival = tmp;
         }        
       }
-      maximpty = __shfl(maximpty, jtodo-1);               // Carefully copy the last active thread to all threads, needed outside this loop     
+      minimpty = __shfl(minimpty, jtodo-1);               // Carefully copy the last active thread to all threads, needed outside this loop     
       bestival = __shfl(bestival, jtodo-1);
       ctot = __shfl(ctot, jtodo-1);                
       clogc = __shfl(clogc, jtodo-1);
@@ -208,19 +208,20 @@ __global__ void __maxImpurity(long long *keys, int *counts, int *out, float *out
     }
     if (threadIdx.x == 0) {
       out[i] = bestival;                                  // Output the best split feature value
-      outv[i] = maximpty - (clogc) / ctot + log((float)ctot);    // And the impurity gain
+      outv[i] = minimpty + (clogc) / ctot - log((float)ctot);    // And the impurity gain
     }
   }
 }
 #else
-__global__ void __maxImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, int ntrees, int nnodes, int ncats, int nsamps) {}
+__global__ void __minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
+                              int ntrees, int nnodes, int ncats, int nsamps) {}
 #endif
 
-int maxImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, int ntrees, int nnodes, int ncats, int nsamps) {
+int minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, int ntrees, int nnodes, int ncats, int nsamps) {
   int ny = min(32, DBSIZE/ncats);
   dim3 tdim(32, ny, 1);
   int ng = min(64, 1L*ntrees*nnodes*nsamps);
-  __maxImpurity<<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
+  __minImpurity<<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
