@@ -21,8 +21,8 @@ $(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(CUDA_OBJS)
 %.$(OBJ) : %.cpp
 	$(GCC) $(CPPFLAGS) $(LAPACK_INCLUDES) $*.cpp
 
-Devel.$(OBJ) : Devel.cu
-	$(NVCC) $(NVCCFLAGS) -Xptxas -v Devel.cu
+Dtree.$(OBJ) : Devel.cu
+	$(NVCC) $(NVCCFLAGS) -Xptxas -v Dtree.cu
 
 %.$(OBJ) : %.cu
 	$(NVCC) $(NVCCFLAGS) $*.cu

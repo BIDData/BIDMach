@@ -41,7 +41,7 @@ __device__ inline unsigned int mmhash(unsigned int v1, unsigned int v2, unsigned
 #define DBSIZE (8*1024)
 
 __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long long *out, int *fieldlens, 
-			   int nrows, int ncols, int ntrees, int nsamps) {
+                           int nrows, int ncols, int ntrees, int nsamps) {
   __shared__ int dbuff[DBSIZE];
   __shared__ int fl[32];
   int j, k, ic, ival;
@@ -76,16 +76,16 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
     
     for (j = i; j < i + ctodo; j++) {
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
-	int inode = treenodes[itree + j * ntrees];
-	int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
-	long long hdr = (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | (((long long)(fmask & ifeat)) << fshift);
-	for (k = jc[j]; k < jc[j+1]; k++) {    
-	  ic = icats[k];
-	  if (jfeat < nsamps) {
-	    ival = dbuff[ifeat + (j - i) * nrows];
-	    out[jfeat + nsamps * (itree + ntrees * k)] = hdr | (((long long)(vmask & ival)) << vshift) | ((long long)(ic & cmask));
-	  }
-	}
+        int inode = treenodes[itree + j * ntrees];
+        int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
+        long long hdr = (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | (((long long)(fmask & ifeat)) << fshift);
+        for (k = jc[j]; k < jc[j+1]; k++) {    
+          ic = icats[k];
+          if (jfeat < nsamps) {
+            ival = dbuff[ifeat + (j - i) * nrows];
+            out[jfeat + nsamps * (itree + ntrees * k)] = hdr | (((long long)(vmask & ival)) << vshift) | ((long long)(ic & cmask));
+          }
+        }
       }
     }
     __syncthreads();
@@ -119,10 +119,10 @@ class giniImpty {
 #if __CUDA_ARCH__ >= 300
 
 template<typename T>
-__global__ void __minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
-                              int ntrees, int nnodes, int ncats, int nsamps) {
-  __shared__ int catcnt[DBSIZE];
-
+__global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+                              int nnodes, int ncats, int nsamps) {
+  __shared__ int catcnt[DBSIZE/2];
+  __shared__ int cattot[DBSIZE/2];
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
 
   if (tid < 5) {
@@ -130,34 +130,34 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
   }
   __syncthreads();
   int vshift = catcnt[0];
+  int fshift = catcnt[1] + vshift;
 
   int cmask = (1 << catcnt[0]) - 1;
   int vmask = (1 << catcnt[1]) - 1;
+  int fmask = (1 << catcnt[2]) - 1;
   __syncthreads();
 
   int i, j, k, h, jc0, jc1, jtodo;
   long long key;
-  int ccnt, ctot, cnew, cnt, ival, icat, lastival, bestival, tmp;
-  float update, cacc, impty, minimpty, lastimpty, tmpx;
+  int ccnt, ctot, ctot2, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp;
+  float update, updatet, cacc, cact, impty, minimpty, lastimpty, tmpx, tmpy;
 
-  for (i = threadIdx.y + blockDim.y * blockIdx.x; i < ntrees*nnodes*nsamps; i += blockDim.y * gridDim.x) {
+  for (i = threadIdx.y + blockDim.y * blockIdx.x; i < nnodes*nsamps; i += blockDim.y * gridDim.x) {
     // Process a group with fixed itree, inode, and ifeat
 
     jc0 = jc[i];                                            // The range of indices for this group
     jc1 = jc[i+1];
-    
+    __syncthreads();
+
     // Clear the cat counts for this group
-    for (j = tid; j < DBSIZE; j += blockDim.x * blockDim.y) {
+    for (j = tid; j < DBSIZE/2; j += blockDim.x * blockDim.y) {
       catcnt[j] = 0;
+      cattot[j] = 0;
     }
     __syncthreads();
 
-
-    lastival = -1;
-    lastimpty = 1e7f;
-    minimpty = 1e7f;
-    ctot = 0;
-    cacc = 0.0f;
+    ctot = 0;                                              // First pass gets counts for each category
+    cacc = 0.0f;                                           // and the (ci)log(ci) sum for this block
     for (j = jc0; j < jc1; j += blockDim.x) {
       if (j + threadIdx.x < jc1) {                         // Read a block of (32) keys and counts
         key = keys[j + threadIdx.x];                       // Each (x) thread handles a different input
@@ -168,9 +168,9 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
       jtodo = min(32, jc1 - j);
       for (k = 0; k < jtodo; k++) {                        // Sequentially update counts so that each thread
         if (threadIdx.x == k) {                            // in this warp gets the old and new counts
-          ccnt = catcnt[icat + ncats * threadIdx.y];       // i.e. data for item k is in thread k
+          ccnt = cattot[icat + ncats * threadIdx.y];       // i.e. data for item k is in thread k
           cnew = ccnt + cnt;
-          catcnt[icat + ncats * threadIdx.y] = cnew;
+          cattot[icat + ncats * threadIdx.y] = cnew;
         }
       }
       update = T::fupdate((float)cnew);                    // Compute the impurity update for this input
@@ -184,10 +184,58 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
           cnt += tmp;
         }        
       }  
+      ctot += cnt;                                         // Now update the total c and total ci log ci sums
+      cacc += update;
+      ctot = __shfl(ctot, jtodo-1);                
+      cacc = __shfl(cacc, jtodo-1);
+    }
+    __syncthreads();
+
+
+    cact = cacc;                                           // Save the total count and (ci)log(ci) sum
+    ctotall = ctot;
+    ctot = 0;
+    cacc = 0.0f;
+    lastival = -1;
+    lastimpty = 1e7f;
+    minimpty = 1e7f;
+    for (j = jc0; j < jc1; j += blockDim.x) {
+      if (j + threadIdx.x < jc1) {                         // Read a block of (32) keys and counts
+        key = keys[j + threadIdx.x];                       // Each (x) thread handles a different input
+        cnt = counts[j + threadIdx.x];
+        icat = (int)(key & cmask);                         // Extract the cat id and integer value
+        ival = ((int)(key >> vshift)) & vmask;
+      }
+      jtodo = min(32, jc1 - j);
+      for (k = 0; k < jtodo; k++) {                        // Sequentially update counts so that each thread
+        if (threadIdx.x == k) {                            // in this warp gets the old and new counts
+          ccnt = catcnt[icat + ncats * threadIdx.y];       // i.e. data for item k is in thread k
+          ctt = cattot[icat + ncats * threadIdx.y];  
+          cnew = ccnt + cnt;
+          catcnt[icat + ncats * threadIdx.y] = cnew;
+        }
+      }
+      update = T::fupdate((float)cnew);                    // Compute the impurity update for this input
+      if (ccnt > 0) update -= T::fupdate((float)ccnt);
+      updatet = - T::fupdate((float)(ctt - ccnt));
+      if (ctt - cnew > 0) updatet += T::fupdate((float)(ctt - cnew));
+#pragma unroll
+      for (h = 1; h < 32; h = h + h) {                     // Form the cumsums of updates and counts
+        tmpx = __shfl_up(update, h);
+        tmpy = __shfl_up(updatet, h);
+        tmp = __shfl_up(cnt, h);
+        if (threadIdx.x >=h) {
+          update += tmpx;
+          updatet += tmpy;
+          cnt += tmp;
+        }        
+      }  
       ctot += cnt;                                        // Now update the total c and total ci log ci sums
       cacc += update;
+      cact += updatet;
       ctot = max(1, ctot);
-      impty = T::ffinal(cacc, (float)ctot);               // And the impurity for this input
+      ctot2 = max(1, ctotall - ctot);
+      impty = T::ffinal(cacc, (float)ctot) + T::ffinal(cact, (float)ctot2);  // And the impurity for this input
 
       tmp = __shfl_up(ival, 1);
       tmpx = __shfl_up(impty, 1);                         // Need the last impurity and ival in order
@@ -215,31 +263,33 @@ __global__ void __minImpurity(long long *keys, int *counts, int *out, float *out
       bestival = __shfl(bestival, jtodo-1);
       ctot = __shfl(ctot, jtodo-1);                
       cacc = __shfl(cacc, jtodo-1);
+      cact = __shfl(cact, jtodo-1);
       lastival = __shfl(ival, jtodo-1);             
       lastimpty = __shfl(impty, jtodo-1);
     }
     if (threadIdx.x == 0) {
-      out[i] = bestival;                                  // Output the best split feature value
-      outv[i] = minimpty - T::ffinal(cacc, (float)ctot);  // And the impurity gain
+      outv[i] = bestival;                                 // Output the best split feature value
+      outf[i] = (int)((key >> fshift) & fmask);           // Save the feature index
+      outg[i] = minimpty - T::ffinal(cacc, (float)ctot);  // And the impurity gain
     }
   }
 }
 #else
 template<class T>
-__global__ void __minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
-                              int ntrees, int nnodes, int ncats, int nsamps) {}
+__global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+                              int nnodes, int ncats, int nsamps) {}
 #endif
 
-int minImpurity(long long *keys, int *counts, int *out, float *outv, int *jc, int *fieldlens, 
-                int ntrees, int nnodes, int ncats, int nsamps, int impType) {
+int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+                int nnodes, int ncats, int nsamps, int impType) {
   // Note: its safe to round ncats up to a multiple of 32, since its only used to split shmem
-  int ny = min(32, DBSIZE/ncats);
+  int ny = min(32, DBSIZE/ncats/2);
   dim3 tdim(32, ny, 1);
-  int ng = min(64, 1L*ntrees*nnodes*nsamps);
+  int ng = min(64, 1L*nnodes*nsamps);
   if (impType == 0) {
-    __minImpurity<entImpty><<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
+    __minImpurity<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
   } else {
-    __minImpurity<giniImpty><<<ng,tdim>>>(keys, counts, out, outv, jc, fieldlens, ntrees, nnodes, ncats, nsamps);
+    __minImpurity<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
   }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();

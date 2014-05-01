@@ -21,7 +21,7 @@ abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) {
 
 object DataSource {
   trait Opts {
-    var batchSize = 100000
+    var batchSize = 10000
     var sizeMargin = 3f
     var sample = 1f
     var addConstFeat:Boolean = false
