@@ -52,16 +52,16 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
     fl[tid] = fieldlens[tid];
   }
   __syncthreads();
-  int vshift = fl[0];
-  int fshift = fl[1] + vshift;
+  int vshift = fl[4];
+  int fshift = fl[3] + vshift;
   int nshift = fl[2] + fshift;
-  int tshift = fl[3] + nshift;
+  int tshift = fl[1] + nshift;
 
-  int cmask = (1 << fl[0]) - 1;
-  int vmask = (1 << fl[1]) - 1;
+  int cmask = (1 << fl[4]) - 1;
+  int vmask = (1 << fl[3]) - 1;
   int fmask = (1 << fl[2]) - 1;
-  int nmask = (1 << fl[3]) - 1;
-  int tmask = (1 << fl[4]) - 1;
+  int nmask = (1 << fl[1]) - 1;
+  int tmask = (1 << fl[0]) - 1;
   
   int nc = (DBSIZE / nrows);
   int itree = threadIdx.y;
@@ -129,11 +129,11 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
     catcnt[tid] = fieldlens[tid];
   }
   __syncthreads();
-  int vshift = catcnt[0];
-  int fshift = catcnt[1] + vshift;
+  int vshift = catcnt[4];
+  int fshift = catcnt[3] + vshift;
 
-  int cmask = (1 << catcnt[0]) - 1;
-  int vmask = (1 << catcnt[1]) - 1;
+  int cmask = (1 << catcnt[4]) - 1;
+  int vmask = (1 << catcnt[3]) - 1;
   int fmask = (1 << catcnt[2]) - 1;
   __syncthreads();
 

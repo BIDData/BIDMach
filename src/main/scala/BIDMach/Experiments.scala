@@ -6,6 +6,8 @@ import java.io._
 import BIDMach.datasources._
 import BIDMach.models._
 import BIDMach.updaters._
+import scala.concurrent.future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Experiments {
   
@@ -301,7 +303,7 @@ object Twitter {
 			nbi0:Int = 100,
 			ntri0:Int = 200		
 			) = {
-	  val ds = SFilesDS.twitterNgramBlend(nstart0, nend0)
+	  val ds = twitterNgramBlend(nstart0, nend0)
 //	  val ds = SFilesDataSource.twitterWords(nstart0, nend0)
 	  ds.opts.addConstFeat = true
 	  ds.opts.featType = 0
@@ -366,5 +368,158 @@ object Twitter {
   	Learner(ds, new GLM(gopts), null, new ADAGrad(aopts))	  
 	}
 	
+	  
+  val twitterFeatureDir = "/disk%02d/twitter/featurized/%04d/%02d/%02d/"
+  val twitterSmileyFeatureDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
+  
+  def twitterWords(
+      nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
+        nend0:Int = FilesDS.encodeDate(2012,12,1,0), 
+        n:Int = 1, 
+        i:Int = 0, 
+        nfeats:Int = 100000) = {
+    val opts = new SFilesDS.Options {  
+        override def fnames:List[(Int)=>String] = List(FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
+        fcounts = icol(nfeats)
+        nstart = nstart0/n
+        nend = nend0/n
+        order = 1
+        batchSize = 100000
+        eltsPerSample = 40
+        lookahead = 3
+    }
+    new SFilesDS(opts)
+  }
+  
+  def twitterSmileyWords(
+        nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
+        nend0:Int = FilesDS.encodeDate(2013,7,1,0), 
+        n:Int = 1, 
+        i:Int = 0, 
+        nfeats:Int = 100000) = {
+    val opts = new SFilesDS.Options {  
+        override def fnames:List[(Int)=>String] = List(FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
+        fcounts = icol(nfeats)
+        nstart = nstart0/n
+        nend = nend0/n
+        order = 1
+        batchSize = 100000
+        eltsPerSample = 40
+        lookahead = 3
+    }
+    new SFilesDS(opts)
+  }
+  
+  def twitterNgrams(
+      nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
+        nend0:Int = FilesDS.encodeDate(2012,12,1,0), 
+        n:Int = 1, 
+        i:Int = 0, 
+        nuni0:Int = 50, 
+        nbi0:Int = 100, 
+        ntri0:Int = 200) = {
+    val opts = new SFilesDS.Options {  
+        override def fnames:List[(Int)=>String] = List(
+                FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i),
+                FilesDS.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
+                FilesDS.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
+            )
+        fcounts = icol(nuni0*1000,nbi0*1000,ntri0*1000)
+        nstart = nstart0/n
+        nend = nend0/n
+        order = 1
+        batchSize = 100000
+        eltsPerSample = 40
+        lookahead = 3
+    }
+    new SFilesDS(opts)
+  }
+  
+  def twitterSmileyNgrams(
+      nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
+        nend0:Int = FilesDS.encodeDate(2013,7,1,0), 
+        n:Int = 1, 
+        i:Int = 0, 
+        nuni0:Int = 50, 
+        nbi0:Int = 100, 
+        ntri0:Int = 200) = {
+    val opts = new SFilesDS.Options {  
+        override def fnames:List[(Int)=>String] = List(
+                FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i),
+                FilesDS.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
+                FilesDS.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)
+            )
+        fcounts = icol(nuni0*1000,nbi0*1000,ntri0*1000)
+        nstart = nstart0/n
+        nend = nend0/n 
+        order = 1
+        batchSize = 100000
+        eltsPerSample = 40
+        lookahead = 3
+    }
+    new SFilesDS(opts)
+  }
+   
+  def twitterWordBlend(
+        nstart0:Int = FilesDS.encodeDate(2012,3,1,0),
+        nend0:Int = FilesDS.encodeDate(2013,7,1,0),
+        n:Int = 1,
+        i:Int = 0,
+        nfeats:Int = 10000) = {  
+    val ds1 = twitterWords(nstart0, nend0, n, i, nfeats)
+    val ds2 = twitterSmileyWords(nstart0, nend0, n, i, nfeats)
+    if (n > 1) {
+        ds1.opts.lookahead = 2
+        ds2.opts.lookahead = 2
+    }
+    val opts3 = new BlendedDS.Options
+    new BlendedDS(ds1, ds2, 0.5f, 1f, 1f, opts3)
+  }
+  
+  def twitterNgramBlend( 
+        nstart0:Int = FilesDS.encodeDate(2012,3,1,0),
+        nend0:Int = FilesDS.encodeDate(2013,7,1,0),
+        n:Int = 1,
+        i:Int = 0,
+        nuni0:Int = 50,
+        nbi0:Int = 100,
+        ntri0:Int = 200) = {
+    val ds1 = twitterNgrams(nstart0, nend0, n, i, nuni0, nbi0, ntri0)
+    val ds2 = twitterSmileyNgrams(nstart0, nend0, n, i, nuni0, nbi0, ntri0)
+    if (n > 1) {
+        ds1.opts.lookahead = 2
+        ds2.opts.lookahead = 2
+    }
+    val opts3 = new BlendedDS.Options
+    new BlendedDS(ds1, ds2, 0.7f, 1f, 1f, opts3)
+  }
+  
+  def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int,Int)=>DataSource = twitterWords, nfeats:Int=100000):IMat = { 
+    val nstart0 = FilesDS.encodeDate(2012,3,22,0)
+    val nend0 = FilesDS.encodeDate(2013,7,1,0)
+    var bytes = 0L
+    var done = 0L
+    var step = 10000000000L
+    var stop = izeros(1,1)
+    tic
+    for (i <- 0 until nthreads) { 
+      future { 
+        val ss = ff(nstart0, nend0, nthreads, i, nfeats)
+        ss.init
+        while (ss.hasNext && stop.v != 1) { 
+            val a = ss.next
+            bytes += 12L*a(0).nnz
+            if (bytes > done + step) { 
+                done = (bytes/step)*step
+                val t=toc
+                println("GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (bytes/1e9, t, bytes/t/1e6))
+            }
+        }
+        val t = toc
+        println("Thread %d done, GB=%4.2f, t=%4.2f, MB/s=%4.2f" format (i, bytes/1e9, t, bytes/t/1e6))
+      }
+    }
+    stop
+  }
 
 }

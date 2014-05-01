@@ -512,7 +512,7 @@ object GLM {
   	opts.lrate = 1f
   	val nn = new ParLearnerxF(
   	    null,
-  	    (dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i),
+  	    (dopts:DataSource.Opts, i:Int) => Twitter.twitterWords(nstart, nend, opts.nthreads, i),
   	    opts, mkGLMModel _,
   	    opts, mkRegularizer _,
   	    opts, mkUpdater _,
@@ -529,7 +529,7 @@ object GLM {
   	val opts = new LearnFParOptions
   	opts.lrate = 1f
   	val nn = new ParLearnerF(
-  	    SFilesDS.twitterWords(nstart, nend),
+  	    Twitter.twitterWords(nstart, nend),
   	    opts, mkGLMModel _, 
         opts, mkRegularizer _,
   	    opts, mkUpdater _,

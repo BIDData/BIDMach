@@ -202,7 +202,7 @@ object NMF  {
   	opts.resFile = "/big/twitter/test/results.mat"
   	val nn = new ParLearnerxF(
   	    null, 
-  			(dopts:DataSource.Opts, i:Int) => SFilesDS.twitterWords(nstart, nend, opts.nthreads, i), 
+  			(dopts:DataSource.Opts, i:Int) => Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
   			opts, mkNMFmodel _, 
   			null, null, 
   	    opts, mkUpdater _,
@@ -222,7 +222,7 @@ object NMF  {
   	opts.npasses = 4
   	opts.resFile = "/big/twitter/test/results.mat"
   	val nn = new ParLearnerF(
-  	    SFilesDS.twitterWords(nstart, nend), 
+  	    Twitter.twitterWords(nstart, nend), 
   	    opts, mkNMFmodel _, 
   	    null, null, 
   	    opts, mkUpdater _,
