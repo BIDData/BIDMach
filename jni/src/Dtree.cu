@@ -285,7 +285,7 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
   // Note: its safe to round ncats up to a multiple of 32, since its only used to split shmem
   int ny = min(32, DBSIZE/ncats/2);
   dim3 tdim(32, ny, 1);
-  int ng = min(64, 1L*nnodes*nsamps);
+  int ng = min(64, nnodes*nsamps);
   if (impType == 0) {
     __minImpurity<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
   } else {
