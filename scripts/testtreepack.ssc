@@ -1,21 +1,33 @@
 
-val ntrees = 32
-val nrows = 1024
-val ncols = 64*1024
-val nsamps = 32
+// itree, inode, ifeat, vfeat, icat
+val nsamps = 16
+val ncols = 1024*64
 
-val idata = IMat(256*rand(nrows,ncols))
+val fieldlens = irow(6, 12, 12, 8, 4)
 
-val treenodes = IMat(256*rand(ntrees,ncols))
+val ntrees = 1 << fieldlens(0)
+val nnodes = 1 << fieldlens(1)
+val nrows = 1 << fieldlens(2)
+val nvals = 1 << fieldlens(3)
+val ncats = 1 << fieldlens(4)
 
-val icats = IMat(16*rand(1,ncols))
+val tmask = ntrees - 1
+val nmask = nnodes - 1
+val fmask = nrows - 1
+val vmask = nvals - 1
+val cmask = ncats - 1
 
+val vshift = fieldlens(4)
+val fshift = fieldlens(3) + vshift
+val nshift = fieldlens(2) + fshift
+val tshift = fieldlens(1) + nshift
+
+val idata = IMat(min(vmask, nvals*rand(nrows,ncols)))
+val treenodes = IMat(min(nmask, nnodes*rand(ntrees,ncols)))
+val out = izeros(2*ntrees*nsamps, ncols)
 val jc = irow(0->(ncols+1))
+val icats = IMat(min(cmask, ncats*rand(1,ncols)))
 
-val out = gizeros(2*ntrees*nsamps, ncols)
-
-// icat, vfeat, ifeat, nnodes, ntrees
-val fieldlens = irow(4, 8, 10, 8, 6)
 
 val gid = GIMat(idata)
 val gtn = GIMat(treenodes)
@@ -25,3 +37,35 @@ val gout = GIMat(out)
 val gfln = GIMat(fieldlens)
 
 tic;val err=edu.berkeley.bid.CUMACH.treePack(gid.data, gtn.data, gic.data, gjc.data, gout.data, gfln.data, nrows, ncols, ntrees, nsamps); val tt=toc
+
+println("throughput=%f GB/s" format (idata.length*4f + out.length*4f)/tt/1e9)
+
+out <-- gout
+
+if (false) {
+println("checking %d trees" format ntrees);
+var i = 0;
+while (i < ntrees*nsamps) {
+  val itree = i / nsamps
+  val jfeat = i % nsamps
+  if (jfeat == 0) print(".")
+  var j = 0
+  while (j < ncols) {
+     val icat = icats(0, j)
+     val v1 = out(2*i, j)
+     val v2 = out(2*i+1, j)
+     val v = (v1.toLong & 0xffffffffL) | (v2.toLong << 32);
+
+     val ival = ((v >> vshift) & vmask).toInt
+     val ifeat = ((v >> fshift) & fmask).toInt
+     val itreex = ((v >> tshift) & tmask).toInt
+     val icatx = (v & cmask).toInt
+     val ivalx = idata(ifeat, j);
+     if (ivalx != ival)   println("xproblem %d %d %d %d %x" format (i,j,ival,ivalx,v))
+     if (itree != itreex) println("yproblem %d %d %d %d %x" format (i,j,itree,itreex,v))
+     if (icat != icatx)   println("zproblem %d %d %d %d %x" format (i,j,icat,icatx,v))
+     j += 1
+  }
+  i += 1
+}
+}
