@@ -48,18 +48,20 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
   int seed = 45123421;
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
-  if (tid < 5) {
+  if (tid < 6) {
     fl[tid] = fieldlens[tid];
   }
   __syncthreads();
-  int vshift = fl[4];
-  int fshift = fl[3] + vshift;
-  int nshift = fl[2] + fshift;
+  int vshift = fl[5];
+  int ishift = fl[4] + vshift;
+  int jshift = fl[3] + ishift;
+  int nshift = fl[2] + jshift;
   int tshift = fl[1] + nshift;
 
-  int cmask = (1 << fl[4]) - 1;
-  int vmask = (1 << fl[3]) - 1;
-  int fmask = (1 << fl[2]) - 1;
+  int cmask = (1 << fl[5]) - 1;
+  int vmask = (1 << fl[4]) - 1;
+  int imask = (1 << fl[3]) - 1;
+  int jmask = (1 << fl[2]) - 1;
   int nmask = (1 << fl[1]) - 1;
   int tmask = (1 << fl[0]) - 1;
   
@@ -78,7 +80,8 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
         int inode = treenodes[itree + j * ntrees];
         int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
-        long long hdr = (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | (((long long)(fmask & ifeat)) << fshift);
+        long long hdr = (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
+          (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) ;
         for (k = jc[j]; k < jc[j+1]; k++) {    
           ic = icats[k];
           if (jfeat < nsamps) {
@@ -106,14 +109,14 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
 
 class entImpty {
  public:
-  static __device__ inline float fupdate(float v) { return v * log((float)v); }
-  static __device__ inline float ffinal(float vacc, float vsum) { return log(vsum) - vacc / vsum; }
+  static __device__ inline float fupdate(float v) { return v * log(max(1.0f, v)); }
+  static __device__ inline float ffinal(float vacc, float vsum) { vsum = max(1.0f, vsum); return log(vsum) - vacc / vsum; }
 };
 
 class giniImpty {
  public:
   static __device__ inline float fupdate(float v) { return v * v; }
-  static __device__ inline float ffinal(float vacc, float vsum) { return 1 - vacc / (vsum*vsum); }
+  static __device__ inline float ffinal(float vacc, float vsum) { vsum = max(1.0f, vsum); return 1 - vacc / (vsum*vsum); }
 };
 
 #if __CUDA_ARCH__ >= 300
@@ -125,16 +128,17 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
   __shared__ int cattot[DBSIZE/2];
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
 
-  if (tid < 5) {
+  if (tid < 6) {
     catcnt[tid] = fieldlens[tid];
   }
   __syncthreads();
-  int vshift = catcnt[4];
-  int fshift = catcnt[3] + vshift;
+  int vshift = catcnt[5];
+  int ishift = catcnt[4] + vshift;
 
-  int cmask = (1 << catcnt[4]) - 1;
-  int vmask = (1 << catcnt[3]) - 1;
-  int fmask = (1 << catcnt[2]) - 1;
+  int cmask = (1 << catcnt[5]) - 1;
+  int vmask = (1 << catcnt[4]) - 1;
+  int imask = (1 << catcnt[3]) - 1;
+
   __syncthreads();
 
   int i, j, k, h, jc0, jc1, jtodo;
@@ -162,7 +166,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
       if (j + threadIdx.x < jc1) {                         // Read a block of (32) keys and counts
         key = keys[j + threadIdx.x];                       // Each (x) thread handles a different input
         cnt = counts[j + threadIdx.x];
-        icat = (int)(key & cmask);                         // Extract the cat id and integer value
+        icat = ((int)key) & cmask;                         // Extract the cat id and integer value
         ival = ((int)(key >> vshift)) & vmask;
       }
       jtodo = min(32, jc1 - j);
@@ -190,7 +194,6 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
       cacc = __shfl(cacc, jtodo-1);
     }
     __syncthreads();
-
 
     cact = cacc;                                           // Save the total count and (ci)log(ci) sum
     ctotall = ctot;
@@ -269,7 +272,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
     }
     if (threadIdx.x == 0) {
       outv[i] = bestival;                                 // Output the best split feature value
-      outf[i] = (int)((key >> fshift) & fmask);           // Save the feature index
+      outf[i] = (int)((key >> ishift) & imask);           // Save the feature index
       outg[i] = minimpty - T::ffinal(cacc, (float)ctot);  // And the impurity gain
     }
   }
@@ -291,6 +294,53 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
   } else {
     __minImpurity<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
   }
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+
+__global__ void __findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
+  __shared__ int dbuff[1024];
+  int i, j, iv, lasti, tmp;
+
+  int imin = ((int)(32 * ((((long long)n) * blockIdx.x) / (gridDim.x * 32))));
+  int imax = min(n, ((int)(32 * ((((long long)n) * (blockIdx.x + 1)) / (gridDim.x * 32) + 1))));
+
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  if (tid == 0 && blockIdx.x == 0) {
+    jc[0] = 0;
+  }
+  __syncthreads();
+  lasti = 0x7fffffff;
+  for (i = imin; i <= imax; i += blockDim.x * blockDim.y) {
+    iv = njc;
+    if (i + tid < imax) {
+      iv = (int)(keys[i + tid] >> shift);
+      dbuff[tid] = iv;
+    }
+    __syncthreads();
+    if (i + tid < imax || i + tid == n) {
+      if (tid > 0) lasti = dbuff[tid - 1];
+      if (iv > lasti) {
+        for (j = lasti+1; j <= iv; j++) {
+          jc[j] = i + tid;
+        }
+      }
+      if (tid == 0) {
+        lasti = dbuff[blockDim.x * blockDim.y - 1];
+      }
+    }
+    __syncthreads();
+    }
+}
+
+
+int findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
+  int ny = min(32, 1 + (n-1)/32);
+  dim3 tdim(32, ny, 1);
+  int ng = min(64, 1+n/32/ny);
+  __findBoundaries<<<ng,tdim>>>(keys, jc, n, njc, shift);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;

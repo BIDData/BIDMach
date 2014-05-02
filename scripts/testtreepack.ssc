@@ -1,29 +1,33 @@
+import edu.berkeley.bid.CUMAT
+import edu.berkeley.bid.CUMACH
 
-// itree, inode, ifeat, vfeat, icat
-val nsamps = 16
-val ncols = 1024*64
+val ncols = 64*1024
 
-val fieldlens = irow(6, 12, 12, 8, 4)
+// itree, inode, jfeat, ifeat, vfeat, icat
+val fieldlens = irow(6, 12, 5, 10, 8, 4)
 
 val ntrees = 1 << fieldlens(0)
 val nnodes = 1 << fieldlens(1)
-val nrows = 1 << fieldlens(2)
-val nvals = 1 << fieldlens(3)
-val ncats = 1 << fieldlens(4)
+val nsamps = 1 << fieldlens(2)
+val nrows = 1 << fieldlens(3)
+val nvals = 1 << fieldlens(4)
+val ncats = 1 << fieldlens(5)
 
 val tmask = ntrees - 1
 val nmask = nnodes - 1
-val fmask = nrows - 1
+val jmask = nsamps - 1
+val imask = nrows - 1
 val vmask = nvals - 1
 val cmask = ncats - 1
 
-val vshift = fieldlens(4)
-val fshift = fieldlens(3) + vshift
-val nshift = fieldlens(2) + fshift
+val vshift = fieldlens(5)
+val ishift = fieldlens(4) + vshift
+val jshift = fieldlens(3) + ishift
+val nshift = fieldlens(2) + jshift
 val tshift = fieldlens(1) + nshift
 
-val idata = IMat(min(vmask, nvals*rand(nrows,ncols)))
-val treenodes = IMat(min(nmask, nnodes*rand(ntrees,ncols)))
+val idata = IMat(min(vmask, nvals*rand(nrows, ncols)))
+val treenodes = IMat(min(nmask, nnodes*rand(ntrees, ncols)))
 val out = izeros(2*ntrees*nsamps, ncols)
 val jc = irow(0->(ncols+1))
 val icats = IMat(min(cmask, ncats*rand(1,ncols)))
@@ -36,7 +40,7 @@ val gjc = GIMat(jc)
 val gout = GIMat(out)
 val gfln = GIMat(fieldlens)
 
-tic;val err=edu.berkeley.bid.CUMACH.treePack(gid.data, gtn.data, gic.data, gjc.data, gout.data, gfln.data, nrows, ncols, ntrees, nsamps); val tt=toc
+tic;val err=CUMACH.treePack(gid.data, gtn.data, gic.data, gjc.data, gout.data, gfln.data, nrows, ncols, ntrees, nsamps); val tt=toc
 
 println("throughput=%f GB/s" format (idata.length*4f + out.length*4f)/tt/1e9)
 
@@ -57,10 +61,12 @@ while (i < ntrees*nsamps) {
      val v = (v1.toLong & 0xffffffffL) | (v2.toLong << 32);
 
      val ival = ((v >> vshift) & vmask).toInt
-     val ifeat = ((v >> fshift) & fmask).toInt
+     val ifeat = ((v >> ishift) & imask).toInt
+     val jfeatx = ((v >> jshift) & jmask).toInt
      val itreex = ((v >> tshift) & tmask).toInt
      val icatx = (v & cmask).toInt
      val ivalx = idata(ifeat, j);
+     if (jfeat != jfeatx) println("wproblem %d %d %d %d %x" format (i,j,jfeat,jfeatx,v))
      if (ivalx != ival)   println("xproblem %d %d %d %d %x" format (i,j,ival,ivalx,v))
      if (itree != itreex) println("yproblem %d %d %d %d %x" format (i,j,itree,itreex,v))
      if (icat != icatx)   println("zproblem %d %d %d %d %x" format (i,j,icat,icatx,v))
@@ -69,3 +75,20 @@ while (i < ntrees*nsamps) {
   i += 1
 }
 }
+
+tic;val err2=CUMAT.lsort(gout.data, gout.length/2, 1); val t2=toc
+println("sorting at %f GB/s" format out.length*8f/t2/1e9)
+
+val goutv = gizeros(nsamps, ntrees*nnodes)
+val goutf = gizeros(nsamps, ntrees*nnodes)
+val goutg = gizeros(nsamps, ntrees*nnodes)
+
+val ones = iones(gout.nrows/2, gout.ncols)
+val gones = GIMat(ones);
+
+val jc2 = gizeros(1,nsamps*ntrees*nnodes+1)
+tic; val err3= CUMACH.findBoundaries(gout.data, jc2.data, gout.length/2, nsamps*ntrees*nnodes, jshift); val t3 = toc
+
+tic;
+val err4=CUMACH.minImpurity(gout.data, gones.data, goutv.data, goutf.data, goutg.data, jc2.data, gfln.data, nnodes*ntrees, ncats, nsamps, 0); 
+val t4 = toc

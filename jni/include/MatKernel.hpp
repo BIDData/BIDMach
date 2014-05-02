@@ -20,3 +20,4 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
 int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
                 int nnodes, int ncats, int nsamps, int impType);
 
+int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);

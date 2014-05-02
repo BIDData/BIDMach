@@ -136,7 +136,7 @@ extern "C" {
     return treePack(idata, treenodes, icats, jc, out, fieldlens, nrows, ncols, ntrees, nsamps);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_minImpurity
+ JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_minImpurity
   (JNIEnv *env, jobject obj, jobject jkeys, jobject jcounts, jobject joutv, jobject joutf, jobject joutg, jobject jjc, jobject jfieldlens, 
    jint nnodes, jint ncats, jint nsamps, jint impType) 
   {
@@ -149,5 +149,14 @@ extern "C" {
     int *fieldlens = (int*)getPointer(env, jfieldlens);
 
     return minImpurity(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps, impType);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_findBoundaries
+  (JNIEnv *env, jobject obj, jobject jkeys, jobject jjc, jint n, jint njc, jint shift)
+  {
+    long long *keys = (long long*)getPointer(env, jkeys);
+    int *jc = (int*)getPointer(env, jjc);
+
+    return findBoundaries(keys, jc, n, njc, shift);
   }
 }
