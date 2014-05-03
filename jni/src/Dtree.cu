@@ -452,7 +452,7 @@ __global__ void mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) 
   for (i = imin; i < imax; i += blockDim.x * blockDim.y) {
     itodo = min(1024, imax - i);
     __syncthreads();
-    if (i + tid < imax) {                           // Copy a block of input data into dbuff
+    if (i + tid < imax) {                                // Copy a block of input data into dbuff
       thisval = keys[i + tid];
       dbuff[tid] = thisval;
     }
@@ -461,10 +461,10 @@ __global__ void mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) 
     if (tid == 0) endval = dbuff[itodo-1];       
     __syncthreads();
     if (i + tid < imax) {
-      ocnts[tid] = (thisval == lastval) ? 0 : 1;    // Bit that indicates a change of index
+      ocnts[tid] = (thisval == lastval) ? 0 : 1;        // Bit that indicates a change of index
     }
     __syncthreads();
-    for (j = 1; j < itodo; j = j << 1) {           // Cumsum of these bits = where to put key
+    for (j = 1; j < itodo; j = j << 1) {                // Cumsum of these bits = where to put key
       doit = tid + j < itodo && (tid & ((j << 1)-1)) == 0;
       if (doit) {
         tmp = ocnts[tid] + ocnts[tid + j];
@@ -476,12 +476,12 @@ __global__ void mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) 
       __syncthreads();
     }
     total = ocnts[itodo-1];
-    if (tid > 0 && i + tid < imax) {
+    if (tid > 0 && i + tid < imax) {                    // Find where the index changes
       thiscnt = ocnts[tid];
       lastcnt = ocnts[tid-1];
     }
     __syncthreads();
-    if (tid > 0 && i + tid < imax) {
+    if (tid > 0 && i + tid < imax) {                    // and save the key/counts there in buffer memory
       if (thiscnt > lastcnt) {
         obuff[obase + thiscnt] = thisval;
         ocnts[obase + thiscnt] = i + tid;
@@ -489,21 +489,21 @@ __global__ void mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) 
     }
     __syncthreads();
     obase += total;
-    if (obase > 1024) {
+    if (obase > 1024) {                                 // Buffer full so flush it
       okeys[odone+tid] = obuff[tid];
       counts[odone+tid] = ocnts[tid] - ocnts[tid-1];    // Need to fix wraparound
       odone += 1024;
     }
     __syncthreads();
-    if (obase > 1024) {
+    if (obase > 1024) {                                 // Copy top to bottom of buffer
       obuff[tid] = obuff[tid+1024];
       ocnts[tid] = ocnts[tid+1024];
     }
     obase -= 1024;
   }	   
-  if (tid < obase) {
+  if (tid < obase) {                                    // Flush out anything that's left
     okeys[odone+tid] = obuff[tid];
-    counts[odone+tid] = ocnts[tid] - ocnts[tid-1];    // Need to fix wraparound
+    counts[odone+tid] = ocnts[tid] - ocnts[tid-1];      // Need to fix wraparound
   }
 }
 
