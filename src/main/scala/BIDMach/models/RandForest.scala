@@ -198,9 +198,9 @@ object RandForest {
         tott += cnt;
         j += 1;
       }
-      acct = 0;
+      acct = 0; 
       j = 0;
-      while (j < ncats) {                  // Get the total update totals and impurity for the node
+      while (j < ncats) {                  // Get the impurity for the node
         acct += imptyFns.update(totcounts(j))
         j += 1
       }
