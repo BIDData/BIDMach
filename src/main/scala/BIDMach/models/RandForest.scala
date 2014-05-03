@@ -14,7 +14,7 @@ import jcuda.runtime.JCuda._
 import jcuda.runtime.cudaMemcpyKind._
 import edu.berkeley.bid.CUMAT
 
-object RForest {
+object RandForest {
   import jcuda.runtime._
   import jcuda.runtime.JCuda._
   import jcuda.runtime.cudaError._
@@ -43,46 +43,32 @@ object RForest {
       ) << fieldlengths(ICat))
   }
   
-  def extractAbove(fieldNum : Int, packedFields : Long, fieldlengths : IMat, FieldMaskRShifts : IMat) : Int = {
-    (packedFields >>> FieldMaskRShifts(fieldNum)).toInt
+  def extractAbove(fieldNum : Int, packedFields : Long, FieldShifts : IMat) : Int = {
+    (packedFields >>> FieldShifts(fieldNum)).toInt
   }
 
-  def extractField(fieldNum : Int, packedFields : Long, fieldlengths : IMat, FieldMaskRShifts : IMat, FieldMasks : IMat) : Int = {
-    (packedFields >>> FieldMaskRShifts(fieldNum)).toInt & FieldMasks(fieldNum) 
+  def extractField(fieldNum : Int, packedFields : Long, FieldShifts : IMat, FieldMasks : IMat) : Int = {
+    (packedFields >>> FieldShifts(fieldNum)).toInt & FieldMasks(fieldNum) 
   }
 
-  def getFieldMaskRShifts(fL : IMat) : Mat = {
-    val out = fL.izeros(1, fL.length)
-    var i : Int = 0
-    while (i < fL.length) {
-      out(i) = getFieldMaskRShiftFor(i, fL)
-      i += 1
+  def getFieldShifts(fL : IMat) : IMat = {
+    val out = izeros(1, fL.length)
+    var i = fL.length - 2
+    while (i >= 0) {
+      out(i) = out(i+1) + fL(i+1)
+      i -= 1
     }
     out
   }
 
-  def getFieldMaskRShiftFor(fieldNum : Int, fL : IMat) : Int = {
-    var bitShift : Int = 0
-    var i : Int = fieldNum + 1
-    while (i < fL.length) {
-      bitShift += fL(i)
-      i += 1
-    }
-    bitShift
-  }
-
-  def getFieldMasks(fL : IMat) : Mat = {
-    val out = fL.izeros(1, fL.length)
+  def getFieldMasks(fL : IMat) : IMat = {
+    val out = izeros(1, fL.length)
     var i = 0
     while (i < fL.length) {
-      out(i) = getFieldMaskFor(i, fL)
+      out(i) = (fL(i) << 1) - 1
       i += 1
     }
     out
-  }
-
-  def getFieldMaskFor(fieldNum : Int, fL : IMat) : Int = {
-    (math.pow(2, fL(fieldNum))).toInt - 1
   }
 
   def sortLongs(a:Array[Long], useGPU : Boolean) {
@@ -155,112 +141,107 @@ object RForest {
     }
     out
   }
-
-  def updateTreeData(packedVals : Array[Long], fL : IMat, ncats : Int, tMI : IMat, d : Int, isLastIteration : Boolean, 
-      FieldMaskRShifts : IMat, FieldMasks : IMat) = {
-    val n = packedVals.length
-    val dnodes = (math.pow(2, d).toInt - 1)
-    var bgain = NegativeInfinityF; var bthreshold = NegativeInfinityI; var brfeat = -1; 
-    val catCounts = fL.zeros(1, ncats);
-    val catCountsSoFar = fL.zeros(1, ncats);
-
-    var i = 0
-    while (i < n) {
-        val itree = extractField(ITree, packedVals(i), fL, FieldMaskRShifts, FieldMasks)
-        val inode = extractField(INode, packedVals(i), fL, FieldMaskRShifts, FieldMasks)
-        val ivfeat = extractField(IVFeat, packedVals(i), fL, FieldMaskRShifts, FieldMasks)
-        val uirfeat = extractAbove(IFeat, packedVals(i), fL, FieldMaskRShifts) // u for unique
-        val uivfeat = extractAbove(IVFeat, packedVals(i), fL, FieldMaskRShifts)
-        val uinode = extractAbove(INode, packedVals(i), fL, FieldMaskRShifts)
-
-        var j = i
-        catCounts.clear
-        val mybreaks = new Breaks
-        import mybreaks.{break, breakable}
-        breakable {
-          while (j < n) {
-            val jcat = extractField(ICat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
-            val ujrfeat = extractAbove(IFeat, packedVals(j), fL, FieldMaskRShifts)
-            if (ujrfeat != uirfeat) {
-              break()
-            }
-            catCounts(jcat) += 1f
-            j+=1
-          }
-        }
-        val (bCatCount, bCat) = maxi2(catCounts, 2)
-        val inext = j // beginning of next feat
-        j = i
-        catCountsSoFar.clear
-        var ujvlastFeat = uivfeat
-        while (j < inext && (inext - i)> 10) {
-          val ujvfeat = extractAbove(IVFeat, packedVals(j), fL, FieldMaskRShifts)
-          val jvfeat = extractField(IVFeat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
-          val jrfeat = extractField(IRFeat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
-          val jcat = extractField(ICat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
-          if (ujvlastFeat != ujvfeat || (j == (inext - 1)))  {
-            val gain = getGain(catCountsSoFar, catCounts)
-            if (gain > bgain && gain > 0f) {
-              bgain = gain
-              bthreshold = jvfeat
-              brfeat = jrfeat
-            }
-            ujvlastFeat = ujvfeat
-          }
-          catCountsSoFar(jcat) += 1f
-
-          j+=1
-        }
-
-        i = inext
-
-        if (i == n || extractAbove(INode, packedVals(i), fL, FieldMaskRShifts) != uinode) {
-          tMI(0, (itree  * dnodes) + inode) = brfeat
-          tMI(1, (itree  * dnodes) + inode) = bthreshold
-          tMI(2, (itree  * dnodes) + inode) = bCat(0)
-          if (isLastIteration || bgain <= 0f) {
-            tMI(3, (itree  * dnodes) + inode) = 1
-          }
-          bgain = NegativeInfinityF; bthreshold = NegativeInfinityI; brfeat = -1;
-        }
-    }
-
+  
+  trait imptyType {
+    val update: (Int)=>Float;
+    val result: (Float, Int)=>Float;
   }
-
-  def getGain(catCountsSoFar : FMat, catCounts : FMat) : Float = {
-    val topCountsSoFar = catCounts - catCountsSoFar
-    val topTots = sum(topCountsSoFar, 2)(0)
-    val botTots = sum(catCountsSoFar, 2)(0)
-    var totTots = sum(catCounts, 2)(0)
-    var topFract = 0f
-    var botFract = 0f 
-    if (totTots > 0f) {
-      botFract = botTots/ totTots
-      topFract = 1f - botFract
-    }
-    val totalImpurity = getImpurity(catCounts, totTots)
-    val topImpurity = getImpurity(topCountsSoFar, topTots)
-    val botImpurity = getImpurity(catCountsSoFar, botTots)
-    val infoGain = totalImpurity - (topFract * topImpurity) - (botFract * botImpurity)
-    infoGain
+  
+  object entImpurity extends imptyType {
+    def updatefn(a:Int):Float = { val v = math.max(a,1).toFloat; v * math.log(v).toFloat }
+    def resultfn(acc:Float, tot:Int) = { val v = math.max(tot,1).toFloat; math.log(v) - acc / v }
+    val update = updatefn _ ;
+    val result = resultfn _ ;
   }
+  
+  object giniImpurity extends imptyType {
+    def updatefn(a:Int):Float = { val v = a.toFloat; v * v }
+    def resultfn(acc:Float, tot:Int) = { val v = math.max(tot,1).toFloat; 1f - acc / (v * v) }
+    val update = updatefn _ ;
+    val result = resultfn _ ;
+  }
+  
+  // Pass in one of the two object above as the last argument (imptyFns) to control the impurity
+  // outv should be an nsamps * nnodes array to hold the feature threshold value
+  // outf should be an nsamps * nnodes array to hold the feature index
+  // outg should be an nsamps * nnodes array holding the impurity gain (use maxi2 to get the best)
+  // jc should be a zero-based array that points to the start and end of each group of fixed node,jfeat
 
-  def getImpurity(countsSoFar : FMat, totCounts : Float) : Float = {
-    var impurity = 0f
-    var i = 0
-    while (i < countsSoFar.length)  {
-      var p = 0f 
-      if (totCounts > 0f) {
-        p = countsSoFar(i)/ totCounts
+  def minImpurity(keys:Array[Long], cnts:IMat, outv:IMat, outf:IMat, outg:FMat, jc:IMat, fieldlens:IMat, 
+      ncats:Int, imptyFns:imptyType) = {
+
+    val totcounts = izeros(1,ncats);
+    val counts = izeros(1,ncats);
+    val fieldshifts = getFieldShifts(fieldlens);
+    val fieldmasks = getFieldMasks(fieldlens);
+
+
+    var j = 0;
+    var tot = 0;
+    var tott = 0;
+    var acc = 0f;
+    var acct = 0f;
+    var i = 1;
+    while (i < jc.length) {
+      val jci = jc(i-1);
+      val jcn = jc(i);
+
+      totcounts.clear;
+      counts.clear;
+      tott = 0;
+      j = jci;
+      while (j < jcn) {                     // First get the total counts for each
+        val key = keys(i)
+        val cnt = cnts(i)
+        val icat = extractField(ICat, key, fieldshifts, fieldmasks); 
+        totcounts(icat) += cnt;
+        tott += cnt;
+        j += 1;
       }
-      var plog : Float = 0f
-      if (p != 0) {
-        plog = scala.math.log(p).toFloat
+      acct = 0;
+      j = 0;
+      while (j < ncats) {                  // Get the total update totals and impurity for the node
+        acct += imptyFns.update(totcounts(j))
+        j += 1
       }
-      impurity = impurity + (-1f * p * plog)
-      i += 1
+      val nodeImpty = imptyFns.result(acct, tott);
+      
+      var oldvfeat = -1
+      var minImpty = Float.MaxValue
+      var partv = -1
+      var besti = -1
+      acc = 0;
+      tot = 0;
+      j = jci;
+      while (j < jcn) {                   // Then incrementally update top and bottom impurities and find min total 
+        val key = keys(i)
+        val cnt = cnts(i)
+        val vfeat = extractField(IVFeat, key, fieldshifts, fieldmasks);
+        val icat = extractField(ICat, key, fieldshifts, fieldmasks);
+        val oldcnt = counts(icat);
+        val newcnt = oldcnt + cnt;
+        counts(icat) = newcnt;
+        val oldcntt = totcounts(icat) - oldcnt;
+        val newcntt = totcounts(icat) - newcnt;
+        tot += cnt;
+        acc += imptyFns.update(newcnt) - imptyFns.update(oldcnt);
+        acct += imptyFns.update(newcntt) - imptyFns.update(oldcntt);
+        if (vfeat != oldvfeat) {
+          val impty = imptyFns.result(acc, tot) + imptyFns.result(acct, tott - tot)
+          if (impty < minImpty) {
+            val ifeat = extractField(IFeat, key, fieldshifts, fieldmasks);
+            minImpty = impty;
+            partv = vfeat;
+            besti = ifeat;
+          }
+        }
+        j += 1;
+      }
+      outv(i) = partv;
+      outg(i) = nodeImpty - minImpty;
+      outf(i) = besti;
+      i += 1;
     }
-    impurity
   }
 
   def treeSteps(tn : IMat, fd : FMat, fb : FMat, fL : IMat, tMI : IMat, depth : Int, ncats : Int, isLastIteration : Boolean)  {
