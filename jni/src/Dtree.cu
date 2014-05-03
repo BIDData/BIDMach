@@ -302,7 +302,7 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
 
 __global__ void __findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
   __shared__ int dbuff[1024];
-  int i, j, iv, lasti, tmp;
+  int i, j, iv, lasti;
 
   int imin = ((int)(32 * ((((long long)n) * blockIdx.x) / (gridDim.x * 32))));
   int imax = min(n, ((int)(32 * ((((long long)n) * (blockIdx.x + 1)) / (gridDim.x * 32) + 1))));
@@ -345,3 +345,165 @@ int findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
   cudaError_t err = cudaGetLastError();
   return err;
 }
+
+template<typename T>
+__global__ void mergeIndsP1(T *keys, int *cspine, T *ispine, T *vspine, int n) {
+  __shared__ T dbuff[1024];
+  int i, j, itodo, doit, total;
+  T thisval, lastval, endval, tmp;
+
+  int tid = threadIdx.x + threadIdx.y * blockDim.x;
+  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
+  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
+  
+  total = 0;
+  if (tid == 0) {
+    lastval = keys[imin];
+    ispine[blockIdx.x] = lastval;
+  }
+  for (i = imin; i < imax; i += blockDim.x * blockDim.y) {
+    itodo = min(1024, imax - i);
+    __syncthreads();
+    if (i + tid < imax) {
+      thisval = keys[i + tid];
+      dbuff[tid] = thisval;
+    }
+    __syncthreads();
+    if (tid > 0 && i + tid < imax) lastval = dbuff[tid - 1];
+    if (tid == 0) endval = dbuff[itodo-1];
+    __syncthreads();
+    if (i + tid < imax) {
+      dbuff[tid] = (thisval == lastval) ? 0 : 1;
+    }
+    __syncthreads();
+    for (j = 1; j < itodo; j = j << 1) {
+      doit = tid + j < itodo && (tid & ((j << 1)-1)) == 0;
+      if (doit) {
+        tmp = dbuff[tid] + dbuff[tid + j];
+      }
+      __syncthreads();
+      if (doit) {
+        dbuff[tid] = tmp;
+      }
+      __syncthreads();
+    }
+    if (tid == 0) {
+      total += dbuff[0];
+      lastval = endval;
+    }
+  }	   
+  if (tid == 0) {
+    cspine[blockIdx.x] = total;
+    vspine[blockIdx.x] = endval;
+  }
+}
+
+template<typename T>
+__global__ void fixSpine(int *cspine, T *ispine, T *vspine, int n) {
+  __shared__ int counts[1024];
+  int tid = threadIdx.x + threadIdx.y * blockDim.x;
+  int i, tmp;
+
+  if (tid < n) {
+    counts[tid] = cspine[tid];
+  }
+  __syncthreads();
+  if (tid < n - 1) {
+    if (ispine[tid + 1] != vspine[tid]) {
+      counts[tid + 1] += 1;
+    }
+  }
+  if (tid == 0) {
+    counts[0] += 1;
+  }
+  __syncthreads();
+  for (i = 1; i < n; i = i << 1) {
+    if (tid >= i) {
+      tmp = counts[tid - i];
+    }
+    __syncthreads();
+    if (tid >= i) {
+      counts[tid] += tmp;
+    }
+    __syncthreads();
+  }
+  if (tid < n) {
+    cspine[tid] = counts[tid];
+  }
+}
+    
+template<typename T>
+__global__ void mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) {
+  __shared__ T dbuff[1024];
+  __shared__ T obuff[2048];
+  __shared__ int ocnts[2048];
+  int i, j, itodo, doit, thiscnt, lastcnt, obase, odone, total;
+  T thisval, lastval, endval, tmp;
+
+  int tid = threadIdx.x + threadIdx.y * blockDim.x;
+  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
+  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
+  
+  odone = cspine[blockIdx.x];
+  obase = 0;
+  if (tid == 0) {
+    lastval = keys[imin];
+  }
+  for (i = imin; i < imax; i += blockDim.x * blockDim.y) {
+    itodo = min(1024, imax - i);
+    __syncthreads();
+    if (i + tid < imax) {                           // Copy a block of input data into dbuff
+      thisval = keys[i + tid];
+      dbuff[tid] = thisval;
+    }
+    __syncthreads();
+    if (tid > 0 && i + tid < imax) lastval = dbuff[tid - 1];
+    if (tid == 0) endval = dbuff[itodo-1];       
+    __syncthreads();
+    if (i + tid < imax) {
+      ocnts[tid] = (thisval == lastval) ? 0 : 1;    // Bit that indicates a change of index
+    }
+    __syncthreads();
+    for (j = 1; j < itodo; j = j << 1) {           // Cumsum of these bits = where to put key
+      doit = tid + j < itodo && (tid & ((j << 1)-1)) == 0;
+      if (doit) {
+        tmp = ocnts[tid] + ocnts[tid + j];
+      }
+      __syncthreads();
+      if (doit) {
+        ocnts[tid] = tmp;
+      }
+      __syncthreads();
+    }
+    total = ocnts[itodo-1];
+    if (tid > 0 && i + tid < imax) {
+      thiscnt = ocnts[tid];
+      lastcnt = ocnts[tid-1];
+    }
+    __syncthreads();
+    if (tid > 0 && i + tid < imax) {
+      if (thiscnt > lastcnt) {
+        obuff[obase + thiscnt] = thisval;
+        ocnts[obase + thiscnt] = i + tid;
+      }
+    }
+    __syncthreads();
+    obase += total;
+    if (obase > 1024) {
+      okeys[odone+tid] = obuff[tid];
+      counts[odone+tid] = ocnts[tid] - ocnts[tid-1];    // Need to fix wraparound
+      odone += 1024;
+    }
+    __syncthreads();
+    if (obase > 1024) {
+      obuff[tid] = obuff[tid+1024];
+      ocnts[tid] = ocnts[tid+1024];
+    }
+    obase -= 1024;
+  }	   
+  if (tid < obase) {
+    okeys[odone+tid] = obuff[tid];
+    counts[odone+tid] = ocnts[tid] - ocnts[tid-1];    // Need to fix wraparound
+  }
+}
+
