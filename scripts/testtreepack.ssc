@@ -1,5 +1,6 @@
 import edu.berkeley.bid.CUMAT
 import edu.berkeley.bid.CUMACH
+import edu.berkeley.bid.UTILS
 
 val ncols = 64*1024
 
@@ -79,16 +80,32 @@ while (i < ntrees*nsamps) {
 tic;val err2=CUMAT.lsort(gout.data, gout.length/2, 1); val t2=toc
 println("sorting at %f GB/s" format out.length*8f/t2/1e9)
 
-val goutv = gizeros(nsamps, ntrees*nnodes)
-val goutf = gizeros(nsamps, ntrees*nnodes)
-val goutg = gizeros(nsamps, ntrees*nnodes)
+
+val outv = izeros(nsamps, ntrees*nnodes)
+val outf = izeros(nsamps, ntrees*nnodes)
+val outg = zeros(nsamps, ntrees*nnodes)
+
+val goutv = GIMat(outv)
+val goutf = GIMat(outf)
+val goutg = GMat(outg)
 
 val ones = iones(gout.nrows/2, gout.ncols)
 val gones = GIMat(ones);
 
-val jc2 = gizeros(1,nsamps*ntrees*nnodes+1)
-tic; val err3= CUMACH.findBoundaries(gout.data, jc2.data, gout.length/2, nsamps*ntrees*nnodes, jshift); val t3 = toc
+out <-- gout
+
+val jjc = izeros(1,nsamps*ntrees*nnodes+1)
+val gjjc = GIMat(jjc)
+tic; val err3= CUMACH.findBoundaries(gout.data, gjjc.data, gout.length/2, nsamps*ntrees*nnodes, jshift); val t3 = toc
+
+
+val lout = new Array[Long](out.length/2)
+UTILS.memcpyil(out.length, out.data, 0, lout, 0)
+
+tic; BIDMach.models.RandForest.findBoundaries(lout, jjc, jshift); val t4 = toc
 
 tic;
-val err4=CUMACH.minImpurity(gout.data, gones.data, goutv.data, goutf.data, goutg.data, jc2.data, gfln.data, nnodes*ntrees, ncats, nsamps, 0); 
-val t4 = toc
+val err4=CUMACH.minImpurity(gout.data, gones.data, goutv.data, goutf.data, goutg.data, gjjc.data, gfln.data, nnodes*ntrees, ncats, nsamps, 0); 
+val t5 = toc
+
+tic; BIDMach.models.RandForest.minImpurity(lout, ones, outv, outf, outg, jjc, fieldlens, ncats, 0); val t6 = toc

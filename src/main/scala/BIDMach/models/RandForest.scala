@@ -142,6 +142,26 @@ object RandForest {
     out
   }
   
+  // Find boundaries where (key >> shift) changes
+  
+  def findBoundaries(keys:Array[Long], jc:IMat, shift:Int) { 
+    var oldv = -1
+    var v = -1
+    var i = 0
+    while (i < keys.length) {
+      v = (keys(i) >>> shift).toInt
+      while (oldv < v) {
+        oldv += 1
+        jc(oldv) = i
+      }
+      i += 1
+    }
+    while (oldv < jc.length - 1) {
+      oldv += 1
+      jc(oldv) = i
+    }
+  }
+  
   trait imptyType {
     val update: (Int)=>Float;
     val result: (Float, Int)=>Float;
@@ -149,7 +169,7 @@ object RandForest {
   
   object entImpurity extends imptyType {
     def updatefn(a:Int):Float = { val v = math.max(a,1).toFloat; v * math.log(v).toFloat }
-    def resultfn(acc:Float, tot:Int) = { val v = math.max(tot,1).toFloat; math.log(v) - acc / v }
+    def resultfn(acc:Float, tot:Int):Float = { val v = math.max(tot,1).toFloat; math.log(v).toFloat - acc / v }
     val update = updatefn _ ;
     val result = resultfn _ ;
   }
@@ -161,6 +181,8 @@ object RandForest {
     val result = resultfn _ ;
   }
   
+  val imptyFunArray = Array[imptyType](entImpurity,giniImpurity)
+  
   // Pass in one of the two object above as the last argument (imptyFns) to control the impurity
   // outv should be an nsamps * nnodes array to hold the feature threshold value
   // outf should be an nsamps * nnodes array to hold the feature index
@@ -168,7 +190,9 @@ object RandForest {
   // jc should be a zero-based array that points to the start and end of each group of fixed node,jfeat
 
   def minImpurity(keys:Array[Long], cnts:IMat, outv:IMat, outf:IMat, outg:FMat, jc:IMat, fieldlens:IMat, 
-      ncats:Int, imptyFns:imptyType) = {
+      ncats:Int, fnum:Int) = {
+    
+    val imptyFns = imptyFunArray(fnum)
 
     val totcounts = izeros(1,ncats);
     val counts = izeros(1,ncats);
@@ -191,8 +215,8 @@ object RandForest {
       tott = 0;
       j = jci;
       while (j < jcn) {                     // First get the total counts for each
-        val key = keys(i)
-        val cnt = cnts(i)
+        val key = keys(j)
+        val cnt = cnts(j)
         val icat = extractField(ICat, key, fieldshifts, fieldmasks); 
         totcounts(icat) += cnt;
         tott += cnt;
@@ -201,7 +225,7 @@ object RandForest {
       acct = 0; 
       j = 0;
       while (j < ncats) {                  // Get the impurity for the node
-        acct += imptyFns.update(totcounts(j))
+        acct += imptyFns.update(totcounts(j));
         j += 1
       }
       val nodeImpty = imptyFns.result(acct, tott);
@@ -214,8 +238,8 @@ object RandForest {
       tot = 0;
       j = jci;
       while (j < jcn) {                   // Then incrementally update top and bottom impurities and find min total 
-        val key = keys(i)
-        val cnt = cnts(i)
+        val key = keys(j)
+        val cnt = cnts(j)
         val vfeat = extractField(IVFeat, key, fieldshifts, fieldmasks);
         val icat = extractField(ICat, key, fieldshifts, fieldmasks);
         val oldcnt = counts(icat);
@@ -237,9 +261,9 @@ object RandForest {
         }
         j += 1;
       }
-      outv(i) = partv;
-      outg(i) = nodeImpty - minImpty;
-      outf(i) = besti;
+      outv(i-1) = partv;
+      outg(i-1) = nodeImpty - minImpty;
+      outf(i-1) = besti;
       i += 1;
     }
   }

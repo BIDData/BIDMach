@@ -109,23 +109,80 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
 
 class entImpty {
  public:
-  static __device__ inline float fupdate(float v) { return v * log(max(1.0f, v)); }
-  static __device__ inline float ffinal(float vacc, float vsum) { vsum = max(1.0f, vsum); return log(vsum) - vacc / vsum; }
+  static __device__ inline float fupdate(int v) { return (float)v * log((float)max(1, v)); }
+  static __device__ inline float fresult(float vacc, int vsum) { float vs = (float)max(1, vsum); return log(vs) - vacc / vs; }
 };
 
 class giniImpty {
  public:
-  static __device__ inline float fupdate(float v) { return v * v; }
-  static __device__ inline float ffinal(float vacc, float vsum) { vsum = max(1.0f, vsum); return 1 - vacc / (vsum*vsum); }
+  static __device__ inline float fupdate(int v) { return (float)v * (float)v; }
+  static __device__ inline float fresult(float vacc, int vsum) { float vs = (float)max(1, vsum); return 1.0f - vacc / (vs*vs); }
 };
 
 #if __CUDA_ARCH__ >= 300
 
+__device__ inline void accumup2(int &cnt, float &update) {
+#pragma unroll
+  for (int h = 1; h < 32; h = h + h) {
+    float tmpx = __shfl_up(update, h);
+    int tmp = __shfl_up(cnt, h);
+    if (threadIdx.x >=h) {
+      update += tmpx;
+      cnt += tmp;
+    }
+  }
+}
+
+__device__ inline void accumup3(int &cnt, float update, float &updatet) {
+#pragma unroll
+  for (int h = 1; h < 32; h = h + h) {
+    float tmpx = __shfl_up(update, h);
+    float tmpy = __shfl_up(updatet, h);
+    int tmp = __shfl_up(cnt, h);
+    if (threadIdx.x >=h) {
+      update += tmpx;
+      updatet += tmpy;
+      cnt += tmp;
+    }
+  }
+}
+
+__device__ inline void accumdown3(int &cnt, float &update, float &updatet, int bound) {
+#pragma unroll
+  for (int h = 1; h < 32; h = h + h) {
+    float tmpx = __shfl_down(update, h);
+    float tmpy = __shfl_down(updatet, h);
+    int tmp = __shfl_down(cnt, h);
+    if (threadIdx.x + h <= bound) {
+      update += tmpx;
+      updatet += tmpy;
+      cnt += tmp;
+    }
+  }
+}
+
+__device__ inline void minup2(float &impty, int &ival) {
+#pragma unroll
+  for (int h = 1; h < 32; h = h + h) {
+    float tmpx = __shfl_up(impty, h);
+    int tmp = __shfl_up(ival, h);
+    if (threadIdx.x >= h && tmpx < impty) {
+      impty = tmpx;
+      ival = tmp; 
+    }
+  }
+}
+
 template<typename T>
 __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
                               int nnodes, int ncats, int nsamps) {
-  __shared__ int catcnt[DBSIZE/2];
-  __shared__ int cattot[DBSIZE/2];
+  __shared__ int catcnt[DBSIZE];
+  __shared__ int cattot[DBSIZE/4];
+  __shared__ int stott[32];
+  __shared__ float sacct[32];
+  __shared__ int slastival[64];
+  __shared__ int sbestival[32];
+  __shared__ float sminimpty[32];
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
 
   if (tid < 6) {
@@ -141,140 +198,206 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
 
   __syncthreads();
 
-  int i, j, k, h, jc0, jc1, jtodo;
+  int i, j, k, h, jc0, jc1, ilast, jlast;
   long long key;
-  int ccnt, ctot, ctot2, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp;
-  float update, updatet, cacc, cact, impty, minimpty, lastimpty, tmpx, tmpy;
+  int ccnt, tot, ctt, tott, cnew, cnt, ncnt, tcnt, ival, icat, lastival, bestival, tmp;
+  float update, updatet, acc, acct, impty, minimpty;
 
-  for (i = threadIdx.y + blockDim.y * blockIdx.x; i < nnodes*nsamps; i += blockDim.y * gridDim.x) {
+  for (i = blockIdx.x; i < nnodes*nsamps; i += gridDim.x) {
     // Process a group with fixed itree, inode, and ifeat
 
-    jc0 = jc[i];                                            // The range of indices for this group
+    jc0 = jc[i];                                              // The range of indices for this group
     jc1 = jc[i+1];
     __syncthreads();
 
-    // Clear the cat counts for this group
-    for (j = tid; j < DBSIZE/2; j += blockDim.x * blockDim.y) {
-      catcnt[j] = 0;
-      cattot[j] = 0;
+    // Clear the cat counts and totals
+    for (j = threadIdx.x; j < ncats; j += blockDim.x) {
+      catcnt[j + threadIdx.y * blockDim.x] = 0;
+      if (threadIdx.y == 0) cattot[j] = 0;
+    }
+    if (threadIdx.y == 0) {
+      sminimpty[threadIdx.x] = 1e7f;
+      sbestival[threadIdx.x] = -1;
     }
     __syncthreads();
+    // First pass gets counts for each category and the (ci)log(ci) sum for this entire ifeat group
 
-    ctot = 0;                                              // First pass gets counts for each category
-    cacc = 0.0f;                                           // and the (ci)log(ci) sum for this block
-    for (j = jc0; j < jc1; j += blockDim.x) {
-      if (j + threadIdx.x < jc1) {                         // Read a block of (32) keys and counts
-        key = keys[j + threadIdx.x];                       // Each (x) thread handles a different input
-        cnt = counts[j + threadIdx.x];
-        icat = ((int)key) & cmask;                         // Extract the cat id and integer value
-        ival = ((int)(key >> vshift)) & vmask;
+    for (j = jc0; j < jc1; j += blockDim.x * blockDim.x) {
+      if (j + tid < jc1) {                                    // Read a block of keys and counts
+        key = keys[j + tid]; 
+        cnt = counts[j + tid];
+        icat = ((int)key) & cmask;                            // Extract the cat id 
+        atomicAdd(&cattot[icat], cnt);                        // Update count totals 
       }
-      jtodo = min(32, jc1 - j);
-      for (k = 0; k < jtodo; k++) {                        // Sequentially update counts so that each thread
-        if (threadIdx.x == k) {                            // in this warp gets the old and new counts
-          ccnt = cattot[icat + ncats * threadIdx.y];       // i.e. data for item k is in thread k
-          cnew = ccnt + cnt;
-          cattot[icat + ncats * threadIdx.y] = cnew;
+    }
+
+    __syncthreads();
+    
+    tott = 0;                                                 // Compute total count and (c)log(c) for the entire ifeat group
+    acct = 0;
+    if (threadIdx.y == 0) {
+      for (k = 0; k < ncats; k += blockDim.x) {
+        if (k + threadIdx.x < ncats) {
+          tcnt = cattot[k + threadIdx.x];
+          update = T::fupdate(tcnt);
+        } else {
+          tcnt = 0;
+          update = 0;
         }
+        accumup2(tcnt,update);
+        ilast = min(31, ncats - k - 1);
+        tcnt = __shfl(tcnt, ilast);
+        update = __shfl(update, ilast);
+        tott += tcnt;
+        acct += update;
       }
-      update = T::fupdate((float)cnew);                    // Compute the impurity update for this input
-      if (ccnt > 0) update -= T::fupdate((float)ccnt);
-#pragma unroll
-      for (h = 1; h < 32; h = h + h) {                     // Form the cumsums of updates and counts
-        tmpx = __shfl_up(update, h);
-        tmp = __shfl_up(cnt, h);
-        if (threadIdx.x >=h) {
-          update += tmpx;
-          cnt += tmp;
+      stott[threadIdx.x] = tott;
+      sacct[threadIdx.x] = acct;
+    }
+    tott = stott[threadIdx.x];
+
+    // Main loop, work on blocks of 1024 (ideally)
+    /*
+
+    for (j = jc0; j < jc1; j += blockDim.x * blockDim.x) {
+
+      for (k = 0; k < ncats; k += blockDim.x) {               // copy cumcounts from last row of last iteration to the first row
+        tmp = catcnt[k + threadIdx.x + (blockDim.y -1) * ncats];
+        __syncthreads();
+        if (threadIdx.y == 0) {
+          catcnt[k + threadIdx.x] = tmp;
+        } else {
+          catcnt[k + threadIdx.x + threadIdx.y * ncats] = 0;
+        }
+        __syncthreads();
+      }
+
+      if (j + tid < jc1) {                                    // Read a block of keys and counts
+        key = keys[j + tid]; 
+        cnt = counts[j + tid];
+        icat = ((int)key) & cmask;                            // Extract the cat id and integer value;
+        ival = ((int)(key >> vshift)) & vmask;                
+        atomicAdd(&catcnt[icat + threadIdx.y * ncats], cnt);  // Update count totals 
+      }
+      jlast = min(31, jc1 - j - threadIdx.y * 32 - 1);        // Save the last value in this group
+      if (threadIdx.x == jlast) {
+        slastival[threadIdx.y + 1] = ival;
+      }
+
+      __syncthreads();
+
+      for (k = 0; k < ncats; k += blockDim.x) {               // Form the cumsum along columns of catcnts
+        for (h = 1; h < blockDim.y; h = h + h) {
+          if (k + threadIdx.x < ncats && blockIdx.y + h < blockDim.y) {
+            tmp = catcnt[k + threadIdx.x + ncats * threadIdx.y];
+          }
+          __syncthreads();
+          if (k + threadIdx.x < ncats && blockIdx.y + h < blockDim.y) {
+            catcnt[k + threadIdx.x + ncats * (threadIdx.y + h)] += tmp;
+          }
+          __syncthreads();
         }        
       }  
-      ctot += cnt;                                         // Now update the total c and total ci log ci sums
-      cacc += update;
-      ctot = __shfl(ctot, jtodo-1);                
-      cacc = __shfl(cacc, jtodo-1);
-    }
-    __syncthreads();
 
-    cact = cacc;                                           // Save the total count and (ci)log(ci) sum
-    ctotall = ctot;
-    ctot = 0;
-    cacc = 0.0f;
-    lastival = -1;
-    lastimpty = 1e7f;
-    minimpty = 1e7f;
-    for (j = jc0; j < jc1; j += blockDim.x) {
-      if (j + threadIdx.x < jc1) {                         // Read a block of (32) keys and counts
-        key = keys[j + threadIdx.x];                       // Each (x) thread handles a different input
-        cnt = counts[j + threadIdx.x];
-        icat = (int)(key & cmask);                         // Extract the cat id and integer value
-        ival = ((int)(key >> vshift)) & vmask;
+      tot = 0;                                                 // Local to a yblock (row) of catcnts                                                
+      acc = 0.0f; 
+      acct = 0.0f;
+      for (k = 0; k < ncats; k += blockDim.x) {                // Now sum within a row (yblock)
+        if (k + threadIdx.x < ncats) {
+          cnt = catcnt[k + threadIdx.x + threadIdx.y * ncats];
+          update = T::fupdate(cnt);
+          updatet = T::fupdate(cattot[k + threadIdx.x] - cnt);
+        } else {
+          cnt = 0;
+          update = 0;
+          updatet = 0;
+        }
+        accumup3(cnt,update,updatet);
+        ilast = min(31, ncats - k - 1);
+        update = __shfl(update, ilast);
+        updatet = __shfl(updatet, ilast);
+        cnt = __shfl(cnt, ilast);
+        tot += cnt;
+        acc += update;
+        acct += updatet;
       }
-      jtodo = min(32, jc1 - j);
-      for (k = 0; k < jtodo; k++) {                        // Sequentially update counts so that each thread
-        if (threadIdx.x == k) {                            // in this warp gets the old and new counts
-          ccnt = catcnt[icat + ncats * threadIdx.y];       // i.e. data for item k is in thread k
+
+      __syncthreads();
+    
+      // OK, we have everything needed now to compute impurity for the rows in this yblock: 
+      // tot, acc, acct at the end of the block
+
+      lastival = -1;
+      minimpty = 1e7f;
+
+      ncnt = -cnt;
+      for (k = jlast; k >= 0; k--) {                           // Sequentially update counts so that each thread
+        if (threadIdx.x == k) {                                // in this warp gets the old and new counts
+          ccnt = catcnt[icat + ncats * threadIdx.y];           // i.e. data for item k is in thread k
           ctt = cattot[icat + ncats * threadIdx.y];  
-          cnew = ccnt + cnt;
+          cnew = ccnt + ncnt;
           catcnt[icat + ncats * threadIdx.y] = cnew;
         }
       }
-      update = T::fupdate((float)cnew);                    // Compute the impurity update for this input
-      if (ccnt > 0) update -= T::fupdate((float)ccnt);
-      updatet = - T::fupdate((float)(ctt - ccnt));
-      if (ctt - cnew > 0) updatet += T::fupdate((float)(ctt - cnew));
-#pragma unroll
-      for (h = 1; h < 32; h = h + h) {                     // Form the cumsums of updates and counts
-        tmpx = __shfl_up(update, h);
-        tmpy = __shfl_up(updatet, h);
-        tmp = __shfl_up(cnt, h);
-        if (threadIdx.x >=h) {
-          update += tmpx;
-          updatet += tmpy;
-          cnt += tmp;
-        }        
-      }  
-      ctot += cnt;                                        // Now update the total c and total ci log ci sums
-      cacc += update;
-      cact += updatet;
-      ctot = max(1, ctot);
-      ctot2 = max(1, ctotall - ctot);
-      impty = T::ffinal(cacc, (float)ctot) + T::ffinal(cact, (float)ctot2);  // And the impurity for this input
+      update = T::fupdate(cnew) - T::fupdate(ccnt);
+      updatet = T::fupdate(ctt - cnew) - T::fupdate(ctt - ccnt);
+
+      accumdown3(ncnt,update,updatet,jlast);
+      tot += cnt;                                              // Now update the total c and total ci log ci sums
+      acc += update;
+      acct += updatet;
+    
+      impty = T::fresult(acc, tot) + T::fresult(acct, tott - tot); // And the impurity for this input
 
       tmp = __shfl_up(ival, 1);
-      tmpx = __shfl_up(impty, 1);                         // Need the last impurity and ival in order
-      if (threadIdx.x > 0) {                              // to restrict the partition feature to a value boundary
+      if (threadIdx.x > 0) {                                  // Get the last ival to check for a boundary
         lastival = tmp;
-        lastimpty = tmpx;
+      } else {
+        lastival = slastival[threadIdx.y];
+      }
+      __syncthreads();
+      if (tid == 0) {
+        tmp = slastival[33];
+        slastival[0] = tmp;
+      }
+      __syncthreads();
+
+      if (ival == lastival) impty = 1e7f;                    // Eliminate values which are not at value boundaries
+      if (impty < minimpty) {
+        minimpty = impty;
+        bestival = ival;
       }
 
-      if (ival == lastival) lastimpty = 1e7f;             // Eliminate values which are not at value boundaries
-      if (lastimpty < minimpty) {
-        minimpty = lastimpty;
-        bestival = lastival;
-      }
+      minup2(minimpty,bestival);
 
-#pragma unroll
-      for (h = 1; h < 32; h = h + h) {                    // Find the cumulative min impurity and corresponding ival
-        tmpx = __shfl_up(minimpty, h);
-        tmp = __shfl_up(bestival, h);
-        if (threadIdx.x >= h && tmpx < minimpty) {
-          minimpty = tmpx;
-          bestival = tmp;
-        }        
+      minimpty = __shfl(minimpty, jlast);                
+      bestival = __shfl(bestival, jlast);
+      if (threadIdx.x == 0) {
+        sminimpty[threadIdx.y] = minimpty;
+        sbestival[threadIdx.y] = bestival;
       }
-      minimpty = __shfl(minimpty, jtodo-1);               // Carefully copy the last active thread to all threads, needed outside this loop     
-      bestival = __shfl(bestival, jtodo-1);
-      ctot = __shfl(ctot, jtodo-1);                
-      cacc = __shfl(cacc, jtodo-1);
-      cact = __shfl(cact, jtodo-1);
-      lastival = __shfl(ival, jtodo-1);             
-      lastimpty = __shfl(impty, jtodo-1);
+      __syncthreads();
+
+      if (threadIdx.y == 0) {
+        minimpty = sminimpty[threadIdx.x];
+        bestival = sbestival[threadIdx.x];
+        minup2(minimpty,bestival);
+        minimpty = __shfl(minimpty, blockDim.y - 1);
+        bestival = __shfl(bestival, blockDim.y - 1);
+        sminimpty[threadIdx.x] = minimpty;
+        sbestival[threadIdx.x] = bestival;
+      }
+      __syncthreads();
     }
-    if (threadIdx.x == 0) {
-      outv[i] = bestival;                                 // Output the best split feature value
-      outf[i] = (int)((key >> ishift) & imask);           // Save the feature index
-      outg[i] = minimpty - T::ffinal(cacc, (float)ctot);  // And the impurity gain
+    */
+
+    if (tid == 0) {
+      outv[i] = bestival;                                    // Output the best split feature value
+      outf[i] = (int)((key >> ishift) & imask);              // Save the feature index
+      //      outg[i] = T::fresult(sacct[0], tott) - minimpty;   // And the impurity gain
+      outg[i] = T::fresult(sacct[0], tott);   // And the impurity gain
     }
+    __syncthreads();
   }
 }
 #else

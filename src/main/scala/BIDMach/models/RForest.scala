@@ -24,23 +24,21 @@ object RForest {
 
   val NegativeInfinityF = 0xff800000.toFloat
   val NegativeInfinityI = 0xff800000.toInt
-  val ITree = 0; val INode = 1; val JFeat = 2; val IFeat = 3; val IVFeat = 4; val ICat = 5
+  val ITree = 0; val INode = 1; val IRFeat = 2; val IVFeat = 3; val ICat = 4
   
   def rhash(v1:Int, v2:Int, v3:Int, nb:Int):Int = {
     math.abs(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3) % nb)
   }
   
-  def packFields(itree:Int, inode:Int, jfeat:Int, ifeat:Int, ivfeat:Int, icat:Int, fieldlengths:IMat):Long = {
-    icat.toLong + 
-    ((ivfeat.toLong + 
-        ((ifeat.toLong + 
-            ((jfeat.toLong + 
-                ((inode.toLong + 
-                    (itree.toLong << fieldlengths(INode))
-                    ) << fieldlengths(JFeat))
-                ) << fieldlengths(IFeat))
-          ) << fieldlengths(IVFeat))
-      ) << fieldlengths(ICat))
+  def packFields(itree:Int, inode:Int, irfeat:Int, ivfeat:Int, icat:Int, fieldlengths:IMat):Long = {
+    icat.toLong +
+    ((ivfeat.toLong +
+        ((irfeat.toLong +
+            ((inode.toLong +
+                (itree.toLong << fieldlengths(1))
+             ) << fieldlengths(2))
+          ) << fieldlengths(3))
+      ) << fieldlengths(4))
   }
   
   def extractAbove(fieldNum : Int, packedFields : Long, fieldlengths : IMat, FieldMaskRShifts : IMat) : Int = {
@@ -48,7 +46,7 @@ object RForest {
   }
 
   def extractField(fieldNum : Int, packedFields : Long, fieldlengths : IMat, FieldMaskRShifts : IMat, FieldMasks : IMat) : Int = {
-    (packedFields >>> FieldMaskRShifts(fieldNum)).toInt & FieldMasks(fieldNum) 
+    (packedFields >>> FieldMaskRShifts(fieldNum)).toInt & FieldMasks(fieldNum)
   }
 
   def getFieldMaskRShifts(fL : IMat) : Mat = {
@@ -92,7 +90,7 @@ object RForest {
       val deviceData : Pointer = new Pointer();
       cudaMalloc(deviceData, memorySize);
       cudaMemcpy(deviceData, Pointer.to(a), memorySize, cudaMemcpyKind.cudaMemcpyHostToDevice);
-      val err =  CUMAT.lsort(deviceData, a.length, 1)
+      val err = CUMAT.lsort(deviceData, a.length, 1)
       if (err != 0) {throw new RuntimeException("lsort: CUDA kernel error in lsort " + cudaGetErrorString(err))}
       cudaMemcpy(Pointer.to(a), deviceData, memorySize, cudaMemcpyKind.cudaMemcpyDeviceToHost);
       cudaFree(deviceData);
@@ -125,26 +123,30 @@ object RForest {
     }
   }
 
-  def treePack(fdata:IMat, treenodes:IMat, cats:IMat, out:Array[Long], jc:IMat, nsamps:Int, fieldlengths:IMat) = {
+  def treePack(fdata:FMat, fbounds:FMat, treenodes:IMat, cats:SMat, nsamps:Int, fieldlengths:IMat) : Array[Long] = {
     val nfeats = fdata.nrows
     val nitems = fdata.ncols
     val ntrees = treenodes.nrows
     val ncats = cats.nrows
-    val nnzcats = cats.length
+    val nnzcats = cats.nnz
+    val out = new Array[Long](ntrees * nsamps * nnzcats)
+    var ioff = Mat.ioneBased
+    val nifeats = math.pow(2, fieldlengths(3)).toInt - 1
     var icol = 0
     while (icol < nitems) {
-      var jci = jc(icol)
-      val jcn = jc(icol+1)
+      var jci = cats.jc(icol) - ioff
+      val jcn = cats.jc(icol+1) - ioff
       var itree = 0
       while (itree < ntrees) {
         val inode = treenodes(itree, icol)
         var jfeat = 0
         while (jfeat < nsamps) {
           val ifeat = rhash(itree, inode, jfeat, nfeats)
-          val ivfeat = fdata(ifeat, icol)
+          val vfeat = fdata(ifeat, icol)
+          val ivfeat = math.min(nifeats, math.floor((vfeat - fbounds(ifeat,0))/(fbounds(ifeat,1) - fbounds(ifeat,0))*nifeats).toInt)
           var jc = jci
           while (jc < jcn) {
-            out(jfeat + nsamps * (itree + ntrees * jc)) = packFields(itree, inode, jfeat, ifeat, ivfeat, cats(jc), fieldlengths)
+            out(jfeat + nsamps * (itree + ntrees * jc)) = packFields(itree, inode, ifeat, ivfeat, cats.ir(jc) - ioff, fieldlengths)
             jc += 1
           }
           jfeat += 1
@@ -156,11 +158,11 @@ object RForest {
     out
   }
 
-  def updateTreeData(packedVals : Array[Long], fL : IMat, ncats : Int, tMI : IMat, d : Int, isLastIteration : Boolean, 
+  def updateTreeData(packedVals : Array[Long], fL : IMat, ncats : Int, tMI : IMat, d : Int, isLastIteration : Boolean,
       FieldMaskRShifts : IMat, FieldMasks : IMat) = {
     val n = packedVals.length
     val dnodes = (math.pow(2, d).toInt - 1)
-    var bgain = NegativeInfinityF; var bthreshold = NegativeInfinityI; var brfeat = -1; 
+    var bgain = NegativeInfinityF; var bthreshold = NegativeInfinityI; var brfeat = -1;
     val catCounts = fL.zeros(1, ncats);
     val catCountsSoFar = fL.zeros(1, ncats);
 
@@ -169,7 +171,7 @@ object RForest {
         val itree = extractField(ITree, packedVals(i), fL, FieldMaskRShifts, FieldMasks)
         val inode = extractField(INode, packedVals(i), fL, FieldMaskRShifts, FieldMasks)
         val ivfeat = extractField(IVFeat, packedVals(i), fL, FieldMaskRShifts, FieldMasks)
-        val uirfeat = extractAbove(IFeat, packedVals(i), fL, FieldMaskRShifts) // u for unique
+        val uirfeat = extractAbove(IRFeat, packedVals(i), fL, FieldMaskRShifts) // u for unique
         val uivfeat = extractAbove(IVFeat, packedVals(i), fL, FieldMaskRShifts)
         val uinode = extractAbove(INode, packedVals(i), fL, FieldMaskRShifts)
 
@@ -180,7 +182,7 @@ object RForest {
         breakable {
           while (j < n) {
             val jcat = extractField(ICat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
-            val ujrfeat = extractAbove(IFeat, packedVals(j), fL, FieldMaskRShifts)
+            val ujrfeat = extractAbove(IRFeat, packedVals(j), fL, FieldMaskRShifts)
             if (ujrfeat != uirfeat) {
               break()
             }
@@ -198,7 +200,7 @@ object RForest {
           val jvfeat = extractField(IVFeat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
           val jrfeat = extractField(IRFeat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
           val jcat = extractField(ICat, packedVals(j), fL, FieldMaskRShifts, FieldMasks)
-          if (ujvlastFeat != ujvfeat || (j == (inext - 1)))  {
+          if (ujvlastFeat != ujvfeat || (j == (inext - 1))) {
             val gain = getGain(catCountsSoFar, catCounts)
             if (gain > bgain && gain > 0f) {
               bgain = gain
@@ -215,11 +217,11 @@ object RForest {
         i = inext
 
         if (i == n || extractAbove(INode, packedVals(i), fL, FieldMaskRShifts) != uinode) {
-          tMI(0, (itree  * dnodes) + inode) = brfeat
-          tMI(1, (itree  * dnodes) + inode) = bthreshold
-          tMI(2, (itree  * dnodes) + inode) = bCat(0)
+          tMI(0, (itree * dnodes) + inode) = brfeat
+          tMI(1, (itree * dnodes) + inode) = bthreshold
+          tMI(2, (itree * dnodes) + inode) = bCat(0)
           if (isLastIteration || bgain <= 0f) {
-            tMI(3, (itree  * dnodes) + inode) = 1
+            tMI(3, (itree * dnodes) + inode) = 1
           }
           bgain = NegativeInfinityF; bthreshold = NegativeInfinityI; brfeat = -1;
         }
@@ -233,7 +235,7 @@ object RForest {
     val botTots = sum(catCountsSoFar, 2)(0)
     var totTots = sum(catCounts, 2)(0)
     var topFract = 0f
-    var botFract = 0f 
+    var botFract = 0f
     if (totTots > 0f) {
       botFract = botTots/ totTots
       topFract = 1f - botFract
@@ -248,8 +250,8 @@ object RForest {
   def getImpurity(countsSoFar : FMat, totCounts : Float) : Float = {
     var impurity = 0f
     var i = 0
-    while (i < countsSoFar.length)  {
-      var p = 0f 
+    while (i < countsSoFar.length) {
+      var p = 0f
       if (totCounts > 0f) {
         p = countsSoFar(i)/ totCounts
       }
@@ -263,7 +265,7 @@ object RForest {
     impurity
   }
 
-  def treeSteps(tn : IMat, fd : FMat, fb : FMat, fL : IMat, tMI : IMat, depth : Int, ncats : Int, isLastIteration : Boolean)  {
+  def treeSteps(tn : IMat, fd : FMat, fb : FMat, fL : IMat, tMI : IMat, depth : Int, ncats : Int, isLastIteration : Boolean) {
     val dnodes = (math.pow(2, depth).toInt - 1)
     val nfeats = fd.nrows
     val nitems = fd.ncols
@@ -299,14 +301,14 @@ object RForest {
   def treeSearch(ntn : IMat, fd : FMat, fb : FMat, fL : IMat, tMI : IMat, depth : Int, ncats : Int) {
     var d = 0
     while (d < depth) {
-      treeSteps(ntn, fd, fb, fL, tMI, depth, ncats, d==(depth - 1)) 
+      treeSteps(ntn, fd, fb, fL, tMI, depth, ncats, d==(depth - 1))
       d += 1
     }
   }
 
   // expects a to be n * t
   // returns out (n * numCats)
-  def accumG(a : Mat, dim : Int, numBuckets : Int)  : Mat = {
+  def accumG(a : Mat, dim : Int, numBuckets : Int) : Mat = {
     (dim, a) match {
       case (1, aMat : IMat) => {
         // col by col
