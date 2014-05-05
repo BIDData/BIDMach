@@ -2,7 +2,7 @@ import edu.berkeley.bid.CUMAT
 import edu.berkeley.bid.CUMACH
 import edu.berkeley.bid.UTILS
 
-val ncols = 16*1024
+val ncols = 8*1024
 
 // itree, inode, jfeat, ifeat, vfeat, icat
 val fieldlens = irow(6, 8, 4, 10, 8, 4)
@@ -108,4 +108,4 @@ tic;
 val err4=CUMACH.minImpurity(gout.data, gones.data, goutv.data, goutf.data, goutg.data, gjjc.data, gfln.data, nnodes*ntrees, ncats, nsamps, 0); 
 val t5 = toc
 
-//tic; BIDMach.models.RandForest.minImpurity(lout, ones, outv, outf, outg, jjc, fieldlens, ncats, 0); val t6 = toc
+tic; BIDMach.models.RandForest.minImpurity(lout, ones, outv, outf, outg, jjc, fieldlens, ncats, 0); val t6 = toc

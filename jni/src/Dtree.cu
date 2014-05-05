@@ -109,8 +109,8 @@ int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, in
 
 class entImpty {
  public:
-  static __device__ inline float fupdate(int v) { return (float)v * log((float)max(1, v)); }
-  static __device__ inline float fresult(float vacc, int vsum) { float vs = (float)max(1, vsum); return log(vs) - vacc / vs; }
+  static __device__ inline float fupdate(int v) { return (float)v * logf((float)max(1, v)); }
+  static __device__ inline float fresult(float vacc, int vsum) { float vs = (float)max(1, vsum); return logf(vs) - vacc / vs; }
 };
 
 class giniImpty {
@@ -133,7 +133,7 @@ __device__ inline void accumup2(int &cnt, float &update) {
   }
 }
 
-__device__ inline void accumup3(int &cnt, float update, float &updatet) {
+__device__ inline void accumup3(int &cnt, float &update, float &updatet) {
 #pragma unroll
   for (int h = 1; h < 32; h = h + h) {
     float tmpx = __shfl_up(update, h);
@@ -196,9 +196,7 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
   int i, j, k, h, jc0, jc1, jlast;
   long long key;
   int cold, ctot, ctot2, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp;
-  float update, updatet, cacc, cact, impty, minimpty, lastimpty, tmpx, tmpy;
-
-  printf("cuda %d\n", tid);
+  float update, updatet, cacc, cact, caccall, impty, minimpty, lastimpty, tmpx, tmpy;
 
   for (i = threadIdx.y + blockDim.y * blockIdx.x; i < nnodes*nsamps; i += blockDim.y * gridDim.x) {
     // Process a group with fixed itree, inode, and ifeat
@@ -239,10 +237,11 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       cacc += update;
     }
     __syncthreads();
-    if (threadIdx.x == 0 && i < 32) printf("cuda %d %d %f\n", i, ctot, cacc);
+    //    if (threadIdx.x == 0 && i < 32) printf("cuda %d %d %f\n", i, ctot, cacc);
 
     // Second pass to compute impurity at every input point
-    cact = cacc;                                            // Save the total count and (ci)log(ci) sum
+    caccall = cacc;                                            // Save the total count and (ci)log(ci) sum
+    cact = cacc;
     ctotall = ctot;
     ctot = 0;
     cacc = 0.0f;
@@ -253,7 +252,7 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       if (j + threadIdx.x < jc1) {                          // Read a block of (32) keys and counts
         key = keys[j + threadIdx.x];                        // Each (x) thread handles a different input
         cnt = counts[j + threadIdx.x];
-        icat = (int)(key & cmask);                          // Extract the cat id and integer value
+        icat = ((int)key) & cmask;                           // Extract the cat id and integer value
         ival = ((int)(key >> vshift)) & vmask;
       }
       jlast = min(31, jc1 - j - 1);
@@ -272,7 +271,10 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       ctot += cnt;                                          // Now update the total c and total ci log ci sums
       cacc += update;
       cact += updatet;
-      impty = T::fresult(cacc, ctot) + T::fresult(cact, ctotall - ctot); // And the impurity for this input
+      float impty1 = T::fresult(cacc, ctot);
+      float impty2 = T::fresult(cact, ctotall - ctot); // And the impurity for this input
+      impty = impty1 + impty2;
+      //      if (i == 0) printf("cuda pos %d impty %f %f icat %d cnts %d %d cacc %f %d\n", j + threadIdx.x, impty1, impty2, icat, cold, cnew, cacc, ctot);
 
       tmp = __shfl_up(ival, 1);                             // Need the last impurity and ival in order
       tmpx = __shfl_up(impty, 1);                           // to restrict the partition feature to a value boundary
@@ -298,7 +300,7 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
     if (threadIdx.x == 0) {
       outv[i] = bestival;                                   // Output the best split feature value
       outf[i] = (int)((key >> ishift) & imask);             // Save the feature index
-      outg[i] = T::fresult(cacc, ctot) - minimpty;          // And the impurity gain
+      outg[i] = T::fresult(caccall, ctotall) - minimpty;          // And the impurity gain
     }
   }
 }
@@ -385,6 +387,7 @@ __global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *out
       sacct[threadIdx.x] = acct;
     }
     tott = stott[threadIdx.x];
+    if (tid == 0 && i < 32) printf("cuda %d %d %f\n", i, tott, acct);
 
     // Main loop, work on blocks of 1024 (ideally)
     /*
@@ -533,11 +536,11 @@ __global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *out
 #else
 template<class T>
 __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
-                              int nnodes, int ncats, int nsamps) {}
+                               int nnodes, int ncats, int nsamps) {}
 
 template<class T>
 __global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
-                              int nnodes, int ncats, int nsamps) {}
+                               int nnodes, int ncats, int nsamps) {}
 #endif
 
 int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
@@ -546,15 +549,14 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
   int ny = min(32, DBSIZE/ncats/2);
   dim3 tdim(32, ny, 1);
   int ng = min(64, nnodes*nsamps);
-  printf("CUDA %d\n", impType);
-  if (impType & 2 == 0) {
-    if (impType & 1 == 0) {
+  if ((impType & 2) == 0) {
+    if ((impType & 1) == 0) {
       __minImpuritya<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
     } else {
       __minImpuritya<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
     }
   } else {
-    if (impType & 1 == 0) {
+    if ((impType & 1) == 0) {
       __minImpurityb<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
     } else {
       __minImpurityb<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);

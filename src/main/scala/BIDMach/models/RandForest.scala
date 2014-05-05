@@ -65,7 +65,7 @@ object RandForest {
     val out = izeros(1, fL.length)
     var i = 0
     while (i < fL.length) {
-      out(i) = (fL(i) << 1) - 1
+      out(i) = (1 << fL(i)) - 1
       i += 1
     }
     out
@@ -205,10 +205,10 @@ object RandForest {
     var tott = 0;
     var acc = 0f;
     var acct = 0f;
-    var i = 1;
-    while (i < jc.length) {
-      val jci = jc(i-1);
-      val jcn = jc(i);
+    var i = 0;
+    while (i < jc.length - 1) {
+      val jci = jc(i);
+      val jcn = jc(i+1);
 
       totcounts.clear;
       counts.clear;
@@ -228,13 +228,12 @@ object RandForest {
         acct += imptyFns.update(totcounts(j));
         j += 1
       }
-      if (i < 32) {
-          println("scala %d %d %f" format (i, tott, acct))
-      }
+//      if (i < 32)  println("scala %d %d %f" format (i, tott, acct))
       val nodeImpty = imptyFns.result(acct, tott);
       
-      var oldvfeat = -1
+      var lastival = -1
       var minImpty = Float.MaxValue
+      var lastImpty = Float.MaxValue
       var partv = -1
       var besti = -1
       acc = 0;
@@ -243,7 +242,7 @@ object RandForest {
       while (j < jcn) {                   // Then incrementally update top and bottom impurities and find min total 
         val key = keys(j)
         val cnt = cnts(j)
-        val vfeat = extractField(IVFeat, key, fieldshifts, fieldmasks);
+        val ival = extractField(IVFeat, key, fieldshifts, fieldmasks);
         val icat = extractField(ICat, key, fieldshifts, fieldmasks);
         val oldcnt = counts(icat);
         val newcnt = oldcnt + cnt;
@@ -253,20 +252,23 @@ object RandForest {
         tot += cnt;
         acc += imptyFns.update(newcnt) - imptyFns.update(oldcnt);
         acct += imptyFns.update(newcntt) - imptyFns.update(oldcntt);
-        if (vfeat != oldvfeat) {
-          val impty = imptyFns.result(acc, tot) + imptyFns.result(acct, tott - tot)
-          if (impty < minImpty) {
+        val impty = imptyFns.result(acc, tot) + imptyFns.result(acct, tott - tot)
+//        if (i==0) println("scala pos %d impty %f icat %d cnts %d %d cacc %f %d" format (j, impty,  icat, oldcnt, newcnt, acc, tot))
+        if (ival != lastival) {
+          if (lastImpty < minImpty) {
             val ifeat = extractField(IFeat, key, fieldshifts, fieldmasks);
-            minImpty = impty;
-            partv = vfeat;
+            minImpty = lastImpty;
+            partv = lastival;
             besti = ifeat;
           }
         }
+        lastival = ival;
+        lastImpty = impty;
         j += 1;
       }
-      outv(i-1) = partv;
-      outg(i-1) = nodeImpty;// - minImpty;
-      outf(i-1) = besti;
+      outv(i) = partv;
+      outg(i) = nodeImpty - minImpty;
+      outf(i) = besti;
       i += 1;
     }
   }
