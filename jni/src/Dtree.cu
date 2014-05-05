@@ -174,7 +174,137 @@ __device__ inline void minup2(float &impty, int &ival) {
 }
 
 template<typename T>
-__global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+__global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens,
+                              int nnodes, int ncats, int nsamps) {
+  __shared__ int catcnt[DBSIZE/2];
+  __shared__ int cattot[DBSIZE/2];
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+
+  if (tid < 6) {
+    catcnt[tid] = fieldlens[tid];
+  }
+  __syncthreads();
+  int vshift = catcnt[5];
+  int ishift = catcnt[4] + vshift;
+
+  int cmask = (1 << catcnt[5]) - 1;
+  int vmask = (1 << catcnt[4]) - 1;
+  int imask = (1 << catcnt[3]) - 1;
+
+  __syncthreads();
+
+  int i, j, k, h, jc0, jc1, jlast;
+  long long key;
+  int cold, ctot, ctot2, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp;
+  float update, updatet, cacc, cact, impty, minimpty, lastimpty, tmpx, tmpy;
+
+  printf("cuda %d\n", tid);
+
+  for (i = threadIdx.y + blockDim.y * blockIdx.x; i < nnodes*nsamps; i += blockDim.y * gridDim.x) {
+    // Process a group with fixed itree, inode, and ifeat
+
+    jc0 = jc[i]; // The range of indices for this group
+    jc1 = jc[i+1];
+    __syncthreads();
+
+    // Clear the cat counts for this group
+    for (j = tid; j < DBSIZE/2; j += blockDim.x * blockDim.y) {
+      catcnt[j] = 0;
+      cattot[j] = 0;
+    }
+    __syncthreads();
+
+    // First pass gets counts for each category and the (ci)log(ci) sum for this block
+    ctot = 0; 
+    cacc = 0.0f; 
+    for (j = jc0; j < jc1; j += blockDim.x) {
+      if (j + threadIdx.x < jc1) {                          // Read a block of (32) keys and counts
+        key = keys[j + threadIdx.x];                        // Each (x) thread handles a different input
+        cnt = counts[j + threadIdx.x];
+        icat = ((int)key) & cmask;                          // Extract the cat id and integer value
+      }
+      jlast = min(31, jc1 - j - 1);
+      for (k = 0; k <= jlast; k++) {                        // Sequentially update counts so that each thread
+        if (threadIdx.x == k) {                             // in this warp gets the old and new counts
+          cold = cattot[icat + ncats * threadIdx.y];        // i.e. data for item k is in thread k
+          cnew = cold + cnt;
+          cattot[icat + ncats * threadIdx.y] = cnew;
+        }
+      }
+      update = T::fupdate(cnew) - T::fupdate(cold);
+      accumup2(cnt,update);
+      cnt = __shfl(cnt, jlast);                             // Now update the total c and total ci log ci sums
+      update = __shfl(update, jlast);
+      ctot += cnt;
+      cacc += update;
+    }
+    __syncthreads();
+    if (threadIdx.x == 0 && i < 32) printf("cuda %d %d %f\n", i, ctot, cacc);
+
+    // Second pass to compute impurity at every input point
+    cact = cacc;                                            // Save the total count and (ci)log(ci) sum
+    ctotall = ctot;
+    ctot = 0;
+    cacc = 0.0f;
+    lastival = -1;
+    lastimpty = 1e7f;
+    minimpty = 1e7f;
+    for (j = jc0; j < jc1; j += blockDim.x) {
+      if (j + threadIdx.x < jc1) {                          // Read a block of (32) keys and counts
+        key = keys[j + threadIdx.x];                        // Each (x) thread handles a different input
+        cnt = counts[j + threadIdx.x];
+        icat = (int)(key & cmask);                          // Extract the cat id and integer value
+        ival = ((int)(key >> vshift)) & vmask;
+      }
+      jlast = min(31, jc1 - j - 1);
+      for (k = 0; k <= jlast; k++) {                        // Sequentially update counts so that each thread
+        if (threadIdx.x == k) {                             // in this warp gets the old and new counts
+          cold = catcnt[icat + ncats * threadIdx.y];        // i.e. data for item k is in thread k
+          ctt = cattot[icat + ncats * threadIdx.y];
+          cnew = cold + cnt;
+          catcnt[icat + ncats * threadIdx.y] = cnew;
+        }
+      }
+      update = T::fupdate(cnew) - T::fupdate(cold);         // Compute the impurity updates for this input
+      updatet = T::fupdate(ctt-cnew) - T::fupdate(ctt-cold);
+
+      accumup3(cnt, update, updatet);
+      ctot += cnt;                                          // Now update the total c and total ci log ci sums
+      cacc += update;
+      cact += updatet;
+      impty = T::fresult(cacc, ctot) + T::fresult(cact, ctotall - ctot); // And the impurity for this input
+
+      tmp = __shfl_up(ival, 1);                             // Need the last impurity and ival in order
+      tmpx = __shfl_up(impty, 1);                           // to restrict the partition feature to a value boundary
+      if (threadIdx.x > 0) {        
+        lastival = tmp;
+        lastimpty = tmpx;
+      }
+
+      if (ival == lastival) lastimpty = 1e7f;               // Eliminate values which are not at value boundaries
+      if (lastimpty < minimpty) {
+        minimpty = lastimpty;
+        bestival = lastival;
+      }
+      minup2(minimpty,bestival);
+      minimpty = __shfl(minimpty, jlast);                   // Carefully copy the last active thread to all threads, needed outside this loop
+      bestival = __shfl(bestival, jlast);
+      ctot = __shfl(ctot, jlast);
+      cacc = __shfl(cacc, jlast);
+      cact = __shfl(cact, jlast);
+      lastival = __shfl(ival, jlast);
+      lastimpty = __shfl(impty, jlast);
+    }
+    if (threadIdx.x == 0) {
+      outv[i] = bestival;                                   // Output the best split feature value
+      outf[i] = (int)((key >> ishift) & imask);             // Save the feature index
+      outg[i] = T::fresult(cacc, ctot) - minimpty;          // And the impurity gain
+    }
+  }
+}
+
+template<typename T>
+__global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
                               int nnodes, int ncats, int nsamps) {
   __shared__ int catcnt[DBSIZE];
   __shared__ int cattot[DBSIZE/4];
@@ -200,7 +330,7 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
 
   int i, j, k, h, jc0, jc1, ilast, jlast;
   long long key;
-  int ccnt, tot, ctt, tott, cnew, cnt, ncnt, tcnt, ival, icat, lastival, bestival, tmp;
+  int cold, tot, ctt, tott, cnew, cnt, ncnt, tcnt, ival, icat, lastival, bestival, tmp;
   float update, updatet, acc, acct, impty, minimpty;
 
   for (i = blockIdx.x; i < nnodes*nsamps; i += gridDim.x) {
@@ -333,14 +463,14 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
       ncnt = -cnt;
       for (k = jlast; k >= 0; k--) {                           // Sequentially update counts so that each thread
         if (threadIdx.x == k) {                                // in this warp gets the old and new counts
-          ccnt = catcnt[icat + ncats * threadIdx.y];           // i.e. data for item k is in thread k
+          cold = catcnt[icat + ncats * threadIdx.y];           // i.e. data for item k is in thread k
           ctt = cattot[icat + ncats * threadIdx.y];  
-          cnew = ccnt + ncnt;
+          cnew = cold + ncnt;
           catcnt[icat + ncats * threadIdx.y] = cnew;
         }
       }
-      update = T::fupdate(cnew) - T::fupdate(ccnt);
-      updatet = T::fupdate(ctt - cnew) - T::fupdate(ctt - ccnt);
+      update = T::fupdate(cnew) - T::fupdate(cold);
+      updatet = T::fupdate(ctt - cnew) - T::fupdate(ctt - cold);
 
       accumdown3(ncnt,update,updatet,jlast);
       tot += cnt;                                              // Now update the total c and total ci log ci sums
@@ -402,7 +532,11 @@ __global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf
 }
 #else
 template<class T>
-__global__ void __minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+__global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+                              int nnodes, int ncats, int nsamps) {}
+
+template<class T>
+__global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
                               int nnodes, int ncats, int nsamps) {}
 #endif
 
@@ -412,11 +546,21 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
   int ny = min(32, DBSIZE/ncats/2);
   dim3 tdim(32, ny, 1);
   int ng = min(64, nnodes*nsamps);
-  if (impType == 0) {
-    __minImpurity<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+  printf("CUDA %d\n", impType);
+  if (impType & 2 == 0) {
+    if (impType & 1 == 0) {
+      __minImpuritya<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+    } else {
+      __minImpuritya<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+    }
   } else {
-    __minImpurity<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+    if (impType & 1 == 0) {
+      __minImpurityb<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+    } else {
+      __minImpurityb<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+    }
   }
+  fflush(stdout);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;

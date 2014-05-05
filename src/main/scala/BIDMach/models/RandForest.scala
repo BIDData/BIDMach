@@ -228,6 +228,9 @@ object RandForest {
         acct += imptyFns.update(totcounts(j));
         j += 1
       }
+      if (i < 32) {
+          println("scala %d %d %f" format (i, tott, acct))
+      }
       val nodeImpty = imptyFns.result(acct, tott);
       
       var oldvfeat = -1
@@ -262,7 +265,7 @@ object RandForest {
         j += 1;
       }
       outv(i-1) = partv;
-      outg(i-1) = nodeImpty - minImpty;
+      outg(i-1) = nodeImpty;// - minImpty;
       outf(i-1) = besti;
       i += 1;
     }
