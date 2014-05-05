@@ -2,7 +2,7 @@ import edu.berkeley.bid.CUMAT
 import edu.berkeley.bid.CUMACH
 import edu.berkeley.bid.UTILS
 
-val ncols = 128*1024
+val ncols = 64*1024
 
 // itree, inode, jfeat, ifeat, vfeat, icat
 val fieldlens = irow(6, 12, 4, 10, 8, 4)
@@ -43,7 +43,7 @@ val gfln = GIMat(fieldlens)
 
 tic;val err=CUMACH.treePack(gid.data, gtn.data, gic.data, gjc.data, gout.data, gfln.data, nrows, ncols, ntrees, nsamps); val tt=toc
 
-println("throughput=%f GB/s" format (idata.length*4f + out.length*4f)/tt/1e9)
+println("treepack throughput=%f GB/s" format (idata.length*4f + out.length*4f)/tt/1e9)
 
 out <-- gout
 
@@ -110,4 +110,4 @@ val t5 = toc
 
 tic; BIDMach.models.RandForest.minImpurity(lout, ones, outv, outf, outg, jjc, fieldlens, ncats, 0); val t6 = toc
 
-println("treepack %f\nsort %f\nboundaries %f\nimpurity %f" format (tt, t2, t3, t5))
+println("treepack %f\nsort %f\nboundaries %f\nimpurity %f\nscala impurity %f" format (tt, t2, t3, t5, t6))
