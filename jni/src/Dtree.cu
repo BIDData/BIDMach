@@ -193,10 +193,10 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
 
   __syncthreads();
 
-  int i, j, k, h, jc0, jc1, jlast;
+  int i, j, k, jc0, jc1, jlast;
   long long key;
-  int cold, ctot, ctot2, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp;
-  float update, updatet, cacc, cact, caccall, impty, minimpty, lastimpty, tmpx, tmpy;
+  int cold, ctot, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp;
+  float update, updatet, cacc, cact, caccall, impty, minimpty, lastimpty, tmpx;
 
   for (i = threadIdx.y + blockDim.y * blockIdx.x; i < nnodes*nsamps; i += blockDim.y * gridDim.x) {
     // Process a group with fixed itree, inode, and ifeat
@@ -235,12 +235,12 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       update = __shfl(update, jlast);
       ctot += cnt;
       cacc += update;
-    }
+      }
     __syncthreads();
     //    if (threadIdx.x == 0 && i < 32) printf("cuda %d %d %f\n", i, ctot, cacc);
 
     // Second pass to compute impurity at every input point
-    caccall = cacc;                                            // Save the total count and (ci)log(ci) sum
+    caccall = cacc;                                         // Save the total count and (ci)log(ci) sum
     cact = cacc;
     ctotall = ctot;
     ctot = 0;
@@ -252,7 +252,7 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       if (j + threadIdx.x < jc1) {                          // Read a block of (32) keys and counts
         key = keys[j + threadIdx.x];                        // Each (x) thread handles a different input
         cnt = counts[j + threadIdx.x];
-        icat = ((int)key) & cmask;                           // Extract the cat id and integer value
+        icat = ((int)key) & cmask;                          // Extract the cat id and integer value
         ival = ((int)(key >> vshift)) & vmask;
       }
       jlast = min(31, jc1 - j - 1);
@@ -271,10 +271,8 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       ctot += cnt;                                          // Now update the total c and total ci log ci sums
       cacc += update;
       cact += updatet;
-      float impty1 = T::fresult(cacc, ctot);
-      float impty2 = T::fresult(cact, ctotall - ctot); // And the impurity for this input
-      impty = impty1 + impty2;
-      //      if (i == 0) printf("cuda pos %d impty %f %f icat %d cnts %d %d cacc %f %d\n", j + threadIdx.x, impty1, impty2, icat, cold, cnew, cacc, ctot);
+      impty = T::fresult(cacc, ctot) + T::fresult(cact, ctotall-ctot); // And the impurity for this input
+      //      if (i == 0) printf("cuda pos %d impty %f icat %d cnts %d %d cacc %f %d\n", j + threadIdx.x, impty, icat, cold, cnew, cacc, ctot);
 
       tmp = __shfl_up(ival, 1);                             // Need the last impurity and ival in order
       tmpx = __shfl_up(impty, 1);                           // to restrict the partition feature to a value boundary
@@ -286,7 +284,7 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       if (ival == lastival) lastimpty = 1e7f;               // Eliminate values which are not at value boundaries
       if (lastimpty < minimpty) {
         minimpty = lastimpty;
-        bestival = lastival;
+        bestival = ival;
       }
       minup2(minimpty,bestival);
       minimpty = __shfl(minimpty, jlast);                   // Carefully copy the last active thread to all threads, needed outside this loop
@@ -299,8 +297,8 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
     }
     if (threadIdx.x == 0) {
       outv[i] = bestival;                                   // Output the best split feature value
-      outf[i] = (int)((key >> ishift) & imask);             // Save the feature index
-      outg[i] = T::fresult(caccall, ctotall) - minimpty;          // And the impurity gain
+      outf[i] = ((int)(key >> ishift)) & imask;             // Save the feature index
+      outg[i] = T::fresult(caccall, ctotall) - minimpty;    // And the impurity gain
     }
   }
 }
@@ -359,7 +357,7 @@ __global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *out
         key = keys[j + tid]; 
         cnt = counts[j + tid];
         icat = ((int)key) & cmask;                            // Extract the cat id 
-        atomicAdd(&cattot[icat], cnt);                        // Update count totals 
+        atomicAdd(&cattot[icat + threadIdx.y * ncats], cnt);                        // Update count totals 
       }
     }
 
@@ -387,10 +385,10 @@ __global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *out
       sacct[threadIdx.x] = acct;
     }
     tott = stott[threadIdx.x];
-    if (tid == 0 && i < 32) printf("cuda %d %d %f\n", i, tott, acct);
+    //    if (tid == 0 && i < 32) printf("cuda %d %d %f\n", i, tott, acct);
 
     // Main loop, work on blocks of 1024 (ideally)
-    /*
+    
 
     for (j = jc0; j < jc1; j += blockDim.x * blockDim.x) {
 
@@ -522,7 +520,7 @@ __global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *out
       }
       __syncthreads();
     }
-    */
+    
 
     if (tid == 0) {
       outv[i] = bestival;                                    // Output the best split feature value

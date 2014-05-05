@@ -258,7 +258,7 @@ object RandForest {
           if (lastImpty < minImpty) {
             val ifeat = extractField(IFeat, key, fieldshifts, fieldmasks);
             minImpty = lastImpty;
-            partv = lastival;
+            partv = ival;
             besti = ifeat;
           }
         }

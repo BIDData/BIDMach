@@ -2,10 +2,10 @@ import edu.berkeley.bid.CUMAT
 import edu.berkeley.bid.CUMACH
 import edu.berkeley.bid.UTILS
 
-val ncols = 8*1024
+val ncols = 128*1024
 
 // itree, inode, jfeat, ifeat, vfeat, icat
-val fieldlens = irow(6, 8, 4, 10, 8, 4)
+val fieldlens = irow(6, 12, 4, 10, 8, 4)
 
 val ntrees = 1 << fieldlens(0)
 val nnodes = 1 << fieldlens(1)
@@ -109,3 +109,5 @@ val err4=CUMACH.minImpurity(gout.data, gones.data, goutv.data, goutf.data, goutg
 val t5 = toc
 
 tic; BIDMach.models.RandForest.minImpurity(lout, ones, outv, outf, outg, jjc, fieldlens, ncats, 0); val t6 = toc
+
+println("treepack %f\nsort %f\nboundaries %f\nimpurity %f" format (tt, t2, t3, t5))
