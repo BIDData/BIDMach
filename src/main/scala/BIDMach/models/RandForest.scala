@@ -189,7 +189,7 @@ object RandForest {
   // outg should be an nsamps * nnodes array holding the impurity gain (use maxi2 to get the best)
   // jc should be a zero-based array that points to the start and end of each group of fixed node,jfeat
 
-  def minImpurity(keys:Array[Long], cnts:IMat, outv:IMat, outf:IMat, outg:FMat, jc:IMat, fieldlens:IMat, 
+  def minImpurity(keys:Array[Long], cnts:IMat, outv:IMat, outf:IMat, outg:FMat, outc:IMat, jc:IMat, fieldlens:IMat, 
       ncats:Int, fnum:Int) = {
     
     val imptyFns = imptyFunArray(fnum)
@@ -214,12 +214,19 @@ object RandForest {
       counts.clear;
       tott = 0;
       j = jci;
+      var maxcnt = -1;
+      var imaxcnt = -1;
       while (j < jcn) {                     // First get the total counts for each
         val key = keys(j)
         val cnt = cnts(j)
-        val icat = extractField(ICat, key, fieldshifts, fieldmasks); 
-        totcounts(icat) += cnt;
+        val icat = extractField(ICat, key, fieldshifts, fieldmasks);
+        val newcnt = totcounts(icat) + cnt;
+        totcounts(icat) = newcnt;
         tott += cnt;
+        if (newcnt > maxcnt) {
+          maxcnt = newcnt;
+          imaxcnt = icat;
+        }
         j += 1;
       }
       acct = 0; 
@@ -255,11 +262,10 @@ object RandForest {
         val impty = imptyFns.result(acc, tot) + imptyFns.result(acct, tott - tot)
 //        if (i==0) println("scala pos %d impty %f icat %d cnts %d %d cacc %f %d" format (j, impty,  icat, oldcnt, newcnt, acc, tot))
         if (ival != lastival) {
-          if (lastImpty < minImpty) {
-            val ifeat = extractField(IFeat, key, fieldshifts, fieldmasks);
+          if (lastImpty < minImpty) { 
             minImpty = lastImpty;
             partv = ival;
-            besti = ifeat;
+            besti = extractField(IFeat, key, fieldshifts, fieldmasks);
           }
         }
         lastival = ival;
@@ -268,7 +274,8 @@ object RandForest {
       }
       outv(i) = partv;
       outg(i) = nodeImpty - minImpty;
-      outf(i) = besti;
+      outf(i) = besti
+      outc(i) = imaxcnt
       i += 1;
     }
   }

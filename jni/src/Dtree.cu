@@ -173,8 +173,20 @@ __device__ inline void minup2(float &impty, int &ival) {
   }
 }
 
+__device__ inline void maxup2(int &v, int &indx) {
+#pragma unroll
+  for (int h = 1; h < 32; h = h + h) {
+    int tmpv = __shfl_up(v, h);
+    int tmpi = __shfl_up(indx, h);
+    if (threadIdx.x >= h && tmpv > v) {
+      v = tmpv;
+      indx = tmpi; 
+    }
+  }
+}
+
 template<typename T>
-__global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens,
+__global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens,
                               int nnodes, int ncats, int nsamps) {
   __shared__ int catcnt[DBSIZE/2];
   __shared__ int cattot[DBSIZE/2];
@@ -195,7 +207,7 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
 
   int i, j, k, jc0, jc1, jlast;
   long long key;
-  int cold, ctot, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp;
+  int cold, ctot, ctt, ctotall, cnew, cnt, ival, icat, lastival, bestival, tmp, maxcnt, imaxcnt;
   float update, updatet, cacc, cact, caccall, impty, minimpty, lastimpty, tmpx;
 
   for (i = threadIdx.y + blockDim.y * blockIdx.x; i < nnodes*nsamps; i += blockDim.y * gridDim.x) {
@@ -215,6 +227,8 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
     // First pass gets counts for each category and the (ci)log(ci) sum for this block
     ctot = 0; 
     cacc = 0.0f; 
+    maxcnt = -1;
+    imaxcnt = -1;
     for (j = jc0; j < jc1; j += blockDim.x) {
       if (j + threadIdx.x < jc1) {                          // Read a block of (32) keys and counts
         key = keys[j + threadIdx.x];                        // Each (x) thread handles a different input
@@ -231,11 +245,18 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       }
       update = T::fupdate(cnew) - T::fupdate(cold);
       accumup2(cnt,update);
-      cnt = __shfl(cnt, jlast);                             // Now update the total c and total ci log ci sums
-      update = __shfl(update, jlast);
-      ctot += cnt;
+      ctot += cnt;                                          // Now update the total c and total ci log ci sums
       cacc += update;
+      ctot = __shfl(ctot, jlast);
+      cacc = __shfl(cacc, jlast);
+      if (cnew > maxcnt) {                                  // Compute and distribute the max cnt
+        maxcnt = cnew;
+        imaxcnt = icat;
       }
+      maxup2(maxcnt, imaxcnt);
+      maxcnt = __shfl(maxcnt, jlast);
+      imaxcnt = __shfl(imaxcnt, jlast);
+    }
     __syncthreads();
     //    if (threadIdx.x == 0 && i < 32) printf("cuda %d %d %f\n", i, ctot, cacc);
 
@@ -299,12 +320,13 @@ __global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *out
       outv[i] = bestival;                                   // Output the best split feature value
       outf[i] = ((int)(key >> ishift)) & imask;             // Save the feature index
       outg[i] = T::fresult(caccall, ctotall) - minimpty;    // And the impurity gain
+      outc[i] = imaxcnt;
     }
   }
 }
 
 template<typename T>
-__global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+__global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 
                               int nnodes, int ncats, int nsamps) {
   __shared__ int catcnt[DBSIZE];
   __shared__ int cattot[DBSIZE/4];
@@ -533,15 +555,15 @@ __global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *out
 }
 #else
 template<class T>
-__global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+__global__ void __minImpuritya(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 
                                int nnodes, int ncats, int nsamps) {}
 
 template<class T>
-__global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+__global__ void __minImpurityb(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 
                                int nnodes, int ncats, int nsamps) {}
 #endif
 
-int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 
                 int nnodes, int ncats, int nsamps, int impType) {
   // Note: its safe to round ncats up to a multiple of 32, since its only used to split shmem
   int ny = min(32, DBSIZE/ncats/2);
@@ -549,15 +571,15 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
   int ng = min(64, nnodes*nsamps);
   if ((impType & 2) == 0) {
     if ((impType & 1) == 0) {
-      __minImpuritya<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+      __minImpuritya<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, outc, jc, fieldlens, nnodes, ncats, nsamps);
     } else {
-      __minImpuritya<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+      __minImpuritya<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, outc, jc, fieldlens, nnodes, ncats, nsamps);
     }
   } else {
     if ((impType & 1) == 0) {
-      __minImpurityb<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+      __minImpurityb<entImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, outc, jc, fieldlens, nnodes, ncats, nsamps);
     } else {
-      __minImpurityb<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps);
+      __minImpurityb<giniImpty><<<ng,tdim>>>(keys, counts, outv, outf, outg, outc, jc, fieldlens, nnodes, ncats, nsamps);
     }
   }
   fflush(stdout);

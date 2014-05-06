@@ -17,7 +17,7 @@ int LDA_Gibbs1(int nrows, int nnz, float *A, float *B, int *Cir, int *Cic, float
 
 int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, int *fieldlens, int nrows, int ncols, int ntrees, int nsamps);
 
-int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *jc, int *fieldlens, 
+int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 
                 int nnodes, int ncats, int nsamps, int impType);
 
 int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);

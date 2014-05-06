@@ -1,5 +1,7 @@
 
 Logistic Regression (dense) on 1000 x 100000 block of RCV1
+E5-2660 CPU
+GTX-680 GPU
 
 MLLib:      1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
 VW:      110 targets, (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
@@ -20,9 +22,9 @@ Notes
 
 Latent Dirichlet Allocation (sparse) on 276k x 100000 block of RCV1, 256 dimensions, minibatch=1024
 
-VW:                   880 secs,    3 passes,     1 gf/s
-BIDMach: (MKL only)   320 secs,    3 passes,     0.7 gf/s
-BIDMach: (680 GPU)     23 secs,    3 passes,     9 gf/s
+VW:                   880 secs,    3 passes,     1 gf/s         
+BIDMach: (MKL only)   320 secs,    3 passes,     0.7 gf/s       0.01 Gflops/W
+BIDMach: (680 GPU)     23 secs,    3 passes,     9 gf/s         0.1  Gflops/W
 
 Latent Dirichlet Allocation (dense) on 1000 x 100000 block of RCV1, 256 dims, minibatch=1024
 
