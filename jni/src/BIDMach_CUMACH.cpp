@@ -137,7 +137,7 @@ extern "C" {
   }
 
  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_minImpurity
-  (JNIEnv *env, jobject obj, jobject jkeys, jobject jcounts, jobject joutv, jobject joutf, jobject joutg, jobject jjc, jobject jfieldlens, 
+ (JNIEnv *env, jobject obj, jobject jkeys, jobject jcounts, jobject joutv, jobject joutf, jobject joutg, jobject joutc, jobject jjc, jobject jfieldlens, 
    jint nnodes, jint ncats, jint nsamps, jint impType) 
   {
     long long *keys = (long long*)getPointer(env, jkeys);
@@ -145,10 +145,11 @@ extern "C" {
     int *outv = (int*)getPointer(env, joutv);
     int *outf = (int*)getPointer(env, joutf);
     float *outg = (float*)getPointer(env, joutg);
+    int *outc = (int*)getPointer(env, joutc);
     int *jc = (int*)getPointer(env, jjc);
     int *fieldlens = (int*)getPointer(env, jfieldlens);
 
-    return minImpurity(keys, counts, outv, outf, outg, jc, fieldlens, nnodes, ncats, nsamps, impType);
+    return minImpurity(keys, counts, outv, outf, outg, outc, jc, fieldlens, nnodes, ncats, nsamps, impType);
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_findBoundaries

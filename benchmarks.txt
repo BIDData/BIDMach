@@ -1,6 +1,8 @@
 
 Logistic Regression
 ===================
+E5-2660 CPU
+GTX-680 GPU
 
 Logistic Regression (sparse) on 276k x 100000 block of RCV1
 
@@ -9,7 +11,6 @@ VW^3:      110 targets (OAA), (1 machine):   44 secs, 1 pass,   2 MB/s,
 BIDMach^1: 110 targets (OAA),  (MKL only):   19 secs, 1 pass,   5 MB/s, 0.4 gflops
 BIDMach^1: 110 targets (OAA),   (680 GPU):    5 secs, 1 pass,  20 MB/s,  10 gflops
 BIDMach^2: 110 targets (OAA),   (680 GPU):  0.7 secs, 1 pass, 150 MB/s,  11 gflops
-
 
 Logistic Regression (dense) on 1000 x 100000 block of RCV1
 
@@ -33,12 +34,7 @@ Latent Dirichlet Allocation (LDA)
 
 Latent Dirichlet Allocation (sparse) on 276k x 100000 block of RCV1, 256 dimensions, minibatch=1024, 3 passes
 
-VW:                   330 secs,    1 MB/s,  1.2 gf/s
-BIDMach: (MKL only)   320 secs,    1 MB/s,  0.7 gf/s
-BIDMach: (680 GPU)     23 secs,   13 MB/s,    9 gf/s
+VW:                   330 secs,     1 gf/s        1 MB/s 
+BIDMach: (MKL only)   320 secs,     0.7 gf/s      1 MB/s        0.01 Gflops/W
+BIDMach: (680 GPU)     23 secs,     9 gf/s       13 MB/s         0.1  Gflops/W
 
-
-Latent Dirichlet Allocation (dense) on 1000 x 100000 block of RCV1, 256 dimensions, minibatch=1024, 3 passes
-
-VW:                   210 secs,     1 MB/s,  1.4 gf/s
-BIDMach: (680 GPU)      2 secs,   100 MB/s,  300 gf/s
