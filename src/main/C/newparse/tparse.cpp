@@ -314,7 +314,7 @@ int parseLine(char * line, int lineno, const char * delim1, ivector & tvec,
       out[i].div.push_back(dival);
       break;
     case ftype_qhex:
-      sscanf(here, "%16Lx%16Lx", &qval.top, &qval.bottom);
+      sscanf(here, "%16llx%16llx", &qval.top, &qval.bottom);
       out[i].qv.push_back(qval);
       break;
     case ftype_float:

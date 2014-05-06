@@ -57,10 +57,12 @@ BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )"
 if [ "$OS" = "apple" ] ; then
     MKL_ROOT="/opt/intel/mkl"
     COMPOSER_ROOT="/opt/intel/composerxe"
-    JAVA_HOME="/System/Library/Frameworks/JavaVM.framework"
+    if [ "JAVA_HOME" = "" ]; then
+	JAVA_HOME="/System/Library/Frameworks/JavaVM.framework"
+    fi
     CUDA_HOME="/usr/local/cuda"
     CC="icc"
-    GCC="gcc"
+    GCC="icc"
     NVCC="nvcc"
     NVCCFLAGS="-c -use_fast_math  -I$BIDMACH_ROOT/jni/include \
           -gencode arch=compute_20,code=sm_20 \
@@ -68,8 +70,8 @@ if [ "$OS" = "apple" ] ; then
           --machine ${MBITS}  -Xcompiler \"-fPIC -c -O2 -g -DNDEBUG\""
     OBJ="o"
     OUTFLG="-o "
-    CPPFLAGS="-fPIC -c -O2 -fopenmp -DNDEBUG -I$JAVA_HOME/Headers -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include"
-    CFLAGS="-fPIC -c -O2 -openmp -std=c99 -DNDEBUG -I$JAVA_HOME/Headers -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    CPPFLAGS="-fPIC -c -O2 -fopenmp -DNDEBUG -I$JAVA_HOME/include -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include"
+    CFLAGS="-fPIC -c -O2 -openmp -std=c99 -DNDEBUG -I$JAVA_HOME/include -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
     LB="ar rc"    
     GLD="icc -bundle -static-intel"
     LD="icc -bundle -static-intel"
@@ -81,14 +83,14 @@ if [ "$OS" = "apple" ] ; then
     LAPACK_INCLUDES=""
     FORTRAN_LIBS="-lgfortran"
     if [ "$PARLIB" = "sequential" ] ; then
-	    MKL_LIBS="-L$JAVA_HOME/Libraries -L${COMPOSER_ROOT}/lib/${ARCHD} \ 
+	    MKL_LIBS="-L${COMPOSER_ROOT}/lib/${ARCHD} \ 
             $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_sequential.a \
             $MKL_ROOT/lib/libmkl_core.a \
             $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_sequential.a \
             $MKL_ROOT/lib/libmkl_core.a \
             -lpthread -lm  -framework JavaVM"
     else 
-	    MKL_LIBS="-L$JAVA_HOME/Libraries -L${COMPOSER_ROOT}/lib/${ARCHD} \
+	    MKL_LIBS="-L${COMPOSER_ROOT}/lib/${ARCHD} \
             $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_intel_thread.a \
             $MKL_ROOT/lib/libmkl_core.a \
             $MKL_ROOT/lib/libmkl_intel${PTYPE}.a $MKL_ROOT/lib/libmkl_intel_thread.a \
@@ -145,17 +147,17 @@ elif [ "$OS" = "linux" ] ; then
 elif [ "$OS" = "windows" ] ; then
     CUDA_HOME="$CUDA_PATH"
     MKL_ROOT="$MKLROOT"
-    CC="cl"
-    GCC="cl"
+    CC="icl"
+    GCC="icl"
     NVCC="nvcc"
     OBJ="obj"
     OUTFLG="/OUT:"
-    CPPFLAGS="/c /MT /DNDEBUG /O2 /EHsc $CFLAGS"    # static linking
+    CPPFLAGS="/c /MT /DNDEBUG /O2 /Qstd=c99 /Qopenmp $CFLAGS"    # static linking
     NVCCFLAGS="-c -use_fast_math  -I$BIDMAT_ROOT/jni/include \
           -gencode arch=compute_20,code=sm_20 \
           -gencode arch=compute_30,code=sm_30 \
           --machine ${MBITS}  -Xcompiler \"/EHsc /W3 /nologo /O2 /Zi  /MT\""
-    CFLAGS="/c /MT /DNDEBUG /O2 /EHsc $CFLAGS"    # static linking
+    CFLAGS="/c /MT /DNDEBUG /O2 /Qstd=c99 /Qopenmp $CFLAGS"    # static linking
     LB="lib"    
     LD="link"
     GLD="link"
