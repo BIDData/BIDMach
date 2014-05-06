@@ -74,3 +74,18 @@ for (i <- 0 until atrain.ncols) {
   }
 }
 outn.close
+
+val outp = new PrintWriter(dir+"vw_sparse_lda_train.dat")
+for (i <- 0 until atrain.ncols) { 
+  val ic = find(c(?,i))
+  val (ii, jj, vv) = find3(atrains(?,i))
+  var j = 0
+  outp.write("%d |" format ic(0)+1)
+  var k = 0 
+  while (k < ii.length) { 
+    outp.write(" " + d(ii(k)) + ":" + vv(k))
+    k += 1
+  }
+  outp.write("\n")
+}
+outp.close

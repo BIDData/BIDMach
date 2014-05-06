@@ -1,30 +1,44 @@
 
-Logistic Regression (dense) on 1000 x 100000 block of RCV1
-
-MLLib:      1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
-VW:      110 targets, (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
-BIDMach: 110 targets,  (MKL only):   2.4 secs,    1 pass,   160 MB/s,  16 gflops, accuracy 0.891^2
-BIDMach: 110 targets,   (680 GPU):   0.3 secs,    1 pass,  1300 MB/s, 100 gflops, accuracy 0.891^2
+Logistic Regression
+===================
 
 Logistic Regression (sparse) on 276k x 100000 block of RCV1
 
 MLLib:     N/A
-VW^1:      110 targets, (1 machine):   44 secs, 1 pass,   2 MB/s,
-BIDMach^1: 110 targets,  (MKL only):   19 secs, 1 pass,   5 MB/s, 0.4 gflops
-BIDMach^1: 110 targets,   (680 GPU):    5 secs, 1 pass,  20 MB/s,  10 gflops
-BIDMach^2: 110 targets,   (680 GPU):  0.7 secs, 1 pass, 150 MB/s,  11 gflops
+VW^3:      110 targets (OAA), (1 machine):   44 secs, 1 pass,   2 MB/s,
+BIDMach^1: 110 targets (OAA),  (MKL only):   19 secs, 1 pass,   5 MB/s, 0.4 gflops
+BIDMach^1: 110 targets (OAA),   (680 GPU):    5 secs, 1 pass,  20 MB/s,  10 gflops
+BIDMach^2: 110 targets (OAA),   (680 GPU):  0.7 secs, 1 pass, 150 MB/s,  11 gflops
+
+
+Logistic Regression (dense) on 1000 x 100000 block of RCV1
+
+MLLib:            1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
+VW:      110 targets (OAA), (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
+BIDMach: 110 targets (OAA),  (MKL only):   2.4 secs,    1 pass,   160 MB/s,  16 gflops, accuracy 0.891^2
+BIDMach: 110 targets (OAA),   (680 GPU):   0.3 secs,    1 pass,  1300 MB/s, 100 gflops, accuracy 0.891^2
 
 Notes
 1: minibatch size 1000
 2: minibatch size 10000
+3: no minibatch option
 
-Latent Dirichlet Allocation (sparse) on 276k x 100000 block of RCV1, 256 dimensions, minibatch=1024
+OAA = One Against All, really 110 independent classifiers. The number of targets is the number of classes.
+110 targets means 110 classifiers were trained. 
 
-VW:                   880 secs,    3 passes,     1 gf/s
-BIDMach: (MKL only)   320 secs,    3 passes,     0.7 gf/s
-BIDMach: (680 GPU)     23 secs,    3 passes,     9 gf/s
+Accuracy is quoted only for topic 6, which is roughly balanced in +/- instances. Others are too close to 1.00
 
-Latent Dirichlet Allocation (dense) on 1000 x 100000 block of RCV1, 256 dims, minibatch=1024
+Latent Dirichlet Allocation (LDA)
+=================================
 
-VW:                   
-BIDMach: (680 GPU)      2 secs,    3 passes,  300 gf/s
+Latent Dirichlet Allocation (sparse) on 276k x 100000 block of RCV1, 256 dimensions, minibatch=1024, 3 passes
+
+VW:                   330 secs,    1 MB/s,  1.2 gf/s
+BIDMach: (MKL only)   320 secs,    1 MB/s,  0.7 gf/s
+BIDMach: (680 GPU)     23 secs,   13 MB/s,    9 gf/s
+
+
+Latent Dirichlet Allocation (dense) on 1000 x 100000 block of RCV1, 256 dimensions, minibatch=1024, 3 passes
+
+VW:                   210 secs,     1 MB/s,  1.4 gf/s
+BIDMach: (680 GPU)      2 secs,   100 MB/s,  300 gf/s
