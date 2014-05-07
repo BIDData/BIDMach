@@ -30,17 +30,12 @@ class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Upda
 	    	(math.pow(firstStep / step, opts.power)).toFloat
 	    }
   	}
-//    println("rr=%g, %g %g" format (rr, mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
+
     um ~ um *@ rm.set(rr)
-//    println("rr=%g, %g %g" format (rr, mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
     ln(mm, mm)
-//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
     mm ~ mm *@ rm.set(1-rr)
-//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
     mm ~ mm + um 
-//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
     exp(mm, mm)
-//    println("mm=%g %g" format (mini(mini(mm,1),2).dv, maxi(maxi(mm,1),2).dv))
     mm ~ mm / sum(mm,2)
   }
   

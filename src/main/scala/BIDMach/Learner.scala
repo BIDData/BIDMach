@@ -604,7 +604,7 @@ class ParLearnerF(
 		val ds:DataSource,
 		val mopts:Model.Opts,
 		mkmodel:(Model.Opts)=>Model,
-		ropts:Regularizer.Opts,
+		ropts:Mixin.Opts,
 		mkreg:(Mixin.Opts)=>Array[Mixin],
 		val uopts:Updater.Opts,
 		mkupdater:(Updater.Opts)=>Updater,

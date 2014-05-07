@@ -11,6 +11,8 @@ abstract class Mixin(val opts:Mixin.Opts = new Mixin.Options) {
   
   def compute(mats:Array[Mat], step:Float)
   
+  def score(mats:Array[Mat], step:Float):FMat
+  
   def init(model:Model) = {
     modelmats = model.modelmats
     updatemats = model.updatemats

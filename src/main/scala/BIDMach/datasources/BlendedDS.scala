@@ -4,7 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
 
-class BlendedDS(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1:Float, var samp2:Float, 
+class BlendedDS(val s1:DataSource, val s2:DataSource, 
     override val opts:BlendedDS.Opts = new BlendedDS.Options) extends DataSource(opts) {
 
   var sizeMargin = 0f 
@@ -70,23 +70,23 @@ class BlendedDS(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1
     var i = 0
     var xptr = 0
     while (xptr < blockSize && hascol(mats1, iptr1, s1) && hascol(mats2, iptr2, s2)) {
-      if (randv.data(i) < alpha) {
-        while (iptr1 < mats1(0).ncols && rands1.data(iptr1/bBlock) > samp1) iptr1 += bBlock
+      if (randv.data(i) < opts.afrac) {
+        while (iptr1 < mats1(0).ncols && rands1.data(iptr1/bBlock) > opts.samp1) iptr1 += bBlock
         if (iptr1 >= mats1(0).ncols) {
           mats1 = s1.next
           iptr1 = 0
-          rand(0, 1f, samp1)
+          rand(0, 1f, opts.samp1)
         }
         val jptr1 = math.min(mats1(0).ncols, iptr1 + math.min(bBlock, math.min(blockSize, omats(0).ncols) - xptr))
         copycol(mats1, iptr1, jptr1,  omats, xptr)
         xptr += jptr1 - iptr1
         iptr1 = jptr1
       } else {
-        while (iptr2 < mats2(0).ncols && rands2.data(iptr2/bBlock) > samp2) iptr2 += bBlock
+        while (iptr2 < mats2(0).ncols && rands2.data(iptr2/bBlock) > opts.samp2) iptr2 += bBlock
       	if (iptr2 >= mats2(0).ncols) {
           mats2 = s2.next
           iptr2 = 0
-          rand(0, 1f, samp2)
+          rand(0, 1f, opts.samp2)
         }
         val jptr2 = math.min(mats1(0).ncols, iptr2 + math.min(bBlock, math.min(blockSize, omats(0).ncols) - xptr))
         copycol(mats1, iptr2, jptr2,  omats, xptr)
@@ -130,6 +130,9 @@ class BlendedDS(val s1:DataSource, val s2:DataSource, var alpha:Float, var samp1
 object BlendedDS {
   trait Opts extends DataSource.Opts {
   	var bBlock = 1000
+  	var afrac = 0.5f
+  	var samp1 = 1f
+  	var samp2 = 1f 
   }
   
   class Options extends Opts {}

@@ -41,7 +41,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   }
   
   def mupdate(sdata:Mat, ipass:Int):Unit = {
-    val vmatch = -2 * mm * sdata + mmnorm + colnorm(sdata)
+    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)
     val bestm = vmatch <= mini(vmatch)
     bestm ~ bestm / sum(bestm)
     um ~ um + bestm *^ sdata     
@@ -49,7 +49,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   }
     
   def evalfun(sdata:Mat):FMat = {  
-    val vmatch = -2 * mm * sdata + mmnorm + colnorm(sdata)  
+    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)  
     val vm = mini(vmatch)
     max(vm, 0f, vm)
     val vv = mean(sqrt(vm)).dv

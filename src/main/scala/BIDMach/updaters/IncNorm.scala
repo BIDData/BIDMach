@@ -37,15 +37,10 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
   	if (modelmats.length > 1) {
   		val ms = modelmats(1)
   		val ums = updatemats(1)
-//  		println("ums0 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
   		ums ~ ums *@ rm.set(rr)
-//  		println("ums1 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
   		ms ~ ms *@ rm.set(1-rr)
-//  		println("ums2 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
   		ms ~ ms + ums
-//  		println("ums3 %g %g %g" format (rr, mini(mini(ums,1),2).dv, maxi(maxi(ums,1),2).dv))
   		um ~ um / ms
-//  		println("um %g %g" format (mini(mini(um,1),2).dv, maxi(maxi(um,1),2).dv))
   	}
   	um ~ um *@ rm.set(rr)
   	mm ~ mm *@ rm.set(1-rr)

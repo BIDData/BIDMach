@@ -205,7 +205,7 @@ object FilesDS {
   	var sampleFiles = 1.0f
     var nstart:Int = 0
     var nend:Int = 0
-    var dorows:Boolean = true
+    var dorows:Boolean = false
     var order:Int = 1                           // 0 = sequential order, 1 = random
   }
   

@@ -304,14 +304,14 @@ object GLM {
   } 
   
   def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
-    Array(new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts]))
+    Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
   
   def mkL2Regularizer(nopts:Mixin.Opts):Array[Mixin] = {
-    Array(new L2Regularizer(nopts.asInstanceOf[Regularizer.Opts]))
+    Array(new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
   }
   
-  class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
+  class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
      
   // Basic in-memory learner with generated target
   def learner(mat0:Mat, d:Int = 0) = { 
@@ -399,7 +399,7 @@ object GLM {
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     mopts.links.set(3)
-    mopts.regweight = 1f
+    mopts.reg1weight = 1f
     val model = new GLM(mopts)
     val mm = new Learner(
         new MatDS(Array(mat0, targ), mopts), 
@@ -418,7 +418,7 @@ object GLM {
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     nopts.links = mopts.links
     mopts.links.set(2)
-    mopts.regweight = 1f
+    mopts.reg1weight = 1f
     nopts.batchSize = mopts.batchSize
     nopts.putBack = 1
     val model = new GLM(mopts)
@@ -466,7 +466,7 @@ object GLM {
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
+  class LearnParOptions extends ParLearner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
@@ -500,7 +500,7 @@ object GLM {
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with ADAGrad.Opts with Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
     nstart:Int=FilesDS.encodeDate(2012,3,1,0), 

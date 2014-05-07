@@ -14,7 +14,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
   
-  val linkArray = Array[GLMlink](LinearLink, LogisticLink)
+  val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
   
   var totflops = 0L
   
@@ -58,7 +58,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
-    GLM.preds(eta, mylinks, eta, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, linkArray, totflops)
     eta ~ targ - eta
     uv ~ eta *^ in
     um1 ~ (vt1 ∘ (eta * 2f)) *^ in
@@ -73,11 +73,12 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   }
   
   def meval2(in:Mat, targ:Mat):FMat = {
+    val ftarg = full(targ)
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
-    GLM.preds(eta, mylinks, eta, linkArray, totflops)
-    GLM.llfun(eta, targ, mylinks, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, linkArray, totflops)
+    GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
   }
 
 }
@@ -100,14 +101,14 @@ object FM {
   }
   
   def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
-    Array(new L1Regularizer(nopts.asInstanceOf[Regularizer.Opts]))
+    Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   } 
   
-  class LearnOptions extends Learner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
+  class LearnOptions extends Learner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
      
   def learner(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new FM(opts), 
@@ -120,7 +121,7 @@ object FM {
   
   def learner(mat0:Mat, targ:Mat, d:Int) = {
     val opts = new LearnOptions
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new Learner(
@@ -147,7 +148,7 @@ object FM {
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with Regularizer.Opts
+  class LearnParOptions extends ParLearner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
@@ -180,7 +181,7 @@ object FM {
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with FM.Opts with SFilesDS.Opts with ADAGrad.Opts with Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with FM.Opts with SFilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
     nstart:Int=FilesDS.encodeDate(2012,3,1,0), 

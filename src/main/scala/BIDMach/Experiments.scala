@@ -473,7 +473,10 @@ object Twitter {
         ds2.opts.lookahead = 2
     }
     val opts3 = new BlendedDS.Options
-    new BlendedDS(ds1, ds2, 0.5f, 1f, 1f, opts3)
+    opts3.afrac = 0.5f
+    opts3.samp1 = 0.1f
+    opts3.samp2 = 1f
+    new BlendedDS(ds1, ds2, opts3)
   }
   
   def twitterNgramBlend( 
@@ -491,7 +494,10 @@ object Twitter {
         ds2.opts.lookahead = 2
     }
     val opts3 = new BlendedDS.Options
-    new BlendedDS(ds1, ds2, 0.7f, 1f, 1f, opts3)
+    opts3.afrac = 0.7f
+    opts3.samp1 = 0.1f
+    opts3.samp2 = 1f
+    new BlendedDS(ds1, ds2, opts3)
   }
   
   def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int,Int)=>DataSource = twitterWords, nfeats:Int=100000):IMat = { 
