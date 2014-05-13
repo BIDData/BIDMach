@@ -30,9 +30,9 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     updatemats = new Array[Mat](1)
     updatemats(0) = modelmats(0).zeros(mm.nrows, mm.ncols)
     if (! targetData) {
-      targets = if (useGPU) GMat(opts.targets) else opts.targets
+      targets = if (useGPU && opts.targets.asInstanceOf[AnyRef] != null) GMat(opts.targets) else opts.targets
       targmap = if (useGPU) GMat(opts.targmap) else opts.targmap
-      mask = if (useGPU) GMat(opts.rmask) else opts.rmask
+      mask =    if (useGPU) GMat(opts.rmask) else opts.rmask
     }
   } 
   

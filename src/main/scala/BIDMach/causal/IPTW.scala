@@ -32,21 +32,21 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     for (i <- 0 until opts.links.length) {
       totflops += linkArray(opts.links(i)).fnflops
     }
-    otargets = targets.rowslice(targets.nrows/2,targets.nrows);
+    otargets = targmap.rowslice(targmap.nrows/2, targmap.nrows);
     val tmats = new Array[Mat](3)
     tmats(0) = modelmats(0)
-    tmats(1) = modelmats(0).zeros(targets.nrows/2,1)
-    tmats(2) = modelmats(0).zeros(targets.nrows/2,1)
+    tmats(1) = modelmats(0).zeros(targmap.nrows/2,1)
+    tmats(2) = modelmats(0).zeros(targmap.nrows/2,1)
     modelmats = tmats
     val umats = new Array[Mat](3)
     umats(0) = updatemats(0)
-    umats(1) = updatemats(0).zeros(targets.nrows/2,1)
-    umats(2) = updatemats(0).zeros(targets.nrows/2,1)
+    umats(1) = updatemats(0).zeros(targmap.nrows/2,1)
+    umats(2) = updatemats(0).zeros(targmap.nrows/2,1)
     updatemats = umats
   }
     
   def mupdate(in:Mat) = {
-    val targs = targets * in
+    val targs = targmap * in
     mupdate2(in, targs)
   }
   
@@ -59,8 +59,9 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     GLM.preds(eta, feta, mylinks, linkArray, totflops)
    
     val propensity = feta.rowslice(0, feta.nrows/2)                         // Propensity score
-    val iptw = treatment ∘ outcome / propensity - (1 - treatment) ∘ outcome / (1 - propensity)
-    updatemats(1) <-- mean(iptw, 2)
+    val iptw = (treatment ∘ outcome) / propensity - ((1 - treatment) ∘ outcome) / (1 - propensity)
+    println("effect %f" format mean(iptw,2).dv)
+    updatemats(1) ~ mean(iptw, 2) - modelmats(1)
     
     val tmodel = otargets ∘ modelmats(0).rowslice(targ.nrows/2, targ.nrows)
     val vx0 = eta.rowslice(eta.nrows/2, eta.nrows) - tmodel * in            // compute vx given T = 0
@@ -70,18 +71,18 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
 
     val tdiff = treatment - propensity
     val aiptw = iptw - (tdiff ∘ (vx0 / propensity + vx1 / (1 - propensity)))
-    updatemats(2) <-- mean(aiptw, 2)
+    updatemats(2) ~ mean(aiptw, 2) - modelmats(2)
     
     GLM.derivs(feta, ftarg, feta, mylinks, linkArray, totflops)
     updatemats(0) ~ feta *^ in                                              // update the primary predictors
- 
+     if (mask.asInstanceOf[AnyRef] != null) {
+      updatemats(0) ~ updatemats(0) ∘ mask
+    }
   }
   
   def meval(in:Mat):FMat = {
-    val targs = targets * in
-    min(targs, 1f, targs)
-    val alltargs = targmap * targs
-    meval2(in, alltargs)
+    val targs = targmap * in
+    meval2(in, targs)
   }
   
   def meval2(in:Mat, targ:Mat):FMat = {

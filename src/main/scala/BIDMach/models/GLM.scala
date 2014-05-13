@@ -44,6 +44,9 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
     GLM.derivs(eta, ftarg, eta, mylinks, linkArray, totflops)
     updatemats(0) ~ eta *^ in
+    if (mask.asInstanceOf[AnyRef] != null) {
+      updatemats(0) ~ updatemats(0) ∘ mask
+    }
   }
   
   def meval(in:Mat):FMat = {
