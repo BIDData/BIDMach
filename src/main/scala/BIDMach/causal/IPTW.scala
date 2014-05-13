@@ -24,6 +24,8 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
   
   var totflops = 0L
   
+  var ustep = 0
+  
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
@@ -43,6 +45,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     umats(1) = updatemats(0).zeros(targmap.nrows/2,1)
     umats(2) = updatemats(0).zeros(targmap.nrows/2,1)
     updatemats = umats
+    ustep = 0
   }
     
   def mupdate(in:Mat) = {
@@ -60,8 +63,6 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
    
     val propensity = feta.rowslice(0, feta.nrows/2)                         // Propensity score
     val iptw = (treatment ∘ outcome) / propensity - ((1 - treatment) ∘ outcome) / (1 - propensity)
-    println("effect %f" format mean(iptw,2).dv)
-    updatemats(1) ~ mean(iptw, 2) - modelmats(1)
     
     val tmodel = otargets ∘ modelmats(0).rowslice(targ.nrows/2, targ.nrows)
     val vx0 = eta.rowslice(eta.nrows/2, eta.nrows) - tmodel * in            // compute vx given T = 0
@@ -71,7 +72,12 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
 
     val tdiff = treatment - propensity
     val aiptw = iptw - (tdiff ∘ (vx0 / propensity + vx1 / (1 - propensity)))
-    updatemats(2) ~ mean(aiptw, 2) - modelmats(2)
+//    println("%d effect %f" format (ustep, mean(iptw,2).dv))
+    if (ustep > opts.cwait) {
+      updatemats(1) ~ mean(iptw, 2) - modelmats(1)
+      updatemats(2) ~ mean(aiptw, 2) - modelmats(2)
+    }
+    ustep += 1
     
     GLM.derivs(feta, ftarg, feta, mylinks, linkArray, totflops)
     updatemats(0) ~ feta *^ in                                              // update the primary predictors
@@ -99,6 +105,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
 object IPTW {
   trait Opts extends RegressionModel.Opts {
     var links:IMat = null
+    var cwait = 20
   }
   
   class Options extends Opts {}
