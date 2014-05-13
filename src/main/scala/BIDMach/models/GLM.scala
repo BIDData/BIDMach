@@ -15,9 +15,9 @@ import BIDMach._
 
 class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
-  var mylinks:Mat = null
+  val linkArray = GLM.linkArray
   
-  val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
+  var mylinks:Mat = null
   
   var totflops = 0L
   
@@ -214,6 +214,8 @@ object GLM {
   val logistic = 1
   val maxp = 2
   val svm = 3
+  
+  val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
   
   class Options extends Opts {}
   

@@ -14,7 +14,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
   
-  val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
+  val linkArray = GLM.linkArray
   
   var totflops = 0L
   

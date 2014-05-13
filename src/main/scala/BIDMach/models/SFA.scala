@@ -7,7 +7,7 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.Learner
 
-class ALS(override val opts:ALS.Opts = new ALS.Options) extends FactorModel(opts) {
+class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts) {
 
   var mm:Mat = null
   var traceMem = false
@@ -89,7 +89,7 @@ class ALS(override val opts:ALS.Opts = new ALS.Options) extends FactorModel(opts
   }
 }
 
-object ALS  {
+object SFA  {
   trait Opts extends FactorModel.Opts {
   	var ueps = 1e-10f
   	var uconvg = 1e-2f
@@ -101,14 +101,14 @@ object ALS  {
   class Options extends Opts {} 
   
   def learner(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with ALS.Opts with MatDS.Opts with ADAGrad.Opts
+    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts),
-  	    new ALS(opts), 
+  	    new SFA(opts), 
   	    null,
   	    new ADAGrad(opts), opts)
     (nn, opts)

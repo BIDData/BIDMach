@@ -111,12 +111,11 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 	    if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADA 0 "+i)
 	    val tmp = ss ^ ve
 	    if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 1 "+i)
-
 	    tmp ~ tmp *@ (stepn ^ te)
-	           if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 2 "+i)
+	    if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 2 "+i)
 	    tmp ~ tmp + opts.epsilon
 	    tmp ~ um / tmp
-	           if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 3 "+i)
+	    if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 3 "+i)
 	    tmp ~ tmp *@ lrate
 	    mm ~ mm + tmp
 	    if (mask != null) mm ~ mm *@ mask

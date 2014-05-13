@@ -66,20 +66,15 @@ object CG {
   	val pAp = (p dot Ap)
   	max(pAp, weps, pAp)
   	val rsold = (r dot r) + 0                // add 0 to make a new vector, Otherwise this will alias...
-//   	println("    pAp min %f, rsoldm %f, rsoldx %f" format (mini(pAp).dv, maxi(rsold).dv, mean(rsold).dv))
   	val convec = rsold > convgd              // Check convergence
-//  	println("    conv %f" format (1f - sum(convec).dv / convec.length))
   	val alpha = convec *@ (rsold / pAp)      // Only process unconverged elements
   	min(alpha, 1f, alpha)
-//  	println("    alpha max %f" format (maxi(alpha).dv))
   	x ~ x + (p *@ alpha)
   	r ~ r - (Ap *@ alpha)
   	val rsnew = (r dot r)                    // ...down here
-//  	println("    rsnewm %f, rsnewx %f" format (maxi(rsnew).dv, mean(rsnew).dv))
   	max(rsold, weps, rsold)
   	val beta = convec *@ (rsnew / rsold)
   	min(beta, 1f, beta)
-//  	println("    beta max %f" format (maxi(beta).dv))
   	p ~ r + (p *@ beta)
   }  
 }
