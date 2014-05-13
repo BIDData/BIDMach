@@ -1,0 +1,199 @@
+package BIDMach.causal
+
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import edu.berkeley.bid.CUMACH
+import scala.concurrent.future
+import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent.CountDownLatch
+import BIDMach.datasources._
+import BIDMach.updaters._
+import BIDMach.mixins._
+import BIDMach.models._
+import BIDMach._
+
+
+class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
+  
+  val linkArray = GLM.linkArray
+  
+  var mylinks:Mat = null
+  
+  var otargets:Mat = null
+  
+  var totflops = 0L
+  
+  override def init() = {
+    super.init()
+    mylinks = if (useGPU) GIMat(opts.links) else opts.links
+    if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask
+    totflops = 0L
+    for (i <- 0 until opts.links.length) {
+      totflops += linkArray(opts.links(i)).fnflops
+    }
+    otargets = targets.rowslice(targets.nrows/2,targets.nrows);
+  }
+    
+  def mupdate(in:Mat) = {
+    val targs = targets * in
+    mupdate2(in, targs)
+  }
+  
+  def mupdate2(in:Mat, targ:Mat) = {
+    val ftarg = full(targ)
+    val treatment = ftarg.rowslice(0, ftarg.nrows/2);
+    val outcome = ftarg.rowslice(ftarg.nrows/2, ftarg.nrows)
+    val eta = modelmats(0) * in
+    val feta = eta + 0f
+    GLM.preds(eta, feta, mylinks, linkArray, totflops)
+   
+    val propensity = feta.rowslice(0, feta.nrows/2)                         // Propensity score
+    val iptw = treatment ∘ outcome / propensity - (1 - treatment) ∘ outcome / (1 - propensity)
+    updatemats(1) <-- mean(iptw, 2)
+    
+    val tmodel = otargets ∘ modelmats(0).rowslice(targ.nrows/2, targ.nrows)
+    val vx0 = eta.rowslice(eta.nrows/2, eta.nrows) - tmodel * in            // compute vx given T = 0
+    val vx1 = vx0 + sum(tmodel, 2)                                          // compute vx given T = 1
+    GLM.preds(vx0, vx0, mylinks, linkArray, totflops)
+    GLM.preds(vx1, vx1, mylinks, linkArray, totflops)
+
+    val tdiff = treatment - propensity
+    val aiptw = iptw - (tdiff ∘ (vx0 / propensity + vx1 / (1 - propensity)))
+    updatemats(2) <-- mean(aiptw, 2)
+    
+    GLM.derivs(feta, ftarg, feta, mylinks, linkArray, totflops)
+    updatemats(0) ~ feta *^ in                                              // update the primary predictors
+ 
+  }
+  
+  def meval(in:Mat):FMat = {
+    val targs = targets * in
+    min(targs, 1f, targs)
+    val alltargs = targmap * targs
+    meval2(in, alltargs)
+  }
+  
+  def meval2(in:Mat, targ:Mat):FMat = {
+    val ftarg = full(targ)
+    val eta = modelmats(0) * in
+    GLM.preds(eta, eta, mylinks, linkArray, totflops)
+    val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
+    if (putBack >= 0) {ftarg <-- eta}
+    v
+  }
+}
+
+
+object IPTW {
+  trait Opts extends RegressionModel.Opts {
+    var links:IMat = null
+  }
+  
+  class Options extends Opts {}
+  
+  def mkModel(fopts:Model.Opts) = {
+  	new IPTW(fopts.asInstanceOf[IPTW.Opts])
+  }
+  
+  def mkUpdater(nopts:Updater.Opts) = {
+  	new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
+  } 
+  
+  def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
+  }
+  
+  def mkL2Regularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
+  }
+  
+  class LearnOptions extends Learner.Options with IPTW.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+     
+  // Basic in-memory learner with generated target
+  def learner(mat0:Mat, d:Int = 0) = { 
+    val opts = new LearnOptions
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    opts.lrate = 1f
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new IPTW(opts), 
+  	    mkRegularizer(opts),
+  	    new ADAGrad(opts), 
+  	    opts)
+    (nn, opts)
+  }  
+  
+  class LearnParOptions extends ParLearner.Options with IPTW.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  
+  def learnPar(mat0:Mat, d:Int) = {
+    val opts = new LearnParOptions
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    opts.lrate = 1f
+  	val nn = new ParLearnerF(
+  	    new MatDS(Array(mat0), opts), 
+  	    opts, mkModel _,
+  	    opts, mkRegularizer _,
+  	    opts, mkUpdater _, 
+  	    opts)
+    (nn, opts)
+  }
+  
+  def learnPar(mat0:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, 0)
+  
+  def learnPar(mat0:Mat, targ:Mat, d:Int) = {
+    val opts = new LearnParOptions
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    opts.lrate = 1f
+    if (opts.links == null) opts.links = izeros(targ.nrows,1)
+    opts.links.set(d)
+    val nn = new ParLearnerF(
+        new MatDS(Array(mat0, targ), opts), 
+        opts, mkModel _,
+        opts, mkRegularizer _,
+        opts, mkUpdater _, 
+        opts)
+    (nn, opts)
+  }
+  
+  def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
+  
+  class LearnFParOptions extends ParLearner.Options with IPTW.Opts with SFilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  
+  def learnFParx(
+    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+		d:Int = 0
+		) = {
+  	
+  	val opts = new LearnFParOptions
+  	opts.lrate = 1f
+  	val nn = new ParLearnerxF(
+  	    null,
+  	    (dopts:DataSource.Opts, i:Int) => Twitter.twitterWords(nstart, nend, opts.nthreads, i),
+  	    opts, mkModel _,
+  	    opts, mkRegularizer _,
+  	    opts, mkUpdater _,
+  	    opts
+  	)
+  	(nn, opts)
+  }
+  
+  def learnFPar(
+    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+		d:Int = 0
+		) = {	
+  	val opts = new LearnFParOptions
+  	opts.lrate = 1f
+  	val nn = new ParLearnerF(
+  	    Twitter.twitterWords(nstart, nend),
+  	    opts, mkModel _, 
+        opts, mkRegularizer _,
+  	    opts, mkUpdater _,
+  	    opts
+  	)
+  	(nn, opts)
+  }
+}
+
