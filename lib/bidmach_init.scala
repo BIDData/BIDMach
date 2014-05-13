@@ -5,7 +5,8 @@ import BIDMat.Solvers._
 import BIDMat.Plotting._
 import BIDMach.Learner
 import BIDMach.datasources.{MatDS,FilesDS,SFilesDS}
-import BIDMach.models.{KMeans,GLM,LDA,NMF,SFA,FM,LDAgibbs,IPTW}
+import BIDMach.models.{KMeans,GLM,LDA,NMF,SFA,FM,LDAgibbs}
+import BIDMach.causal.{IPTW}
 
 Mat.checkMKL
 Mat.checkCUDA
