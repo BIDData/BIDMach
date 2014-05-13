@@ -33,6 +33,16 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
       totflops += linkArray(opts.links(i)).fnflops
     }
     otargets = targets.rowslice(targets.nrows/2,targets.nrows);
+    val tmats = new Array[Mat](3)
+    tmats(0) = modelmats(0)
+    tmats(1) = modelmats(0).zeros(targets.nrows/2,1)
+    tmats(2) = modelmats(0).zeros(targets.nrows/2,1)
+    modelmats = tmats
+    val umats = new Array[Mat](3)
+    umats(0) = updatemats(0)
+    umats(1) = updatemats(0).zeros(targets.nrows/2,1)
+    umats(2) = updatemats(0).zeros(targets.nrows/2,1)
+    updatemats = umats
   }
     
   def mupdate(in:Mat) = {
@@ -111,7 +121,7 @@ object IPTW {
   class LearnOptions extends Learner.Options with IPTW.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
      
   // Basic in-memory learner with generated target
-  def learner(mat0:Mat, d:Int = 0) = { 
+  def learner(mat0:Mat) = { 
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
