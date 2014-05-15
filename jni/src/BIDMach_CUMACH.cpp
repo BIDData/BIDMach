@@ -160,4 +160,25 @@ extern "C" {
 
     return findBoundaries(keys, jc, n, njc, shift);
   }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_mergeInds
+  (JNIEnv *env, jobject obj, jobject jkeys, jobject jokeys, jobject jcounts, jint n, jobject jcspine)
+  {
+    long long *keys = (long long*)getPointer(env, jkeys);
+    long long *okeys = (long long*)getPointer(env, jokeys);
+    int *counts = (int*)getPointer(env, jcounts);
+    int *cspine = (int*)getPointer(env, jcspine);
+
+    return mergeInds(keys, okeys, counts, n, cspine);
+  }
+
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_getMergeIndsLen
+  (JNIEnv *env, jobject obj, jobject jkeys, jint n, jobject jcspine)
+  {
+    long long *keys = (long long*)getPointer(env, jkeys);
+    int *cspine = (int*)getPointer(env, jcspine);
+
+    return getMergeIndsLen(keys, n, cspine);
+  }
 }

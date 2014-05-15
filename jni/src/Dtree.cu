@@ -589,12 +589,12 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
 }
 
 
-__global__ void __findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
+__global__ void __findBoundaries(__int64 *keys, int *jc, int n, int njc, int shift) {
   __shared__ int dbuff[1024];
   int i, j, iv, lasti;
 
-  int imin = ((int)(32 * ((((long long)n) * blockIdx.x) / (gridDim.x * 32))));
-  int imax = min(n, ((int)(32 * ((((long long)n) * (blockIdx.x + 1)) / (gridDim.x * 32) + 1))));
+  int imin = ((int)(32 * ((((__int64)n) * blockIdx.x) / (gridDim.x * 32))));
+  int imax = min(n, ((int)(32 * ((((__int64)n) * (blockIdx.x + 1)) / (gridDim.x * 32) + 1))));
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   if (tid == 0 && blockIdx.x == 0) {
@@ -625,7 +625,7 @@ __global__ void __findBoundaries(long long *keys, int *jc, int n, int njc, int s
 }
 
 
-int findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
+int findBoundaries(__int64 *keys, int *jc, int n, int njc, int shift) {
   int ny = min(32, 1 + (n-1)/32);
   dim3 tdim(32, ny, 1);
   int ng = min(64, 1+n/32/ny);
@@ -636,14 +636,14 @@ int findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
 }
 
 template<typename T>
-__global__ void mergeIndsP1(T *keys, int *cspine, T *ispine, T *vspine, int n) {
+__global__ void __mergeIndsP1(T *keys, int *cspine, T *ispine,  T *vspine, int n) {
   __shared__ T dbuff[1024];
   int i, j, itodo, doit, total;
   T thisval, lastval, endval, tmp;
 
   int tid = threadIdx.x + threadIdx.y * blockDim.x;
-  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
-  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
+  int imin = (int)(((__int64)n) * blockIdx.x / gridDim.x);
+  int imax = (int)(((__int64)n) * (blockIdx.x + 1) / gridDim.x);
   
   total = 0;
   if (tid == 0) {
@@ -651,7 +651,7 @@ __global__ void mergeIndsP1(T *keys, int *cspine, T *ispine, T *vspine, int n) {
     ispine[blockIdx.x] = lastval;
   }
   for (i = imin; i < imax; i += blockDim.x * blockDim.y) {
-    itodo = min(1024, imax - i);
+    itodo = min(blockDim.x * blockDim.y, imax - i);
     __syncthreads();
     if (i + tid < imax) {
       thisval = keys[i + tid];
@@ -665,8 +665,8 @@ __global__ void mergeIndsP1(T *keys, int *cspine, T *ispine, T *vspine, int n) {
       dbuff[tid] = (thisval == lastval) ? 0 : 1;
     }
     __syncthreads();
-    for (j = 1; j < itodo; j = j << 1) {
-      doit = tid + j < itodo && (tid & ((j << 1)-1)) == 0;
+    for (j = 1; j < itodo; j = j + j) {
+      doit = tid + j < itodo && (tid & ((j + j)-1)) == 0;
       if (doit) {
         tmp = dbuff[tid] + dbuff[tid + j];
       }
@@ -680,15 +680,16 @@ __global__ void mergeIndsP1(T *keys, int *cspine, T *ispine, T *vspine, int n) {
       total += dbuff[0];
       lastval = endval;
     }
+    __syncthreads();
   }	   
   if (tid == 0) {
     cspine[blockIdx.x] = total;
     vspine[blockIdx.x] = endval;
-  }
+  } 
 }
 
 template<typename T>
-__global__ void fixSpine(int *cspine, T *ispine, T *vspine, int n) {
+__global__ void __fixSpine(int *cspine, T *ispine, T *vspine, int n) {
   __shared__ int counts[1024];
   int tid = threadIdx.x + threadIdx.y * blockDim.x;
   int i, tmp;
@@ -699,11 +700,8 @@ __global__ void fixSpine(int *cspine, T *ispine, T *vspine, int n) {
   __syncthreads();
   if (tid < n - 1) {
     if (ispine[tid + 1] != vspine[tid]) {
-      counts[tid + 1] += 1;
+      counts[tid] += 1;
     }
-  }
-  if (tid == 0) {
-    counts[0] += 1;
   }
   __syncthreads();
   for (i = 1; i < n; i = i << 1) {
@@ -716,83 +714,171 @@ __global__ void fixSpine(int *cspine, T *ispine, T *vspine, int n) {
     }
     __syncthreads();
   }
+  if (tid == 0) {
+    counts[n-1] += 1;
+  }
+  __syncthreads();
   if (tid < n) {
     cspine[tid] = counts[tid];
   }
 }
     
 template<typename T>
-__global__ void mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) {
+__global__ void __mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) {
   __shared__ T dbuff[1024];
   __shared__ T obuff[2048];
   __shared__ int ocnts[2048];
-  int i, j, itodo, doit, thiscnt, lastcnt, obase, odone, total;
-  T thisval, lastval, endval, tmp;
+  __shared__ int icnts[1024];
+  int i, j, itodo, doit, lastcnt, lastocnt, obase, odone, total, coff;
+  T thisval, lastval, tmp;
 
   int tid = threadIdx.x + threadIdx.y * blockDim.x;
-  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
-  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
+  int imin = (int)(((__int64)n) * blockIdx.x / gridDim.x);
+  int imax = (int)(((__int64)n) * (blockIdx.x + 1) / gridDim.x);
+  int nbthreads = blockDim.x * blockDim.y;
   
-  odone = cspine[blockIdx.x];
+  if (blockIdx.x == 0) {
+    odone = 0;
+  } else {
+    odone = cspine[blockIdx.x - 1];
+  }
   obase = 0;
+  lastocnt = imin;
   if (tid == 0) {
     lastval = keys[imin];
   }
-  for (i = imin; i < imax; i += blockDim.x * blockDim.y) {
-    itodo = min(1024, imax - i);
+  for (i = imin; i < imax; i += nbthreads) {
+    itodo = min(nbthreads, imax - i);
     __syncthreads();
-    if (i + tid < imax) {                                // Copy a block of input data into dbuff
+    if (i + tid < imax) {                                       // Copy a block of input data into dbuff
       thisval = keys[i + tid];
       dbuff[tid] = thisval;
     }
     __syncthreads();
     if (tid > 0 && i + tid < imax) lastval = dbuff[tid - 1];
-    if (tid == 0) endval = dbuff[itodo-1];       
     __syncthreads();
     if (i + tid < imax) {
-      ocnts[tid] = (thisval == lastval) ? 0 : 1;        // Bit that indicates a change of index
+      icnts[tid] = (thisval == lastval) ? 0 : 1;                // Bit that indicates a change of index
     }
     __syncthreads();
-    for (j = 1; j < itodo; j = j << 1) {                // Cumsum of these bits = where to put key
-      doit = tid + j < itodo && (tid & ((j << 1)-1)) == 0;
+    for (j = 1; j < itodo; j = j << 1) {                        // Cumsum of these bits = where to put key
+      doit = tid + j < itodo;
       if (doit) {
-        tmp = ocnts[tid] + ocnts[tid + j];
+        tmp = icnts[tid] + icnts[tid + j];
       }
       __syncthreads();
       if (doit) {
-        ocnts[tid] = tmp;
+        icnts[tid + j] = tmp;
       }
       __syncthreads();
     }
-    total = ocnts[itodo-1];
-    if (tid > 0 && i + tid < imax) {                    // Find where the index changes
-      thiscnt = ocnts[tid];
-      lastcnt = ocnts[tid-1];
-    }
+    total = icnts[itodo-1];
     __syncthreads();
-    if (tid > 0 && i + tid < imax) {                    // and save the key/counts there in buffer memory
-      if (thiscnt > lastcnt) {
-        obuff[obase + thiscnt] = thisval;
-        ocnts[obase + thiscnt] = i + tid;
+    if (i + tid < imax && thisval != lastval) {                 // and save the key/counts there in buffer memory
+      if (tid > 0) {
+        lastcnt = icnts[tid-1];
+      } else {
+        lastcnt = 0;
       }
+      obuff[obase + lastcnt] = lastval;
+      ocnts[obase + lastcnt] = i + tid;
     }
     __syncthreads();
     obase += total;
-    if (obase > 1024) {                                 // Buffer full so flush it
+    if (obase >= nbthreads) {                                   // Buffer full so flush it
       okeys[odone+tid] = obuff[tid];
-      counts[odone+tid] = ocnts[tid] - ocnts[tid-1];    // Need to fix wraparound
-      odone += 1024;
+      if (tid > 0) lastocnt = ocnts[tid-1];
+      coff = ocnts[tid] - lastocnt;
+      atomicAdd(&counts[odone+tid], coff); 
+      lastocnt = ocnts[nbthreads-1];
+      odone += nbthreads;
     }
     __syncthreads();
-    if (obase > 1024) {                                 // Copy top to bottom of buffer
-      obuff[tid] = obuff[tid+1024];
-      ocnts[tid] = ocnts[tid+1024];
+    if (obase >= nbthreads) {                                   // Copy top to bottom of buffer
+      obuff[tid] = obuff[tid+nbthreads];
+      ocnts[tid] = ocnts[tid+nbthreads];
+      obase -= nbthreads;
     }
-    obase -= 1024;
+    __syncthreads();
   }	   
-  if (tid < obase) {                                    // Flush out anything that's left
+  if (tid == itodo-1) {
+    obuff[obase] = thisval;
+    ocnts[obase] = i - nbthreads + tid + 1;
+  }
+  __syncthreads();
+  if (tid <= obase) {                                            // Flush out anything that's left
     okeys[odone+tid] = obuff[tid];
-    counts[odone+tid] = ocnts[tid] - ocnts[tid-1];      // Need to fix wraparound
+    if (tid > 0) lastocnt = ocnts[tid-1];
+    coff = ocnts[tid] - lastocnt;
+    atomicAdd(&counts[odone+tid], coff); 
   }
 }
+
+//
+// Accepts an array of int64 keys which should be sorted. Outputs an array okeys with unique copies of each key,
+// with corresponding counts in the *counts* array. cspine is a working storage array in GPUmem which should be
+// passed in. The size of cspine should be at least nb32 * 32 bytes with nb32 as below (maximum 2048 bytes). 
+// Returns the length of the output in cspine[0].
+//
+int mergeInds(long long *keys, long long *okeys, int *counts, int n, int *cspine) {
+  cudaError_t err;
+  int nthreads = min(n, 1024);
+  int nt32 = 32*(1 + (nthreads-1)/32);
+  int nblocks = min(1 + (n-1)/nthreads, 64);
+  int nb32 = 32*(1+(nblocks - 1)/32);
+  long long *ispine = (long long *)&cspine[2*nb32];
+  long long *vspine = (long long *)&cspine[4*nb32];
+
+  __mergeIndsP1<long long><<<nblocks,nt32>>>(keys, cspine, ispine, vspine, n);
+  cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err == 0) {
+    __fixSpine<long long><<<1,nblocks>>>(cspine, ispine, vspine, nblocks);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+  }
+  if (err == 0) {
+    __mergeIndsP2<long long><<<nblocks,nt32>>>(keys, okeys, counts, cspine, n);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+  }
+  if (err == 0) {
+    cudaMemcpy(cspine, &cspine[nblocks-1], 4, cudaMemcpyDeviceToDevice);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+  }
+  return err;
+}
+//
+// Support function for mergeInds. Returns the length of the output arrays in cspine[0].
+// cspine is a working storage array in GPUmem which should be passed in. 
+// The size of cspine should be at least nb32 * 32 bytes with nb32 as below (maximum 2048 bytes). 
+//
+
+int getMergeIndsLen(long long *keys, int n, int *cspine) {
+  cudaError_t err;
+  int nthreads = min(n, 1024);
+  int nt32 = 32*(1 + (nthreads-1)/32);
+  int nblocks = min(1 + (n-1)/nthreads, 64);
+  int nb32 = 32*(1+(nblocks - 1)/32);
+  long long *ispine = (long long *)&cspine[2*nb32];
+  long long *vspine = (long long *)&cspine[4*nb32];
+
+  __mergeIndsP1<long long><<<nblocks,nt32>>>(keys, cspine, ispine, vspine, n);
+  cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err == 0) {
+    __fixSpine<long long><<<1,nblocks>>>(cspine, ispine, vspine, nblocks);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+  }
+  if (err == 0) {
+    cudaMemcpy(cspine, &cspine[nblocks-1], 4, cudaMemcpyDeviceToDevice);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+  }
+  return err;
+}
+
+
 

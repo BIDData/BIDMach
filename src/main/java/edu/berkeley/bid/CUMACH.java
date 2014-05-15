@@ -34,4 +34,8 @@ public final class CUMACH {
     public static native int minImpurity(Pointer keys, Pointer counts, Pointer outv, Pointer outf, Pointer outg, Pointer outc, Pointer jc, Pointer fieldlens, int nnodes, int ncats, int nsamps, int impType);
 
     public static native int findBoundaries(Pointer keys, Pointer jc, int n, int njc, int shift);
+    
+    public static native int mergeInds(Pointer keys, Pointer okeys, Pointer counts, int n, Pointer cspine);
+    
+    public static native int getMergeIndsLen(Pointer keys, int n, Pointer cspine);
 }

@@ -21,3 +21,7 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
                 int nnodes, int ncats, int nsamps, int impType);
 
 int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);
+
+int mergeInds(long long *keys, long long *okeys, int *counts, int n, int *cspine);
+
+int getMergeIndsLen(long long *keys, int n, int *cspine);

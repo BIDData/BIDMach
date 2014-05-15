@@ -34,22 +34,22 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     for (i <- 0 until opts.links.length) {
       totflops += linkArray(opts.links(i)).fnflops
     }
-    otargets = targmap.rowslice(targmap.nrows/2, targmap.nrows);
+    otargets = targets.rowslice(targets.nrows/2, targets.nrows);
     val tmats = new Array[Mat](3)
     tmats(0) = modelmats(0)
-    tmats(1) = modelmats(0).zeros(targmap.nrows/2,1)
-    tmats(2) = modelmats(0).zeros(targmap.nrows/2,1)
+    tmats(1) = modelmats(0).zeros(targets.nrows/2,1)
+    tmats(2) = modelmats(0).zeros(targets.nrows/2,1)
     modelmats = tmats
     val umats = new Array[Mat](3)
     umats(0) = updatemats(0)
-    umats(1) = updatemats(0).zeros(targmap.nrows/2,1)
-    umats(2) = updatemats(0).zeros(targmap.nrows/2,1)
+    umats(1) = updatemats(0).zeros(targets.nrows/2,1)
+    umats(2) = updatemats(0).zeros(targets.nrows/2,1)
     updatemats = umats
     ustep = 0
   }
     
   def mupdate(in:Mat) = {
-    val targs = targmap * in
+    val targs = targets * in
     mupdate2(in, targs)
   }
   
@@ -87,7 +87,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
   }
   
   def meval(in:Mat):FMat = {
-    val targs = targmap * in
+    val targs = targets * in
     meval2(in, targs)
   }
   

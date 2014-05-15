@@ -65,7 +65,7 @@ mask(1,33) = 0
 
 println("\n<<<<<<< Testing IPTW estimators >>>>>>>")
 val (mm7,opts7) = IPTW.learner(aa)
-opts7.targmap = targetmat
+opts7.targets = targetmat
 opts7.rmask = mask
 opts7.links = ilink
 opts7.useGPU = false
