@@ -6,26 +6,37 @@ GTX-680 GPU
 
 Logistic Regression (sparse) on 276k x 100000 block of RCV1
 
-MLLib:     N/A
-VW^3:      110 targets (OAA), (1 machine):   44 secs, 1 pass,   2 MB/s,
-BIDMach^1: 110 targets (OAA),  (MKL only):   19 secs, 1 pass,   5 MB/s, 0.4 gflops
-BIDMach^1: 110 targets (OAA),   (680 GPU):    5 secs, 1 pass,  20 MB/s,  10 gflops
-BIDMach^2: 110 targets (OAA),   (680 GPU):  0.7 secs, 1 pass, 150 MB/s,  11 gflops
+Mahout^0:  NI
+MLLib:     NI
+VW^3:      103 targets (OAA), (1 machine):   44 secs, 1 pass,   2 MB/s, 0.15 gflops (estimated)
+BIDMach^1: 103 targets (OAA),  (MKL only):   19 secs, 1 pass,   5 MB/s, 0.4 gflops (measured)
+BIDMach^1: 103 targets (OAA),   (680 GPU):    5 secs, 1 pass,  20 MB/s,  10 gflops
+BIDMach^2: 103 targets (OAA),   (680 GPU):  0.7 secs, 1 pass, 150 MB/s,  11 gflops
+
+NI = Not Implemented.
+
+Notes: 
+0: Internallly Mahout does implement sparse data structures,
+but can only load data for logistic regression from dense csv files
+which for this problem are 20GB. The load time completely dominates
+the compute time. 
 
 Logistic Regression (dense) on 1000 x 100000 block of RCV1
 
+Mahout:           1 target, (1 machine):    55 secs,    1 pass,     8 MB/s,   6 mflops, accuracy ?
 MLLib:            1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
-VW:      110 targets (OAA), (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
-BIDMach: 110 targets (OAA),  (MKL only):   2.4 secs,    1 pass,   160 MB/s,  16 gflops, accuracy 0.891^2
-BIDMach: 110 targets (OAA),   (680 GPU):   0.3 secs,    1 pass,  1300 MB/s, 100 gflops, accuracy 0.891^2
+MLLib:            1 target, (1 machine):    20 secs,    1 pass,    20 MB/s,  15 mflops, accuracy 0.850^2 
+VW:      103 targets (OAA), (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
+BIDMach: 103 targets (OAA),  (MKL only):   2.4 secs,    1 pass,   160 MB/s,  16 gflops, accuracy 0.891^2
+BIDMach: 103 targets (OAA),   (680 GPU):   0.3 secs,    1 pass,  1300 MB/s, 100 gflops, accuracy 0.891^2
 
 Notes
 1: minibatch size 1000
 2: minibatch size 10000
 3: no minibatch option
 
-OAA = One Against All, really 110 independent classifiers. The number of targets is the number of classes.
-110 targets means 110 classifiers were trained. 
+OAA = One Against All, really 103 independent classifiers. The number of targets is the number of classes.
+103 targets means 103 classifiers were trained. 
 
 Accuracy is quoted only for topic 6, which is roughly balanced in +/- instances. Others are too close to 1.00
 

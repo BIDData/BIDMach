@@ -353,7 +353,7 @@ int parseLine(char * line, int lineno, const char * delim1, ivector & tvec,
     case ftype_mdate:
       ival = parsemdate(here);
       if (ival < 0)
-	printf("\nWarning: bad date on line %d\n", lineno);
+	printf("\nWarning: bad mdate on line %d\n", lineno, here);
       out[i].iv.push_back(ival);
       break;
     case ftype_group:
