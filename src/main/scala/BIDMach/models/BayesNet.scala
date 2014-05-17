@@ -14,9 +14,12 @@ object BayesNet {
   var sdata: SMat = null
   // 
   var cpt: FMat = null
+  var cpt0: FMat = null
   var cptoffset: IMat = null
+  
   // projection matrix
-  var pmat: SMat = null
+  var iproject: SMat = null
+  var pproject: SMat = null
   
   var state: FMat = null
   var state0: FMat = null
@@ -26,6 +29,9 @@ object BayesNet {
   var beta = 0.1f
   var batchSize = 1
   var niter=100
+  var nsampls=10
+  
+  var llikelihood=0f
 
   
   def init = {
@@ -34,6 +40,10 @@ object BayesNet {
     val dag = loadDag("C:/data/zp_dlm_FT_code_and_data/dag.txt", n)
     graph = new Graph(dag, n)
     sdata = loadSdata("C:/data/zp_dlm_FT_code_and_data/sdata_cleaned.txt")
+    ///val data = loadIMat("C:/data/zp_dlm_FT_code_and_data/sdata_test.txt")
+    //sdata = sparse(data(?,0),data(?,1),data(?,2), n, size(data,1))
+    sdata = sdata(?, 0 until 4000)
+    //sdata = loadSMat("C:/data/zp_dlm_FT_code_and_data/sdata.smat")
   }
   
   def setup = {
@@ -47,6 +57,7 @@ object BayesNet {
     val lcpt = sum(ns).v
     cpt = rand(lcpt, 1)
     cpt(1 until lcpt by 2) = 1 - cpt(0 until lcpt by 2)
+    cpt0 = loadFMat("C:/data/zp_dlm_FT_code_and_data/cpt_test.txt")
     
     /*
     for(i <- 0 until cpt.length-1 by 2 ){
@@ -62,53 +73,68 @@ object BayesNet {
     cptoffset(1 until graph.n) = cumsum(ns)(0 until graph.n-1)
     
     // prepare projection matrix
-    pmat = graph.dag.t
+    val dag = graph.dag
+    iproject = dag.t
     
-    //println("dag")
-    //println(graph.dag(?, 0))
-    //println("pmat")
-    //println(pmat(0, ?))
-    //println(sum(sum(pmat.t != graph.dag)))
-    println("pmat nnz: %d" format pmat.nnz)
-    println("dag nnz: %d" format graph.dag.nnz)
-    
-    //saveSMat("C:/data/zp_dlm_FT_code_and_data/dag.smat", graph.dag)
-   
+       
     for(i <- 0 until graph.n){
-      //val ps0 = find(pmat(i, ?))
-      val ps = find(graph.dag(?, i))
+      val ps = find(dag(?, i))
       val np = ps.length
       
       for(j <-0 until np){
-        pmat(i, ps(j)) = math.pow(2, np-j).toFloat
+        iproject(i, ps(j)) = math.pow(2, np-j).toFloat
       }
       //pmat(i, ps) = pow(2, IMat(np to 1 by -1))
     }
     
-    pmat = pmat + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
+    iproject = iproject + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
+    pproject = dag + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
+    
+    /*
+    println("iproject")
+    var (r,c,v) = find3(iproject)
+    for(i <-0 until iproject.nnz){
+      println(r(i),c(i),v(i))
+    }
+    
+    println("pproject")
+    var (rp,cp,vp) = find3(pproject)
+    for(i <-0 until pproject.nnz){
+      println(rp(i),cp(i),vp(i))
+    }
+    */
+    // load synthetic data
+    //
   }
   
   def initState(fdata: FMat) = {
     val ndata = size(fdata, 2)
-    state = rand(graph.n, ndata)
-    state = (state >= 0.5) - (state < 0.5)
-    
-    state(find(fdata)) = 0
-    state = state + fdata
+    state = rand(graph.n, batchSize*nsampls)
+    state = (state >= 0.5)
+    //state = (state >= 0.5) - (state < 0.5)
+    val innz = find(fdata)
+    for(i <- 0 until batchSize*nsampls by batchSize){
+    	state(innz + i * graph.n) = 0
+    	state(?, i until i+batchSize) = state(?, i until i+batchSize) + (fdata > 0)
+    }
+
   }
   
   def initStateColor(fdata: FMat, ids: IMat) = {
     state0 = state.copy
     state1 = state.copy
     
-    state0(ids) = -1
-    state1(ids) = 1
+    state0(ids, ?) = 0
+    state1(ids, ?) = 1
     
-    state0(find(fdata)) = 0
-    state1(find(fdata)) = 0
-    
-    state0 = ((state0 + fdata) > 0)
-    state1 = ((state1 + fdata) > 0)
+    val innz = find(fdata)
+    for(i <- 0 until batchSize*nsampls by batchSize){
+    	state0(innz + i * graph.n) = 0
+    	state0(?, i until i+batchSize) = state0(?, i until i+batchSize) + (fdata > 0)
+    	state1(innz + i * graph.n) = 0
+    	state1(?, i until i+batchSize) = state1(?, i until i+batchSize) + (fdata > 0)
+    }
+
   }
   
   def getCpt(index: IMat) = {
@@ -121,54 +147,58 @@ object BayesNet {
   
   def sampleColor(fdata: FMat, ids: IMat)={
     
-    //val ids = find(graph.colors == c)
+
     val nnode = size(ids, 1)
-    val ndata = size(fdata, 2)
-    //val fdata = full(data)
+    //val ndata = size(fdata, 2)    
     
-    // wouldn't work if bsize > 1
-    val nodep0 = ln(getCpt(cptoffset + IMat(pmat*state0)) + 1e-10)
-    val nodep1 = ln(getCpt(cptoffset + IMat(pmat*state1)) + 1e-10)
-    
-    val summat = graph.dag + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
-    
-    val p0 = exp(summat(ids, ?) * nodep0)
-    val p1 = exp(summat(ids, ?) * nodep1)
+    val nodep0 = ln(getCpt(cptoffset + IMat(iproject*state0)) + 1e-10)
+    val nodep1 = ln(getCpt(cptoffset + IMat(iproject*state1)) + 1e-10)
+        
+    val p0 = exp(pproject(ids, ?) * nodep0)
+    val p1 = exp(pproject(ids, ?) * nodep1)
     
     val p = p1/(p0+p1)
     
-    var sample = rand(nnode, ndata)
-    sample = (sample > p) - (sample < p)
+    var sample = rand(nnode, batchSize*nsampls)
+    sample = (sample <= p)
     
     state(ids, ?) = sample
-    state(find(fdata)) = 0
-    state = state + fdata
+    val innz = find(fdata)
+    for(i <- 0 until batchSize*nsampls by batchSize){
+    	var c = innz+i
+    	state(innz + i * graph.n) = 0
+    	state(?, i until i+batchSize) = state(?, i until i+batchSize) + (fdata > 0)
+    }
+
   }
   
   def sample(data: SMat) = {
     val fdata = full(data)
     initState(fdata)
+    for(i <- 0 until 8){
     for(c <- 0 until graph.ncolors){
       val ids = find(graph.colors == c)
       initStateColor(fdata, ids)
       sampleColor(fdata, ids)
     }
+    }
   }
   
   def sampleAll = {
     val ndata = size(sdata, 2)
-
     
     for(k <- 0 until niter){
     var j = 0;
+    
     for(i <- 0 until ndata by batchSize){
       sample(sdata(?, i until math.min(ndata, i+batchSize)))
       updateCpt
-      val ll = eval.v
-      if(j%1000==0)
-    	  println("ll: %f" format ll)
-      j = j + 1
+      eval
     }
+    
+    println("ll: %f" format llikelihood)
+    llikelihood = 0f
+    //println("dist cpt - cpt0: %f" format ((cpt-cpt0) dot (cpt-cpt0)).v )
 
     }
 
@@ -176,9 +206,9 @@ object BayesNet {
   
   def updateCpt = {
     val nstate = size(state, 2)
-	val index = IMat(cptoffset + pmat*(state>0))
+	val index = IMat(cptoffset + iproject*(state>0))
 	var counts = zeros(cpt.length, 1)
-	for(i <- 1 until nstate){
+	for(i <- 0 until nstate){
 	  counts(index(?, i)) = counts(index(?, i)) + 1
 	}
     counts = counts + beta
@@ -199,25 +229,77 @@ object BayesNet {
     }
     */	
 	cpt = (1-alpha) * cpt + alpha * counts
+    //for(i<-0 until cpt.length){
+    //  print("%f," format cpt(i))
+    //}
+    //println("")
 	
   }
   
-  def eval = {
-	val index = IMat(cptoffset + pmat*(state>0))
-	//val summat = graph.dag + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
-	val ll = sum(sum ( ln(getCpt(index))))/size(index, 2)
-    ll
+  def synthesize(n: Int, sp: Float) = {
+    var syndata = izeros(graph.n, n)
+    for(k <-0 until n){
+    	for(i <- 0 until graph.n){
+    		 val ps = find(graph.dag(?, i))
+    		 val np = ps.length
+    		 var ind = cptoffset(i).v
+    		 for(j <- 0 until np){
+    		   var pv = if(syndata(ps(j),k) > 0) 1 else 0
+    		   ind = ind +  math.pow(2f, np-j).toInt * pv
+    		 }
+    		 val p0 = cpt(ind)
+    		 val p1 = cpt(ind + 1)
+    		 val p = p1/(p0+p1)
+    		 if(i==4) println(p)
+    		 var r = rand(1,1)
+    		 r = ( r <= p )	- (r > p)	 
+    		 syndata(i, k) = r.v.toInt
+    	}
+    }
+    saveFMat("C:/data/zp_dlm_FT_code_and_data/sdata.smat",syndata)
+    
+    var l = (n * graph.n * sp * 1.5).toInt
+    var r = izeros(l ,1)
+    var c = izeros(l ,1)
+    var v = zeros(l ,1)
+    var ptr = 0
+    for(k <-0 until n){
+      val rd = (rand(graph.n, 1) < sp)
+      val ids = find(rd==1)
+      val vs = syndata(ids, k)
+      val len = ids.length
+      if(len > 0){
+      r(ptr until ptr + len,0) = ids
+      v(ptr until ptr + len,0) = vs
+      c(ptr until ptr + len,0) = k * iones(len, 1)
+      ptr = ptr + len
+      }
+    }
+    val smat = sparse(r(0 until ptr), c(0 until ptr), v(0 until ptr), graph.n, n)
+    saveSMat("C:/data/zp_dlm_FT_code_and_data/sdata.smat",smat)
   }
   
-  def run(alpha0: Float, beta0: Float, batchSize0: Int, niter0: Int) = {
+  def eval = {
+	val index = IMat(cptoffset + iproject*(state>0))
+	val ll = sum(sum ( ln(getCpt(index))))/nsampls
+    llikelihood += ll.v
+  }
+  
+  def run(alpha0: Float, beta0: Float, batchSize0: Int, niter0: Int, nsampls0: Int) = {
     alpha = alpha0
     beta = beta0
     batchSize = batchSize0
     niter = niter0
+    nsampls = nsampls0
     
     init
     setup
+    //synthesize(5000, 0.3f)
     sampleAll
+  }
+  
+  def main(args: Array[String]){
+    run(0.2f, 1f, 500, 10, 100)
   }
   def showCpt(node: String){
     val id = nodeMap(node)
@@ -267,6 +349,7 @@ object BayesNet {
       v(ptr) = 1f
       ptr = ptr + 1
     }
+    /*
     for(i<-0 until n){
       if(ptr % bufsize == 0 && ptr > 0){
         row = row on izeros(bufsize, 1)
@@ -277,8 +360,8 @@ object BayesNet {
       col(ptr) = i
       v(ptr) = 0
       ptr = ptr + 1
-    }
-    sparse(row(0 until ptr), col(0 until ptr), v(0 until ptr))
+    }*/
+    sparse(row(0 until ptr), col(0 until ptr), v(0 until ptr), n, n)
   }
   
   def loadSdata(path: String) = {
