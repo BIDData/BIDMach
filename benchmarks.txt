@@ -5,15 +5,17 @@ E5-2660 CPU
 GTX-680 GPU
 
 Logistic Regression (sparse) on 276k x 100000 block of RCV1
-
+-----------------------------------------------------------
 Mahout^0:  NI
 MLLib:     NI
-VW^3:      103 targets (OAA), (1 machine):   44 secs, 1 pass,   2 MB/s, 0.15 gflops (estimated)
-BIDMach^1: 103 targets (OAA),  (MKL only):   19 secs, 1 pass,   5 MB/s, 0.4 gflops (measured)
-BIDMach^1: 103 targets (OAA),   (680 GPU):    5 secs, 1 pass,  20 MB/s,  10 gflops
-BIDMach^2: 103 targets (OAA),   (680 GPU):  0.7 secs, 1 pass, 150 MB/s,  11 gflops
+Scikit-Learn 103 targets (OAA), (1 machine):  576 secs, ? passes,   
+VW^3:        103 targets (OAA), (1 machine):   44 secs,   1 pass,   2 MB/s, 0.15 gflops (estimated)
+BIDMach^1:   103 targets (OAA),  (MKL only):   19 secs,   1 pass,   5 MB/s,  0.4 gflops (measured)
+BIDMach^1:   103 targets (OAA),   (680 GPU):    5 secs,   1 pass,  20 MB/s,   10 gflops
+BIDMach^2:   103 targets (OAA),   (680 GPU):  0.7 secs,   1 pass, 150 MB/s,   11 gflops
 
 NI = Not Implemented.
+VW = Vowpal Wabbit
 
 Notes: 
 0: Internallly Mahout does implement sparse data structures,
@@ -21,31 +23,59 @@ but can only load data for logistic regression from dense csv files
 which for this problem are 20GB. The load time completely dominates
 the compute time. 
 
-Logistic Regression (dense) on 1000 x 100000 block of RCV1
 
-Mahout:           1 target, (1 machine):    55 secs,    1 pass,     8 MB/s,   6 mflops, accuracy ?
-MLLib:            1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
-MLLib:            1 target, (1 machine):    20 secs,    1 pass,    20 MB/s,  15 mflops, accuracy 0.850^2 
-VW:      103 targets (OAA), (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
-BIDMach: 103 targets (OAA),  (MKL only):   2.4 secs,    1 pass,   160 MB/s,  16 gflops, accuracy 0.891^2
-BIDMach: 103 targets (OAA),   (680 GPU):   0.3 secs,    1 pass,  1300 MB/s, 100 gflops, accuracy 0.891^2
+Logistic Regression (dense) on 1000 x 100000 block of RCV1
+----------------------------------------------------------
+Mahout:               1 target, (1 machine):    55 secs,    1 pass,     8 MB/s,   6 mflops, accuracy 0.85^4
+MLLib:                1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
+MLLib:                1 target, (1 machine):    20 secs,    1 pass,    20 MB/s,  15 mflops, accuracy 0.850^2 
+Scikit-Learn 103 targets (OAA), (1 machine):    84 secs,  ? passes,          ?,          ?, accuracy 0.878
+VW:          103 targets (OAA), (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
+BIDMach:     103 targets (OAA),  (MKL only):   2.4 secs,    1 pass,   160 MB/s,  16 gflops, accuracy 0.891^2
+BIDMach:     103 targets (OAA),   (680 GPU):   0.3 secs,    1 pass,  1300 MB/s, 100 gflops, accuracy 0.891^2
+
 
 Notes
 1: minibatch size 1000
 2: minibatch size 10000
 3: no minibatch option
+4: Mahout accuracy did not improve after the first iteration. On inspection it looks like the model is being
+re-initialized at the start of each iteration. 
+
+Logistic Regression (dense) on 100 GB dataset
+---------------------------------------------
+Spark/MLLib:      1 target, 100 machines,      Java:    46 secs,    1 pass,     2 GB/s,   2 gflops
+BIDMach: 103 targets (OAA),    1 machine,  MKL only:   400 secs,    1 pass,   160 MB/s,  16 gflops
+BIDMach: 103 targets (OAA),    1 machine,   680 GPU:    60 secs,    1 pass,   1.3 GB/s, 100 gflops
 
 OAA = One Against All, really 103 independent classifiers. The number of targets is the number of classes.
 103 targets means 103 classifiers were trained. 
 
 Accuracy is quoted only for topic 6, which is roughly balanced in +/- instances. Others are too close to 1.00
 
+
 Latent Dirichlet Allocation (LDA)
 =================================
 
 Latent Dirichlet Allocation (sparse) on 276k x 100000 block of RCV1, 256 dimensions, minibatch=1024, 3 passes
+-------------------------------------------------------------------------------------------------------------
+MLLib:          NI (5/19/2014)
+VW:                   330 secs,       1 gflops      1 MB/s 
+BIDMach: (MKL only)   320 secs,     0.7 gflops      1 MB/s        0.01 Gflops/W
+BIDMach: (680 GPU)     23 secs,       9 gflops     13 MB/s         0.1 Gflops/W
 
-VW:                   330 secs,     1 gf/s        1 MB/s 
-BIDMach: (MKL only)   320 secs,     0.7 gf/s      1 MB/s        0.01 Gflops/W
-BIDMach: (680 GPU)     23 secs,     9 gf/s       13 MB/s         0.1  Gflops/W
+Latent Dirichlet Allocation (dense) on 1k x 100k block of RCV1, 256 dimensions, minibatch=1024, 3 passes
+--------------------------------------------------------------------------------------------------------
+MLLib:          NI (5/19/2014)
+BIDMach: (MKL only)     20 secs,     93 gflops      9 MB/s           1 Gflops/W
+BIDMach: (680 GPU)     3.6 secs,    530 gflops     50 MB/s           5 Gflops/W
 
+
+K-Means
+=======
+
+K-Means clustering (dense) on 1k x 100k block of RCV1, 256 dimensions, 20 passes
+--------------------------------------------------------------------------------
+MLLib:               315 secs,      6 gflops       3 MB/s        0.05 Gflops/W
+BIDMach: (MKL only)   47 secs,     50 gflops      25 MB/s         0.4 Gflops/W
+BIDMach: (680 GPU)     7 secs,    280 gflops     180 MB/s           3 Gflops/W
