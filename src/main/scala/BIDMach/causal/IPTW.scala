@@ -133,6 +133,7 @@ object IPTW {
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
+    opts.links = 1
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new IPTW(opts), 

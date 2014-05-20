@@ -27,8 +27,8 @@ the compute time.
 Logistic Regression (dense) on 1000 x 100000 block of RCV1
 ----------------------------------------------------------
 Mahout:               1 target, (1 machine):    55 secs,    1 pass,     8 MB/s,   6 mflops, accuracy 0.85^4
-MLLib:                1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
-MLLib:                1 target, (1 machine):    20 secs,    1 pass,    20 MB/s,  15 mflops, accuracy 0.850^2 
+Spark/MLLib 0.9:      1 target, (1 machine):   210 secs, 10 passes,    20 MB/s,  15 mflops, accuracy 0.885^2 
+Spark/MLLib 0.9:      1 target, (1 machine):    20 secs,    1 pass,    20 MB/s,  15 mflops, accuracy 0.850^2 
 Scikit-Learn 103 targets (OAA), (1 machine):    84 secs,  ? passes,          ?,          ?, accuracy 0.878
 VW:          103 targets (OAA), (1 machine):    30 secs,    1 pass,    13 MB/s,  ??
 BIDMach:     103 targets (OAA),  (MKL only):   2.4 secs,    1 pass,   160 MB/s,  16 gflops, accuracy 0.891^2
@@ -44,9 +44,9 @@ re-initialized at the start of each iteration.
 
 Logistic Regression (dense) on 100 GB dataset
 ---------------------------------------------
-Spark/MLLib:      1 target, 100 machines,      Java:    46 secs,    1 pass,     2 GB/s,   2 gflops
-BIDMach: 103 targets (OAA),    1 machine,  MKL only:   400 secs,    1 pass,   160 MB/s,  16 gflops
-BIDMach: 103 targets (OAA),    1 machine,   680 GPU:    60 secs,    1 pass,   1.3 GB/s, 100 gflops
+Spark/MLLib 0.9:    1 target, 100 machines,      Java:    46 secs,    1 pass,     2 GB/s,   2 gflops
+BIDMach:   103 targets (OAA),    1 machine,  MKL only:   400 secs,    1 pass,   160 MB/s,  16 gflops
+BIDMach:   103 targets (OAA),    1 machine,   680 GPU:    60 secs,    1 pass,   1.3 GB/s, 100 gflops
 
 OAA = One Against All, really 103 independent classifiers. The number of targets is the number of classes.
 103 targets means 103 classifiers were trained. 
@@ -59,14 +59,14 @@ Latent Dirichlet Allocation (LDA)
 
 Latent Dirichlet Allocation (sparse) on 276k x 100000 block of RCV1, 256 dimensions, minibatch=1024, 3 passes
 -------------------------------------------------------------------------------------------------------------
-MLLib:          NI (5/19/2014)
+MLLib:  NI (5/19/2014)
 VW:                   330 secs,       1 gflops      1 MB/s 
 BIDMach: (MKL only)   320 secs,     0.7 gflops      1 MB/s        0.01 Gflops/W
 BIDMach: (680 GPU)     23 secs,       9 gflops     13 MB/s         0.1 Gflops/W
 
 Latent Dirichlet Allocation (dense) on 1k x 100k block of RCV1, 256 dimensions, minibatch=1024, 3 passes
 --------------------------------------------------------------------------------------------------------
-MLLib:          NI (5/19/2014)
+MLLib:  NI (5/19/2014)
 BIDMach: (MKL only)     20 secs,     93 gflops      9 MB/s           1 Gflops/W
 BIDMach: (680 GPU)     3.6 secs,    530 gflops     50 MB/s           5 Gflops/W
 
