@@ -26,6 +26,7 @@ saveFMat(dir+"spark_cattest.fmat.lz4", ctest)
 
 import java.io._
 val output = new PrintWriter(dir+"spark_train.dat")
+val out2 = new PrintWriter(dir+"spark_KMtrain.dat")
 
 for (i <- 0 until atrain.ncols) { 
   val ic = ctrain(icat,i)
@@ -33,11 +34,18 @@ for (i <- 0 until atrain.ncols) {
   var k = 0
   while (k < atrain.nrows) { 
     output.write(" " + atrain(k,i))
+    if (k > 0) {
+      out2.write(" " + atrain(k,i))     
+    } else {
+      out2.write("" + atrain(k,i))     
+    }
     k += 1
   }
   output.write("\n")
+  out2.write("\n")
 }
 output.close
+out2.close
 
 val out = new PrintWriter(dir+"vw_dense_train.dat")
 for (i <- 0 until atrain.ncols) { 
@@ -56,6 +64,24 @@ for (i <- 0 until atrain.ncols) {
   }
 }
 out.close
+
+val outl = new PrintWriter(dir+"libsvm_train.dat")
+for (i <- 0 until atrain.ncols) { 
+  val ic = find(c(?,i))
+  val (ii, jj, vv) = find3(atrain(?,i))
+  var j = 0
+  while (j < ic.length) { 
+    outl.write("%d" format ic(j)+1)
+    var k = 0 
+    while (k < ii.length) { 
+      outl.write(" " + (ii(k)+1)+ ":" + vv(k))
+      k += 1
+    }
+    outl.write("\n")
+    j += 1
+  }
+}
+outl.close
 
 val outn = new PrintWriter(dir+"vw_sparse_train.dat")
 for (i <- 0 until atrain.ncols) { 

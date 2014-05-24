@@ -589,12 +589,12 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
 }
 
 
-__global__ void __findBoundaries(__int64 *keys, int *jc, int n, int njc, int shift) {
+__global__ void __findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
   __shared__ int dbuff[1024];
   int i, j, iv, lasti;
 
-  int imin = ((int)(32 * ((((__int64)n) * blockIdx.x) / (gridDim.x * 32))));
-  int imax = min(n, ((int)(32 * ((((__int64)n) * (blockIdx.x + 1)) / (gridDim.x * 32) + 1))));
+  int imin = ((int)(32 * ((((long long)n) * blockIdx.x) / (gridDim.x * 32))));
+  int imax = min(n, ((int)(32 * ((((long long)n) * (blockIdx.x + 1)) / (gridDim.x * 32) + 1))));
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   if (tid == 0 && blockIdx.x == 0) {
@@ -625,7 +625,7 @@ __global__ void __findBoundaries(__int64 *keys, int *jc, int n, int njc, int shi
 }
 
 
-int findBoundaries(__int64 *keys, int *jc, int n, int njc, int shift) {
+int findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
   int ny = min(32, 1 + (n-1)/32);
   dim3 tdim(32, ny, 1);
   int ng = min(64, 1+n/32/ny);
@@ -642,8 +642,8 @@ __global__ void __mergeIndsP1(T *keys, int *cspine, T *ispine,  T *vspine, int n
   T thisval, lastval, endval, tmp;
 
   int tid = threadIdx.x + threadIdx.y * blockDim.x;
-  int imin = (int)(((__int64)n) * blockIdx.x / gridDim.x);
-  int imax = (int)(((__int64)n) * (blockIdx.x + 1) / gridDim.x);
+  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
+  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
   
   total = 0;
   if (tid == 0) {
@@ -733,8 +733,8 @@ __global__ void __mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n
   T thisval, lastval, tmp;
 
   int tid = threadIdx.x + threadIdx.y * blockDim.x;
-  int imin = (int)(((__int64)n) * blockIdx.x / gridDim.x);
-  int imax = (int)(((__int64)n) * (blockIdx.x + 1) / gridDim.x);
+  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
+  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
   int nbthreads = blockDim.x * blockDim.y;
   
   if (blockIdx.x == 0) {
