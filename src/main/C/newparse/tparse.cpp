@@ -506,6 +506,7 @@ int main(int argc, char ** argv) {
     }
     iarg++;
   }
+  if (mfname.size() == 0) mfname = ofname;
   ivector tvec(0);
   svector delims(0);
   svector dnames(0);
@@ -548,7 +549,6 @@ int main(int argc, char ** argv) {
     }
   }
   if (ifstr) delete ifstr;
-  if (mfname.size() == 0) mfname = ofname;
   cout<<"\r"<<jmax<<" lines processed";
   cout.flush();
 
