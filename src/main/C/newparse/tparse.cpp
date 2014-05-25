@@ -474,7 +474,7 @@ int main(int argc, char ** argv) {
   int iline=0, i, iarg=1, nfields=1, jmax=0, writetxt=0, writemat=0, grpsize=1;
   int membuf=1048576;
   char * here;
-  string ifname = "", ofname = "", mfname = "", ffname = "", matfname = "", fdelim=" ,\t", suffix="";
+  string ifname = "", ofname = "", mfname = "", ffname = "", matfname = "", fdelim="\t", suffix="";
   if (argc < 2) {
     printf("%s", usage);
     return 1;
@@ -548,6 +548,7 @@ int main(int argc, char ** argv) {
     }
   }
   if (ifstr) delete ifstr;
+  if (mfname.size() == 0) mfname = ofname;
   cout<<"\r"<<jmax<<" lines processed";
   cout.flush();
 
