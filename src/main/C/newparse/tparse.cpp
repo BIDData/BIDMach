@@ -63,7 +63,10 @@ class stringIndexer {
   stringIndexer(const stringIndexer & si);
   ~stringIndexer();
   stringIndexer(char *);
-  int writeMap(string fname) {return writeSBVecs(unh, fname, BUFSIZE);}
+  int writeMap(string fname, string suffix) {
+    writeIntVec(count, fname + ".cnt.imat" + suffix, BUFSIZE);
+    return writeSBVecs(unh, fname + ".sbmat" + suffix, BUFSIZE);
+  }
   int checkword(char *str);
   ivector checkstring(char *, const char *);
   ivector checkstrings(char **, const char *, int);
@@ -571,11 +574,11 @@ int main(int argc, char ** argv) {
       break;
     case ftype_word:
       ftv[i].writeInts(ofname + dnames[i] + ".imat" + suffix);
-      srv[i].writeMap(mfname + dnames[i] + ".sbmat" + suffix);
+      srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_string: case ftype_group: 
       ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
-      srv[i].writeMap(mfname + dnames[i] + ".sbmat" + suffix);
+      srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_igroup:
       ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
