@@ -365,13 +365,29 @@ int writeDIntVec(divector & im, string fname, int buffsize) {
   return 0;
 }
 
-int writeQIntVec(qvector & im, string fname, int buffsize) {
+int writeQIntVecx(qvector & im, string fname, int buffsize) {
   int fmt, nrows, ncols, nnz;
   ostream *ofstr = open_out_buf(fname.c_str(), buffsize);
   fmt = 170;
   nrows = im.size();
   ncols = 1;
   nnz = nrows;
+  ofstr->write((const char *)&fmt, 4);
+  ofstr->write((const char *)&nrows, 4);
+  ofstr->write((const char *)&ncols, 4);
+  ofstr->write((const char *)&nnz, 4);
+  ofstr->write((const char *)&im[0], 16 * nrows);
+  closeos(ofstr);
+  return 0;
+}
+
+int writeQIntVec(qvector & im, string fname, int buffsize) {
+  int fmt, nrows, ncols, nnz;
+  ostream *ofstr = open_out_buf(fname.c_str(), buffsize);
+  fmt = 110;
+  nrows = 4;
+  ncols = im.size();
+  nnz = 4*nrows;
   ofstr->write((const char *)&fmt, 4);
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
