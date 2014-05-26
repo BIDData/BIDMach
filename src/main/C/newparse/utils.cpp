@@ -381,21 +381,29 @@ int writeQIntVecx(qvector & im, string fname, int buffsize) {
   return 0;
 }
 
-int writeQIntVec(qvector & im, string fname, int buffsize) {
-  int fmt, nrows, ncols, nnz;
-  ostream *ofstr = open_out_buf(fname.c_str(), buffsize);
-  fmt = 110;
+
+int writeQIntVec(qvector & qv, string fname, int buffsize) {
+  int j, nrows, fmt, ncols, nnz;
+  uint64 v;
+  ostream *ofstr = open_out_buf(fname, buffsize);
+  ncols = qv.size();
   nrows = 4;
-  ncols = im.size();
-  nnz = 4*nrows;
+  nnz = nrows * ncols;
+  fmt = 110;
   ofstr->write((const char *)&fmt, 4);
   ofstr->write((const char *)&nrows, 4);
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)&im[0], 16 * nrows);
+  for (j = 0; j < qv.size(); j++) {
+    v = qv[j].bottom;
+    ofstr->write((const char *)&v, 8);
+    v = qv[j].top;
+    ofstr->write((const char *)&v, 8);
+  }
   closeos(ofstr);
   return 0;
 }
+
 
 int writeFVec(fvector & im, string fname, int buffsize) {
   int fmt, nrows, ncols, nnz;
