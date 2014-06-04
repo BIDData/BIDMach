@@ -58,6 +58,25 @@ extern "C" {
 
     return LDA_Gibbs1(nrows, nnz, A, B, Cir, Cic, P, Ms, Us, k);
   }
+  
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_LDAgibbsv
+  (JNIEnv *env, jobject obj, jint nrows, jint nnz, jobject jA, jobject jB, jobject jAN, jobject jBN, 
+   jobject jCir, jobject jCic, jobject jP, jobject jnsamps)
+  // (JNIEnv *env, jobject obj, jint nrows, jint nnz, jobject jA, jobject jB, jobject jAN, jobject jBN, 
+  // jobject jCir, jobject jCic, jobject jP, jfloat nsamps)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *B = (float*)getPointer(env, jB);
+    float *AN = (float*)getPointer(env, jAN);
+    float *BN = (float*)getPointer(env, jBN);
+    int *Cir = (int*)getPointer(env, jCir);
+    int *Cic = (int*)getPointer(env, jCic);
+    float *P = (float*)getPointer(env, jP);
+    float *nsamps = (float*)getPointer(env, jnsamps);
+    return LDA_Gibbsv(nrows, nnz, A, B, AN, BN, Cir, Cic, P, nsamps);
+    //return LDA_Gibbs(nrows, nnz, A, B, AN, BN, Cir, Cic, P, nsamps);
+  }
+  
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_veccmp
   (JNIEnv *env, jobject obj, jobject ja, jobject jb, jobject jc)
