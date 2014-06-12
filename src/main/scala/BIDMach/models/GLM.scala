@@ -315,8 +315,14 @@ object GLM {
   def mkL2Regularizer(nopts:Mixin.Opts):Array[Mixin] = {
     Array(new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
   }
+
+  def mkL1L2Regularizers(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]),
+	  new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
+  }
   
   class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class Learn12Options extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts with L2Regularizer.Opts
      
   // Basic in-memory learner with generated target
   def learner(mat0:Mat, d:Int = 0) = { 
@@ -398,39 +404,39 @@ object GLM {
   }
   
    // Basic in-memory SVM learner with explicit target
-  def SVMlearner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = {
-    val mopts = new LearnOptions;
+  def SVMlearner(mat0:Mat, targ:Mat):(Learner, Learn12Options) = {
+    val mopts = new Learn12Options;
     mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     mopts.links.set(3)
-    mopts.reg1weight = 1f
+    mopts.reg2weight = 1f
     val model = new GLM(mopts)
     val mm = new Learner(
         new MatDS(Array(mat0, targ), mopts), 
         model, 
-        mkL2Regularizer(mopts),
+        mkL1L2Regularizers(mopts),
         new ADAGrad(mopts), mopts)
     (mm, mopts)
   }
   
   // This function constructs a learner and a predictor. 
-  def SVMlearner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat):(Learner, LearnOptions, Learner, LearnOptions) = {
-    val mopts = new LearnOptions;
-    val nopts = new LearnOptions;
+  def SVMlearner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat):(Learner, Learn12Options, Learner, Learn12Options) = {
+    val mopts = new Learn12Options;
+    val nopts = new Learn12Options;
     mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    mopts.links.set(3)
+    mopts.reg2weight = 1f
     nopts.links = mopts.links
-    mopts.links.set(2)
-    mopts.reg1weight = 1f
     nopts.batchSize = mopts.batchSize
     nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
         new MatDS(Array(mat0, targ), mopts), 
         model, 
-        mkL2Regularizer(mopts),
+        mkL1L2Regularizers(mopts),
         new ADAGrad(mopts), mopts)
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
