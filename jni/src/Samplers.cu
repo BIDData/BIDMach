@@ -147,6 +147,37 @@ __global__ void __LDA_Gibbs(int nrows, int nnz, float *A, float *B, float *AN, f
   }
 }
 
+__global__ void __LDA_Gibbsv(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float *nsamps, curandState *rstates) {
+
+  int jstart = ((long long)blockIdx.x) * nnz / gridDim.x;
+  int jend = ((long long)(blockIdx.x + 1)) * nnz / gridDim.x;
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  int id = threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * blockIdx.x);
+
+  curandState rstate = rstates[id];
+
+  for (int j = jstart; j < jend ; j++) {
+
+    int aoff = nrows * Cir[j];
+    int boff = nrows * Cic[j];
+
+    float Pj = P[j];
+
+    for (int i = tid; i < nrows; i += blockDim.x * blockDim.y) {
+
+      float nsampsi = nsamps[i];
+      float pval = nsampsi / Pj;
+      float prod = A[i + aoff] * B[i + boff];
+
+      int cr = curand_poisson(&rstate, prod * pval);
+      if (cr > 0) {
+        atomicAdd(&AN[i + aoff], cr/nsampsi );
+        atomicAdd(&BN[i + boff], cr/nsampsi );
+      }
+    }
+  }
+}
+
 __global__ void __randinit(curandState *rstates) {
   int id = threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * blockIdx.x);
   curand_init(1234, id, 0, &rstates[id]);
@@ -157,12 +188,14 @@ __global__ void __randinit(curandState *rstates) {
 __global__ void __LDA_Gibbs1(int nrows, int nnz, float *A, float *B, int *Cir, int *Cic, float *P, int *Ms, int *Us, int k, curandState *) {}
 __global__ void __LDA_Gibbs(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float nsamps, curandState *) {}
 __global__ void __LDA_Gibbsy(int nrows, int nnz, float *A, float *B, float *AN, int *Cir, int *Cic, float *P, float nsamps, curandState *) {}
+__global__ void __LDA_Gibbsv(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float *nsamps, curandState *) {}
 __global__ void __randinit(curandState *rstates) {}
 #endif
 #else
 __global__ void __LDA_Gibbs1(int nrows, int nnz, float *A, float *B, int *Cir, int *Cic, float *P, int *Ms, int *Us, int k, curandState *) {}
 __global__ void __LDA_Gibbs(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float nsamps, curandState *) {}
 __global__ void __LDA_Gibbsy(int nrows, int nnz, float *A, float *B, float *AN, int *Cir, int *Cic, float *P, float nsamps, curandState *) {}
+__global__ void __LDA_Gibbsv(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float *nsamps, curandState *) {}
 __global__ void __randinit(curandState *rstates) {}
 #endif
 
@@ -227,4 +260,23 @@ int LDA_Gibbsy(int nrows, int ncols, float *A, float *B, float *AN, int *Cir, in
   return err;
 }
 
+int LDA_Gibbsv(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float *nsamps) {
+  dim3 blockDims(min(32,nrows), min(32, 1+(nrows-1)/64), 1);
+  int nblocks = min(128, max(1,nnz/128));
+  curandState *rstates;
+  int err;
+  err = cudaMalloc(( void **)& rstates , nblocks * blockDims.x * blockDims.y * sizeof(curandState));
+  if (err > 0) {
+    fprintf(stderr, "Error in cudaMalloc %d", err);
+    return err;
+  }
+  cudaDeviceSynchronize();
+  __randinit<<<nblocks,blockDims>>>(rstates); 
+  cudaDeviceSynchronize(); 
+  __LDA_Gibbsv<<<nblocks,blockDims>>>(nrows, nnz, A, B, AN, BN, Cir, Cic, P, nsamps, rstates);
+  cudaDeviceSynchronize();
+  cudaFree(rstates);
+  err = cudaGetLastError();
+  return err;
+}
 
