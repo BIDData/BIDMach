@@ -1,3 +1,6 @@
+These are not being updated any more. Please consult the wiki Benchmarks page at:
+https://github.com/BIDData/BIDMach/wiki/Benchmarks
+
 
 Logistic Regression
 ===================
