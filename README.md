@@ -1,4 +1,4 @@
-BIDMach is a very fast machine learning library.
+BIDMach is a very fast machine learning library. Check the latest <b><a href="https://github.com/BIDData/BIDMach/wiki/Benchmarks">benchmarks</a></b>
 
 Documentation is <b><a href="https://github.com/BIDData/BIDMach/wiki">here in the wiki</a></b>
 
