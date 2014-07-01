@@ -644,7 +644,7 @@ class ParLearnerF(
 object Learner {
   
   class Options extends BIDMat.Options {
-  	var npasses = 1 
+  	var npasses = 2 
   	var evalStep = 11
   	var pstep = 0.01f
   	var resFile:String = null

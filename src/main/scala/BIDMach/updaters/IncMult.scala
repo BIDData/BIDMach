@@ -36,7 +36,7 @@ class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Upda
     mm ~ mm *@ rm.set(1-rr)
     mm ~ mm + um 
     exp(mm, mm)
-    mm ~ mm / sum(mm,2)
+    if (opts.isprob) mm ~ mm / sum(mm,2)
   }
   
   override def clear() = {
@@ -49,6 +49,7 @@ object IncMult {
   trait Opts extends Updater.Opts {
     var warmup = 0L 
     var power = 0.3f
+    var isprob = true
   }
   
   class Options extends Opts {}

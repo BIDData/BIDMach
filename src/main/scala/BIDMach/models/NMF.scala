@@ -20,7 +20,7 @@ import BIDMach._
  * Other key parameters inherited from the learner, datasource and updater:
  - batchSize: the number of samples processed in a block
  - power(0.3f): the exponent of the moving average model' = a dmodel + (1-a)*model, a = 1/nblocks^power
- - npasses(10): number of complete passes over the dataset
+ - npasses(2): number of complete passes over the dataset
  *
  * '''Example:'''
  * 

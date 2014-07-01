@@ -42,10 +42,17 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
   		ms ~ ms + ums
   		um ~ um / ms
   	}
+  	if (modelmats.length > 2) {
+  		val ms2 = modelmats(2)
+  		val ums2 = updatemats(2)
+  		ums2 ~ ums2 *@ rm.set(rr)
+  		ms2 ~ ms2 *@ rm.set(1-rr)
+  		ms2 ~ ms2 + ums2
+  	}
   	um ~ um *@ rm.set(rr)
   	mm ~ mm *@ rm.set(1-rr)
     mm ~ mm + um 
-    mm ~ mm / sum(mm,2)
+    if (opts.isprob) mm ~ mm / sum(mm,2)
     if (opts.warmup > 0) {
       if (started == 0 && step > opts.warmup) {
         restart <-- mm
@@ -54,7 +61,7 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
       if (started == 1 && step > 2*opts.warmup) {
         mm ~ mm - restart
         max(mm, 0f, mm)
-        mm ~ mm / sum(mm,2)
+        if (opts.isprob) mm ~ mm / sum(mm,2)
         started = 2
       }
     }
@@ -69,6 +76,7 @@ object IncNorm {
   trait Opts extends Updater.Opts {
     var warmup = 0L 
     var power = 0.3f
+    var isprob = true
   }
   
   class Options extends Opts {}

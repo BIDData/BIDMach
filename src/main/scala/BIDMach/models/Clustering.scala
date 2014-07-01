@@ -15,12 +15,17 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
     val data0 = mats(0)
     val m = size(data0, 1)
     
-    val mm = rand(opts.dim, m) 
-    mm ~ mm / sqrt(mm dotr mm)
+    val nc = data0.ncols
+    if (opts.dim > nc)
+      throw new RuntimeException("Cluster initialization needs batchsize >= dim")
+
+    val rp = randperm(nc)
+    val mmi = full(data0(?,rp(0,0->opts.dim))).t
+    
     modelmats = Array[Mat](1)
-    modelmats(0) = if (useGPU) GMat(mm) else mm 
+    modelmats(0) = if (useGPU) GMat(mmi) else mmi
     updatemats = new Array[Mat](1)
-    updatemats(0) = modelmats(0).zeros(mm.nrows, mm.ncols)
+    updatemats(0) = modelmats(0).zeros(mmi.nrows, mmi.ncols)
   } 
   
   def mupdate(data:Mat, ipass:Int):Unit

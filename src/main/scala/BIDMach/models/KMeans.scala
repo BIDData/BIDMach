@@ -67,7 +67,6 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
 
 object KMeans  {
   trait Opts extends ClusteringModel.Opts {
-    var eps = 1e-5f 
   }
   
   class Options extends Opts {}
@@ -85,6 +84,7 @@ object KMeans  {
     val opts = new xopts
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.npasses = 10
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new KMeans(opts), 
@@ -98,6 +98,7 @@ object KMeans  {
     val opts = new xopts
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
+    opts.npasses = 10
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 
@@ -116,7 +117,7 @@ object KMeans  {
   	class xopts extends ParLearner.Options with KMeans.Opts with SFilesDS.Opts with Batch.Opts
   	val opts = new xopts
   	opts.dim = d
-  	opts.npasses = 4
+  	opts.npasses = 10
   	opts.resFile = "/big/twitter/test/results.mat"
   	val nn = new ParLearnerxF(
   	    null, 
