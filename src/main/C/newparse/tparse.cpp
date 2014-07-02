@@ -476,7 +476,7 @@ const char usage[] =
 int main(int argc, char ** argv) {
   int iline=0, i, iarg=1, nfields=1, jmax=0, writetxt=0, writemat=0, grpsize=1;
   int membuf=1048576;
-  char * here;
+  char * here, *linebuf, *readbuf;
   string ifname = "", ofname = "", mfname = "", ffname = "", matfname = "", fdelim="\t", suffix="";
   if (argc < 2) {
     printf("%s", usage);
@@ -516,23 +516,15 @@ int main(int argc, char ** argv) {
   nfields = parseFormat(ffname, tvec, dnames, delims, &grpsize);
   srivector srv(nfields);
   ftvector ftv(nfields);
+
   istream * ifstr;
-  if (ifname.rfind(".gz") == ifname.length() - 3) 
-    ifstr = new igzstream(ifname.c_str());
-  else
-    ifstr = new ifstream(ifname.c_str());
-  if (!ifstr) {
-    cerr << "Couldnt open input stream" << endl;
-    return 1;
-  }
-  char * linebuf = NULL;
   linebuf = new char[membuf];
+  readbuf = new char[membuf];
+
+  ifstr = open_in_buf(ifname, readbuf, membuf);
+
   while (!ifstr->bad() && !ifstr->eof()) {
-    //  while (!ifstr->bad()) {
     ifstr->getline(linebuf, membuf-1);
-    //   ifstr->peek();
-    //    printf("vals= %d %d\n", ifstr->bad(), ifstr->eof());
-    //    printf(linebuf);
     linebuf[membuf-1] = 0;
     if (ifstr->fail()) {
       ifstr->clear();
