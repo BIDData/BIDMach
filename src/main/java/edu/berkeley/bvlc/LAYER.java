@@ -15,7 +15,17 @@ public final class LAYER {
 
     public int num_blobs() {if (_shptr != 0) return num_blobs(_shptr); else throw new RuntimeException("Layer uninitialized");}
 
-    public BLOB blob(int i) {if (_shptr != 0) return new BLOB(blob(_shptr, i)); else throw new RuntimeException("Layer uninitialized");}
+    public BLOB blob(int i) {
+    	if (_shptr == 0) {
+    		throw new RuntimeException("Layer uninitialized");
+    	} else {
+    		int n = num_blobs();
+    		if (i < 0 || i >= n) {
+    			throw new RuntimeException("Layer blob index "+i+" out of range (0, "+(n-1)+")");
+    		}
+    		return new BLOB(blob(_shptr, i));
+    	}
+    }
 
     @Override
     protected void finalize() {
