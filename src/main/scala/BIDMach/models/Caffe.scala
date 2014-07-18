@@ -63,7 +63,7 @@ class Net (_net:NET) {
 class Classifier (val net:Net) {
   
   def init(model_file:String, pretrained_file:String, image_dims:Array[Int] = Array(256, 256), 
-      gpu:Boolean = false, mean_file:String = null, input_scale:Float = 255f, channel_swap:IMat = 2\1\0) = {
+      gpu:Boolean = false, mean_file:String = null, input_scale:Float = 1f, channel_swap:IMat = 2\1\0) = {
     
     net.init(model_file, pretrained_file);
     
