@@ -34,6 +34,10 @@ public final class NET {
     public int num_blobs() {if (_shptr != 0) return num_blobs(_shptr); else throw new RuntimeException("Net uninitialized");}
 
     public BLOB blob(int i) {if (_shptr != 0) return new BLOB(blob(_shptr, i)); else throw new RuntimeException("Net uninitialized");}
+    
+    public BLOB input_blob(int i) {if (_shptr != 0) return new BLOB(input_blob(_shptr, i)); else throw new RuntimeException("Net uninitialized");}
+    
+    public BLOB output_blob(int i) {if (_shptr != 0) return new BLOB(output_blob(_shptr, i)); else throw new RuntimeException("Net uninitialized");}
 
     public LAYER layer(int i) {if (_shptr != 0) return new LAYER(layer(_shptr, i)); else throw new RuntimeException("Net uninitialized");}
 
@@ -77,6 +81,10 @@ public final class NET {
     private static native long layer(long ref, int i);
 
     private static native long blob(long ref, int i);
+    
+    private static native long input_blob(long ref, int i);
+    
+    private static native long output_blob(long ref, int i);
 
     private static native Object [] blob_names(long ref);
 
