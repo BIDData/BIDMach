@@ -42,6 +42,7 @@ class Net () {
   
   def set_mean(mfile:String, varname:String = "image_mean") = {
     var meanf:FND = load(mfile, varname)                                   // Matlab means file is W < H < D, BGR
+    println("mean file %d %d %d" format(meanf.dims(0), meanf.dims(1), meanf.dims(2)))
     if (meanf.dims(0) != inwidth || meanf.dims(1) != inheight) {
     	meanf = meanf.transpose(2, 0, 1)                                     // First go to resizing order D < W < H
     	meanf = Image(meanf).resize(inwidth, inheight).toFND                 // Resize if needed
