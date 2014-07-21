@@ -9,7 +9,7 @@ import edu.berkeley.bvlc.CAFFE
 
 class Classifier {
   
-    val net = new Net
+  val net = new Net
   
   def init(model_file:String, pretrained_file:String, image_dims:Array[Int] = Array(256, 256), 
       gpu:Boolean = false, mean_file:String = null, input_scale:Float = 1f, channel_swap:IMat = 2\1\0) = {
