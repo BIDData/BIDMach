@@ -9,7 +9,9 @@ import edu.berkeley.bvlc.CAFFE
 
 // Caffe Images are W < H < D (< N), Java images are D < W < H, Matlab means file is W < H < D
 
-class Net (val _net:NET) {
+class Net () {
+  
+  val _net = new NET
   
   def init(modelfile:String, paramfile:String) = {
   	_net.init(modelfile, paramfile)
