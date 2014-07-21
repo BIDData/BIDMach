@@ -34,12 +34,12 @@ class Classifier {
      
   }
     
-  def classify(im:Image) = {
+  def classify(im:Image):FND = {
   	val fnd = net.preprocess(im)
   	net.clear_inputs
-  	net.add_input(fnd, 0)
+  	net.add_input(fnd, 0, 0)
   	net.forward
-  	net.output_data(?,?,?,0)
+  	net.output_data(0)(?,?,?,0)
   }
 
 

@@ -13,18 +13,32 @@ class Net () {
   
   val _net = new NET
   
+  def initIO = {
+    input_data = new Array[FND](num_inputs)
+   	for (i <- 0 until num_inputs) {
+   	  val iblob = _net.input_blob(i)
+   	  input_data(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
+   	}
+   	output_data = new Array[FND](num_outputs)
+   	for (i <- 0 until num_outputs) {
+   	  val oblob = _net.output_blob(i)
+   	  output_data(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
+   	}
+  }
+  
   def init(modelfile:String, paramfile:String) = {
   	_net.init(modelfile, paramfile)
-   	input_data = FND(inwidth, inheight, inchannels, num)
-   	output_data = FND(outwidth, outheight, outchannels, num)
-   	
+  	initIO
   }
   
   def init(modelfile:String) = {
   	_net.init(modelfile)
-   	input_data = FND(inwidth, inheight, inchannels, num)
-   	output_data = FND(outwidth, outheight, outchannels, num)
+  	initIO
   }
+  
+  def num_inputs = _net.num_inputs()
+  
+  def num_outputs = _net.num_outputs()
 
   def inchannels = _net.input_blob(0).channels
   
@@ -43,7 +57,7 @@ class Net () {
   def set_mean(mfile:String, varname:String = "image_mean") = {
     var meanf:FND = load(mfile, varname)                                   // Matlab means file is W < H < D, BGR
     println("mean file %d %d %d" format(meanf.dims(0), meanf.dims(1), meanf.dims(2)))
-    if (meanf.dims(0) != inwidth || meanf.dims(1) != inheight) {
+    if (meanf.dims(0) != _image_dims(0) || meanf.dims(1) != _image_dims(1)) {
     	meanf = meanf.transpose(2, 0, 1)                                     // First go to resizing order D < W < H
     	meanf = Image(meanf).resize(inwidth, inheight).toFND                 // Resize if needed
     	meanf = meanf.transpose(1, 2, 0)                                     // Now back to W < H < D
@@ -86,8 +100,8 @@ class Net () {
   
   def crop(im:FND):FND = {                                                // Image should be D < W < H
     if (im.dims(1) > inwidth || im.dims(2) > inheight) {
-      val x0 = (im.dims(0) - inwidth)/2;
-      val y0 = (im.dims(1) - inheight)/2;
+      val x0 = (im.dims(1) - inwidth)/2;
+      val y0 = (im.dims(2) - inheight)/2;
       val x1 = x0 + inwidth;
       val y1 = y0 + inheight;
       im(?, icol(x0->x1), icol(y0->y1));
@@ -97,25 +111,31 @@ class Net () {
   }
   
   def clear_inputs = {
-    input_data.clear    
+  	for (i <- 0 until num_inputs) {
+  		input_data(i).clear 
+  	}
   }
   
-  def add_input(im:FND, i:Int) = {
+  def add_input(im:FND, i:Int, j:Int) = {
     val inblob = _net.input_blob(0)
     if (im.dims(0) != inblob.width || im.dims(1) != inblob.height || im.dims(2) != inblob.channels) {
       throw new RuntimeException("add_input dimensions mismatch")
     } else if (i < 0 || i >= num) {
       throw new RuntimeException("add_input index out of range %d %d" format (i, num))
     }
-    input_data(?,?,?,i) = im
+    input_data(i)(?,?,?,j) = im
   }
   
   def push_inputs = {
-  	_net.input_blob(0).put_data(input_data.data)
+    for (i <- 0 until num_inputs) {
+    	_net.input_blob(i).put_data(input_data(i).data)
+    }
   }
   
   def pull_outputs = {
-  	_net.output_blob(0).get_data(output_data.data)
+  	for (i <- 0 until num_outputs) {
+  		_net.output_blob(i).get_data(output_data(i).data)
+  	}
   }
   
   private var _mean:FND = null
@@ -126,9 +146,9 @@ class Net () {
   
   private var _image_dims:Array[Int] = null
   
-  var input_data:FND = null
+  var input_data:Array[FND] = null
   
-  var output_data:FND = null
+  var output_data:Array[FND] = null
   
 }
 
