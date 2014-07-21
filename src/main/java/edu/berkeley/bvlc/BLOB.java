@@ -62,7 +62,6 @@ public final class BLOB {
 		}
 	}
 
-
 	public float [] get_diff() {
 		if (_shptr != 0) {
 			int size = count(_shptr);

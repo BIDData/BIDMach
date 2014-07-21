@@ -7,7 +7,7 @@ public final class NET {
         jcuda.LibUtils.loadLibrary("caffe");
     } 
 
-    private NET() {_shptr = 0;}
+    public NET() {_shptr = 0;}
 
     public NET(String pfile) {_shptr = netFromParamFile(pfile);}
 
@@ -112,9 +112,9 @@ public final class NET {
 
     private static native int num_blobs(long ref);
 
-    private static native int forward(long ref);
+    private static native void forward(long ref);
 
-    private static native int backward(long ref);
+    private static native void backward(long ref);
 
     private static native int clearNet(long ref);
 
