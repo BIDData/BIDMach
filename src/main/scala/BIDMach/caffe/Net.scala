@@ -62,6 +62,7 @@ class Net () {
     	meanf = Image(meanf).resize(inwidth, inheight).toFND                 // Resize if needed
     	meanf = meanf.transpose(1, 2, 0)                                     // Now back to W < H < D
     }
+    meanf = crop(meanf)
     _mean = meanf
   }
   
@@ -87,11 +88,11 @@ class Net () {
     if (_scale != 1f) {
       cafimg = cafimg *@ _scale;
     }
-    cafimg = crop(cafimg);
     if (_channel_swap.asInstanceOf[AnyRef] != null) {
       cafimg = cafimg(_channel_swap, ?, ?);
     }
     cafimg = cafimg.transpose(1, 2, 0);                                   // to W < H < D
+    cafimg = crop(cafimg);
     if (_mean.asInstanceOf[AnyRef] != null) {
       cafimg = cafimg - _mean;
     }
@@ -99,12 +100,12 @@ class Net () {
   }
   
   def crop(im:FND):FND = {                                                // Image should be D < W < H
-    if (im.dims(1) > inwidth || im.dims(2) > inheight) {
-      val x0 = (im.dims(1) - inwidth)/2;
-      val y0 = (im.dims(2) - inheight)/2;
+    if (im.dims(0) > inwidth || im.dims(1) > inheight) {
+      val x0 = (im.dims(0) - inwidth)/2;
+      val y0 = (im.dims(1) - inheight)/2;
       val x1 = x0 + inwidth;
       val y1 = y0 + inheight;
-      im(?, icol(x0->x1), icol(y0->y1));
+      im(icol(x0->x1), icol(y0->y1), ?);
     } else {
       im
     }
