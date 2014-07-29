@@ -81,9 +81,9 @@ public final class NET {
     	}
     }
 
-    public Object [] blob_names() {if (_shptr != 0) return blob_names(_shptr); else throw new RuntimeException("Net uninitialized");}
+    public String [] blob_names() {if (_shptr != 0) return blob_names(_shptr); else throw new RuntimeException("Net uninitialized");}
 
-    public Object [] layer_names() {if (_shptr != 0) return layer_names(_shptr); else throw new RuntimeException("Net uninitialized");}
+    public String [] layer_names() {if (_shptr != 0) return layer_names(_shptr); else throw new RuntimeException("Net uninitialized");}
 
     public BLOB blob_by_name(String s) {if (_shptr != 0) return new BLOB(blob_by_name(_shptr, s)); else throw new RuntimeException("Net uninitialized");}
 
@@ -126,9 +126,9 @@ public final class NET {
     
     private static native long output_blob(long ref, int i);
 
-    private static native Object [] blob_names(long ref);
+    private static native String [] blob_names(long ref);
 
-    private static native Object [] layer_names(long ref);
+    private static native String [] layer_names(long ref);
 
     private static native long blob_by_name(long ref, String s);
 
