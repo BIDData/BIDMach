@@ -1,10 +1,9 @@
 package edu.berkeley.bvlc;
-import jcuda.*;
 
 public final class SGDSOLVER {
 
     static {
-        jcuda.LibUtils.loadLibrary("caffe");
+        LibUtils.loadLibrary("caffe");
     } 
 
     public SGDSOLVER(String pfile) {

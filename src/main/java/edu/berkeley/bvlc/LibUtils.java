@@ -203,6 +203,8 @@ public final class LibUtils
                 return "so";
             case WINDOWS:
                 return "dll";
+            case UNKNOWN:
+                throw new RuntimeException("Unknown OS");
         }
         return "";
     }
@@ -225,6 +227,8 @@ public final class LibUtils
                 return "lib";
             case WINDOWS:
                 return "";
+            case UNKNOWN:
+                throw new RuntimeException("Unknown OS");
         }
         return "";
     }

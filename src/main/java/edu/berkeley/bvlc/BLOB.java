@@ -1,12 +1,11 @@
 package edu.berkeley.bvlc;
-import jcuda.*;
 
 public final class BLOB {
 
 	private BLOB() {}
 
 	static {
-		jcuda.LibUtils.loadLibrary("caffe");
+		LibUtils.loadLibrary("caffe");
 	} 
 
 	protected BLOB(long shptr) {

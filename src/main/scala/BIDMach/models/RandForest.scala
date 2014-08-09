@@ -22,8 +22,6 @@ object RandForest {
   import scala.util.hashing.MurmurHash3
   import edu.berkeley.bid.CUMACH
 
-  val NegativeInfinityF = 0xff800000.toFloat
-  val NegativeInfinityI = 0xff800000.toInt
   val ITree = 0; val INode = 1; val JFeat = 2; val IFeat = 3; val IVFeat = 4; val ICat = 5
   
   def rhash(v1:Int, v2:Int, v3:Int, nb:Int):Int = {

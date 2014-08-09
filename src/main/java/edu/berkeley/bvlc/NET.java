@@ -1,10 +1,9 @@
 package edu.berkeley.bvlc;
-import jcuda.*;
 
 public final class NET {
 
     static {
-        jcuda.LibUtils.loadLibrary("caffe");
+        LibUtils.loadLibrary("caffe");
     } 
 
     public NET() {_shptr = 0;}

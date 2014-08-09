@@ -1,12 +1,11 @@
 package edu.berkeley.bvlc;
-import jcuda.*;
 
 public final class CAFFE {
 
     private CAFFE() {}
 
     static {
-        jcuda.LibUtils.loadLibrary("caffe");
+        LibUtils.loadLibrary("caffe");
     } 
     
     public static native void set_mode(int mode);

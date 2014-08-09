@@ -6,9 +6,9 @@ import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Sorting._
 import edu.berkeley.bid.CUMAT
-import BIDMach.models.RForest._
+import BIDMach.models.RandForest._
 import jcuda._
-
+/*
 /**********
  * fdata = nfeats x n 
  * fbounds = nfeats x 2
@@ -40,7 +40,7 @@ class RandomForest(fdata : Mat, cats : Mat, ntrees : Int, depth : Int, nsamps : 
 	var FieldMaskRShifts : Mat = null;  var FieldMasks : Mat = null
 	(fieldLengths) match {
 		case (fL : IMat) => {
-			FieldMaskRShifts = RForest.getFieldMaskRShifts(fL); FieldMasks = RForest.getFieldMasks(fL)
+			FieldMaskRShifts = RandForest.getFieldMaskRShifts(fL); FieldMasks = RandForest.getFieldMasks(fL)
 		}
 	}
 	
@@ -51,7 +51,7 @@ class RandomForest(fdata : Mat, cats : Mat, ntrees : Int, depth : Int, nsamps : 
 				var d = 0
 				while (d <  depth) {
 					println("d: " + d)
-					val treePacked : Array[Long] = RForest.treePack(fd, fb, tn, cts, nsps, fL)
+					val treePacked : Array[Long] = RandForest.treePack(fd, fb, tn, cts, nsps, fL)
 					RForest.sortLongs(treePacked, useGPU)
 					RForest.updateTreeData(treePacked, fL, ncats, tMI, depth, d == (depth - 1), fMRS, fM)
 					if (!(d == (depth - 1))) {
@@ -78,4 +78,5 @@ class RandomForest(fdata : Mat, cats : Mat, ntrees : Int, depth : Int, nsamps : 
 	}
 
 
-}
+} 
+*/
