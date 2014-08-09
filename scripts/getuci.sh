@@ -17,7 +17,7 @@ mkdir -p ${UCI}
 cd ${UCI}
 
 if [ ! -e docword.${1}.txt.gz ]; then
-    curl --retry 2 -O https://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.${1}.txt.gz
+    curl --retry 2 -O http://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.${1}.txt.gz
 fi 
 
 if [ ! -e "${1}.smat.lz4" ]; then
