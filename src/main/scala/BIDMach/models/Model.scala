@@ -71,7 +71,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
 	  }
   }
   
-  def updatePass = {}
+  def updatePass(ipass:Int) = {}
   
 }
 

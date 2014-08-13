@@ -56,7 +56,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   	row(-vv, math.exp(vv))
   }
   
-  override def updatePass = {
+  override def updatePass(ipass:Int) = {
     max(umcount, 1f, umcount)
     mm ~ um / umcount
     mmnorm ~ mm dotr mm

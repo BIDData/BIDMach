@@ -190,7 +190,8 @@ object RandForest {
   def minImpurity(keys:Array[Long], cnts:IMat, outv:IMat, outf:IMat, outg:FMat, outc:IMat, jc:IMat, fieldlens:IMat, 
       ncats:Int, fnum:Int) = {
     
-    val imptyFns = imptyFunArray(fnum)
+    val update = imptyFunArray(fnum).update
+    val result = imptyFunArray(fnum).result
 
     val totcounts = izeros(1,ncats);
     val counts = izeros(1,ncats);
@@ -230,11 +231,11 @@ object RandForest {
       acct = 0; 
       j = 0;
       while (j < ncats) {                  // Get the impurity for the node
-        acct += imptyFns.update(totcounts(j));
+        acct += update(totcounts(j));
         j += 1
       }
 //      if (i < 32)  println("scala %d %d %f" format (i, tott, acct))
-      val nodeImpty = imptyFns.result(acct, tott);
+      val nodeImpty = result(acct, tott);
       
       var lastival = -1
       var minImpty = Float.MaxValue
@@ -255,9 +256,9 @@ object RandForest {
         val oldcntt = totcounts(icat) - oldcnt;
         val newcntt = totcounts(icat) - newcnt;
         tot += cnt;
-        acc += imptyFns.update(newcnt) - imptyFns.update(oldcnt);
-        acct += imptyFns.update(newcntt) - imptyFns.update(oldcntt);
-        val impty = imptyFns.result(acc, tot) + imptyFns.result(acct, tott - tot)
+        acc += update(newcnt) - update(oldcnt);
+        acct += update(newcntt) - update(oldcntt);
+        val impty = result(acc, tot) + result(acct, tott - tot)
 //        if (i==0) println("scala pos %d impty %f icat %d cnts %d %d cacc %f %d" format (j, impty,  icat, oldcnt, newcnt, acc, tot))
         if (ival != lastival) {
           if (lastImpty < minImpty) { 
