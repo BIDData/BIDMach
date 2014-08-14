@@ -14,9 +14,9 @@ opts1.useGPU=false
 mm1.train
 
 println("\n<<<<<<< Testing GLM no MKL >>>>>>>")
-Mat.noMKL=true
+Mat.useMKL=false
 mm1.train
-Mat.noMKL=false
+Mat.useMKL=true
 
 if (Mat.hasCUDA > 0) resetGPU
 Mat.clearCaches
@@ -52,9 +52,9 @@ opts5.npasses=2
 mm5.train
 
 println("\n<<<<<<< Testing LDA, no MKL >>>>>>>")
-Mat.noMKL=true
+Mat.useMKL=false
 mm5.train
-Mat.noMKL=false
+Mat.useMKL=true
 
 if (Mat.hasCUDA > 0) resetGPU
 Mat.clearCaches
