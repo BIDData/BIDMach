@@ -10,6 +10,9 @@ package BIDMach.models
 // (1,X,Y) value holds the majority category id for that node. 
 
 import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
+import BIDMach.Learner
+import BIDMach.datasources.MatDS
+import BIDMach.updaters.Batch
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
@@ -45,6 +48,7 @@ class RandomForest(override val opts:RandomForest.Opts) extends Model(opts) {
     nsamps = opts.nsamps;
     nvals = opts.nvals;
     trees = if (opts.useGPU && Mat.hasCUDA > 0) gizeros(2 * nnodes, opts.ntrees) else izeros(2 * nnodes, opts.ntrees);
+    trees.set(-1);
     modelmats = Array(trees);
     mats = datasource.next;
     nfeats = mats(0).nrows;
@@ -484,8 +488,8 @@ object RandomForest {
     
   trait Opts extends Model.Opts { 
      var depth = 8;
-     var ntrees = 10;
-     var nsamps = 10;
+     var ntrees = 32;
+     var nsamps = 32;
      var nvals = 1000;
      var gain = 0.1f; 
      var margin = 1.5f;
@@ -493,4 +497,19 @@ object RandomForest {
   }
   
   class Options extends Opts {}
+  
+  def learn(data:FMat, labels:SMat) = {
+    class xopts extends Learner.Options with RandomForest.Opts with MatDS.Opts with Batch.Opts;
+    val opts = new xopts;
+    opts.useGPU = false;
+    opts.nvals = maxi(maxi(data)).dv.toInt;
+    opts.batchSize = math.min(100000000/data.nrows, data.ncols);
+    val nn = new Learner(
+        new MatDS(Array(data, labels), opts), 
+        new RandomForest(opts), 
+        null, 
+        new Batch(opts),
+        opts)
+    (nn, opts)
+  }
 }

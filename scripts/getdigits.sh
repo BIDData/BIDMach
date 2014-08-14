@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
