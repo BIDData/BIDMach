@@ -1,12 +1,15 @@
-/*
-val a = loadSMat("/code/BIDMach/data/rcv1/docs.smat.lz4")
-val c = loadFMat("/code/BIDMach/data/rcv1/cats.fmat.lz4")
+val dir = "/code/BIDmach"
+val a = loadSMat(dir+"/data/rcv1/docs.smat.lz4")
+val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
 
-println("\n<<<<<<< Testing GLM on RCV1 >>>>>>>")
+if (Mat.hasCUDA > 0) {
+println("\n<<<<<<< Testing GLM on RCV1 with GPU >>>>>>>")
 val (mm1,opts1) = GLM.learner(a,c,2)
 mm1.train
+}
 
 println("\n<<<<<<< Testing GLM with MKL, no GPU >>>>>>>")
+val (mm1,opts1) = GLM.learner(a,c,2)
 opts1.useGPU=false
 mm1.train
 
@@ -28,18 +31,45 @@ mm2.train
 
 resetGPU
 Mat.clearCaches
+if (Mat.hasCUDA > 1) {
 println("\n<<<<<<< Testing parallel LDA >>>>>>>")
 val (mm5,opts5) = LDA.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
 opts5.npasses=2
 mm5.train
+} else if (Mat.hasCUDA > 0) {
+println("\n<<<<<<< Testing LDA with GPU >>>>>>>")
+val (mm5,opts5) = LDA.learner(a, 256)
+opts5.npasses=2
+mm5.train
+}
 
 resetGPU
 Mat.clearCaches
+println("\n<<<<<<< Testing LDA, no GPU >>>>>>>")
+val (mm5,opts5) = LDA.learner(a, 256)
+opts5.useGPU = false
+opts5.npasses=2
+mm5.train
+
+println("\n<<<<<<< Testing LDA, no MKL >>>>>>>")
+Mat.noMKL=true
+mm5.train
+Mat.noMKL=false
+
+resetGPU
+Mat.clearCaches
+if (Mat.hasCUDA > 1) {
 println("\n<<<<<<< Testing parallel NMF >>>>>>>")
 val (mm6,opts6) = NMF.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
 opts6.npasses=2
 mm6.train
-*/
+} else {
+println("\n<<<<<<< Testing NMF >>>>>>>")
+val (mm6,opts6) = NMF.learner(a, 256)
+opts6.npasses=2
+mm6.train
+}
+
 
 val x = rand(32,1000000)           // A causal data matrix
 val b = rand(1,32) - 0.5f         // influence on the treatment
