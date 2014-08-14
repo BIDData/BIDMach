@@ -1,4 +1,4 @@
-val dir = "/code/BIDmach"
+val dir = "/usr/local/BIDMach"
 val a = loadSMat(dir+"/data/rcv1/docs.smat.lz4")
 val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
 
@@ -18,7 +18,7 @@ Mat.noMKL=true
 mm1.train
 Mat.noMKL=false
 
-resetGPU
+if (Mat.hasCUDA > 0) resetGPU
 Mat.clearCaches
 
 println("\n<<<<<<< Testing FM >>>>>>>")
@@ -29,7 +29,7 @@ opts2.dim2=16
 opts2.reg1weight=1
 mm2.train
 
-resetGPU
+if (Mat.hasCUDA > 0) resetGPU
 Mat.clearCaches
 if (Mat.hasCUDA > 1) {
 println("\n<<<<<<< Testing parallel LDA >>>>>>>")
@@ -43,7 +43,7 @@ opts5.npasses=2
 mm5.train
 }
 
-resetGPU
+if (Mat.hasCUDA > 0) resetGPU
 Mat.clearCaches
 println("\n<<<<<<< Testing LDA, no GPU >>>>>>>")
 val (mm5,opts5) = LDA.learner(a, 256)
@@ -56,7 +56,7 @@ Mat.noMKL=true
 mm5.train
 Mat.noMKL=false
 
-resetGPU
+if (Mat.hasCUDA > 0) resetGPU
 Mat.clearCaches
 if (Mat.hasCUDA > 1) {
 println("\n<<<<<<< Testing parallel NMF >>>>>>>")
