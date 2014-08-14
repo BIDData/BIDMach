@@ -6,7 +6,11 @@ export JAVA_OPTS="-Xmx12G -Xms128M" # Set as much memory as possible
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
+  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
+  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
 else 
+  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
+  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
   BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
 fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`

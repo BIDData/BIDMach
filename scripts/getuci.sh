@@ -20,16 +20,11 @@ if [ ! -e docword.${1}.txt.gz ]; then
     curl --retry 2 -O https://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.${1}.txt.gz
 fi 
 
-if [ ! -e "${1}.smat.lz4" ]; then
-    if [ ! -e "docword.${1}.txt" ]; then
-        echo "Uncompressing docword.${1}.txt.gz"
-        gunzip -c "docword.${1}.txt.gz" | tail -n +4 > "docword.${1}.txt"
-    fi
-    if [ ! -e "${1}.cols.imat.gz" ]; then
-        ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "docword.${1}.txt" -f "${UCI}/../uci_fmt.txt" -o "./${1}." -m "./${1}." -d " " -c
-    fi
-    ${BIDMACH_SCRIPTS}/../bidmach "-e"  "BIDMach.NYTIMES.preprocess(\"${UCI}/\",\"${1}.\")"
-fi
+echo "Uncompressing docword.${1}.txt.gz"
+gunzip -c "docword.${1}.txt.gz" | tail -n +4 > "docword.${1}.txt"
+${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "docword.${1}.txt" -f "${UCI}/../uci_fmt.txt" -o "./${1}." -m "./${1}." -d " " -c
+cd ${BIDMACH_SCRIPTS}/..
+${BIDMACH_SCRIPTS}/../bidmach "-e"  "BIDMach.NYTIMES.preprocess(\"${UCI}/\",\"${1}.\")"
 
 if [ -e "docword.${1}.txt" ]; then
     echo "clearing up"

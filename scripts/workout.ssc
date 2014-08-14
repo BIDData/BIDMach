@@ -1,4 +1,4 @@
-val dir = "/usr/local/BIDMach"
+val dir = "/use/local/BIDMach"
 val a = loadSMat(dir+"/data/rcv1/docs.smat.lz4")
 val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
 

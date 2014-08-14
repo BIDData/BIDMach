@@ -38,32 +38,21 @@ if [ ! -e rcv1-v2.topics.qrels.gz ]; then
 fi
 
 # Tokenize the text files
-if [ ! -e tokenized/dict.sbmat.gz ]; then
 # Windows cant use an uncompression pipe so uncompress here
-    if [ "$OS" = "Windows_NT" ]; then
-        for i in `seq 0 3`; do 
-            if [ ! -e lyrl2004_tokens_test_pt${i}.dat ]; then
-                echo "Uncompressing lyrl2004_tokens_test_pt${i}.dat.gz"
-                gunzip -c lyrl2004_tokens_test_pt${i}.dat.gz > lyrl2004_tokens_test_pt${i}.dat
-            fi
-        done
-        if [ ! -e lyrl2004_tokens_train.dat ]; then
-            gunzip -c lyrl2004_tokens_train.dat.gz > lyrl2004_tokens_train.dat
-        fi
-        allfiles=`echo $allfiles | sed s/\.dat\.gz/.dat/g`
-    fi
-
-    ${BIDMACH_SCRIPTS}/../bin/trec.exe -i $allfiles -o tokenized/ -c
+if [ "$OS" = "Windows_NT" ]; then
+    for i in `seq 0 3`; do 
+        gunzip -c lyrl2004_tokens_test_pt${i}.dat.gz > lyrl2004_tokens_test_pt${i}.dat
+    done
+    gunzip -c lyrl2004_tokens_train.dat.gz > lyrl2004_tokens_train.dat
 fi
+allfiles=`echo $allfiles | sed s/\.dat\.gz/.dat/g`
+${BIDMACH_SCRIPTS}/../bin/trec.exe -i $allfiles -o tokenized/ -c
 
 # Parse the topic assignment file
-if [ ! -e "catname.imat" ]; then
-    ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/../rcv1_fmt.txt" -o "./" -m "./" -d " "
-fi
+${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/../rcv1_fmt.txt" -o "./" -m "./" -d " "
 
 # Call bidmach to put the data together
-if [ ! -e "docs.smat.lz4" ]; then
-    ${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.RCV1.prepare(\"${RCV1}/tokenized/\")"
-fi
+cd ${BIDMACH_SCRIPTS}/..
+${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.RCV1.prepare(\"${RCV1}/tokenized/\")"
 
 
