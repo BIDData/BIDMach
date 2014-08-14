@@ -28,7 +28,7 @@ if [ ! -e "${1}.smat.lz4" ]; then
     if [ ! -e "${1}.cols.imat.gz" ]; then
         ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "docword.${1}.txt" -f "${UCI}/../uci_fmt.txt" -o "./${1}." -m "./${1}." -d " " -c
     fi
-    bidmach "-e"  "BIDMach.NYTIMES.preprocess(\"${UCI}/\",\"${1}.\")"
+    ${BIDMACH_SCRIPTS}/../bidmach "-e"  "BIDMach.NYTIMES.preprocess(\"${UCI}/\",\"${1}.\")"
 fi
 
 if [ -e "docword.${1}.txt" ]; then

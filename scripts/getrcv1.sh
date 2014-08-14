@@ -63,7 +63,7 @@ fi
 
 # Call bidmach to put the data together
 if [ ! -e "docs.smat.lz4" ]; then
-    bidmach "-e" "BIDMach.RCV1.prepare(\"${RCV1}/tokenized/\")"
+    ${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.RCV1.prepare(\"${RCV1}/tokenized/\")"
 fi
 
 

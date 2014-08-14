@@ -22,7 +22,7 @@ if [ ! -e "arabic.fmat.lz4" ]; then
     if [ ! -e "arabic.txt" ]; then
         sed -e 's/^[[:space:]]*$/0 0 0 0 0 0 0 0 0 0 0 0 0/g' Train_Arabic_Digit.txt > arabic.txt
     fi
-    bidmach "-e" "BIDMach.DIGITS.preprocess(\"${UCI}/\",\"arabic\")"
+    ${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.DIGITS.preprocess(\"${UCI}/\",\"arabic\")"
 fi
 
 if [ -e "arabic.txt" ]; then
