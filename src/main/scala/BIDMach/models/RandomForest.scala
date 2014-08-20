@@ -17,6 +17,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
 import scala.util.hashing.MurmurHash3
+import java.util.Arrays
 
 class RandomForest(override val opts:RandomForest.Opts) extends Model(opts) {
   
@@ -87,12 +88,16 @@ class RandomForest(override val opts:RandomForest.Opts) extends Model(opts) {
     val sdata = gmats(0);
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null
-    val (inds, counts):(LMat, IMat) = (sdata, cats, nnodes, trees, tmp1, tmp2, tc1) match {
-        case (idata:IMat, scats:SMat, inodes:IMat, itrees:IMat, lt1:LMat, lt2:LMat, tc:IMat) => {
-          val xnodes = if (inodes.asInstanceOf[AnyRef] != null) inodes else treeWalk(idata, itrees, ipass);
+    val (inds, counts):(LMat, IMat) = (sdata, cats, trees, tmp1, tmp2, tc1) match {
+        case (idata:IMat, scats:SMat, itrees:IMat, lt1:LMat, lt2:LMat, tc:IMat) => {
+          val xnodes = if (nnodes.asInstanceOf[AnyRef] != null) nnodes.asInstanceOf[IMat] else treeWalk(idata, itrees, ipass);
+          print("xnodes="+xnodes.toString)
           val lt = treePack(idata, xnodes, scats, lt1, nsamps, fieldlengths);
-          sort(lt);    
+          Arrays.sort(lt.data, 0, lt.length);    
           makeV(lt, lt2, tc);
+        }
+        case _ => {
+          throw new RuntimeException("RandomForest doblock types dont match")
         }
     }
     if (totalinds.asInstanceOf[AnyRef] != null) {
@@ -111,19 +116,26 @@ class RandomForest(override val opts:RandomForest.Opts) extends Model(opts) {
   } 
   
   override def updatePass(ipass:Int) = {
+    println("Update pass %d" format ipass)
+//    throw new RuntimeException("unexceptional")
     val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, jc, opts.impurity);
+    println("gg %d %d" format (gg.nrows, gg.ncols))
+    print("gg data "+gg.toString)
+    print("outv data "+outv.toString)
     val (vm, im) = mini2(gg);
     val inds = im + irow(0->im.length) * gg.nrows;
     val inodes = outn(inds);
+    print("inodes "+inodes.toString+"\n")
     val reqgain = if (ipass < opts.depth) opts.gain else Float.MaxValue;
-    val i1 = find(vm > reqgain);
-    val i2 = find(vm <= reqgain);
+    val i1 = find(vm < -reqgain);
+    val i2 = find(vm >= -reqgain);
+    println("i1 %d i2 %d" format (i1.length, i2.length))
     if (i1.length > 0) {
       trees(inodes(i1)*2) = outf(inds(i1));
       trees(inodes(i1)*2+1) = outv(inds(i1));
     }
     if (i2.length > 0) {
-      trees(inodes(i2)*2) = -1;
+      trees(inodes(i2)*2) = iones(i2.length,1) * -1;
       trees(inodes(i2)*2+1) = outc(inds(i2));
     }
     totalinds = null;
@@ -244,7 +256,7 @@ class RandomForest(override val opts:RandomForest.Opts) extends Model(opts) {
       while (itree < ntrees) {
         var inode = 0;
         var id = 0;
-        while (id <= depth) {
+        while (id < depth) {
           val ifeat = trees(2 * inode, itree);
           val ithresh = trees(1 + 2 * inode, itree);
           if (ifeat < 0) {
@@ -498,12 +510,13 @@ object RandomForest {
   
   class Options extends Opts {}
   
-  def learn(data:FMat, labels:SMat) = {
+  def learner(data:IMat, labels:SMat) = {
     class xopts extends Learner.Options with RandomForest.Opts with MatDS.Opts with Batch.Opts;
     val opts = new xopts;
     opts.useGPU = false;
     opts.nvals = maxi(maxi(data)).dv.toInt;
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
+    opts.npasses = opts.depth;
     val nn = new Learner(
         new MatDS(Array(data, labels), opts), 
         new RandomForest(opts), 
