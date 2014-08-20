@@ -19,7 +19,7 @@ import edu.berkeley.bid.CUMAT
 import scala.util.hashing.MurmurHash3
 import java.util.Arrays
 
-class RandomForest(override val opts:RandomForest.Opts) extends Model(opts) {
+class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   
   val ITree = 0; val INode = 1; val JFeat = 2; val IFeat = 3; val IVFeat = 4; val ICat = 5
   
@@ -44,6 +44,7 @@ class RandomForest(override val opts:RandomForest.Opts) extends Model(opts) {
   val fieldlengths = izeros(1,6);
   
   def init() = {
+    opts.npasses = opts.depth;                   // Make sure we make the correct number of passes
     nnodes = math.pow(2, opts.depth + 1).toInt;  // Num nodes per tree. Keep as a power of two (dont subtract one), so blocks align better. 
     ntrees = opts.ntrees;
     nsamps = opts.nsamps;
@@ -510,13 +511,13 @@ object RandomForest {
   
   class Options extends Opts {}
   
+  class RFopts extends Learner.Options with RandomForest.Opts with MatDS.Opts with Batch.Opts;
+  
   def learner(data:IMat, labels:SMat) = {
-    class xopts extends Learner.Options with RandomForest.Opts with MatDS.Opts with Batch.Opts;
-    val opts = new xopts;
+    val opts = new RFopts;
     opts.useGPU = false;
     opts.nvals = maxi(maxi(data)).dv.toInt;
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
-    opts.npasses = opts.depth;
     val nn = new Learner(
         new MatDS(Array(data, labels), opts), 
         new RandomForest(opts), 
