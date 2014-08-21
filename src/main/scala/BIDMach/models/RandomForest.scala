@@ -148,8 +148,8 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     val inodes = outn(inds);
     val reqgain = if (ipass < opts.depth - 1) opts.gain else Float.MaxValue;
     val i1 = find(vm > reqgain);
-    trees(inodes*2+1) = outc(inds);                          // Save the node class for this node
-    if (ipass < opts.depth - 1) tochildren(inodes, outc(inds));
+    trees(inodes*2+1) = outc(inds);                             // Save the node class for this node
+    if (ipass < opts.depth - 1) tochildren(inodes, outc(inds)); // Save class id to children in class we don't visit them later
     if (i1.length > 0) {
       trees(inodes(i1)*2) = outf(inds(i1));
       trees(inodes(i1)*2+1) = outv(inds(i1));
