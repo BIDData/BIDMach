@@ -147,6 +147,8 @@ int parsemdt(char * str);
 
 int parsemdate(char * str);
 
+int parsecmdate(char * str);
+
 
 istream * open_in(string ifname);
 

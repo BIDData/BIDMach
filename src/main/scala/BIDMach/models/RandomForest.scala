@@ -29,7 +29,8 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   var tc1:Mat = null;
   var totalinds:LMat = null;
   var totalcounts:IMat = null;
-  var trees:Mat = null;
+  var trees:IMat = null;
+  var gtrees:GIMat = null;
   var outv:IMat = null;
   var outf:IMat = null;
   var outn:IMat = null;
@@ -42,6 +43,13 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   var nvals = 0;
   var ncats = 0;
   val fieldlengths = izeros(1,6);
+  var fieldmasks:IMat = null;
+  var t1 = 0f;
+  var t2 = 0f;
+  var t3 = 0f; 
+  var t4 = 0f;
+  var t5 = 0f;
+  val runtimes = zeros(7,1);
   
   def init() = {
     opts.npasses = opts.depth;                   // Make sure we make the correct number of passes
@@ -49,8 +57,9 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     ntrees = opts.ntrees;
     nsamps = opts.nsamps;
     nvals = opts.nvals;
-    trees = if (opts.useGPU && Mat.hasCUDA > 0) gizeros(2 * nnodes, opts.ntrees) else izeros(2 * nnodes, opts.ntrees);
+    trees = izeros(2 * nnodes, opts.ntrees);
     trees.set(-1);
+    if (opts.useGPU && Mat.hasCUDA > 0) gtrees = GIMat(trees);
     modelmats = Array(trees);
     mats = datasource.next;
     nfeats = mats(0).nrows;
@@ -73,6 +82,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     fieldlengths(IFeat) = countbits(nfeats);
     fieldlengths(IVFeat) = countbits(nvals);
     fieldlengths(ICat) = countbits(ncats);
+    fieldmasks = getFieldMasks(fieldlengths);
   } 
   
   def countbits(n:Int):Int = {
@@ -89,18 +99,27 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     val sdata = gmats(0);
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null
-    val (inds, counts):(LMat, IMat) = (sdata, cats, trees, tmp1, tmp2, tc1) match {
-        case (idata:IMat, scats:SMat, itrees:IMat, lt1:LMat, lt2:LMat, tc:IMat) => {
-          val xnodes = if (nnodes.asInstanceOf[AnyRef] != null) nnodes.asInstanceOf[IMat] else treeWalk(idata, itrees, ipass);
-          print("xnodes="+xnodes.toString)
+    tic
+    val (inds, counts):(LMat, IMat) = (sdata, cats, tmp1, tmp2, tc1) match {
+        case (idata:IMat, scats:SMat, lt1:LMat, lt2:LMat, tc:IMat) => {
+          val xnodes = if (nnodes.asInstanceOf[AnyRef] != null) nnodes.asInstanceOf[IMat] else treeWalk(idata, trees, ipass);
+ //         print("xnodes="+xnodes.toString)
+          t1 = toc;
+          runtimes(0) += t1;
           val lt = treePack(idata, xnodes, scats, lt1, nsamps, fieldlengths);
+          t2 = toc;
+          runtimes(1) += t2 - t1;
           Arrays.sort(lt.data, 0, lt.length);    
+          t3 = toc;
+          runtimes(2) += t3 - t2;
           makeV(lt, lt2, tc);
         }
         case _ => {
           throw new RuntimeException("RandomForest doblock types dont match")
         }
     }
+    t4 = toc;
+    runtimes(3) += t4 - t3;
     if (totalinds.asInstanceOf[AnyRef] != null) {
       val (inds1, counts1) = addV(inds, counts, totalinds, totalcounts);
       totalinds = inds1;
@@ -109,6 +128,8 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
       totalinds = inds;
       totalcounts = counts;
     }        
+    t5 = toc;
+    runtimes(4) += t5 - t4;
   }
   
   def evalblock(mats:Array[Mat], ipass:Int):FMat = {
@@ -117,29 +138,38 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   } 
   
   override def updatePass(ipass:Int) = {
-    println("Update pass %d" format ipass)
-//    throw new RuntimeException("unexceptional")
+    tic;
     val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, jc, opts.impurity);
+    t1 = toc;
+    runtimes(5) += t1;
     println("gg %d %d" format (gg.nrows, gg.ncols))
-    print("gg data "+gg.toString)
-    print("outv data "+outv.toString)
     val (vm, im) = mini2(gg);
     val inds = im + irow(0->im.length) * gg.nrows;
     val inodes = outn(inds);
-    print("inodes "+inodes.toString+"\n")
-    val reqgain = if (ipass < opts.depth) opts.gain else Float.MaxValue;
-    val i1 = find(vm < -reqgain);
-    val i2 = find(vm >= -reqgain);
-    println("i1 %d i2 %d" format (i1.length, i2.length))
+    val reqgain = if (ipass < opts.depth - 1) opts.gain else Float.MaxValue;
+    val i1 = find(vm > reqgain);
+    trees(inodes*2+1) = outc(inds);                          // Save the node class for this node
+    if (ipass < opts.depth - 1) tochildren(inodes, outc(inds));
     if (i1.length > 0) {
       trees(inodes(i1)*2) = outf(inds(i1));
       trees(inodes(i1)*2+1) = outv(inds(i1));
     }
-    if (i2.length > 0) {
-      trees(inodes(i2)*2) = iones(i2.length,1) * -1;
-      trees(inodes(i2)*2+1) = outc(inds(i2));
-    }
     totalinds = null;
+    t2 = toc;
+    runtimes(6) += t2 - t1;
+  }
+  
+  def tochildren(inodes:IMat, icats:IMat) {
+    var i = 0;
+    val nmask = fieldmasks(INode);
+    while (i < inodes.length) {
+      val inode = inodes(i) & nmask;
+      val itree = (inodes(i) >> fieldlengths(INode));
+      trees(4*inode + 3, itree) = icats(i);
+      trees(4*inode + 5, itree) = icats(i);
+      i += 1;
+    }
+
   }
   
   def rhash(v1:Int, v2:Int, v3:Int, nb:Int):Int = {
@@ -188,35 +218,39 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   }
   
   def treePack(idata:IMat, treenodes:IMat, cats:SMat, out:LMat, nsamps:Int, fieldlengths:IMat):LMat = {
-    val nfeats = idata.nrows
-    val nitems = idata.ncols
-    val ntrees = treenodes.nrows
-    val ncats = cats.nrows
-    val nnzcats = cats.nnz
-    val ionebased = Mat.ioneBased
-    var icol = 0
+    val nfeats = idata.nrows;
+    val nitems = idata.ncols;
+    val ntrees = treenodes.nrows;
+    val ncats = cats.nrows;
+    val nnzcats = cats.nnz;
+    val ionebased = Mat.ioneBased;
+    var icol = 0;
+    var nvals = 0;
     while (icol < nitems) {
-      var jci = cats.jc(icol) - ionebased
-      val jcn = cats.jc(icol+1) - ionebased
-      var itree = 0
+      var jci = cats.jc(icol) - ionebased;
+      val jcn = cats.jc(icol+1) - ionebased;
+      var itree = 0;
       while (itree < ntrees) {
-        val inode = treenodes(itree, icol)
-        var jfeat = 0
-        while (jfeat < nsamps) {
-          val ifeat = rhash(itree, inode, jfeat, nfeats)
-          val ivfeat = idata(ifeat, icol)
-          var j = jci
-          while (j < jcn) {
-            out.data(jfeat + nsamps * (itree + ntrees * j)) = packFields(itree, inode, jfeat, ifeat, ivfeat, cats.ir(j) - ionebased, fieldlengths)
-            j += 1
+        val inode = treenodes(itree, icol);
+        if (inode >= 0) {
+          var jfeat = 0;
+          while (jfeat < nsamps) {
+            val ifeat = rhash(itree, inode, jfeat, nfeats);
+            val ivfeat = idata(ifeat, icol);
+            var j = jci;
+            while (j < jcn) {
+              out.data(nvals) = packFields(itree, inode, jfeat, ifeat, ivfeat, cats.ir(j) - ionebased, fieldlengths);
+              j += 1;
+              nvals += 1;
+            }
+            jfeat += 1;
           }
-          jfeat += 1
         }
-        itree += 1
+        itree += 1;
       }
-      icol += 1
+      icol += 1;
     }
-    new LMat(nsamps * nnzcats * ntrees, 1, out.data);
+    new LMat(nvals, 1, out.data);
   }
   
   def treeStep(idata:IMat, tnodes:IMat,  trees:IMat, nifeats:Int, nnodes:Int)  {
@@ -228,16 +262,18 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
       var itree = 0;
       while (itree < ntrees) {
         val inode = tnodes(itree, icol);
-        val ifeat = trees(2 * inode, itree);
-        val ithresh = trees(1 + 2 * inode, itree);
-        if (ifeat < 0) {
-          tnodes(itree, icol) = ithresh;
-        } else {
-          val ivfeat = idata(ifeat, icol);
-          if (ivfeat > ithresh) {
-            tnodes(itree, icol) = 2 * inode + 2;
-          } else {
-            tnodes(itree, icol) = 2 * inode + 1;
+        if (inode >= 0) {                                 // Not already classified. Otherwise inode should be a negative class id
+          val ifeat = trees(2 * inode, itree);
+          val ithresh = trees(1 + 2 * inode, itree);
+          if (ifeat < 0) {                                // At a leaf in the tree so save class id
+            tnodes(itree, icol) = -ithresh;
+          } else {                                        // Walk down one level in the tree
+            val ivfeat = idata(ifeat, icol);
+            if (ivfeat > ithresh) {
+              tnodes(itree, icol) = 2 * inode + 2;
+            } else {
+              tnodes(itree, icol) = 2 * inode + 1;
+            }
           }
         }
         itree += 1;
@@ -261,7 +297,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
           val ifeat = trees(2 * inode, itree);
           val ithresh = trees(1 + 2 * inode, itree);
           if (ifeat < 0) {
-            inode = ithresh;
+            inode = -ithresh;                    // Should be the class number
             id = depth;
           } else {
             val ivfeat = idata(ifeat, icol);
@@ -374,22 +410,27 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   }
   
   trait imptyType {
-    val update: (Int)=>Float;
-    val result: (Float, Int)=>Float;
+    val update: (Int)=>Double;
+    val result: (Double, Int)=>Double;
+    val combine: (Double, Double, Int, Int) => Double;
   }
   
   object entImpurity extends imptyType {
-    def updatefn(a:Int):Float = { val v = math.max(a,1).toFloat; v * math.log(v).toFloat }
-    def resultfn(acc:Float, tot:Int):Float = { val v = math.max(tot,1).toFloat; math.log(v).toFloat - acc / v }
+    def updatefn(a:Int):Double = { val v = math.max(a,1); v * math.log(v) }
+    def resultfn(acc:Double, tot:Int):Double = { val v = math.max(tot,1); math.log(v) - acc / v }
+    def combinefn(ent1:Double, ent2:Double, tot1:Int, tot2:Int):Double = { (ent1 * tot1 + ent2 * tot2)/math.max(1, tot1 + tot2) } 
     val update = updatefn _ ;
     val result = resultfn _ ;
+    val combine = combinefn _ ;
   }
   
   object giniImpurity extends imptyType {
-    def updatefn(a:Int):Float = { val v = a.toFloat; v * v }
-    def resultfn(acc:Float, tot:Int) = { val v = math.max(tot,1).toFloat; 1f - acc / (v * v) }
+    def updatefn(a:Int):Double = { val v = a; v * v }
+    def resultfn(acc:Double, tot:Int) = { val v = math.max(tot,1); 1f - acc / (v * v) }
+    def combinefn(ent1:Double, ent2:Double, tot1:Int, tot2:Int):Double = { (ent1 * tot1 + ent2 * tot2)/math.max(1, tot1 + tot2) }
     val update = updatefn _ ;
     val result = resultfn _ ;
+    val combine = combinefn _ ;
   }
   
   val imptyFunArray = Array[imptyType](entImpurity,giniImpurity)
@@ -404,6 +445,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     
     val update = imptyFunArray(fnum).update
     val result = imptyFunArray(fnum).result
+    val combine = imptyFunArray(fnum).combine
 
     val totcounts = izeros(1,ncats);
     val counts = izeros(1,ncats);
@@ -415,8 +457,8 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     var j = 0;
     var tot = 0;
     var tott = 0;
-    var acc = 0f;
-    var acct = 0f;
+    var acc = 0.0;
+    var acct = 0.0;
     var i = 0;
     while (i < jc.length - 1) {
       val jci = jc(i);
@@ -428,7 +470,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
       j = jci;
       var maxcnt = -1;
       var imaxcnt = -1;
-      while (j < jcn) {                     // First get the total counts for each
+      while (j < jcn) {                     // First get the total counts for each, and the max
         val key = keys(j)
         val cnt = cnts(j)
         val icat = extractField(ICat, key, fieldshifts, fieldmasks);
@@ -442,28 +484,37 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
         j += 1;
       }
       acct = 0; 
+//      println("totcounts "+totcounts.toString);
       j = 0;
       while (j < ncats) {                  // Get the impurity for the node
         acct += update(totcounts(j));
         j += 1
       }
-//      if (i < 32)  println("scala %d %d %f" format (i, tott, acct))
       val nodeImpty = result(acct, tott);
       
       var lastival = -1
-      var minImpty = Float.MaxValue
-      var lastImpty = Float.MaxValue
+      var minImpty = nodeImpty
+      var lastImpty = Double.MaxValue
       var partv = -1
-      var besti = -1
+      var lastkey = -1L
       acc = 0;
       tot = 0;
       j = jci;
       val inode = (keys(j) >>> fieldshifts(INode)).toInt;
-      while (j < jcn) {                   // Then incrementally update top and bottom impurities and find min total 
+      val ifeat = extractField(IFeat, keys(j), fieldshifts, fieldmasks);
+      while (j < jcn) {     
         val key = keys(j)
         val cnt = cnts(j)
         val ival = extractField(IVFeat, key, fieldshifts, fieldmasks);
-        val icat = extractField(ICat, key, fieldshifts, fieldmasks);
+        val icat = extractField(ICat, key, fieldshifts, fieldmasks);  
+        
+        if (j > jci && ival != lastival) {
+          lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // Dont compute every time!
+          if (lastImpty < minImpty) { 
+            minImpty = lastImpty;
+            partv = lastival;
+          }
+        }       
         val oldcnt = counts(icat);
         val newcnt = oldcnt + cnt;
         counts(icat) = newcnt;
@@ -472,22 +523,15 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
         tot += cnt;
         acc += update(newcnt) - update(oldcnt);
         acct += update(newcntt) - update(oldcntt);
-        val impty = result(acc, tot) + result(acct, tott - tot)
-//        if (i==0) println("scala pos %d impty %f icat %d cnts %d %d cacc %f %d" format (j, impty,  icat, oldcnt, newcnt, acc, tot))
-        if (ival != lastival) {
-          if (lastImpty < minImpty) { 
-            minImpty = lastImpty;
-            partv = ival;
-            besti = extractField(IFeat, key, fieldshifts, fieldmasks);
-          }
-        }
+        lastkey = key;
         lastival = ival;
-        lastImpty = impty;
         j += 1;
       }
+      lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // For checking
+//      println("Impurity %f, %f, min %f, %d, %d" format (nodeImpty, lastImpty, minImpty, partv, ifeat))
       outv(i) = partv;
       outg(i) = nodeImpty - minImpty;
-      outf(i) = besti;
+      outf(i) = ifeat;
       outc(i) = imaxcnt;
       outn(i) = inode;
       i += 1;
@@ -504,7 +548,7 @@ object RandomForest {
      var ntrees = 32;
      var nsamps = 32;
      var nvals = 1000;
-     var gain = 0.1f; 
+     var gain = 0.00001f 
      var margin = 1.5f;
      var impurity = 0;  // zero for entropy, one for Gini impurity
   }
@@ -525,5 +569,31 @@ object RandomForest {
         new Batch(opts),
         opts)
     (nn, opts)
+  }
+  
+  def entropy(a:FMat):Double = {
+    val v = a / sum(a);
+    v ddot ln(v)
+  }
+  
+  def checktree(tree:IMat, ncats:Int) {
+    val ntrees = tree.ncols;
+    val nnodes = tree.nrows >> 1;
+    def checknode(inode:Int, itree:Int) {
+      if (tree(inode * 2, itree) < 0) {
+        if (tree(inode * 2 + 1, itree) <  0 ||  tree(inode * 2 + 1, itree) >= ncats) {
+          throw new RuntimeException("Bad node %d in tree %d" format (inode, itree));
+        }
+      } else {
+        checknode(inode*2+1, itree);
+        checknode(inode*2+2, itree);
+      }
+    }
+    var i = 0
+    while (i < ntrees) {
+      checknode(0, i);
+      i += 1;
+    }
+    println("OK");
   }
 }

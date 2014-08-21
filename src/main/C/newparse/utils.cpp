@@ -158,8 +158,9 @@ int parsedt(char * str) {
 }
 
 
-// For dates of form MM/DD/YYYY HH:MM:SS
-int parsemdate(char * str) {
+// For dates of form MM/DD/YYYY HH:MM:SS or MM/DD/YY HH:MM:SS
+// nyear (2 or 4) is the number of year digits
+int parsegdate(char * str, int nyear) {
   struct tm tnow;
   int i, fields[6];
   float secs;
@@ -184,7 +185,11 @@ int parsemdate(char * str) {
   if (str)
     sscanf(str, "%f", &secs);
   //  printf("%s %f %d\n", str, secs, (int)secs);
-  tnow.tm_year = fields[2]-1900;
+  if (nyear == 4) {
+    tnow.tm_year = fields[2]-1900;
+  } else {
+    tnow.tm_year = fields[2];
+  }
   tnow.tm_mon = fields[0]-1;
   tnow.tm_mday = fields[1];
   tnow.tm_hour = fields[3];
@@ -201,6 +206,16 @@ int parsemdate(char * str) {
   tnow.tm_isdst = 0;
   tt = tt - mktime(&tnow) + 24*3600;
   return tt;
+}
+
+// For dates of form MM/DD/YYYY HH:MM:SS 
+int parsemdate(char * str) {
+  return parsegdate(str, 4);
+}
+
+// For dates of form MM/DD/YY HH:MM:SS 
+int parsecmdate(char * str) {
+  return parsegdate(str, 2);
 }
 
 // For dates of form YYYY/MM/DD HH:MM:SS

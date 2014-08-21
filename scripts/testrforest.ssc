@@ -10,7 +10,12 @@ val cats = sparse(IMat(c), irow(0->c.length), ones(c.length, 1), 10, c.length)
 
 val (mm, opts)=RandomForest.learner(a, cats)
 opts.batchSize=40000
+opts.depth = 10
 
 mm.train
 
 val mr = mm.model.asInstanceOf[RandomForest]
+
+val trees = mr.trees.asInstanceOf[IMat]
+
+RandomForest.checktree(trees,10)

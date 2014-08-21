@@ -17,6 +17,7 @@ enum ftypes {
   ftype_word,
   ftype_string,
   ftype_date,
+  ftype_cmdate,
   ftype_mdate,
   ftype_dt,
   ftype_mdt,
@@ -359,6 +360,12 @@ int parseLine(char * line, int lineno, const char * delim1, ivector & tvec,
 	printf("\nWarning: bad mdate on line %d\n", lineno, here);
       out[i].iv.push_back(ival);
       break;
+    case ftype_cmdate:
+      ival = parsecmdate(here);
+      if (ival < 0)
+	printf("\nWarning: bad cmdate on line %d\n", lineno, here);
+      out[i].iv.push_back(ival);
+      break;
     case ftype_group:
       *(next-1) = *delim1;
       out[i].im.push_back(srv[i].checkstrings(&here, delim1, grpsize));
@@ -428,6 +435,9 @@ int parseFormat(string ffname, ivector & tvec, svector & dnames, svector & delim
 	delims.push_back("");
       } else if (strncmp(linebuf, "mdate", 5) == 0) {
 	tvec.push_back(ftype_mdate);
+	delims.push_back("");
+      } else if (strncmp(linebuf, "cmdate", 6) == 0) {
+	tvec.push_back(ftype_cmdate);
 	delims.push_back("");
       } else if (strncmp(linebuf, "dt", 2) == 0) {
 	tvec.push_back(ftype_dt);
@@ -549,7 +559,7 @@ int main(int argc, char ** argv) {
 
   for (i = 0; i < nfields; i++) {
     switch (tvec[i]) {
-    case ftype_int: case ftype_dt: case ftype_mdt: case ftype_date: case ftype_mdate:
+    case ftype_int: case ftype_dt: case ftype_mdt: case ftype_date: case ftype_mdate: case ftype_cmdate:
       ftv[i].writeInts(ofname + dnames[i] + ".imat" + suffix);
       break;
     case ftype_dint:
