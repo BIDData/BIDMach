@@ -81,11 +81,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options) extends Data
     initbase
     omats = new Array[Mat](fnames.size)
     for (i <- 0 until fnames.size) {
-      var mm = HMat.loadMat(fnames(i)(nstart))
-      if (opts.dorows) {
-      	omats(i) = mm.zeros(blockSize, mm.ncols)
-      } else {
-      	omats(i) = mm.zeros(mm.nrows, blockSize)
+      var mm = HMat.loadMat(fnames(i)(nstart));
+      val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
+      omats(i) = mm match {
+        case mf:FMat => zeros(nr, nc);
+        case mi:IMat => izeros(nr, nc);
+        case md:DMat => dzeros(nr, nc);
       }
     } 
   }
@@ -197,6 +198,12 @@ object FilesDS {
     }    
   }
   
+  def simpleEnum(fname:String, m:Int, i:Int):(Int)=>String = {
+    (n0:Int) => { 
+      val n = n0 * m + i
+      (fname format n)
+    }    
+  }
  
   trait Opts extends DataSource.Opts {
   	val localDir:String = ""

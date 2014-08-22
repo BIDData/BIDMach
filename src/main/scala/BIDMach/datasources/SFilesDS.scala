@@ -6,6 +6,12 @@ import scala.concurrent.future
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.io._
 
+/*
+ * SFilesDatasource constructs SMat batches from data files stored on disk as IMat. 
+ * The IMats are 3-column with column, row indices and integer values.
+ * This format allows dynamic construction of the SMat with a specified bound on the max row index,
+ * and with specified featurization (e.g. clipped to 1, linear, logarithmic etc.). 
+ */
 
 class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends FilesDS(opts) {
   

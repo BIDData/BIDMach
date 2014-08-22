@@ -20,6 +20,31 @@ object Experiments {
   }
 }
 
+object MNIST {
+  def datasource(n:Int = 1, i:Int = 0) = {
+    val opts1 = new SFilesDS.Options {  
+      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum("/data/MNIST8M/parts/part3col%02d.imat.lz4", n, i));
+    fcounts = icol(784);
+    nstart = 0;
+    nend = 80;
+    order = 1;
+    batchSize = 10000;
+    eltsPerSample = 500;
+    lookahead = 1;
+    }
+    val opts2 = new FilesDS.Options {  
+      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum("/data/MNIST8M/parts/cats%02d.imat.lz4", n, i));
+    nstart = opts1.nstart;
+    nend = opts1.nend;
+    order = opts1.order;
+    batchSize = opts1.batchSize;
+    lookahead = opts1.lookahead;
+    }
+    new StackedDS(new SFilesDS(opts1), new FilesDS(opts2))
+  }
+
+}
+
 object NYTIMES {
   def preprocess(dict:String, fname:String) {
     println("Processing "+fname); 
@@ -498,7 +523,7 @@ object Twitter {
     opts3.samp1 = 0.1f
     opts3.samp2 = 1f
     new BlendedDS(ds1, ds2, opts3)
-  }
+  }  
   
   def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int,Int)=>DataSource = twitterWords, nfeats:Int=100000):IMat = { 
     val nstart0 = FilesDS.encodeDate(2012,3,22,0)
