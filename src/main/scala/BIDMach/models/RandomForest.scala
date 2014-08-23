@@ -38,6 +38,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   var outc:IMat = null;
   var jc:IMat = null;
   var xnodes:IMat = null;
+  var ynodes:IMat = null;
   var ntrees = 0;
   var nsamps = 0;
   var nfeats = 0;
@@ -151,14 +152,14 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
     val nodes:IMat = (sdata, cats, tmp1, tmp2, tc1) match {
     case (idata:IMat, scats:SMat, lt1:LMat, lt2:LMat, tc:IMat) => {
-      xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
+      ynodes = if (nnodes.asInstanceOf[AnyRef] != null) {
         val nn = nnodes.asInstanceOf[IMat];
         treeStep(idata, nn, trees);
         nn;
       } else {
         treeWalk(idata, trees, ipass, true);
       }
-      xnodes
+      ynodes
     }
     }
     val cinds = icol(0->nodes.ncols) ⊗  iones(ntrees,1);
@@ -182,7 +183,9 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     val inodes = outn(inds);
     val reqgain = if (ipass < opts.depth - 1) opts.gain else Float.MaxValue;
     val i1 = find(vm > reqgain);
+    println("reqgain "+vm.toString+"\n");
     trees(inodes*2+1) = outc(inds);                             // Save the node class for this node
+    println("i1 %d" format i1.length)
     if (ipass < opts.depth - 1) tochildren(inodes, outc(inds)); // Save class id to children in class we don't visit them later
     if (i1.length > 0) {
       trees(inodes(i1)*2) = outf(inds(i1));
@@ -327,11 +330,11 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
       while (itree < ntrees) {
         var inode = 0;
         var id = 0;
-        while (id < depth || (toleaf && id <= depth)) {
+        while (id < depth) {
           val ifeat = trees(2 * inode, itree);
           val ithresh = trees(1 + 2 * inode, itree);
-          if (ifeat < 0) {
-            inode = -ithresh;                    // Should be the class number
+          if (ifeat < 0 || (toleaf && id == depth-1)) {
+            inode = -ithresh;                    // ithresh should be the class number
             id = depth;
           } else {
             val ivfeat = idata(ifeat, icol);
