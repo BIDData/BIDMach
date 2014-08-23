@@ -11,7 +11,7 @@ package BIDMach.models
 
 import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
 import BIDMach.Learner
-import BIDMach.datasources.MatDS
+import BIDMach.datasources.{DataSource,MatDS}
 import BIDMach.updaters.Batch
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
@@ -37,6 +37,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   var outg:FMat = null;
   var outc:IMat = null;
   var jc:IMat = null;
+  var xnodes:IMat = null;
   var ntrees = 0;
   var nsamps = 0;
   var nfeats = 0;
@@ -44,6 +45,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   var ncats = 0;
   val fieldlengths = izeros(1,6);
   var fieldmasks:IMat = null;
+  var t0 = 0f;
   var t1 = 0f;
   var t2 = 0f;
   var t3 = 0f; 
@@ -59,6 +61,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     nvals = opts.nvals;
     trees = izeros(2 * nnodes, opts.ntrees);
     trees.set(-1);
+    trees(1,?) = 0;
     if (opts.useGPU && Mat.hasCUDA > 0) gtrees = GIMat(trees);
     modelmats = Array(trees);
     mats = datasource.next;
@@ -99,17 +102,27 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     val sdata = gmats(0);
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null
-    tic
+    val t0 = toc
     val (inds, counts):(LMat, IMat) = (sdata, cats, tmp1, tmp2, tc1) match {
         case (idata:IMat, scats:SMat, lt1:LMat, lt2:LMat, tc:IMat) => {
-          val xnodes = if (nnodes.asInstanceOf[AnyRef] != null) nnodes.asInstanceOf[IMat] else treeWalk(idata, trees, ipass);
+          xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
+            val nn = nnodes.asInstanceOf[IMat];
+            treeStep(idata, nn, trees);
+            Mat.nflops += idata.ncols;
+            nn;
+          } else {
+            Mat.nflops += idata.ncols * ipass;
+            treeWalk(idata, trees, ipass, false);
+          }
  //         print("xnodes="+xnodes.toString)
           t1 = toc;
-          runtimes(0) += t1;
+          runtimes(0) += t1 - t0;
           val lt = treePack(idata, xnodes, scats, lt1, nsamps, fieldlengths);
+          Mat.nflops += scats.nnz * nsamps * ntrees * 6;
           t2 = toc;
           runtimes(1) += t2 - t1;
-          Arrays.sort(lt.data, 0, lt.length);    
+          Arrays.sort(lt.data, 0, lt.length);  
+          Mat.nflops += lt.length * math.log(lt.length).toLong
           t3 = toc;
           runtimes(2) += t3 - t2;
           makeV(lt, lt2, tc);
@@ -133,15 +146,36 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   }
   
   def evalblock(mats:Array[Mat], ipass:Int):FMat = {
-    // measure impurity here
-    row(0)
+    val sdata = gmats(0);
+    val cats = gmats(1);
+    val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
+    val nodes:IMat = (sdata, cats, tmp1, tmp2, tc1) match {
+    case (idata:IMat, scats:SMat, lt1:LMat, lt2:LMat, tc:IMat) => {
+      xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
+        val nn = nnodes.asInstanceOf[IMat];
+        treeStep(idata, nn, trees);
+        nn;
+      } else {
+        treeWalk(idata, trees, ipass, true);
+      }
+      xnodes
+    }
+    }
+    val cinds = icol(0->nodes.ncols) ⊗  iones(ntrees,1);
+    val vc = accum(-nodes(?), cinds, 1, ncats, nodes.ncols);
+    val (uu, mm) = maxi2(vc);
+    val (ii, jj, vv) = find3(SMat(cats));
+//    println("dims %d %d %d %d" format (mm.ncols, ii.nrows, sdata.ncols, cats.ncols))
+    val matches = FMat(mm.t != ii);
+//    println("Matches %d %d %d %d %d %f" format (nodes.ncols, matches.length, vc.ncols, mm.ncols, ncats, mean(matches).v))
+    -mean(matches)
   } 
   
   override def updatePass(ipass:Int) = {
-    tic;
+    t0 = toc;
     val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, jc, opts.impurity);
     t1 = toc;
-    runtimes(5) += t1;
+    runtimes(5) += t1 - t0;
     println("gg %d %d" format (gg.nrows, gg.ncols))
     val (vm, im) = mini2(gg);
     val inds = im + irow(0->im.length) * gg.nrows;
@@ -253,7 +287,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     new LMat(nvals, 1, out.data);
   }
   
-  def treeStep(idata:IMat, tnodes:IMat,  trees:IMat, nifeats:Int, nnodes:Int)  {
+  def treeStep(idata:IMat, tnodes:IMat,  trees:IMat)  {
     val nfeats = idata.nrows;
     val nitems = idata.ncols;
     val ntrees = tnodes.nrows;
@@ -282,7 +316,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     }
   }
   
-  def treeWalk(idata:IMat, trees:IMat, depth:Int):IMat = {
+  def treeWalk(idata:IMat, trees:IMat, depth:Int, toleaf:Boolean):IMat = {
     val nfeats = idata.nrows;
     val nitems = idata.ncols;
     val ntrees = trees.ncols;
@@ -293,7 +327,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
       while (itree < ntrees) {
         var inode = 0;
         var id = 0;
-        while (id < depth) {
+        while (id < depth || (toleaf && id <= depth)) {
           val ifeat = trees(2 * inode, itree);
           val ithresh = trees(1 + 2 * inode, itree);
           if (ifeat < 0) {
@@ -342,10 +376,10 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     var i1 = 0
     var i2 = 0
     while (i1 < n1 || i2 < n2) {
-      if (i1 >= n1 || ind2(i2) < ind1(i1)) {
+      if (i1 >= n1 || (i2 < n2 && ind2(i2) < ind1(i1))) {
         count += 1
         i2 += 1
-      } else if (i2 >= n2 || ind1(i1) < ind2(i2)) {
+      } else if (i2 >= n2 || (i1 < n1 && ind1(i1) < ind2(i2))) {
         count += 1
         i1 += 1
       } else {
@@ -367,12 +401,12 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     var i1 = 0
     var i2 = 0
     while (i1 < n1 || i2 < n2) {
-      if (i1 >= n1 || ind2(i2) < ind1(i1)) {
+      if (i1 >= n1 || (i2 < n2 && ind2(i2) < ind1(i1))) {
         ind3(count) = ind2(i2)
         counts3(count) = counts2(i2)
         count += 1
         i2 += 1
-      } else if (i2 >= n2 || ind1(i1) < ind2(i2)) {
+      } else if (i2 >= n2 || (i1 < n1 && ind1(i1) < ind2(i2))) {
         ind3(count) = ind1(i1)
         counts3(count) = counts1(i1)
         count += 1
@@ -548,7 +582,7 @@ object RandomForest {
      var ntrees = 32;
      var nsamps = 32;
      var nvals = 1000;
-     var gain = 0.00001f 
+     var gain = 0.000001f 
      var margin = 1.5f;
      var impurity = 0;  // zero for entropy, one for Gini impurity
   }
@@ -564,6 +598,20 @@ object RandomForest {
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
     val nn = new Learner(
         new MatDS(Array(data, labels), opts), 
+        new RandomForest(opts), 
+        null, 
+        new Batch(opts),
+        opts)
+    (nn, opts)
+  }
+  
+  def learner(ds:DataSource) = {
+    val opts = new RFopts;
+    opts.useGPU = false;
+    opts.nvals = 256;
+    opts.batchSize = 40000;
+    val nn = new Learner(
+        ds, 
         new RandomForest(opts), 
         null, 
         new Batch(opts),

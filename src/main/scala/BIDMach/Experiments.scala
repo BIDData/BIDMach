@@ -21,26 +21,26 @@ object Experiments {
 }
 
 object MNIST {
-  def datasource(n:Int = 1, i:Int = 0) = {
-    val opts1 = new SFilesDS.Options {  
-      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum("/data/MNIST8M/parts/part3col%02d.imat.lz4", n, i));
-    fcounts = icol(784);
+  def datasource(dir:String="/data/MNIST8M/parts/", nlast:Int = 80, n:Int = 1, i:Int = 0) = {
+    val opts1 = new FilesDS.Options {  
+      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
     nstart = 0;
-    nend = 80;
-    order = 1;
+    nend = nlast;
+    order = 0;
     batchSize = 10000;
-    eltsPerSample = 500;
     lookahead = 1;
     }
-    val opts2 = new FilesDS.Options {  
-      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum("/data/MNIST8M/parts/cats%02d.imat.lz4", n, i));
+    val opts2 = new SFilesDS.Options {  
+      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
     nstart = opts1.nstart;
     nend = opts1.nend;
     order = opts1.order;
     batchSize = opts1.batchSize;
     lookahead = opts1.lookahead;
+    fcounts = irow(10);
+    eltsPerSample = 2;
     }
-    new StackedDS(new SFilesDS(opts1), new FilesDS(opts2))
+    new StackedDS(new FilesDS(opts1), new SFilesDS(opts2))
   }
 
 }

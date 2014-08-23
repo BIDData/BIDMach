@@ -127,10 +127,12 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
     	while (ready(filex) < fileno) Thread.sleep(1)
-    	val spm = spmax(matqueue(filex))
+    	val spm = spmax(matqueue(filex)) + 1
+//    	println("spm %d" format spm)
     	nrow = math.min(rowno + todo, spm)
     	val matq = matqueue(filex)
     	if (matq(0) != null) {
+//    	  println("Here %d %d %d" format(rowno, nrow, todo))
     		omats(0) = sprowslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
     		if (spm == nrow) donextfile = true
     	} else {
