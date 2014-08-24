@@ -61,8 +61,8 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     nsamps = opts.nsamps;
     nvals = opts.nvals;
     trees = izeros(2 * nnodes, opts.ntrees);
-    trees.set(-1);
-    trees(1,?) = 0;
+    val tinds = icol(0->nnodes)*2;
+    trees(tinds,?) = -1;
     if (opts.useGPU && Mat.hasCUDA > 0) gtrees = GIMat(trees);
     modelmats = Array(trees);
     mats = datasource.next;
@@ -163,13 +163,13 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     }
     }
     val cinds = icol(0->nodes.ncols) ⊗  iones(ntrees,1);
-    val vc = accum(-nodes(?), cinds, 1, ncats, nodes.ncols);
-    val (uu, mm) = maxi2(vc);
     val (ii, jj, vv) = find3(SMat(cats));
-//    println("dims %d %d %d %d" format (mm.ncols, ii.nrows, sdata.ncols, cats.ncols))
-    val matches = FMat(mm.t != ii);
-//    println("Matches %d %d %d %d %d %f" format (nodes.ncols, matches.length, vc.ncols, mm.ncols, ncats, mean(matches).v))
-    -mean(matches)
+//    val matches = FMat((-nodes) != ii.t);
+//    -mean(mean(matches))
+    
+    val vc = accum(-nodes(?) \ cinds, 1, ncats, nodes.ncols);
+    val (uu, mm) = maxi2(vc);
+    mean(FMat(mm != ii.t));
   } 
   
   override def updatePass(ipass:Int) = {
@@ -178,12 +178,12 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     t1 = toc;
     runtimes(5) += t1 - t0;
     println("gg %d %d" format (gg.nrows, gg.ncols))
-    val (vm, im) = mini2(gg);
+    val (vm, im) = maxi2(gg);
     val inds = im + irow(0->im.length) * gg.nrows;
     val inodes = outn(inds);
     val reqgain = if (ipass < opts.depth - 1) opts.gain else Float.MaxValue;
     val i1 = find(vm > reqgain);
-    println("reqgain "+vm.toString+"\n");
+    println("reqgain "+mean(vm).dv.toString+"\n");
     trees(inodes*2+1) = outc(inds);                             // Save the node class for this node
     println("i1 %d" format i1.length)
     if (ipass < opts.depth - 1) tochildren(inodes, outc(inds)); // Save class id to children in class we don't visit them later
@@ -319,7 +319,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     }
   }
   
-  def treeWalk(idata:IMat, trees:IMat, depth:Int, toleaf:Boolean):IMat = {
+  def treeWalk(idata:IMat, trees:IMat, depth:Int,  getcat:Boolean):IMat = {
     val nfeats = idata.nrows;
     val nitems = idata.ncols;
     val ntrees = trees.ncols;
@@ -333,7 +333,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
         while (id < depth) {
           val ifeat = trees(2 * inode, itree);
           val ithresh = trees(1 + 2 * inode, itree);
-          if (ifeat < 0 || (toleaf && id == depth-1)) {
+          if (ifeat < 0) {
             inode = -ithresh;                    // ithresh should be the class number
             id = depth;
           } else {
@@ -342,6 +342,9 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
               inode = 2 * inode + 2;
             } else {
               inode = 2 * inode + 1;
+            }
+            if (getcat && id == depth - 1) {
+              inode = -trees(1 + 2 * inode, itree);
             }
           }
           id += 1;
@@ -567,7 +570,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
       lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // For checking
 //      println("Impurity %f, %f, min %f, %d, %d" format (nodeImpty, lastImpty, minImpty, partv, ifeat))
       outv(i) = partv;
-      outg(i) = nodeImpty - minImpty;
+      outg(i) = (nodeImpty - minImpty).toFloat;
       outf(i) = ifeat;
       outc(i) = imaxcnt;
       outn(i) = inode;
@@ -585,7 +588,7 @@ object RandomForest {
      var ntrees = 32;
      var nsamps = 32;
      var nvals = 1000;
-     var gain = 0.000001f 
+     var gain = 1e-6f;
      var margin = 1.5f;
      var impurity = 0;  // zero for entropy, one for Gini impurity
   }
@@ -622,10 +625,28 @@ object RandomForest {
     (nn, opts)
   }
   
-  def entropy(a:FMat):Double = {
-    val v = a / sum(a);
-    v ddot ln(v)
+  def entropy(a:DMat):Double = {
+    val sa = sum(a).dv;
+    (a ddot ln(max(drow(1.0), a))) / sa - math.log(sa)
   }
+  
+  def entropy(a:DMat, b:DMat):Double = {
+    val ea = entropy(a);
+    val eb = entropy(b);
+    val sa = sum(a).dv;
+    val sb = sum(b).dv;
+    if (sa > 0 && sb > 0) {
+      (sa * ea + sb * eb)/(sa + sb)
+    } else if (sa > 0) {
+      ea
+    } else {
+      eb
+    }
+  }
+  
+  def entropy(a:IMat):Double = entropy(DMat(a));
+  
+  def entropy(a:IMat, b:IMat):Double = entropy(DMat(a), DMat(b));
   
   def checktree(tree:IMat, ncats:Int) {
     val ntrees = tree.ncols;
