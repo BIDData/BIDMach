@@ -7,7 +7,8 @@ import BIDMach.datasources._
 import BIDMach.models._
 import BIDMach.updaters._
 import scala.concurrent.future
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
+import java.util.concurrent.Executors
 
 object Experiments {
   
@@ -22,13 +23,16 @@ object Experiments {
 
 object MNIST {
   def datasource(dir:String="/data/MNIST8M/parts/", nlast:Int = 80, n:Int = 1, i:Int = 0) = {
+    implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(8))
     val opts1 = new FilesDS.Options {  
       override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
     nstart = 0;
     nend = nlast;
     order = 0;
     batchSize = 10000;
-    lookahead = 1;
+    lookahead = 2;
+    featType = 2;
+    featThreshold = 128;
     }
     val opts2 = new SFilesDS.Options {  
       override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
@@ -141,7 +145,9 @@ object RCV1 {
 
 object Twitter { 
   
-   def dodicts(threshold:Int=10, rebuild:Boolean=false):Unit = {
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(8))
+  
+  def dodicts(threshold:Int=10, rebuild:Boolean=false):Unit = {
   		 val stokdir = "/twitter/smiley/tokenized/"
     	 val tokdir = "/twitter/tokenized/"
   		 val dy1 = mergedicts(2011, 2013, "/disk%02d" + stokdir, "/big" + stokdir, threshold, rebuild)

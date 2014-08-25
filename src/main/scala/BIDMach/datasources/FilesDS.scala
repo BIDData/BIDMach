@@ -3,10 +3,10 @@ import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SD
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.concurrent.future
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContextExecutor
 import java.io._
 
-class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options) extends DataSource(opts) { 
+class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val ec:ExecutionContextExecutor) extends DataSource(opts) { 
   var sizeMargin = 0f
   var blockSize = 0 
   @volatile var fileno = 0
@@ -102,10 +102,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options) extends Data
   def next:Array[Mat] = {
     var donextfile = false
     var todo = blockSize
+    val featType = opts.featType
+    val threshold = opts.featThreshold
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
-    	while (ready(filex) < fileno) Thread.sleep(1)
+    	while (ready(filex) < fileno) Thread.`yield`
     	for (i <- 0 until fnames.size) {
     		val matq = matqueue(filex)(i)
     		if (matq != null) {
@@ -116,8 +118,16 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options) extends Data
     			} else {
     				omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo)   			  
     			}
+    		  if (featType == 0) {
+    		    min(1f, omats(i), omats(i))
+    		  } else if (featType == 2) {
+    		    omats(i) ~ omats(i) >= threshold
+    		  }
     			if (matqnr == nrow) donextfile = true
     		} else {
+    		  if (opts.throwMissing) {
+    		    throw new RuntimeException("Missing file "+fileno)
+    		  }
     		  donextfile = true
     		}
     	}
@@ -151,7 +161,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options) extends Data
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
   	while  (!stop) {
-  		while (ready(ifilex) >= fileno) Thread.sleep(1)
+  		while (ready(ifilex) >= fileno) Thread.`yield`
   		val inew = ready(ifilex) + opts.lookahead
   		val pnew = permfn(inew)
   		val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles)
@@ -216,6 +226,7 @@ object FilesDS {
     var nend:Int = 0
     var dorows:Boolean = false
     var order:Int = 1                           // 0 = sequential order, 1 = random
+    var throwMissing:Boolean = false
   }
   
   class Options extends Opts {}

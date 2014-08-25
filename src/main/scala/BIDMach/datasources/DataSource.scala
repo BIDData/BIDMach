@@ -25,7 +25,8 @@ object DataSource {
     var sizeMargin = 3f
     var sample = 1f
     var addConstFeat:Boolean = false
-    var featType:Int = 1                 // 0 = binary features, 1 = linear features
+    var featType:Int = 1                 // 0 = binary features, 1 = linear features, 2 = threshold features
+    var featThreshold:Mat = null
     var putBack = -1
   } 
   

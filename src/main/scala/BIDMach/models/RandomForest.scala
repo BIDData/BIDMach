@@ -587,18 +587,20 @@ object RandomForest {
      var depth = 8;
      var ntrees = 32;
      var nsamps = 32;
-     var nvals = 1000;
-     var gain = 1e-6f;
+     var nvals = 2;
+     var gain = 0.01f;
      var margin = 1.5f;
      var impurity = 0;  // zero for entropy, one for Gini impurity
   }
   
   class Options extends Opts {}
   
-  class RFopts extends Learner.Options with RandomForest.Opts with MatDS.Opts with Batch.Opts;
+  class RFopts extends Learner.Options with RandomForest.Opts with DataSource.Opts with Batch.Opts;
+  
+  class RFSopts extends RFopts with MatDS.Opts;
   
   def learner(data:IMat, labels:SMat) = {
-    val opts = new RFopts;
+    val opts = new RFSopts;
     opts.useGPU = false;
     opts.nvals = maxi(maxi(data)).dv.toInt;
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
@@ -615,7 +617,6 @@ object RandomForest {
     val opts = new RFopts;
     opts.useGPU = false;
     opts.nvals = 256;
-    opts.batchSize = 40000;
     val nn = new Learner(
         ds, 
         new RandomForest(opts), 

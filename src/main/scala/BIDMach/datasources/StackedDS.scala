@@ -10,11 +10,13 @@ class StackedDS(val s1:DataSource, val s2:DataSource,
   omats = null
   
   def init = {
-    s1.init
-    s2.init
-    val mats1 = s1.omats
-    val mats2 = s2.omats
-    omats = new Array[Mat](mats1.length + mats2.length)
+    s1.opts.batchSize = opts.batchSize;
+    s2.opts.batchSize = opts.batchSize;
+    s1.init;
+    s2.init;
+    val mats1 = s1.omats;
+    val mats2 = s2.omats;
+    omats = new Array[Mat](mats1.length + mats2.length);
     for (i <- 0 until mats1.length) {
       omats(i) = mats1(i);
     }
@@ -26,13 +28,18 @@ class StackedDS(val s1:DataSource, val s2:DataSource,
   def nmats = omats.length
   
   def reset = {
-    s1.reset
-    s2.reset
+    s1.reset;
+    s2.reset;
   }
   
   def next:Array[Mat] = {
     val mats1 = s1.next;
     val mats2 = s2.next;
+    val fs1 = s1.asInstanceOf[FilesDS];
+    val fs2 = s2.asInstanceOf[FilesDS];
+    if (fs1.fileno != fs2.fileno || fs1.rowno != fs2.rowno) {
+      throw new RuntimeException("Data source skew %d %d %d %d" format (fs1.fileno, fs2.fileno, fs1.rowno, fs2.rowno))
+    }
     for (i <- 0 until mats1.length) {
       omats(i) = mats1(i);
     }

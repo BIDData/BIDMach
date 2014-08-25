@@ -3,7 +3,8 @@ import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SD
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.concurrent.future
-import scala.concurrent.ExecutionContext.Implicits.global
+//import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContextExecutor
 import java.io._
 
 /*
@@ -13,7 +14,7 @@ import java.io._
  * and with specified featurization (e.g. clipped to 1, linear, logarithmic etc.). 
  */
 
-class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends FilesDS(opts) {
+class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null
@@ -53,6 +54,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
     val nfiles = opts.fcounts.length
     val addConstFeat = opts.addConstFeat
     val featType = opts.featType
+    val threshold = opts.featThreshold
     var j = 0
     while (j < nfiles) {
     	inptrs(j, 0) = binFind(rowno, inmat(j))
@@ -71,7 +73,13 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
         val yoff = offsets(j) + ioff
         while (k < mat.nrows && mat.data(k) == irow && mat.data(k+mrows) < lims(j)) {
           omat.ir(xoff + k) = mat.data(k+mrows) + yoff
-          omat.data(xoff + k) = if (featType == 0) 1f else mat.data(k+2*mrows)
+          omat.data(xoff + k) = if (featType == 0) {
+            1f
+          } else if (featType == 1) {
+            mat.data(k+2*mrows) 
+          } else {
+            if (mat.data(k+2*mrows).toDouble >= threshold.dv) 1f else 0f          
+          }
           k += 1
         }
         innz = xoff + k
@@ -126,7 +134,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
-    	while (ready(filex) < fileno) Thread.sleep(1)
+    	while (ready(filex) < fileno) Thread.`yield`
     	val spm = spmax(matqueue(filex)) + 1
 //    	println("spm %d" format spm)
     	nrow = math.min(rowno + todo, spm)
@@ -134,8 +142,11 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options) extends F
     	if (matq(0) != null) {
 //    	  println("Here %d %d %d" format(rowno, nrow, todo))
     		omats(0) = sprowslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
-    		if (spm == nrow) donextfile = true
+    		if (rowno + todo >= spm) donextfile = true
     	} else {
+    	  if (opts.throwMissing) {
+    	    throw new RuntimeException("Missing file "+fileno)
+    	  }
     		donextfile = true
     	}
     	todo -= nrow - rowno
