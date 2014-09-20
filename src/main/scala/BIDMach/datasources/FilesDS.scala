@@ -100,44 +100,44 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   def nmats = omats.length
   
   def next:Array[Mat] = {
-    var donextfile = false
-    var todo = blockSize
-    val featType = opts.featType
-    val threshold = opts.featThreshold
+    var donextfile = false;
+    var todo = blockSize;
+    val featType = opts.featType;
+    val threshold = opts.featThreshold;
     while (todo > 0 && fileno < opts.nend) {
-    	var nrow = rowno
-    	val filex = fileno % opts.lookahead
+    	var nrow = rowno;
+    	val filex = fileno % opts.lookahead;
     	while (ready(filex) < fileno) Thread.`yield`
     	for (i <- 0 until fnames.size) {
-    		val matq = matqueue(filex)(i)
+    		val matq = matqueue(filex)(i);
     		if (matq != null) {
-    		  val matqnr = if (opts.dorows) matq.nrows else matq.ncols
-    			nrow = math.min(rowno + todo, matqnr)
-    			if (opts.dorows) {
-      			omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo)  			  
-    			} else {
-    				omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo)   			  
-    			}
-    		  if (featType == 0) {
-    		    min(1f, omats(i), omats(i))
-    		  } else if (featType == 2) {
-    		    omats(i) ~ omats(i) >= threshold
+    		  val matqnr = if (opts.dorows) matq.nrows else matq.ncols;
+    		  nrow = math.min(rowno + todo, matqnr);
+    		  if (opts.dorows) {
+    		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
+    		  } else {
+    		    omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
     		  }
-    			if (matqnr == nrow) donextfile = true
+    		  if (featType == 0) {
+    		    min(1f, omats(i), omats(i));
+    		  } else if (featType == 2) {
+    		    omats(i) ~ omats(i) >= threshold;
+    		  }
+    		  if (matqnr == nrow) donextfile = true;
     		} else {
     		  if (opts.throwMissing) {
-    		    throw new RuntimeException("Missing file "+fileno)
+    		    throw new RuntimeException("Missing file "+fileno);
     		  }
-    		  donextfile = true
+    		  donextfile = true;
     		}
     	}
-    	todo -= nrow - rowno
+    	todo -= nrow - rowno;
     	if (donextfile) {
-    	  fileno += 1
-    	  rowno = 0
-    	  donextfile = false
+    	  fileno += 1;
+    	  rowno = 0;
+    	  donextfile = false;
     	} else {
-    		rowno = nrow
+    	  rowno = nrow;
     	}
     }
     omats
