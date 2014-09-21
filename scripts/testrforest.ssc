@@ -1,16 +1,17 @@
 import BIDMach.models.RandomForest
 
-val aa=loadIDX("c:/data/MNIST/train-images-idx3-ubyte.gz")
-val cc=loadIDX("c:/data/MNIST/train-labels-idx1-ubyte.gz")
+val a0=loadIMat("d:/data/MNIST8M/parts/part70.imat.lz4")
+val c0=loadSMat("d:/data/MNIST8M/parts/cats70.smat.lz4")
 
-val a = IMat(aa.toFMat(aa.dims(0), aa.dims(1)*aa.dims(2)).t)
-val c=cc.toFMat(cc.dims(0), 1)
-
-val cats = sparse(IMat(c), irow(0->c.length), ones(c.length, 1), 10, c.length)
-
-val (mm, opts)=RandomForest.learner(a, cats)
+val rp = randperm(a0.ncols)
+val a = a0(?,rp)
+val c = c0(?,rp)
+val (mm, opts)=RandomForest.learner(a, c)
 opts.batchSize=40000
-opts.depth = 10
+opts.ntrees = 32
+opts.nsamps = 32
+opts.depth = 16
+opts.gain = 0.0f
 
 mm.train
 
@@ -18,4 +19,4 @@ val mr = mm.model.asInstanceOf[RandomForest]
 
 val trees = mr.trees.asInstanceOf[IMat]
 
-RandomForest.checktree(trees,10)
+RandomForest.checktree(trees,11)
