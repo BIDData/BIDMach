@@ -313,6 +313,14 @@ class PointersArrayPointerData : public PointerData
         /** The byteOffset from the Java Pointer */
         jlong byteOffset;
 
+		/** 
+		 * Whether the pointers that the startPointer points
+		 * to have already been initialized - that is, 
+		 * assigned the values from the respective
+		 * arrayPointerDatas[i]->getPointer(env) call
+		 */
+		bool localPointersInitialized;
+
 
     public:
 
@@ -321,10 +329,35 @@ class PointersArrayPointerData : public PointerData
             arrayPointerDatas = NULL;
             startPointer = NULL;
             byteOffset = 0;
+			localPointersInitialized = false;
         }
         ~PointersArrayPointerData()
         {
         }
+
+		void initLocalPointers(JNIEnv *env)
+		{
+            Logger::log(LOG_DEBUGTRACE, "Initializing PointersArrayPointerData local pointers\n");
+
+			jobjectArray pointersArray = (jobjectArray)env->GetObjectField(
+                nativePointerObject, Pointer_pointers);
+            long size = (long)env->GetArrayLength(pointersArray);
+			void **localPointer = (void**)startPointer;
+            for (int i=0; i<size; i++)
+            {
+				if (arrayPointerDatas[i] != NULL)
+				{
+                    localPointer[i] = arrayPointerDatas[i]->getPointer(env);
+				}
+				else
+				{
+					localPointer[i] = NULL;
+				}
+			}
+			localPointersInitialized = true;
+
+            Logger::log(LOG_DEBUGTRACE, "Initialized  PointersArrayPointerData local pointers\n");
+		}
 
         bool init(JNIEnv *env, jobject object)
         {
@@ -380,12 +413,10 @@ class PointersArrayPointerData : public PointerData
                         return false;
                     }
                     arrayPointerDatas[i] = arrayPointerData;
-                    localPointer[i] = arrayPointerData->getPointer(env);
                 }
                 else
                 {
                     arrayPointerDatas[i] = NULL;
-                    localPointer[i] = NULL;
                 }
             }
 
@@ -403,6 +434,11 @@ class PointersArrayPointerData : public PointerData
         bool release(JNIEnv *env, jint mode=0)
         {
             Logger::log(LOG_DEBUGTRACE, "Releasing    PointersArrayPointerData       %p\n", startPointer);
+
+			if (!localPointersInitialized)
+			{
+				initLocalPointers(env);
+			}
 
             jobjectArray pointersArray = (jobjectArray)env->GetObjectField(
                 nativePointerObject, Pointer_pointers);
@@ -474,11 +510,16 @@ class PointersArrayPointerData : public PointerData
 
         void* getPointer(JNIEnv *env)
         {
+			if (!localPointersInitialized)
+			{
+				initLocalPointers(env);
+			}
             return (void*)(((char*)startPointer)+byteOffset);
         }
 
         void releasePointer(JNIEnv *env, jint mode=0)
         {
+
         }
 
         bool setNewNativePointerValue(JNIEnv *env, jlong nativePointerValue)
@@ -639,9 +680,10 @@ class ArrayBufferPointerData : public PointerData
         {
             if (startPointer == NULL)
             {
+                Logger::log(LOG_DEBUGTRACE, "Initializing ArrayBufferPointerData critical\n");
                 isCopy = JNI_FALSE;
                 startPointer = env->GetPrimitiveArrayCritical(array, &isCopy);
-                if (env->ExceptionCheck())
+                if (startPointer == NULL)
                 {
                     return NULL;
                 }
@@ -654,6 +696,7 @@ class ArrayBufferPointerData : public PointerData
         {
             if (startPointer != NULL)
             {
+                Logger::log(LOG_DEBUGTRACE, "Releasing    ArrayBufferPointerData critical\n");
                 if (!isCopy)
                 {
                     env->ReleasePrimitiveArrayCritical(array, startPointer, JNI_ABORT);
