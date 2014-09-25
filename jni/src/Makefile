@@ -2,7 +2,8 @@ include Makefile.incl
 
 MKL_OBJS=
 
-CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ)
+CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ) \
+          Logger.$(OBJ) JNIUtils.$(OBJ) PointerUtils.$(OBJ)
 
 .SUFFIXES: .$(OBJ) .c .cpp .cu
 
@@ -35,5 +36,5 @@ clean:
 	rm -f *.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib
 
 distclean: clean
-	rm -f *$(LIBAPPEND) *.exp *.lib *.jnilib Makefile.incl
+	rm -f  *.jnilib Makefile.incl
 
