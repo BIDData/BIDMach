@@ -44,8 +44,8 @@ if [ "$OS" = "Windows_NT" ]; then
         gunzip -c lyrl2004_tokens_test_pt${i}.dat.gz > lyrl2004_tokens_test_pt${i}.dat
     done
     gunzip -c lyrl2004_tokens_train.dat.gz > lyrl2004_tokens_train.dat
+    allfiles=`echo $allfiles | sed s/\.dat\.gz/.dat/g`
 fi
-allfiles=`echo $allfiles | sed s/\.dat\.gz/.dat/g`
 ${BIDMACH_SCRIPTS}/../bin/trec.exe -i $allfiles -o tokenized/ -c
 
 # Parse the topic assignment file
