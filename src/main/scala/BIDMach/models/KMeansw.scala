@@ -1,6 +1,8 @@
 package BIDMach.models
 
-// Minibatch k-means with soft size constraint. Size weight is controlled by wsize.
+// Minibatch k-means with soft size constraint. 
+// Includes a size weight matrix w. Size of a cluster is the sum of the w values for that cluster. 
+// Size weight is controlled by wsize.
 
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
@@ -13,15 +15,19 @@ import BIDMach.models._
 /**
  * KMeans
  * {{{
- * val (nn, opts) = KMeansw.learn(a,w)
+ * val (nn, opts) = KMeansw.learner(a,w)
+ * val (nn, opts) = KMeansw.learner(a)
+ * a                     // input matrix
+ * w                     // optional weight matrix
  * opts.what             // prints the available options
  * opts.dim=200          // customize options
- * nn.run                // run the learner
+ * nn.train              // train the learner
  * nn.modelmat           // get the final model
  * 
  * val (nn, opts) = KMeans.learnPar(a,w) // Build a parallel learner
+ * val (nn, opts) = KMeans.learnPar(a) 
  * opts.nthreads=2       // number of threads (defaults to number of GPUs)
- * nn.run                // run the learner
+ * nn.train              // train the learner
  * nn.modelmat           // get the final model
  * }}}
  */
@@ -62,28 +68,53 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
 
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
-    mupdate(gmats(0), gmats(1), ipass)
+    if (gmats.length > 1) {
+      mupdate(gmats(0), gmats(1), ipass)
+    } else {
+      mupdate(gmats(0), null, ipass)
+    }
   }
   
   def evalblock(gmats:Array[Mat], ipass:Int):FMat = {
-    evalfun(gmats(0), gmats(1))
+    if (gmats.length > 1) {
+      evalfun(gmats(0), gmats(1))
+    } else {
+      evalfun(gmats(0), null)
+    }
   }
   
   def mupdate(sdata:Mat, weights:Mat, ipass:Int):Unit = {
-    val vmatch = -2 * mm * sdata + snorm(sdata) + ((mm dotr mm) + (opts.wsize * mweights))
-    val bestm = vmatch <= mini(vmatch)
-    bestm ~ bestm / sum(bestm)
-    um ~ bestm *^ sdata     
-    sum(bestm, 2, umcounts)
-    umweights ~ bestm *^ weights
+    val vmatch = -2 * mm * sdata + snorm(sdata) + ((mm dotr mm) + (opts.wsize * mweights));
+    val bestm = vmatch <= mini(vmatch);
+    bestm ~ bestm / sum(bestm);
+    um ~ bestm *^ sdata;
+    sum(bestm, 2, umcounts);
+    if (weights.asInstanceOf[AnyRef] != null) {
+      umweights ~ bestm *^ weights
+    } else {
+      sum(bestm, 1, umweights)
+    }
   }
     
   def evalfun(sdata:Mat, weights:Mat):FMat = {  
     val vmatch = -2 * mm * sdata + snorm(sdata) + ((mm dotr mm) + (opts.wsize * mweights))
     val vm = mini(vmatch)
     max(vm, 0f, vm)
-    val vv = mean(sqrt(vm) *@ weights).dv
+    val vv = if (weights.asInstanceOf[AnyRef] != null) {
+      mean(sqrt(vm) *@ weights).dv
+    } else {
+      mean(sqrt(vm)).dv
+    }
   	row(-vv, math.exp(vv))
+  }
+  
+  override def updatePass(ipass:Int) = {
+    max(umcounts, 1f, umcounts);
+    mm ~ um / umcounts;
+    mweights <-- umweights;
+    um.clear;
+    umcounts.clear;
+    umweights.clear;
   }
 }
 
@@ -102,7 +133,7 @@ object KMeansw  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
    
-  def learner(datamat:Mat, wghts:Mat, d:Int = 256) = {
+  def learner(datamat:Mat, wghts:Mat, d:Int) = {
     class xopts extends Learner.Options with KMeansw.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
@@ -114,6 +145,21 @@ object KMeansw  {
   	    new KMeansw(opts), 
   	    null,
   	    new IncNorm(opts), opts)
+    (nn, opts)
+  }
+  
+  def learner(datamat:Mat, d:Int) = {
+    class xopts extends Learner.Options with KMeansw.Opts with MatDS.Opts with IncNorm.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.batchSize = math.min(100000, datamat.ncols/30 + 1)
+    opts.isprob = false
+    opts.power = 0.5f
+    val nn = new Learner(
+        new MatDS(Array(datamat), opts), 
+        new KMeansw(opts), 
+        null,
+        new IncNorm(opts), opts)
     (nn, opts)
   }
    

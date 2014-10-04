@@ -12,6 +12,7 @@ import java.io._
  * The IMats are 3-column with column, row indices and integer values.
  * This format allows dynamic construction of the SMat with a specified bound on the max row index,
  * and with specified featurization (e.g. clipped to 1, linear, logarithmic etc.). 
+ * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
 class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
@@ -71,6 +72,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
         inptrs(j) = k
         val xoff = innz - k
         val yoff = offsets(j) + ioff
+ //       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
         while (k < mat.nrows && mat.data(k) == irow && mat.data(k+mrows) < lims(j)) {
           omat.ir(xoff + k) = mat.data(k+mrows) + yoff
           omat.data(xoff + k) = if (featType == 0) {
@@ -169,7 +171,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
 object SFilesDS {
   trait Opts extends FilesDS.Opts {
   	var fcounts:IMat = null
-    var eltsPerSample = 0
+    var eltsPerSample = 10
   }
   
   class Options extends Opts {}

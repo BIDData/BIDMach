@@ -10,15 +10,15 @@ import BIDMach._
 /**
  * KMeans
  * {{{
- * val (nn, opts) = KMeans.learn(a)
+ * val (nn, opts) = KMeans.learner(a)
  * opts.what             // prints the available options
  * opts.dim=200          // customize options
- * nn.run                // run the learner
+ * nn.train              // rain the learner
  * nn.modelmat           // get the final model
  * 
  * val (nn, opts) = KMeans.learnPar(a) // Build a parallel learner
  * opts.nthreads=2       // number of threads (defaults to number of GPUs)
- * nn.run                // run the learner
+ * nn.train              // train the learner
  * nn.modelmat           // get the final model
  * }}}
  */

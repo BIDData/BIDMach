@@ -4,8 +4,10 @@ import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Plotting._
 import BIDMach.Learner
+import BIDMach.models.{FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,NMF,SFA}
 import BIDMach.datasources.{MatDS,FilesDS,SFilesDS}
-import BIDMach.models.{KMeans,GLM,LDA,NMF,SFA,FM,LDAgibbs}
+import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,IncMult,IncNorm,Telescoping}
 import BIDMach.causal.{IPTW}
 
 Mat.checkMKL
