@@ -50,7 +50,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   def mupdate(in:Mat) = {
     val targs = targets * in
     min(targs, 1f, targs)
-    val alltargs = targmap * targs
+    val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
     mupdate2(in, alltargs)
   }
   
@@ -68,7 +68,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   def meval(in:Mat):FMat = {
     val targs = targets * in
     min(targs, 1f, targs)
-    val alltargs = targmap * targs
+    val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
     meval2(in, alltargs)
   }
   

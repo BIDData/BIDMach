@@ -74,6 +74,9 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
         val yoff = offsets(j) + ioff
  //       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
         while (k < mat.nrows && mat.data(k) == irow && mat.data(k+mrows) < lims(j)) {
+          if (xoff + k >= omat.ir.length) {
+            throw new RuntimeException("SFilesDS index out of range. Try increasing opts.eltsPerSample")
+          }
           omat.ir(xoff + k) = mat.data(k+mrows) + yoff
           omat.data(xoff + k) = if (featType == 0) {
             1f

@@ -41,7 +41,10 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     nstart = opts.nstart
     fnames = opts.fnames
     blockSize = opts.batchSize
-    while (!fileExists(fnames(0)(nstart))) {nstart += 1}
+    while (!fileExists(fnames(0)(nstart)) && nstart < opts.nend) {nstart += 1}
+    if (nstart == opts.nend) {
+      throw new RuntimeException("Couldnt find any files");
+    }
     if (opts.order == 0) {
         permfn = (a:Int) => a
       } else if (opts.order == 1) {
