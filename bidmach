@@ -2,7 +2,7 @@
 # export JAVA_HOME="" # Set here if not set in environment
 # export CUDA_PATH="" # Set here if not set in environment
 JCUDA_VERSION="0.6.5" # Fix if needed
-export JAVA_OPTS="-Xmx14G -Xms128M" # Set as much memory as possible
+export JAVA_OPTS="-Xmx14G -Xms128M -Dfile.encoding=UTF-8" # Set as much memory as possible
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
