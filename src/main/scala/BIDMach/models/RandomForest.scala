@@ -153,7 +153,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     runtimes(4) += t5 - t4;
   }
   
-  def evalblock(mats:Array[Mat], ipass:Int):FMat = {
+  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val sdata = gmats(0);
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;

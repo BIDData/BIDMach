@@ -57,11 +57,13 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   }
   
   override def updatePass(ipass:Int) = {
-    max(umcount, 1f, umcount)
-    mm ~ um / umcount
-    mmnorm ~ mm dotr mm
-    um.clear
-    umcount.clear
+    if (ipass > 0) {
+      max(umcount, 1f, umcount);
+      mm ~ um / umcount;
+      um.clear;
+      umcount.clear;
+    }
+    mmnorm ~ mm dotr mm;
   }
 }
 

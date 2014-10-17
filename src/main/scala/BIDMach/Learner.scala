@@ -68,7 +68,7 @@ case class Learner(
         here += datasource.opts.batchSize
         bytes += 12L*mats(0).nnz
         if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
-        	val scores = model.evalblockg(mats, ipass)
+        	val scores = model.evalblockg(mats, ipass, here)
         	reslist.append(scores.newcopy)
         	samplist.append(here)
         } else {
@@ -129,7 +129,7 @@ case class Learner(
       val mats = datasource.next    
       here += datasource.opts.batchSize
       bytes += 12L*mats(0).nnz
-      val scores = model.evalblockg(mats, 0)
+      val scores = model.evalblockg(mats, 0, here)
       reslist.append(scores.newcopy)
       samplist.append(here)
       if (dopts.putBack >= 0) datasource.putBack(mats, dopts.putBack)
@@ -247,7 +247,7 @@ case class ParLearnerx(
 	  				}
 	  				try {
 	  					if (istep % opts.evalStep == 0) {
-	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats, ipass)}
+	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats, ipass, here)}
 	  						reslist.synchronized { reslist.append(scores) }
 	  						samplist.synchronized { samplist.append(here) }
 	  					} else {
@@ -489,7 +489,7 @@ case class ParLearner(
     			while (done(ithread) == 1) Thread.sleep(1)
     			try {
     				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
-    					val scores = models(ithread).evalblockg(cmats(ithread), ipass)
+    					val scores = models(ithread).evalblockg(cmats(ithread), ipass, here)
     					reslist.synchronized { reslist.append(scores(0)) }
     					samplist.synchronized { samplist.append(here) }
     				} else {

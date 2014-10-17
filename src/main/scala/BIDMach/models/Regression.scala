@@ -52,7 +52,7 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     }
   }
   
-  def evalblock(mats:Array[Mat], ipass:Int):FMat = {
+  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (gmats.length == 1) {
       meval(gmats(0))
     } else {

@@ -75,7 +75,7 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
     }
   }
   
-  def evalblock(gmats:Array[Mat], ipass:Int):FMat = {
+  def evalblock(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (gmats.length > 1) {
       evalfun(gmats(0), gmats(1))
     } else {
@@ -109,12 +109,14 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
   }
   
   override def updatePass(ipass:Int) = {
-    max(umcounts, 1f, umcounts);
-    mm ~ um / umcounts;
-    mweights <-- umweights;
-    um.clear;
-    umcounts.clear;
-    umweights.clear;
+    if (ipass > 0) {
+      max(umcounts, 1f, umcounts);
+      mm ~ um / umcounts;
+      mweights <-- umweights;
+      um.clear;
+      umcounts.clear;
+      umweights.clear;
+    }
   }
 }
 

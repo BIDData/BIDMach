@@ -155,7 +155,7 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
     mupdate(sdata, user, ipass)
   }
   
-  def evalblock(mats:Array[Mat], ipass:Int):FMat = {
+  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
     uupdate(sdata, user, ipass)

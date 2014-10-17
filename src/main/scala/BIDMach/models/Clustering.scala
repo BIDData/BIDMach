@@ -8,35 +8,56 @@ import BIDMach.updaters._
 import BIDMach._
 
 abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends Model {
+  var lastpos = 0L
   
   def init() = {
 
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
-    val m = size(data0, 1)
-    
-    val nc = data0.ncols
-    if (opts.dim > nc)
-      throw new RuntimeException("Cluster initialization needs batchsize >= dim")
-
-    val rp = randperm(nc)
-    val mmi = full(data0(?,rp(0,0->opts.dim))).t
+    val m = data0.nrows
+    val mmi = rand(opts.dim, m);
     
     modelmats = Array[Mat](1)
     modelmats(0) = if (useGPU) GMat(mmi) else mmi
     updatemats = new Array[Mat](1)
     updatemats(0) = modelmats(0).zeros(mmi.nrows, mmi.ncols)
+    lastpos = 0;
   } 
   
   def mupdate(data:Mat, ipass:Int):Unit
    
   def evalfun(data:Mat):FMat
   
-  def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
-    mupdate(gmats(0), ipass)
+  def doblock(gmats:Array[Mat], ipass:Int, here:Long) = {
+    val mm = modelmats(0);
+    val gm = gmats(0);
+    if (ipass == 0) {
+      if (here.toInt == gm.ncols) {
+        println("First pass random centroid initialization")
+      }
+      val gg = full(gm).t;
+      val lastp = lastpos.toInt
+      if (lastp < mm.nrows - 1) {
+        val step = math.min(gg.nrows, mm.nrows - lastp);
+        mm(lastp->(lastp+step),?) = gg(0->step, ?);
+//        full(gm).t.rowslice(0, math.min(gm.ncols, mm.nrows - lastp), mm, lastp)
+      } else {
+        val rp1 = randperm(gm.ncols);
+        val rp2 = randperm(mm.nrows);
+        val pp = ((here - lastpos) * mm.nrows / here).toInt;
+//        println("here %d lastpos %d pp %d" format (here, lastpos,pp))
+        if (pp > 0) {
+          mm(rp2(0->pp), ?) = gg(rp1(0->pp), ?);        
+        }
+      }
+      lastpos = here;
+    } else {
+      mupdate(gmats(0), ipass)
+    }
   }
   
-  def evalblock(mats:Array[Mat], ipass:Int):FMat = {
+  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+    lastpos = here;
     evalfun(gmats(0))
   }
 }
