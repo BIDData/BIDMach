@@ -12,8 +12,16 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   var targets:Mat = null
   var mask:Mat = null
   var sp:Mat = null
+   
+  override def copyTo(mod:Model) = {
+    super.copyTo(mod);
+    val rmod = mod.asInstanceOf[RegressionModel];
+    rmod.targmap = targmap;
+    rmod.targets = targets;
+    rmod.mask = mask;
+    rmod.sp = sp;    
+  }
   
- 
   def init() = {
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)

@@ -18,12 +18,21 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   val linkArray = GLM.linkArray
   
   var mylinks:Mat = null
+  var weights:Mat = null
   
   var totflops = 0L
+  
+  override def copyTo(mod:Model) = {
+    super.copyTo(mod);
+    val rmod = mod.asInstanceOf[GLM];
+    rmod.mylinks = mylinks;
+    rmod.weights = weights;    
+  }
   
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
+    weights = if (useGPU) GMat(opts.weights) else opts.weights
     if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask
     totflops = 0L
     for (i <- 0 until opts.links.length) {
@@ -35,14 +44,18 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
-    mupdate2(in, alltargs)
+    val dweights = if (weights.asInstanceOf[AnyRef] != null) weights * in else null
+    mupdate3(in, alltargs, dweights)
   }
   
-  def mupdate2(in:Mat, targ:Mat) = {
+  def mupdate2(in:Mat, targ:Mat) = mupdate3(in, targ, null)
+  
+  def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {
     val ftarg = full(targ)
-    val eta = modelmats(0) * in
+    val eta = modelmats(0) * in  
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
     GLM.derivs(eta, ftarg, eta, mylinks, linkArray, totflops)
+    if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘  dweights
     updatemats(0) ~ eta *^ in
     if (mask.asInstanceOf[AnyRef] != null) {
       updatemats(0) ~ updatemats(0) ∘ mask
@@ -53,16 +66,23 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
-    meval2(in, alltargs)
+    val dweights = if (weights.asInstanceOf[AnyRef] != null) weights * in else null
+    meval3(in, alltargs, dweights)
   }
   
-  def meval2(in:Mat, targ:Mat):FMat = {
+  def meval2(in:Mat, targ:Mat):FMat = meval3(in, targ, null)
+  
+  def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
     val ftarg = full(targ)
     val eta = modelmats(0) * in
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
     if (putBack >= 0) {ftarg <-- eta}
-    v
+    if (dweights.asInstanceOf[AnyRef] != null) {
+      FMat(sum(v ∘  dweights, 2) / sum(dweights))
+    } else {
+      FMat(mean(v, 2))
+    }
   }
 }
 
@@ -211,6 +231,7 @@ abstract class GLMlink {
 object GLM {
   trait Opts extends RegressionModel.Opts {
     var links:IMat = null
+    var weights:FMat = null
   }
   
   val linear = 0
@@ -250,7 +271,7 @@ object GLM {
     }
   }
   
-  def llfun(pred:Mat, targ:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long):FMat = {
+  def llfun(pred:Mat, targ:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long):Mat = {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
         Mat.nflops += 10L * ftarg.length
@@ -265,13 +286,13 @@ object GLM {
                 }
                 i += 1
             }
-            mean(out,2)
+            out
       }
       case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         val out = (gpred + 3f)
         CUMACH.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
-        FMat(mean(out,2))
+        out
       }
     }
   }

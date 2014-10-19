@@ -78,7 +78,8 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
+    val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
+    FMat(mean(v,2))
   }
 
 }

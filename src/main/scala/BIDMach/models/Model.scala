@@ -20,6 +20,14 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var putBack = -1
   
+  def copyTo(mod:Model) = {
+    mod.datasource = datasource;
+    mod.modelmats = modelmats;
+    mod.updatemats = updatemats;
+    mod.mats = mats;
+    mod.gmats = gmats;
+  }
+  
   def bind(ds:DataSource):Unit = {
     datasource = ds;
 	  mats = datasource.next

@@ -97,7 +97,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
     if (putBack >= 0) {ftarg <-- eta}
-    v
+    FMat(mean(v, 2))
   }
 }
 

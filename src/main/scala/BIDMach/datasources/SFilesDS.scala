@@ -266,7 +266,7 @@ class SFilesDSv2(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
       	maxv = matq(i).ncols
       }
     }
-    maxv
+    maxv - 1
   }
   
   def fillup(mat:Mat, todo:Int) = {
@@ -299,7 +299,7 @@ class SFilesDSv2(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
     	nrow = math.min(rowno + todo, spm)
     	val matq = matqueue(filex)
     	if (matq(0) != null) {
-//    	  println("Here %d %d %d" format(rowno, nrow, todo))
+//    	  println("Here %d %d %d %d" format(rowno, nrow, todo, spm))
     		omats(0) = spcolslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
     		if (rowno + todo >= spm) donextfile = true
     	} else {
