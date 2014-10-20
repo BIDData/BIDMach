@@ -18,7 +18,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   val linkArray = GLM.linkArray
   
   var mylinks:Mat = null
-  var weights:Mat = null
+  var iweight:Mat = null
   
   var totflops = 0L
   
@@ -26,13 +26,13 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     super.copyTo(mod);
     val rmod = mod.asInstanceOf[GLM];
     rmod.mylinks = mylinks;
-    rmod.weights = weights;    
+    rmod.iweight = iweight;    
   }
   
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
-    weights = if (useGPU) GMat(opts.weights) else opts.weights
+    iweight = if (useGPU) GMat(opts.iweight) else opts.iweight
     if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask
     totflops = 0L
     for (i <- 0 until opts.links.length) {
@@ -44,7 +44,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
-    val dweights = if (weights.asInstanceOf[AnyRef] != null) weights * in else null
+    val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null
     mupdate3(in, alltargs, dweights)
   }
   
@@ -66,7 +66,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
-    val dweights = if (weights.asInstanceOf[AnyRef] != null) weights * in else null
+    val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null
     meval3(in, alltargs, dweights)
   }
   
@@ -231,7 +231,7 @@ abstract class GLMlink {
 object GLM {
   trait Opts extends RegressionModel.Opts {
     var links:IMat = null
-    var weights:FMat = null
+    var iweight:FMat = null
   }
   
   val linear = 0
