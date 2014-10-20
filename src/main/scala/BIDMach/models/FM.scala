@@ -31,7 +31,6 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
     iweight = if (useGPU) GMat(opts.iweight) else opts.iweight
     mv = modelmats(0)
-    if (mask.asInstanceOf[AnyRef] != null) mv ~ mv ∘ mask
     val rmat1 = rand(opts.dim1, mv.ncols) - 0.5f 
     rmat1 ~ rmat1 *@ (sp * (1f/math.sqrt(opts.dim1).toFloat))
     mm1 = if (useGPU) GMat(rmat1) else rmat1
@@ -39,6 +38,11 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     rmat2 ~ rmat2 *@ (sp * (1f/math.sqrt(opts.dim2).toFloat))
     mm2 = if (useGPU) GMat(rmat2) else rmat2
     modelmats = Array(mv, mm1, mm2)
+    if (mask.asInstanceOf[AnyRef] != null) {
+      mv ~ mv ∘ mask
+      mm1 ~ mm1 ∘ mask
+      mm2 ~ mm2 ∘ mask
+    }
     uv = updatemats(0)
     um1 = uv.zeros(opts.dim1, uv.ncols)
     um2 = uv.zeros(opts.dim2, uv.ncols)
@@ -70,6 +74,11 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     uv ~ eta *^ in
     um1 ~ (vt1 ∘ (eta * 2f)) *^ in
     um2 ~ (vt2 ∘ (eta * -2f)) *^ in
+    if (mask.asInstanceOf[AnyRef] != null) {
+      uv ~ uv ∘ mask;
+      um1 ~ um1 ∘ mask;
+      um2 ~ um2 ∘ mask;
+    }
   }
   
   def meval(in:Mat):FMat = {
