@@ -10,9 +10,9 @@ if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
 else 
-  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
+  while [ -L "${BIDMACH_ROOT}" ]; do
+    BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
+  done
 fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
