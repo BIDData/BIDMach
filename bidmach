@@ -44,7 +44,6 @@ fi
 if [ "$1" = "notebook" ]; then
     shift 1
     KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"$JAVA_NATIVE\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\", \"$@\"]"
-    echo ${KERNEL_CMD}
     ipython notebook --profile scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
     scala -nobootcp -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "$@"
