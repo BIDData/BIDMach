@@ -7,8 +7,6 @@ export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8" # Set as much memor
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
 else 
   while [ -L "${BIDMACH_ROOT}" ]; do
     BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
