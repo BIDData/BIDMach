@@ -102,6 +102,11 @@ case class Learner(
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    if (opts.autoReset) {
+      Learner.toCPU(modelmats)
+      resetGPUs
+    }
+    datasource.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
@@ -154,6 +159,7 @@ case class Learner(
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    datasource.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
@@ -321,6 +327,11 @@ case class ParLearnerx(
 	  val gf = gflop
 	  Mat.useCache = cacheState
 	  println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
+	  if (opts.autoReset) {
+	    Learner.toCPU(modelmats)
+	    resetGPUs
+	  }
+	  for (ithread <- 0 until opts.nthreads) datasources(ithread).close
 	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
@@ -563,7 +574,8 @@ case class ParLearner(
       	saveAs(opts.resFile, Learner.scores2FMat(reslist) on row(samplist.toList), "results")
       }
     }
-    running = false
+    running = false;
+    datasource.close
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*here, bytes/gf._2/1e6))
@@ -648,6 +660,19 @@ object Learner {
   	var evalStep = 11
   	var pstep = 0.01f
   	var resFile:String = null
+  	var autoReset = true
+  }
+  
+    
+  def toCPU(mats:Array[Mat]) {
+    for (i <- 0 until mats.length) {
+      mats(i) match {
+        case g:GMat => mats(i) = FMat(g)
+        case g:GSMat => mats(i) = SMat(g)
+        case g:GIMat => mats(i) = IMat(g)
+        case _ => {}
+      }
+    }
   }
   
   def setupPB(ds:DataSource, npb:Int, dim:Int) = {

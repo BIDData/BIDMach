@@ -25,7 +25,7 @@ object MNIST {
   def datasource(dir:String="/data/MNIST8M/parts/", nlast:Int = 80, n:Int = 1, i:Int = 0) = {
     implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(8))
     val opts1 = new FilesDS.Options {  
-      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
+    fnames = List(FilesDS.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
     nstart = 0;
     nend = nlast;
     order = 0;
@@ -35,7 +35,7 @@ object MNIST {
     featThreshold = 128;
     }
     val opts2 = new SFilesDS.Options {  
-      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
+    fnames = List(FilesDS.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
     nstart = opts1.nstart;
     nend = opts1.nend;
     order = opts1.order;
@@ -415,7 +415,7 @@ object Twitter {
         i:Int = 0, 
         nfeats:Int = 100000) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
+        fnames = List(FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
         fcounts = icol(nfeats)
         nstart = nstart0/n
         nend = nend0/n
@@ -434,7 +434,7 @@ object Twitter {
         i:Int = 0, 
         nfeats:Int = 100000) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
+        fnames = List(FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
         fcounts = icol(nfeats)
         nstart = nstart0/n
         nend = nend0/n
@@ -455,7 +455,7 @@ object Twitter {
         nbi0:Int = 100, 
         ntri0:Int = 200) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(
+        fnames = List(
                 FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
@@ -480,7 +480,7 @@ object Twitter {
         nbi0:Int = 100, 
         ntri0:Int = 200) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(
+        fnames = List(
                 FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)
