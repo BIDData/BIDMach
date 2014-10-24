@@ -50,9 +50,9 @@ opts5.npasses=2
 mm5.train
 
 println("\n<<<<<<< Testing LDA, no MKL >>>>>>>")
-Mat.noMKL=true
+Mat.useMKL=false
 mm5.train
-Mat.noMKL=false
+Mat.useMKL=true
 
 if (Mat.hasCUDA > 1) {
 println("\n<<<<<<< Testing parallel NMF >>>>>>>")
