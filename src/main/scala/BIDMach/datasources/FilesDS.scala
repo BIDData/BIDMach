@@ -167,17 +167,19 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
   	while  (!stop) {
-  		while (ready(ifilex) >= fileno) Thread.`yield`
-  		val inew = ready(ifilex) + opts.lookahead
-  		val pnew = permfn(inew)
-  		val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles)
-  		for (i <- 0 until fnames.size) {
-  			matqueue(ifilex)(i) = if (fexists) {
-  			  HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i))  			 
-  			} else null  			
-//  			println("%d" format inew)
-  		}
-  		ready(ifilex) = inew
+      while (ready(ifilex) >= fileno && !stop) Thread.`yield`
+      if (!stop) {
+        val inew = ready(ifilex) + opts.lookahead;
+        val pnew = permfn(inew);
+        val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles);
+        for (i <- 0 until fnames.size) {
+          matqueue(ifilex)(i) = if (fexists) {
+            HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	 
+          } else null;  			
+          //  			println("%d" format inew)
+        }
+        ready(ifilex) = inew;
+      }
   	}
   }
   
