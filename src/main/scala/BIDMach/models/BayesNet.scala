@@ -12,8 +12,10 @@ object BayesNet {
   //var dag: FMat = null
   var graph: Graph = null
   var sdata: SMat = null
+  var tdata: SMat = null
   // 
   var cpt: FMat = null
+  var cpt_old: FMat = null
   var cpt0: FMat = null
   var cptoffset: IMat = null
   
@@ -28,22 +30,88 @@ object BayesNet {
   var alpha = 1f
   var beta = 0.1f
   var batchSize = 1
+  var batchSizeTr = 1
+  var batchSizeTe = 1
   var niter=100
-  var nsampls=10
+  var nsampls = 10
+  var nsamplsTr=10
+  var nsamplsTe=10
   
   var llikelihood=0f
+  
+  var predprobs: FMat = null
+  
+  var nodepath = "C:/data/zp_dlm_FT_code_and_data/node.txt"
+  var dagpath = "C:/data/zp_dlm_FT_code_and_data/dag.txt"
+  var cptpath = "C:/data/zp_dlm_FT_code_and_data/cpt.fmat"
+  var datapath = "C:/data/zp_dlm_FT_code_and_data/dl-10000-0.100000.smat"
+  //var datapath = "C:/data/zp_dlm_FT_code_and_data/train4.smat"
+  
+  def run(alpha0: Float, beta0: Float, batchSize0: Int, batchSize1: Int, niter0: Int, nsampls0: Int, nsampls1: Int) = {
+    alpha = alpha0
+    beta = beta0
+    batchSizeTr = batchSize0
+    batchSizeTe = batchSize1
+    niter = niter0
+    nsamplsTr = nsampls0
+    nsamplsTe = nsampls1
+    println("alpha: %f, beta: %f, batchSize: %d, nsampls: %d" format (alpha, beta, batchSizeTr, nsamplsTr))
+    init
+    setup
+    synthesize(4300, 0.03f, "dl")
+    loadData
 
+    sampleAll
+
+    //testAll
+  }
+  
+  def main(args: Array[String]){
+    //run(0.05f, 0.1f, 100, 1, 40, 10, 50)
+    //run(1f, 0.1f, 3600, 1, 50, 1, 50)
+    //run(1f, 1f, 3600, 1, 50, 1, 50)
+    
+    //run(1f, 0.1f, 3600, 1, 50, 5, 50)
+    //run(1f, 1f, 3600, 1, 50, 5, 50)
+    
+    //run(1f, 0.1f, 3600, 1, 50, 10, 50)
+    //run(1f, 1f, 3600, 1, 50, 10, 50)
+    
+    //run(0.05f, 0.1f, 200, 1, 50, 1, 50)
+    //run(0.05f, 0.1f, 200, 1, 50, 5, 50)
+
+    //flip
+    //run(1f, 0.1f, 10000, 1, 50, 5, 50)
+    //val f1 = gflop
+    flip
+    run(1f, 0.1f, 10000, 1, 200, 1, 1)
+    val f2 = gflop
+    println(f2)
+   
+    //run(1f, 0.1f, 10000, 1, 20, 20, 50)
+    //run(0.05f, 0.2f, 1000, 1, 50, 20, 50)
+    //run(0.1f, 0.1f, 400, 1, 50, 1, 50)
+    //run(0.05f, 0.1f, 400, 1, 40, 5, 50)
+    //run(0.1f, 0.1f, 900, 1, 40, 10, 50)
+    
+    //run(0.05f, 0.1f, 200, 1, 60, 1, 50)
+    //run(0.05f, 0.1f, 200, 1, 40, 5, 50)
+    //run(0.05f, 0.1f, 200, 1, 40, 10, 50)
+    //run(0.1f, 0.1f, 400, 1, 60, 1, 50)
+    //run(0.05f, 0.1f, 400, 1, 40, 5, 50)
+    //run(0.1f, 0.1f, 900, 1, 40, 10, 50)
+    
+  }
   
   def init = {
-    nodeMap = loadNodeMap("C:/data/zp_dlm_FT_code_and_data/node.txt")
+    nodeMap = loadNodeMap(nodepath)
     val n = nodeMap.size
-    val dag = loadDag("C:/data/zp_dlm_FT_code_and_data/dag.txt", n)
+    val dag = loadDag(dagpath, n)
+    saveSMat("C:/data/zp_dlm_FT_code_and_data/dag.smat",dag)
     graph = new Graph(dag, n)
-    sdata = loadSdata("C:/data/zp_dlm_FT_code_and_data/sdata_cleaned.txt")
-    ///val data = loadIMat("C:/data/zp_dlm_FT_code_and_data/sdata_test.txt")
-    //sdata = sparse(data(?,0),data(?,1),data(?,2), n, size(data,1))
-    sdata = sdata(?, 0 until 4000)
-    //sdata = loadSMat("C:/data/zp_dlm_FT_code_and_data/sdata.smat")
+    //var data = loadSdata("C:/data/zp_dlm_FT_code_and_data/sdata_cleaned.txt")
+    //val data = loadIMat("C:/data/zp_dlm_FT_code_and_data/sdata_test.txt")
+    
   }
   
   def setup = {
@@ -53,20 +121,12 @@ object BayesNet {
     // prepare cpt 
     val np = sum(graph.dag)
     val ns = IMat(pow(2*ones(1, graph.n), np+1))
-
+    //setseed(1003)
     val lcpt = sum(ns).v
     cpt = rand(lcpt, 1)
     cpt(1 until lcpt by 2) = 1 - cpt(0 until lcpt by 2)
-    cpt0 = loadFMat("C:/data/zp_dlm_FT_code_and_data/cpt_test.txt")
-    
-    /*
-    for(i <- 0 until cpt.length-1 by 2 ){
-      if(cpt(i)> cpt(i+1)){
-        var temp = cpt(i)
-        cpt(i) = cpt(i+1)
-        cpt(i+1) = temp
-      }
-    }*/
+    //saveFMat("C:/data/zp_dlm_FT_code_and_data/cptinit.fmat", cpt)
+    cpt0 = loadFMat(cptpath)
     
     // prepare cpt offset 
     cptoffset = izeros(graph.n, 1)
@@ -90,24 +150,39 @@ object BayesNet {
     iproject = iproject + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
     pproject = dag + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
     
-    /*
-    println("iproject")
-    var (r,c,v) = find3(iproject)
-    for(i <-0 until iproject.nnz){
-      println(r(i),c(i),v(i))
-    }
+    //saveSMat("C:/data/zp_dlm_FT_code_and_data/debug/mat11.smat", iproject)
+    //saveSMat("C:/data/zp_dlm_FT_code_and_data/debug/mat12.smat", pproject)
     
-    println("pproject")
-    var (rp,cp,vp) = find3(pproject)
-    for(i <-0 until pproject.nnz){
-      println(rp(i),cp(i),vp(i))
-    }
-    */
     // load synthetic data
     //
+    predprobs = rand(graph.n, batchSizeTr)
+  }
+  
+  def loadData = {
+    var data = loadSMat(datapath)
+    //val perm = randperm(4300)
+    //data = data(?, perm)
+    //val cutoff = 4000
+    //sdata = data(?, 0 until 3600)
+    //val perm2 = randperm(4000)
+    //tdata = data(?, 3600 until 4300)
+    //tdata = data(?, 0 until cutoff)
+    //tdata = data(?, cutoff until 4300)
+    sdata = data.copy
+    tdata = data.copy
+    //sdata = data.t
+    //tdata = data.t
+    //val data = loadSMat("C:/data/zp_dlm_FT_code_and_data/sdata.smat")
+    //val perm = randperm(5000)
+    //data = data(?, perm)
+    //val cutoff = 4000
+    //sdata = data(?, 0 until cutoff)
+    //tdata = data(?, 0 until cutoff)
+    //tdata = data(?, cutoff until 5000)
   }
   
   def initState(fdata: FMat) = {
+    
     val ndata = size(fdata, 2)
     state = rand(graph.n, batchSize*nsampls)
     state = (state >= 0.5)
@@ -137,10 +212,19 @@ object BayesNet {
 
   }
   
+  
   def getCpt(index: IMat) = {
     var cptindex = zeros(index.nr, index.nc)
     for(i <-0 until index.nc){
       cptindex(?, i) = cpt(index(?, i))
+    }
+    cptindex
+  }
+  
+  def getCpt0(index: IMat) = {
+    var cptindex = zeros(index.nr, index.nc)
+    for(i <-0 until index.nc){
+      cptindex(?, i) = cpt0(index(?, i))
     }
     cptindex
   }
@@ -150,7 +234,6 @@ object BayesNet {
 
     val nnode = size(ids, 1)
     //val ndata = size(fdata, 2)    
-    
     val nodep0 = ln(getCpt(cptoffset + IMat(iproject*state0)) + 1e-10)
     val nodep1 = ln(getCpt(cptoffset + IMat(iproject*state1)) + 1e-10)
         
@@ -158,10 +241,11 @@ object BayesNet {
     val p1 = exp(pproject(ids, ?) * nodep1)
     
     val p = p1/(p0+p1)
-    
+    //val p = 0.5
     var sample = rand(nnode, batchSize*nsampls)
     sample = (sample <= p)
-    
+
+    //check the logic of this part, enforce data
     state(ids, ?) = sample
     val innz = find(fdata)
     for(i <- 0 until batchSize*nsampls by batchSize){
@@ -172,35 +256,152 @@ object BayesNet {
 
   }
   
-  def sample(data: SMat) = {
+  def sampleColor(fdata: FMat, ids: IMat, pids: IMat)={
+    
+
+    val nnode = size(ids, 1)
+    //val ndata = size(fdata, 2)
+
+    //val a = IMat(cptoffset(pids) + iproject(pids,?)*state0)
+
+    val nodep0 = ln(getCpt(cptoffset(pids) + IMat(iproject(pids,?)*state0)) + 1e-10)
+    val nodep1 = ln(getCpt(cptoffset(pids) + IMat(iproject(pids,?)*state1)) + 1e-10)
+        
+    val p0 = exp(pproject(ids, pids) * nodep0)
+    val p1 = exp(pproject(ids, pids) * nodep1)
+    
+    val p = p1/(p0+p1)
+    //println(p)
+    //val p = 0.5
+    var sample = rand(nnode, batchSize*nsampls)
+    sample = (sample <= p)
+
+    //check the logic of this part, enforce data
+    state(ids, ?) = sample
+    val innz = find(fdata)
+    for(i <- 0 until batchSize*nsampls by batchSize){
+    	var c = innz+i
+    	state(innz + i * graph.n) = 0
+    	state(?, i until i+batchSize) = state(?, i until i+batchSize) + (fdata > 0)
+    }
+
+    predprobs(ids, ?) = p
+
+  }
+  
+  def sample(data: SMat, k: Int) = {
     val fdata = full(data)
-    initState(fdata)
-    for(i <- 0 until 8){
+    if(k==0){
+    	initState(fdata)
+    }
+    for(i <- 0 until 1){
     for(c <- 0 until graph.ncolors){
       val ids = find(graph.colors == c)
+      val pids = find( sum(pproject(ids, ?), 1))
       initStateColor(fdata, ids)
-      sampleColor(fdata, ids)
+      sampleColor(fdata, ids, pids)
+
     }
     }
   }
   
   def sampleAll = {
     val ndata = size(sdata, 2)
-    
+
     for(k <- 0 until niter){
     var j = 0;
     
+   // println("iteration %d" format k)
+    //testAll
+    batchSize = batchSizeTr
+    nsampls = nsamplsTr
     for(i <- 0 until ndata by batchSize){
-      sample(sdata(?, i until math.min(ndata, i+batchSize)))
-      updateCpt
+      sample(sdata(?, i until math.min(ndata, i+batchSize)), k)
+      updateCpt      
       eval
+      
     }
-    
-    println("ll: %f" format llikelihood)
+    println("delta: %f, %f, %f, %f" format (eval2._1, eval2._2, eval2._3, llikelihood))
+    //pred
+
+    //println("ll: %f" format llikelihood)
     llikelihood = 0f
     //println("dist cpt - cpt0: %f" format ((cpt-cpt0) dot (cpt-cpt0)).v )
+  
 
     }
+
+  }
+  
+   def pred = {
+    val ndata = size(sdata, 1)
+    for(j <- 0 until ndata by batchSizeTr){         
+    	   //val jend = math.min(ndata, j + opts.batchSize)
+    	   //val minidata = data(j until jend, ?)
+         val minidata = sdata
+    	   // sample mini-batch of data
+    	 sample(minidata, 0)
+    	   // update parameters
+    }
+    val vdatat = loadSMat("C:/data/zp_dlm_FT_code_and_data/train4.smat")
+    val vdata = vdatat.t
+    val (r, c, v) = find3(vdata)
+    var correct = 0f
+    var tot = 0f
+    for(i <- 0 until vdata.nnz){
+      val ri = r(i).toInt
+      val ci = c(i).toInt
+      if(predprobs(ri, ci).v != 0.5){
+      val pred = ( predprobs(ri, ci).v >= 0.5)
+      val targ = (v(i).v >= 0)
+      //println(probs(ri, ci).v, v(i).v)
+      //println(pred, targ)
+      if(pred == targ){
+        correct = correct + 1
+      }
+      tot = tot + 1
+      }
+    }
+    println(vdata.nnz, tot, correct)
+   
+    println("prediction accuracy: " + correct/tot)
+  }
+  
+  def testAll = {
+    val ndata = size(tdata, 2)  
+    var n = 0f;
+    var nc = 0f;
+    batchSize = batchSizeTe
+    nsampls = nsamplsTe
+    //setseed(123456)
+    for(i <- 0 until ndata ){
+      var test:SMat = tdata(?, i)
+      var (ids: IMat, d, v) = find3(test)
+      if(ids.length>=2){
+
+      var targeti = ids((rand(1,1)*ids.length).v.toInt)
+      var target = full(test)(targeti).toInt
+      
+      var r0 = izeros(ids.length-1, 1)
+      var v0 = zeros(ids.length-1, 1)
+      var ptr = 0
+      
+      for(j <-0 until ids.length){
+        if(targeti != ids(j)){
+          r0(ptr) = ids(j)
+          v0(ptr) = v(j)
+          ptr += 1
+        }
+      }
+      var test0= sparse(r0, izeros(ids.length-1, 1) ,v0, 334, 1)
+      sample(test0, 0)
+      var pred = if(sum(state(targeti, ?)).v/state(targeti, ?).length >= 0.5) 1 else -1
+      n = n+1
+      //println(i, pred, target, pred==target)
+      if(pred == target) nc = nc + 1
+      }
+    }
+    println("Test accuracy: %f" format nc.toFloat/n)
 
   }
   
@@ -219,24 +420,13 @@ object BayesNet {
     normcounts(1 until counts.length by 2) = counts(0 until counts.length-1 by 2) 
     normcounts = normcounts + counts
     counts = counts / normcounts
-    /*
-    for(i <- 0 until counts.length-1 by 2 ){
-      if(counts(i)> counts(i+1)){
-        var temp = counts(i)
-        counts(i) = counts(i+1)
-        counts(i+1) = temp
-      }
-    }
-    */	
+    
+    cpt_old = counts.copy
 	cpt = (1-alpha) * cpt + alpha * counts
-    //for(i<-0 until cpt.length){
-    //  print("%f," format cpt(i))
-    //}
-    //println("")
-	
+    
   }
   
-  def synthesize(n: Int, sp: Float) = {
+  def synthesize(n: Int, sp: Float, name: String) = {
     var syndata = izeros(graph.n, n)
     for(k <-0 until n){
     	for(i <- 0 until graph.n){
@@ -247,16 +437,15 @@ object BayesNet {
     		   var pv = if(syndata(ps(j),k) > 0) 1 else 0
     		   ind = ind +  math.pow(2f, np-j).toInt * pv
     		 }
-    		 val p0 = cpt(ind)
-    		 val p1 = cpt(ind + 1)
+    		 val p0 = cpt0(ind)
+    		 val p1 = cpt0(ind + 1)
     		 val p = p1/(p0+p1)
-    		 if(i==4) println(p)
     		 var r = rand(1,1)
     		 r = ( r <= p )	- (r > p)	 
     		 syndata(i, k) = r.v.toInt
     	}
     }
-    saveFMat("C:/data/zp_dlm_FT_code_and_data/sdata.smat",syndata)
+    saveFMat("C:/data/zp_dlm_FT_code_and_data/%s-%d-%f.fmat" format (name, n, sp), syndata)
     
     var l = (n * graph.n * sp * 1.5).toInt
     var r = izeros(l ,1)
@@ -276,7 +465,7 @@ object BayesNet {
       }
     }
     val smat = sparse(r(0 until ptr), c(0 until ptr), v(0 until ptr), graph.n, n)
-    saveSMat("C:/data/zp_dlm_FT_code_and_data/sdata.smat",smat)
+    saveSMat("C:/data/zp_dlm_FT_code_and_data/%s-%d-%f.smat" format (name, n, sp), smat)
   }
   
   def eval = {
@@ -285,35 +474,27 @@ object BayesNet {
     llikelihood += ll.v
   }
   
-  def run(alpha0: Float, beta0: Float, batchSize0: Int, niter0: Int, nsampls0: Int) = {
-    alpha = alpha0
-    beta = beta0
-    batchSize = batchSize0
-    niter = niter0
-    nsampls = nsampls0
-    
-    init
-    setup
-    //synthesize(5000, 0.3f)
-    sampleAll
+  def eval2 = {
+    (sqrt(((cpt - cpt0) dot (cpt - cpt0))/((cpt0) dot (cpt0))).v, sqrt(((cpt_old - cpt0) dot (cpt_old - cpt0))/((cpt0) dot (cpt0))).v, sqrt(((cpt_old - cpt) dot (cpt_old - cpt))/cpt.length).v)
   }
   
-  def main(args: Array[String]){
-    run(0.2f, 1f, 500, 10, 100)
-  }
+
   def showCpt(node: String){
     val id = nodeMap(node)
     val np = sum(graph.dag(?, id)).v
     val offset = cptoffset(id)
     
-    for(i <-0 until math.pow(2, np).toInt)
-    	print(String.format("\t%" + np.toInt + "s", i.toBinaryString).replace(" ", "0"))
+    for(i <-0 until math.pow(2, np).toInt){
+    	if(np > 0)
+    		print(String.format("\t%" + np.toInt + "s", i.toBinaryString).replace(" ", "0"))
+    }
     print("\n0")
     for(i <-0 until math.pow(2, np).toInt)
     	print("\t%.2f" format cpt(offset + i*2))
     print("\n1")
     for(i <-0 until math.pow(2, np).toInt)
     	print("\t%.2f" format cpt(offset + i*2+1))
+    print("\n")
   }
   
   def loadNodeMap(path: String) = {
