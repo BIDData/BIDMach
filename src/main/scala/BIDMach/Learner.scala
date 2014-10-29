@@ -660,7 +660,7 @@ object Learner {
   	var evalStep = 11
   	var pstep = 0.01f
   	var resFile:String = null
-  	var autoReset = false
+  	var autoReset = true
   }
   
     

@@ -36,6 +36,7 @@ ALL_LIBS=";${LIBDIR}/IScala.jar;${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JC
 
 if [ ! "$OS" = "Windows_NT" ]; then
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
+    JAVA_NATIVE="-Djava.library.path=${LD_LIBRARY_PATH}:/usr/lib64:/lib64:lib:/usr/lib"
 else
     if [ ! "${CUDA_PATH}" = "" ]; then
 	    NEWPATH=`${BIDMACH_ROOT}/shortpath.bat "${CUDA_PATH}"`
