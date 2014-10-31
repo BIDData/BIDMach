@@ -26,6 +26,19 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   var um1:Mat = null
   var um2:Mat = null
   
+  override def copyTo(mod:Model) = {
+    super.copyTo(mod);
+    val rmod = mod.asInstanceOf[FM];
+    rmod.mylinks = mylinks;
+    rmod.iweight = iweight;    
+    rmod.mv = mv;
+    rmod.mm1 = mm1;
+    rmod.mm2 = mm2;
+    rmod.uv = uv;
+    rmod.um1 = um2;
+    rmod.um2 = um2;
+  }
+  
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links

@@ -33,7 +33,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     one = mm.ones(1,1)
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols)
     te = mm.zeros(opts.texp.nrows, opts.texp.ncols)
-    lrate = mm.zeros(1, 1)
+    lrate = mm.zeros(opts.lrate.nrows, 1)
     ve <-- opts.vexp
     te <-- opts.texp
   } 
@@ -57,10 +57,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 	  val um = updatemats(i)
 	  val mm = modelmats(i)
 	  val ss = sumSq(i)
-	  if (opts.lrate.length > 1) {
-	    lrate.set(opts.lrate(i))
+	  if (opts.lrate.ncols > 1) {
+	    lrate <-- opts.lrate(?,i)
 	  } else {
-	    lrate.set(opts.lrate(0))
+	    lrate <-- opts.lrate
 	  }
 	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
@@ -98,10 +98,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
       val mm = modelmats(i)
       val um = updatemats(i)
       val ss = sumSq(i)
-      if (opts.lrate.length > 1) {
-        lrate.set(opts.lrate(i))
+      if (opts.lrate.ncols > 1) {
+        lrate <-- opts.lrate(?,i)
       } else {
-        lrate.set(opts.lrate(0))
+        lrate <-- opts.lrate
       }
 	  val newsquares = um *@ um
 	  newsquares ~ newsquares *@ nw
