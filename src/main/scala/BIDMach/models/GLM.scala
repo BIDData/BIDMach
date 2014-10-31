@@ -32,7 +32,8 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
-    iweight = if (useGPU) GMat(opts.iweight) else opts.iweight
+    iweight = opts.iweight
+    if (iweight.asInstanceOf[AnyRef] != null && useGPU) iweight = GMat(iweight)
     if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask
     totflops = 0L
     for (i <- 0 until opts.links.length) {

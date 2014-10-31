@@ -15,7 +15,7 @@ import java.io._
  * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
-class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
+class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null
@@ -179,7 +179,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
  * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
-class SFilesDSv2(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
+class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null
@@ -309,9 +309,11 @@ class SFilesDSv2(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
     		donextfile = true
     	}
     	todo -= nrow - rowno
+    	fprogress = nrow*1f / spm
     	if (donextfile) {
     	  fileno += 1
     	  rowno = 0
+    	  fprogress = 0
     	  donextfile = false
     	} else {
     		rowno = nrow
@@ -321,6 +323,10 @@ class SFilesDSv2(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
       fillup(omats(0), todo)
     }
     omats
+  }
+  
+  override def progress = {
+    ((fileno-nstart)*1f + fprogress)/ totalSize
   }
 
 }

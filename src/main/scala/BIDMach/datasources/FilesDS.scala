@@ -19,6 +19,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   var stop:Boolean = false
   var permfn:(Int)=>Int = null
   var totalSize = 0
+  var fprogress:Float = 0
   
   def softperm(nstart:Int, nend:Int) = {
     val dd1 = nstart / 24
@@ -97,7 +98,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   }
   
   def progress = {
-    (fileno-nstart)*1f / totalSize
+    ((fileno-nstart)*1f + fprogress)/ totalSize
   }
   
   def nmats = omats.length
@@ -111,10 +112,11 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     	var nrow = rowno;
     	val filex = fileno % opts.lookahead;
     	while (ready(filex) < fileno) Thread.`yield`
+    	var matqnr = 0
     	for (i <- 0 until fnames.size) {
     		val matq = matqueue(filex)(i);
     		if (matq != null) {
-    		  val matqnr = if (opts.dorows) matq.nrows else matq.ncols;
+    		  matqnr = if (opts.dorows) matq.nrows else matq.ncols;
     		  nrow = math.min(rowno + todo, matqnr);
     		  if (opts.dorows) {
     		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
@@ -135,6 +137,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		}
     	}
     	todo -= nrow - rowno;
+    	fprogress = nrow*1f / matqnr;
     	if (donextfile) {
     	  fileno += 1;
     	  rowno = 0;
@@ -164,17 +167,19 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
   	while  (!stop) {
-  		while (ready(ifilex) >= fileno) Thread.`yield`
-  		val inew = ready(ifilex) + opts.lookahead
-  		val pnew = permfn(inew)
-  		val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles)
-  		for (i <- 0 until fnames.size) {
-  			matqueue(ifilex)(i) = if (fexists) {
-  			  HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i))  			 
-  			} else null  			
-//  			println("%d" format inew)
-  		}
-  		ready(ifilex) = inew
+      while (ready(ifilex) >= fileno && !stop) Thread.`yield`
+      if (!stop) {
+        val inew = ready(ifilex) + opts.lookahead;
+        val pnew = permfn(inew);
+        val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles);
+        for (i <- 0 until fnames.size) {
+          matqueue(ifilex)(i) = if (fexists) {
+            HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	 
+          } else null;  			
+          //  			println("%d" format inew)
+        }
+        ready(ifilex) = inew;
+      }
   	}
   }
   
@@ -182,6 +187,9 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     (fileno < opts.nend)
   }
 
+  override def close = {
+//    stop = true
+  }
 }
 
 
@@ -222,13 +230,13 @@ object FilesDS {
  
   trait Opts extends DataSource.Opts {
   	val localDir:String = ""
-  	def fnames:List[(Int)=>String] = null
-  	var lookahead = 8
+  	var fnames:List[(Int)=>String] = null
+  	var lookahead = 2
   	var sampleFiles = 1.0f
     var nstart:Int = 0
     var nend:Int = 0
     var dorows:Boolean = false
-    var order:Int = 1                           // 0 = sequential order, 1 = random
+    var order:Int = 0                          // 0 = sequential order, 1 = random
     var throwMissing:Boolean = false
   }
   

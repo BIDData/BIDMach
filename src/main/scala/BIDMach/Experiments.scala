@@ -25,7 +25,7 @@ object MNIST {
   def datasource(dir:String="/data/MNIST8M/parts/", nlast:Int = 80, n:Int = 1, i:Int = 0) = {
     implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(8))
     val opts1 = new FilesDS.Options {  
-      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
+    fnames = List(FilesDS.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
     nstart = 0;
     nend = nlast;
     order = 0;
@@ -35,7 +35,7 @@ object MNIST {
     featThreshold = 128;
     }
     val opts2 = new SFilesDS.Options {  
-      override def fnames:List[(Int)=>String] = List(FilesDS.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
+    fnames = List(FilesDS.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
     nstart = opts1.nstart;
     nend = opts1.nend;
     order = opts1.order;
@@ -81,8 +81,10 @@ object RCV1 {
   
   def prepare(dict:String) {
     println("Preprocessing"); preprocess(dict)
-    println("Making Sparse Data Matrix"); mksparse(dict)
-    println("Making Category Matrix"); mkcats(dict)
+    println("Making Sparse Data Matrix"); mksparse(dict,"")
+    println("Making Category Matrix"); mkcats(dict,"")
+    println("Making Sparse Test Data Matrix"); mksparse(dict,"test")
+    println("Making Test Category Matrix"); mkcats(dict,"test")
   }
   
   def preprocess(dict:String) {
@@ -102,13 +104,16 @@ object RCV1 {
     iinv(ii) = icol(0->n)
     val jj = find(a > 0)
     a(jj,0) = iinv(a(jj,0)-1)
+    val jj2 = find(a4 > 0)
+    a4(jj2,0) = iinv(a4(jj2,0)-1)
     saveIMat(dict+"tokens.imat.lz4", a)
+    saveIMat(dict+"testtokens.imat.lz4", a4)
     saveSBMat(dict+"../sdict.sbmat.lz4", bdict)
     saveIMat(dict+"../swcount.imat.lz4", swc)
   }
   
-  def mksparse(dict:String) {
-    val a = loadIMat(dict+"tokens.imat.lz4")
+  def mksparse(dict:String, prefix:String) {
+    val a = loadIMat(dict+prefix+"tokens.imat.lz4")
     val dictm = Dict(loadSBMat(dict+"../sdict.sbmat.lz4"))
     val swc = loadIMat(dict+"../swcount.imat.lz4")
     val tab = izeros(a.nrows,2)
@@ -125,12 +130,12 @@ object RCV1 {
     val iikeep = find(tab(?,1) >= 0)
     val ntab = tab(iikeep,?)
     val sm = sparse(ntab(?,1), ntab(?,0), ones(ntab.nrows,1), swc.length, ii.length)
-    saveSMat(dict+"../docs.smat.lz4", sm)
-    saveIMat(dict+"../lkup.imat.lz4", lkup)    
+    saveSMat(dict+"../"+prefix+"docs.smat.lz4", sm)
+    saveIMat(dict+"../"+prefix+"lkup.imat.lz4", lkup)    
   }
   
-  def mkcats(dict:String) {
-    val lkup = loadIMat(dict+"../lkup.imat.lz4")
+  def mkcats(dict:String, prefix:String) {
+    val lkup = loadIMat(dict+"../"+prefix+"lkup.imat.lz4")
     val catids=loadIMat(dict+"../catname.imat")
     val docids=loadIMat(dict+"../docid.imat")
     val nd = math.max(maxi(lkup).v,maxi(docids).v)+1
@@ -139,7 +144,7 @@ object RCV1 {
     val indx = catids - 1 + nc*docids
     cmat(indx) = 1
     val cm = FMat(cmat(?,lkup))
-    saveFMat(dict+"../cats.fmat.lz4", cm) 
+    saveFMat(dict+"../"+prefix+"cats.fmat.lz4", cm) 
   }
 }
 
@@ -410,7 +415,7 @@ object Twitter {
         i:Int = 0, 
         nfeats:Int = 100000) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
+        fnames = List(FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
         fcounts = icol(nfeats)
         nstart = nstart0/n
         nend = nend0/n
@@ -429,7 +434,7 @@ object Twitter {
         i:Int = 0, 
         nfeats:Int = 100000) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
+        fnames = List(FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
         fcounts = icol(nfeats)
         nstart = nstart0/n
         nend = nend0/n
@@ -450,7 +455,7 @@ object Twitter {
         nbi0:Int = 100, 
         ntri0:Int = 200) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(
+        fnames = List(
                 FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
@@ -475,7 +480,7 @@ object Twitter {
         nbi0:Int = 100, 
         ntri0:Int = 200) = {
     val opts = new SFilesDS.Options {  
-        override def fnames:List[(Int)=>String] = List(
+        fnames = List(
                 FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
                 FilesDS.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)

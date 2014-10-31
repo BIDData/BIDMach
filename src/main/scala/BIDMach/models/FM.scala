@@ -42,7 +42,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
-    iweight = if (useGPU) GMat(opts.iweight) else opts.iweight
+    iweight = if (useGPU && opts.iweight.asInstanceOf[AnyRef] != null) GMat(opts.iweight) else opts.iweight
     mv = modelmats(0)
     val rmat1 = rand(opts.dim1, mv.ncols) - 0.5f 
     rmat1 ~ rmat1 *@ (sp * (1f/math.sqrt(opts.dim1).toFloat))

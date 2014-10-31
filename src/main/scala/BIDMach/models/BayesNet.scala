@@ -59,7 +59,7 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
         }
 
         for(i <- 0 until opts.nsampls){
-        	state.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0
+        	state.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
         	state(?, i*sdata.ncols until (i+1)*sdata.ncols) = state(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
         }
         datasource.putBack(mats,1)
@@ -97,7 +97,7 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
     	  
     	  user0.asInstanceOf[FMat](ids, ?) = 0f
     	  for(i <- 0 until opts.nsampls){
-    		user0.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0
+    		user0.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
     		user0(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
     	  }
     	  val nodep0 = ln(getCpt(offset + iproject*user0) + opts.eps)        
@@ -106,7 +106,7 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
     	  val user1 = user.copy
     	  user1.asInstanceOf[FMat](ids, ?) = 1f
     	  for(i <- 0 until opts.nsampls){
-    		user1.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0
+    		user1.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
     		user1(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
     	  }
     	  val nodep1 = ln(getCpt(offset + iproject*user1) + opts.eps)        
@@ -118,7 +118,7 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
 
     	  user(ids, ?) <-- sample
     	  for(i <- 0 until opts.nsampls){
-    		user.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0
+    		user.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
     		user(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
     	  }
 

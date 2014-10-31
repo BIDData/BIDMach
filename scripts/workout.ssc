@@ -1,4 +1,4 @@
-val dir = "/opt/BIDMach"
+val dir = "/code/BIDMach"
 val a = loadSMat(dir+"/data/rcv1/docs.smat.lz4")
 val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
 
@@ -14,9 +14,9 @@ opts1.useGPU=false
 mm1.train
 
 println("\n<<<<<<< Testing GLM no MKL >>>>>>>")
-Mat.noMKL=true
+Mat.useMKL=false
 mm1.train
-Mat.noMKL=false
+Mat.useMKL=true
 
 if (Mat.hasCUDA > 0) resetGPU
 Mat.clearCaches
@@ -26,11 +26,11 @@ val c6 = c(6,?)
 val (mm2,opts2) = FM.learner(a,c6,2)
 opts2.dim1=64
 opts2.dim2=16
+opts2.lrate=0.01
 opts2.reg1weight=1
 mm2.train
 
-if (Mat.hasCUDA > 0) resetGPU
-Mat.clearCaches
+
 if (Mat.hasCUDA > 1) {
 println("\n<<<<<<< Testing parallel LDA >>>>>>>")
 val (mm5,opts5) = LDA.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
@@ -43,8 +43,6 @@ opts5.npasses=2
 mm5.train
 }
 
-if (Mat.hasCUDA > 0) resetGPU
-Mat.clearCaches
 println("\n<<<<<<< Testing LDA, no GPU >>>>>>>")
 val (mm5,opts5) = LDA.learner(a, 256)
 opts5.useGPU = false
@@ -52,12 +50,10 @@ opts5.npasses=2
 mm5.train
 
 println("\n<<<<<<< Testing LDA, no MKL >>>>>>>")
-Mat.noMKL=true
+Mat.useMKL=false
 mm5.train
-Mat.noMKL=false
+Mat.useMKL=true
 
-if (Mat.hasCUDA > 0) resetGPU
-Mat.clearCaches
 if (Mat.hasCUDA > 1) {
 println("\n<<<<<<< Testing parallel NMF >>>>>>>")
 val (mm6,opts6) = NMF.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))

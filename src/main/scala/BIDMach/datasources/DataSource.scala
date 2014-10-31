@@ -13,6 +13,7 @@ abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) {
   def nmats:Int
   def init:Unit
   def progress:Float
+  def close = {}
   var omats:Array[Mat] = null
   var endmats:Array[Mat] = null
   var fullmats:Array[Mat] = null

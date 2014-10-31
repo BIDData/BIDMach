@@ -21,7 +21,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     val d = opts.dim    
     modelmats = new Array[Mat](1)
     mm = rand(d,m) - 0.5f
-	  useGPU = opts.useGPU && Mat.hasCUDA > 0
+    useGPU = opts.useGPU && Mat.hasCUDA > 0
 	  if (useGPU) {
 	    gmats = new Array[Mat](mats.length)
 	    mm = GMat(mm)
@@ -30,6 +30,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  }     
     modelmats(0) = mm
     mzero = mm.zeros(1,1)
+    if (opts.forceOnes) mm(1,?) = 1f
     updatemats = new Array[Mat](2)
   }
   
@@ -39,6 +40,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
  
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit =  {
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
+      if (opts.forceOnes) mm(1,?) = 1f;
 	  val slu = opts.lambdau
 	  val b = mm * sdata
 	  val r = if (ipass < opts.startup || putBack < 0) {
@@ -57,6 +59,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     // values to be accumulated
+    if (opts.forceOnes) user(0,?) = 1f;
     val slm = opts.lambdam
     updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // derivative
   }
@@ -97,6 +100,7 @@ object SFA  {
   	var lambdau = 0.2f
   	var lambdam = 0.2f
   	var startup = 5
+  	var forceOnes = false
   }  
   class Options extends Opts {} 
   
@@ -104,7 +108,9 @@ object SFA  {
     class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 2
+    opts.putBack = -1
+    opts.npasses = 4
+    opts.lrate = 0.1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts),

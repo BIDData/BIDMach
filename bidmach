@@ -7,12 +7,10 @@ export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8" # Set as much memor
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
 else 
-  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
-  BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
+  while [ -L "${BIDMACH_ROOT}" ]; do
+    BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
+  done
 fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
@@ -23,19 +21,26 @@ if [ `uname` = "Darwin" ]; then
 else
   export LD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
 fi
+if [ "$OS" = "Windows_NT" ]; then
+    if [ ! "${JAVA_HOME}" = "" ]; then
+        JAVA_HOME=`${BIDMACH_ROOT}/shortpath.bat "${JAVA_HOME}"`
+	    export JAVA_HOME=`echo ${JAVA_HOME} | sed 's_\\\\_/_g'`/bin
+    fi
+fi
 
 BIDMACH_LIBS="${LIBDIR}/BIDMat.jar;${LIBDIR}/ptplot.jar;${LIBDIR}/ptplotapplication.jar;${LIBDIR}/jhdf5.jar;${LIBDIR}/commons-math3-3.1.1.jar;${LIBDIR}/lz4-1.1.2.jar;${LIBDIR}/jline-2.10.3.jar"
 
 JCUDA_LIBS="${JCUDA_LIBDIR}/jcuda-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcublas-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcufft-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcurand-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcusparse-${JCUDA_VERSION}.jar"
 
-ALL_LIBS="${LIBDIR}/IScala.jar;${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
+ALL_LIBS=";${LIBDIR}/IScala.jar;${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
 
 if [ ! "$OS" = "Windows_NT" ]; then
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
+    JAVA_NATIVE="-Djava.library.path=${LD_LIBRARY_PATH}:/usr/lib64:/lib64:lib:/usr/lib"
 else
     if [ ! "${CUDA_PATH}" = "" ]; then
-	NEWPATH=`${BIDMACH_ROOT}/shortpath.bat "${CUDA_PATH}"`
-	NEWPATH=`echo ${NEWPATH} | sed 's_\\\\_/_g'`/bin
+	    NEWPATH=`${BIDMACH_ROOT}/shortpath.bat "${CUDA_PATH}"`
+	    NEWPATH=`echo ${NEWPATH} | sed 's_\\\\_/_g'`/bin
     fi
     JAVA_NATIVE="-Djava.library.path=${LIBDIR};${NEWPATH}"
     export JAVA_OPTS="${JAVA_NATIVE} ${JAVA_OPTS}"
@@ -44,8 +49,7 @@ fi
 if [ "$1" = "notebook" ]; then
     shift 1
     KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"$JAVA_NATIVE\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\", \"$@\"]"
-    echo ${KERNEL_CMD}
     ipython notebook --profile scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    scala -nobootcp -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "$@"
+    ${BIDMACH_ROOT}/scripts/scala/scala -nobootcp -toolcp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "$@"
 fi
