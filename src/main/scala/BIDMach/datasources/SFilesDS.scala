@@ -298,7 +298,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
     	var nrow = rowno
     	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
-    	while (ready(filex) < fileno) Thread.`yield`
+    	  while (ready(filex) < fileno) Thread.`yield`
     	} else {
     	  fetch
     	}    	
@@ -314,7 +314,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
     	  if (opts.throwMissing) {
     	    throw new RuntimeException("Missing file "+fileno)
     	  }
-    		donextfile = true
+    	  donextfile = true;
     	}
     	todo -= nrow - rowno
     	fprogress = nrow*1f / spm
