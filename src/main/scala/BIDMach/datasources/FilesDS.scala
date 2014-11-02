@@ -44,7 +44,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       if (n >= nend - 1) {
         n
       } else {
-        nstart + ii(n - nstart);
+        nstart + ii(n - nstart, 0);
       }
     }
   }
