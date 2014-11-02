@@ -15,12 +15,14 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     val sp = sdat / sum(sdat)
     println("corpus perplexity=%f" format math.exp(- (sp ddot ln(sp))) )
     
-    val modelmat = rand(d,m) 
-    modelmat ~ modelmat *@ sdat
-    val msum = sum(modelmat, 2)
-    modelmat ~ modelmat / msum
-    modelmats = new Array[Mat](1)
-    modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat
+    if (refresh) {
+    	val modelmat = rand(d,m);
+    	modelmat ~ modelmat *@ sdat;
+    	val msum = sum(modelmat, 2);
+    	modelmat ~ modelmat / msum;
+    	modelmats = new Array[Mat](1);
+    	modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat;
+    }
     
     if (mats.size > 1) {
       while (datasource.hasNext) {

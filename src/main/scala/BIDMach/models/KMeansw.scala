@@ -50,14 +50,16 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
     val nc = data0.ncols
     if (opts.dim > nc)
       throw new RuntimeException("KMeanspp need batchsize >= dim")
-
-    val rp = randperm(nc)
-    val mmi = full(data0(?,rp(0,0->opts.dim))).t
     
-    mm = if (useGPU) GMat(mmi) else mmi
-    mcounts = mm.zeros(mm.nrows, 1)
-    mweights = mm.zeros(mm.nrows, 1)
-    modelmats = Array(mm, mcounts, mweights)
+    if (refresh) {
+    	val rp = randperm(nc);
+    	val mmi = full(data0(?,rp(0,0->opts.dim))).t;
+
+    	mm = if (useGPU) GMat(mmi) else mmi;
+    	mcounts = mm.zeros(mm.nrows, 1);
+    	mweights = mm.zeros(mm.nrows, 1);
+    	modelmats = Array(mm, mcounts, mweights);
+    }
     
     um = modelmats(0).zeros(mm.nrows, mm.ncols)
     umcounts = mm.zeros(mm.nrows, 1)

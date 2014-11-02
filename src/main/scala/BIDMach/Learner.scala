@@ -114,7 +114,12 @@ case class Learner(
     setup
     datasource.init
     model.bind(datasource)
-    repredict
+    val rstate = model.refresh 
+    model.refresh = false
+    model.init
+    val results = repredict
+    model.refresh = rstate
+    results
   }
   
   def repredict() = {

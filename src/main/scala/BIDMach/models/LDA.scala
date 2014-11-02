@@ -50,13 +50,15 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   
   override def init() = {
     super.init()
-    mm = modelmats(0)
-    modelmats = new Array[Mat](2)
-    modelmats(0) = mm
-    modelmats(1) = mm.ones(mm.nrows, 1)
-    updatemats = new Array[Mat](2)
-    updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    updatemats(1) = mm.zeros(mm.nrows, 1)
+    if (refresh) {
+    	mm = modelmats(0);
+    	modelmats = new Array[Mat](2);
+    	modelmats(0) = mm;
+    	modelmats(1) = mm.ones(mm.nrows, 1);
+    }
+    updatemats = new Array[Mat](2);
+    updatemats(0) = mm.zeros(mm.nrows, mm.ncols);
+    updatemats(1) = mm.zeros(mm.nrows, 1);
   }
   
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {

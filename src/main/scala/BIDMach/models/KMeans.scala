@@ -32,9 +32,11 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   
   override def init() = {
     super.init()
-    mm = modelmats(0)
-    mmnorm = mm dotr mm
-    modelmats = Array(mm, mmnorm)
+    if (refresh) {
+    	mm = modelmats(0);
+    	mmnorm = mm dotr mm;
+    	modelmats = Array(mm, mmnorm);
+    }
     um = updatemats(0)
     umcount = mm.zeros(mm.nrows, 1)
     updatemats = Array(um, umcount)

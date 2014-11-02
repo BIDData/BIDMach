@@ -20,6 +20,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var putBack = -1
   
+  var refresh = true
+  
   def copyTo(mod:Model) = {
     mod.datasource = datasource;
     mod.modelmats = modelmats;
@@ -29,16 +31,16 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   }
   
   def bind(ds:DataSource):Unit = {
-    datasource = ds;
-	  mats = datasource.next
-	  datasource.reset
-	  putBack = datasource.opts.putBack
-	  useGPU = opts.useGPU && Mat.hasCUDA > 0
-	  if (useGPU) {
-	    gmats = new Array[Mat](mats.length)
-	  } else {
-	    gmats = mats
-	  }
+	datasource = ds;
+	mats = datasource.next;
+	datasource.reset;
+	putBack = datasource.opts.putBack;
+	useGPU = opts.useGPU && Mat.hasCUDA > 0;
+	if (useGPU) {
+		gmats = new Array[Mat](mats.length);
+	} else {
+		gmats = mats;
+	}
   }
   
   def init():Unit

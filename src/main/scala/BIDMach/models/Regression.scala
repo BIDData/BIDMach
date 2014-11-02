@@ -32,11 +32,13 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     sp = sdat / sum(sdat)
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
-    val mm = zeros(d,m)
-    modelmats = Array[Mat](1)
-    modelmats(0) = if (useGPU) GMat(mm) else mm 
+    if (refresh) {
+    	val mm = zeros(d,m);
+    	modelmats = Array[Mat](1);
+    	modelmats(0) = if (useGPU) GMat(mm) else mm;
+    }
     updatemats = new Array[Mat](1)
-    updatemats(0) = modelmats(0).zeros(mm.nrows, mm.ncols)
+    updatemats(0) = modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols)
     if (! targetData) {
       targets = if (useGPU && opts.targets.asInstanceOf[AnyRef] != null) GMat(opts.targets) else opts.targets
       targmap = if (useGPU && opts.targmap.asInstanceOf[AnyRef] != null) GMat(opts.targmap) else opts.targmap

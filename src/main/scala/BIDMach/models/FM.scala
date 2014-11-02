@@ -43,18 +43,20 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
     iweight = if (useGPU && opts.iweight.asInstanceOf[AnyRef] != null) GMat(opts.iweight) else opts.iweight
-    mv = modelmats(0)
-    val rmat1 = rand(opts.dim1, mv.ncols) - 0.5f 
-    rmat1 ~ rmat1 *@ (sp * (1f/math.sqrt(opts.dim1).toFloat))
-    mm1 = if (useGPU) GMat(rmat1) else rmat1
-    val rmat2 = rand(opts.dim2, mv.ncols) - 0.5f 
-    rmat2 ~ rmat2 *@ (sp * (1f/math.sqrt(opts.dim2).toFloat))
-    mm2 = if (useGPU) GMat(rmat2) else rmat2
-    modelmats = Array(mv, mm1, mm2)
-    if (mask.asInstanceOf[AnyRef] != null) {
-      mv ~ mv ∘ mask
-      mm1 ~ mm1 ∘ mask
-      mm2 ~ mm2 ∘ mask
+    if (refresh) {
+    	mv = modelmats(0);
+    	val rmat1 = rand(opts.dim1, mv.ncols) - 0.5f ;
+    	rmat1 ~ rmat1 *@ (sp * (1f/math.sqrt(opts.dim1).toFloat));
+    	mm1 = if (useGPU) GMat(rmat1) else rmat1;
+    	val rmat2 = rand(opts.dim2, mv.ncols) - 0.5f ;
+    	rmat2 ~ rmat2 *@ (sp * (1f/math.sqrt(opts.dim2).toFloat));
+    	mm2 = if (useGPU) GMat(rmat2) else rmat2;
+    	modelmats = Array(mv, mm1, mm2);
+    	if (mask.asInstanceOf[AnyRef] != null) {
+    		mv ~ mv ∘ mask;
+    		mm1 ~ mm1 ∘ mask;
+    		mm2 ~ mm2 ∘ mask;
+    	}
     }
     uv = updatemats(0)
     um1 = uv.zeros(opts.dim1, uv.ncols)
