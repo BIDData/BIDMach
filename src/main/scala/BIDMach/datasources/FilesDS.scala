@@ -60,7 +60,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     if (opts.order == 0) {
         permfn = (a:Int) => a
     } else if (opts.order == 1) {
-      permfn = genperm(opts.nstart, opts.nend)
+      permfn = genperm(nstart, opts.nend)
     } else {
       permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
         val (yy, mm, dd, hh) = FilesDS.decodeDate(n)
@@ -190,7 +190,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
           matqueue(ifilex)(i) = if (fexists) {
             HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	 
           } else {
-            if (opts.throwMissing) {
+            if (opts.throwMissing && inew < opts.nend) {
               throw new RuntimeException("Missing file "+fnames(i)(pnew));
             }
             null;  	
