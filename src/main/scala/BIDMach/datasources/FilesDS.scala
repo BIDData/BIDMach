@@ -49,7 +49,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     if (opts.order == 0) {
         permfn = (a:Int) => a
       } else if (opts.order == 1) {
-      	val (dmy, rr) = sort2(rand(opts.nend+opts.lookahead+1-nstart,1))         // Randomize the file read order
+      	val (dmy, rr) = sort2(rand(opts.nend-nstart,1))         // Randomize the file read order
       	permfn = (a:Int) => rr(a-nstart)+nstart
       } else {
       permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
