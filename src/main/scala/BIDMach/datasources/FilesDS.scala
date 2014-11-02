@@ -38,6 +38,17 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     }    
   }
   
+  def genperm(nstart:Int, nend:Int) = {
+    val (dmy, ii) = sort2(rand(nend - nstart - 1));
+    (n:Int) => {
+      if (n == nend - 1) {
+        n
+      } else {
+        nstart + ii(n - nstart);
+      }
+    }
+  }
+  
   def initbase = {
     nstart = opts.nstart
     fnames = opts.fnames
@@ -49,8 +60,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     if (opts.order == 0) {
         permfn = (a:Int) => a
       } else if (opts.order == 1) {
-      	val (dmy, rr) = sort2(rand(opts.nend-nstart,1))         // Randomize the file read order
-      	permfn = (a:Int) => rr(a-nstart)+nstart
+      	permfn = genperm(opts.nstart, opts.nend)
       } else {
       permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
         val (yy, mm, dd, hh) = FilesDS.decodeDate(n)
