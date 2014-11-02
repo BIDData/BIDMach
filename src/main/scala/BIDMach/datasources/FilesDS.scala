@@ -78,8 +78,8 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     fileno = nstart;
     for (i <- 0 until math.max(1,opts.lookahead)) {
       val ifile = nstart + i
-      val ifilex = ifile % opts.lookahead
-      ready(ifilex) = ifile - opts.lookahead
+      val ifilex = ifile % math.max(opts.lookahead, 1)
+      ready(ifilex) = ifile - math.max(1, opts.lookahead)
     } 
   }
   

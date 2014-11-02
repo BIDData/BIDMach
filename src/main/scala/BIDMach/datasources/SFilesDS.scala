@@ -138,7 +138,7 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
     flushMat(omats(0))
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
-    	val filex = fileno % opts.lookahead
+    	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
     	  while (ready(filex) < fileno) Thread.`yield`
     	} else {
@@ -296,7 +296,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
     flushMat(omats(0))
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
-    	val filex = fileno % opts.lookahead
+    	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
     	while (ready(filex) < fileno) Thread.`yield`
     	} else {
