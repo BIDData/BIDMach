@@ -107,7 +107,7 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
   def spmax(matq:Array[Mat]):Int = {
     var maxv = 0
     for (i <- 0 until matq.length) {
-      if (matq(i) != null) {
+      if (matq(i).asInstanceOf[AnyRef] != null) {
       	val mat = matq(i).asInstanceOf[IMat]
       	maxv = math.max(maxv, mat(mat.nrows-1,0))
       }
@@ -266,7 +266,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
   def spmax(matq:Array[Mat]):Int = {
     var maxv = 0;
     for (i <- 0 until matq.length) {
-      if (matq(i) != null) {
+      if (matq(i).asInstanceOf[AnyRef] != null) {
       	maxv = matq(i).ncols
       }
     }
@@ -306,7 +306,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
 //    	println("spm %d" format spm)
     	nrow = math.min(rowno + todo, spm)
     	val matq = matqueue(filex)
-    	if (matq(0) != null) {
+    	if (matq(0).asInstanceOf[AnyRef] != null) {
 //    	  println("Here %d %d %d %d" format(rowno, nrow, todo, spm))
     		omats(0) = spcolslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
     		if (rowno + todo >= spm) donextfile = true
