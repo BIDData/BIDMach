@@ -198,12 +198,13 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
       for (i <- 0 until fnames.size) {
         matqueue(0)(i) = if (fexists) {
-          val tmp = HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));  
-          if (tmp.asInstanceOf[AnyRef] == null) {
-            throw new RuntimeException("couldnt read "+fnames(i)(pnew))
+          HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));  
+        } else {
+          if (opts.throwMissing) {
+            throw new RuntimeException("Missing file "+fnames(i)(pnew));
           }
-          tmp;
-        } else null;              
+          null;              
+        }
       }
       ready(0) = fileno;
     }
