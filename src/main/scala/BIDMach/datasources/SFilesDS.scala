@@ -148,7 +148,7 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
 //    	println("spm %d" format spm)
     	nrow = math.min(rowno + todo, spm)
     	val matq = matqueue(filex)
-    	if (matq(0) != null) {
+    	if (matq(0).asInstanceOf[AnyRef] != null) {
 //    	  println("Here %d %d %d" format(rowno, nrow, todo))
     		omats(0) = sprowslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
     		if (rowno + todo >= spm) donextfile = true

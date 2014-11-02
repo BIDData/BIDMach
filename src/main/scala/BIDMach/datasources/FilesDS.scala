@@ -119,7 +119,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     	var matqnr = 0
     	for (i <- 0 until fnames.size) {
     		val matq = matqueue(filex)(i);
-    		if (matq != null) {
+    		if (matq.asInstanceOf[AnyRef] != null) {
     		  matqnr = if (opts.dorows) matq.nrows else matq.ncols;
     		  nrow = math.min(rowno + todo, matqnr);
     		  if (opts.dorows) {
@@ -179,7 +179,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
         for (i <- 0 until fnames.size) {
           matqueue(ifilex)(i) = if (fexists) {
             HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	 
-          } else null;  			
+          } else {
+            if (opts.throwMissing) {
+              throw new RuntimeException("Missing file "+fnames(i)(pnew));
+            }
+            null;  	
+          }
           //  			println("%d" format inew)
         }
         ready(ifilex) = inew;
