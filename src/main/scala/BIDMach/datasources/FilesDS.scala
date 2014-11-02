@@ -110,7 +110,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     val threshold = opts.featThreshold;
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno;
-    	val filex = fileno % opts.lookahead;
+    	val filex = fileno % math.max(1, opts.lookahead);
     	if (opts.lookahead > 0) {
     	  while (ready(filex) < fileno) Thread.`yield`
     	} else {
