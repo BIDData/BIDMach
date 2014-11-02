@@ -58,12 +58,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
         FilesDS.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
       } 
     }    
-    fileno = nstart                                                            // Number of the current output file
-    rowno = 0                                                                  // row number in the current output file
+    rowno = 0;
+    fileno = nstart;                                                            // Number of the current output file                                                                 // row number in the current output file
     totalSize = opts.nend - nstart
-    matqueue = new Array[Array[Mat]](opts.lookahead)                           // Queue of matrices for each output matrix
-    ready = -iones(opts.lookahead, 1)                                          // Numbers of files currently loaded in queue
-    for (i <- 0 until opts.lookahead) {
+    matqueue = new Array[Array[Mat]](math.max(1,opts.lookahead))               // Queue of matrices for each output matrix
+    ready = -iones(math.max(opts.lookahead,1), 1)                                          // Numbers of files currently loaded in queue
+    for (i <- 0 until math.max(1,opts.lookahead)) {
       matqueue(i) = new Array[Mat](fnames.size)
     }
     for (i <- 0 until opts.lookahead) {
@@ -74,9 +74,9 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   }
   
   def reset = {
-    fileno = nstart
-    rowno = 0
-    for (i <- 0 until opts.lookahead) {
+    rowno = 0;
+    fileno = nstart;
+    for (i <- 0 until math.max(1,opts.lookahead)) {
       val ifile = nstart + i
       val ifilex = ifile % opts.lookahead
       ready(ifilex) = ifile - opts.lookahead
@@ -111,7 +111,11 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno;
     	val filex = fileno % opts.lookahead;
-    	while (ready(filex) < fileno) Thread.`yield`
+    	if (opts.lookahead > 0) {
+    	  while (ready(filex) < fileno) Thread.`yield`
+    	} else {
+    	  fetch
+    	}
     	var matqnr = 0
     	for (i <- 0 until fnames.size) {
     		val matq = matqueue(filex)(i);
@@ -139,8 +143,8 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     	todo -= nrow - rowno;
     	fprogress = nrow*1f / matqnr;
     	if (donextfile) {
-    	  fileno += 1;
     	  rowno = 0;
+    	  fileno += 1;
     	  donextfile = false;
     	} else {
     	  rowno = nrow;
@@ -171,7 +175,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       if (!stop) {
         val inew = ready(ifilex) + opts.lookahead;
         val pnew = permfn(inew);
-        val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v < opts.sampleFiles);
+        val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
         for (i <- 0 until fnames.size) {
           matqueue(ifilex)(i) = if (fexists) {
             HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	 
@@ -182,6 +186,20 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       }
   	}
   }
+  
+  def fetch = {
+    if (ready(0) < fileno) {
+      val pnew = permfn(fileno);
+      val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
+      for (i <- 0 until fnames.size) {
+        matqueue(0)(i) = if (fexists) {
+          HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));  
+        } else null;              
+      }
+      ready(0) = fileno;
+    }
+  }
+
   
   def hasNext:Boolean = {
     (fileno < opts.nend)

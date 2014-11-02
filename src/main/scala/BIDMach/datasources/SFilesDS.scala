@@ -139,7 +139,11 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
-    	while (ready(filex) < fileno) Thread.`yield`
+    	if (opts.lookahead > 0) {
+    	  while (ready(filex) < fileno) Thread.`yield`
+    	} else {
+          fetch
+        }
     	val spm = spmax(matqueue(filex)) + 1
 //    	println("spm %d" format spm)
     	nrow = math.min(rowno + todo, spm)
@@ -152,15 +156,15 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
     	  if (opts.throwMissing) {
     	    throw new RuntimeException("Missing file "+fileno)
     	  }
-    		donextfile = true
+    	  donextfile = true
     	}
     	todo -= nrow - rowno
     	if (donextfile) {
-    	  fileno += 1
-    	  rowno = 0
+    	  rowno = 0;
+    	  fileno += 1;
     	  donextfile = false
     	} else {
-    		rowno = nrow
+    	  rowno = nrow;
     	}
     }
     if (todo > 0) {
@@ -293,7 +297,11 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno
     	val filex = fileno % opts.lookahead
+    	if (opts.lookahead > 0) {
     	while (ready(filex) < fileno) Thread.`yield`
+    	} else {
+    	  fetch
+    	}    	
     	val spm = spmax(matqueue(filex)) + 1
 //    	println("spm %d" format spm)
     	nrow = math.min(rowno + todo, spm)
@@ -311,12 +319,12 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
     	todo -= nrow - rowno
     	fprogress = nrow*1f / spm
     	if (donextfile) {
-    	  fileno += 1
-    	  rowno = 0
+    	  rowno = 0;
+    	  fileno += 1;
     	  fprogress = 0
     	  donextfile = false
     	} else {
-    		rowno = nrow
+    	  rowno = nrow
     	}
     }
     if (todo > 0) {
