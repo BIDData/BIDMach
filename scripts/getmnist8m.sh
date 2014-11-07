@@ -7,7 +7,7 @@ else
   while [ -L "${BIDMACH_SCRIPTS}" ]; do
     BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
   done
-  alias wget='curl --retry 2 -O'
+  alias wget='curl --retry 20 -O'
 fi
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 cd ${BIDMACH_SCRIPTS}
@@ -15,17 +15,19 @@ BIDMACH_SCRIPTS=`pwd`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 
 
-export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
+echo "Loading MNIST8M data"
 
-${BIDMACH_SCRIPTS}/getrcv1.sh
+MNIST8M="${BIDMACH_SCRIPTS}/../data/MNIST8M"
+mkdir -p ${MNIST8M}/parts
+cd ${MNIST8M}
 
-${BIDMACH_SCRIPTS}/getuci.sh nips
+if [ ! -e mnist8m.bz2 ]; then
+    wget http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist8m.bz2
+fi
 
-${BIDMACH_SCRIPTS}/getuci.sh nytimes
+bunzip2 -c mnist8m.bz2 > mnist8m.lsvm
 
-# ${BIDMACH_SCRIPTS}/getuci.sh pubmed
+split -l 100000 -d mnist8m.lsvm parts/part
 
-${BIDMACH_SCRIPTS}/getdigits.sh
-
-
-
+cd ${MNIST8M}/parts
+../../../bidmach '../../../scripts/processmnist8m.ssc'
