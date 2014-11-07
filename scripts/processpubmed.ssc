@@ -1,0 +1,17 @@
+
+
+val a=loadSMat("pubmed.smat.lz4");
+val sa = sum(a,2);
+val (vx,ix) = sortdown2(sa);
+val ip = invperm(ix);
+val nc = a.ncols;
+for (i <- 0 until 10) {
+    val icmin = ((i * 1L * nc)/10).toInt;
+    val icmax = (((i+1) * 1L * nc)/10).toInt;
+    val a0 = a(?, icmin -> icmax);
+    val (ii, jj, vv) = find3(a0);
+    val aa = sparse(ip(ii), jj, vv, a.nrows, a0.ncols);
+    aa.check
+    saveSMat("pubmed_parts/part%02d.smat.lz4" format i, aa);    
+}
+exit
