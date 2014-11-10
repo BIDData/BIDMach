@@ -50,29 +50,11 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   }
   
   def initbase = {
-    nstart = opts.nstart
-    fnames = opts.fnames
-    blockSize = opts.batchSize
-    while (!fileExists(fnames(0)(nstart)) && nstart < opts.nend) {nstart += 1}
-    if (nstart == opts.nend) {
-      throw new RuntimeException("Couldnt find any files");
-    }
-    if (opts.order == 0) {
-        permfn = (a:Int) => a
-    } else if (opts.order == 1) {
-      permfn = genperm(nstart, opts.nend)
-    } else {
-      permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
-        val (yy, mm, dd, hh) = FilesDS.decodeDate(n)
-        val hhdd = hh + 24 * (dd - 1)
-        FilesDS.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
-      } 
-    }    
+    reset    
     rowno = 0;
     fileno = nstart;                                                            // Number of the current output file                                                                 // row number in the current output file
     totalSize = opts.nend - nstart
     matqueue = new Array[Array[Mat]](math.max(1,opts.lookahead))               // Queue of matrices for each output matrix
-    ready = -iones(math.max(opts.lookahead,1), 1)                                          // Numbers of files currently loaded in queue
     for (i <- 0 until math.max(1,opts.lookahead)) {
       matqueue(i) = new Array[Mat](fnames.size)
     }
@@ -84,8 +66,27 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   }
   
   def reset = {
+    nstart = opts.nstart
+    fnames = opts.fnames
+    blockSize = opts.batchSize
+    while (!fileExists(fnames(0)(nstart)) && nstart < opts.nend) {nstart += 1}
+    if (nstart == opts.nend) {
+      throw new RuntimeException("Couldnt find any files");
+    }
+    if (opts.order == 0) {
+      permfn = (a:Int) => a
+    } else if (opts.order == 1) {
+      permfn = genperm(nstart, opts.nend)
+    } else {
+      permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
+        val (yy, mm, dd, hh) = FilesDS.decodeDate(n)
+        val hhdd = hh + 24 * (dd - 1)
+        FilesDS.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
+      } 
+    }
     rowno = 0;
     fileno = nstart;
+    ready = -iones(math.max(opts.lookahead,1), 1)                              // Numbers of files currently loaded in queue
     for (i <- 0 until math.max(1,opts.lookahead)) {
       val ifile = nstart + i
       val ifilex = ifile % math.max(opts.lookahead, 1)
@@ -151,7 +152,6 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		}
     	}
     	todo -= nrow - rowno;
-    	fprogress = nrow*1f / matqnr;
     	if (donextfile) {
     	  rowno = 0;
     	  fileno += 1;
@@ -159,6 +159,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     	} else {
     	  rowno = nrow;
     	}
+    	fprogress = rowno*1f / matqnr;
     }
     omats
   }
