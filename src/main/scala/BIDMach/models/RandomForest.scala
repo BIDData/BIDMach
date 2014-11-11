@@ -109,12 +109,12 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
   }
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
-    val sdata = gmats(0);
-    val cats = gmats(1);
+    val cats = gmats(0);
+    val sdata = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null
     val t0 = toc
     val (inds, counts):(LMat, IMat) = (sdata, cats, tmp1, tmp2, tc1) match {
-      case (idata:IMat, scats:SMat, lt1:LMat, lt2:LMat, tc:IMat) => {
+      case (idata:IMat, scats:IMat, lt1:LMat, lt2:LMat, tc:IMat) => {
         xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
           val nn = nnodes.asInstanceOf[IMat];
           treeStep(idata, nn, itrees, ftrees, vtrees, ctrees, false);
@@ -270,7 +270,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     out
   }
   
-  def treePack(idata:IMat, treenodes:IMat, cats:SMat, out:LMat, nsamps:Int, fieldlengths:IMat):LMat = {
+  def treePack(idata:IMat, treenodes:IMat, cats:IMat, out:LMat, nsamps:Int, fieldlengths:IMat):LMat = {
     val nfeats = idata.nrows;
     val nitems = idata.ncols;
     val ntrees = treenodes.nrows;
@@ -280,8 +280,6 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     var icol = 0;
     var nvals = 0;
     while (icol < nitems) {
-      var jci = cats.jc(icol) - ionebased;
-      val jcn = cats.jc(icol+1) - ionebased;
       var itree = 0;
       while (itree < ntrees) {
         val inode = treenodes(itree, icol);
@@ -290,11 +288,13 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
           while (jfeat < nsamps) {
             val ifeat = rhash(itree, inode, jfeat, nfeats);
             val ivfeat = idata(ifeat, icol);
-            var j = jci;
-            while (j < jcn) {
-              out.data(nvals) = packFields(itree, inode, jfeat, ifeat, ivfeat, cats.ir(j) - ionebased, fieldlengths);
+            var j = 0;
+            while (j < ncats) {
+              if (cats(j, icol) > 0) {
+                out.data(nvals) = packFields(itree, inode, jfeat, ifeat, ivfeat, j, fieldlengths);
+                nvals += 1;
+              }
               j += 1;
-              nvals += 1;
             }
             jfeat += 1;
           }
