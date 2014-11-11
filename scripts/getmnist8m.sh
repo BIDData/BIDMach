@@ -25,9 +25,9 @@ if [ ! -e mnist8m.bz2 ]; then
     wget http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist8m.bz2
 fi
 
-bunzip2 -c mnist8m.bz2 > mnist8m.lsvm
+bunzip2 -c mnist8m.bz2 > mnist8m.libsvm
 
-split -l 100000 -d mnist8m.lsvm parts/part
+split -l 100000 -d mnist8m.libsvm parts/part
 
 cd ${MNIST8M}/parts
 ../../../bidmach '../../../scripts/processmnist8m.ssc'

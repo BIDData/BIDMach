@@ -114,7 +114,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null
     val t0 = toc
     val (inds, counts):(LMat, IMat) = (sdata, cats, tmp1, tmp2, tc1) match {
-      case (idata:IMat, scats:IMat, lt1:LMat, lt2:LMat, tc:IMat) => {
+      case (idata:FMat, scats:FMat, lt1:LMat, lt2:LMat, tc:IMat) => {
         xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
           val nn = nnodes.asInstanceOf[IMat];
           treeStep(idata, nn, itrees, ftrees, vtrees, ctrees, false);
@@ -229,7 +229,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     math.abs(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3) % nb)
   }
   
-  def packFields(itree:Int, inode:Int, jfeat:Int, ifeat:Int, ivfeat:Int, icat:Int, fieldlengths:IMat):Long = {
+  def packFields(itree:Int, inode:Int, jfeat:Int, ifeat:Int, ivfeat:Float, icat:Int, fieldlengths:IMat):Long = {
     icat.toLong + 
     ((ivfeat.toLong + 
         ((ifeat.toLong + 
@@ -270,7 +270,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     out
   }
   
-  def treePack(idata:IMat, treenodes:IMat, cats:IMat, out:LMat, nsamps:Int, fieldlengths:IMat):LMat = {
+  def treePack(idata:FMat, treenodes:IMat, cats:FMat, out:LMat, nsamps:Int, fieldlengths:IMat):LMat = {
     val nfeats = idata.nrows;
     val nitems = idata.ncols;
     val ntrees = treenodes.nrows;
@@ -306,7 +306,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     new LMat(nvals, 1, out.data);
   }
   
-  def treeStep(idata:IMat, tnodes:IMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, getcat:Boolean)  {
+  def treeStep(idata:FMat, tnodes:IMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, getcat:Boolean)  {
     val nfeats = idata.nrows;
     val nitems = idata.ncols;
     val ntrees = tnodes.nrows;
@@ -336,7 +336,7 @@ class RandomForest(override val opts:RandomForest.RFopts) extends Model(opts) {
     }
   }
   
-  def treeWalk(idata:IMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, depth:Int, getcat:Boolean):IMat = {
+  def treeWalk(idata:FMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, depth:Int, getcat:Boolean):IMat = {
     val nfeats = idata.nrows;
     val nitems = idata.ncols;
     val ntrees = ftrees.ncols;
