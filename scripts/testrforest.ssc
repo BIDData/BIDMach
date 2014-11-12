@@ -1,0 +1,36 @@
+import BIDMach.models.RandomForest
+
+class xopts extends Learner.Options with FilesDS.Opts with RandomForest.Opts with Batch.Opts
+val opts = new xopts
+
+val mdir = "../data/MNIST8M/parts/"
+opts.fnames = List(FilesDS.simpleEnum(mdir+"data%02d.fmat.lz4", 1, 0),  
+                   FilesDS.simpleEnum(mdir+"cats%02d.fmat.lz4", 1, 0));
+opts.nend = 70;                   // Ending file number
+
+val ds = {
+  implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
+  new FilesDS(opts)               // the datasource
+}
+
+val nn = new Learner(             // make a learner instance
+    ds,                           // datasource
+    new RandomForest(opts),       // the model 
+    null,                         // list of mixins or regularizers
+    new Batch(opts),              // the optimization class to use
+    opts)                         // pass the options to the learner as well
+
+
+opts.useGPU = false
+opts.batchSize = 100000
+opts.depth = 30
+opts.ntrees = 8
+opts.nsamps = 30
+opts.nnodes = 200000
+opts.nvals = 256
+opts.margin = 0.1f
+
+val rf = nn.model.asInstanceOf[RandomForest]
+
+nn.train
+

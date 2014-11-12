@@ -2,7 +2,7 @@
 for (i <- 0 to 80) {
     val (d,c,w) = loadLibSVM("part%02d" format i, 784);
     val fd = full(d);
-    val fc = FMat(c);
+    val fc = accum(c, irow(0->c.length), 1f, 10, c.length);
     saveFMat("data%02d.fmat.lz4" format i, fd);
     saveFMat("cats%02d.fmat.lz4" format i, fc);
     val alls = (fc * 10000f) on fd;
