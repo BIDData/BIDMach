@@ -66,10 +66,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     ntrees = opts.ntrees;
     nsamps = opts.nsamps;
     nvals = opts.nvals;
-    itrees = izeros(nnodes, opts.ntrees);
-    ftrees = izeros(nnodes, opts.ntrees);
-    vtrees = izeros(nnodes, opts.ntrees);
-    ctrees = izeros(nnodes, opts.ntrees);
+    itrees = izeros(nnodes, ntrees);
+    ftrees = izeros(nnodes, ntrees);
+    vtrees = izeros(nnodes, ntrees);
+    ctrees = izeros(nnodes, ntrees);
     gains = zeros(ntrees,1);
     igains = zeros(ntrees,1);
     nodecounts = iones(opts.ntrees, 1);
@@ -84,19 +84,20 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val nc = mats(0).ncols;
     val nnz = mats(1).nnz;
     datasource.reset;
-    tmp1 = lzeros(1, (opts.margin * ntrees * nnodes * ncats * nsamps).toInt);
-    tmp2 = lzeros(1, (opts.margin * ntrees * nnodes * ncats * nsamps).toInt);
-    tmp3 = lzeros(1, (opts.margin * ntrees * nnodes * ncats * nsamps).toInt);
-    tmpc1 = izeros(1, (opts.margin * ntrees * nnodes * ncats * nsamps).toInt);
-    tmpc2 = izeros(1, (opts.margin * ntrees * nnodes * ncats * nsamps).toInt);
-    tmpc3 = izeros(1, (opts.margin * ntrees * nnodes * ncats * nsamps).toInt);
+    val bufsize = (opts.margin * ntrees * nnodes * ncats * nsamps).toInt
+    tmp1 = lzeros(1, bufsize);
+    tmp2 = lzeros(1, bufsize);
+    tmp3 = lzeros(1, bufsize);
+    tmpc1 = izeros(1, bufsize);
+    tmpc2 = izeros(1, bufsize);
+    tmpc3 = izeros(1, bufsize);
     outv = IMat(nsamps, nnodes);
     outf = IMat(nsamps, nnodes);
     outn = IMat(nsamps, nnodes);
     outg = FMat(nsamps, nnodes);
     outc = IMat(nsamps, nnodes);
     outlr = IMat(nsamps, nnodes);
-    jc = IMat(nsamps, nnodes);
+    jc = IMat(1, ntrees * nnodes * nsamps);
     fieldlengths(ITree) = countbits(ntrees);
     fieldlengths(INode) = countbits(nnodes);
     fieldlengths(JFeat) = countbits(nsamps);
@@ -444,12 +445,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   def addV(ind1:LMat, counts1:IMat, ind2:LMat, counts2:IMat, tmp:LMat, tmpc:IMat):(LMat, IMat) = {
-    val size = countV(ind1, counts1, ind2, counts2);
-    if (size > tmp.data.length) {
-      throw new RuntimeException("temporary sparse Long storage too small, try increasing opts.margin");
+    val vsize = countV(ind1, counts1, ind2, counts2);
+    if (vsize > tmp. length) {
+      throw new RuntimeException("temporary sparse Long storage too small %d %d, try increasing opts.margin" format (vsize, tmp.length));
     }
-    val ind3 = LMat(size, 1, tmp.data)
-    val counts3 = IMat(size, 1, tmpc.data)
+    val ind3 = LMat(vsize, 1, tmp.data)
+    val counts3 = IMat(vsize, 1, tmpc.data)
     var count = 0
     val n1 = counts1.length
     val n2 = counts2.length

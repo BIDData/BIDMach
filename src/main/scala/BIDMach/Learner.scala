@@ -699,7 +699,7 @@ object Learner {
       sum += mean(scoremat(?,0)).v
       i += 1
     }
-    ("ll=%5.4f" format sum/(length-lasti))    
+    ("ll=%6.5f" format sum/(length-lasti))    
   }
   
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
