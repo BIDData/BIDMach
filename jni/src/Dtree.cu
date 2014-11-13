@@ -40,12 +40,12 @@ __device__ inline unsigned int mmhash(unsigned int v1, unsigned int v2, unsigned
 
 #define DBSIZE (8*1024)
 
-__global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long long *out, int *fieldlens, 
+__global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *out, int *fieldlens, 
                            int nrows, int ncols, int ntrees, int nsamps) {
-  __shared__ int dbuff[DBSIZE];
+  __shared__ float fbuff[DBSIZE];
   __shared__ int fl[32];
-  int j, k, ic, ival;
-  int seed = 45123421;
+  int i, j, ic, ival;
+  int seed = 45123421;    
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   if (tid < 6) {
@@ -69,25 +69,23 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
   int itree = threadIdx.y;
   int jfeat = threadIdx.x;
 
-  for (int i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
+  for (i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
     int ctodo = min(nc, ncols - i);
     for (j = tid; j < nrows * ctodo; j += blockDim.x*blockDim.y) {
-      dbuff[j] = idata[j + i * nrows];
+      fbuff[j] = fdata[j + i * nrows];
     }
     __syncthreads();
     
     for (j = i; j < i + ctodo; j++) {
+      ic = icats[j - i];
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
         int inode = treenodes[itree + j * ntrees];
         int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
         long long hdr = (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
           (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) ;
-        for (k = jc[j]; k < jc[j+1]; k++) {    
-          ic = icats[k];
-          if (jfeat < nsamps) {
-            ival = dbuff[ifeat + (j - i) * nrows];
-            out[jfeat + nsamps * (itree + ntrees * k)] = hdr | (((long long)(vmask & ival)) << vshift) | ((long long)(ic & cmask));
-          }
+        if (jfeat < nsamps) {
+          ival = (int)(fbuff[ifeat + (j - i) * nrows]);
+          out[jfeat + nsamps * (itree + ntrees * (j - i))] = hdr | (((long long)(vmask & ival)) << vshift) | ((long long)(ic & cmask));
         }
       }
     }
@@ -95,12 +93,12 @@ __global__ void __treePack(int *idata, int *treenodes, int *icats, int *jc, long
   }
 }
 
-int treePack(int *fdata, int *treenodes, int *icats, int *jc, long long *out, int *fieldlens, int nrows, int ncols, int ntrees, int nsamps) {
+int treePack(float *fdata, int *treenodes, int *icats, long long *out, int *fieldlens, int nrows, int ncols, int ntrees, int nsamps) {
   int ntx = 32 * (1 + (nsamps - 1)/32);
   int nty = min(1024 / ntx, ntrees);
   dim3 bdim(ntx, nty, 1);
   int nb = min(32, 1 + (ncols-1)/32);
-  __treePack<<<nb,bdim>>>(fdata, treenodes, icats, jc, out, fieldlens, nrows, ncols, ntrees, nsamps);
+  __treePack<<<nb,bdim>>>(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;

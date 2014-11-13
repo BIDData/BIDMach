@@ -18,13 +18,15 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   
   val ITree = 0; val INode = 1; val JFeat = 2; val IFeat = 3; val IVFeat = 4; val ICat = 5
   
-  var nnodes:Int = 0;
-  var tmp1:LMat = null;
-  var tmp2:LMat = null;
-  var tmp3:LMat = null;
-  var tmpc1:IMat = null;
-  var tmpc2:IMat = null;
-  var tmpc3:IMat = null;
+  var nnodes = 0;
+  var ntrees = 0;
+  var nsamps = 0;
+  var nfeats = 0;
+  var nvals = 0;
+  var ncats = 0;
+  var batchSize = 0;
+  var tmpinds:LMat = null;
+  var tmpcounts:IMat = null;
   var totalinds:LMat = null;
   var totalcounts:IMat = null;
   var nodecounts:IMat = null;
@@ -44,11 +46,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var ynodes:IMat = null;
   var gains:FMat = null;
   var igains:FMat = null; 
-  var ntrees = 0;
-  var nsamps = 0;
-  var nfeats = 0;
-  var nvals = 0;
-  var ncats = 0;
   val fieldlengths = izeros(1,6);
   var fieldmasks:IMat = null;
   var fieldshifts:IMat = null;
@@ -82,15 +79,17 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     nfeats = mats(0).nrows;
     ncats = mats(1).nrows;
     val nc = mats(0).ncols;
+    batchSize = nc;
     val nnz = mats(1).nnz;
     datasource.reset;
-    val bufsize = (opts.margin * ntrees * nnodes * ncats * nsamps).toInt
-    tmp1 = lzeros(1, bufsize);
-    tmp2 = lzeros(1, bufsize);
-    tmp3 = lzeros(1, bufsize);
-    tmpc1 = izeros(1, bufsize);
-    tmpc2 = izeros(1, bufsize);
-    tmpc3 = izeros(1, bufsize);
+    // Small buffers hold results of batch treepack and sort
+    val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
+    tmpinds = lzeros(1, bsize);
+    tmpcounts = izeros(1, bsize);
+    // Allocate about half our memory to the main buffers
+    val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt
+    totalinds = new LMat(1, 0, new Array[Long](bufsize));
+    totalcounts = new IMat(1, 0, new Array[Int](bufsize));
     outv = IMat(nsamps, nnodes);
     outf = IMat(nsamps, nnodes);
     outn = IMat(nsamps, nnodes);
@@ -137,7 +136,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         //         print("xnodes="+xnodes.toString)
         t1 = toc;
         runtimes(0) += t1 - t0;
-        val lt = treePack(fdata, xnodes, fcats, tmp1, nsamps, fieldlengths);
+        val lt = treePack(fdata, xnodes, fcats, tmpinds, nsamps, fieldlengths);
         Mat.nflops += fcats.nnz * nsamps * ntrees * 6;
         t2 = toc;
         runtimes(1) += t2 - t1;
@@ -145,7 +144,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         Mat.nflops += lt.length * math.log(lt.length).toLong;
         t3 = toc;
         runtimes(2) += t3 - t2;
-        makeV(lt, tmp2, tmpc2);
+        makeV(lt, tmpcounts);
       }
       case _ => {
         throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
@@ -153,14 +152,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     t4 = toc;
     runtimes(3) += t4 - t3;
-    if (totalinds.asInstanceOf[AnyRef] != null) {
-      val (inds1, counts1) = addV(inds, counts, totalinds, totalcounts, tmp1, tmpc1);
-      totalinds = copyinds(inds1, tmp3);
-      totalcounts = copycounts(counts1, tmpc3);
-    } else {
-      totalinds = copyinds(inds, tmp3);
-      totalcounts = copycounts(counts, tmpc3);
-    }     
+    val (inds1, counts1) = addV(inds, counts, totalinds, totalcounts);
+    totalinds = inds1;
+    totalcounts = counts1;   
     t5 = toc;
     runtimes(4) += t5 - t4;
   }
@@ -181,15 +175,34 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       ynodes
     }
     }
-    val cinds = icol(0->nodes.ncols) ⊗  iones(ntrees,1);
     val (ii, jj, vv) = find3(FMat(cats));
-//    val matches = FMat((-nodes) != ii.t);
-//    -mean(mean(matches))
-    
-    val vc = accum((-nodes(?) - 1)\ cinds, 1, ncats, nodes.ncols);
-    val (uu, mm) = maxi2(vc);
-    mean(FMat(mm != ii.t));
+    val mm = tally(nodes);
+    mean(FMat(mm != ii));
   } 
+  
+  def tally(nodes:IMat):IMat = {
+    val tallys = izeros(ncats, 1);
+    val best = izeros(nodes.ncols, 1);
+    var i = 0;
+    while (i < nodes.ncols) {
+      var j = 0;
+      var maxind = -1;
+      var maxv = -1;
+      tallys.clear
+      while (j < nodes.nrows) {
+         val ct = -nodes.data(j + i * nodes.nrows) - 1;
+         tallys.data(ct) += 1;
+         if (tallys.data(ct) > maxv) {
+           maxv = tallys.data(ct);
+           maxind = ct;
+         }
+         j += 1;
+      }
+      best.data(i) = maxind;
+      i += 1;
+    }
+    best
+  }
   
   override def updatePass(ipass:Int) = { 
     val (jc0, jtree) = findBoundaries(totalinds, jc);
@@ -197,8 +210,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 
     while (itree < ntrees) {
       t0 = toc;
-      val jc1 = jc0(jtree(itree) to jtree(itree+1))
-      val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, outlr, jc1, opts.impurity);
+      val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, outlr, jc0, jtree, itree, opts.impurity);
       t1 = toc;
       runtimes(5) += t1 - t0;
 //      println("jc1 %d gg %d %d" format (jc1.length, gg.nrows, gg.ncols))
@@ -225,7 +237,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     } 
     println("gain %5.4f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, 2*mean(igains).v, mean(FMat(nodecounts)).v));
     if (ipass < opts.depth-1)
-      totalinds = null;
+      totalinds = new LMat(1,0,totalinds.data);
   }
   
   def tochildren(itree:Int, inodes:IMat, icats:IMat) {
@@ -404,16 +416,17 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     tnodes
   }
     
-  def makeV(ind:LMat, out:LMat, counts:IMat):(LMat, IMat) = {
+  def makeV(ind:LMat, counts:IMat):(LMat, IMat) = {
     val n = ind.length;
+    val out = ind;
     var cc = 0;
     var ngroups = 0;
     var i = 1;
     while (i <= n) {
       cc += 1;
-      if (i == n || ind(i) != ind(i-1)) {
-        out(ngroups) = ind(i-1);
-        counts(ngroups) = cc;
+      if (i == n || ind.data(i) != ind.data(i-1)) {
+        out.data(ngroups) = ind.data(i-1);
+        counts.data(ngroups) = cc;
         ngroups += 1;
         cc = 0;
       }
@@ -444,38 +457,44 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     return count
   }
   
-  def addV(ind1:LMat, counts1:IMat, ind2:LMat, counts2:IMat, tmp:LMat, tmpc:IMat):(LMat, IMat) = {
-    val vsize = countV(ind1, counts1, ind2, counts2);
-    if (vsize > tmp. length) {
-      throw new RuntimeException("temporary sparse Long storage too small %d %d, try increasing opts.margin" format (vsize, tmp.length));
+  // Add a short sparse Lvector (first arg) to a short one (2nd arg). Reuses the storage of the long vector. 
+  
+  def addV(ind1:LMat, counts1:IMat, ind2:LMat, counts2:IMat):(LMat, IMat) = {
+    if (ind1.length + ind2.length > ind2.data.length) {
+      throw new RuntimeException("temporary sparse Long storage too small %d %d" format (ind1.length+ind2.length, ind2.data.length));
     }
-    val ind3 = LMat(vsize, 1, tmp.data)
-    val counts3 = IMat(vsize, 1, tmpc.data)
-    var count = 0
-    val n1 = counts1.length
-    val n2 = counts2.length
-    var i1 = 0
-    var i2 = 0
+    val offset = ind1.length;
+    var i = ind2.length - 1;
+    while (i >= 0) {
+      ind2.data(i + offset) = ind2.data(i);
+      counts2.data(i + offset) = counts2.data(i);
+      i -= 1;
+    }
+    var count = 0;
+    var i1 = 0;
+    val n1 = ind1.length;
+    var i2 = offset;
+    val n2 = ind2.length + offset;
     while (i1 < n1 || i2 < n2) {
-      if (i1 >= n1 || (i2 < n2 && ind2(i2) < ind1(i1))) {
-        ind3(count) = ind2(i2)
-        counts3(count) = counts2(i2)
+      if (i1 >= n1 || (i2 < n2 && ind2.data(i2) < ind1.data(i1))) {
+        ind2.data(count) = ind2.data(i2)
+        counts2.data(count) = counts2.data(i2)
         count += 1
         i2 += 1
-      } else if (i2 >= n2 || (i1 < n1 && ind1(i1) < ind2(i2))) {
-        ind3(count) = ind1(i1)
-        counts3(count) = counts1(i1)
+      } else if (i2 >= n2 || (i1 < n1 && ind1.data(i1) < ind2.data(i2))) {
+        ind2.data(count) = ind1.data(i1)
+        counts2.data(count) = counts1.data(i1)
         count += 1
         i1 += 1
       } else {
-        ind3(count) = ind1(i1)
-        counts3(count) = counts1(i1) + counts2(i2)
+        ind2.data(count) = ind1.data(i1)
+        counts2.data(count) = counts1.data(i1) + counts2.data(i2)
         count += 1
         i1 += 1
         i2 += 1
       }
     }
-    (ind3, counts3)
+    (new LMat(1, count, ind2.data), new IMat(1, count, counts2.data))
   }
   
   def copyinds(inds:LMat, tmp:LMat) = {
@@ -559,7 +578,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   // outg should be an nsamps * nnodes array holding the impurity gain (use maxi2 to get the best)
   // jc should be a zero-based array that points to the start and end of each group of fixed node, jfeat
 
-  def minImpurity(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:IMat, outlr:IMat, jc:IMat, fnum:Int):FMat = {
+  def minImpurity(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:IMat, outlr:IMat, jc:IMat, jtree:IMat, itree:Int, fnum:Int):FMat = {
     
     val update = imptyFunArray(fnum).update
     val result = imptyFunArray(fnum).result
@@ -576,9 +595,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var acc = 0.0;
     var acct = 0.0;
     var i = 0;
-    while (i < jc.length - 1) {
-      val jci = jc(i);
-      val jcn = jc(i+1);
+    val todo = jtree(itree+1) - jtree(itree);
+    while (i < todo) {
+      val jci = jc(i + jtree(itree));
+      val jcn = jc(i + jtree(itree) + 1);
 
       totcounts.clear;
       counts.clear;
@@ -680,7 +700,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       outn(i) = inode;
       i += 1;
     }
-    new FMat(nsamps, (jc.length - 1)/nsamps, outg.data);
+    new FMat(nsamps, todo/nsamps, outg.data);
   }
 
 }
@@ -688,13 +708,13 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 object RandomForest {
     
   trait Opts extends Model.Opts { 
-     var depth = 8;
+     var depth = 32;
      var ntrees = 32;
      var nsamps = 32;
      var nnodes = 100000;
-     var nvals = 2;
+     var nvals = 256;
+     var catsPerSample = 1f;
      var gain = 0.01f;
-     var margin = 0.1f;
      var impurity = 0;  // zero for entropy, one for Gini impurity
   }
   
