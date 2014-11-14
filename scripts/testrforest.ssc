@@ -23,12 +23,12 @@ val nn = new Learner(             // make a learner instance
 
 opts.useGPU = false
 opts.batchSize = 50000
-opts.depth = 4
-opts.ntrees = 4
+opts.depth = 32
+opts.ntrees = 10
 opts.nsamps = 32
-opts.nnodes = 400000
+opts.nnodes = 500000
 opts.nvals = 256
-opts.gain = 0.01f
+opts.gain = 0.001f
 
 val rf = nn.model.asInstanceOf[RandomForest]
 
@@ -38,4 +38,4 @@ opts.nstart=70
 opts.nend=81
 opts.training=false
 
-//nn.repredict
+nn.repredict
