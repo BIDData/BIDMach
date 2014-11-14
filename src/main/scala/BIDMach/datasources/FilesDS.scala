@@ -50,10 +50,10 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   }
   
   def initbase = {
+    ready = -iones(math.max(opts.lookahead,1), 1)                              // Numbers of files currently loaded in queue
     reset    
     rowno = 0;
     fileno = nstart;                                                            // Number of the current output file                                                                 // row number in the current output file
-    totalSize = opts.nend - nstart
     matqueue = new Array[Array[Mat]](math.max(1,opts.lookahead))               // Queue of matrices for each output matrix
     for (i <- 0 until math.max(1,opts.lookahead)) {
       matqueue(i) = new Array[Mat](fnames.size)
@@ -86,12 +86,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     }
     rowno = 0;
     fileno = nstart;
-    ready = -iones(math.max(opts.lookahead,1), 1)                              // Numbers of files currently loaded in queue
     for (i <- 0 until math.max(1,opts.lookahead)) {
       val ifile = nstart + i
       val ifilex = ifile % math.max(opts.lookahead, 1)
       ready(ifilex) = ifile - math.max(1, opts.lookahead)
     } 
+    totalSize = opts.nend - nstart
   }
   
   def init = {
@@ -122,6 +122,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     while (todo > 0 && fileno < opts.nend) {
     	var nrow = rowno;
     	val filex = fileno % math.max(1, opts.lookahead);
+//    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
     	if (opts.lookahead > 0) {
     	  while (ready(filex) < fileno) Thread.`yield`
     	} else {
