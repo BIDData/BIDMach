@@ -54,7 +54,7 @@ class MatDS(var mats:Array[Mat], override val opts:MatDS.Opts = new MatDS.Option
     here + blockSize < mats(0).ncols
   }
   
-  override def setupPutBack(n:Int, dim:Int) = {
+  override def setupPutBack(n:Int, dim:Int):Unit = {
     if (mats.length <= n || mats(n).asInstanceOf[AnyRef] == null || mats(n).nrows != dim) {
       val newmats = new Array[Mat](n+1)
       for (i <- 0 until mats.length) {
@@ -80,7 +80,7 @@ class MatDS(var mats:Array[Mat], override val opts:MatDS.Opts = new MatDS.Option
 }
 
 object MatDS {
-  trait Opts extends DataSource.Opts {
+    trait Opts extends DataSource.Opts {
   }
   
   class Options extends Opts {   

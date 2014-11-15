@@ -389,6 +389,7 @@ object GLM {
     val nopts = new LearnOptions;
     mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    mopts.autoReset = false
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     nopts.links = mopts.links
     mopts.links.set(d)

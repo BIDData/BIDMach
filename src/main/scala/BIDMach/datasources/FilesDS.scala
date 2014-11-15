@@ -53,7 +53,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     ready = -iones(math.max(opts.lookahead,1), 1)                              // Numbers of files currently loaded in queue
     reset    
     rowno = 0;
-    fileno = nstart;                                                            // Number of the current output file                                                                 // row number in the current output file
+    fileno = nstart;                                                           // Number of the current output file      
     matqueue = new Array[Array[Mat]](math.max(1,opts.lookahead))               // Queue of matrices for each output matrix
     for (i <- 0 until math.max(1,opts.lookahead)) {
       matqueue(i) = new Array[Mat](fnames.size)

@@ -71,14 +71,14 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   }
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
-	  for (i <- 0 until from.length) {
-	    if (useGPU) {
-	    	to(i) = from(i) match {
-	    	case aa:FMat => GMat(aa)
-	    	case aa:SMat => GSMat(aa)
-	    	}
-	    }
-	  }
+    for (i <- 0 until from.length) {
+      if (useGPU) {
+        to(i) = from(i) match {
+        case aa:FMat => GMat(aa)
+        case aa:SMat => GSMat(aa)
+        }
+      }
+    }
   }
   
   def updatePass(ipass:Int) = {}
