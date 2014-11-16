@@ -44,18 +44,18 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def mupdate(in:Mat) = {
     val targs = targets * in
     min(targs, 1f, targs)
-    val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
     val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null
-    mupdate3(in, alltargs, dweights)
+    mupdate3(in, targs, dweights)
   }
   
   def mupdate2(in:Mat, targ:Mat) = mupdate3(in, targ, null)
   
-  def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {
-    val ftarg = full(targ)
+  def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {        
+    val ftarg = full(targ);
+    val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = modelmats(0) * in  
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    GLM.derivs(eta, ftarg, eta, mylinks, linkArray, totflops)
+    GLM.derivs(eta, targs, eta, mylinks, linkArray, totflops)
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘  dweights
     updatemats(0) ~ eta *^ in
     if (mask.asInstanceOf[AnyRef] != null) {
@@ -64,21 +64,21 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
   
   def meval(in:Mat):FMat = {
-    val targs = targets * in
-    min(targs, 1f, targs)
-    val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
-    val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null
-    meval3(in, alltargs, dweights)
+    val targs = targets * in;
+    min(targs, 1f, targs);
+    val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null;
+    meval3(in, targs, dweights);
   }
   
   def meval2(in:Mat, targ:Mat):FMat = meval3(in, targ, null)
   
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
-    val ftarg = full(targ)
+    val ftarg = full(targ);
+    val targs = if (!(putBack >= 0) && targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = modelmats(0) * in
     GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
-    if (putBack >= 0) {ftarg <-- eta}
+    val v = GLM.llfun(eta, targs, mylinks, linkArray, totflops)
+    if (putBack >= 0) {targ <-- eta}
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights))
     } else {
