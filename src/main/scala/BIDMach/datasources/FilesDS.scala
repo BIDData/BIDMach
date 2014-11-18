@@ -2,7 +2,7 @@ package BIDMach.datasources
 import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.concurrent.future
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContextExecutor
 import java.io._
 
@@ -12,6 +12,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   @volatile var fileno = 0
   var rowno = 0
   var nstart = 0
+  var nend = 0
   var fnames:List[(Int)=>String] = null
   omats = null
   var matqueue:Array[Array[Mat]] = null
@@ -59,7 +60,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       matqueue(i) = new Array[Mat](fnames.size)
     }
     for (i <- 0 until opts.lookahead) {
-      future {
+      Future {
         prefetch(nstart + i)
       }
     }
@@ -67,16 +68,20 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   
   def reset = {
     nstart = opts.nstart
+    nend = opts.nend
     fnames = opts.fnames
     blockSize = opts.batchSize
-    while (!fileExists(fnames(0)(nstart)) && nstart < opts.nend) {nstart += 1}
-    if (nstart == opts.nend) {
+    if (nend == 0) {
+      while (fileExists(fnames(0)(nend))) {nend += 1}
+    }
+    while (!fileExists(fnames(0)(nstart)) && nstart < nend) {nstart += 1}
+    if (nstart == nend) {
       throw new RuntimeException("Couldnt find any files");
     }
     if (opts.order == 0) {
       permfn = (a:Int) => a
     } else if (opts.order == 1) {
-      permfn = genperm(nstart, opts.nend)
+      permfn = genperm(nstart, nend)
     } else {
       permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
         val (yy, mm, dd, hh) = FilesDS.decodeDate(n)
@@ -91,7 +96,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       val ifilex = ifile % math.max(opts.lookahead, 1)
       ready(ifilex) = ifile - math.max(1, opts.lookahead)
     } 
-    totalSize = opts.nend - nstart
+    totalSize = nend - nstart
   }
   
   def init = {
@@ -119,7 +124,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     var todo = blockSize;
     val featType = opts.featType;
     val threshold = opts.featThreshold;
-    while (todo > 0 && fileno < opts.nend) {
+    while (todo > 0 && fileno < nend) {
     	var nrow = rowno;
     	val filex = fileno % math.max(1, opts.lookahead);
 //    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
@@ -192,7 +197,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
           matqueue(ifilex)(i) = if (fexists) {
             HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	 
           } else {
-            if (opts.throwMissing && inew < opts.nend) {
+            if (opts.throwMissing && inew < nend) {
               throw new RuntimeException("Missing file "+fnames(i)(pnew));
             }
             null;  	
@@ -224,7 +229,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
 
   
   def hasNext:Boolean = {
-    (fileno < opts.nend)
+    (fileno < nend)
   }
 
   override def close = {

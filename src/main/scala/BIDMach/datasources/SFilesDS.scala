@@ -136,7 +136,7 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
     var donextfile = false
     var todo = opts.batchSize
     flushMat(omats(0))
-    while (todo > 0 && fileno < opts.nend) {
+    while (todo > 0 && fileno < nend) {
     	var nrow = rowno
     	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
@@ -187,15 +187,24 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
   
   var inptrs:IMat = null
   var offsets:IMat = null
+  var fcounts:IMat = null
   
   override def init = {
     initbase
-    var totsize = sum(opts.fcounts).v
+    fcounts = if (opts.fcounts == null) {
+      val fc = izeros(opts.fnames.length,1)
+      for (i <- 0 until opts.fnames.length) {
+        val m = loadSMat(opts.fnames(0)(nstart))
+        fc(i) = m.nrows
+      }
+      fc
+    } else opts.fcounts
+    var totsize = sum(fcounts).v
     if (opts.addConstFeat) totsize += 1
     omats = new Array[Mat](1)
     omats(0) = SMat(totsize, opts.batchSize, opts.batchSize * opts.eltsPerSample)
-    inptrs = izeros(opts.fcounts.length, 1)
-    offsets = 0 on cumsum(opts.fcounts)
+    inptrs = izeros(fcounts.length, 1)
+    offsets = 0 on cumsum(fcounts)
   }
   
   def binFind(i:Int, mat:Mat):Int = {
@@ -219,8 +228,8 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
     val ioff = Mat.ioneBased
     var idone = done
     var innz = omat.nnz
-    val lims = opts.fcounts
-    val nfiles = opts.fcounts.length
+    val lims = fcounts
+    val nfiles = fcounts.length
     val addConstFeat = opts.addConstFeat
     val featType = opts.featType
     val threshold = opts.featThreshold
@@ -294,7 +303,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
     var donextfile = false
     var todo = opts.batchSize
     flushMat(omats(0))
-    while (todo > 0 && fileno < opts.nend) {
+    while (todo > 0 && fileno < nend) {
     	var nrow = rowno
     	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {

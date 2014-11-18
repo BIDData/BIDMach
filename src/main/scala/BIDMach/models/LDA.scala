@@ -123,13 +123,33 @@ object LDA  {
   /**
    * Online Variational Bayes LDA algorithm
    */
-  def learner(mat0:Mat, d:Int = 256) = {
+  def learner(mat0:Mat, d:Int) = {
     class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
+  	    new LDA(opts), 
+  	    null,
+  	    new IncNorm(opts), 
+  	    opts)
+    (nn, opts)
+  }
+  
+   /**
+   * Online Variational Bayes LDA algorithm with a files dataSource
+   */
+  def learner(fnames:List[(Int)=>String], d:Int) = {
+    class xopts extends Learner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.fnames = fnames
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+    implicit val threads = threadPool(4)
+  	val nn = new Learner(
+  	    new SFilesDS(opts), 
   	    new LDA(opts), 
   	    null,
   	    new IncNorm(opts), 

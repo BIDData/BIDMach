@@ -1,0 +1,94 @@
+val dir = ".."
+val a = loadSMat(dir+"/data/rcv1/docs.smat.lz4")
+val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
+val ta = loadSMat(dir+"/data/rcv1/testdocs.smat.lz4")
+val tc = loadFMat(dir+"/data/rcv1/testcats.fmat.lz4")
+
+println("\n<<<<<<< Testing GLM on RCV1 >>>>>>>")
+val pc = zeros(tc.nrows, tc.ncols);
+val (mm1,opts1,nn1,nopts1) = GLM.learner(a,c,ta,pc,1)
+opts1.useGPU=useGPU
+nopts1.useGPU=useGPU
+mm1.train
+nn1.predict
+val rc = roc2(pc, tc, 1-tc, 1000)
+val mr = mean(rc)
+println("ROC AUC: mean %5.4f, cat6 %5.4f" format (mean(mr(0->100)).v, mr(6)))
+ 
+println("\n<<<<<<< Testing FM on RCV1 >>>>>>>")
+val c6 = c(6,?)
+val (mm2,opts2) = FM.learner(a,c6,2)
+opts2.useGPU=useGPU
+opts2.dim1=34
+opts2.dim2=13
+opts2.lrate=0.01
+opts2.reg1weight=1
+mm2.train
+
+
+if (doTwitter) {
+println("\n<<<<<<< Testing parallel LDA on Twitter >>>>>>>")
+val (mm4,opts4) = LDA.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
+opts4.useGPU=useGPU
+opts4.npasses=2
+mm4.train
+} else if (Mat.hasCUDA > 0) {
+println("\n<<<<<<< Testing LDA on RCV1 >>>>>>>")
+val (mm4,opts4) = LDA.learner(a, 253)
+opts4.useGPU=useGPU
+opts4.npasses=2
+mm4.train
+}
+
+println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed >>>>>>>")
+
+val (mm6,opts6) = LDA.learner(List((n:Int)=> ("../data/uci/pubmed_parts/part%02d.smat.lz4" format n)), 256)
+opts6.npasses=2
+opts6.useGPU=useGPU
+mm6.train
+
+if (doTwitter) {
+println("\n<<<<<<< Testing parallel NMF on Twitter >>>>>>>")
+val (mm8,opts8) = NMF.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
+opts8.useGPU=useGPU
+opts8.npasses=2
+mm8.train
+} else {
+println("\n<<<<<<< Testing NMF on RCV1 >>>>>>>")
+val (mm8,opts8) = NMF.learner(a, 256)
+opts8.useGPU=useGPU
+opts8.npasses=2
+mm8.train
+}
+
+val x = rand(32,1000000)           // A causal data matrix
+val b = rand(1,32) - 0.5f         // influence on the treatment
+val z = rand(1,33) - 0.5f         // influence on the outcome
+
+val bx = (b * x)
+val ilink = irow(1,1)
+GLM.preds(bx, bx, ilink, GLM.linkArray, 10)
+val atreat = (rand(1, x.ncols) < bx)
+val xa = x on atreat
+val zx = z * xa
+GLM.preds(zx, zx, ilink, GLM.linkArray, 10)
+val yout = (rand(1, x.ncols) < zx)
+val aa = xa on yout
+
+val targetmat = zeros(2,34)
+targetmat(0,32) = 1
+targetmat(1,33) = 1
+val mask = ones(2,34)
+mask(0,32) = 0
+mask(0,33) = 0
+mask(1,33) = 0
+
+println("\n<<<<<<< Testing IPTW estimators >>>>>>>")
+val (mm10,opts10) = IPTW.learner(aa)
+opts10.useGPU=useGPU
+opts10.targets = targetmat
+opts10.rmask = mask
+opts10.links = ilink
+opts10.useGPU = false
+opts10.npasses = 10
+mm10.train

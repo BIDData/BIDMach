@@ -10,7 +10,7 @@ import BIDMach.datasources._
 import BIDMach.mixins._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.future
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 case class Learner(
@@ -242,7 +242,7 @@ case class ParLearnerx(
 	  var lasti = 0
 	  done.clear
 	  for (ithread <- 0 until opts.nthreads) {
-	  	future {
+	  	Future {
 	  		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
 	  		var here = 0L
 	  		updaters(ithread).clear
@@ -499,7 +499,7 @@ case class ParLearner(
     var running = true
 
     for (ithread <- 0 until opts.nthreads) {
-    	future {
+    	Future {
     		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
     		while (running) {
     			while (done(ithread) == 1) Thread.sleep(1)

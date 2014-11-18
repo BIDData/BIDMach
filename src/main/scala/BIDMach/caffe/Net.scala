@@ -135,7 +135,7 @@ class Net () {
   }
   
   def update_params(params:TreeMap[String,Array[FND]]) = {
-    params.foreach((x:Pair[String,Array[FND]]) => {
+    params.foreach((x:Tuple2[String,Array[FND]]) => {
       val layer = _net.layer_by_name(x._1)
       val nblobs = layer.num_blobs
       if (nblobs > 0) {
@@ -157,7 +157,7 @@ class Net () {
   }
   
   def pull(blobs:Iterable[(String,FND)]) = {
-    blobs.foreach((x:Pair[String,FND]) => {
+    blobs.foreach((x:Tuple2[String,FND]) => {
       val bname = x._1;
       val fnd = x._2;
       val blob = _net.blob_by_name(bname);
@@ -167,7 +167,7 @@ class Net () {
   }
   
   def pull_diffs(blobs:Iterable[(String,FND)]) = {
-    blobs.foreach((x:Pair[String,FND]) => {
+    blobs.foreach((x:Tuple2[String,FND]) => {
       val bname = x._1;
       val fnd = x._2;
       val blob = _net.blob_by_name(bname);
@@ -177,7 +177,7 @@ class Net () {
   }
   
   def push(blobs:Iterable[(String,FND)]) = {
-    blobs.foreach((x:Pair[String,FND]) => {
+    blobs.foreach((x:Tuple2[String,FND]) => {
       val bname = x._1;
       val fnd = x._2;
       val blob = _net.blob_by_name(bname);

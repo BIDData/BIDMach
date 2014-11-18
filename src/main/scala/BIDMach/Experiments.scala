@@ -6,7 +6,7 @@ import java.io._
 import BIDMach.datasources._
 import BIDMach.models._
 import BIDMach.updaters._
-import scala.concurrent.future
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import java.util.concurrent.Executors
 
@@ -545,7 +545,7 @@ object Twitter {
     var stop = izeros(1,1)
     tic
     for (i <- 0 until nthreads) { 
-      future { 
+      Future { 
         val ss = ff(nstart0, nend0, nthreads, i, nfeats)
         ss.init
         while (ss.hasNext && stop.v != 1) { 
