@@ -1,5 +1,7 @@
 #!/bin/sh
 
-time /code/spark/bin/run-example org.apache.spark.mllib.classification.LogisticRegressionWithSGD local /big/RCV1/v2/spark_train.dat 10000 10 > /code/spark/model.txt
+SPARKDIR=/code/spark-1.1.0
 
-sed 's/Weights:.\[//g' /code/spark/model.txt | sed '/\]$/N;s/\]\nIntercept: /,/'  > /code/spark/modelx.txt
+time ${SPARKDIR}/bin/run-example mllib.classification.LogisticRegressionWithSGD local /big/RCV1/v2/spark_train.dat 10000 10 > ${SPARKDIR}/model.txt
+
+sed 's/Weights:.\[//g' ${SPARKDIR}/model.txt | sed '/\]$/N;s/\]\nIntercept: /,/'  > ${SPARKDIR}/modelx.txt

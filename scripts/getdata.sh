@@ -15,8 +15,6 @@ BIDMACH_SCRIPTS=`pwd`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 
 
-export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
-
 ${BIDMACH_SCRIPTS}/getrcv1.sh
 
 ${BIDMACH_SCRIPTS}/getuci.sh nips

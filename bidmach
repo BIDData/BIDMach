@@ -55,5 +55,5 @@ if [ "$1" = "notebook" ]; then
     fi
     ipython notebook --profile scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    ${BIDMACH_ROOT}/scripts/scala/scala -nobootcp -toolcp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "$@"
+    ${BIDMACH_ROOT}/scripts/scala/scala -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "$@"
 fi
