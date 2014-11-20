@@ -96,6 +96,25 @@ object KMeans  {
   	    new Batch(opts), opts)
     (nn, opts)
   }
+  
+  /**
+   * KMeans with a files dataSource
+   */
+  def learner(fnames:List[(Int)=>String], d:Int) = {
+    class xopts extends Learner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.fnames = fnames
+    opts.batchSize = 10000;
+    implicit val threads = threadPool(4)
+  	val nn = new Learner(
+  	    new FilesDS(opts), 
+  	    new KMeans(opts), 
+  	    null,
+  	    new Batch(opts), 
+  	    opts)
+    (nn, opts)
+  }
    
   def learnPar(mat0:Mat, d:Int = 256) = {
     class xopts extends ParLearner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
