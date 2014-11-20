@@ -9,4 +9,3 @@ for (i <- 0 to 80) {
     saveFMat("alls%02d.fmat.lz4" format i, alls);
     print(".");
 }
-exit

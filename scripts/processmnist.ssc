@@ -6,4 +6,3 @@ val (d2,c2,w2) = loadLibSVM("mnist.t.lsvm", 784);
 saveFMat("test.fmat.lz4", full(d2));
 saveIMat("ctest.imat.lz4", c2);
 
-exit

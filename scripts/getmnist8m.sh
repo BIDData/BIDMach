@@ -1,4 +1,5 @@
 #!/bin/bash
+# run this to load the MNIST8M data
 
 BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then

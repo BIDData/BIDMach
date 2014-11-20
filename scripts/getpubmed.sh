@@ -1,4 +1,5 @@
 #!/bin/bash
+# Run this to load and partition pubmed data
 
 BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
@@ -17,8 +18,9 @@ BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )
 
 echo "Loading pubmed data"
 
-# ${BIDMACH_SCRIPTS}/getuci.sh pubmed
+${BIDMACH_SCRIPTS}/getuci.sh pubmed
 
 cd "${BIDMACH_SCRIPTS}/../data/uci"
+mkdir -p pubmed_parts
 
 ../../bidmach '../../scripts/processpubmed.ssc'
