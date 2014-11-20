@@ -9,6 +9,7 @@ val pc = zeros(tc.nrows, tc.ncols);
 val (mm1,opts1,nn1,nopts1) = GLM.learner(a,c,ta,pc,1)
 opts1.useGPU=useGPU
 nopts1.useGPU=useGPU
+opts1.autoReset=false
 mm1.train
 nn1.predict
 val rc = roc2(pc, tc, 1-tc, 1000)
