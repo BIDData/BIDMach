@@ -48,6 +48,14 @@ opts6.npasses=2
 opts6.useGPU=useGPU
 mm6.train
 
+println("\n<<<<<<< Testing KMeans with FilesDS on MNIST8M >>>>>>>")
+
+val (mm7,opts7) = KMeans.learner(List((n:Int)=> ("../data/MNIST8M/parts/alls%02d.fmat.lz4" format n)), 256)
+opts7.npasses=6
+opts7.nend=70
+opts7.useGPU=useGPU
+mm7.train
+
 if (doTwitter) {
 println("\n<<<<<<< Testing parallel NMF on Twitter >>>>>>>")
 val (mm8,opts8) = NMF.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
