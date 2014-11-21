@@ -4,7 +4,7 @@
 :: Set as much memory as possible
 (SET JAVA_OPTS=-Xmx12G -Xms128M)
 :: Fix these if needed
-SET JCUDA_VERSION=0.5.5
+SET JCUDA_VERSION=0.6.5
 SET LIBDIR=%CD%\lib
 SET JCUDA_LIBDIR=%LIBDIR%
 SET PATH=%LIBDIR%;%PATH%
@@ -13,6 +13,7 @@ SET BIDMACH_LIBS=%LIBDIR%\BIDMat.jar;%CD%\BIDMach.jar;%LIBDIR%\ptplot.jar;%LIBDI
 
 SET JCUDA_LIBS=%JCUDA_LIBDIR%\jcuda-%JCUDA_VERSION%.jar;%JCUDA_LIBDIR%\jcublas-%JCUDA_VERSION%.jar;%JCUDA_LIBDIR%\jcufft-%JCUDA_VERSION%.jar;%JCUDA_LIBDIR%\jcurand-%JCUDA_VERSION%.jar;%JCUDA_LIBDIR%\jcusparse-%JCUDA_VERSION%.jar
 
-SET ALL_LIBS=%BIDMACH_LIBS%;%JCUDA_LIBS%;%JAVA_HOME%\lib\tools.jar
+SET ALL_LIBS=%LIBDIR%\IScala.jar;%BIDMACH_LIBS%;%JCUDA_LIBS%;%JAVA_HOME%\lib\tools.jar
+SET JAVA_NATIVE='-Djava.library.path='%LIBDIR%;%PATH%
 
-scala -nobootcp -cp "%ALL_LIBS%" -Yrepl-sync -i %LIBDIR%\bidmach_init.scala
+%CD%\scripts\scala\scala.bat -toolcp "%ALL_LIBS%" -Yrepl-sync -i %LIBDIR%\bidmach_init.scala
