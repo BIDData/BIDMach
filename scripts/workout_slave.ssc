@@ -41,13 +41,17 @@ opts4.npasses=2
 mm4.train
 }
 
+
+if ((new java.io.File("../data/uci/pubmed_parts/part00.smat.lz4")).exists) {
 println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed >>>>>>>")
 
 val (mm6,opts6) = LDA.learner(List((n:Int)=> ("../data/uci/pubmed_parts/part%02d.smat.lz4" format n)), 256)
 opts6.npasses=2
 opts6.useGPU=useGPU
 mm6.train
+}
 
+if ((new java.io.File("../data/MNIST8M/parts/alls00.fmat.lz4")).exists) {
 println("\n<<<<<<< Testing KMeans with FilesDS on MNIST8M >>>>>>>")
 
 val (mm7,opts7) = KMeans.learner(List((n:Int)=> ("../data/MNIST8M/parts/alls%02d.fmat.lz4" format n)), 256)
@@ -55,6 +59,7 @@ opts7.npasses=6
 opts7.nend=70
 opts7.useGPU=useGPU
 mm7.train
+}
 
 if (doTwitter) {
 println("\n<<<<<<< Testing parallel NMF on Twitter >>>>>>>")
