@@ -81,11 +81,11 @@ val z = rand(1,33) - 0.5f         // influence on the outcome
 
 val bx = (b * x)
 val ilink = irow(1,1)
-GLM.preds(bx, bx, ilink, GLM.linkArray, 10)
+GLM.preds(bx, bx, ilink, 10)
 val atreat = (rand(1, x.ncols) < bx)
 val xa = x on atreat
 val zx = z * xa
-GLM.preds(zx, zx, ilink, GLM.linkArray, 10)
+GLM.preds(zx, zx, ilink, 10)
 val yout = (rand(1, x.ncols) < zx)
 val aa = xa on yout
 

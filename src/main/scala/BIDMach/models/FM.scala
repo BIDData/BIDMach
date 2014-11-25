@@ -83,8 +83,8 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
-    GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    GLM.derivs(eta, ftarg, eta, mylinks, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, totflops)
+    GLM.derivs(eta, ftarg, eta, mylinks, totflops)
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights
     uv ~ eta *^ in
     um1 ~ (vt1 ∘ (eta * 2f)) *^ in
@@ -111,8 +111,8 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
-    GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, totflops)
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops)
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights))
     } else {

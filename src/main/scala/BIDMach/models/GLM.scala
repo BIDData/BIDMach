@@ -54,8 +54,8 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val ftarg = full(targ);
     val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = modelmats(0) * in  
-    GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    GLM.derivs(eta, targs, eta, mylinks, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, totflops)
+    GLM.derivs(eta, targs, eta, mylinks, totflops)
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘  dweights
     updatemats(0) ~ eta *^ in
     if (mask.asInstanceOf[AnyRef] != null) {
@@ -76,8 +76,8 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val ftarg = full(targ);
     val targs = if (!(putBack >= 0) && targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = modelmats(0) * in
-    GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    val v = GLM.llfun(eta, targs, mylinks, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, totflops)
+    val v = GLM.llfun(eta, targs, mylinks, totflops)
     if (putBack >= 0) {targ <-- eta}
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights))
@@ -244,12 +244,12 @@ object GLM {
   
   class Options extends Opts {}
   
-  def meanHelper(feta:FMat, fout:FMat, linkArray:Array[GLMlink], ilinks:IMat, istart:Int, iend:Int) {
+  def meanHelper(feta:FMat, fout:FMat, ilinks:IMat, istart:Int, iend:Int) {
     var i = istart
     while (i < iend) {
       var j = 0
       while (j < feta.nrows) { 
-        val fun = linkArray(ilinks(j)).meanfn
+        val fun = GLM.linkArray(ilinks(j)).meanfn
         fout.data(j + i * fout.nrows) = fun(feta.data(j + i * feta.nrows))
         j += 1 
       }
@@ -257,11 +257,11 @@ object GLM {
     }     
   }
   
-  def preds(eta:Mat, out:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long):Mat = {
+  def preds(eta:Mat, out:Mat, links:Mat, totflops:Long):Mat = {
     (eta, links, out) match {
       case (feta:FMat, ilinks:IMat, fout:FMat) => {
         Mat.nflops += totflops * feta.ncols
-        meanHelper(feta, fout, linkArray, ilinks, 0, feta.ncols)
+        meanHelper(feta, fout, ilinks, 0, feta.ncols)
         out
       }
       case (geta:GMat, gilinks:GIMat, gout:GMat) => {
@@ -272,7 +272,7 @@ object GLM {
     }
   }
   
-  def llfun(pred:Mat, targ:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long):Mat = {
+  def llfun(pred:Mat, targ:Mat, links:Mat, totflops:Long):Mat = {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
         Mat.nflops += 10L * ftarg.length
@@ -281,7 +281,7 @@ object GLM {
             while (i < ftarg.ncols) {
                 var j = 0
                 while (j < ftarg.nrows) {
-                    val fun = linkArray(ilinks(j)).likelihoodfn
+                    val fun = GLM.linkArray(ilinks(j)).likelihoodfn
                     out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
                     j += 1
                 }
@@ -298,7 +298,7 @@ object GLM {
     }
   }
   
-   def derivs(pred:Mat, targ:Mat, out:Mat, links:Mat, linkArray:Array[GLMlink], totflops:Long) = {
+   def derivs(pred:Mat, targ:Mat, out:Mat, links:Mat, totflops:Long) = {
     (pred, targ, out, links) match {
       case (fpred:FMat, ftarg:FMat, fout:FMat, ilinks:IMat) => {
         Mat.nflops += 10L * ftarg.length
@@ -306,7 +306,7 @@ object GLM {
             while (i < ftarg.ncols) {
                 var j = 0
                 while (j < ftarg.nrows) {
-                    val fun = linkArray(ilinks(j)).derivfn
+                    val fun = GLM.linkArray(ilinks(j)).derivfn
                     fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
                     j += 1
                 }

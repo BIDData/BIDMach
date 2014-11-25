@@ -16,8 +16,6 @@ import BIDMach._
 
 class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
   
-  val linkArray = GLM.linkArray
-  
   var mylinks:Mat = null
   
   var otargets:Mat = null
@@ -32,7 +30,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask
     totflops = 0L
     for (i <- 0 until opts.links.length) {
-      totflops += linkArray(opts.links(i)).fnflops
+      totflops += GLM.linkArray(opts.links(i)).fnflops
     }
     otargets = targets.rowslice(targets.nrows/2, targets.nrows);
     val tmats = new Array[Mat](3)
@@ -59,7 +57,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     val outcome = ftarg.rowslice(ftarg.nrows/2, ftarg.nrows)
     val eta = modelmats(0) * in
     val feta = eta + 0f
-    GLM.preds(eta, feta, mylinks, linkArray, totflops)
+    GLM.preds(eta, feta, mylinks, totflops)
    
     val propensity = feta.rowslice(0, feta.nrows/2)                         // Propensity score
     val iptw = (treatment ∘ outcome) / propensity - ((1 - treatment) ∘ outcome) / (1 - propensity)
@@ -67,8 +65,8 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     val tmodel = otargets ∘ modelmats(0).rowslice(targ.nrows/2, targ.nrows)
     val vx0 = eta.rowslice(eta.nrows/2, eta.nrows) - tmodel * in            // compute vx given T = 0
     val vx1 = vx0 + sum(tmodel, 2)                                          // compute vx given T = 1
-    GLM.preds(vx0, vx0, mylinks, linkArray, totflops)
-    GLM.preds(vx1, vx1, mylinks, linkArray, totflops)
+    GLM.preds(vx0, vx0, mylinks, totflops)
+    GLM.preds(vx1, vx1, mylinks, totflops)
 
     val tdiff = treatment - propensity
     val aiptw = iptw - (tdiff ∘ (vx0 / propensity + vx1 / (1 - propensity)))
@@ -79,7 +77,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     }
     ustep += 1
     
-    GLM.derivs(feta, ftarg, feta, mylinks, linkArray, totflops)
+    GLM.derivs(feta, ftarg, feta, mylinks, totflops)
     updatemats(0) ~ feta *^ in                                              // update the primary predictors
      if (mask.asInstanceOf[AnyRef] != null) {
       updatemats(0) ~ updatemats(0) ∘ mask
@@ -94,8 +92,8 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
   def meval2(in:Mat, targ:Mat):FMat = {
     val ftarg = full(targ)
     val eta = modelmats(0) * in
-    GLM.preds(eta, eta, mylinks, linkArray, totflops)
-    val v = GLM.llfun(eta, ftarg, mylinks, linkArray, totflops)
+    GLM.preds(eta, eta, mylinks, totflops)
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops)
     if (putBack >= 0) {ftarg <-- eta}
     FMat(mean(v, 2))
   }
