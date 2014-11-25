@@ -23,24 +23,20 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	for (i <- 0 until opts.layers.length) {
 	  opts.layers(i) match {
 	    case fcs:DNN.FC => {
-	      val fc = new FCLayer(imodel);
-	      layers(i) = fc;
+	      layers(i) = new FCLayer(imodel);
 	      modelmats(imodel) = if (useGPU) gzeros(fcs.outsize, nfeats) else zeros(fcs.outsize, nfeats);
 	      updatemats(imodel) = if (useGPU) gzeros(fcs.outsize, nfeats) else zeros(fcs.outsize, nfeats);
 	      nfeats = fcs.outsize;
 	      imodel += 1;
 	    }
 	    case rls:DNN.Rect => {
-	      val rl = new RectLayer;
-	      layers(i) = rl;
+	      layers(i) = new RectLayer;
 	    }
 	    case ils:DNN.Input => {
-	      val il = new InputLayer;
-	      layers(i) = il;
+	      layers(i) = new InputLayer;
 	    }
 	    case ols:DNN.GLM => {
-	      val ol = new GLMLayer(ols.links);
-	      layers(i) = ol;
+	      layers(i) = new GLMLayer(ols.links);
 	    }
 	  }
 	}
