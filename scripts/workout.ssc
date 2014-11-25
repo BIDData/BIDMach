@@ -1,4 +1,7 @@
 :silent
+
+// This script needs to be run from <BIDMACH_DIR>/scripts
+
 var useGPU=true
 var doTwitter=false
 
