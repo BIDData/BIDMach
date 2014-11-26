@@ -7,18 +7,22 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
 
+/**
+ * Basic DNN class. Need to add random initialization.
+ */
+
 class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   var layers:Array[Layer] = null
 
   override def init() = {
     mats = datasource.next;
+    var nfeats = mats(0).nrows;
     datasource.reset;
-    var nfeats = mats(0).ncols
     layers = new Array[Layer](opts.layers.length);
     var imodel = 0;
-    val nmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false})
-    modelmats = new Array[Mat](nmats);
-    updatemats = new Array[Mat](nmats);
+    val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false})
+    modelmats = new Array[Mat](nmodelmats);
+    updatemats = new Array[Mat](nmodelmats);
     
 	for (i <- 0 until opts.layers.length) {
 	  opts.layers(i) match {
@@ -39,6 +43,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	      layers(i) = new GLMLayer(ols.links);
 	    }
 	  }
+	  if (i > 0) layers(i).input = layers(i-1)
 	}
   }
   
@@ -91,11 +96,11 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   class RectLayer extends Layer {
     override def forward = {
-      data = max(input.data, 0)
+      data = max(input.data, 0f)
     }
     
     override def backward = {
-      input.deriv = deriv ∘ (input.data > 0);
+      input.deriv = deriv ∘ (input.data > 0f);
     }
   }
   
@@ -132,6 +137,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 object DNN  {
   trait Opts extends Model.Opts {
 	var layers:Seq[LayerSpec] = null;
+    var links:IMat = null;
   }
   
   class Options extends Opts {}
@@ -147,14 +153,41 @@ object DNN  {
   class Input extends LayerSpec {}
   
   class GLM(val links:IMat) extends LayerSpec {}
+  
+  /**
+   * Build a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
+   * Intermediate layers are FC alternating with Rect, starting and ending with FC. 
+   * First FC layer width is given as an argument, then it tapers off by taper.
+   */
+  
+  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts) = {
+    val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
+    val layers = new Array[LayerSpec](depth);
+    var w = width
+    for (i <- 1 until depth - 2) {
+    	if (i % 2 == 1) {
+    		layers(i) = new FC(w);
+    		w = (taper*w).toInt;
+    	} else {
+    		layers(i) = new Rect;
+    	}
+    }
+    layers(0) = new Input;
+    layers(depth-2) = new FC(ntargs);
+    layers(depth-1) = new GLM(opts.links);
+    opts.layers = layers
+    layers
+  }
 
-  def learner(mat0:Mat, d:Int) = {
+  def learner(mat0:Mat, targ:Mat, d:Int) = {
     class xopts extends Learner.Options with DNN.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
-    opts.dim = d
+    if (opts.links == null) opts.links = izeros(1,targ.nrows)
+    opts.links.set(d)
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatDS(Array(mat0, targ), opts), 
   	    new DNN(opts), 
   	    null,
   	    new ADAGrad(opts), 
@@ -169,9 +202,11 @@ object DNN  {
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
-    implicit val threads = threadPool(4)
+    implicit val threads = threadPool(4);
+    val ds = new SFilesDS(opts)
+//    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
-  	    new SFilesDS(opts), 
+  			ds, 
   	    new DNN(opts), 
   	    null,
   	    new ADAGrad(opts), 
