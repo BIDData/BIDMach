@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
 import BIDMach.updaters._
+import BIDMach.mixins._
 import BIDMach._
 
 /**
@@ -15,36 +16,38 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   var layers:Array[Layer] = null
 
   override def init() = {
-    mats = datasource.next;
-    var nfeats = mats(0).nrows;
-    datasource.reset;
-    layers = new Array[Layer](opts.layers.length);
-    var imodel = 0;
-    val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false})
-    modelmats = new Array[Mat](nmodelmats);
-    updatemats = new Array[Mat](nmodelmats);
-    
-	for (i <- 0 until opts.layers.length) {
-	  opts.layers(i) match {
-	    case fcs:DNN.FC => {
-	      layers(i) = new FCLayer(imodel);
-	      modelmats(imodel) = if (useGPU) gzeros(fcs.outsize, nfeats) else zeros(fcs.outsize, nfeats);
-	      updatemats(imodel) = if (useGPU) gzeros(fcs.outsize, nfeats) else zeros(fcs.outsize, nfeats);
-	      nfeats = fcs.outsize;
-	      imodel += 1;
-	    }
-	    case rls:DNN.Rect => {
-	      layers(i) = new RectLayer;
-	    }
-	    case ils:DNN.Input => {
-	      layers(i) = new InputLayer;
-	    }
-	    case ols:DNN.GLM => {
-	      layers(i) = new GLMLayer(ols.links);
-	    }
-	  }
-	  if (i > 0) layers(i).input = layers(i-1)
-	}
+    if (refresh) {
+    	mats = datasource.next;
+    	var nfeats = mats(0).nrows;
+    	datasource.reset;
+    	layers = new Array[Layer](opts.layers.length);
+    	var imodel = 0;
+    	val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false});
+    	modelmats = new Array[Mat](nmodelmats);
+    	updatemats = new Array[Mat](nmodelmats);
+
+    	for (i <- 0 until opts.layers.length) {
+    		opts.layers(i) match {
+    		case fcs:DNN.FC => {
+    			layers(i) = new FCLayer(imodel);
+    			modelmats(imodel) = if (useGPU) gnormrnd(0, 1, fcs.outsize, nfeats) else normrnd(0, 1, fcs.outsize, nfeats);
+    			updatemats(imodel) = if (useGPU) gzeros(fcs.outsize, nfeats) else zeros(fcs.outsize, nfeats);
+    			nfeats = fcs.outsize;
+    			imodel += 1;
+    		}
+    		case rls:DNN.Rect => {
+    			layers(i) = new RectLayer;
+    		}
+    		case ils:DNN.Input => {
+    			layers(i) = new InputLayer;
+    		}
+    		case ols:DNN.GLM => {
+    			layers(i) = new GLMLayer(ols.links);
+    		}
+    		}
+    		if (i > 0) layers(i).input = layers(i-1)
+    	}
+    }
   }
   
   
@@ -64,12 +67,14 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
     layers(0).data = gmats(0);
-    layers(layers.length-1).data = gmats(1);
-    var i = 1
+    val targ = gmats(1);
+    layers(layers.length-1).data = targ;
+    var i = 1;
     while (i < layers.length) {
       layers(i).forward;
       i += 1;
     }
+    if (putBack >= 0) {targ <-- layers(layers.length-1).data}
     layers(layers.length-1).score
   }
   
@@ -89,7 +94,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
     
     override def backward = {
-      input.deriv = modelmats(imodel) ^* deriv;
+      if (imodel > 0) input.deriv = modelmats(imodel) ^* deriv;
       updatemats(imodel) = deriv *^ input.data;
     }
   }
@@ -115,12 +120,12 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
     
     override def forward = {
-      data = input.data + 0
+      data = input.data + 0f
       GLM.preds(data, data, ilinks, totflops)
     }
     
     override def backward = {
-      input.deriv = data + 1
+      input.deriv = data + 1f
       GLM.derivs(data, target, input.deriv, ilinks, totflops)
       if (deriv.asInstanceOf[AnyRef] != null) {
         input.deriv ~ input.deriv ∘ deriv;
@@ -213,6 +218,36 @@ object DNN  {
   	    opts)
     (nn, opts)
   } 
+  
+  class LearnOptions extends Learner.Options with DNN.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+    
+    // This function constructs a learner and a predictor. 
+  def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
+    val mopts = new LearnOptions;
+    val nopts = new LearnOptions;
+    mopts.lrate = 1f
+    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    mopts.autoReset = false
+    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    nopts.links = mopts.links
+    mopts.links.set(d)
+    nopts.batchSize = mopts.batchSize
+    nopts.putBack = 1
+    dlayers(3, 0, 1f, targ.nrows, mopts)                   // default to a 3-layer network
+    val model = new DNN(mopts)
+    val mm = new Learner(
+        new MatDS(Array(mat0, targ), mopts), 
+        model, 
+        Array(new L1Regularizer(mopts)),
+        new ADAGrad(mopts), mopts)
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        model, 
+        null,
+        null, 
+        nopts)
+    (mm, mopts, nn, nopts)
+  }
 
 }
 

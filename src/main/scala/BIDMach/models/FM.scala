@@ -113,6 +113,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
     GLM.preds(eta, eta, mylinks, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, totflops)
+    if (putBack >= 0) {targ <-- eta}
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights))
     } else {
@@ -174,6 +175,33 @@ object FM {
   }
   
   def learner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 0)
+  
+   // This function constructs a learner and a predictor. 
+  def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
+    val mopts = new LearnOptions;
+    val nopts = new LearnOptions;
+    mopts.lrate = row(1f, 0.1f, 0.1f)
+    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    mopts.autoReset = false
+    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
+    nopts.links = mopts.links
+    mopts.links.set(d)
+    nopts.batchSize = mopts.batchSize
+    nopts.putBack = 1
+    val model = new FM(mopts)
+    val mm = new Learner(
+        new MatDS(Array(mat0, targ), mopts), 
+        model, 
+        mkRegularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        model, 
+        null,
+        null, 
+        nopts)
+    (mm, mopts, nn, nopts)
+  }
      
   def learnBatch(mat0:Mat, d:Int) = {
     val opts = new LearnOptions
