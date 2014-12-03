@@ -16,19 +16,23 @@ cd ${BIDMACH_SCRIPTS}
 BIDMACH_SCRIPTS=`pwd`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 
-echo "Loading arabic digits data"
+echo "Loading movielens 10M data"
 
-UCI=${BIDMACH_SCRIPTS}/../data/uci
-cd $UCI
+ML=${BIDMACH_SCRIPTS}/../data/movielens
+mkdir -p ${ML}
+cd ${ML}
 
-if [ ! -e Train_Arabic_Digit.txt ]; then
-    ${WGET} https://archive.ics.uci.edu/ml/machine-learning-databases/00195/Train_Arabic_Digit.txt
+if [ ! -e ml-10m.zip ]; then
+    ${WGET} http://files.grouplens.org/datasets/movielens/ml-10m.zip
 fi 
 
-sed -e 's/^[[:space:]]*$/0 0 0 0 0 0 0 0 0 0 0 0 0/g' Train_Arabic_Digit.txt > arabic.txt
-cd ${BIDMACH_SCRIPTS}/..
-${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.DIGITS.preprocess(\"${UCI}/\",\"arabic\")"
+unzip ml-10m.zip
+cd ml-10M100k
+./split_ratings.sh
+for i in 1 2 3 4 5 a b; do
+    mv r${i}.train r${i}.train.txt
+    mv r${i}.test r${i}.test.txt
+done
+cd ${BIDMACH_SCRIPTS}
 
-if [ -e "arabic.txt" ]; then
-  rm arabic.txt
-fi
+bidmach getmovies.ssc

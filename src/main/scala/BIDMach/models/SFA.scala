@@ -16,8 +16,8 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   
   override def init() = {
     mats = datasource.next
-	datasource.reset
-	val m = size(mats(0), 1)
+  	datasource.reset
+	  val m = size(mats(0), 1)
     val d = opts.dim    
     modelmats = new Array[Mat](1)
     mm = rand(d,m) - 0.5f
@@ -40,7 +40,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
  
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit =  {
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
-      if (opts.forceOnes) mm(1,?) = 1f;
+    if (opts.forceOnes) mm(1,?) = 1f;
 	  val slu = opts.lambdau
 	  val b = mm * sdata
 	  val r = if (ipass < opts.startup || putBack < 0) {
@@ -104,7 +104,7 @@ object SFA  {
   }  
   class Options extends Opts {} 
   
-  def learner(mat0:Mat, d:Int = 256) = {
+  def learner(mat0:Mat, d:Int) = {
     class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
@@ -117,6 +117,22 @@ object SFA  {
   	    new SFA(opts), 
   	    null,
   	    new ADAGrad(opts), opts)
+    (nn, opts)
+  }
+  
+  def learner(mat0:Mat, user0:Mat, d:Int) = {
+    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = 1
+    opts.npasses = 4
+    opts.lrate = 0.1
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    val nn = new Learner(
+        new MatDS(Array(mat0, user0), opts),
+        new SFA(opts), 
+        null,
+        new ADAGrad(opts), opts)
     (nn, opts)
   }
 }

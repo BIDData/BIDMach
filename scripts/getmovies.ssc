@@ -1,0 +1,31 @@
+:silent
+val dir="../data/movielens/ml-10M100k/"
+val nusers = 71567
+val nmovies = 65134
+
+println("Converting movies")
+for (i <- List("1","2","3","4","5","a","b")) {
+    val a = loadDMat(dir + "r" + i + ".train.txt");
+    val sa = sparse(IMat(a(?,1))-1, IMat(a(?,0))-1, FMat(a(?,2)), nmovies, nusers);
+    sa.check
+    saveSMat(dir+"../train%s.smat.lz4" format i, sa);
+
+    val b = loadDMat(dir + "r" + i + ".test.txt");
+    val sb = sparse(IMat(b(?,1))-1, IMat(b(?,0))-1, FMat(b(?,2)), nmovies, nusers);
+    sb.check
+    saveSMat(dir+"../test%s.smat.lz4" format i, sb);
+    print(".");
+}
+println("")
+val a=loadSMat(dir+"../train1.smat.lz4");
+val ta=loadSMat(dir+"../test1.smat.lz4");
+val aa = a + ta;
+val (ii, jj, vv) = find3(aa);
+val rs = rand(ii.length, 1) < 0.1;
+val itrain = find(rs == 0);
+val itest = find(rs);
+val train = sparse(ii(itrain), jj(itrain), vv(itrain), nmovies, nusers);
+val test = sparse(ii(itest), jj(itest), vv(itest), nmovies, nusers);
+saveSMat(dir+"../train.smat.lz4", train);
+saveSMat(dir+"../test.smat.lz4", test);
+:silent

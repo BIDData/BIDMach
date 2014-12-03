@@ -58,6 +58,34 @@ opts4.npasses=2
 mm4.train
 }
 
+println("\n<<<<<<< Testing SFA on MovieLens 10M Data >>>>>>>")
+val a5=loadSMat(dir+"/data/movielens/train.smat.lz4")
+val ta5=loadSMat(dir+"/data/movielens/test.smat.lz4")
+
+val offset = 3.52f
+a5.contents ~ a5.contents - offset
+
+val d = 1024
+
+val fact5 = zeros(d, a5.ncols);
+val (mm5,opts5) = SFA.learner(a5,fact5,d)
+
+opts5.useGPU = useGPU
+opts5.lambdam = 5f
+opts5.lambdau = 5f
+opts5.miter = 4
+opts5.uiter = 8
+opts5.npasses=5
+opts5.batchSize = 2000
+opts5.forceOnes = true
+
+mm5.train
+val mod5 = FMat(mm5.modelmat)
+val preds = DDS(mod5, fact5, ta5)
+preds.contents ~ preds.contents + offset
+val diff = preds.contents - ta5.contents
+val rmse = sqrt((diff ^* diff) / diff.length)
+println("RMSE = %f" format rmse.v);
 
 if ((new java.io.File("../data/uci/pubmed_parts/part00.smat.lz4")).exists) {
 println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed >>>>>>>")

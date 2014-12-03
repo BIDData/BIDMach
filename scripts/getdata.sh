@@ -7,7 +7,6 @@ else
   while [ -L "${BIDMACH_SCRIPTS}" ]; do
     BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
   done
-  alias wget='curl --retry 2 -O'
 fi
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 cd ${BIDMACH_SCRIPTS}
@@ -24,6 +23,8 @@ ${BIDMACH_SCRIPTS}/getuci.sh nytimes
 # ${BIDMACH_SCRIPTS}/getuci.sh pubmed
 
 ${BIDMACH_SCRIPTS}/getdigits.sh
+
+${BIDMACH_SCRIPTS}/getmovies.sh
 
 
 
