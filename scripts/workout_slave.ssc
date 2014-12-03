@@ -65,7 +65,7 @@ val ta5=loadSMat(dir+"/data/movielens/test.smat.lz4")
 val offset = 3.52f
 a5.contents ~ a5.contents - offset
 
-val d = 1024
+val d = 512
 
 val fact5 = zeros(d, a5.ncols);
 val (mm5,opts5) = SFA.learner(a5,fact5,d)

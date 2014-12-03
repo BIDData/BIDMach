@@ -7,7 +7,7 @@ val ta=loadSMat(dir+"test.smat.lz4")
 val offset = 3.52f
 a.contents ~ a.contents - offset
 
-val d = 1024
+val d = 512
 
 val fact = zeros(d, a.ncols);
 val (nn,opts) = SFA.learner(a,fact,d)
@@ -16,7 +16,7 @@ opts.lambdam = 5f
 opts.lambdau = 5f
 opts.miter = 4
 opts.uiter = 8
-opts.npasses=5
+opts.npasses = 5
 opts.batchSize = 2000
 opts.forceOnes = true
 
