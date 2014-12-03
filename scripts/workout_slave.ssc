@@ -19,6 +19,8 @@ val wt = nt / sum(nt);
 println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))
  
 println("\n<<<<<<< Testing FM on RCV1 >>>>>>>")
+//min(a,1f,a)
+//min(ta,1f,ta)
 val c6 = c(6,?)
 val p6 = zeros(1,ta.ncols)
 val tc6 = tc(6,?)
@@ -34,6 +36,7 @@ opts2.addConstFeat = true
 nopts2.addConstFeat = true
 opts2.dim1 = 32
 opts2.dim2 = 32
+//opts2.strictFM = true
 
 mm2.train
 nn2.predict

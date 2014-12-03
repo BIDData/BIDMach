@@ -12,6 +12,40 @@ import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach._
 
+/**
+ * Train a GLM model. The types of model are given by the values of opts.links (IMat). They are:
+ - 0 = linear model (squared loss)
+ - 1 = logistic model (logistic loss)
+ - 2 = hinge logistic (hinge loss on logistic prediction)
+ - 3 = SVM model (hinge loss)
+ * 
+ * Options are:
+ -   links: an IMat whose nrows should equal the number of targets. Values as above. Can be different for different targets.
+ -   iweight: an FMat typically used to select a weight row from the input. i.e. iweight = 0,1,0,0,0 uses the second
+ *            row of input data as weights to be applied to input samples. The iweight field should be 0 in mask. 
+ *            
+ * Inherited from Regression Model:
+ -   rmask: FMat, optional, 0-1-valued. Used to ignore certain input rows (which are targets or weights). 
+ *          Zero value in an element will ignore the corresponding row. 
+ -   targets: FMat, optional, 0-1-valued. ntargs x nfeats. Used to specify which input features corresponding to targets. 
+ -   targmap: FMat, optional, 0-1-valued. nntargs x ntargs. Used to replicate actual targets, e.g. to train multiple models
+ *            (usually with different parameters) for the same target. 
+ *    
+ * Some convenience functions for training:
+ * {{{
+ * val (mm, opts) = GLM.learner(a, d)    // On an input matrix a including targets (set opts.targets to specify them), 
+ *                                       // learns a GLM model of type d. 
+ *                                       // returns the model (nn) and the options class (opts). 
+ * val (mm, opts) = GLM.learner(a, c, d) // On an input matrix a and target matrix c, learns a GLM model of type d. 
+ *                                       // returns the model (nn) and the options class (opts). 
+ * val (nn, nopts) = predictor(model, ta, pc, d) // constructs a prediction learner from an existing model. returns the learner and options. 
+ *                                       // pc should be the same dims as the test label matrix, and will contain results after nn.predict
+ * val (mm, mopts, nn, nopts) = GLM.learner(a, c, ta, pc, d) // a = training data, c = training labels, ta = test data, pc = prediction matrix, d = type.
+ *                                       // returns a training learner mm, with options mopts. Also returns a prediction model nn with its own options.
+ *                                       // typically set options, then do mm.train; nn.predict with results in pc.  
+ * val (mm, opts) = learner(ds)          // Build a learner for a general datasource ds (e.g. a files data source). 
+ * }}}                                   
+ */
 
 class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
@@ -56,7 +90,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val eta = modelmats(0) * in  
     GLM.preds(eta, eta, mylinks, totflops)
     GLM.derivs(eta, targs, eta, mylinks, totflops)
-    if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘  dweights
+    if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights
     updatemats(0) ~ eta *^ in
     if (mask.asInstanceOf[AnyRef] != null) {
       updatemats(0) ~ updatemats(0) ∘ mask
@@ -410,6 +444,23 @@ object GLM {
     (mm, mopts, nn, nopts)
   }
   
+  class GOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts 
+
+  // A learner that uses a general data source (e.g. a files data source). 
+  // The datasource options (like batchSize) need to be set externally. 
+  def learner(ds:DataSource):(Learner, GOptions) = {
+    val mopts = new GOptions;
+    mopts.lrate = 1f
+    mopts.autoReset = false
+    val model = new GLM(mopts)
+    val mm = new Learner(
+        ds, 
+        model, 
+        mkRegularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    (mm, mopts)
+  }
+  
   // This function constructs a predictor from an existing model 
   def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
     val nopts = new LearnOptions;
@@ -419,7 +470,7 @@ object GLM {
     nopts.putBack = 1
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
-        model.asInstanceOf[GLM], 
+        model, 
         null,
         null,
         nopts)

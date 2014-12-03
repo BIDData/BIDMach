@@ -9,7 +9,7 @@ import BIDMach.mixins._
 import BIDMach._
 
 /**
- * Basic DNN class. Need to add random initialization.
+ * Basic DNN class. 
  */
 
 class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
