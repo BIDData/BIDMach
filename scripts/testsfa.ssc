@@ -1,0 +1,31 @@
+:silent
+val dir="../data/movielens/"
+
+val a=loadSMat(dir+"train.smat.lz4")
+val ta=loadSMat(dir+"test.smat.lz4")
+
+val offset = 3.52f
+a.contents ~ a.contents - offset
+
+val d = 1024
+
+val fact = zeros(d, a.ncols);
+val (nn,opts) = SFA.learner(a,fact,d)
+
+opts.lambdam = 5f
+opts.lambdau = 5f
+opts.miter = 4
+opts.uiter = 8
+opts.npasses=5
+opts.batchSize = 2000
+opts.forceOnes = true
+
+nn.train
+val mm = FMat(nn.modelmat)
+val preds = DDS(mm, fact, ta)
+preds.contents ~ preds.contents + offset
+val diff = preds.contents - ta.contents
+val rmse = sqrt((diff ^* diff) / diff.length)
+
+println("rmse = %f" format rmse.v);
+:silent
