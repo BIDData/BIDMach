@@ -19,7 +19,7 @@ object Experiments {
       i += 1
     }
   }
-}
+
 
 object MNIST {
   def datasource(dir:String="/data/MNIST8M/parts/", nlast:Int = 80, n:Int = 1, i:Int = 0) = {
@@ -563,5 +563,5 @@ object Twitter {
     }
     stop
   }
-
+}
 }

@@ -122,6 +122,17 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
 }
 
 
+object GLM {
+  trait Opts extends RegressionModel.Opts {
+    var links:IMat = null
+    var iweight:FMat = null
+  }
+  
+  val linear = 0
+  val logistic = 1
+  val maxp = 2
+  val svm = 3  
+
 object LinearLink extends GLMlink {
   def link(in:Float) = {
     in
@@ -262,17 +273,6 @@ abstract class GLMlink {
   val likelihoodfn:((Float,Float) => Float)
   val fnflops:Int
 }
-
-object GLM {
-  trait Opts extends RegressionModel.Opts {
-    var links:IMat = null
-    var iweight:FMat = null
-  }
-  
-  val linear = 0
-  val logistic = 1
-  val maxp = 2
-  val svm = 3
   
   val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
   
@@ -597,7 +597,7 @@ object GLM {
   	opts.lrate = 1f
   	val nn = new ParLearnerxF(
   	    null,
-  	    (dopts:DataSource.Opts, i:Int) => Twitter.twitterWords(nstart, nend, opts.nthreads, i),
+  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
   	    opts, mkGLMModel _,
   	    opts, mkRegularizer _,
   	    opts, mkUpdater _,
@@ -614,7 +614,7 @@ object GLM {
   	val opts = new LearnFParOptions
   	opts.lrate = 1f
   	val nn = new ParLearnerF(
-  	    Twitter.twitterWords(nstart, nend),
+  	    Experiments.Twitter.twitterWords(nstart, nend),
   	    opts, mkGLMModel _, 
         opts, mkRegularizer _,
   	    opts, mkUpdater _,

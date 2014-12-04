@@ -5,6 +5,7 @@ import BIDMat.SciFunctions._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.annotation.switch
+import Featurizer._
 import java.io._
 
 class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
@@ -14,9 +15,9 @@ class Featurizer(val opts:Featurizer.Options = new Featurizer.Options) {
   var alltdict:IDict = null
   	
   def mergeDicts(rebuild:Int,dictname:String="dict.gz",wcountname:String="wcount.gz"):Dict = {
-    val dd = new Array[Dict](5)                                                // Big enough to hold log2(days per month)
+    val dd = new Array[Dict](5)                                              // Big enough to hold log2(days per month)
   	val nmonths = 2 + (opts.nend - opts.nstart)/31
-  	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)          // Big enough to hold log2(num months)
+  	val md = new Array[Dict](1+(math.log(nmonths)/math.log(2)).toInt)        // Big enough to hold log2(num months)
   	println("Building monthly dicts for "+opts.thisDir)
 	  for (d <- opts.nstart to opts.nend) {                                    // Conditional on rebuild, merge the dictionaries for each month
 	    val (year, month, day) = Featurizer.decodeDate(d)
@@ -481,7 +482,7 @@ object Featurizer {
     var guessSize = 200000000
     var nthreads = 1
   }
-}
+
 
 trait Scanner { 
 	def scan(opts:Featurizer.Options, dict:Dict, idata:IMat, unigramsx:IMat, bigramsx:IMat, trigramsx:IMat, userids:IMat):(Int, Int, Int, Int)
@@ -625,4 +626,5 @@ object TwitterScanner extends Scanner {
 		}
 		(nuni, nbi, ntri, istatus)
 	}
+}
 }

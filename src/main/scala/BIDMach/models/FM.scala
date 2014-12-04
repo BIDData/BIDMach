@@ -394,7 +394,7 @@ object FM {
   	val opts = new LearnFParOptions
   	val nn = new ParLearnerxF(
   	    null,
-  	    (dopts:DataSource.Opts, i:Int) => Twitter.twitterWords(nstart, nend, opts.nthreads, i),
+  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
   	    opts, mkFMModel _,
         opts, mkRegularizer _,
   	    opts, mkUpdater _,
@@ -410,7 +410,7 @@ object FM {
 		) = {	
   	val opts = new LearnFParOptions
   	val nn = new ParLearnerF(
-  	    Twitter.twitterWords(nstart, nend),
+  	    Experiments.Twitter.twitterWords(nstart, nend),
   	    opts, mkFMModel _, 
         opts, mkRegularizer _,
   	    opts, mkUpdater _,

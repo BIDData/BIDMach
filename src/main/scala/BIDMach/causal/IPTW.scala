@@ -187,7 +187,7 @@ object IPTW {
   	opts.lrate = 1f
   	val nn = new ParLearnerxF(
   	    null,
-  	    (dopts:DataSource.Opts, i:Int) => Twitter.twitterWords(nstart, nend, opts.nthreads, i),
+  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
   	    opts, mkModel _,
   	    opts, mkRegularizer _,
   	    opts, mkUpdater _,
@@ -204,7 +204,7 @@ object IPTW {
   	val opts = new LearnFParOptions
   	opts.lrate = 1f
   	val nn = new ParLearnerF(
-  	    Twitter.twitterWords(nstart, nend),
+  	    Experiments.Twitter.twitterWords(nstart, nend),
   	    opts, mkModel _, 
         opts, mkRegularizer _,
   	    opts, mkUpdater _,

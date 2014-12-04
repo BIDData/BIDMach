@@ -144,7 +144,7 @@ object KMeans  {
   	opts.resFile = "/big/twitter/test/results.mat"
   	val nn = new ParLearnerxF(
   	    null, 
-  	    (dopts:DataSource.Opts, i:Int) => Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
+  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
   	    opts, mkKMeansModel _, 
   	    null, null, 
   	    opts, mkUpdater _,
@@ -164,7 +164,7 @@ object KMeans  {
   	opts.npasses = 4
   	opts.resFile = "/big/twitter/test/results.mat"
   	val nn = new ParLearnerF(
-  	    Twitter.twitterWords(nstart, nend), 
+  	    Experiments.Twitter.twitterWords(nstart, nend), 
   	    opts, mkKMeansModel _, 
   	    null, null, 
   	    opts, mkUpdater _,

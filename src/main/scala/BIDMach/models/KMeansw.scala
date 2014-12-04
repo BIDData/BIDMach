@@ -24,8 +24,8 @@ import BIDMach.models._
  * nn.train              // train the learner
  * nn.modelmat           // get the final model
  * 
- * val (nn, opts) = KMeans.learnPar(a,w) // Build a parallel learner
- * val (nn, opts) = KMeans.learnPar(a) 
+ * val (nn, opts) = KMeansw.learnPar(a,w) // Build a parallel learner
+ * val (nn, opts) = KMeansw.learnPar(a) 
  * opts.nthreads=2       // number of threads (defaults to number of GPUs)
  * nn.train              // train the learner
  * nn.modelmat           // get the final model

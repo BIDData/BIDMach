@@ -9,7 +9,17 @@ import BIDMach.mixins._
 import BIDMach._
 
 /**
- * Basic DNN class. 
+ * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 4 layer types:
+ - InputLayer: just a placeholder for the first layer which is loaded with input data blocks. No learnable params. 
+ - FCLayer: Fully-Connected Linear layer. Has a matrix of learnable params which is the input-output map. 
+ - RectLayer: Rectifying one-to-one layer. No params.
+ - GLMLayer: a one-to-one layer with GLM mappings (linear, logistic, abs-logistic and SVM). No learnable params. 
+ *
+ * The network topology is specified by opts.layers which is a sequence of "LayerSpec" objects. There is a LayerSpec
+ * Class for each Layer class, which holds the params for defining that layer. Currently only two LayerSpec types need params:
+ - FC: holds the output dimensions of the FClayer (input dimension set by previous layer). 
+ - GLM: holds the links matrix (integer specs for loss types, see GLM), for the output of that layer. Its size should match the
+ * number of targets. 
  */
 
 class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
