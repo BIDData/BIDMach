@@ -677,78 +677,84 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         }
         j += 1;
       }
-      acct = 0; 
-//      println("totcounts "+totcounts.toString);
-      j = 0;
-      while (j < ncats) {                  // Get the impurity for the node
-        acct += update(totcounts(j));
-        j += 1
+      val inode = extractField(INode, keys(jci));
+      val ifeat = extractField(IFeat, keys(jci));
+      var minImpty = 0.0;
+      var lastImpty = 0.0;
+      var nodeImpty = 0.0;
+      var partv = -1;
+      var lastkey = -1L;
+      var jmaxcnt = 0;
+      var kmaxcnt = 0;
+      if (maxcnt < tott) { // This is not a pure node
+      	acct = 0; 
+      	//      println("totcounts "+totcounts.toString);
+      	j = 0;
+      	while (j < ncats) {                  // Get the impurity for the node
+      		acct += update(totcounts(j));
+      		j += 1
+      	}
+      	nodeImpty = result(acct, tott);
+
+      	var lastival = -1;
+      	minImpty = nodeImpty;
+      	lastImpty = Double.MaxValue;
+      	acc = 0;
+      	tot = 0;
+      	j = jci;
+      	maxcnt = -1;
+      	var upcat = -1;
+      	var jmax = j;
+
+      	while (j < jcn) {     
+      		val key = keys(j);
+      		val cnt = cnts(j);
+      		val ival = extractField(IVFeat, key);
+      		val icat = extractField(ICat, key);  
+
+      		if (j > jci && ival != lastival) {
+      			lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // Dont compute every time!
+      			if (lastImpty < minImpty) { 
+      				minImpty = lastImpty;
+      				partv = lastival;
+      				upcat = jmaxcnt;
+      				jmax = j;
+      			}
+      		}       
+      		val oldcnt = counts(icat);
+      		val newcnt = oldcnt + cnt;
+      		counts(icat) = newcnt;
+      		if (newcnt > maxcnt) {
+      			maxcnt = newcnt;
+      			jmaxcnt = icat;
+      		}
+      		val oldcntt = totcounts(icat) - oldcnt;
+      		val newcntt = totcounts(icat) - newcnt;
+      		tot += cnt;
+      		acc += update(newcnt) - update(oldcnt);
+      		acct += update(newcntt) - update(oldcntt);
+      		lastkey = key;
+      		lastival = ival;
+      		j += 1;
+      	}
+      	counts.clear;
+      	maxcnt = -1;
+      	while (j > jmax) {
+      		j -= 1;
+      		val key = keys(j);
+      		val cnt = cnts(j);
+      		val ival = extractField(IVFeat, key);
+      		val icat = extractField(ICat, key);
+      		val oldcnt = counts(icat);
+      		val newcnt = oldcnt + cnt;
+      		counts(icat) = newcnt;
+      		if (newcnt > maxcnt) {
+      			maxcnt = newcnt;
+      			kmaxcnt = icat;
+      		}        
+      	} 
+      	lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // For checking
       }
-      val nodeImpty = result(acct, tott);
-      
-      var lastival = -1
-      var minImpty = nodeImpty
-      var lastImpty = Double.MaxValue
-      var partv = -1
-      var lastkey = -1L
-      acc = 0;
-      tot = 0;
-      j = jci;
-      maxcnt = -1;
-      var jmaxcnt = -1;
-      var upcat = -1;
-      var jmax = j;
-      val inode = extractField(INode, keys(j));
-      val ifeat = extractField(IFeat, keys(j));
-      while (j < jcn) {     
-        val key = keys(j)
-        val cnt = cnts(j)
-        val ival = extractField(IVFeat, key);
-        val icat = extractField(ICat, key);  
-        
-        if (j > jci && ival != lastival) {
-          lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // Dont compute every time!
-          if (lastImpty < minImpty) { 
-            minImpty = lastImpty;
-            partv = lastival;
-            upcat = jmaxcnt;
-            jmax = j;
-          }
-        }       
-        val oldcnt = counts(icat);
-        val newcnt = oldcnt + cnt;
-        counts(icat) = newcnt;
-        if (newcnt > maxcnt) {
-          maxcnt = newcnt;
-          jmaxcnt = icat;
-        }
-        val oldcntt = totcounts(icat) - oldcnt;
-        val newcntt = totcounts(icat) - newcnt;
-        tot += cnt;
-        acc += update(newcnt) - update(oldcnt);
-        acct += update(newcntt) - update(oldcntt);
-        lastkey = key;
-        lastival = ival;
-        j += 1;
-      }
-      counts.clear;
-      maxcnt = -1
-      var kmaxcnt = -1;
-      while (j > jmax) {
-        j -= 1;
-        val key = keys(j)
-        val cnt = cnts(j)
-        val ival = extractField(IVFeat, key);
-        val icat = extractField(ICat, key);
-        val oldcnt = counts(icat);
-        val newcnt = oldcnt + cnt;
-        counts(icat) = newcnt;
-        if (newcnt > maxcnt) {
-          maxcnt = newcnt;
-          kmaxcnt = icat;
-        }        
-      } 
-      lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // For checking
 //      println("Impurity %f, %f, min %f, %d, %d" format (nodeImpty, lastImpty, minImpty, partv, ifeat))
       outv(i) = partv;
       outg(i) = (nodeImpty - minImpty).toFloat;
