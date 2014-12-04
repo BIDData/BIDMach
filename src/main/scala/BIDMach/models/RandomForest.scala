@@ -24,9 +24,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var nfeats = 0;
   var nvals = 0;
   var ncats = 0;
+  var iblock = 0;
   var batchSize = 0;
   var tmpinds:LMat = null;
   var tmpcounts:IMat = null;
+  var midinds:LMat = null;
+  var midcounts:IMat = null;
   var totalinds:LMat = null;
   var totalcounts:IMat = null;
   var nodecounts:IMat = null;
@@ -58,6 +61,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var t3 = 0f; 
   var t4 = 0f;
   var t5 = 0f;
+  var midstep = 0;
   val runtimes = zeros(7,1);
   
   def init() = {
@@ -73,6 +77,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     gains = zeros(ntrees,1);
     igains = zeros(ntrees,1);
     nodecounts = iones(opts.ntrees, 1);
+    midstep = 8;
     ctrees.set(-1);
     ctrees(0,?) = 0;
     ftrees.set(-1)
@@ -89,6 +94,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
     tmpinds = lzeros(1, bsize);
     tmpcounts = izeros(1, bsize);
+    midinds = lzeros(1, 4*bsize);
+    midcounts = izeros(1, 4*bsize);
     // Allocate about half our memory to the main buffers
     val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt
     totalinds = new LMat(1, 0, new Array[Long](bufsize));
@@ -161,11 +168,22 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     t4 = toc;
     runtimes(3) += t4 - t3;
-    val (inds1, counts1) = addV(inds, counts, totalinds, totalcounts);
-    totalinds = inds1;
-    totalcounts = counts1;   
+    val (inds1, counts1) = addV(inds, counts, midinds, midcounts);
+    midinds = inds1;
+    midcounts = counts1;
+    iblock += 1;
+    if (iblock % midstep == 0) midmerge
     t5 = toc;
     runtimes(4) += t5 - t4;
+  }
+  
+  def midmerge = {
+    if (midinds.length > 0) {
+    	val (inds, counts) = addV(midinds, midcounts, totalinds, totalcounts);
+    	totalinds = inds;
+    	totalcounts = counts;  
+    	midinds = new LMat(1,0,midinds.data);
+    }
   }
   
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -216,6 +234,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   override def updatePass(ipass:Int) = { 
+    midmerge
     val (jc0, jtree) = findBoundaries(totalinds, jc);
     var itree = 0;
 //    println("jc0="+jc0.t.toString);

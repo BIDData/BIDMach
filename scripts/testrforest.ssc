@@ -22,7 +22,7 @@ val nn = new Learner(             // make a learner instance
 
 
 opts.useGPU = false
-opts.batchSize = 50000
+opts.batchSize = 20000
 opts.depth = 32
 opts.ntrees = 10
 opts.nsamps = 32
