@@ -151,12 +151,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         //         print("xnodes="+xnodes.toString)
         t1 = toc;
         runtimes(0) += t1 - t0;
-        val lt = gtreePack(fdata, xnodes, icats, tmpinds);
+        val nxvals = gtreePack(fdata, xnodes, icats);
 //        println("lt "+lt(0->100).toString)
         Mat.nflops += icats.length * nsamps * ntrees * 6;
         t2 = toc;
         runtimes(1) += t2 - t1;
-//        Arrays.sort(lt.data, 0, lt.length);  
+        val lt = gpsort(nxvals, tmpinds);  
         Mat.nflops += lt.length * math.log(lt.length).toLong;
         t3 = toc;
         runtimes(2) += t3 - t2;
@@ -538,7 +538,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
   
-  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, out:LMat) ={
+  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat):Int ={
     import edu.berkeley.bid.CUMACH
     import jcuda._
     import jcuda.runtime.JCuda._
@@ -553,6 +553,13 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     cudaDeviceSynchronize()
     CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
     cudaDeviceSynchronize();
+    nxvals;
+  }
+  
+  def gpsort(nxvals:Int, out:LMat):LMat = {
+    import jcuda._
+    import jcuda.runtime.JCuda._
+    import jcuda.runtime.cudaMemcpyKind._
     CUMAT.lsort(gout.data, nxvals, 1);
     cudaDeviceSynchronize();
     cudaMemcpy(Pointer.to(out.data), gout.data, nxvals*Sizeof.LONG, cudaMemcpyDeviceToHost)
