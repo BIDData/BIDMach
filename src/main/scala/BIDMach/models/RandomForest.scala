@@ -61,8 +61,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var t3 = 0f; 
   var t4 = 0f;
   var t5 = 0f;
+  var t6 = 0f;
   var midstep = 0;
-  val runtimes = zeros(7,1);
+  val runtimes = zeros(8,1);
   
   def init() = {
     opts.asInstanceOf[Learner.Options].npasses = opts.depth;                   // Make sure we make the correct number of passes
@@ -172,9 +173,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     midinds = inds1;
     midcounts = counts1;
     iblock += 1;
-    if (iblock % midstep == 0) midmerge
     t5 = toc;
     runtimes(4) += t5 - t4;
+    if (iblock % midstep == 0) midmerge
+    t6 = toc;
+    runtimes(5) += t6 - t5;
   }
   
   def midmerge = {
@@ -244,7 +247,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       t0 = toc;
       val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, outlr, jc0, jtree, itree, opts.impurity);
       t1 = toc;
-      runtimes(5) += t1 - t0;
+      runtimes(6) += t1 - t0;
 //      println("jc1 %d gg %d %d" format (jc1.length, gg.nrows, gg.ncols))
 //      println("gg %s" format (gg.t.toString))
       val (vm, im) = maxi2(gg);                                         // Find feats with maximum -impurity gain
@@ -265,7 +268,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       }
       itree += 1;
       t2 = toc;
-      runtimes(6) += t2 - t1;
+      runtimes(7) += t2 - t1;
     } 
     println("gain %5.4f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, 2*mean(igains).v, mean(FMat(nodecounts)).v));
     if (ipass < opts.depth-1) { 
