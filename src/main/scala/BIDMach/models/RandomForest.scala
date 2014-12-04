@@ -94,8 +94,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
     tmpinds = lzeros(1, bsize);
     tmpcounts = izeros(1, bsize);
-    midinds = lzeros(1, 4*bsize);
-    midcounts = izeros(1, 4*bsize);
+    midinds = new LMat(1, 0, new Array[Long](midstep*bsize));
+    midcounts = new IMat(1, 0, new Array[Int](midstep*bsize));
     // Allocate about half our memory to the main buffers
     val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt
     totalinds = new LMat(1, 0, new Array[Long](bufsize));
