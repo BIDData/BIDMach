@@ -39,3 +39,6 @@ opts.nend=81
 opts.training=false
 
 nn.repredict
+
+val err = mean(nn.results(0,?)) // The final test set error
+

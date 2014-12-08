@@ -270,7 +270,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       t2 = toc;
       runtimes(7) += t2 - t1;
     } 
-    println("gain %5.4f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, 2*mean(igains).v, mean(FMat(nodecounts)).v));
+    println("purity gain %5.4f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, 2*mean(igains).v, mean(FMat(nodecounts)).v));
     if (ipass < opts.depth-1) { 
       totalinds = new LMat(1,0,totalinds.data)
     } else { 
@@ -657,6 +657,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var acct = 0.0;
     var i = 0;
     val todo = jtree(itree+1) - jtree(itree);
+    var all = 0.0;
+    var impure = 0.0;
     while (i < todo) {
       val jci = jc(i + jtree(itree));
       val jcn = jc(i + jtree(itree) + 1);
@@ -689,7 +691,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       var lastkey = -1L;
       var jmaxcnt = 0;
       var kmaxcnt = 0;
+      all += tott;
       if (maxcnt < tott) { // This is not a pure node
+        impure += tott;
       	acct = 0; 
       	//      println("totcounts "+totcounts.toString);
       	j = 0;
@@ -767,6 +771,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       outn(i) = inode;
       i += 1;
     }
+    println("fraction of impure nodes %f" format impure/all);
     new FMat(nsamps, todo/nsamps, outg.data);
   }
 

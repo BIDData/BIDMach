@@ -1,0 +1,52 @@
+import org.apache.spark.SparkContext
+import org.apache.spark.mllib.classification.LogisticRegressionWithSGD
+import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
+import org.apache.spark.mllib.optimization.L1Updater
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.util.MLUtils
+import scala.compat.Platform._ 
+
+val t0=currentTime
+// Load training data in LIBSVM format.
+val training = MLUtils.loadLibSVMFile(sc, "/big/RCV1/v2/train6.libsvm")
+val test = MLUtils.loadLibSVMFile(sc, "/big/RCV1/v2/test6.libsvm")
+val t1=currentTime
+
+val lrAlg = new LogisticRegressionWithSGD()
+lrAlg.optimizer.
+  setNumIterations(5).
+  setRegParam(0.0000001).
+  setUpdater(new L1Updater)
+
+// Run training algorithm to build the model
+val numIterations = 100
+val model = lrAlg.run(training)
+
+val t2=currentTime
+
+// Clear the default threshold.
+model.clearThreshold()
+
+// Compute raw scores on the test set. 
+val scoreAndLabels = test.map { point =>
+  val score = model.predict(point.features)
+  (score, point.label)
+}
+
+val t3=currentTime
+
+// Get evaluation metrics.
+val metrics = new BinaryClassificationMetrics(scoreAndLabels)
+val auROC = metrics.areaUnderROC()
+println("Area under ROC = " + auROC)
+
+println("load time %f, train %f, predict %f" format ((t1-t0)/1000f,(t2-t1)/1000f, (t3-t2)/1000f))
+
+// Number of Iterations    Time       AUC
+//           5               61       0.931
+//          10              102       0.941                            
+//          20              188       0.948
+//          50              443       0.955
+//         100              800       0.959
+//         300             2477       0.949
