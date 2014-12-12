@@ -1,17 +1,32 @@
 :silent
-val dir="../data/movielens/"
+val dir="../data/netflix/"
 
-val a=loadSMat(dir+"train.smat.lz4")
-val ta=loadSMat(dir+"test.smat.lz4")
+val a0=loadSMat(dir+"train.smat.lz4")
+val ta0=loadSMat(dir+"test.smat.lz4")
 
-val offset = 3.52f
+val rebuild = false
+
+val (a, ta) = if (rebuild) {
+val (ii, jj, vv) = find3(a0+ta0);
+val ir = rand(ii.length, 1) < 0.1f;
+val itrain = find(ir == 0);
+val itest = find(ir);
+val a = sparse(ii(itrain),jj(itrain),vv(itrain),a0.nrows,a0.ncols);
+val ta = sparse(ii(itest),jj(itest),vv(itest),a0.nrows,a0.ncols);
+(a, ta)
+} else {
+(a0, ta0)
+}
+
+val offset = sum(sum(a))/a.nnz
 a.contents ~ a.contents - offset
 
-val d = 512
+val d = 256
 
 val fact = zeros(d, a.ncols);
 val (nn,opts) = SFA.learner(a,fact,d)
 
+// good values for movielens 10m
 opts.lambdam = 5f
 opts.lambdau = 5f
 opts.miter = 4
@@ -20,9 +35,20 @@ opts.npasses = 5
 opts.batchSize = 2000
 opts.forceOnes = true
 
+// good values for netflix
+opts.lambdam = 2f
+opts.lambdau = 20f
+opts.miter = 3
+opts.uiter = 4
+opts.npasses = 4
+opts.batchSize = 2000
+opts.forceOnes = true
+opts.lrate = 0.1
+
 nn.train
 val mm = FMat(nn.modelmat)
-val preds = DDS(mm, fact, ta)
+val tanz = ta > 0;
+val preds = DDS(mm, fact, tanz)
 preds.contents ~ preds.contents + offset
 val diff = preds.contents - ta.contents
 val rmse = sqrt((diff ^* diff) / diff.length)

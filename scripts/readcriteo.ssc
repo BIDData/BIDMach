@@ -1,0 +1,61 @@
+
+def readcritfile(fname:String, haslabel:Int):(IMat, IMat, IMat) = {
+  import java.io._
+  import java.lang.Long
+  val fin = new BufferedReader(new InputStreamReader(HMat.getInputStream(fname, 0)));
+  var nlines = 0;
+  var line = fin.readLine()
+  while (line != null && line.length > 0) {
+    line = fin.readLine();
+    nlines += 1; 
+  }
+  fin.close;
+  val labels = if (haslabel > 0) izeros(1, nlines) else null;
+  val numpart = izeros(39, nlines);
+  val bpart = izeros(39, nlines);
+  val din = new BufferedReader(new InputStreamReader(HMat.getInputStream(fname, 0)));
+  line = din.readLine();
+  var iline = 0;
+  while (iline < nlines) {
+    val parts = line.split("\t");
+    val nparts = parts.length
+    if (haslabel > 0) labels(iline) = parts(0).toInt;
+    var i = 0;
+    while (i < 13 && i+haslabel < nparts) {
+      if (parts(i+haslabel).length > 0) { 
+        numpart(i, iline) = parts(i+haslabel).toInt;
+        bpart(i, iline) = 1;
+      } 
+      i += 1;  
+    }
+    while (i < 39 && i+haslabel < nparts) {
+      if (parts(i+haslabel).length > 0) { 
+        numpart(i, iline) = Long.parseLong(parts(i+haslabel), 16).toInt;
+        bpart(i, iline) = 1;
+      } 
+      i += 1;  
+    }
+    line = din.readLine();
+    iline += 1; 
+  }
+  din.close;
+  (labels, numpart, bpart);
+}
+
+val dir = "d:/criteo/parts/"
+println("reading and converting training data")
+for (i <- 0 to 76) { 
+  val (a,b,c) = readcritfile(dir+("train%02d" format i), 1);
+  saveIMat(dir+("trainlabel%02d.imat.lz4" format i), a);
+  saveIMat(dir+("traindata%02d.imat.lz4" format i), b);
+  saveIMat(dir+("trainnz%02d.imat.lz4" format i), c);
+  print(".")
+}
+
+println("reading and converting test data")
+for (i <- 0 to 10) { 
+  val (a,b,c) = readcritfile(dir+("test%02d" format i), 0);
+  saveIMat(dir+("testdata%02d.imat.lz4" format i), b);
+  saveIMat(dir+("testnz%02d.imat.lz4" format i), c);
+  print(".")
+}
