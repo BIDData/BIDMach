@@ -58,6 +58,15 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   	row(-vv, math.exp(vv))
   }
   
+  override def evalfun(sdata:Mat, targ:Mat):FMat = {  
+    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)  
+    val (vm, im) = mini2(vmatch)
+    if (putBack >= 0) {targ <-- im}
+    max(vm, 0f, vm)
+    val vv = mean(sqrt(vm)).dv
+  	row(-vv, math.exp(vv))
+  }
+  
   override def updatePass(ipass:Int) = {
     if (ipass > 0) {
       max(umcount, 1f, umcount);

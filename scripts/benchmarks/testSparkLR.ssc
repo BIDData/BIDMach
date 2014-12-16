@@ -7,17 +7,20 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.util.MLUtils
 import scala.compat.Platform._ 
 
-val nnodes = 8
+val nnodes = 32
 
 val t0=currentTime
 // Load training data in LIBSVM format.
-val training = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTrain.libsvm", false, 595072, nnodes*4)
-val test = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTest.libsvm", false, 595072, nnodes*4)
+val both = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTrain.libsvm", false, 595072, nnodes*4)
+//val test = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTest.libsvm", false, 595072, nnodes*4)
+val splits = both.randomSplit(Array(0.6, 0.4))
+val training = splits(0)
+val test = splits(1)
 val t1=currentTime
 
 val lrAlg = new LogisticRegressionWithSGD()
 lrAlg.optimizer.
-  setNumIterations(50).
+  setNumIterations(30).
   setRegParam(1e-10).
   setUpdater(new L1Updater)
 
@@ -44,4 +47,9 @@ val auROC = metrics.areaUnderROC()
 println("Area under ROC = " + auROC)
 
 println("load time %f, train %f, predict %f" format ((t1-t0)/1000f,(t2-t1)/1000f, (t3-t2)/1000f))
+
+val ts = model.weights.toString;
+scala.tools.nsc.io.File("/home/ec2-user/weights.txt").writeAll(ts.substring(1,ts.length-1))
+
+
 
