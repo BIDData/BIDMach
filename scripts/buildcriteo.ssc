@@ -1,6 +1,6 @@
 
 val dir = "d:/criteo/parts/";
-/*val ivals = new Array[IMat](26);
+val ivals = new Array[IMat](26);
 val mvals = new Array[IMat](26);
 println("Building feature lookup tables")
 for (i <- 0 to 87) {
@@ -18,14 +18,19 @@ for (i <- 0 to 87) {
   }
   print(".")
 }
-println("")*/
+println("")
 println("Building feature matrices");
 
 val dicts = ivals.map(IDict(_));
 val offsets = izeros(27,1);
 for (i <- 0 until 26) { 
-  offsets(i+1) = offsets(i) + ivals(i).length;
+  if (ivals(i).length < 1000000) { 
+    offsets(i+1) = offsets(i) + ivals(i).length;
+  } else { 
+    offsets(i+1) = offsets(i);
+  }
 }
+
 for (i <- 0 to 87) {
   val (a,b)= if (i <= 76) { 
     (loadIMat(dir+("traindata%02d.imat.lz4" format i)),
@@ -52,7 +57,7 @@ for (i <- 0 to 87) {
   while (icol < a.ncols) { 
     var irow = 0;
     while (irow < a1.nrows) { 
-      if (b1(irow,icol) > 0) { 
+      if (b1(irow,icol) > 0 && offsets(irow+1) > offsets(irow)) { 
         rows(ix) = offsets(irow) + mvals(irow)(icol) + ioff;
         cols(ix) = icol;
         ix += 1;
@@ -61,9 +66,9 @@ for (i <- 0 to 87) {
     }
     icol += 1;
   }
-  val ccols = BIDMat.SparseMat.compressInds(cols.data, a.ncols, new Array[Int](a.ncols+1), nnz);
-  val sout = SMat(offsets(26), a.ncols, nnz, rows.data, ccols, vv.data);
-  val out = sparse(b0 on a0) on sout;
+  val ccols = BIDMat.SparseMat.compressInds(cols.data, a.ncols, new Array[Int](a.ncols+1), ix);
+  val sout = SMat(offsets(26), a.ncols, ix, rows.data, ccols, vv.data);
+  val out = sparse(iones(1, b0.ncols) on b0 on a0) on sout;
   out.check;
   if (i <= 76) { 
     saveSMat(dir+("train%02d.smat.lz4" format i), out);
@@ -72,6 +77,4 @@ for (i <- 0 to 87) {
   }
   print(".")
 }
-
-
 

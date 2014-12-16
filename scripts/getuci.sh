@@ -23,10 +23,10 @@ mkdir -p ${UCI}
 cd ${UCI}
 
 if [ ! -e docword.${1}.txt.gz ]; then
-    ${WGET} https://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.${1}.txt.gz
+    ${WGET} http://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.${1}.txt.gz
 fi 
 if [ ! -e vocab.${1}.txt ]; then
-    ${WGET} https://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/vocab.${1}.txt
+    ${WGET} http://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/vocab.${1}.txt
 fi 
 
 echo "Uncompressing docword.${1}.txt.gz"

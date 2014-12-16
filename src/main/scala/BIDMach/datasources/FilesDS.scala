@@ -109,6 +109,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
         case mf:FMat => zeros(nr, nc);
         case mi:IMat => izeros(nr, nc);
         case md:DMat => dzeros(nr, nc);
+        case ms:SMat => SMat(nr, nc, nc * opts.eltsPerSample);
       }
     } 
   }
@@ -142,7 +143,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		  if (opts.dorows) {
     		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
     		  } else {
-    		    omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
+    		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
     		  }
     		  if (featType == 0) {
     		    min(1f, omats(i), omats(i));
@@ -282,6 +283,7 @@ object FilesDS {
     var nend:Int = 0
     var dorows:Boolean = false
     var order:Int = 0                          // 0 = sequential order, 1 = random
+    var eltsPerSample = 10;
     var throwMissing:Boolean = false
   }
   

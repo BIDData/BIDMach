@@ -22,7 +22,7 @@ UCI=${BIDMACH_SCRIPTS}/../data/uci
 cd $UCI
 
 if [ ! -e Train_Arabic_Digit.txt ]; then
-    ${WGET} https://archive.ics.uci.edu/ml/machine-learning-databases/00195/Train_Arabic_Digit.txt
+    ${WGET} http://archive.ics.uci.edu/ml/machine-learning-databases/00195/Train_Arabic_Digit.txt
 fi 
 
 sed -e 's/^[[:space:]]*$/0 0 0 0 0 0 0 0 0 0 0 0 0/g' Train_Arabic_Digit.txt > arabic.txt

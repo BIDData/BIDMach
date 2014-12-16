@@ -77,6 +77,8 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   var um1:Mat = null
   var um2:Mat = null
   var xs:Mat = null
+  var ulim:Mat = null
+  var llim:Mat = null
   
   override def copyTo(mod:Model) = {
     super.copyTo(mod);
@@ -97,12 +99,12 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     iweight = if (useGPU && opts.iweight.asInstanceOf[AnyRef] != null) GMat(opts.iweight) else opts.iweight
     if (refresh) {
     	mv = modelmats(0);
-    	val rmat1 = rand(opts.dim1, mv.ncols) - 0.5f ;
-    	rmat1 ~ rmat1 *@ (sp * (1f/math.sqrt(opts.dim1).toFloat));
+    	val rmat1 = normrnd(0, opts.initscale/math.sqrt(opts.dim1).toFloat, opts.dim1, mv.ncols);
     	mm1 = if (useGPU) GMat(rmat1) else rmat1;
-    	val rmat2 = rand(opts.dim2, mv.ncols) - 0.5f ;
-    	rmat2 ~ rmat2 *@ (sp * (1f/math.sqrt(opts.dim2).toFloat));
+    	val rmat2 = normrnd(0, opts.initscale/math.sqrt(opts.dim2).toFloat, opts.dim2, mv.ncols)
     	mm2 = if (useGPU) GMat(rmat2) else rmat2;
+    	ulim = if (useGPU) GMat(row(opts.lim)) else row(opts.lim)
+    	llim = if (useGPU) GMat(row(-opts.lim)) else row(-opts.lim)
     	modelmats = Array(mv, mm1, mm2);
     	if (mask.asInstanceOf[AnyRef] != null) {
     		mv ~ mv ∘ mask;
@@ -140,6 +142,10 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
       xs = in.copy
       (xs.contents ~ xs.contents) ∘ xs.contents          // xs is the element-wise square of in.
       eta ~ eta - (((mm1 ∘ mm1) - (mm2 ∘ mm2)) * xs) 
+    }
+    if (opts.lim > 0) {
+      max(eta, llim, eta);
+      min(eta, ulim, eta);
     }
     GLM.preds(eta, eta, mylinks, totflops)
     GLM.derivs(eta, ftarg, eta, mylinks, totflops)
@@ -195,6 +201,10 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
+    if (opts.lim > 0) {
+      max(eta, - opts.lim, eta)
+      min(eta, opts.lim, eta)
+    }
     GLM.preds(eta, eta, mylinks, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, totflops)
     if (putBack >= 0) {targ <-- eta}
@@ -225,12 +235,11 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
 }
 
 object FM {
-  trait Opts extends RegressionModel.Opts {
-    var links:IMat = null;
-    var iweight:FMat = null;
+  trait Opts extends GLM.Opts {
     var strictFM = false;
     var dim1 = 32
     var dim2 = 32
+    var initscale = 0.1f
   }
   
   class Options extends Opts {}

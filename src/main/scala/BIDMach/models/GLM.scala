@@ -53,7 +53,8 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   var mylinks:Mat = null
   var iweight:Mat = null
-  
+  var ulim:Mat = null
+  var llim:Mat = null
   var totflops = 0L
   
   override def copyTo(mod:Model) = {
@@ -73,6 +74,8 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     for (i <- 0 until opts.links.length) {
       totflops += linkArray(opts.links(i)).fnflops
     }
+    ulim = if (useGPU) GMat(row(opts.lim)) else row(opts.lim)
+    llim = - ulim
   }
     
   def mupdate(in:Mat) = {
@@ -87,7 +90,11 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {        
     val ftarg = full(targ);
     val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
-    val eta = modelmats(0) * in  
+    val eta = modelmats(0) * in 
+    if (opts.lim > 0) {
+      max(eta, llim, eta);
+      min(eta, ulim, eta);
+    }
     GLM.preds(eta, eta, mylinks, totflops)
     GLM.derivs(eta, targs, eta, mylinks, totflops)
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights
@@ -126,6 +133,7 @@ object GLM {
   trait Opts extends RegressionModel.Opts {
     var links:IMat = null
     var iweight:FMat = null
+    var lim = 0f
   }
   
   val linear = 0

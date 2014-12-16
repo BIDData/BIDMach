@@ -64,7 +64,7 @@ case class Learner(
       var istep = 0
       println("pass=%2d" format ipass)
       while (datasource.hasNext) {
-        val mats = datasource.next    
+        val mats = datasource.next   
         here += datasource.opts.batchSize
         bytes += 12L*mats(0).nnz
         if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
@@ -75,7 +75,7 @@ case class Learner(
         	model.doblockg(mats, ipass, here)
         	if (mixins != null) mixins map (_ compute(mats, here))
         	updater.update(ipass, here)
-        }   
+        }  
         if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
         istep += 1
         val dsp = datasource.progress

@@ -7,16 +7,18 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.util.MLUtils
 import scala.compat.Platform._ 
 
+val nnodes = 8
+
 val t0=currentTime
 // Load training data in LIBSVM format.
-val training = MLUtils.loadLibSVMFile(sc, "/big/RCV1/v2/train6.libsvm")
-val test = MLUtils.loadLibSVMFile(sc, "/big/RCV1/v2/test6.libsvm")
+val training = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTrain.libsvm", false, 595072, nnodes*4)
+val test = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTest.libsvm", false, 595072, nnodes*4)
 val t1=currentTime
 
 val lrAlg = new LogisticRegressionWithSGD()
 lrAlg.optimizer.
-  setNumIterations(5).
-  setRegParam(0.0000001).
+  setNumIterations(50).
+  setRegParam(1e-10).
   setUpdater(new L1Updater)
 
 // Run training algorithm to build the model
@@ -43,10 +45,3 @@ println("Area under ROC = " + auROC)
 
 println("load time %f, train %f, predict %f" format ((t1-t0)/1000f,(t2-t1)/1000f, (t3-t2)/1000f))
 
-// Number of Iterations    Time       AUC
-//           5               61       0.931
-//          10              102       0.941                            
-//          20              188       0.948
-//          50              443       0.955
-//         100              800       0.959
-//         300             2477       0.949

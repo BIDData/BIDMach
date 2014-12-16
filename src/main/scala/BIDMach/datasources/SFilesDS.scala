@@ -351,7 +351,6 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
 object SFilesDS {
   trait Opts extends FilesDS.Opts {
   	var fcounts:IMat = null
-    var eltsPerSample = 10
   }
   
   class Options extends Opts {}

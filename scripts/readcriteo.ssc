@@ -1,5 +1,5 @@
 
-def readcritfile(fname:String, haslabel:Int):(IMat, IMat, IMat) = {
+def readcritfile(fname:String, haslabel:Int):(FMat, IMat, IMat) = {
   import java.io._
   import java.lang.Long
   val fin = new BufferedReader(new InputStreamReader(HMat.getInputStream(fname, 0)));
@@ -10,7 +10,7 @@ def readcritfile(fname:String, haslabel:Int):(IMat, IMat, IMat) = {
     nlines += 1; 
   }
   fin.close;
-  val labels = if (haslabel > 0) izeros(1, nlines) else null;
+  val labels = if (haslabel > 0) zeros(1, nlines) else null;
   val numpart = izeros(39, nlines);
   val bpart = izeros(39, nlines);
   val din = new BufferedReader(new InputStreamReader(HMat.getInputStream(fname, 0)));
@@ -46,7 +46,7 @@ val dir = "d:/criteo/parts/"
 println("reading and converting training data")
 for (i <- 0 to 76) { 
   val (a,b,c) = readcritfile(dir+("train%02d" format i), 1);
-  saveIMat(dir+("trainlabel%02d.imat.lz4" format i), a);
+  saveFMat(dir+("trainlabel%02d.fmat.lz4" format i), a);
   saveIMat(dir+("traindata%02d.imat.lz4" format i), b);
   saveIMat(dir+("trainnz%02d.imat.lz4" format i), c);
   print(".")
@@ -55,7 +55,7 @@ for (i <- 0 to 76) {
 println("reading and converting test data")
 for (i <- 0 to 10) { 
   val (a,b,c) = readcritfile(dir+("test%02d" format i), 0);
-  saveIMat(dir+("testdata%02d.imat.lz4" format i), b);
+  saveFMat(dir+("testdata%02d.fmat.lz4" format i), b);
   saveIMat(dir+("testnz%02d.imat.lz4" format i), c);
   print(".")
 }
