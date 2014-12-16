@@ -26,8 +26,8 @@ if [ ! -e ml-10m.zip ]; then
     ${WGET} http://files.grouplens.org/datasets/movielens/ml-10m.zip
 fi 
 
-unzip ml-10m.zip
-cd ml-10M100k
+unzip -o ml-10m.zip
+cd ml-10M100K
 ./split_ratings.sh
 for i in 1 2 3 4 5 a b; do
     mv r${i}.train r${i}.train.txt

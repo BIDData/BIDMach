@@ -1,5 +1,5 @@
 :silent
-val dir="../data/movielens/ml-10M100k/"
+val dir="../data/movielens/ml-10M100K/"
 val nusers = 71567
 val nmovies = 65134
 
@@ -29,3 +29,5 @@ val test = sparse(ii(itest), jj(itest), vv(itest), nmovies, nusers);
 saveSMat(dir+"../train.smat.lz4", train);
 saveSMat(dir+"../test.smat.lz4", test);
 :silent
+
+sys.exit

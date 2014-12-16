@@ -1,0 +1,18 @@
+
+
+object UCI {
+  def preprocess(dict:String, fname:String) {
+    println("Processing "+fname); 
+    tic; 
+    val cols = loadIMat(dict+fname+"cols.imat.gz")
+    val rows = loadIMat(dict+fname+"rows.imat.gz")
+    val values = loadFMat(dict+fname+"vals.fmat.gz")
+    val m = cols2sparse(rows, cols, values, true, 1)
+    saveSMat(dict+fname+"smat.lz4", m)
+  }
+}
+
+UCI.preprocess("","")
+
+sys.exit
+
