@@ -1,0 +1,30 @@
+
+
+class xopts extends Learner.Options with SFilesDS.Opts with LDA.Opts with IncNorm.Opts 
+
+def learnPubmed(dim:Int = 256) = {
+    implicit val ec = threadPool(4);
+    val opts = new xopts;
+  	val nn = new Learner(
+        new SFilesDS(opts),
+  	    new LDA(opts), 
+  	    null, 
+  	    new IncNorm(opts),
+  	    opts);
+    (nn, opts)
+};
+
+val (nn, opts) = learnPubmed(256);
+
+val dir = "/data/uci/"
+opts.fnames = List(FilesDS.simpleEnum(dir+"/pubmed_parts/part%02d.smat.lz4", 1, 0))
+opts.nstart = 0;
+opts.nend = 9;
+opts.fcounts = 141043
+opts.eltsPerSample = 400
+
+opts.batchSize = 20000;
+opts.npasses = 3;
+
+val dict = Dict(loadSBMat(dir+"pubmed.term.sbmat.gz"))
+

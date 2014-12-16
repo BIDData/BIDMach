@@ -1,0 +1,11 @@
+
+val dir = "/data/MNIST8M/parts";
+
+for (i<- 0 until 80) {
+    val a=loadSMat(dir+"/part%02d.smat.lz4" format i);
+    saveSMat(dir+"/part%02d.smat.gz" format i, a);
+    val c=loadSMat(dir+"/cats%02d.smat.lz4" format i);
+    saveSMat(dir+"/cats%02d.smat.gz" format i, c);
+    print(".");
+}
+

@@ -26,8 +26,9 @@ if [ ! -e Train_Arabic_Digit.txt ]; then
 fi 
 
 sed -e 's/^[[:space:]]*$/0 0 0 0 0 0 0 0 0 0 0 0 0/g' Train_Arabic_Digit.txt > arabic.txt
-cd ${BIDMACH_SCRIPTS}/..
-${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.Experiments.DIGITS.preprocess(\"${UCI}/\",\"arabic\")"
+cd ${UCI}
+#${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.Experiments.DIGITS.preprocess(\"${UCI}/\",\"arabic\")"
+${BIDMACH_SCRIPTS}/../bidmach ${BIDMACH_SCRIPTS}/getdigits.ssc
 
 if [ -e "arabic.txt" ]; then
   rm arabic.txt

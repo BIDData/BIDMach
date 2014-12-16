@@ -1,0 +1,14 @@
+import scala.concurrent.future
+import scala.concurrent.ExecutionContextExecutor
+import java.io._
+import scala.concurrent.ExecutionContext.Implicits.global
+
+def test(n:Int) = {
+    for (i <- 0 until n) {
+    	future {
+	       println("started %d" format i);
+	       Thread.`yield`
+	       println("done %d" format i);
+	       }
+    }
+}

@@ -60,6 +60,7 @@ ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/../r
 
 # Call bidmach to put the data together
 cd ${BIDMACH_SCRIPTS}/..
-${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.Experiments.RCV1.prepare(\"${RCV1}/tokenized/\")"
+# ${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.Experiments.RCV1.prepare(\"${RCV1}/tokenized/\")"
+${BIDMACH_SCRIPTS}/../bidmach scripts/getrcv1.ssc
 
 

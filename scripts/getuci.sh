@@ -18,26 +18,31 @@ BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )
 
 echo "Loading $1 data"
 
-UCI="${BIDMACH_SCRIPTS}/../data/uci"
+UCI="${BIDMACH_SCRIPTS}/../data/uci/${1}"
 mkdir -p ${UCI}
 cd ${UCI}
 
-if [ ! -e docword.${1}.txt.gz ]; then
+if [ ! -e docword.txt.gz ]; then
     ${WGET} http://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.${1}.txt.gz
+    mv docword.${1}.txt.gz docword.txt.gz
 fi 
 if [ ! -e vocab.${1}.txt ]; then
     ${WGET} http://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/vocab.${1}.txt
+    mv vocab.${1}.txt vocab.txt
 fi 
 
 echo "Uncompressing docword.${1}.txt.gz"
-gunzip -c "docword.${1}.txt.gz" | tail -n +4 > "docword.${1}.txt"
-${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "docword.${1}.txt" -f "${UCI}/../uci_fmt.txt" -o "./${1}." -m "./${1}." -d " " -c
-${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "vocab.${1}.txt" -f "${UCI}/../uci_wfmt.txt" -o "./${1}." -m "./${1}." -c
+gunzip -c "docword.txt.gz" | tail -n +4 > "docword.txt"
+${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "docword.txt" -f "${UCI}/../../uci_fmt.txt" -o "" -m "" -d " " -c
+${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "vocab.txt" -f "${UCI}/../../uci_wfmt.txt" -o "" -m "" -c
 cd ${BIDMACH_SCRIPTS}/..
-${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.Experiments.NYTIMES.preprocess(\"${UCI}/\",\"${1}.\")" 
+#${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.Experiments.NYTIMES.preprocess(\"${UCI}/\",\"${1}.\")" 
 cd ${UCI}
-if [ -e "docword.${1}.txt" ]; then
+${BIDMACH_SCRIPTS}/../bidmach ${BIDMACH_SCRIPTS}/getuci.ssc
+mv "smat.lz4" "../${1}.smat.lz4"
+mv "term.sbmat.gz" "../${1}.term.sbmat.lz4"
+mv "term.imat.gz" "../${1}.term.imat.lz4"
+if [ -e "docword.txt" ]; then
     echo "clearing up"
-    rm docword.${1}.txt
-    rm vocab.${1}.txt
+    rm docword.txt
 fi
