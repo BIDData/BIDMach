@@ -3,6 +3,7 @@ package BIDMach.models
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMat.Solvers._
 import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.Learner
@@ -13,6 +14,8 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   var traceMem = false
   var pm:Mat = null
   var mzero:Mat = null
+  var Minv:Mat = null
+  var diagM:Mat = null
   
   override def init() = {
     mats = datasource.next
@@ -21,12 +24,15 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     val d = opts.dim    
     modelmats = new Array[Mat](1)
     mm = rand(d,m) - 0.5f
+    diagM = mkdiag(ones(d,1)) 
     useGPU = opts.useGPU && Mat.hasCUDA > 0
 	  if (useGPU) {
 	    gmats = new Array[Mat](mats.length)
 	    mm = GMat(mm)
+	    Minv = GMat(diagM)
 	  } else {
 	    gmats = mats
+	    Minv = diagM + 0
 	  }     
     modelmats(0) = mm
     mzero = mm.zeros(1,1)
@@ -50,10 +56,12 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  } else {
 	    b - (user ∘ slu + mm * DDS(mm, user, sdata))  // r = b - Ax
 	  }
- 	  val p = b + 0
+	  val z = Minv * r
+ 	  val p = z + 0
 	  for (i <- 0 until opts.uiter) {
 	  	val Ap = (p ∘ slu) + mm * DDS(mm, p, sdata)
-	  	CG.CGupdate(p, r, Ap, user, opts.ueps, opts.uconvg)
+//	  	CG.CGupdate(p, r, Ap, user, opts.ueps, opts.uconvg)
+	  	CG.PreCGupdate(p, r, z, Ap, user, Minv, opts.ueps, opts.uconvg)
 	  }
   }
   
@@ -61,7 +69,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     // values to be accumulated
     if (opts.forceOnes) user(0,?) = 1f;
     val slm = opts.lambdam
-    updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // derivative
+    updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
   }
     
   def mupdate0(sdata:Mat, user:Mat, ipass:Int):Unit = {
@@ -80,6 +88,10 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
       updatemats(0) = rm
       updatemats(1) = (pm ∘ slm) + user *^ DDS(pm, user, sdata)                    // accumulate Ap
     }
+  }
+  
+  override def updatePass(ipass:Int) = {
+    Minv <-- inv(FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
   def evalfun(sdata:Mat, user:Mat):FMat = {  

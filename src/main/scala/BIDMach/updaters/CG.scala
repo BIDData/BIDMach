@@ -10,6 +10,7 @@ class CG(override val opts:CG.Opts = new CG.Options) extends Updater(opts) {
 	var Ap:Mat = null
 	var pm:Mat = null
 	var rm:Mat = null
+	var zm:Mat = null
 	var mm:Mat = null
 	var lastStep = -1L
 	
@@ -67,14 +68,32 @@ object CG {
   	max(pAp, weps, pAp)
   	val rsold = (r dot r) + 0                // add 0 to make a new vector, Otherwise this will alias...
   	val convec = rsold > convgd              // Check convergence
-  	val alpha = convec *@ (rsold / pAp)      // Only process unconverged elements
+  	val alpha = convec ∘ (rsold / pAp)      // Only process unconverged elements
   	min(alpha, 1f, alpha)
-  	x ~ x + (p *@ alpha)
-  	r ~ r - (Ap *@ alpha)
+  	x ~ x + (p ∘ alpha)
+  	r ~ r - (Ap ∘ alpha)
   	val rsnew = (r dot r)                    // ...down here
   	max(rsold, weps, rsold)
-  	val beta = convec *@ (rsnew / rsold)
+  	val beta = convec ∘ (rsnew / rsold)
   	min(beta, 1f, beta)
-  	p ~ r + (p *@ beta)
-  }  
+  	p ~ r + (p ∘ beta)
+  } 
+  
+  // Preconditioned CG update
+  def PreCGupdate(p:Mat, r:Mat, z:Mat, Ap:Mat, x:Mat, Minv:Mat, weps:Float, convgd:Float) = {
+  	val pAp = (p dot Ap)
+  	max(pAp, weps, pAp)
+  	val rsold = (r dot z) 
+  	val convec = rsold > convgd              // Check convergence
+  	val alpha = convec ∘ (rsold / pAp)      // Only process unconverged elements
+  	min(alpha, 1f, alpha)
+  	x ~ x + (p ∘ alpha)
+  	r ~ r - (Ap ∘ alpha)
+  	z ~ Minv * r
+  	val rsnew = (z dot r)                    // order is critical to avoid aliasing
+  	max(rsold, weps, rsold)
+  	val beta = convec ∘ (rsnew / rsold)
+  	min(beta, 1f, beta)
+  	p ~ z + (p ∘ beta)
+  }
 }
