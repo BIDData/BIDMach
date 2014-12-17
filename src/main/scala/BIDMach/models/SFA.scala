@@ -61,7 +61,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  for (i <- 0 until opts.uiter) {
 	  	val Ap = (p ∘ slu) + mm * DDS(mm, p, sdata)
 //	  	CG.CGupdate(p, r, Ap, user, opts.ueps, opts.uconvg)
-	  	CG.PreCGupdate(p, r, z, Ap, user, Minv, opts.ueps, opts.uconvg)
+	  	CG.PreCGupdate(p, r, z, Ap, user, Minv, opts.ueps, opts.uconvg)  // Should scale preconditioner by number of predictions per user
 	  }
   }
   
