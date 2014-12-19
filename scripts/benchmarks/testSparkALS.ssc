@@ -1,0 +1,51 @@
+
+import org.apache.spark.mllib.recommendation.ALS
+import org.apache.spark.mllib.recommendation.Rating
+
+import scala.compat.Platform._
+
+val nnodes = 32;
+val t0 = currentTime
+val data = sc.textFile("s3n://bidmach/netflix_mm.train", nnodes * 4)
+//val ratings = data.map(_.split("::") match { case Array(user, item, rate, timestamp) =>
+//    Rating(user.toInt, item.toInt, rate.toDouble)
+val ratings = data.map(_.split("\t") match { case Array(user, item, rate) =>
+    Rating(user.toInt, item.toInt, rate.toDouble)
+  })
+
+// Do a test-train split
+val splits = ratings.randomSplit(Array(0.8, 0.2))
+val training = splits(0)
+val test = splits(1)
+
+val cc = training.cache.count  // force the parse to execute, result in memory
+val t1 = currentTime
+
+
+// Build the recommendation model using ALS
+val rank = 200
+val numIterations = 5
+val model = ALS.train(training, rank, numIterations, 0.1)
+val t2 = currentTime
+// Evaluate the model on test data
+val usersProducts = test.map { case Rating(user, product, rate) =>
+  (user, product)
+}
+
+val predictions = 
+  model.predict(usersProducts).map { case Rating(user, product, rate) => 
+    ((user, product), rate)
+  }
+
+val ratesAndPreds = test.map { case Rating(user, product, rate) => 
+  ((user, product), rate)
+}.join(predictions)
+
+val MSE = ratesAndPreds.map { case ((user, product), (r1, r2)) => 
+  val err = (r1 - r2)
+  err * err
+}.mean()
+
+println("Mean Squared Error = " + MSE)
+
+println("Load Time = %f secs, Compute Time = %f" format ((t1-t0)/1000f, (t2-t1)/1000f))

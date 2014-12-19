@@ -7,26 +7,29 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.util.MLUtils
 import scala.compat.Platform._ 
 
-val nnodes = 32
+val nnodes = 2
 
 val t0=currentTime
 // Load training data in LIBSVM format.
-val both = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTrain.libsvm", false, 595072, nnodes*4)
-//val test = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTest.libsvm", false, 595072, nnodes*4)
+/*val both = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/CriteoTrain.libsvm", false, 595072, nnodes*4)
 val splits = both.randomSplit(Array(0.6, 0.4))
-val training = splits(0)
-val test = splits(1)
+val train = splits(0)
+val test = splits(1) */
+
+val train = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/RCV1train6.libsvm", false, 276544, nnodes*4)
+val test = MLUtils.loadLibSVMFile(sc, "s3n://bidmach/RCV1test6.libsvm", false, 276544, nnodes*4)
+
 val t1=currentTime
 
 val lrAlg = new LogisticRegressionWithSGD()
 lrAlg.optimizer.
-  setNumIterations(30).
+  setNumIterations(10).
   setRegParam(1e-10).
   setUpdater(new L1Updater)
 
 // Run training algorithm to build the model
 val numIterations = 100
-val model = lrAlg.run(training)
+val model = lrAlg.run(train)
 
 val t2=currentTime
 

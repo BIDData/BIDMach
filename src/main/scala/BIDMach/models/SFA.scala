@@ -91,7 +91,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   }
   
   override def updatePass(ipass:Int) = {
-    Minv <-- inv(FMat(mm *^ mm) + opts.lambdau * diagM); 
+    Minv <-- inv(0.01f*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
   def evalfun(sdata:Mat, user:Mat):FMat = {  
