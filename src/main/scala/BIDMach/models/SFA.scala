@@ -16,14 +16,18 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   var mzero:Mat = null
   var Minv:Mat = null
   var diagM:Mat = null
+  var avgrating:Float = 0
+  var avgmat:Mat = null
   var nfeats:Int = 0
+  var totratings:Double = 0
+  var nratings:Double = 0
+
   
   override def init() = {
     mats = datasource.next
   	datasource.reset
 	  nfeats = mats(0).nrows
     val d = opts.dim    
-    modelmats = new Array[Mat](1)
     mm = rand(d,nfeats) - 0.5f
     diagM = mkdiag(ones(d,1)) 
     useGPU = opts.useGPU && Mat.hasCUDA > 0
@@ -35,8 +39,9 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	    gmats = mats
 	    Minv = diagM + 0
 	  }     
-    modelmats(0) = mm
     mzero = mm.zeros(1,1)
+    avgmat = mm.zeros(1,1)
+    modelmats = Array(mm)
     if (opts.forceOnes) mm(1,?) = 1f
     updatemats = new Array[Mat](2)
   }
@@ -48,6 +53,12 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit =  {
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
     if (opts.forceOnes) mm(1,?) = 1f;
+    if (ipass == 0) {
+	    totratings += sum(sdata.contents).dv;
+	    nratings += sdata.nnz
+	  } else {
+	    sdata.contents ~ sdata.contents - avgmat;
+	  }
 	  val slu = opts.lambdau
 	  val b = mm * sdata
 	  val r = if (ipass < opts.startup || putBack < 0) {
@@ -95,7 +106,11 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   }
   
   override def updatePass(ipass:Int) = {
-    Minv <-- inv(100f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
+    if (ipass == 0) {
+      avgrating = (totratings / nratings).toFloat;
+      avgmat.set(avgrating);
+    }
+    Minv <-- inv(50f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
   def evalfun(sdata:Mat, user:Mat):FMat = {  
@@ -113,8 +128,8 @@ object SFA  {
   	var ueps = 1e-10f
   	var uconvg = 1e-2f
   	var miter = 4
-  	var lambdau = 0.2f
-  	var lambdam = 0.2f
+  	var lambdau = 5f
+  	var lambdam = 5f
   	var startup = 5
   	var traceConverge = false
   	var forceOnes = false

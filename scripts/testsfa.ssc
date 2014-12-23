@@ -22,10 +22,7 @@ saveSMat(dir+"newtest.smat.lz4", ta)
 (a0, ta0)
 }
 
-val offset = sum(sum(a))/a.nnz
-a.contents ~ a.contents - offset
-
-val d = 256
+val d = 512
 
 val fact = zeros(d, a.ncols);
 val (nn,opts) = SFA.learner(a,fact,d)
@@ -39,23 +36,29 @@ opts.batchSize = 2000
 opts.forceOnes = true
 
 // good values for netflix
-opts.lambdam = 10f
-opts.lambdau = 10f
-opts.uiter = 5
-opts.npasses = 8
+opts.lambdam = 5f
+opts.lambdau = 5f
+opts.uiter = 8
+opts.startup = 5
+opts.npasses = 5
 opts.batchSize = 1000
 opts.forceOnes = true
-opts.lrate = 0.1
+opts.lrate = 0.03
+opts.uconvg = 1e-3f
 //opts.traceConverge = true
 
 
 nn.train
+val model = nn.model.asInstanceOf[SFA]
 val mm = FMat(nn.modelmat)
+val avg = model.avgrating
 val tanz = ta > 0;
 val preds = DDS(mm, fact, tanz)
-preds.contents ~ preds.contents + offset
+preds.contents ~ preds.contents + avg
+min(preds.contents, 5f, preds.contents)
+max(preds.contents, 1f, preds.contents)
 val diff = DMat(preds.contents - ta.contents)
-val rmse = sqrt((diff ^* diff) / diff.length)
+val mse = ((diff ^* diff) / diff.length).dv
 
-println("rmse = %f" format rmse.v);
+println("mse = %f" format mse);
 :silent
