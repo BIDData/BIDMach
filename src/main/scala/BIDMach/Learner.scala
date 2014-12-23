@@ -49,7 +49,7 @@ case class Learner(
   def retrain() = {
     flip 
     var cacheState = Mat.useCache
-    Mat.useCache = true
+    Mat.useCache = opts.useCache
     var done = false
     var ipass = 0
     var here = 0L
@@ -126,7 +126,7 @@ case class Learner(
     flip 
     useGPU = model.useGPU
     var cacheState = Mat.useCache
-    Mat.useCache = true
+    Mat.useCache = opts.useCache
     var here = 0L
     var lasti = 0
     var bytes = 0L
@@ -223,7 +223,7 @@ case class ParLearnerx(
   def retrain() = {
 	  flip 
 	  var cacheState = Mat.useCache
-    Mat.useCache = true
+    Mat.useCache = opts.useCache
 	  val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
@@ -472,7 +472,7 @@ case class ParLearner(
     flip
     val mm0 = models(0).modelmats(0)
     var cacheState = Mat.useCache
-    Mat.useCache = true
+    Mat.useCache = opts.useCache
     cmats = new Array[Array[Mat]](opts.nthreads)
     for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
     val thisGPU = if (useGPU) getGPU else 0
@@ -666,6 +666,7 @@ object Learner {
   	var pstep = 0.01f
   	var resFile:String = null
   	var autoReset = true
+  	var useCache = true
   }
   
     

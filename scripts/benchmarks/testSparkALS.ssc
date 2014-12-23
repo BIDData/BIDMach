@@ -25,7 +25,7 @@ val t1 = currentTime
 // Build the recommendation model using ALS
 val rank = 200
 val numIterations = 5
-val model = ALS.train(training, rank, numIterations, 0.1)
+val model = ALS.train(training, rank, numIterations, 0.3)
 val t2 = currentTime
 // Evaluate the model on test data
 val usersProducts = test.map { case Rating(user, product, rate) =>

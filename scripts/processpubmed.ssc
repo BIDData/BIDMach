@@ -1,6 +1,8 @@
 
 
 val a=loadSMat("pubmed.smat.lz4");
+val d=loadSBMat("pubmed.term.sbmat.gz");
+val dc=CSMat(d);
 val sa = sum(a,2);
 val (vx,ix) = sortdown2(sa);
 val ip = invperm(ix);
@@ -13,5 +15,7 @@ for (i <- 0 until 10) {
     val aa = sparse(ip(ii), jj, vv, a.nrows, a0.ncols);
     aa.check
     saveSMat("pubmed_parts/part%02d.smat.lz4" format i, aa);    
+    print(".");
 }
-exit
+saveSBMat("pubmed.term.sbmat.lz4",SBMat(dc(ix)));
+sys.exit()

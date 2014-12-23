@@ -16,14 +16,15 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   var mzero:Mat = null
   var Minv:Mat = null
   var diagM:Mat = null
+  var nfeats:Int = 0
   
   override def init() = {
     mats = datasource.next
   	datasource.reset
-	  val m = size(mats(0), 1)
+	  nfeats = mats(0).nrows
     val d = opts.dim    
     modelmats = new Array[Mat](1)
-    mm = rand(d,m) - 0.5f
+    mm = rand(d,nfeats) - 0.5f
     diagM = mkdiag(ones(d,1)) 
     useGPU = opts.useGPU && Mat.hasCUDA > 0
 	  if (useGPU) {
@@ -52,16 +53,19 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  val r = if (ipass < opts.startup || putBack < 0) {
 	    // Setup CG on the first pass, or if no saved state
 	  	user.clear
-	  	b
+	  	b + 0
 	  } else {
-	    b - (user ∘ slu + mm * DDS(mm, user, sdata))  // r = b - Ax
+	    b - ((user ∘ slu) + mm * DDS(mm, user, sdata))  // r = b - Ax
 	  }
 	  val z = Minv * r
  	  val p = z + 0
 	  for (i <- 0 until opts.uiter) {
-	  	val Ap = (p ∘ slu) + mm * DDS(mm, p, sdata)
+	  	val Ap = (p ∘ slu) + mm * DDS(mm, p, sdata);
 //	  	CG.CGupdate(p, r, Ap, user, opts.ueps, opts.uconvg)
-	  	CG.PreCGupdate(p, r, z, Ap, user, Minv, opts.ueps, opts.uconvg)  // Should scale preconditioner by number of predictions per user
+	  	SFA.PreCGupdate(p, r, z, Ap, user, Minv, opts.ueps, opts.uconvg)  // Should scale preconditioner by number of predictions per user
+	  	if (opts.traceConverge) {
+	  		println("i=%d, r=%f" format (i, norm(r)));
+	  	}
 	  }
   }
   
@@ -91,7 +95,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   }
   
   override def updatePass(ipass:Int) = {
-    Minv <-- inv(0.01f*FMat(mm *^ mm) + opts.lambdau * diagM); 
+    Minv <-- inv(100f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
   def evalfun(sdata:Mat, user:Mat):FMat = {  
@@ -112,7 +116,9 @@ object SFA  {
   	var lambdau = 0.2f
   	var lambdam = 0.2f
   	var startup = 5
+  	var traceConverge = false
   	var forceOnes = false
+  	
   }  
   class Options extends Opts {} 
   
@@ -146,6 +152,23 @@ object SFA  {
         null,
         new ADAGrad(opts), opts)
     (nn, opts)
+  }
+    // Preconditioned CG update
+  def PreCGupdate(p:Mat, r:Mat, z:Mat, Ap:Mat, x:Mat, Minv:Mat, weps:Float, convgd:Float) = {
+  	val pAp = (p dot Ap)
+  	max(pAp, weps, pAp)
+  	val rsold = (r dot z) 
+  	val convec = rsold > convgd              // Check convergence
+  	val alpha = convec ∘ (rsold / pAp)      // Only process unconverged elements
+  	min(alpha, 10f, alpha)
+  	x ~ x + (p ∘ alpha)
+  	r ~ r - (Ap ∘ alpha)
+  	z ~ Minv * r
+  	val rsnew = (z dot r)                    // order is important to avoid aliasing
+  	max(rsold, weps, rsold)
+  	val beta = convec ∘ (rsnew / rsold)
+  	min(beta, 10f, beta)
+  	p ~ z + (p ∘ beta)
   }
 }
 
