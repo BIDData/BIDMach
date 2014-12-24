@@ -84,12 +84,22 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     // values to be accumulated
     if (opts.forceOnes) user(0,?) = 1f;
     val slm = opts.lambdam
-    updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+    if (opts.weightByUser) {
+      val cvals = sdata.contents.copy;
+      sdata.contents.set(1);
+      val iwt = 100f / max(sum(sdata), 100f); 
+      sdata.contents <-- cvals;
+      val suser = user ∘ iwt;
+      updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+    } else {
+    	updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+    }
+
   }
     
   def mupdate0(sdata:Mat, user:Mat, ipass:Int):Unit = {
     // values to be accumulated
-    val slm = sum((sdata>mzero), 2).t * opts.lambdam
+    val slm = sum((sdata != mzero), 2).t * opts.lambdam
     val rm = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))          // accumulate res = (b - Ax)
     pm <-- rm
     if (ipass < 2) {
@@ -126,13 +136,14 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 object SFA  {
   trait Opts extends FactorModel.Opts {
   	var ueps = 1e-10f
-  	var uconvg = 1e-2f
-  	var miter = 4
+  	var uconvg = 1e-3f
+  	var miter = 8
   	var lambdau = 5f
   	var lambdam = 5f
   	var startup = 5
   	var traceConverge = false
   	var forceOnes = false
+  	var weightByUser = false
   	
   }  
   class Options extends Opts {} 
@@ -174,7 +185,7 @@ object SFA  {
   	max(pAp, weps, pAp)
   	val rsold = (r dot z) 
   	val convec = rsold > convgd              // Check convergence
-  	val alpha = convec ∘ (rsold / pAp)      // Only process unconverged elements
+  	val alpha = convec ∘ (rsold / pAp)       // Only process unconverged elements
   	min(alpha, 10f, alpha)
   	x ~ x + (p ∘ alpha)
   	r ~ r - (Ap ∘ alpha)

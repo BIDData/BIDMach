@@ -39,12 +39,12 @@ opts.forceOnes = true
 opts.lambdam = 5f
 opts.lambdau = 5f
 opts.uiter = 8
-opts.startup = 5
 opts.npasses = 5
 opts.batchSize = 1000
 opts.forceOnes = true
 opts.lrate = 0.03
 opts.uconvg = 1e-3f
+//opts.weightByUser = true
 //opts.traceConverge = true
 
 

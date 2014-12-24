@@ -2,15 +2,18 @@
 cd /opt/spark/ec2
 
 # launch a cluster
-./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa -s 2 --instance-type=m3.xlarge --region=us-west-1 launch sparkcluster
+./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa -s 2 --instance-type=m3.2xlarge --region=us-west-2 launch sparkcluster
 
 # ganglia patch
 
-MASTER=`./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa --region=us-west-1 get-master sparkcluster | tail -n 1`
+MASTER=`./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa --region=us-west-2 get-master sparkcluster | tail -n 1`
 scp -i ~/.ssh/jfc_rsa ~/httpd.conf ec2-user@${MASTER}:httpd.conf
 
 # login to the master
-./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa --region=us-west-1 login sparkcluster
+./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa --region=us-west-2 login sparkcluster
+
+export AWS_ACCESS_KEY_ID=
+export AWS_SECRET_ACCESS_KEY=
 
 rm -r /var/lib/ganglia/rrds
 ln -s /mnt/ganglia/rrds /var/lib/ganglia/rrds
@@ -22,6 +25,8 @@ apachectl -k graceful
 
 spark/bin/spark-shell
 
-./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa --region=us-west-1 destroy sparkcluster
+exit
+
+./spark-ec2 -k "pils_rsa" -i /home/ec2-user/.ssh/jfc_rsa --region=us-west-2 destroy sparkcluster
 
 

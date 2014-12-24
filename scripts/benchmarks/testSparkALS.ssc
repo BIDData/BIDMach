@@ -4,9 +4,9 @@ import org.apache.spark.mllib.recommendation.Rating
 
 import scala.compat.Platform._
 
-val nnodes = 32;
+val nnodes = 2;
 val t0 = currentTime
-val data = sc.textFile("s3n://bidmach/netflix_mm.train", nnodes * 4)
+val data = sc.textFile("s3n://bidmach/netflix_mm.train", nnodes * 8)
 //val ratings = data.map(_.split("::") match { case Array(user, item, rate, timestamp) =>
 //    Rating(user.toInt, item.toInt, rate.toDouble)
 val ratings = data.map(_.split("\t") match { case Array(user, item, rate) =>
@@ -14,7 +14,7 @@ val ratings = data.map(_.split("\t") match { case Array(user, item, rate) =>
   })
 
 // Do a test-train split
-val splits = ratings.randomSplit(Array(0.8, 0.2))
+val splits = ratings.randomSplit(Array(0.9, 0.1))
 val training = splits(0)
 val test = splits(1)
 
@@ -23,9 +23,9 @@ val t1 = currentTime
 
 
 // Build the recommendation model using ALS
-val rank = 200
+val rank = 100
 val numIterations = 5
-val model = ALS.train(training, rank, numIterations, 0.3)
+val model = ALS.train(training, rank, numIterations, 0.01)
 val t2 = currentTime
 // Evaluate the model on test data
 val usersProducts = test.map { case Rating(user, product, rate) =>
@@ -34,7 +34,7 @@ val usersProducts = test.map { case Rating(user, product, rate) =>
 
 val predictions = 
   model.predict(usersProducts).map { case Rating(user, product, rate) => 
-    ((user, product), rate)
+    ((user, product), math.min(5.0, math.max(1.0, rate)))
   }
 
 val ratesAndPreds = test.map { case Rating(user, product, rate) => 
