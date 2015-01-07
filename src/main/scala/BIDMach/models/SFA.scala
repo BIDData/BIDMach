@@ -16,8 +16,12 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   var mzero:Mat = null
   var Minv:Mat = null
   var diagM:Mat = null
+  var scalem:Mat = null
   var avgrating:Float = 0
   var avgmat:Mat = null
+  var itemcounts:Mat = null
+  var icm:Mat = null
+  var mscale:Mat = null
   var nfeats:Int = 0
   var totratings:Double = 0
   var nratings:Double = 0
@@ -31,13 +35,20 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     mm = rand(d,nfeats) - 0.5f
     diagM = mkdiag(ones(d,1)) 
     useGPU = opts.useGPU && Mat.hasCUDA > 0
+    mscale = 0.9 ^ icol(0 until d)
+    
 	  if (useGPU) {
 	    gmats = new Array[Mat](mats.length)
 	    mm = GMat(mm)
 	    Minv = GMat(diagM)
+	    scalem = gzeros(d, d)
+	    itemcounts = gzeros(nfeats,1)
+	    mscale = GMat(mscale)
 	  } else {
 	    gmats = mats
 	    Minv = diagM + 0
+	    scalem = zeros(d, d)
+	    itemcounts = zeros(nfeats,1)
 	  }     
     mzero = mm.zeros(1,1)
     avgmat = mm.zeros(1,1)
@@ -83,18 +94,37 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     // values to be accumulated
     if (opts.forceOnes) user(0,?) = 1f;
-    val slm = opts.lambdam
+    val slm = opts.lambdam;
+ //   val nratings = sum(sdata != 0);
+//    user ~ user ∘ (nratings > 20f)
     if (opts.weightByUser) {
-      val cvals = sdata.contents.copy;
-      sdata.contents.set(1);
-      val iwt = 100f / max(sum(sdata), 100f); 
-      sdata.contents <-- cvals;
+      val iwt = 100f / max(sum(sdata != 0), 100f); 
       val suser = user ∘ iwt;
       updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
     } else {
     	updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
     }
+  }
+  
 
+  def mupdate1(sdata:Mat, user:Mat, ipass:Int):Unit = {
+  	val regularizer = if (opts.forceOnes) {
+  	  user(0,?) = 1f;
+  	  val mmc = mm.copy;
+  	  mmc(1,?) = 0f;
+  	  mscale ∘ mmc - sum(mmc);
+  	} else {
+  	  mscale ∘ mm - sum(mm);
+  	}
+//	  updatemats(0) = user *^ sdata - user *^ DDS(mm, user, sdata) + regularizer ∘ opts.lambdam;
+	  updatemats(0) = user *^ sdata - ((mm ∘ opts.lambdam) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+	  
+	  // scale model to orthonormal rows
+//    val prod = FMat(mm *^ mm);
+//    val ch = triinv(chol(prod));
+//    scalem <-- ch;
+//    val mtmp = scalem ^* mm;
+//    mm <-- mtmp;
   }
     
   def mupdate0(sdata:Mat, user:Mat, ipass:Int):Unit = {
@@ -119,6 +149,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     if (ipass == 0) {
       avgrating = (totratings / nratings).toFloat;
       avgmat.set(avgrating);
+      icm = maxi(itemcounts) / (itemcounts.t + 100f);
     }
     Minv <-- inv(50f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }

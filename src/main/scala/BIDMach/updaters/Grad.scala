@@ -8,25 +8,25 @@ import BIDMach.models._
 class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   
   var firstStep = 0f
-  var modelmat:Mat = null
-  var updatemat:Mat = null  
+ 
+  var modelmats:Array[Mat] = null
+  var updatemats:Array[Mat] = null
   var sumSq:Mat = null 
   var stepn:Mat = null
   var mask:Mat = null
   var ve:Mat = null
 	var te:Mat = null
-	var alpha:Mat = null
+	var lrate:Mat = null
 
   override def init(model0:Model) = {
     model = model0
-	  modelmat = model.modelmats(0)
-	  updatemat = model.updatemats(0) 
+	  modelmats = model.modelmats
+	  updatemats = model.updatemats 
 	  mask = opts.mask
-    stepn = modelmat.zeros(1,1)
-    te = modelmat.zeros(opts.texp.nrows, opts.texp.ncols)
-    alpha = modelmat.zeros(opts.lrate.nrows, opts.lrate.ncols)
+    stepn = modelmats(0).zeros(1,1)
+    te = modelmats(0).zeros(opts.texp.nrows, opts.texp.ncols)
+    lrate = modelmats(0).zeros(opts.lrate.nrows, 1)
     te <-- opts.texp
-    alpha <-- opts.lrate
   } 
   
 	def update(ipass:Int, step:Long):Unit = {
@@ -38,11 +38,20 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   	    step / firstStep
   	  }
   	}
-	  stepn.set(1f/nsteps)
-	  if (opts.waitsteps < nsteps) {
-	  	val tmp = updatemat *@ (alpha *@ (stepn ^ te))
- 	  	modelmat ~ modelmat + tmp
-	  	if (mask != null) modelmat ~ modelmat *@ mask
+	  stepn.set(1f/nsteps);
+	  val nmats = modelmats.length;
+	  //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
+	  for (i <- 0 until nmats) {
+	  	if (opts.lrate.ncols > 1) {
+	  		lrate <-- opts.lrate(?,i);
+	  	} else {
+	  		lrate <-- opts.lrate;
+	  	}
+	  	if (opts.waitsteps < nsteps) {
+	  		val tmp = updatemats(i) *@ (lrate *@ (stepn ^ te));
+	  		modelmats(i) ~ modelmats(i) + tmp;
+	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
+	  	}
 	  }
 	}
 }

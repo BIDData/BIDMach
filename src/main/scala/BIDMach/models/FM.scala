@@ -201,6 +201,11 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     val vt1 = mm1 * in
     val vt2 = mm2 * in
     val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
+    if (opts.strictFM) {
+      in.contents ~ in.contents ∘ in.contents;
+      eta ~ eta - ((mm1 ∘ mm1) * in);
+      eta ~ eta + ((mm2 ∘ mm2) * in);
+    }
     if (opts.lim > 0) {
       max(eta, - opts.lim, eta)
       min(eta, opts.lim, eta)
