@@ -22,7 +22,7 @@ saveSMat(dir+"newtest.smat.lz4", ta)
 (a0, ta0)
 }
 
-val d = 512
+val d = 128
 
 val fact = zeros(d, a.ncols);
 val (nn,opts) = SFA.learner(a,fact,d)
@@ -33,22 +33,24 @@ opts.lambdau = 5f
 opts.uiter = 8
 opts.npasses = 5
 opts.batchSize = 2000
-opts.forceOnes = true
 
 // good values for netflix
-opts.lambdam = 25f //0.1f // 50f
-opts.lambdau = 1f //30f // 
+opts.batchSize = 1000 
+opts.lambdau = 1f;
+opts.regumean = 0.1f;
+opts.lambdam = 0.025f;
+opts.regmmean = 0.000f;
 opts.uiter = 8
 opts.startup = 10
 opts.npasses = 5
-opts.batchSize = 1000 // 3000
 opts.evalStep = 101
-opts.forceOnes = true
-opts.lrate = 0.05
+opts.doUsers = true
+opts.lrate = 0.03
 opts.uconvg = 1e-3f
 //opts.weightByUser = true
 //opts.traceConverge = true
-//opts.autoReset = false
+opts.autoReset = false
+//opts.useDouble = true
 
 
 nn.train

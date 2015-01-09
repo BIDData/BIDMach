@@ -1,5 +1,5 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GIMat,GSMat,HMat,IMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -18,6 +18,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var useGPU = false
   
+  var useDouble = false
+  
   var putBack = -1
   
   var refresh = true
@@ -31,16 +33,17 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   }
   
   def bind(ds:DataSource):Unit = {
-	datasource = ds;
-	mats = datasource.next;
-	datasource.reset;
-	putBack = datasource.opts.putBack;
-	useGPU = opts.useGPU && Mat.hasCUDA > 0;
-	if (useGPU) {
-		gmats = new Array[Mat](mats.length);
-	} else {
-		gmats = mats;
-	}
+	  datasource = ds;
+	  mats = datasource.next;
+	  datasource.reset;
+	  putBack = datasource.opts.putBack;
+	  useGPU = opts.useGPU && Mat.hasCUDA > 0;
+	  useDouble = opts.useDouble;
+	  if (useGPU || useDouble) {
+	  	gmats = new Array[Mat](mats.length);
+	  } else {
+	  	gmats = mats;
+	  }
   }
   
   def init():Unit
@@ -52,7 +55,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   def doblockg(amats:Array[Mat], ipass:Int, here:Long) = {
     if (useGPU) copyMats(amats, gmats)            		
     doblock(gmats, ipass, here)
-    if (useGPU && putBack >= 0) {
+    if ((useGPU || useDouble) && putBack >= 0) {
     	for (i <- 1 to putBack) {
     		amats(i) <-- gmats(i)
     	}
@@ -62,7 +65,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   def evalblockg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (useGPU) copyMats(amats, gmats)
     val v = evalblock(gmats, ipass, here)
-    if (useGPU && putBack >= 0) {
+    if ((useGPU || useDouble) && putBack >= 0) {
       for (i <- 1 to putBack) {
         amats(i) <-- gmats(i)
       }
@@ -73,10 +76,24 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
     for (i <- 0 until from.length) {
       if (useGPU) {
-        to(i) = from(i) match {
-        case aa:FMat => GMat(aa)
-        case aa:SMat => GSMat(aa)
+        if (useDouble) {
+         	to(i) = from(i) match {
+        	case aa:FMat => GDMat(aa)
+        	case aa:SMat => GSDMat(aa)
+        	}         
+        } else {
+        	to(i) = from(i) match {
+        	case aa:FMat => GMat(aa)
+        	case aa:SMat => GSMat(aa)
+        	}
         }
+      } else {
+      	if (useDouble) {
+         	to(i) = from(i) match {
+        	case aa:FMat => DMat(aa)
+        	case aa:SMat => SDMat(aa)
+        	}
+      	}
       }
     }
   }
@@ -91,6 +108,7 @@ object Model {
 	  var nzPerColumn:Int = 0
 	  var startBlock = 8000
 	  var useGPU = true
+	  var useDouble = false
 	  var doubleScore = false
 	  var dim = 256
   }
