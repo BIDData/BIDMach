@@ -19,6 +19,8 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   var scalem:Mat = null
   var avgrating:Float = 0
   var avgmat:Mat = null
+  var itemsum:Mat = null
+  var iavg:Mat = null
   var itemcounts:Mat = null
   var icm:Mat = null
   var mscale:Mat = null
@@ -43,17 +45,21 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	    Minv = GMat(diagM)
 	    scalem = gzeros(d, d)
 	    itemcounts = gzeros(nfeats,1)
+	    itemsum = gzeros(nfeats,1)
+	    iavg = gzeros(nfeats,1)
 	    mscale = GMat(mscale)
 	  } else {
 	    gmats = mats
 	    Minv = diagM + 0
 	    scalem = zeros(d, d)
 	    itemcounts = zeros(nfeats,1)
+	    itemsum = zeros(nfeats,1)
+	    iavg = zeros(nfeats,1)
 	  }     
     mzero = mm.zeros(1,1)
     avgmat = mm.zeros(1,1)
-    modelmats = Array(mm)
-    if (opts.forceOnes) mm(1,?) = 1f
+    modelmats = Array(mm, iavg)
+    if (opts.forceOnes) mm(0,?) = 1f
     updatemats = new Array[Mat](2)
   }
   
@@ -61,15 +67,10 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     pm = pm0
   }
  
-  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit =  {
+  def uupdate(sdata0:Mat, user:Mat, ipass:Int):Unit =  {
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
-    if (opts.forceOnes) mm(1,?) = 1f;
-    if (ipass == 0) {
-	    totratings += sum(sdata.contents).dv;
-	    nratings += sdata.nnz
-	  } else {
-	    sdata.contents ~ sdata.contents - avgmat;
-	  }
+    if (opts.forceOnes) mm(0,?) = 1f; 
+    val sdata = sdata0 - iavg;
 	  val slu = opts.lambdau
 	  val b = mm * sdata
 	  val r = if (ipass < opts.startup || putBack < 0) {
@@ -83,7 +84,6 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
  	  val p = z + 0
 	  for (i <- 0 until opts.uiter) {
 	  	val Ap = (p ∘ slu) + mm * DDS(mm, p, sdata);
-//	  	CG.CGupdate(p, r, Ap, user, opts.ueps, opts.uconvg)
 	  	SFA.PreCGupdate(p, r, z, Ap, user, Minv, opts.ueps, opts.uconvg)  // Should scale preconditioner by number of predictions per user
 	  	if (opts.traceConverge) {
 	  		println("i=%d, r=%f" format (i, norm(r)));
@@ -91,19 +91,19 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  }
   }
   
-  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+  def mupdate(sdata0:Mat, user:Mat, ipass:Int):Unit = {
+    val sdata = sdata0 - iavg;
     // values to be accumulated
-    if (opts.forceOnes) user(0,?) = 1f;
     val slm = opts.lambdam;
- //   val nratings = sum(sdata != 0);
-//    user ~ user ∘ (nratings > 20f)
+    val ddsmu = DDS(mm, user, sdata);
     if (opts.weightByUser) {
       val iwt = 100f / max(sum(sdata != 0), 100f); 
       val suser = user ∘ iwt;
-      updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+      updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ ddsmu);   // simple derivative for ADAGRAD
     } else {
-    	updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+    	updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ ddsmu);     // simple derivative for ADAGRAD
     }
+    updatemats(1) = sum(sdata, 2) - sum(ddsmu, 2);                      // per-item term estimator
   }
   
 
@@ -118,13 +118,6 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   	}
 //	  updatemats(0) = user *^ sdata - user *^ DDS(mm, user, sdata) + regularizer ∘ opts.lambdam;
 	  updatemats(0) = user *^ sdata - ((mm ∘ opts.lambdam) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
-	  
-	  // scale model to orthonormal rows
-//    val prod = FMat(mm *^ mm);
-//    val ch = triinv(chol(prod));
-//    scalem <-- ch;
-//    val mtmp = scalem ^* mm;
-//    mm <-- mtmp;
   }
     
   def mupdate0(sdata:Mat, user:Mat, ipass:Int):Unit = {
@@ -147,20 +140,20 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   
   override def updatePass(ipass:Int) = {
     if (ipass == 0) {
-      avgrating = (totratings / nratings).toFloat;
-      avgmat.set(avgrating);
+      avgmat = sum(itemsum)/sum(itemcounts);
+//      iavg ~ (itemsum + avgmat * 5) / (itemcounts + 5);
       icm = maxi(itemcounts) / (itemcounts.t + 100f);
     }
     Minv <-- inv(50f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
-  def evalfun(sdata:Mat, user:Mat):FMat = {  
-  	val preds = DDS(mm, user, sdata)
+  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {  
+  	val preds = DDS(mm, user, sdata) + iavg
   	val dc = sdata.contents
   	val pc = preds.contents
   	val vv = (dc - pc) ddot (dc - pc)
 //  	println("pc: " + pc)
-  	row(vv/sdata.nnz)
+  	-sqrt(row(vv/sdata.nnz))
   }
 }
 

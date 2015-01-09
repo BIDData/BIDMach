@@ -88,16 +88,16 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   	sum(ud, 2, updatemats(1))
   }
   
-  def evalfun(sdata:Mat, user:Mat):FMat = {  
-  	val preds = DDS(mm, user, sdata)
-  	val dc = sdata.contents
-  	val pc = preds.contents
-  	max(opts.weps, pc, pc)
-  	ln(pc, pc)
-  	val sdat = sum(sdata,1)
-  	val mms = sum(mm,2)
-  	val suu = ln(mms ^* user)
- 	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
+  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {  
+  	val preds = DDS(mm, user, sdata);
+  	val dc = sdata.contents;
+  	val pc = preds.contents;
+  	max(opts.weps, pc, pc);
+  	ln(pc, pc);
+  	val sdat = sum(sdata,1);
+  	val mms = sum(mm,2);
+  	val suu = ln(mms ^* user);
+  	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv;
   	row(vv, math.exp(-vv))
   }
 }

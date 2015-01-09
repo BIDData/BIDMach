@@ -88,7 +88,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
     updatemats(1) ~ uu * mm
   }
   
-  override def evalfun(sdata:Mat, user:Mat):FMat = {
+  override def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {
     if (opts.doubleScore) {
       evalfunx(sdata, user)
     } else {
