@@ -90,7 +90,7 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   	sum(um, 2, updatemats(1))
   }
   
-  def evalfun(sdata:Mat, user:Mat):FMat = {  
+  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {  
   	val preds = DDS(mm, user, sdata)
   	val dc = sdata.contents
   	val pc = preds.contents

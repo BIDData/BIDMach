@@ -19,11 +19,11 @@ val training = splits(0)
 val test = splits(1)
 
 val cc = training.cache.count  // force the parse to execute, result in memory
-val t1 = currentTime
 
 
 // Build the recommendation model using ALS
-val rank = 200
+val rank = 500
+val t1 = currentTime
 val numIterations = 5
 val model = ALS.train(training, rank, numIterations, 0.05)
 val t2 = currentTime

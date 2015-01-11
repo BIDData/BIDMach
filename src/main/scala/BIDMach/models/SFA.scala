@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
@@ -10,50 +10,56 @@ import BIDMach.Learner
 
 class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts) {
 
-  var mm:Mat = null
-  var traceMem = false
-  var pm:Mat = null
-  var mzero:Mat = null
-  var Minv:Mat = null
-  var diagM:Mat = null
-  var scalem:Mat = null
-  var avgrating:Float = 0
-  var avgmat:Mat = null
-  var itemcounts:Mat = null
-  var icm:Mat = null
-  var mscale:Mat = null
-  var nfeats:Int = 0
-  var totratings:Double = 0
-  var nratings:Double = 0
+  var mm:Mat = null;
+  var traceMem = false;
+  var pm:Mat = null;
+  var mzero:Mat = null;
+  var Minv:Mat = null;
+  var diagM:Mat = null;
+  var slm:Mat = null; 
+  var mlm:Mat = null; 
+  var iavg:Mat = null;
+  var avg:Mat = null;
+  var lamu:Mat = null;
+  var itemsum:Mat = null;
+  var itemcount:Mat = null;
+  var nfeats:Int = 0;
+  var totratings:Double = 0;
+  var nratings:Double = 0;
 
   
   override def init() = {
-    mats = datasource.next
-  	datasource.reset
-	  nfeats = mats(0).nrows
-    val d = opts.dim    
-    mm = rand(d,nfeats) - 0.5f
+    mats = datasource.next;
+  	datasource.reset;
+	  nfeats = mats(0).nrows;
+	  val batchSize = mats(0).ncols;
+    val d = opts.dim;
+    mm = normrnd(0,0.01f,d,nfeats);
     diagM = mkdiag(ones(d,1)) 
-    useGPU = opts.useGPU && Mat.hasCUDA > 0
-    mscale = 0.9 ^ icol(0 until d)
+    useGPU = opts.useGPU && Mat.hasCUDA > 0;
     
-	  if (useGPU) {
-	    gmats = new Array[Mat](mats.length)
-	    mm = GMat(mm)
-	    Minv = GMat(diagM)
-	    scalem = gzeros(d, d)
-	    itemcounts = gzeros(nfeats,1)
-	    mscale = GMat(mscale)
+	  if (useGPU || useDouble) {
+	    gmats = new Array[Mat](mats.length);
 	  } else {
-	    gmats = mats
-	    Minv = diagM + 0
-	    scalem = zeros(d, d)
-	    itemcounts = zeros(nfeats,1)
-	  }     
+	    gmats = mats;
+	  }  
+	  if (useGPU) {
+	    if (useDouble) mm = GDMat(mm) else mm = GMat(mm);
+	  } else {
+	    if (useDouble) mm = DMat(mm);
+	  }
+	  Minv = mm.zeros(d, d);
+	  Minv <-- diagM;
+    lamu = mm.ones(d, 1) ∘ opts.lambdau 
+    if (opts.doUsers) lamu(0) = opts.regumean;
+    slm = mm.ones(1,1) ∘ (opts.lambdam * batchSize);
+    mlm = mm.ones(1,1) ∘ (opts.regmmean * batchSize);
+	  iavg = mm.zeros(nfeats,1);
+	  itemsum = mm.zeros(nfeats, 1);
+	  itemcount = mm.zeros(nfeats, 1);
     mzero = mm.zeros(1,1)
-    avgmat = mm.zeros(1,1)
-    modelmats = Array(mm)
-    if (opts.forceOnes) mm(1,?) = 1f
+    modelmats = Array(mm, iavg)
+    if (opts.doUsers) mm(0,?) = 1f
     updatemats = new Array[Mat](2)
   }
   
@@ -61,29 +67,22 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     pm = pm0
   }
  
-  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit =  {
+  def uupdate(sdata0:Mat, user:Mat, ipass:Int):Unit =  {
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
-    if (opts.forceOnes) mm(1,?) = 1f;
-    if (ipass == 0) {
-	    totratings += sum(sdata.contents).dv;
-	    nratings += sdata.nnz
-	  } else {
-	    sdata.contents ~ sdata.contents - avgmat;
-	  }
-	  val slu = opts.lambdau
+    if (opts.doUsers) mm(0,?) = 1f; 
+    val sdata = sdata0 - iavg;
 	  val b = mm * sdata
 	  val r = if (ipass < opts.startup || putBack < 0) {
 	    // Setup CG on the first pass, or if no saved state
 	  	user.clear
 	  	b + 0
 	  } else {
-	    b - ((user ∘ slu) + mm * DDS(mm, user, sdata))  // r = b - Ax
+	    b - ((user ∘ lamu) + mm * DDS(mm, user, sdata))  // r = b - Ax
 	  }
 	  val z = Minv * r
  	  val p = z + 0
 	  for (i <- 0 until opts.uiter) {
-	  	val Ap = (p ∘ slu) + mm * DDS(mm, p, sdata);
-//	  	CG.CGupdate(p, r, Ap, user, opts.ueps, opts.uconvg)
+	  	val Ap = (p ∘ lamu) + mm * DDS(mm, p, sdata);
 	  	SFA.PreCGupdate(p, r, z, Ap, user, Minv, opts.ueps, opts.uconvg)  // Should scale preconditioner by number of predictions per user
 	  	if (opts.traceConverge) {
 	  		println("i=%d, r=%f" format (i, norm(r)));
@@ -91,41 +90,26 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  }
   }
   
-  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+  def mupdate(sdata0:Mat, user:Mat, ipass:Int):Unit = {
+    val sdata = sdata0 - iavg;
     // values to be accumulated
-    if (opts.forceOnes) user(0,?) = 1f;
-    val slm = opts.lambdam;
- //   val nratings = sum(sdata != 0);
-//    user ~ user ∘ (nratings > 20f)
+    val ddsmu = DDS(mm, user, sdata);
     if (opts.weightByUser) {
       val iwt = 100f / max(sum(sdata != 0f), 100f); 
       val suser = user ∘ iwt;
-      updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+      updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ ddsmu);   // simple derivative for ADAGRAD
     } else {
-    	updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
+    	updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ ddsmu);     // simple derivative for ADAGRAD
     }
+    if (ipass == 0) {
+    	itemsum ~ itemsum + sum(sdata0, 2);
+    	itemcount ~ itemcount + sum(sdata0 != 0, 2);
+    	avg = sum(itemsum) / sum(itemcount);
+    	iavg ~ (itemsum + avg) / (itemcount + 1);
+    }
+    updatemats(1) = sum(sdata, 2) - sum(ddsmu, 2) - (iavg - avg)*mlm;   // per-item term estimator
   }
   
-
-  def mupdate1(sdata:Mat, user:Mat, ipass:Int):Unit = {
-  	val regularizer = if (opts.forceOnes) {
-  	  user(0,?) = 1f;
-  	  val mmc = mm.copy;
-  	  mmc(1,?) = 0f;
-  	  mscale ∘ mmc - sum(mmc);
-  	} else {
-  	  mscale ∘ mm - sum(mm);
-  	}
-//	  updatemats(0) = user *^ sdata - user *^ DDS(mm, user, sdata) + regularizer ∘ opts.lambdam;
-	  updatemats(0) = user *^ sdata - ((mm ∘ opts.lambdam) + user *^ DDS(mm, user, sdata))   // simple derivative for ADAGRAD
-	  
-	  // scale model to orthonormal rows
-//    val prod = FMat(mm *^ mm);
-//    val ch = triinv(chol(prod));
-//    scalem <-- ch;
-//    val mtmp = scalem ^* mm;
-//    mm <-- mtmp;
-  }
     
   def mupdate0(sdata:Mat, user:Mat, ipass:Int):Unit = {
     // values to be accumulated
@@ -146,21 +130,16 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   }
   
   override def updatePass(ipass:Int) = {
-    if (ipass == 0) {
-      avgrating = (totratings / nratings).toFloat;
-      avgmat.set(avgrating);
-      icm = maxi(itemcounts) / (itemcounts.t + 100f);
-    }
     Minv <-- inv(50f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
-  def evalfun(sdata:Mat, user:Mat):FMat = {  
-  	val preds = DDS(mm, user, sdata)
+  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {  
+  	val preds = DDS(mm, user, sdata) + iavg
   	val dc = sdata.contents
   	val pc = preds.contents
   	val vv = (dc - pc) ddot (dc - pc)
 //  	println("pc: " + pc)
-  	row(vv/sdata.nnz)
+  	-sqrt(row(vv/sdata.nnz))
   }
 }
 
@@ -171,9 +150,11 @@ object SFA  {
   	var miter = 8
   	var lambdau = 5f
   	var lambdam = 5f
+  	var regumean = 0f
+  	var regmmean = 0f
   	var startup = 5
   	var traceConverge = false
-  	var forceOnes = false
+  	var doUsers = true
   	var weightByUser = false
   	
   }  

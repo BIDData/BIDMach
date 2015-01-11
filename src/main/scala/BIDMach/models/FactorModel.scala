@@ -41,7 +41,7 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
   
   def mupdate2(data:Mat, user:Mat, ipass:Int) = {}
   
-  def evalfun(data:Mat, user:Mat):FMat
+  def evalfun(data:Mat, user:Mat, ipass:Int):FMat
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
     val sdata = gmats(0)
@@ -54,7 +54,7 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, 1f)
     uupdate(sdata, user, ipass)
-    evalfun(sdata, user)
+    evalfun(sdata, user, ipass)
   } 
 }
 

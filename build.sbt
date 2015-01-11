@@ -1,7 +1,7 @@
 
 name := "BIDMach"
 
-version := "0.9.6"
+version := "0.9.8"
 
 organization := "edu.berkeley.bid"
 
@@ -17,6 +17,8 @@ libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
 }
 
 libraryDependencies += "org.scala-lang" % "jline" % "2.10.3"
+
+libraryDependencies += "net.jpountz.lz4" % "lz4" % "1.3"
 
 //libraryDependencies += "org.scalatest" %% "scalatest" % "2.0" % "test"
 
