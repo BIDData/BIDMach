@@ -8,7 +8,7 @@ else
   while [ -L "${BIDMACH_SCRIPTS}" ]; do
     BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
   done
-  alias wget='curl --retry 20 -O'
+  export WGET='curl --retry 20 -O'
 fi
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 cd ${BIDMACH_SCRIPTS}
@@ -23,12 +23,23 @@ mkdir -p ${MNIST8M}/parts
 cd ${MNIST8M}
 
 if [ ! -e mnist8m.bz2 ]; then
-    wget http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist8m.bz2
+    ${WGET} http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist8m.bz2
 fi
 
 bunzip2 -c mnist8m.bz2 > mnist8m.libsvm
 
-split -l 100000 -d mnist8m.libsvm parts/part
+if [ ! `uname` = "Darwin" ]; then
+    split -l 100000 -d mnist8m.libsvm parts/part
+else
+    split -l 100000 mnist8m.libsvm parts/part
+    j=0
+    for i in {a..z}{a..z}; do
+	jj=`printf "%02d" $j`
+	mv parts/part$i parts/part$jj
+	j=$((j+1))
+	if [ $j -gt 80 ]; then break; fi
+    done
+fi
 
 cd ${MNIST8M}/parts
 ../../../bidmach '../../../scripts/processmnist8m.ssc'

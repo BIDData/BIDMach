@@ -43,6 +43,7 @@ nn2.predict
 val rr2 = roc(p6,tc6,1-tc6,100)
 println("ROC AUC cat6 %5.4f" format mean(rr2).dv)
 
+if (useGPU) resetGPU
 
 if (doTwitter) {
 println("\n<<<<<<< Testing parallel LDA on Twitter >>>>>>>")
@@ -52,7 +53,7 @@ opts4.npasses=2
 mm4.train
 } else if (Mat.hasCUDA > 0) {
 println("\n<<<<<<< Testing LDA on RCV1 >>>>>>>")
-val (mm4,opts4) = LDA.learner(a, 253)
+val (mm4,opts4) = LDA.learner(a, 128)
 opts4.useGPU=useGPU
 opts4.npasses=2
 mm4.train
@@ -64,7 +65,7 @@ val ta5=loadSMat(dir+"/data/movielens/test.smat.lz4")
 
 val d = 128
 
-val fact5 = zeros(d, a5.ncols);
+val fact5 = zeros(d, ta5.ncols);
 val (mm5,opts5) = SFA.learner(a5,fact5,d)
 
 opts5.useGPU = useGPU
@@ -73,7 +74,7 @@ opts5.lambdau = 1f
 opts5.regumean = 0.1f;
 opts5.uiter = 8
 opts5.npasses=5
-opts5.batchSize = 2000
+opts5.batchSize = 1000
 
 mm5.train
 val mod5 = FMat(mm5.modelmat)
@@ -86,7 +87,7 @@ println("RMSE = %f" format rmse.v);
 if ((new java.io.File("../data/uci/pubmed_parts/part00.smat.lz4")).exists) {
 println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed >>>>>>>")
 
-val (mm6,opts6) = LDA.learner(List((n:Int)=> ("../data/uci/pubmed_parts/part%02d.smat.lz4" format n)), 256)
+val (mm6,opts6) = LDA.learner(List((n:Int)=> ("../data/uci/pubmed_parts/part%02d.smat.lz4" format n)), 128)
 opts6.npasses=2
 opts6.useGPU=useGPU
 mm6.train
@@ -110,7 +111,7 @@ opts8.npasses=2
 mm8.train
 } else {
 println("\n<<<<<<< Testing NMF on RCV1 >>>>>>>")
-val (mm8,opts8) = NMF.learner(a, 256)
+val (mm8,opts8) = NMF.learner(a, 128)
 opts8.useGPU=useGPU
 opts8.npasses=2
 mm8.train

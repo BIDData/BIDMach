@@ -36,12 +36,11 @@ gunzip -c "docword.txt.gz" | tail -n +4 > "docword.txt"
 ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "docword.txt" -f "${UCI}/../../uci_fmt.txt" -o "" -m "" -d " " -c
 ${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "vocab.txt" -f "${UCI}/../../uci_wfmt.txt" -o "" -m "" -c
 cd ${BIDMACH_SCRIPTS}/..
-#${BIDMACH_SCRIPTS}/../bidmach "-e" "BIDMach.Experiments.NYTIMES.preprocess(\"${UCI}/\",\"${1}.\")" 
 cd ${UCI}
 ${BIDMACH_SCRIPTS}/../bidmach ${BIDMACH_SCRIPTS}/getuci.ssc
 mv "smat.lz4" "../${1}.smat.lz4"
-mv "term.sbmat.gz" "../${1}.term.sbmat.lz4"
-mv "term.imat.gz" "../${1}.term.imat.lz4"
+mv "term.sbmat.gz" "../${1}.term.sbmat.gz"
+mv "term.imat.gz" "../${1}.term.imat.gz"
 if [ -e "docword.txt" ]; then
     echo "clearing up"
     rm docword.txt

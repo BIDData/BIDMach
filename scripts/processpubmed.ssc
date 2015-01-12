@@ -1,4 +1,4 @@
-
+:silent
 
 val a=loadSMat("pubmed.smat.lz4");
 val d=loadSBMat("pubmed.term.sbmat.gz");
@@ -18,4 +18,5 @@ for (i <- 0 until 10) {
     print(".");
 }
 saveSBMat("pubmed.term.sbmat.lz4",SBMat(dc(ix)));
+:silent
 sys.exit()
