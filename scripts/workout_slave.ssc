@@ -62,7 +62,7 @@ println("\n<<<<<<< Testing SFA on MovieLens 10M Data >>>>>>>")
 val a5=loadSMat(dir+"/data/movielens/train.smat.lz4")
 val ta5=loadSMat(dir+"/data/movielens/test.smat.lz4")
 
-val d = 512
+val d = 128
 
 val fact5 = zeros(d, a5.ncols);
 val (mm5,opts5) = SFA.learner(a5,fact5,d)
