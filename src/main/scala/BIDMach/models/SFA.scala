@@ -95,7 +95,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     // values to be accumulated
     val ddsmu = DDS(mm, user, sdata);
     if (opts.weightByUser) {
-      val iwt = 100f / max(sum(sdata != 0), 100f); 
+      val iwt = 100f / max(sum(sdata != 0f), 100f); 
       val suser = user ∘ iwt;
       updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ ddsmu);   // simple derivative for ADAGRAD
     } else {
