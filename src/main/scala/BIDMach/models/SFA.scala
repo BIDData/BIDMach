@@ -133,12 +133,11 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     Minv <-- inv(50f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
-  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {  
-  	val preds = DDS(mm, user, sdata) + iavg
+  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {
+        val preds = DDS(mm, user, sdata) + iavg
   	val dc = sdata.contents
   	val pc = preds.contents
   	val vv = (dc - pc) ddot (dc - pc)
-//  	println("pc: " + pc)
   	-sqrt(row(vv/sdata.nnz))
   }
 }
