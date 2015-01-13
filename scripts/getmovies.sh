@@ -35,4 +35,4 @@ for i in 1 2 3 4 5 a b; do
 done
 cd ${BIDMACH_SCRIPTS}
 
-bidmach getmovies.ssc
+../bidmach getmovies.ssc

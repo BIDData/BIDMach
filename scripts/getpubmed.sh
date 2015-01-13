@@ -24,4 +24,4 @@ ${BIDMACH_SCRIPTS}/getuci.sh pubmed
 cd "${BIDMACH_SCRIPTS}/../data/uci"
 mkdir -p pubmed_parts
 
-../../bidmach '../../scripts/processpubmed.ssc'
+${BIDMACH_SCRIPTS}/../bidmach ${BIDMACH_SCRIPTS}/processpubmed.ssc

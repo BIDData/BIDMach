@@ -42,4 +42,4 @@ else
 fi
 
 cd ${MNIST8M}/parts
-../../../bidmach '../../../scripts/processmnist8m.ssc'
+${BIDMACH_SCRIPTS}/../bidmach ${BIDMACH_SCRIPTS}/processmnist8m.ssc
