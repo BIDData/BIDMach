@@ -211,4 +211,13 @@ extern "C" {
 
     return getMergeIndsLen(keys, n, cspine);
   }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_floatToInt
+  (JNIEnv *env, jobject obj, jint n, jobject jin, jobject jout, jint nbits)
+  {
+    float *in = (float*)getPointer(env, jin);
+    int *out = (int*)getPointer(env, jout);
+
+    return floatToInt(n, in, out, nbits);
+  }
 }

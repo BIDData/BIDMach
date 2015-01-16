@@ -1,3 +1,4 @@
+void setsizes(int N, dim3 *gridp, int *nthreadsp);
 
 int apply_links(float *A, int *L, float *C, int nrows, int ncols);
 
@@ -23,6 +24,8 @@ int treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fie
 
 int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 
                 int nnodes, int ncats, int nsamps, int impType);
+
+int floatToInt(int n, float *in, int *out, int nbits);
 
 int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);
 

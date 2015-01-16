@@ -68,9 +68,9 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
   int itree = threadIdx.y;
   int jfeat = threadIdx.x;
 
-  const int signbit = 0x80000000;
-  const int mag =     0x7fffffff;
-  int fshift = 32 - fl[4];
+  //  const int signbit = 0x80000000;
+  //  const int mag =     0x7fffffff;
+  //  int fshift = 32 - fl[4];
 
   for (i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
     int ctodo = min(nc, ncols - i);
@@ -86,11 +86,12 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
           int inode = treenodes[itree + j * ntrees];
           int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
           float v = fbuff[ifeat + (j - i) * nrows];
-          int vi = *((int *)&v);
-          if (vi & signbit) {
-            vi = -(vi & mag);
-          }
-          int ival = vi >> fshift;
+          //          int vi = *((int *)&v);
+          //          if (vi & signbit) {
+          //            vi = -(vi & mag);
+          //          }
+          //          int ival = vi >> fshift;
+          int ival = (int)v;
           long long hdr = 
             (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
             (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) |
@@ -955,5 +956,29 @@ int getMergeIndsLen(long long *keys, int n, int *cspine) {
   return err;
 }
 
+__global__ void __floatToInt(int n, float *in, int *out, int nbits) {
+  const int signbit = 0x80000000;
+  const int mag =     0x7fffffff;
+  int fshift = 32 - nbits;
+  int ip = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
+  for (int i = ip; i < n; i += blockDim.x * gridDim.x * gridDim.y) {
+    float v = in[i];
+    int vi = *((int *)&v);
+    if (vi & signbit) {
+      vi = -(vi & mag);
+    }
+    int ival = ((unsigned int)vi) >> fshift;
+    out[i] = ival;
+  }
+}
 
+int floatToInt(int n, float *in, int *out, int nbits) {
+  int nthreads;
+  dim3 griddims;
+  setsizes(n, &griddims, &nthreads);
+  __floatToInt<<<griddims,nthreads>>>(n, in, out, nbits);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
 
+}
