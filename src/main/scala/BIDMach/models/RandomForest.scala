@@ -868,4 +868,12 @@ object RandomForest {
     }
     println("OK");
   }
+  
+  def floatToInt(in:GMat, out:Mat, nbits:Int):GIMat = {
+    val omat = GIMat.newOrCheckGIMat(in.nrows, in.ncols, out, in.GUID, "floatToInt".##)
+    edu.berkeley.bid.CUMACH.floatToInt(in.length, in.data, omat.data, nbits)
+    omat
+  }
+  
+  def floatToInt(in:GMat, nbits:Int):GIMat = floatToInt(in, null, nbits)
 }
