@@ -154,6 +154,18 @@ extern "C" {
     return treePack(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps, seed);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_treePackInt
+  (JNIEnv *env, jobject obj, jobject jfdata, jobject jtreenodes, jobject jicats, jobject jout, jobject jfieldlens, jint nrows, jint ncols, jint ntrees, jint nsamps, jint seed) 
+  {
+    int *fdata = (int*)getPointer(env, jfdata);
+    int *treenodes = (int*)getPointer(env, jtreenodes);
+    int *icats = (int*)getPointer(env, jicats);
+    long long *out = (long long*)getPointer(env, jout);
+    int *fieldlens = (int*)getPointer(env, jfieldlens);
+
+    return treePackInt(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps, seed);
+  }
+
  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_minImpurity
  (JNIEnv *env, jobject obj, jobject jkeys, jobject jcounts, jobject joutv, jobject joutf, jobject joutg, jobject joutc, jobject jjc, jobject jfieldlens, 
    jint nnodes, jint ncats, jint nsamps, jint impType) 

@@ -33,6 +33,8 @@ public final class CUMACH {
 
     public static native int treePack(Pointer id, Pointer tn, Pointer icats, Pointer out, Pointer fl, int nrows, int ncols, int ntrees, int nsamps, int seed);
 
+    public static native int treePackInt(Pointer id, Pointer tn, Pointer icats, Pointer out, Pointer fl, int nrows, int ncols, int ntrees, int nsamps, int seed);
+
     public static native int minImpurity(Pointer keys, Pointer counts, Pointer outv, Pointer outf, Pointer outg, Pointer outc, Pointer jc, Pointer fieldlens, int nnodes, int ncats, int nsamps, int impType);
 
     public static native int findBoundaries(Pointer keys, Pointer jc, int n, int njc, int shift);

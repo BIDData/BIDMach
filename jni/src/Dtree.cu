@@ -44,6 +44,70 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
                            int nrows, int ncols, int ntrees, int nsamps, int seed) {
   __shared__ float fbuff[DBSIZE];
   __shared__ int fl[32];
+  int i, j, ic;
+
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  if (tid < 6) {
+    fl[tid] = fieldlens[tid];
+  }
+  __syncthreads();
+  int vshift = fl[5];
+  int ishift = fl[4] + vshift;
+  int jshift = fl[3] + ishift;
+  int nshift = fl[2] + jshift;
+  int tshift = fl[1] + nshift;
+
+  int cmask = (1 << fl[5]) - 1;
+  int vmask = (1 << fl[4]) - 1;
+  int imask = (1 << fl[3]) - 1;
+  int jmask = (1 << fl[2]) - 1;
+  int nmask = (1 << fl[1]) - 1;
+  int tmask = (1 << fl[0]) - 1;
+  
+  int nc = (DBSIZE / nrows);
+  int itree = threadIdx.y;
+  int jfeat = threadIdx.x;
+
+  const int signbit = 0x80000000;
+  const int mag =     0x7fffffff;
+  int fshift = 32 - fl[4];
+
+  for (i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
+    int ctodo = min(nc, ncols - i);
+    for (j = tid; j < nrows * ctodo; j += blockDim.x*blockDim.y) {
+      fbuff[j] = fdata[j + i * nrows];
+    }
+    __syncthreads();
+    
+    for (j = i; j < i + ctodo; j++) {                               // j is the column index
+      ic = icats[j];
+      for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
+        if (jfeat < nsamps) {
+          int inode = treenodes[itree + j * ntrees];
+          int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
+          float v = fbuff[ifeat + (j - i) * nrows];
+          int vi = *((int *)&v);
+          if (vi & signbit) {
+            vi = -(vi & mag);
+          }
+          int ival = vi >> fshift;
+          long long hdr = 
+            (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
+            (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) |
+            (((long long)(vmask & ival)) << vshift) | ((long long)(ic & cmask));
+          out[jfeat + nsamps * (itree + ntrees * j)] = hdr;
+        }
+      }
+    }
+    __syncthreads();
+  }
+}
+
+
+__global__ void __treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fieldlens, 
+                              int nrows, int ncols, int ntrees, int nsamps, int seed) {
+  __shared__ int fbuff[DBSIZE];
+  __shared__ int fl[32];
   int i, j, ic, ival;
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
@@ -81,7 +145,7 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
         if (jfeat < nsamps) {
           int inode = treenodes[itree + j * ntrees];
           int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
-          ival = (int)(fbuff[ifeat + (j - i) * nrows]);
+          ival = fbuff[ifeat + (j - i) * nrows];
           long long hdr = 
             (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
             (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) |
@@ -100,6 +164,18 @@ int treePack(float *fdata, int *treenodes, int *icats, long long *out, int *fiel
   dim3 bdim(ntx, nty, 1);
   int nb = min(32, 1 + (ncols-1)/32);
   __treePack<<<nb,bdim>>>(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps, seed);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+
+int treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fieldlens, int nrows, int ncols, int ntrees, int nsamps, int seed) {
+  int ntx = 32 * (1 + (nsamps - 1)/32);
+  int nty = min(1024 / ntx, ntrees);
+  dim3 bdim(ntx, nty, 1);
+  int nb = min(32, 1 + (ncols-1)/32);
+  __treePackInt<<<nb,bdim>>>(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps, seed);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
