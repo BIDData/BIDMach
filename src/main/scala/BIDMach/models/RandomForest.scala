@@ -152,7 +152,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         //         print("xnodes="+xnodes.toString)
         t1 = toc;
         runtimes(0) += t1 - t0;
-        val nxvals = gtreePack(fdata, xnodes, icats);
+        val nxvals = gtreePack(fdata, xnodes, icats, ipass);
 //        println("lt "+lt(0->100).toString)
         Mat.nflops += icats.length * nsamps * ntrees * 6;
         t2 = toc;
@@ -541,12 +541,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
   
-  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat):Int ={
+  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, ipass:Int):Int ={
     import edu.berkeley.bid.CUMACH
     import jcuda._
     import jcuda.runtime.JCuda._
     import jcuda.runtime.cudaMemcpyKind._
-    val seed = 1231243;
+    val seed = 1231243 + 352453*ipass;
     val nrows = fdata.nrows
     val ncols = fdata.ncols
     val nxvals = ncols * ntrees * nsamps;
