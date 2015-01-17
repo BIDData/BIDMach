@@ -353,15 +353,16 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   
   final val signbit:Int = 0x80000000;
   final val mag:Int = 0x7fffffff;
+  val vmask = fieldmasks(4);
+  val fshift = 32 - fieldlengths(4);
   
-  @inline def floatConvert(a:Float):Int = {
-    val fshift = 32 - fieldlengths(4);    
+  @inline def floatConvert(a:Float):Int = {    
     var ai = java.lang.Float.floatToRawIntBits(a);
     if ((ai & signbit) > 0) {
       ai = -(ai & mag);
     }
     ai += signbit;
-    ai >> fshift;
+    (ai >> fshift) & vmask;
   }
   
   @inline def floatConvert2(a:Float):Int = {
