@@ -68,9 +68,9 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
   int itree = threadIdx.y;
   int jfeat = threadIdx.x;
 
-  //  const int signbit = 0x80000000;
-  //  const int mag =     0x7fffffff;
-  //  int fshift = 32 - fl[4];
+  const int signbit = 0x80000000;
+  const int mag =     0x7fffffff;
+  int fshift = 32 - fl[4];
 
   for (i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
     int ctodo = min(nc, ncols - i);
@@ -86,12 +86,12 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
           int inode = treenodes[itree + j * ntrees];
           int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
           float v = fbuff[ifeat + (j - i) * nrows];
-          //          int vi = *((int *)&v);
-          //          if (vi & signbit) {
-          //            vi = -(vi & mag);
-          //          }
-          //          vi += signbit;
-          //          int ival = vi >> fshift;
+          int vi = *((int *)&v);
+          if (vi & signbit) {
+            vi = -(vi & mag);
+          }
+          vi += signbit;
+          int ival = vi >> fshift;
           int ival = (int)v;
           long long hdr = 
             (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
