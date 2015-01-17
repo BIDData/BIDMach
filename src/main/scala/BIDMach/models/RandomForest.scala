@@ -351,6 +351,23 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
   
+  final val signbit:Int = 0x80000000;
+  final val mag:Int = 0x7fffffff;
+  
+  @inline def floatConvert(a:Float):Int = {
+    val fshift = 32 - fieldlengths(4);    
+    var ai = java.lang.Float.floatToRawIntBits(a);
+    if ((ai & signbit) > 0) {
+      ai = -(ai & mag);
+    }
+    ai += signbit;
+    ai >> fshift;
+  }
+  
+  @inline def floatConvert2(a:Float):Int = {
+    a.toInt
+  }
+  
   def treePack(fdata:FMat, treenodes:IMat, cats:IMat, out:LMat):LMat = {
     val nfeats = fdata.nrows;
     val nitems = fdata.ncols;
@@ -366,7 +383,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
           var jfeat = 0;
           while (jfeat < nsamps) {
             val ifeat = rhash(itree, inode, jfeat, nfeats);
-            val ivfeat = fdata(ifeat, icolx).toInt;
+            val ivfeat = floatConvert(fdata(ifeat, icolx));
             val ic = cats(icolx);
             out.data(nxvals) = packFields(itree, inode, jfeat, ifeat, ivfeat, ic);
             nxvals += 1;
@@ -380,9 +397,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     new LMat(nxvals, 1, out.data);
   }
   
-  def treeStep(idata:FMat, tnodes:IMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, getcat:Boolean)  {
-    val nfeats = idata.nrows;
-    val nitems = idata.ncols;
+  def treeStep(fdata:FMat, tnodes:IMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, getcat:Boolean)  {
+    val nfeats = fdata.nrows;
+    val nitems = fdata.ncols;
     val ntrees = tnodes.nrows;
     var icol = 0;
     while (icol < nitems) {
@@ -393,7 +410,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         if (ileft >= 0) {                                 // Has children so step down
           val ifeat = ftrees(inode, itree);
           val ithresh = vtrees(inode, itree);
-          val ivfeat = idata(ifeat, icol);
+          val ivfeat = floatConvert(fdata(ifeat, icol));
           if (ivfeat > ithresh) {
             inode = ileft + 1;
           } else {
@@ -410,9 +427,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
   }
   
-  def treeWalk(idata:FMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, depth:Int, getcat:Boolean):IMat = {
-    val nfeats = idata.nrows;
-    val nitems = idata.ncols;
+  def treeWalk(fdata:FMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:IMat, depth:Int, getcat:Boolean):IMat = {
+    val nfeats = fdata.nrows;
+    val nitems = fdata.ncols;
     val ntrees = ftrees.ncols;
     val tnodes:IMat = IMat(ntrees, nitems); 
     var icol = 0;
@@ -428,7 +445,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
           } else {
             val ifeat = ftrees(inode, itree);         // Test this node and branch
             val ithresh = vtrees(inode, itree);
-            val ivfeat = idata(ifeat, icol);
+            val ivfeat = floatConvert(fdata(ifeat, icol));
             if (ivfeat > ithresh) {
               inode = ileft + 1;
             } else {

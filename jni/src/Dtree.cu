@@ -90,6 +90,7 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
           //          if (vi & signbit) {
           //            vi = -(vi & mag);
           //          }
+          //          vi += signbit;
           //          int ival = vi >> fshift;
           int ival = (int)v;
           long long hdr = 
