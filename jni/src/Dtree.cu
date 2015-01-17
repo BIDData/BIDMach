@@ -92,7 +92,7 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
           }
           vi += signbit;
           int ival = vi >> fshift;
-          int ival = (int)v;
+          //          int ival = (int)v;
           long long hdr = 
             (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
             (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) |
