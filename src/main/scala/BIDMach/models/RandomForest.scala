@@ -114,6 +114,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     fieldlengths(IFeat) = countbits(nfeats);
     fieldlengths(IVFeat) = countbits(nvals);
     fieldlengths(ICat) = countbits(ncats);
+    if (sum(fieldlengths) > 64) {
+	throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
+    }
     fieldmasks = getFieldMasks(fieldlengths);
     fieldshifts = getFieldShifts(fieldlengths);
 //    if (useGPU) 
@@ -572,9 +575,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val gdata = GMat(fdata);
     val gcats = GIMat(icats);
     cudaMemcpy(gtnodes.data, Pointer.to(tnodes.data), ncols*ntrees*Sizeof.INT, cudaMemcpyHostToDevice)
-    cudaDeviceSynchronize()
-    CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
     cudaDeviceSynchronize();
+    var err = cudaGetLastError
+    if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
+    err= CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
+    if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
     nxvals;
   }
   
