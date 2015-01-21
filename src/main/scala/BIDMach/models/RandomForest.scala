@@ -201,21 +201,19 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val data = gmats(0);
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
-    val fnodes:FMat = zeros(ntrees, data.ncols)
-    val nodes:FMat = (data, cats) match {
-    case (fdata:FMat, icats:IMat) => {
+    val fnodes:FMat = zeros(ntrees, data.ncols);
+    (data, cats) match {
+      case (fdata:FMat, icats:IMat) => {
 //      println("h=%d, hash=%f" format (here, sum(sum(fdata,2)).v))
-      ynodes = if (nnodes.asInstanceOf[AnyRef] != null) {
-        val nn = nnodes.asInstanceOf[IMat];
-        treeStep(fdata, nn, fnodes, itrees, ftrees, vtrees, ctrees, true);
-        fnodes;
-      } else {
-        treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, ipass0, true);
-        fnodes
+        if (nnodes.asInstanceOf[AnyRef] != null) {
+          val nn = nnodes.asInstanceOf[IMat];
+          treeStep(fdata, nn, fnodes, itrees, ftrees, vtrees, ctrees, true);
+        } else {
+        	treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, ipass0, true);
+        }
       }
-      ynodes
     }
-    }
+    ynodes = fnodes;
     val mm = tally(fnodes);
 //    println((mm on IMat(cats)).toString);
     mean(FMat(mm != IMat(cats)));
@@ -447,7 +445,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val nfeats = fdata.nrows;
     val nitems = fdata.ncols;
     val ntrees = ftrees.ncols;
-    val fnodes:FMat = FMat(ntrees, nitems); 
     var icol = 0;
     while (icol < nitems) {
       var itree = 0;
