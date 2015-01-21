@@ -214,9 +214,13 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       }
     }
     ynodes = fnodes;
-    val mm = tally(fnodes);
-//    println((mm on IMat(cats)).toString);
-    mean(FMat(mm != IMat(cats)));
+    if (opts.regression) {
+      var mm = mean(fnodes);
+      mean(abs(mm - FMat(cats)));
+    } else {
+    	val mm = tally(fnodes);
+    	mean(FMat(mm != IMat(cats)));
+    }
   } 
   
   def tally(nodes:FMat):IMat = {
@@ -256,7 +260,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 //    println("totalcounts="+totalcounts(0->100).toString);
     while (itree < ntrees) {
       t0 = toc;
-      val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, outleft, outright, jc0, jtree, itree, opts.impurity);
+      val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, outleft, outright, jc0, jtree, itree, opts.impurity, opts.regression);
       t1 = toc;
       runtimes(6) += t1 - t0;
 //      println("jc1 %d gg %d %d" format (jc1.length, gg.nrows, gg.ncols))
@@ -683,7 +687,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   // outg should be an nsamps * nnodes array holding the impurity gain (use maxi2 to get the best)
   // jc should be a zero-based array that points to the start and end of each group of fixed node, jfeat
 
-  def minImpurity(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:FMat, outleft:FMat, outright:FMat, jc:IMat, jtree:IMat, itree:Int, fnum:Int):FMat = {
+  def minImpurity(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:FMat, outleft:FMat, outright:FMat, 
+		  jc:IMat, jtree:IMat, itree:Int, fnum:Int, regression:Boolean):FMat = {
     
     val update = imptyFunArray(fnum).update
     val result = imptyFunArray(fnum).result
@@ -713,12 +718,14 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       j = jci;
       var maxcnt = -1;
       var imaxcnt = -1;
+      var totcats = 0.0;
       while (j < jcn) {                     // First get the total counts for each group, and the most frequent cat
         val key = keys(j)
         val cnt = cnts(j)
         val icat = extractField(ICat, key);
         val newcnt = totcounts(icat) + cnt;
         totcounts(icat) = newcnt;
+        totcats += cnt * icat;
         tott += cnt;
         if (newcnt > maxcnt) {
           maxcnt = newcnt;
@@ -736,7 +743,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       var jmaxcnt = 0;
       var kmaxcnt = 0;
       all += tott;
+      var lefttotcats = 0.0;
+      var lefttot = 0;
       if (maxcnt < tott) { // This is not a pure node
+    	  totcats = 0.0;
         impure += tott;
       	acct = 0; 
       	//      println("totcounts "+totcounts.toString);
@@ -770,6 +780,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       				partv = lastival;
       				upcat = jmaxcnt;
       				jmax = j;
+              lefttotcats = totcats;
+              lefttot = tot;
       			}
       		}       
       		val oldcnt = counts(icat);
@@ -784,6 +796,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       		tot += cnt;
       		acc += update(newcnt) - update(oldcnt);
       		acct += update(newcntt) - update(oldcntt);
+      		totcats += cnt * icat;
       		lastkey = key;
       		lastival = ival;
       		j += 1;
@@ -810,9 +823,16 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       outv(i) = partv;
       outg(i) = (nodeImpty - minImpty).toFloat;
       outf(i) = ifeat;
-      outc(i) = imaxcnt;
-      outleft(i) = jmaxcnt;
-      outright(i) = kmaxcnt;
+      if (regression) {
+        val defv = totcats.toFloat / tott
+        outc(i) = defv;
+        outleft(i) = if (lefttot > 0) lefttotcats.toFloat / lefttot else defv;
+        outright(i) = if (tott - lefttot > 0) (totcats - lefttotcats) / (tott - lefttot) else defv;
+      } else {
+    	  outc(i) = imaxcnt;
+    	  outleft(i) = jmaxcnt;
+    	  outright(i) = kmaxcnt;
+      }
       outn(i) = inode;
       i += 1;
     }
@@ -835,6 +855,7 @@ object RandomForest {
      var ncats = 0;
      var training = true;
      var impurity = 0;  // zero for entropy, one for Gini impurity
+     var regression = false;
   }
   
   class Options extends Opts {}
