@@ -292,7 +292,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
   }
   
-  def tochildren(itree:Int, inodes:FMat, left:FMat, right:FMat) {
+  def tochildren(itree:Int, inodes:IMat, left:FMat, right:FMat) {
     var i = 0;
     while (i < inodes.length) {
       val inode = inodes(i);
