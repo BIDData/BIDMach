@@ -216,7 +216,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       ynodes
     }
     }
-    val mm = tally(nodes);
+    val mm = tally(fnodes);
 //    println((mm on IMat(cats)).toString);
     mean(FMat(mm != IMat(cats)));
   } 
