@@ -67,64 +67,66 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   val runtimes = zeros(8,1);
   
   def init() = {
-    opts.asInstanceOf[Learner.Options].npasses = opts.depth;                   // Make sure we make the correct number of passes
-    nnodes = opts.nnodes; 
-    ntrees = opts.ntrees;
-    nsamps = opts.nsamps;
-    nvals = opts.nvals;
-    itrees = izeros(nnodes, ntrees);
-    ftrees = izeros(nnodes, ntrees);
-    vtrees = izeros(nnodes, ntrees);
-    ctrees = zeros(nnodes, ntrees);
-    gains = zeros(ntrees,1);
-    igains = zeros(ntrees,1);
-    nodecounts = iones(opts.ntrees, 1);
-    midstep = 8;
-    ctrees.set(-1);
-    ctrees(0,?) = 0;
-    ftrees.set(-1)
-    if (opts.useGPU && Mat.hasCUDA > 0) gtrees = GIMat(ftrees);
-    modelmats = Array(ftrees, vtrees, ctrees);
     mats = datasource.next;
     nfeats = mats(0).nrows;
-    ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1)).dv.toInt + 1);
     val nc = mats(0).ncols;
     batchSize = nc;
     val nnz = mats(1).nnz;
-    datasource.reset;
-    // Small buffers hold results of batch treepack and sort
-    val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
-    tmpinds = lzeros(1, bsize);
-    tmpcounts = izeros(1, bsize);
-    midinds = new LMat(1, 0, new Array[Long](midstep*bsize));
-    midcounts = new IMat(1, 0, new Array[Int](midstep*bsize));
-    // Allocate about half our memory to the main buffers
-    val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt
-    totalinds = new LMat(1, 0, new Array[Long](bufsize));
-    totalcounts = new IMat(1, 0, new Array[Int](bufsize));
-    outv = IMat(nsamps, nnodes);
-    outf = IMat(nsamps, nnodes);
-    outn = IMat(nsamps, nnodes);
-    outg = FMat(nsamps, nnodes);
-    outc = FMat(nsamps, nnodes);
-    outleft = FMat(nsamps, nnodes);
-    outright = FMat(nsamps, nnodes);
-    jc = IMat(1, ntrees * nnodes * nsamps);
-    fieldlengths(ITree) = countbits(ntrees);
-    fieldlengths(INode) = countbits(nnodes);
-    fieldlengths(JFeat) = countbits(nsamps);
-    fieldlengths(IFeat) = countbits(nfeats);
-    fieldlengths(IVFeat) = countbits(nvals);
-    fieldlengths(ICat) = countbits(ncats);
-    if (sum(fieldlengths).v > 64) {
-    	throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
+    datasource.reset;    
+    if (refresh) {
+    	ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1)).dv.toInt + 1);
+    	opts.asInstanceOf[Learner.Options].npasses = opts.depth;                   // Make sure we make the correct number of passes
+    	nnodes = opts.nnodes; 
+    	ntrees = opts.ntrees;
+    	nsamps = opts.nsamps;
+    	nvals = opts.nvals;
+    	itrees = izeros(nnodes, ntrees);
+    	ftrees = izeros(nnodes, ntrees);
+    	vtrees = izeros(nnodes, ntrees);
+    	ctrees = zeros(nnodes, ntrees);
+    	gains = zeros(ntrees,1);
+    	igains = zeros(ntrees,1);
+    	nodecounts = iones(opts.ntrees, 1);
+    	midstep = 8;
+    	ctrees.set(-1);
+    	ctrees(0,?) = 0;
+    	ftrees.set(-1)
+    	if (opts.useGPU && Mat.hasCUDA > 0) gtrees = GIMat(ftrees);
+    	modelmats = Array(itrees, ftrees, vtrees, ctrees);
+    	// Small buffers hold results of batch treepack and sort
+    	val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
+    	tmpinds = lzeros(1, bsize);
+    	tmpcounts = izeros(1, bsize);
+    	midinds = new LMat(1, 0, new Array[Long](midstep*bsize));
+    	midcounts = new IMat(1, 0, new Array[Int](midstep*bsize));
+    	// Allocate about half our memory to the main buffers
+    	val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt
+    			totalinds = new LMat(1, 0, new Array[Long](bufsize));
+    	totalcounts = new IMat(1, 0, new Array[Int](bufsize));
+    	outv = IMat(nsamps, nnodes);
+    	outf = IMat(nsamps, nnodes);
+    	outn = IMat(nsamps, nnodes);
+    	outg = FMat(nsamps, nnodes);
+    	outc = FMat(nsamps, nnodes);
+    	outleft = FMat(nsamps, nnodes);
+    	outright = FMat(nsamps, nnodes);
+    	jc = IMat(1, ntrees * nnodes * nsamps);
+    	fieldlengths(ITree) = countbits(ntrees);
+    	fieldlengths(INode) = countbits(nnodes);
+    	fieldlengths(JFeat) = countbits(nsamps);
+    	fieldlengths(IFeat) = countbits(nfeats);
+    	fieldlengths(IVFeat) = countbits(nvals);
+    	fieldlengths(ICat) = countbits(ncats);
+    	if (sum(fieldlengths).v > 64) {
+    		throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
+    	}
+    	fieldmasks = getFieldMasks(fieldlengths);
+    	fieldshifts = getFieldShifts(fieldlengths);
+    	//    if (useGPU) 
+    	gfieldlengths = GIMat(fieldlengths);
+    	gout = GIMat(2, batchSize * nsamps * ntrees);
+    	gtnodes = GIMat(ntrees, batchSize);
     }
-    fieldmasks = getFieldMasks(fieldlengths);
-    fieldshifts = getFieldShifts(fieldlengths);
-//    if (useGPU) 
-      gfieldlengths = GIMat(fieldlengths);
-      gout = GIMat(2, batchSize * nsamps * ntrees);
-      gtnodes = GIMat(ntrees, batchSize);
   } 
   
   def countbits(n:Int):Int = {
@@ -159,7 +161,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         //         print("xnodes="+xnodes.toString)
         t1 = toc;
         runtimes(0) += t1 - t0;
-        val nxvals = gtreePack(fdata, xnodes, icats, ipass);
+        val nxvals = gtreePack(fdata, xnodes, icats, ipass + opts.seed*341431);
 //        println("lt "+lt(0->100).toString)
         Mat.nflops += icats.length * nsamps * ntrees * 6;
         t2 = toc;
@@ -216,7 +218,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     ynodes = fnodes;
     if (opts.regression) {
       var mm = mean(fnodes);
-      mean(abs(mm - FMat(cats)));
+      val diff = mm - FMat(cats)
+      mean(abs(diff)) on (diff dotr diff)/diff.length
     } else {
     	val mm = tally(fnodes);
     	mean(FMat(mm != IMat(cats)));
@@ -764,7 +767,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       	tot = 0;
       	j = jci;
       	maxcnt = -1;
-      	var upcat = -1;
       	var jmax = j;
 
       	while (j < jcn) {     
@@ -778,7 +780,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       			if (lastImpty < minImpty) { 
       				minImpty = lastImpty;
       				partv = lastival;
-      				upcat = jmaxcnt;
       				jmax = j;
               lefttotcats = totcats;
               lefttot = tot;
@@ -801,30 +802,32 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       		lastival = ival;
       		j += 1;
       	}
-      	counts.clear;
-      	maxcnt = -1;
-      	while (j > jmax) {
-      		j -= 1;
-      		val key = keys(j);
-      		val cnt = cnts(j);
-      		val ival = extractField(IVFeat, key);
-      		val icat = extractField(ICat, key);
-      		val oldcnt = counts(icat);
-      		val newcnt = oldcnt + cnt;
-      		counts(icat) = newcnt;
-      		if (newcnt > maxcnt) {
-      			maxcnt = newcnt;
-      			kmaxcnt = icat;
-      		}        
-      	} 
-      	lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // For checking
+        if (! regression) {
+        	counts.clear;
+        	maxcnt = -1;
+        	while (j > jmax) {
+        		j -= 1;
+        		val key = keys(j);
+        		val cnt = cnts(j);
+        		val ival = extractField(IVFeat, key);
+        		val icat = extractField(ICat, key);
+        		val oldcnt = counts(icat);
+        		val newcnt = oldcnt + cnt;
+        		counts(icat) = newcnt;
+        		if (newcnt > maxcnt) {
+        			maxcnt = newcnt;
+        			kmaxcnt = icat;
+        		}        
+        	} 
+        }
+//      	lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // For checking
       }
 //      println("Impurity %f, %f, min %f, %d, %d" format (nodeImpty, lastImpty, minImpty, partv, ifeat))
       outv(i) = partv;
       outg(i) = (nodeImpty - minImpty).toFloat;
       outf(i) = ifeat;
       if (regression) {
-        val defv = totcats.toFloat / tott
+        val defv = if (tott > 0) totcats.toFloat / tott else ncats/2.0f;
         outc(i) = defv;
         outleft(i) = if (lefttot > 0) lefttotcats.toFloat / lefttot else defv;
         outright(i) = if (tott - lefttot > 0) (totcats - lefttotcats) / (tott - lefttot) else defv;
@@ -838,6 +841,20 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     println("fraction of impure nodes %f" format impure/all);
     new FMat(nsamps, todo/nsamps, outg.data);
+  }
+  
+  def save(fname:String) = {
+    saveIMat(fname+"itrees.imat.lz4", itrees);
+    saveIMat(fname+"ftrees.imat.lz4", ftrees);
+    saveIMat(fname+"vtrees.imat.lz4", vtrees);
+    saveFMat(fname+"ctrees.fmat.lz4", ctrees);
+  }
+  
+  def load(fname:String) = {
+    itrees = loadIMat(fname+"itrees.imat.lz4");
+    ftrees = loadIMat(fname+"ftrees.imat.lz4");
+    vtrees = loadIMat(fname+"vtrees.imat.lz4");
+    ctrees = loadFMat(fname+"ctrees.fmat.lz4");
   }
 
 }
@@ -856,6 +873,7 @@ object RandomForest {
      var training = true;
      var impurity = 0;  // zero for entropy, one for Gini impurity
      var regression = false;
+     var seed = 1;
   }
   
   class Options extends Opts {}
