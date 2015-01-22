@@ -219,7 +219,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     if (opts.regression) {
       var mm = mean(fnodes);
       val diff = mm - FMat(cats)
-      mean(abs(diff)) on (diff dotr diff)/diff.length
+      mean(abs(diff)) //on (diff dotr diff)/diff.length
     } else {
     	val mm = tally(fnodes);
     	mean(FMat(mm != IMat(cats)));
