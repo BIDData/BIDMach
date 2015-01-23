@@ -465,7 +465,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def treeWalk(fdata:FMat, tnodes:IMat, fnodes:FMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:FMat, depth:Int, getcat:Boolean):FMat = {
     val nfeats = fdata.nrows;
     val nitems = fdata.ncols;
-    val ntrees = ftrees.ncols;
     var icol = 0;
     while (icol < nitems) {
       var itree = 0;
