@@ -214,6 +214,19 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         	treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, ipass0, true);
         }
       }
+      case (fdata:FMat, fcats:FMat) => {
+//      println("h=%d, hash=%f" format (here, sum(sum(fdata,2)).v))
+        if (nnodes.asInstanceOf[AnyRef] != null) {
+          val nn = nnodes.asInstanceOf[IMat];
+          treeStep(fdata, nn, fnodes, itrees, ftrees, vtrees, ctrees, true);
+        } else {
+          treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, ipass0, true);
+        }
+        if (datasource.opts.putBack == 1) {
+        	val pcats = mean(fnodes);
+          fcats <-- pcats;
+        }
+      }
     }
     ynodes = fnodes;
     if (opts.regression) {
@@ -908,6 +921,24 @@ object RandomForest {
         new Batch(opts),
         opts)
     (nn, opts)
+  }
+  
+  def predictor(model:RandomForest, ds:DataSource, opts:RFopts):(Learner, RFopts) = {
+    val nn = new Learner(
+        ds, 
+        model,
+        null, 
+        new Batch(opts),
+        opts)
+    (nn, opts)
+  }
+  
+  def predictor(modelname:String, ds:DataSource):(Learner, RFopts) = {
+    val opts = new RFopts;
+    opts.useGPU = false;
+    val model = new RandomForest(opts);
+    model.load(modelname);
+    predictor(model, ds, opts)
   }
   
   def entropy(a:DMat):Double = {
