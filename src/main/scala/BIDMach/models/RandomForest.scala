@@ -72,14 +72,14 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val nc = mats(0).ncols;
     batchSize = nc;
     val nnz = mats(1).nnz;
-    datasource.reset;    
+    datasource.reset;   
+    nnodes = opts.nnodes; 
+    ntrees = opts.ntrees;
+    nsamps = opts.nsamps;
+    nvals = opts.nvals;
+    ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1)).dv.toInt + 1);
     if (refresh) {
-    	ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1)).dv.toInt + 1);
     	opts.asInstanceOf[Learner.Options].npasses = opts.depth;                   // Make sure we make the correct number of passes
-    	nnodes = opts.nnodes; 
-    	ntrees = opts.ntrees;
-    	nsamps = opts.nsamps;
-    	nvals = opts.nvals;
     	itrees = izeros(nnodes, ntrees);
     	ftrees = izeros(nnodes, ntrees);
     	vtrees = izeros(nnodes, ntrees);
@@ -126,7 +126,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	gfieldlengths = GIMat(fieldlengths);
     	gout = GIMat(2, batchSize * nsamps * ntrees);
     	gtnodes = GIMat(ntrees, batchSize);
-    }
+    }       
   } 
   
   def countbits(n:Int):Int = {
