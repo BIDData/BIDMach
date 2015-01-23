@@ -22,7 +22,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var ntrees = 0;
   var nsamps = 0;
   var nfeats = 0;
-  var nvals = 0;
+  var nbits = 0;
   var ncats = 0;
   var iblock = 0;
   var batchSize = 0;
@@ -76,14 +76,14 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     nnodes = opts.nnodes; 
     ntrees = opts.ntrees;
     nsamps = opts.nsamps;
-    nvals = opts.nvals;
+    nbits = opts.nbits;
     ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1)).dv.toInt + 1);
-    fieldlengths(ITree) = countbits(ntrees);
-    fieldlengths(INode) = countbits(nnodes);
-    fieldlengths(JFeat) = countbits(nsamps);
-    fieldlengths(IFeat) = countbits(nfeats);
-    fieldlengths(IVFeat) = countbits(nvals);
-    fieldlengths(ICat) = countbits(ncats);
+    fieldlengths(ITree) = RandomForest.countbits(ntrees);
+    fieldlengths(INode) = RandomForest.countbits(nnodes);
+    fieldlengths(JFeat) = RandomForest.countbits(nsamps);
+    fieldlengths(IFeat) = RandomForest.countbits(nfeats);
+    fieldlengths(IVFeat) = nbits;
+    fieldlengths(ICat) = RandomForest.countbits(ncats);
     fieldmasks = getFieldMasks(fieldlengths);
     fieldshifts = getFieldShifts(fieldlengths);
     //    if (useGPU) 
@@ -128,16 +128,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	gtnodes = GIMat(ntrees, batchSize);
     }       
   } 
-  
-  def countbits(n:Int):Int = {
-    var i = 0;
-    var j = 1;
-    while (j < n) {
-      j *= 2;
-      i += 1;
-    }
-    i
-  }
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
     val data = gmats(0);
@@ -879,7 +869,7 @@ object RandomForest {
      var ntrees = 32;
      var nsamps = 32;
      var nnodes = 100000;
-     var nvals = 256;
+     var nbits = 8;
      var catsPerSample = 1f;
      var gain = 0.01f;
      var ncats = 0;
@@ -898,7 +888,7 @@ object RandomForest {
   def learner(data:IMat, labels:SMat) = {
     val opts = new RFSopts;
     opts.useGPU = false;
-    opts.nvals = maxi(maxi(data)).dv.toInt;
+    opts.nbits = countbits(maxi(maxi(data)).dv.toInt);
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
     val nn = new Learner(
         new MatDS(Array(data, labels), opts), 
@@ -912,7 +902,6 @@ object RandomForest {
   def learner(ds:DataSource) = {
     val opts = new RFopts;
     opts.useGPU = false;
-    opts.nvals = 256;
     val nn = new Learner(
         ds, 
         new RandomForest(opts), 
@@ -991,4 +980,14 @@ object RandomForest {
   }
   
   def floatToInt(in:GMat, nbits:Int):GIMat = floatToInt(in, null, nbits)
+  
+  def countbits(n:Int):Int = {
+    var i = 0;
+    var j = 1;
+    while (j < n) {
+      j *= 2;
+      i += 1;
+    }
+    i
+  }
 }
