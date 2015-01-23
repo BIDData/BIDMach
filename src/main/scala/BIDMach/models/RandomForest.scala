@@ -84,14 +84,14 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     fieldlengths(IFeat) = countbits(nfeats);
     fieldlengths(IVFeat) = countbits(nvals);
     fieldlengths(ICat) = countbits(ncats);
-    if (sum(fieldlengths).v > 64) {
-    	throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
-    }
     fieldmasks = getFieldMasks(fieldlengths);
     fieldshifts = getFieldShifts(fieldlengths);
     //    if (useGPU) 
     gfieldlengths = GIMat(fieldlengths);
     if (refresh) {
+    	if (sum(fieldlengths).v > 64) {
+    		throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
+    	}
     	opts.asInstanceOf[Learner.Options].npasses = opts.depth;                   // Make sure we make the correct number of passes
     	itrees = izeros(nnodes, ntrees);
     	ftrees = izeros(nnodes, ntrees);
