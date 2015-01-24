@@ -183,16 +183,16 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
       }
     }
-    val (g1, g2) = gmakeV(gout, gtmpinds, gtmpcounts);
-    val ginds = LMat(g1);
-    val gcnts = IMat(g2);
-    println("sizes %d %d %d" format(gout.length, inds.length, ginds.length));
-    x = inds;
-    y = ginds;
-    val xdif = ginds - inds(0,0->ginds.length);
-    val ydif = gcnts - counts(0,0->ginds.length);
-    println("indsdelta = %d %d" format (maxi(xdif).v, mini(xdif).v));
-    println("countsdelta = %d %d" format (maxi(ydif).v, mini(ydif).v));
+//    val (g1, g2) = gmakeV(gout, gtmpinds, gtmpcounts);
+//    val ginds = LMat(g1);
+//    val gcnts = IMat(g2);
+//    println("sizes %d %d %d" format(gout.length, inds.length, ginds.length));
+//    x = inds;
+//    y = ginds;
+//    val xdif = ginds - inds(0,0->ginds.length);
+//    val ydif = gcnts - counts(0,0->ginds.length);
+//    println("indsdelta = %d %d" format (maxi(xdif).v, mini(xdif).v));
+//    println("countsdelta = %d %d" format (maxi(ydif).v, mini(ydif).v));
     t4 = toc;
     runtimes(3) += t4 - t3;
     val (inds1, counts1) = addV(inds, counts, midinds, midcounts);
