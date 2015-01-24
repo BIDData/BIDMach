@@ -72,8 +72,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var t6 = 0f;
   var midstep = 0;
   val runtimes = zeros(8,1);
-  val x:Mat = null;
-  val y:Mat = null;
+  var x:Mat = null;
+  var y:Mat = null;
   
   def init() = {
     mats = datasource.next;
