@@ -11,6 +11,7 @@ import BIDMach.updaters.Batch
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
+import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3
 import java.util.Arrays
 
@@ -28,8 +29,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var batchSize = 0;
   var tmpinds:LMat = null;
   var tmpcounts:IMat = null;
+  var gtmpinds:GIMat = null;
+  var gtmpcounts:GIMat = null;
   var midinds:LMat = null;
   var midcounts:IMat = null;
+  var gmidinds:GIMat = null;
+  var gmidcounts:GIMat = null;
   var totalinds:LMat = null;
   var totalcounts:IMat = null;
   var nodecounts:IMat = null;
@@ -56,6 +61,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var gfieldlengths:GIMat = null;
   var fieldmasks:IMat = null;
   var fieldshifts:IMat = null;
+  var cspine:IMat = null;
+  var gspine:GIMat = null;
   var t0 = 0f;
   var t1 = 0f;
   var t2 = 0f;
@@ -110,11 +117,15 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
     	tmpinds = lzeros(1, bsize);
     	tmpcounts = izeros(1, bsize);
+    	gtmpinds = gizeros(2, bsize);
+    	gtmpcounts = gizeros(1, bsize);
     	midinds = new LMat(1, 0, new Array[Long](midstep*bsize));
     	midcounts = new IMat(1, 0, new Array[Int](midstep*bsize));
+    	gmidinds = new GIMat(1, 0, GIMat(1, midstep*bsize*2).data, midstep*bsize*2)
+    	gmidcounts = new GIMat(1, 0, GIMat(1, midstep*bsize).data, midstep*bsize)
     	// Allocate about half our memory to the main buffers
-    	val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt
-    			totalinds = new LMat(1, 0, new Array[Long](bufsize));
+    	val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt;
+    	totalinds = new LMat(1, 0, new Array[Long](bufsize));
     	totalcounts = new IMat(1, 0, new Array[Int](bufsize));
     	outv = IMat(nsamps, nnodes);
     	outf = IMat(nsamps, nnodes);
@@ -126,6 +137,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	jc = IMat(1, ntrees * nnodes * nsamps);
     	gout = GIMat(2, batchSize * nsamps * ntrees);
     	gtnodes = GIMat(ntrees, batchSize);
+    	cspine = IMat(512, 1);
+    	gspine = GIMat(512,1);
     }       
   } 
   
@@ -151,12 +164,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         //         print("xnodes="+xnodes.toString)
         t1 = toc;
         runtimes(0) += t1 - t0;
-        val nxvals = gtreePack(fdata, xnodes, icats, ipass + opts.seed*341431);
+        val nxvals = gtreePack(fdata, xnodes, icats, gout, ipass + opts.seed*341431);
 //        println("lt "+lt(0->100).toString)
         Mat.nflops += icats.length * nsamps * ntrees * 6;
         t2 = toc;
         runtimes(1) += t2 - t1;
-        val lt = gpsort(nxvals, tmpinds);  
+        val lt = gpsort(nxvals, gout, tmpinds);  
         Mat.nflops += lt.length * math.log(lt.length).toLong;
         t3 = toc;
         runtimes(2) += t3 - t2;
@@ -166,6 +179,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
       }
     }
+    val (g1, g2) = gmakeV(gout, gtmpinds, gtmpcounts);
+    val ginds = LMat(g1);
+    val gcnts = IMat(g2);
+    println("indsdelta = %ld %ld" format (maxi(ginds - inds).v, mini(ginds - inds).v))
+    println("countsdelta = %d %d" format (maxi(gcnts - counts).v, mini(ginds - inds).v))
     t4 = toc;
     runtimes(3) += t4 - t3;
     val (inds1, counts1) = addV(inds, counts, midinds, midcounts);
@@ -508,6 +526,13 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     (new LMat(ngroups, 1, out.data), new IMat(ngroups, 1, counts.data))
   }
   
+  def gmakeV(ind:GIMat, outi:GIMat, counts:GIMat):(GIMat, GIMat) = {
+  	CUMACH.mergeInds(ind.data, outi.data, counts.data, ind.length, gspine.data);
+  	cspine <-- gspine;
+  	val ngroups = cspine(0)
+  	(new GIMat(ngroups, 2, outi.data, outi.realsize), new GIMat(ngroups, 1, counts.data, counts.realsize))
+  }
+  
   def countV(ind1:LMat, counts1:IMat, ind2:LMat, counts2:IMat):Int = {
     var count = 0
     val n1 = counts1.length
@@ -582,7 +607,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
   
-  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, ipass:Int):Int ={
+  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, gout:GIMat, ipass:Int):Int ={
     import edu.berkeley.bid.CUMACH
     import jcuda._
     import jcuda.runtime.JCuda._
@@ -602,7 +627,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     nxvals;
   }
   
-  def gpsort(nxvals:Int, out:LMat):LMat = {
+  def gpsort(nxvals:Int, gout:GIMat, out:LMat):LMat = {
     import jcuda._
     import jcuda.runtime.JCuda._
     import jcuda.runtime.cudaMemcpyKind._
