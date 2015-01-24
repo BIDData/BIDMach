@@ -528,14 +528,14 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       }
       i += 1;
     }
-    (new LMat(ngroups, 1, out.data), new IMat(ngroups, 1, counts.data))
+    (new LMat(1, ngroups, out.data), new IMat(1, ngroups, counts.data))
   }
   
   def gmakeV(ind:GIMat, outi:GIMat, counts:GIMat):(GIMat, GIMat) = {
   	CUMACH.mergeInds(ind.data, outi.data, counts.data, ind.length/2, gspine.data);
   	cspine <-- gspine;
   	val ngroups = cspine(0)
-  	(new GIMat(ngroups, 2, outi.data, outi.realsize), new GIMat(ngroups, 1, counts.data, counts.realsize))
+  	(new GIMat(2, ngroups, outi.data, outi.realsize), new GIMat(1, ngroups, counts.data, counts.realsize))
   }
   
   def countV(ind1:LMat, counts1:IMat, ind2:LMat, counts2:IMat):Int = {
