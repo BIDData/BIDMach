@@ -100,7 +100,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	gains = zeros(ntrees,1);
     	igains = zeros(ntrees,1);
     	nodecounts = iones(opts.ntrees, 1);
-    	midstep = 8;
+    	midstep = opts.midstep;
     	ctrees.set(-1);
     	ctrees(0,?) = 0;
     	ftrees.set(-1)
@@ -877,6 +877,7 @@ object RandomForest {
      var impurity = 0;  // zero for entropy, one for Gini impurity
      var regression = false;
      var seed = 1;
+     var midstep = 8;  // try sqrt of ninstances / batchsize
   }
   
   class Options extends Opts {}
