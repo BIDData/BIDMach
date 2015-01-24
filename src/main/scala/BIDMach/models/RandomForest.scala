@@ -530,7 +530,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   def gmakeV(ind:GIMat, outi:GIMat, counts:GIMat):(GIMat, GIMat) = {
-  	CUMACH.mergeInds(ind.data, outi.data, counts.data, ind.length, gspine.data);
+  	CUMACH.mergeInds(ind.data, outi.data, counts.data, ind.length/2, gspine.data);
   	cspine <-- gspine;
   	val ngroups = cspine(0)
   	(new GIMat(ngroups, 2, outi.data, outi.realsize), new GIMat(ngroups, 1, counts.data, counts.realsize))
