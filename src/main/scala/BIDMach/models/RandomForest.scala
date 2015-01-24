@@ -72,6 +72,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var t6 = 0f;
   var midstep = 0;
   val runtimes = zeros(8,1);
+  val x:Mat = null;
+  val y:Mat = null;
   
   def init() = {
     mats = datasource.next;
@@ -184,7 +186,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val (g1, g2) = gmakeV(gout, gtmpinds, gtmpcounts);
     val ginds = LMat(g1);
     val gcnts = IMat(g2);
-    println("sizes %d %d %d" format(gout.length, inds.length, ginds.length))
+    println("sizes %d %d %d" format(gout.length, inds.length, ginds.length));
+    x = inds;
+    y = ginds;
     val xdif = ginds - inds(0,0->ginds.length);
     val ydif = gcnts - counts(0,0->ginds.length);
     println("indsdelta = %d %d" format (maxi(xdif).v, mini(xdif).v));
