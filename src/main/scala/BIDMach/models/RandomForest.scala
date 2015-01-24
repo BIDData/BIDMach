@@ -185,8 +185,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val ginds = LMat(g1);
     val gcnts = IMat(g2);
     println("sizes %d %d %d" format(gout.length, inds.length, ginds.length))
-    println("indsdelta = %ld %ld" format (maxi(ginds - inds).v, mini(ginds - inds).v))
-    println("countsdelta = %d %d" format (maxi(gcnts - counts).v, mini(ginds - inds).v))
+    val xdif = ginds - inds(0,0->ginds.length);
+    val ydif = gcnts - counts(0,0->ginds.length);
+    println("indsdelta = %ld %ld" format (maxi(xdif).v, mini(xdif).v));
+    println("countsdelta = %d %d" format (maxi(ydif).v, mini(ydif).v));
     t4 = toc;
     runtimes(3) += t4 - t3;
     val (inds1, counts1) = addV(inds, counts, midinds, midcounts);
