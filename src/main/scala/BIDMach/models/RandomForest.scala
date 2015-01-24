@@ -170,6 +170,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         t2 = toc;
         runtimes(1) += t2 - t1;
         val lt = gpsort(nxvals, gout, tmpinds);  
+        gout = new GIMat(2, nxvals, gout.data, gout.realsize);
+        println("lengths %d %d" format (lt.length, gout.length))
         Mat.nflops += lt.length * math.log(lt.length).toLong;
         t3 = toc;
         runtimes(2) += t3 - t2;
