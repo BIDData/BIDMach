@@ -4,7 +4,7 @@ package BIDMach.models
 // Computes a matrix representing the Forest.
 
 
-import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
+import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
 import BIDMach.Learner
 import BIDMach.datasources.{DataSource,MatDS}
 import BIDMach.updaters.Batch
@@ -29,12 +29,15 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var batchSize = 0;
   var tmpinds:LMat = null;
   var tmpcounts:IMat = null;
-  var gtmpinds:GIMat = null;
-  var gtmpcounts:GIMat = null;
   var midinds:LMat = null;
   var midcounts:IMat = null;
-  var gmidinds:GIMat = null;
+  var gtmpinds:GLMat = null;
+  var gpiones:GIMat = null;
+  var gtmpcounts:GIMat = null;
+  var gmidinds:GLMat = null;
   var gmidcounts:GIMat = null;
+  var gmergedinds:GLMat = null;
+  var gmergedcounts:GIMat = null;
   var totalinds:LMat = null;
   var totalcounts:IMat = null;
   var nodecounts:IMat = null;
@@ -42,8 +45,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var ftrees:IMat = null;                   // The feature index for this node
   var vtrees:IMat = null;                   // The value to compare with for this node
   var ctrees:FMat = null;                   // Majority class for this node
-  var gtrees:GIMat = null;
-  var gout:GIMat = null;
+  var lout:LMat = null;
+  var gout:GLMat = null;
   var gtnodes:GIMat = null;
   var outv:IMat = null;                     // Threshold values returned by minImpurity
   var outf:IMat = null;                     // Features returned by minImpurity
@@ -61,8 +64,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var gfieldlengths:GIMat = null;
   var fieldmasks:IMat = null;
   var fieldshifts:IMat = null;
-  var cspine:IMat = null;
-  var gspine:GIMat = null;
   var t0 = 0f;
   var t1 = 0f;
   var t2 = 0f;
@@ -74,6 +75,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   val runtimes = zeros(8,1);
   var x:Mat = null;
   var y:Mat = null;
+  var onGPU = false;
   
   def init() = {
     mats = datasource.next;
@@ -95,8 +97,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     fieldlengths(ICat) = RandomForest.countbits(ncats);
     fieldmasks = getFieldMasks(fieldlengths);
     fieldshifts = getFieldShifts(fieldlengths);
-    //    if (useGPU) 
-    gfieldlengths = GIMat(fieldlengths);
+    if (opts.GPU && Mat.hasCUDA > 0) onGPU = true;
     if (refresh) {
     	if (sum(fieldlengths).v > 64) {
     		throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
@@ -113,18 +114,14 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	ctrees.set(-1);
     	ctrees(0,?) = 0;
     	ftrees.set(-1)
-    	if (opts.useGPU && Mat.hasCUDA > 0) gtrees = GIMat(ftrees);
     	modelmats = Array(itrees, ftrees, vtrees, ctrees);
     	// Small buffers hold results of batch treepack and sort
     	val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
     	tmpinds = lzeros(1, bsize);
     	tmpcounts = izeros(1, bsize);
-    	gtmpinds = gizeros(2, bsize);
-    	gtmpcounts = gizeros(1, bsize);
-    	midinds = new LMat(1, 0, new Array[Long](midstep*bsize));
+     	midinds = new LMat(1, 0, new Array[Long](midstep*bsize));
     	midcounts = new IMat(1, 0, new Array[Int](midstep*bsize));
-    	gmidinds = new GIMat(1, 0, GIMat(1, midstep*bsize*2).data, midstep*bsize*2)
-    	gmidcounts = new GIMat(1, 0, GIMat(1, midstep*bsize).data, midstep*bsize)
+    	
     	// Allocate about half our memory to the main buffers
     	val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt;
     	totalinds = new LMat(1, 0, new Array[Long](bufsize));
@@ -137,10 +134,20 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	outleft = FMat(nsamps, nnodes);
     	outright = FMat(nsamps, nnodes);
     	jc = IMat(1, ntrees * nnodes * nsamps);
-    	gout = GIMat(2, batchSize * nsamps * ntrees);
-    	gtnodes = GIMat(ntrees, batchSize);
-    	cspine = IMat(512, 1);
-    	gspine = GIMat(512,1);
+    	lout = LMat(1, batchSize * nsamps * ntrees);
+    	
+    	if (onGPU) {
+    		gfieldlengths = GIMat(fieldlengths);
+    		gtmpinds = glzeros(1, bsize);
+    		gpiones = giones(1, bsize);
+    		gtmpcounts = gizeros(1, bsize);
+    		gmidinds = new GLMat(1, 0, GLMat(1, midstep*bsize).data, midstep*bsize);
+    		gmidcounts = new GIMat(1, 0, GIMat(1, midstep*bsize).data, midstep*bsize);
+    		gmergedinds = new GLMat(1, 0, GLMat(1, midstep*bsize).data, midstep*bsize);
+    		gmergedcounts = new GIMat(1, 0, GIMat(1, midstep*bsize).data, midstep*bsize);
+    		gout = GLMat(1, batchSize * nsamps * ntrees);
+    		gtnodes = GIMat(ntrees, batchSize);
+    	}
     }       
   } 
   
@@ -149,55 +156,59 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null
     val t0 = toc
-    val (inds, counts):(LMat, IMat) = (data, cats) match {
-      case (fdata:FMat, icats:IMat) => {
-//        println("i=%d, hash=%f" format (i, sum(sum(fdata,2)).v))
-        xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
-          val nn = nnodes.asInstanceOf[IMat];
-          treeStep(fdata, nn, null, itrees, ftrees, vtrees, ctrees, false);
-          Mat.nflops += fdata.ncols;
-          nn;
-        } else {
-          Mat.nflops += fdata.ncols * ipass;
-          val nn = izeros(ntrees, fdata.ncols)
-          treeWalk(fdata, nn, null, itrees, ftrees, vtrees, ctrees, ipass, false);
-          nn;
-        }
-        //         print("xnodes="+xnodes.toString)
-        t1 = toc;
-        runtimes(0) += t1 - t0;
-        val nxvals = gtreePack(fdata, xnodes, icats, gout, ipass + opts.seed*341431);
-//        println("lt "+lt(0->100).toString)
-        Mat.nflops += icats.length * nsamps * ntrees * 6;
-        t2 = toc;
-        runtimes(1) += t2 - t1;
-        val lt = gpsort(nxvals, gout, tmpinds);  
-//        gout = new GIMat(2, nxvals, gout.data, gout.realsize);
-//        println("lengths %d %d" format (lt.length, gout.length))
-        Mat.nflops += lt.length * math.log(lt.length).toLong;
-        t3 = toc;
-        runtimes(2) += t3 - t2;
-        makeV(lt, tmpcounts);
-      }
-      case _ => {
-        throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
-      }
+    (data, cats) match {
+    case (fdata:FMat, icats:IMat) => {
+    	//        println("i=%d, hash=%f" format (i, sum(sum(fdata,2)).v))
+    	xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
+    		val nn = nnodes.asInstanceOf[IMat];
+    		treeStep(fdata, nn, null, itrees, ftrees, vtrees, ctrees, false);
+    		Mat.nflops += fdata.ncols;
+    		nn;
+    	} else {
+    		Mat.nflops += fdata.ncols * ipass;
+    		val nn = izeros(ntrees, fdata.ncols);
+    		treeWalk(fdata, nn, null, itrees, ftrees, vtrees, ctrees, ipass, false);
+    		nn;
+    	}
+    	//         print("xnodes="+xnodes.toString)
+    	t1 = toc;
+    	runtimes(0) += t1 - t0;
+    	Mat.nflops += icats.length * nsamps * ntrees * 6;
+    	if (onGPU) {
+    		gout = gtreePack(fdata, xnodes, icats, gout, ipass + opts.seed*341431);
+    		t2 = toc;
+    		runtimes(1) += t2 - t1;
+    		gpsort(gout);  
+    		Mat.nflops += gout.length * math.log(gout.length).toLong;
+    		t3 = toc;
+    		runtimes(2) += t3 - t2;
+    		val (gix, gcx) = GLMat.collectLVec(gout, gpiones, gtmpinds, gtmpcounts);
+    		t4 = toc;
+    		runtimes(3) += t4 - t3;
+    		val (giy, gcy) = gaddV(gix, gcx, gmidinds, gmidcounts, gmergedinds, gmergedcounts);
+    		gmidinds = giy;
+    		gmidcounts = gcy;
+    	} else {
+    		lout = treePack(fdata, xnodes, icats, lout, ipass + opts.seed*341431);
+    		t2 = toc;
+    		runtimes(1) += t2 - t1;
+    		sort(lout);  
+    		Mat.nflops += lout.length * math.log(lout.length).toLong;
+    		t3 = toc;
+    		runtimes(2) += t3 - t2;
+    		val (ix, cx) = makeV(lout, tmpcounts);
+    		t4 = toc;
+    		runtimes(3) += t4 - t3;
+    		val (iy, cy) = addV(ix, cx, midinds, midcounts);
+    		midinds = iy;
+    		midcounts = cy;
+    	}
     }
-//    val (g1, g2) = gmakeV(gout, gtmpinds, gtmpcounts);
-//    val ginds = LMat(g1);
-//    val gcnts = IMat(g2);
-//    println("sizes %d %d %d" format(gout.length, inds.length, ginds.length));
-//    x = inds;
-//    y = ginds;
-//    val xdif = ginds - inds(0,0->ginds.length);
-//    val ydif = gcnts - counts(0,0->ginds.length);
-//    println("indsdelta = %d %d" format (maxi(xdif).v, mini(xdif).v));
-//    println("countsdelta = %d %d" format (maxi(ydif).v, mini(ydif).v));
-    t4 = toc;
-    runtimes(3) += t4 - t3;
-    val (inds1, counts1) = addV(inds, counts, midinds, midcounts);
-    midinds = inds1;
-    midcounts = counts1;
+    case _ => {
+    	throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
+    }
+    }
+
     iblock += 1;
     t5 = toc;
     runtimes(4) += t5 - t4;
@@ -208,6 +219,13 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   
   def midmerge = {
     if (midinds.length > 0) {
+    	if (gmidinds.asInstanceOf[AnyRef] != null) {
+    		midinds = new LMat(1, gmidinds.length, midinds.data);
+    		midcounts = new IMat(1, gmidinds.length, midcounts.data);
+    		midinds <-- gmidinds;
+    		midcounts <-- gmidcounts;
+    		gmidinds = new GLMat(1,0,gmidinds.data,gmidinds.realsize);
+      }
     	val (inds, counts) = addV(midinds, midcounts, totalinds, totalcounts);
     	totalinds = inds;
     	totalcounts = counts;  
@@ -343,6 +361,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     math.abs(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3) % nb)
   }
   
+  def rhash(v1:Int, v2:Int, v3:Int, v4:Int, nb:Int):Int = {
+    math.abs(MurmurHash3.mix(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3), v4) % nb)
+  }
+  
   def packFields(itree:Int, inode:Int, jfeat:Int, ifeat:Int, ivfeat:Int, icat:Int):Long = {
     icat.toLong + 
     ((ivfeat.toLong + 
@@ -419,11 +441,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     a.toInt
   }
   
-  def treePack(fdata:FMat, treenodes:IMat, cats:IMat, out:LMat):LMat = {
+  def treePack(fdata:FMat, treenodes:IMat, cats:IMat, out:LMat, ipass:Int):LMat = {
     val nfeats = fdata.nrows;
     val nitems = fdata.ncols;
     val ntrees = treenodes.nrows;
     val ionebased = Mat.ioneBased;
+    val seed = 1231243 + 352453*ipass;
     var icolx = 0;
     var nxvals = 0;
     while (icolx < nitems) {
@@ -515,6 +538,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     fnodes
   }
+  
+  def gtreeStep(gdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, getcat:Boolean)  {}
+  
+  def gtreeWalk(gdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, depth:Int, getcat:Boolean)  {}
     
   def makeV(ind:LMat, counts:IMat):(LMat, IMat) = {
     val n = ind.length;
@@ -534,14 +561,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     (new LMat(1, ngroups, out.data), new IMat(1, ngroups, counts.data))
   }
-  
-  def gmakeV(ind:GIMat, outi:GIMat, counts:GIMat):(GIMat, GIMat) = {
-  	CUMACH.mergeInds(ind.data, outi.data, counts.data, ind.length/2, gspine.data);
-  	cspine <-- gspine;
-  	val ngroups = cspine(0)
-  	(new GIMat(2, ngroups, outi.data, outi.realsize), new GIMat(1, ngroups, counts.data, counts.realsize))
-  }
-  
+   
   def countV(ind1:LMat, counts1:IMat, ind2:LMat, counts2:IMat):Int = {
     var count = 0
     val n1 = counts1.length
@@ -604,6 +624,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     (new LMat(1, count, ind2.data), new IMat(1, count, counts2.data))
   }
   
+  def gaddV(gix:GLMat, gcx:GIMat, gmidinds:GLMat, gmidcounts:GIMat, gmergedinds:GLMat, gmergedcounts:GIMat):(GLMat, GIMat) = {
+    val (ai, ac) = GLMat.mergeLVecs(gix, gcx, gmidinds, gmidcounts, gmergedinds, gmergedcounts);
+    GLMat.collectLVec(ai, ac, gmidinds, gmidcounts);
+  }
+  
   def copyinds(inds:LMat, tmp:LMat) = {
     val out = new LMat(inds.length, 1, tmp.data);
     out <-- inds;
@@ -616,7 +641,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
   
-  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, gout:GIMat, ipass:Int):Int ={
+  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, gout:GLMat, ipass:Int):GLMat ={
     import edu.berkeley.bid.CUMACH
     import jcuda._
     import jcuda.runtime.JCuda._
@@ -633,18 +658,16 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
     err= CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
     if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
-    nxvals;
+    new GLMat(1, nxvals, gout.data, gout.realsize);
   }
   
-  def gpsort(nxvals:Int, gout:GIMat, out:LMat):LMat = {
+  def gpsort(gout:GLMat) = {
     import jcuda._
     import jcuda.runtime.JCuda._
     import jcuda.runtime.cudaMemcpyKind._
+    val nxvals = gout.length;
     CUMAT.lsort(gout.data, nxvals, 1);
-    cudaDeviceSynchronize();
-    cudaMemcpy(Pointer.to(out.data), gout.data, nxvals*Sizeof.LONG, cudaMemcpyDeviceToHost)
     cudaDeviceSynchronize()
-    new LMat(nxvals, 1, out.data);
   }
   
   // Find boundaries where JFeat or ITree changes
@@ -912,6 +935,7 @@ object RandomForest {
      var regression = false;
      var seed = 1;
      var midstep = 8;  // try sqrt of ninstances / batchsize
+     var GPU = true;
   }
   
   class Options extends Opts {}
