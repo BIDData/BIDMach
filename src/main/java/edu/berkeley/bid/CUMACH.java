@@ -44,4 +44,5 @@ public final class CUMACH {
     public static native int mergeInds(Pointer keys, Pointer okeys, Pointer counts, int n, Pointer cspine);
     
     public static native int getMergeIndsLen(Pointer keys, int n, Pointer cspine);
+    
 }
