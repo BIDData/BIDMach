@@ -136,7 +136,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	jc = IMat(1, ntrees * nnodes * nsamps);
     	lout = LMat(1, batchSize * nsamps * ntrees);
     	
-    	if (onGPU) {
+    	if (true) {
     		gfieldlengths = GIMat(fieldlengths);
     		gtmpinds = glzeros(1, bsize);
     		gpiones = giones(1, bsize);
@@ -192,7 +192,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     		lout = treePack(fdata, xnodes, icats, lout, ipass + opts.seed*341431);
     		t2 = toc;
     		runtimes(1) += t2 - t1;
-    		sort(lout);  
+    		java.util.Arrays.sort(lout.data, 0, lout.length);
     		Mat.nflops += lout.length * math.log(lout.length).toLong;
     		t3 = toc;
     		runtimes(2) += t3 - t2;
@@ -218,8 +218,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   def midmerge = {
-    if (midinds.length > 0) {
-    	if (gmidinds.asInstanceOf[AnyRef] != null) {
+    if (midinds.length > 0 || gmidinds.length > 0) {
+    	if (onGPU) {
     		midinds = new LMat(1, gmidinds.length, midinds.data);
     		midcounts = new IMat(1, gmidinds.length, midcounts.data);
     		midinds <-- gmidinds;
@@ -304,11 +304,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   
   override def updatePass(ipass:Int) = { 
     midmerge
+//    println("total size %d %d" format (totalinds.length, totalcounts.length))
+//    println("totalinds="+totalinds(0->100).toString);
+//    println("totalcounts="+totalcounts(0->100).toString);
     val (jc0, jtree) = findBoundaries(totalinds, jc);
     var itree = 0;
 //    println("jc0="+jc0.t.toString);
-//    println("totalinds="+totalinds(0->100).toString);
-//    println("totalcounts="+totalcounts(0->100).toString);
     while (itree < ntrees) {
       t0 = toc;
       val gg = minImpurity(totalinds, totalcounts, outv, outf, outn, outg, outc, outleft, outright, jc0, jtree, itree, opts.impurity, opts.regression);
