@@ -22,15 +22,16 @@ val nn = new Learner(             // make a learner instance
 
 
 opts.useGPU = false
-opts.batchSize = 5000
+opts.batchSize = 100000
 opts.depth =  20
-opts.ntrees = 8
+opts.ntrees = 4
 opts.nsamps = 32
 opts.nnodes = 500000
 opts.nbits = 16
 opts.gain = 0.001f
-opts.midstep = 32;
+opts.midstep = 8;
 opts.GPU = true
+opts.trace = 0
 
 val rf = nn.model.asInstanceOf[RandomForest]
 
