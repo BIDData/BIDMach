@@ -183,6 +183,77 @@ int treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fie
   return err;
 }
 
+#if __CUDA_ARCH__ > 200
+
+__global__ void __treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees, int *ftrees, int *vtrees, float *ctrees,
+                           int nrows, int ncols, int ntrees, int nnodes, int getcat, int nbits, int nlevels) {
+  __shared__ float fbuff[DBSIZE];
+  int i, j, k, base, m, ipos, itree, ftree, vtree, feat, ikid, big;
+  float ctree;
+
+  int tid = threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z);
+  int inode = threadIdx.x;
+  int itr = threadIdx.y;
+  int icol = threadIdx.z;
+  
+  int nc = (DBSIZE / nrows);
+
+  const int signbit = 0x80000000;
+  const int mag =     0x7fffffff;
+  int fshift = 32 - nbits;
+  int mask = (1 << nbits) - 1;
+
+  for (i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
+    int ctodo = min(nc, ncols - i);
+    // Fill up the SHMEM buffer
+    for (j = tid; j < nrows * ctodo; j += blockDim.x*blockDim.y*blockDim.z) {
+      fbuff[j] = fdata[j + i * nrows];
+    }
+    __syncthreads();
+    
+    for (j = icol; j < i + ctodo; j += blockDim.z) {           // j is the column index
+      base = 0;                                                // points to the current B-tree
+      for (k = 0; k < nlevels; k++) {
+        ipos = base + itr * nnodes + inode;                    // read in a 32-element B-tree block
+        itree = itrees[ipos];
+        ftree = ftrees[ipos];
+        vtree = vtrees[ipos];
+        feat = *((int *)&fbuff[ftree + j * nrows]);            // get the feature pointed to 
+        if (feat & signbit) {                                  // convert to fixed point
+          feat = -(feat & mag);
+        }
+        feat += signbit;
+        feat = (feat >> fshift) & mask;
+        big = feat > vtree;                                    // compare with the threshold
+        ikid = itree;                                          // address of left child in the block
+        // walk down the tree - by passing up the appropriate child
+        if (!getcat || k < nlevels-1) {
+#pragma unroll
+          for (m = 0; m < 5; m++) {
+            itree = __shfl(itree, ikid + big);
+          }
+          base = itree;
+        } else {
+          ctree = ctrees[ipos];
+#pragma unroll
+          for (m = 0; m < 5; m++) {
+            ctree = __shfl(ctree, ikid + big);
+          }
+        }
+      }
+      if (inode == 0) {                                         // save the leaf node index or the label
+        if (getcat) {
+          fnodes[itr + (i + icol) * ntrees] = ctree;
+        } else {
+          inodes[itr + (i + icol) * ntrees] = base;
+        }
+      }
+    }
+    __syncthreads();
+  }
+}
+
+#endif
 
 class entImpty {
  public:

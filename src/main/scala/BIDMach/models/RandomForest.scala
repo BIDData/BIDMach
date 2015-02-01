@@ -35,7 +35,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var gtmpcounts:GIMat = null;
 //  var totalinds:LMat = null;
 //  var totalcounts:IMat = null;
-  var totals:VTree = null;
+  var totals:SVTree = null;
   var nodecounts:IMat = null;
   var itrees:IMat = null;                   // Index of left child (right child is at this value + 1)
   var ftrees:IMat = null;                   // The feature index for this node
@@ -122,7 +122,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 //    	val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt;
 //    	totalinds = new LMat(1, 0, new Array[Long](bufsize));
 //    	totalcounts = new IMat(1, 0, new Array[Int](bufsize));
-        totals = new VTree(20);
+        totals = new SVTree(20);
     	outv = IMat(nsamps, nnodes);
     	outf = IMat(nsamps, nnodes);
     	outn = IMat(nsamps, nnodes);
@@ -998,7 +998,7 @@ class SVec(val inds:LMat, val counts:IMat) {
 
 }
 
-class VTree(val n:Int) { 
+class SVTree(val n:Int) { 
   val tree = new Array[SVec](n);
   
   def showTree = { 
@@ -1023,17 +1023,18 @@ class VTree(val n:Int) {
       i += 1;
     }
     tree(i) = here;
-//    showTree;
   }
 
   def getSum:SVec = { 
-//    showTree;
     var i = 0;
+    var here:SVec = null;
     while (i < n && tree(i) == null) { 
       i += 1;
     }
-    var here = tree(i);
-    tree(i) = null;
+    if (i < n) { 
+      here = tree(i);
+      tree(i) = null;
+    }
     i += 1;
     while (i < n) { 
       if (tree(i) != null) { 
@@ -1042,7 +1043,6 @@ class VTree(val n:Int) {
       }
       i += 1;
     }
-    println("sum %d" format here.length)
     here;
   }
 }
