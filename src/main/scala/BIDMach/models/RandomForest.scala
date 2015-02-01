@@ -193,7 +193,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     t4 = toc;
     runtimes(3) += t4 - t3;
-    if (opts.trace > 0) println("collect/add %d %d" format (gout.length, blockv.length))
+    if (opts.trace > 1) println("collect/add %d %d" format (gout.length, blockv.length))
     totals.addSVec(blockv);
 //      val (iy, cy) = addV(ix, cx, midinds, midcounts);
 //      midinds = iy;
@@ -212,7 +212,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	totalcounts = counts;  
     	midinds = new LMat(1,0,midinds.data);
     }
-    if (opts.trace > 0) println("midmerge %d %d" format (midcounts.length, totalinds.length))
+    if (opts.trace > 1) println("midmerge %d %d" format (midcounts.length, totalinds.length))
   } */
   
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -249,7 +249,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     if (opts.regression) {
       var mm = mean(fnodes);
       val diff = mm - FMat(cats)
-      mean(abs(diff)) //on (diff dotr diff)/diff.length
+      -mean(abs(diff)) //on -(diff dotr diff)/diff.length
     } else {
     	val mm = tally(fnodes);
     	mean(FMat(mm != IMat(cats)));
@@ -904,7 +904,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       outn(i) = inode;
       i += 1;
     }
-    println("fraction of impure nodes %f" format impure/all);
+    if (opts.trace > 0) println("fraction of impure nodes %f" format impure/all);
     new FMat(nsamps, todo/nsamps, outg.data);
   }
   
