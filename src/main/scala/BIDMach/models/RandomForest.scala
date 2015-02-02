@@ -27,14 +27,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var ncats = 0;
   var iblock = 0;
   var batchSize = 0;
-//  var tmpinds:LMat = null;
-//  var tmpcounts:IMat = null;
   var blockv:SVec = null;
   var gtmpinds:GLMat = null;
   var gpiones:GIMat = null;
   var gtmpcounts:GIMat = null;
-//  var totalinds:LMat = null;
-//  var totalcounts:IMat = null;
   var totals:SVTree = null;
   var nodecounts:IMat = null;
   var itrees:IMat = null;                   // Index of left child (right child is at this value + 1)
@@ -113,16 +109,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	modelmats = Array(itrees, ftrees, vtrees, ctrees);
     	// Small buffers hold results of batch treepack and sort
     	val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
-//    	tmpinds = lzeros(1, bsize);
-//    	tmpcounts = izeros(1, bsize);
-//     	midinds = new LMat(1, 0, new Array[Long](midstep*bsize));
-//    	midcounts = new IMat(1, 0, new Array[Int](midstep*bsize));
-    	
-    	// Allocate about half our memory to the main buffers
-//    	val bufsize = (math.min(java.lang.Runtime.getRuntime().maxMemory()/20, 2000000000)).toInt;
-//    	totalinds = new LMat(1, 0, new Array[Long](bufsize));
-//    	totalcounts = new IMat(1, 0, new Array[Int](bufsize));
-        totals = new SVTree(20);
+      totals = new SVTree(20);
     	outv = IMat(nsamps, nnodes);
     	outf = IMat(nsamps, nnodes);
     	outn = IMat(nsamps, nnodes);
@@ -195,25 +182,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     runtimes(3) += t4 - t3;
     if (opts.trace > 1) println("collect/add %d %d" format (gout.length, blockv.length))
     totals.addSVec(blockv);
-//      val (iy, cy) = addV(ix, cx, midinds, midcounts);
-//      midinds = iy;
-//      midcounts = cy;
     iblock += 1;
     t5 = toc;
     runtimes(4) += t5 - t4;
-//      if (iblock % midstep == 0) midmerge
-
   }
-  
-/*  def midmerge = {
-    if (midinds.length > 0) { 
-    	val (inds, counts) = addV(midinds, midcounts, totalinds, totalcounts);
-    	totalinds = inds;
-    	totalcounts = counts;  
-    	midinds = new LMat(1,0,midinds.data);
-    }
-    if (opts.trace > 1) println("midmerge %d %d" format (midcounts.length, totalinds.length))
-  } */
   
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val ipass0 = if (opts.training) ipass else opts.depth
