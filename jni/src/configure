@@ -155,7 +155,7 @@ elif [ "$OS" = "windows" ] ; then
     NVCC="nvcc"
     OBJ="obj"
     OUTFLG="/OUT:"
-    CFLAGS="/c /MT /DNDEBUG /O2 /Qstd=c99 /Qopenmp $CFLAGS"    # static linking
+    CFLAGS="/c /MT /DNDEBUG /O2 /EHsc $CFLAGS"    # static linking
     CPPFLAGS="/c /MT /DNDEBUG /O2 /EHsc $CFLAGS"    # static linking
     NVCCFLAGS="-c -use_fast_math  -I$BIDMAT_ROOT/jni/include \
           -gencode arch=compute_20,code=sm_20 \

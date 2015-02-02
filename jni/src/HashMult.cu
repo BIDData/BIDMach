@@ -9,6 +9,8 @@
 #define MAXXGRID 65535
 #endif
 
+
+
 // Feature hashing multiply and multiply-transpose.
 // This one enumerates, hashes and multiplies all pairs of features.
 //
@@ -17,11 +19,11 @@
 
 // Hash functions
 // Adler32
-__forceinline__ __device__ uint32_t adler32(const void *buf, size_t buflength) {
-     const uint8_t *buffer = (const uint8_t*)buf;
+__forceinline__ __device__ unsigned int adler32(const void *buf, size_t buflength) {
+     const unsigned char *buffer = (const unsigned char*)buf;
 
-     uint32_t s1 = 1;
-     uint32_t s2 = 0;
+     unsigned int s1 = 1;
+     unsigned int s2 = 0;
 
      for (size_t n = 0; n < buflength; n++) {
         s1 = (s1 + buffer[n]) % 65521;
