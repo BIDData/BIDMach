@@ -374,6 +374,7 @@ abstract class GLMlink {
    
   def hashMult(a:GMat, b:GSMat):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashMult".##);
+    c.clear;
     CUMACH.hashMult(a.nrows, a.ncols, b.ncols, a.data, b.data, b.ir, b.jc, c.data);
     c
   }
@@ -386,6 +387,7 @@ abstract class GLMlink {
   
   def hashMultT(a:GMat, b:GSMat, nfeats:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, nfeats, null, a.GUID, b.GUID, nfeats, "hashMultT".##);
+    c.clear;
     CUMACH.hashMultT(a.nrows, nfeats, b.ncols, a.data, b.data, b.ir, b.jc, c.data);
     c
   }
