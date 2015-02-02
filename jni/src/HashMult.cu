@@ -10,11 +10,10 @@
 #endif
 
 
-
 // Feature hashing multiply and multiply-transpose.
 // This one enumerates, hashes and multiplies all pairs of features.
 //
-// NOTE: This uses a fast lookup recurrence which is only valid up to 3000 base features per column (approx 4.5 million pairs)
+// NOTE: The single-matrix version (hashmult) uses a fast lookup recurrence which is only valid up to 3000 base features per column (approx 4.5 million pairs)
 
 
 // Hash functions
@@ -81,6 +80,8 @@ __forceinline__ __device__ int solve1(int j) {
   return (int)(v+2e-5f);   
 }
 
+// Given dense A and sparse B, for each column of B, enumerate all pairs of features, hash to a single feature index, and multiply by A into C
+
 __global__ void __hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C) {
   int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
   int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
@@ -114,6 +115,7 @@ int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir,
   return err;
 }
 
+// Given dense A and sparse B, multiply A by the transpose of feature-expanded B. 
 
 __global__ void __hashmultT(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C) {
   int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
@@ -143,6 +145,87 @@ int hashmultT(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir
   dim3 threadDim(nrows, nt, 1);
   int nblocks = min(MAXXGRID, ncols);
   __hashmultT<<<nblocks,threadDim>>>(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, C);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+__global__ void __hashcross(int nrows, int nfeats, int ncols,
+			    float *A,
+			    float *Bdata, int *Bir, int *Bjc,
+			    float *Cdata, int *Cir, int *Cjc,
+			    float *D) {
+  int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
+  int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
+  for (int i = istart; i < iend ; i++) {                     // i is the column index
+    int jstart1 = Bjc[i];                                    // Range of nz rows in this column of B
+    int jend1 = Bjc[i+1];
+    int jstart2 = Cjc[i];                                    // Range of nz rows in this column of C
+    int jend2 = Cjc[i+1];
+    int nr1 = jend1 - jstart1;                               // Number of nz rows
+    int nr2 = jend2 - jstart2;                               // Number of nz rows
+    int todo = nr1 * nr2;                                    // Number of pairs to process 
+    for (int j = threadIdx.y; j < todo; j += blockDim.y) {   // j indexes a worker for this column
+      int j1 = j / nr2;
+      int j2 = j - j1 * nr2; 
+      float f1 = Bdata[jstart1 + j1];                        // Get the two features
+      float f2 = Cdata[jstart2 + j2];
+      int r1 = Bir[jstart1 + j1];                            // And their row indices
+      int r2 = Cir[jstart2 + j2];
+      int ind = hash2(r1, r2, nfeats);                       // Hash the indices
+
+      float sum = A[threadIdx.x + nrows * ind] * f1 * f2;    // Do the product
+      atomicAdd(&D[threadIdx.x + nrows * i], sum);
+    }
+  }
+}
+
+int hashcross(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *Cdata, int *Cir, int *Cjc, float *D) {
+  int nt = max(1, 256/nrows);
+  dim3 threadDim(nrows, nt, 1);
+  int nblocks = min(MAXXGRID, ncols);
+  __hashcross<<<nblocks,threadDim>>>(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+
+__global__ void __hashcrossT(int nrows, int nfeats, int ncols,
+			     float *A,
+			     float *Bdata, int *Bir, int *Bjc,
+			     float *Cdata, int *Cir, int *Cjc,
+			     float *D) {
+  int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
+  int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
+  for (int i = istart; i < iend ; i++) {                     // i is the column index
+    int jstart1 = Bjc[i];                                    // Range of nz rows in this column of B
+    int jend1 = Bjc[i+1];
+    int jstart2 = Cjc[i];                                    // Range of nz rows in this column of C
+    int jend2 = Cjc[i+1];
+    int nr1 = jend1 - jstart1;                               // Number of nz rows
+    int nr2 = jend2 - jstart2;                               // Number of nz rows
+    int todo = nr1 * nr2;                                    // Number of pairs to process 
+    for (int j = threadIdx.y; j < todo; j += blockDim.y) {   // j indexes a worker for this column
+      int j1 = j / nr2;
+      int j2 = j - j1 * nr2; 
+      float f1 = Bdata[jstart1 + j1];                        // Get the two features
+      float f2 = Cdata[jstart2 + j2];
+      int r1 = Bir[jstart1 + j1];                            // And their row indices
+      int r2 = Cir[jstart2 + j2];
+      int ind = hash2(r1, r2, nfeats);                       // Hash the indices
+
+      float sum = A[threadIdx.x + nrows * i] * f1 * f2;      // Do the product
+      atomicAdd(&D[threadIdx.x + nrows * ind], sum);
+    }
+  }
+}
+
+int hashcrossT(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *Cdata, int *Cir, int *Cjc, float *D) {
+  int nt = max(1, 256/nrows);
+  dim3 threadDim(nrows, nt, 1);
+  int nblocks = min(MAXXGRID, ncols);
+  __hashcrossT<<<nblocks,threadDim>>>(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;

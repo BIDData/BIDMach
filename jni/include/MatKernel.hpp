@@ -36,3 +36,7 @@ int getMergeIndsLen(long long *keys, int n, int *cspine);
 int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C);
 
 int hashmultT(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C);
+
+int hashcross(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *Cdata, int *Cir, int *Cjc, float *D);
+
+int hashcrossT(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *Cdata, int *Cir, int *Cjc, float *D);
