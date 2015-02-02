@@ -32,3 +32,7 @@ int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);
 int mergeInds(long long *keys, long long *okeys, int *counts, int n, int *cspine);
 
 int getMergeIndsLen(long long *keys, int n, int *cspine);
+
+int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C);
+
+int hashmultT(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C);
