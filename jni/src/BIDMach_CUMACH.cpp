@@ -221,7 +221,7 @@ extern "C" {
     return floatToInt(n, in, out, nbits);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashmult
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashMult
   (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC)
   {
     float *A = (float*)getPointer(env, jA);
@@ -233,7 +233,7 @@ extern "C" {
     return hashmult(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, C);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashmultT
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashMultT
   (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC)
   {
     float *A = (float*)getPointer(env, jA);
