@@ -222,7 +222,8 @@ extern "C" {
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashMult
-  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC)
+  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, 
+   jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC, jint transpose)
   {
     float *A = (float*)getPointer(env, jA);
     float *Bdata = (float*)getPointer(env, jBdata);
@@ -230,25 +231,13 @@ extern "C" {
     int *Bjc = (int*)getPointer(env, jBjc);
     float *C = (float*)getPointer(env, jC);
 
-    return hashmult(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, C);
+    return hashmult(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, C, transpose);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashMultT
-  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC)
-  {
-    float *A = (float*)getPointer(env, jA);
-    float *Bdata = (float*)getPointer(env, jBdata);
-    int *Bir = (int*)getPointer(env, jBir);
-    int *Bjc = (int*)getPointer(env, jBjc);
-    float *C = (float*)getPointer(env, jC);
-
-    return hashmultT(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, C);
-  }
-
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashcross
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashCross
   (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jobject jA,
    jobject jBdata, jobject jBir, jobject jBjc,
-   jobject jCdata, jobject jCir, jobject jCjc, jobject jD)
+   jobject jCdata, jobject jCir, jobject jCjc, jobject jD, jint transpose)
   {
     float *A = (float*)getPointer(env, jA);
     float *Bdata = (float*)getPointer(env, jBdata);
@@ -259,25 +248,7 @@ extern "C" {
     int *Cjc = (int*)getPointer(env, jCjc);
     float *D = (float*)getPointer(env, jD);
 
-    return hashcross(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D);
-  }
-
-  
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashcrossT
-  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jobject jA,
-   jobject jBdata, jobject jBir, jobject jBjc,
-   jobject jCdata, jobject jCir, jobject jCjc, jobject jD)
-  {
-    float *A = (float*)getPointer(env, jA);
-    float *Bdata = (float*)getPointer(env, jBdata);
-    int *Bir = (int*)getPointer(env, jBir);
-    int *Bjc = (int*)getPointer(env, jBjc);
-    float *Cdata = (float*)getPointer(env, jCdata);
-    int *Cir = (int*)getPointer(env, jCir);
-    int *Cjc = (int*)getPointer(env, jCjc);
-    float *D = (float*)getPointer(env, jD);
-
-    return hashcrossT(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D);
+    return hashcross(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D, transpose);
   }
 
 }

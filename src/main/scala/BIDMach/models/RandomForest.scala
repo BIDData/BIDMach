@@ -746,6 +746,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var acct = 0.0;
     var i = 0;
     val todo = jtree(itree+1) - jtree(itree);
+    Mat.nflops += todo * 4L * 10;
     var all = 0.0;
     var impure = 0.0;
     while (i < todo) {

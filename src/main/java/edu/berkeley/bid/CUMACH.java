@@ -45,8 +45,8 @@ public final class CUMACH {
     
     public static native int getMergeIndsLen(Pointer keys, int n, Pointer cspine);
     
-    public static native int hashMult(int nrows, int nfeats, int ncols, Pointer jA, Pointer jBdata, Pointer jBir, Pointer jBjc, Pointer jC);
+    public static native int hashMult(int nrows, int nfeats, int ncols, Pointer jA, Pointer jBdata, Pointer jBir, Pointer jBjc, Pointer jC, int transpose);
     
-    public static native int hashMultT(int nrows, int nfeats, int ncols, Pointer jA, Pointer jBdata, Pointer jBir, Pointer jBjc, Pointer jC);
+    public static native int hashCross(int nrows, int nfeats, int ncols, Pointer jA, Pointer jBdata, Pointer jBir, Pointer jBjc, Pointer jCdata, Pointer jCir, Pointer jCjc, Pointer D, int transpose);
     
 }

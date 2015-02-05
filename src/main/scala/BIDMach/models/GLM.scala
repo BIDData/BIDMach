@@ -375,7 +375,7 @@ abstract class GLMlink {
   def hashMult(a:GMat, b:GSMat):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashMult".##);
     c.clear;
-    CUMACH.hashMult(a.nrows, a.ncols, b.ncols, a.data, b.data, b.ir, b.jc, c.data);
+    CUMACH.hashMult(a.nrows, a.ncols, b.ncols, a.data, b.data, b.ir, b.jc, c.data, 0);
     c
   }
   
@@ -388,13 +388,39 @@ abstract class GLMlink {
   def hashMultT(a:GMat, b:GSMat, nfeats:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, nfeats, null, a.GUID, b.GUID, nfeats, "hashMultT".##);
     c.clear;
-    CUMACH.hashMultT(a.nrows, nfeats, b.ncols, a.data, b.data, b.ir, b.jc, c.data);
+    CUMACH.hashMult(a.nrows, nfeats, b.ncols, a.data, b.data, b.ir, b.jc, c.data, 1);
     c
   }
   
   def hashMultT(a:Mat, b:Mat, nfeats:Int):Mat = {
   	(a, b) match {
   	  case (ga:GMat, gb:GSMat) => hashMultT(ga, gb, nfeats)
+  	}
+  }
+  
+  def hashCross(a:GMat, b:GSMat, c:GSMat):GMat = {
+    val d = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashCross".##);
+    d.clear;
+    CUMACH.hashCross(a.nrows, a.ncols, b.ncols, a.data, b.data, b.ir, b.jc, c.data, c.ir, c.jc, d.data, 0);
+    d
+  }
+  
+  def hashCross(a:Mat, b:Mat, c:Mat):Mat = {
+  	(a, b, c) match {
+  	  case (ga:GMat, gb:GSMat, gc:GSMat) => hashCross(ga, gb, gc)
+  	}
+  }
+  
+  def hashCrossT(a:GMat, b:GSMat, c:GSMat, nfeats:Int):GMat = {
+    val d = GMat.newOrCheckGMat(a.nrows, nfeats, null, a.GUID, b.GUID, "hashCrossT".##);
+    d.clear;
+    CUMACH.hashCross(a.nrows, nfeats, b.ncols, a.data, b.data, b.ir, b.jc, c.data, c.ir, c.jc, d.data, 1);
+    d
+  }
+  
+  def hashCrossT(a:Mat, b:Mat, c:Mat, nfeats:Int):Mat = {
+  	(a, b, c) match {
+  	  case (ga:GMat, gb:GSMat, gc:GSMat) => hashCrossT(ga, gb, gc, nfeats)
   	}
   }
   
@@ -495,6 +521,25 @@ abstract class GLMlink {
     mopts.lrate = 1f
     mopts.autoReset = false
     val model = new GLM(mopts)
+    val mm = new Learner(
+        ds, 
+        model, 
+        mkRegularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    (mm, mopts)
+  }
+  
+  class FGOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FilesDS.Opts
+  
+  // A learner that uses a files data source specified by a list of strings.  
+  def learner(fnames:List[String]):(Learner, FGOptions) = {
+    val mopts = new FGOptions;
+    mopts.lrate = 1f;
+    mopts.autoReset = false;
+    val model = new GLM(mopts);
+    mopts.fnames = fnames.map((a:String) => FilesDS.simpleEnum(a,1,0));
+    implicit val ec = threadPool(fnames.length + 2);
+    val ds = new FilesDS(mopts)(ec);    
     val mm = new Learner(
         ds, 
         model, 
