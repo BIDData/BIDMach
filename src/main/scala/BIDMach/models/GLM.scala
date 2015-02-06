@@ -144,151 +144,151 @@ object GLM {
     var hashFeatures = false;
   }
   
-  val linear = 0
-  val logistic = 1
-  val maxp = 2
-  val svm = 3  
+  val linear = 0;
+  val logistic = 1;
+  val maxp = 2;
+  val svm = 3;
 
-object LinearLink extends GLMlink {
-  def link(in:Float) = {
-    in
-  }
-  
-  def mean(in:Float) = {
-    in
-  }
-  
-  def derivlink(in:Float, targ:Float) = {
-    targ - in
-  }
-  
-  def likelihood(pred:Float, targ:Float) = {
-    val diff = targ - pred
-    - diff * diff
-  }
-     
-  override val linkfn = link _
-  
-  override val derivfn = derivlink _
-    
-  override val meanfn = mean _
-  
-  override val likelihoodfn = likelihood _
-  
-  val fnflops = 2
-}
+  object LinearLink extends GLMlink {
+  	def link(in:Float) = {
+  		in
+  	}
 
-object LogisticLink extends GLMlink {
-  def link(in:Float) = {
-    math.log(in / (1.0f - in)).toFloat
+  	def mean(in:Float) = {
+  		in
+  	}
+
+  	def derivlink(in:Float, targ:Float) = {
+  		targ - in;
+  	}
+
+  	def likelihood(pred:Float, targ:Float) = {
+  		val diff = targ - pred;
+  		- diff * diff;
+  	}
+
+  	override val linkfn = link _;
+
+  	override val derivfn = derivlink _;
+
+  	override val meanfn = mean _;
+
+  	override val likelihoodfn = likelihood _;
+
+  	val fnflops = 2;
   }
-  
-  def mean(in:Float) = {
-    if (in > 0) {
-    	val tmp = math.exp(-in)
-    	(1.0 / (1.0 + tmp)).toFloat    
-    } else {
-    	val tmp = math.exp(in)
-    	(tmp / (1.0 + tmp)).toFloat
-    }
+
+  object LogisticLink extends GLMlink {
+  	def link(in:Float) = {
+  		math.log(in / (1.0f - in)).toFloat;
+  	}
+
+  	def mean(in:Float) = {
+  		if (in > 0) {
+  			val tmp = math.exp(-in);
+  			(1.0 / (1.0 + tmp)).toFloat;
+  		} else {
+  			val tmp = math.exp(in);
+  			(tmp / (1.0 + tmp)).toFloat;
+  		}
+  	}
+
+  	def derivlink(in:Float, targ:Float) = {
+  		targ - in;
+  	}
+
+  	def likelihood(pred:Float, targ:Float) = {
+  		math.log(targ * pred + (1.0f - targ) * (1.0f - pred) + 1e-20).toFloat
+  	}
+
+  	override val linkfn = link _;
+
+  	override val derivfn = derivlink _;
+
+  	override val meanfn = mean _;
+
+  	override val likelihoodfn = likelihood _;
+
+  	val fnflops = 20;
   }
-  
-  def derivlink(in:Float, targ:Float) = {
-    targ - in
-  }
-  
-  def likelihood(pred:Float, targ:Float) = {
-    math.log(targ * pred + (1.0f - targ) * (1.0f - pred) + 1e-20).toFloat
-  }
-  
-  override val linkfn = link _
-  
-  override val derivfn = derivlink _
-  
-  override val meanfn = mean _
-  
-  override val likelihoodfn = likelihood _
-  
-  val fnflops = 20
-}
 
 
-object MaxpLink extends GLMlink {
-  def link(in:Float) = {
-    math.log(in / (1.0f - in)).toFloat
-  }
-  
-  def mean(in:Float) = {
-    if (in > 0) {
-        val tmp = math.exp(-in)
-        (1.0 / (1.0 + tmp)).toFloat    
-    } else {
-        val tmp = math.exp(in)
-        (tmp / (1.0 + tmp)).toFloat
-    }
-  }
-  
-  def derivlink(p:Float, targ:Float) = {
-    (2.0f * targ - 1.0f) * p * (1.0f - p)
-  }
-  
-  def likelihood(pred:Float, targ:Float) = {
-    targ * pred + (1.0f - targ) * (1.0f - pred) -1.0f
-  }
-  
-  override val linkfn = link _
-  
-  override val derivfn = derivlink _
-  
-  override val meanfn = mean _
-  
-  override val likelihoodfn = likelihood _
-  
-  val fnflops = 20
-}
+  object MaxpLink extends GLMlink {
+  	def link(in:Float) = {
+  		math.log(in / (1.0f - in)).toFloat;
+  	}
 
-object SVMLink extends GLMlink {
-  def link(in:Float) = {
-    in
-  }
-  
-  def mean(in:Float) = {
-    in
-  }
-  
-  def derivlink(pred:Float, targ:Float) = {
-    val ttarg = 2 * targ - 1
-    if (pred * ttarg < 1f) ttarg else 0f
-  }
-  
-  def likelihood(pred:Float, targ:Float) = {
-    val ttarg = 2 * targ - 1
-    scala.math.min(0f, ttarg * pred - 1f)
-  }
-     
-  override val linkfn = link _
-  
-  override val derivfn = derivlink _
-    
-  override val meanfn = mean _
-  
-  override val likelihoodfn = likelihood _
-  
-  val fnflops = 2
-}
+  	def mean(in:Float) = {
+  		if (in > 0) {
+  			val tmp = math.exp(-in);
+  			(1.0 / (1.0 + tmp)).toFloat;
+  		} else {
+  			val tmp = math.exp(in);
+  			(tmp / (1.0 + tmp)).toFloat;
+  		}
+  	}
 
-object LinkEnum extends Enumeration {
-  type LinkEnum = Value
-  val Linear, Logistic, Maxp, SVMLink = Value
-}
+  	def derivlink(p:Float, targ:Float) = {
+  		(2.0f * targ - 1.0f) * p * (1.0f - p);
+  	}
 
-abstract class GLMlink {
-  val linkfn:(Float => Float)
-  val derivfn:((Float,Float) => Float)
-  val meanfn:(Float => Float)
-  val likelihoodfn:((Float,Float) => Float)
-  val fnflops:Int
-}
+  	def likelihood(pred:Float, targ:Float) = {
+  		targ * pred + (1.0f - targ) * (1.0f - pred) -1.0f;
+  	}
+
+  	override val linkfn = link _;
+
+  	override val derivfn = derivlink _;
+
+  	override val meanfn = mean _;
+
+  	override val likelihoodfn = likelihood _;
+
+  	val fnflops = 20;
+  }
+
+  object SVMLink extends GLMlink {
+  	def link(in:Float) = {
+  		in
+  	}
+
+  	def mean(in:Float) = {
+  		in
+  	}
+
+  	def derivlink(pred:Float, targ:Float) = {
+  		val ttarg = 2 * targ - 1;
+  		if (pred * ttarg < 1f) ttarg else 0f;
+  	}
+
+  	def likelihood(pred:Float, targ:Float) = {
+  		val ttarg = 2 * targ - 1;
+  		scala.math.min(0f, ttarg * pred - 1f);
+  	}
+
+  	override val linkfn = link _;
+
+  	override val derivfn = derivlink _;
+
+  	override val meanfn = mean _;
+
+  	override val likelihoodfn = likelihood _;
+
+  	val fnflops = 2;
+  }
+
+  object LinkEnum extends Enumeration {
+  	type LinkEnum = Value;
+  	val Linear, Logistic, Maxp, SVMLink = Value
+  }
+
+  abstract class GLMlink {
+  	val linkfn:(Float => Float)
+  	val derivfn:((Float,Float) => Float)
+  	val meanfn:(Float => Float)
+  	val likelihoodfn:((Float,Float) => Float)
+  	val fnflops:Int
+  }
   
   val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
   
@@ -675,38 +675,37 @@ abstract class GLMlink {
   class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-		d:Int = 0
-		) = {
-  	
-  	val opts = new LearnFParOptions
-  	opts.lrate = 1f
+  		nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+  		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+  		d:Int = 0
+  		) = {
+  	val opts = new LearnFParOptions;
+  	opts.lrate = 1f;
   	val nn = new ParLearnerxF(
-  	    null,
-  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
-  	    opts, mkGLMModel _,
-  	    opts, mkRegularizer _,
-  	    opts, mkUpdater _,
-  	    opts
-  	)
+  			null,
+  			(dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
+  			opts, mkGLMModel _,
+  			opts, mkRegularizer _,
+  			opts, mkUpdater _,
+  			opts
+  			)
   	(nn, opts)
   }
   
   def learnFPar(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-		d:Int = 0
-		) = {	
-  	val opts = new LearnFParOptions
-  	opts.lrate = 1f
+  		nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
+  		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+  		d:Int = 0
+  		) = {	
+  	val opts = new LearnFParOptions;
+  	opts.lrate = 1f;
   	val nn = new ParLearnerF(
-  	    Experiments.Twitter.twitterWords(nstart, nend),
-  	    opts, mkGLMModel _, 
-        opts, mkRegularizer _,
-  	    opts, mkUpdater _,
-  	    opts
-  	)
+  			Experiments.Twitter.twitterWords(nstart, nend),
+  			opts, mkGLMModel _, 
+  			opts, mkRegularizer _,
+  			opts, mkUpdater _,
+  			opts
+  			)
   	(nn, opts)
   }
 }

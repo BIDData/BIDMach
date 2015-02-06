@@ -3,14 +3,14 @@
 #include <stdio.h>
 #include <MatKernel.hpp>
 
-  static const unsigned int c1 = 0xcc9e2d51;
-  static const unsigned int c2 = 0x1b873593;
-  static const unsigned int r1 = 15;
-  static const unsigned int r2 = 13;
-  static const unsigned int m = 5;
-  static const unsigned int n = 0xe6546b64;
+static const unsigned int c1 = 0xcc9e2d51;
+static const unsigned int c2 = 0x1b873593;
+static const unsigned int r1 = 15;
+static const unsigned int r2 = 13;
+static const unsigned int m = 5;
+static const unsigned int n = 0xe6546b64;
 
-__device__ inline unsigned int h1(unsigned int k, unsigned int hash) {
+__forceinline__ __device__ unsigned int h1(unsigned int k, unsigned int hash) {
 
   k *= c1;
   k = (k << r1) | (k >> (32-r1));
@@ -21,7 +21,7 @@ __device__ inline unsigned int h1(unsigned int k, unsigned int hash) {
   return hash;
 }
 
-__device__ inline unsigned int mmhash(unsigned int v1, unsigned int v2, unsigned int v3, unsigned int mod, unsigned int seed)
+__forceinline__ __device__ unsigned int mmhash3(unsigned int v1, unsigned int v2, unsigned int v3, unsigned int mod, unsigned int seed)
 {
   unsigned int hash = seed;
  
@@ -84,7 +84,7 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
         if (jfeat < nsamps) {
           int inode = treenodes[itree + j * ntrees];
-          int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
+          int ifeat = mmhash3(itree, inode, jfeat, nrows, seed);
           float v = fbuff[ifeat + (j - i) * nrows];
           int vi = *((int *)&v);
           if (vi & signbit) {
@@ -146,7 +146,7 @@ __global__ void __treePackInt(int *fdata, int *treenodes, int *icats, long long 
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
         if (jfeat < nsamps) {
           int inode = treenodes[itree + j * ntrees];
-          int ifeat = mmhash(itree, inode, jfeat, nrows, seed);
+          int ifeat = mmhash3(itree, inode, jfeat, nrows, seed);
           ival = fbuff[ifeat + (j - i) * nrows];
           long long hdr = 
             (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
@@ -1052,5 +1052,24 @@ int floatToInt(int n, float *in, int *out, int nbits) {
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
+}
 
+__global__ void __jfeatToIfeat(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed) {
+  int ip = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
+  for (int i = ip; i < n; i += blockDim.x * gridDim.x * gridDim.y) {
+    int inode = inodes[i];
+    int jfeat = jfeats[i];
+    int ifeat = mmhash3(itree, inode, jfeat, nfeats, seed);
+    ifeats[i] = ifeat;
+  }
+}
+
+int jfeatToIfeat(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed) {
+  int nthreads;
+  dim3 griddims;
+  setsizes(n, &griddims, &nthreads);
+  __jfeatToIfeat<<<griddims,nthreads>>>(itree, inodes, jfeats, ifeats, n, nfeats, seed);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
 }

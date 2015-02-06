@@ -27,6 +27,8 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
 
 int floatToInt(int n, float *in, int *out, int nbits);
 
+int jfeatToIfeat(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed);
+
 int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);
 
 int mergeInds(long long *keys, long long *okeys, int *counts, int n, int *cspine);

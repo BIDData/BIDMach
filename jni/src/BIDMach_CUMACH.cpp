@@ -221,6 +221,16 @@ extern "C" {
     return floatToInt(n, in, out, nbits);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_jfeatToIfeat
+  (JNIEnv *env, jobject obj, jint itree, jobject jinodes, jobject jjfeats, jobject jifeats, jint n, jint nfeats, jint seed)
+  {
+    int *inodes = (int*)getPointer(env, jinodes);
+    int *jfeats = (int*)getPointer(env, jjfeats);
+    int *ifeats = (int*)getPointer(env, jifeats);
+
+    return jfeatToIfeat(itree, inodes, jfeats, ifeats, n, nfeats, seed);
+  }
+
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashMult
   (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, 
    jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC, jint transpose)

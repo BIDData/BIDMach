@@ -41,6 +41,8 @@ public final class CUMACH {
     
     public static native int floatToInt(int n, Pointer in, Pointer out, int nbits);
     
+    public static native int jfeatsToIfeats(int itree, Pointer inodes, Pointer jfeats, Pointer ifeats, int n, int nfeats, int seed);
+    
     public static native int mergeInds(Pointer keys, Pointer okeys, Pointer counts, int n, Pointer cspine);
     
     public static native int getMergeIndsLen(Pointer keys, int n, Pointer cspine);
