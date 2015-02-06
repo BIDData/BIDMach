@@ -84,7 +84,7 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
         if (jfeat < nsamps) {
           int inode = treenodes[itree + j * ntrees];
-          int ifeat = mmhash3(itree, inode, jfeat, nrows, seed);
+	  int ifeat = mmhash3(itree, inode, jfeat, nrows, seed);
           float v = fbuff[ifeat + (j - i) * nrows];
           int vi = *((int *)&v);
           if (vi & signbit) {
@@ -1054,7 +1054,7 @@ int floatToInt(int n, float *in, int *out, int nbits) {
   return err;
 }
 
-__global__ void __jfeatToIfeat(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed) {
+__global__ void __jfeatsToIfeats(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed) {
   int ip = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   for (int i = ip; i < n; i += blockDim.x * gridDim.x * gridDim.y) {
     int inode = inodes[i];
@@ -1064,11 +1064,11 @@ __global__ void __jfeatToIfeat(int itree, int *inodes, int *jfeats, int *ifeats,
   }
 }
 
-int jfeatToIfeat(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed) {
+int jfeatsToIfeats(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed) {
   int nthreads;
   dim3 griddims;
   setsizes(n, &griddims, &nthreads);
-  __jfeatToIfeat<<<griddims,nthreads>>>(itree, inodes, jfeats, ifeats, n, nfeats, seed);
+  __jfeatsToIfeats<<<griddims,nthreads>>>(itree, inodes, jfeats, ifeats, n, nfeats, seed);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
