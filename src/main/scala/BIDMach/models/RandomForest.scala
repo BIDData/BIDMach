@@ -70,11 +70,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var t4 = 0f;
   var t5 = 0f;
   var t6 = 0f;
-  var midstep = 0;
   val runtimes = zeros(8,1);
   var x:Mat = null;
   var y:Mat = null;
   var onGPU = false;
+  var useIfeats = false;
   
   def init() = {
     mats = datasource.next;
@@ -88,11 +88,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     nsamps = opts.nsamps;
     nbits = opts.nbits;
     seed = opts.seed;
+    useIfeats = opts.useIfeats;
     ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1)).dv.toInt + 1);
     fieldlengths(ITree) = RandomForest.countbits(ntrees);
     fieldlengths(INode) = RandomForest.countbits(nnodes);
     fieldlengths(JFeat) = RandomForest.countbits(nsamps);
-    fieldlengths(IFeat) = if (opts.useIfeats) RandomForest.countbits(nfeats) else 0;
+    fieldlengths(IFeat) = if (useIfeats) RandomForest.countbits(nfeats) else 0;
     fieldlengths(IVFeat) = nbits;
     fieldlengths(ICat) = RandomForest.countbits(ncats);
     fieldmasks = getFieldMasks(fieldlengths);
@@ -110,7 +111,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	gains = zeros(ntrees,1);
     	igains = zeros(ntrees,1);
     	nodecounts = iones(opts.ntrees, 1);
-    	midstep = opts.midstep;
     	ctrees.set(-1);
     	ctrees(0,?) = 0;
     	ftrees.set(-1)
@@ -297,7 +297,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         val inn = inodes(igain);
         val igg = inds(igain);
         val ifff = outf(igg);
-        if (! opts.useIfeats) jfeatsToIfeats(itree, inn, ifff, seed, gitree, gftree);
+        if (! useIfeats) jfeatsToIfeats(itree, inn, ifff, seed, gitree, gftree);
         ftrees(inn, itree) = ifff;                    // Set the threshold features
         vtrees(inn, itree) = outv(igg);               // Threshold values
         val ibase = nodecounts(itree);
@@ -431,7 +431,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
             val ifeat = rhash(seed, itree, inode, jfeat, nfeats);
             val ivfeat = floatConvert(fdata(ifeat, icolx));
             val ic = cats(icolx);
-            out.data(nxvals) = packFields(itree, inode, jfeat, ifeat, ivfeat, ic);
+            out.data(nxvals) = packFields(itree, inode, jfeat, if (useIfeats) ifeat else 0, ivfeat, ic);
             nxvals += 1;
             jfeat += 1;
           }
@@ -632,8 +632,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
   
-  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, gout:GLMat, ipass:Int):GLMat ={
-    val seed = 1231243 + 352453*ipass;
+  def gtreePack(fdata:FMat, tnodes:IMat, icats:IMat, gout:GLMat, seed:Int):GLMat ={
     val nrows = fdata.nrows
     val ncols = fdata.ncols
     val nxvals = ncols * ntrees * nsamps;
@@ -812,7 +811,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         j += 1;
       }
       val inode = extractField(INode, keys(jci));
-      val ifeat = extractField(if (opts.useIfeats) IFeat else JFeat, keys(jci));
+      val ifeat = extractField(if (useIfeats) IFeat else JFeat, keys(jci));
       var minImpty = 0.0;
       var lastImpty = 0.0;
       var nodeImpty = 0.0;
@@ -1071,15 +1070,14 @@ object RandomForest {
      var nsamps = 32;
      var nnodes = 100000;
      var nbits = 8;
-     var catsPerSample = 1f;
      var gain = 0.01f;
+     var catsPerSample = 1f;
      var ncats = 0;
      var training = true;
      var impurity = 0;  // zero for entropy, one for Gini impurity
      var regression = false;
      var seed = 1;
-     var useIfeats = true; // explicitly save Ifeat indices (vs. compute them)
-     var midstep = 8;  // try sqrt of ninstances / batchsize
+     var useIfeats = false; // explicitly save Ifeat indices (vs. compute them)
      var GPU = true;
      var trace = 0;
   }
