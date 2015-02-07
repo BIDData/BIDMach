@@ -51,6 +51,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var lout:LMat = null;
   var gout:GLMat = null;
   var gtnodes:GIMat = null;
+  var gfnodes:GMat = null;
   var outv:IMat = null;                     // Threshold values returned by minImpurity
   var outf:IMat = null;                     // Features returned by minImpurity
   var outn:IMat = null;                     // Node numbers returned by minImpurity
@@ -139,6 +140,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     		gtmpcounts = gizeros(1, bsize);
     		gout = GLMat(1, batchSize * nsamps * ntrees);
     		gtnodes = GIMat(ntrees, batchSize);
+    		gfnodes = GMat(ntrees, batchSize);
         gftree = GIMat(nnodes, 1);
         gitree = GIMat(nnodes, 1);
         gitrees = GIMat(itrees);
@@ -184,7 +186,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	}
     }
     case (gdata:GMat, gicats:GIMat) => {
-    	gtreeWalk(gdata, gtnodes, null, gitrees, gftrees, gvtrees, gctrees, ipass, false); 
+    	gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false); 
     	t1 = toc; runtimes(0) += t1 - t0;
     	gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
     	t2 = toc; runtimes(1) += t2 - t1;
