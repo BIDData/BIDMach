@@ -236,6 +236,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
           fcats <-- pcats;
         }
       }
+      case (gdata:GMat, gcats:GIMat) => {
+      	gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false);
+      	val gff = new GMat(fnodes.nrows, fnodes.ncols, gfnodes.data, gfnodes.realsize);
+      	fnodes <-- gff;
+      }
     }
     ynodes = fnodes;
     if (opts.regression) {
