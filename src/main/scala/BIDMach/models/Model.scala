@@ -79,11 +79,13 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
         if (useDouble) {
          	to(i) = from(i) match {
         	case aa:FMat => GDMat(aa)
+        	case aa:IMat => GIMat(aa)
         	case aa:SMat => GSDMat(aa)
         	}         
         } else {
         	to(i) = from(i) match {
         	case aa:FMat => GMat(aa)
+        	case aa:IMat => GIMat(aa)        	
         	case aa:SMat => GSMat(aa)
         	}
         }
