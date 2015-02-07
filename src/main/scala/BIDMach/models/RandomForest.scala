@@ -40,10 +40,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var nodecounts:IMat = null;
   var itrees:IMat = null;                   // Index of left child (right child is at this value + 1)
   var ftrees:IMat = null;                   // The feature index for this node
-  var gftree:GIMat = null;
-  var gitree:GIMat = null;
   var vtrees:IMat = null;                   // The value to compare with for this node
   var ctrees:FMat = null;                   // Majority class for this node
+  var gftree:GIMat = null;
+  var gitree:GIMat = null;
   var lout:LMat = null;
   var gout:GLMat = null;
   var gtnodes:GIMat = null;
@@ -517,6 +517,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def gmakeV(keys:GLMat, vals:GIMat, tmpkeys:GLMat, tmpcounts:GIMat):SVec = {
     Mat.nflops += keys.length;
     val (ginds, gcounts) = GLMat.collectLVec(keys, vals, tmpkeys, tmpcounts);
+    Mat.nflops += 1L * keys.length;
     val ovec = SVec(ginds.length);
     ovec.inds <-- ginds;
     ovec.counts <-- gcounts;
@@ -650,12 +651,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   def gpsort(gout:GLMat) = {
-    import jcuda._
-    import jcuda.runtime.JCuda._
-    import jcuda.runtime.cudaMemcpyKind._
     val nxvals = gout.length;
-    Mat.nflops += nxvals * 2L * math.log(nxvals).toInt;
     CUMAT.lsort(gout.data, nxvals, 1);
+    Mat.nflops += 2L * nxvals * math.log(nxvals).toInt;
+    val err = CUMAT.lsort(gout.data, nxvals, 1);
+    if (err != 0) {throw new RuntimeException("gpsort: error " + cudaGetErrorString(err))}
     cudaDeviceSynchronize()
   }
   
