@@ -208,12 +208,13 @@ __global__ void __treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   int bid = blockIdx.x + gridDim.x * blockIdx.y;
   int nblocks = gridDim.x * gridDim.y;
+  int nthreads = blockDim.x * blockDim.y;
 
   for (i = nc * bid; i < ncols; i += nc * nblocks) {             // i is a global block column index
     int ctodo = min(nc, ncols - i);
-    // Fill up the SHMEM buffer
+    // Fill up the SHMEM buffer with nc columns from fdata
     __syncthreads();
-    for (j = tid; j < nrows * ctodo; j += blockDim.x*blockDim.y) {
+    for (j = tid; j < nrows * ctodo; j += nthreads) {
       fbuff[j] = fdata[j + i * nrows];
     }
     __syncthreads();

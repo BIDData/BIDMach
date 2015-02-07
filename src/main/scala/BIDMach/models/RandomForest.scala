@@ -42,6 +42,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var ftrees:IMat = null;                   // The feature index for this node
   var vtrees:IMat = null;                   // The value to compare with for this node
   var ctrees:FMat = null;                   // Majority class for this node
+  var gitrees:GIMat = null;                   // Index of left child (right child is at this value + 1)
+  var gftrees:GIMat = null;                   // The feature index for this node
+  var gvtrees:GIMat = null;                   // The value to compare with for this node
+  var gctrees:GMat = null; 
   var gftree:GIMat = null;
   var gitree:GIMat = null;
   var lout:LMat = null;
@@ -137,6 +141,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     		gtnodes = GIMat(ntrees, batchSize);
         gftree = GIMat(nnodes, 1);
         gitree = GIMat(nnodes, 1);
+        gitrees = GIMat(itrees);
+        gftrees = GIMat(ftrees);
+        gvtrees = GIMat(vtrees);
+        gctrees = GMat(ctrees);
     	}
     }       
   } 
@@ -148,7 +156,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val t0 = toc
     (data, cats) match {
     case (fdata:FMat, icats:IMat) => {
-    	//        println("i=%d, hash=%f" format (i, sum(sum(fdata,2)).v))
     	xnodes = if (nnodes.asInstanceOf[AnyRef] != null) {
     	  val nn = nnodes.asInstanceOf[IMat];
     	  treeStep(fdata, nn, null, itrees, ftrees, vtrees, ctrees, false);
@@ -163,22 +170,27 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	runtimes(0) += t1 - t0;
         if (onGPU) {
     	  gout = gtreePack(fdata, xnodes, icats, gout, seed);
-    	  t2 = toc;
-    	  runtimes(1) += t2 - t1;
+    	  t2 = toc; runtimes(1) += t2 - t1;
     	  gpsort(gout);  
-    	  t3 = toc;
-    	  runtimes(2) += t3 - t2;
+    	  t3 = toc;  runtimes(2) += t3 - t2;
     	  blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
     	} else {
     	  lout = treePack(fdata, xnodes, icats, lout, seed);
-    	  t2 = toc;
-    	  runtimes(1) += t2 - t1;
+    	  t2 = toc; runtimes(1) += t2 - t1;
     	  java.util.Arrays.sort(lout.data, 0, lout.length);
     	  Mat.nflops += lout.length * math.log(lout.length).toLong;
-    	  t3 = toc;
-    	  runtimes(2) += t3 - t2;
+    	  t3 = toc; runtimes(2) += t3 - t2;
     	  blockv = makeV(lout);
     	}
+    }
+    case (gdata:GMat, gicats:GIMat) => {
+    	gtreeWalk(gdata, gtnodes, null, gitrees, gftrees, gvtrees, gctrees, ipass, false); 
+    	t1 = toc; runtimes(0) += t1 - t0;
+    	gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
+    	t2 = toc; runtimes(1) += t2 - t1;
+    	gpsort(gout);  
+    	t3 = toc;	runtimes(2) += t3 - t2;
+    	blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
     }
     case _ => {
     	throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
@@ -305,6 +317,10 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       t2 = toc;
       runtimes(7) += t2 - t1;
     } 
+    gitrees <-- itrees;
+    gftrees <-- ftrees;
+    gvtrees <-- vtrees;
+    gctrees <-- ctrees;
     seed = opts.seed + 341211*(ipass+1);
     println("purity gain %5.4f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, 2*mean(igains).v, mean(FMat(nodecounts)).v));
 //    if (ipass < opts.depth-1) { 
@@ -472,7 +488,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     Mat.nflops += 1L * nitems * ntrees; 
   }
   
-  def treeWalk(fdata:FMat, tnodes:IMat, fnodes:FMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:FMat, depth:Int, getcat:Boolean):FMat = {
+  def treeWalk(fdata:FMat, tnodes:IMat, fnodes:FMat, itrees:IMat, ftrees:IMat, vtrees:IMat, ctrees:FMat, depth:Int, getcat:Boolean) = {
     val nfeats = fdata.nrows;
     val nitems = fdata.ncols;
     var icol = 0;
@@ -510,9 +526,15 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     fnodes
   }
   
-  def gtreeStep(gdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, getcat:Boolean)  {}
+  def gtreeWalk(fdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, depth:Int, getcat:Boolean) = {
+    val nrows = fdata.nrows;
+    val ncols = fdata.ncols;
+    val err = CUMACH.treeWalk(fdata.data, tnodes.data, fnodes.data, itrees.data, ftrees.data, vtrees.data, ctrees.data, 
+    		nrows, ncols, ntrees, nnodes, if (getcat) 1 else 0, nbits, depth);
+    if (err != 0) {throw new RuntimeException("gtreeWalk: error " + cudaGetErrorString(err))}
+  }
   
-  def gtreeWalk(gdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, depth:Int, getcat:Boolean)  {}
+  def gtreeStep(gdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, getcat:Boolean)  {}
     
   def gmakeV(keys:GLMat, vals:GIMat, tmpkeys:GLMat, tmpcounts:GIMat):SVec = {
     Mat.nflops += keys.length;
@@ -644,8 +666,18 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     cudaMemcpy(gtnodes.data, Pointer.to(tnodes.data), ncols*ntrees*Sizeof.INT, cudaMemcpyHostToDevice)
     cudaDeviceSynchronize();
     var err = cudaGetLastError
-    if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
+    if (err != 0) {throw new RuntimeException("fgtreePack: error " + cudaGetErrorString(err))}
     err= CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
+    if (err != 0) {throw new RuntimeException("fgtreePack: error " + cudaGetErrorString(err))}
+    new GLMat(1, nxvals, gout.data, gout.realsize);
+  }
+  
+  def gtreePack(gdata:GMat, gtnodes:GIMat, gcats:GIMat, gout:GLMat, seed:Int):GLMat ={
+    val nrows = gdata.nrows
+    val ncols = gdata.ncols
+    val nxvals = ncols * ntrees * nsamps;
+    Mat.nflops += 1L * nxvals;
+    val err= CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
     if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
     new GLMat(1, nxvals, gout.data, gout.realsize);
   }
