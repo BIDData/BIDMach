@@ -652,7 +652,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   
   def gpsort(gout:GLMat) = {
     val nxvals = gout.length;
-    CUMAT.lsort(gout.data, nxvals, 1);
     Mat.nflops += 2L * nxvals * math.log(nxvals).toInt;
     val err = CUMAT.lsort(gout.data, nxvals, 1);
     if (err != 0) {throw new RuntimeException("gpsort: error " + cudaGetErrorString(err))}
