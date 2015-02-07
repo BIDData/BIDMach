@@ -25,15 +25,14 @@ int treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fie
 int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 
                 int nnodes, int ncats, int nsamps, int impType);
 
+int treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees, int *ftrees, int *vtrees, float *ctrees,
+             int nrows, int ncols, int ntrees, int nnodes, int getcat, int nbits, int nlevels);
+
 int floatToInt(int n, float *in, int *out, int nbits);
 
 int jfeatsToIfeats(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed);
 
 int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);
-
-int mergeInds(long long *keys, long long *okeys, int *counts, int n, int *cspine);
-
-int getMergeIndsLen(long long *keys, int n, int *cspine);
 
 int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose);
 

@@ -10,6 +10,20 @@ static const unsigned int r2 = 13;
 static const unsigned int m = 5;
 static const unsigned int n = 0xe6546b64;
 
+static const int dtsignbit = 0x80000000;
+static const int dtmag =     0x7fffffff;
+
+__forceinline__ __device__ int getFloatBits(float val, int fshift) {
+  int ival = *((int *)&val);
+  if (ival & dtsignbit) {
+    ival = -(ival & dtmag);
+  }
+  ival += dtsignbit;
+  ival = ((unsigned int)ival) >> fshift;
+  return ival;
+}
+
+
 __forceinline__ __device__ unsigned int h1(unsigned int k, unsigned int hash) {
 
   k *= c1;
@@ -40,6 +54,10 @@ __forceinline__ __device__ unsigned int mmhash3(unsigned int v1, unsigned int v2
 
 #define DBSIZE (8*1024)
 
+// threadIdx.x is the feature index
+// threadIdx.y is the tree index
+// blockIdx.x and blockIdx.y index blocks of columns
+
 __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *out, int *fieldlens, 
                            int nrows, int ncols, int ntrees, int nsamps, int seed) {
   __shared__ float fbuff[DBSIZE];
@@ -68,8 +86,6 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
   int itree = threadIdx.y;
   int jfeat = threadIdx.x;
 
-  const int signbit = 0x80000000;
-  const int mag =     0x7fffffff;
   int fshift = 32 - fl[4];
 
   for (i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
@@ -84,15 +100,9 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
         if (jfeat < nsamps) {
           int inode = treenodes[itree + j * ntrees];
-	  int ifeat = mmhash3(itree, inode, jfeat, nrows, seed);
+          int ifeat = mmhash3(itree, inode, jfeat, nrows, seed);
           float v = fbuff[ifeat + (j - i) * nrows];
-          int vi = *((int *)&v);
-          if (vi & signbit) {
-            vi = -(vi & mag);
-          }
-          vi += signbit;
-          int ival = vi >> fshift;
-          //          int ival = (int)v;
+          int ival = getFloatBits(v, fshift);
           long long hdr = 
             (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
             (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) |
@@ -183,69 +193,50 @@ int treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fie
   return err;
 }
 
-#if __CUDA_ARCH__ > 200
+// threadIdx.x is the tree index
+// threadIdx.y is a column index
+// blockIdx.x and blockIdx.y index blocks of columns
 
 __global__ void __treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees, int *ftrees, int *vtrees, float *ctrees,
                            int nrows, int ncols, int ntrees, int nnodes, int getcat, int nbits, int nlevels) {
   __shared__ float fbuff[DBSIZE];
-  int i, j, k, base, m, ipos, itree, ftree, vtree, feat, ikid, big;
-  float ctree;
+  int i, j, k, itree, inode, ipos, ftree, vtree, ifeat, ichild, big;
+  float ctree, feat;
 
-  int tid = threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z);
-  int inode = threadIdx.x;
-  int itr = threadIdx.y;
-  int icol = threadIdx.z;
-  
   int nc = (DBSIZE / nrows);
-
-  const int signbit = 0x80000000;
-  const int mag =     0x7fffffff;
   int fshift = 32 - nbits;
-  int mask = (1 << nbits) - 1;
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  int bid = blockIdx.x + gridDim.x * blockIdx.y;
+  int nblocks = gridDim.x * gridDim.y;
 
-  for (i = nc * blockIdx.x; i < ncols; i += nc * gridDim.x) {
+  for (i = nc * bid; i < ncols; i += nc * nblocks) {             // i is a global block column index
     int ctodo = min(nc, ncols - i);
     // Fill up the SHMEM buffer
-    for (j = tid; j < nrows * ctodo; j += blockDim.x*blockDim.y*blockDim.z) {
+    __syncthreads();
+    for (j = tid; j < nrows * ctodo; j += blockDim.x*blockDim.y) {
       fbuff[j] = fdata[j + i * nrows];
     }
     __syncthreads();
     
-    for (j = icol; j < i + ctodo; j += blockDim.z) {           // j is the column index
-      base = 0;                                                // points to the current B-tree
-      for (k = 0; k < nlevels; k++) {
-        ipos = base + itr * nnodes + inode;                    // read in a 32-element B-tree block
-        itree = itrees[ipos];
-        ftree = ftrees[ipos];
-        vtree = vtrees[ipos];
-        feat = *((int *)&fbuff[ftree + j * nrows]);            // get the feature pointed to 
-        if (feat & signbit) {                                  // convert to fixed point
-          feat = -(feat & mag);
+    for (j = threadIdx.y; j < ctodo; j += blockDim.y) {          // j is the (local SHMEM) column index
+      for (itree = threadIdx.x; itree < ntrees; itree += blockDim.x) { // itree indexes the trees
+        inode = 0;                                               // points to the current node
+        for (k = 0; k < nlevels; k++) {
+          ipos = inode + itree * nnodes;                         // address in the tree arrays of this node
+          ichild = itrees[ipos];                                 // left child index
+          if (ichild == 0) break;                                // this is a leaf, so break
+          ftree = ftrees[ipos];                                  // otherwise get split feature index
+          vtree = vtrees[ipos];                                  // and threshold 
+          feat = fbuff[ftree + j * nrows];                       // get the feature pointed to 
+          ifeat = getFloatBits(feat, fshift);
+          big = ifeat > vtree;                                   // compare with the threshold
+          inode = ichild + big;                                  // address of left child in the block
         }
-        feat += signbit;
-        feat = (feat >> fshift) & mask;
-        big = feat > vtree;                                    // compare with the threshold
-        ikid = itree;                                          // address of left child in the block
-        // walk down the tree - by passing up the appropriate child
-        if (!getcat || k < nlevels-1) {
-#pragma unroll
-          for (m = 0; m < 5; m++) {
-            itree = __shfl(itree, ikid + big);
-          }
-          base = itree;
-        } else {
+        if (getcat) {                                            // save the leaf node index or the label
           ctree = ctrees[ipos];
-#pragma unroll
-          for (m = 0; m < 5; m++) {
-            ctree = __shfl(ctree, ikid + big);
-          }
-        }
-      }
-      if (inode == 0) {                                         // save the leaf node index or the label
-        if (getcat) {
-          fnodes[itr + (i + icol) * ntrees] = ctree;
+          fnodes[itree + (i + j) * ntrees] = ctree;
         } else {
-          inodes[itr + (i + icol) * ntrees] = base;
+          inodes[itree + (i + j) * ntrees] = inode;
         }
       }
     }
@@ -253,7 +244,21 @@ __global__ void __treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees
   }
 }
 
-#endif
+int treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees, int *ftrees, int *vtrees, float *ctrees,
+             int nrows, int ncols, int ntrees, int nnodes, int getcat, int nbits, int nlevels) {
+  int nc = DBSIZE / nrows;
+  int xthreads = min(ntrees,1024);
+  int ythreads = min(nc,1+1023/xthreads);
+  dim3 threaddims(xthreads, ythreads, 1);
+  int nblocks = 1 + (ncols-1) / 8 / nc;
+  int yblocks =  1 + (nblocks-1)/65536;
+  int xblocks = 1 + (nblocks-1)/yblocks;
+  dim3 blockdims(xblocks, yblocks, 1);
+  __treeWalk<<<blockdims,threaddims>>>(fdata, inodes, fnodes, itrees, ftrees, vtrees, ctrees, nrows, ncols, ntrees, nnodes, getcat, nbits, nlevels);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
 
 class entImpty {
  public:
@@ -783,263 +788,12 @@ int findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
   return err;
 }
 
-template<typename T>
-__global__ void __mergeIndsP1(T *keys, int *cspine, T *ispine,  T *vspine, int n) {
-  __shared__ T dbuff[1024];
-  int i, j, itodo, doit, total;
-  T thisval, lastval, endval, tmp;
-
-  int tid = threadIdx.x + threadIdx.y * blockDim.x;
-  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
-  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
-  
-  total = 0;
-  if (tid == 0) {
-    lastval = keys[imin];
-    ispine[blockIdx.x] = lastval;
-  }
-  for (i = imin; i < imax; i += blockDim.x * blockDim.y) {
-    itodo = min(blockDim.x * blockDim.y, imax - i);
-    __syncthreads();
-    if (i + tid < imax) {
-      thisval = keys[i + tid];
-      dbuff[tid] = thisval;
-    }
-    __syncthreads();
-    if (tid > 0 && i + tid < imax) lastval = dbuff[tid - 1];
-    if (tid == 0) endval = dbuff[itodo-1];
-    __syncthreads();
-    if (i + tid < imax) {
-      dbuff[tid] = (thisval == lastval) ? 0 : 1;
-    }
-    __syncthreads();
-    for (j = 1; j < itodo; j = j + j) {
-      doit = tid + j < itodo && (tid & ((j + j)-1)) == 0;
-      if (doit) {
-        tmp = dbuff[tid] + dbuff[tid + j];
-      }
-      __syncthreads();
-      if (doit) {
-        dbuff[tid] = tmp;
-      }
-      __syncthreads();
-    }
-    if (tid == 0) {
-      total += dbuff[0];
-      lastval = endval;
-    }
-    __syncthreads();
-  }	   
-  if (tid == 0) {
-    cspine[blockIdx.x] = total;
-    vspine[blockIdx.x] = endval;
-  } 
-}
-
-template<typename T>
-__global__ void __fixSpine(int *cspine, T *ispine, T *vspine, int n) {
-  __shared__ int counts[1024];
-  int tid = threadIdx.x + threadIdx.y * blockDim.x;
-  int i, tmp;
-
-  if (tid < n) {
-    counts[tid] = cspine[tid];
-  }
-  __syncthreads();
-  if (tid < n - 1) {
-    if (ispine[tid + 1] != vspine[tid]) {
-      counts[tid] += 1;
-    }
-  }
-  __syncthreads();
-  for (i = 1; i < n; i = i << 1) {
-    if (tid >= i) {
-      tmp = counts[tid - i];
-    }
-    __syncthreads();
-    if (tid >= i) {
-      counts[tid] += tmp;
-    }
-    __syncthreads();
-  }
-  if (tid == 0) {
-    counts[n-1] += 1;
-  }
-  __syncthreads();
-  if (tid < n) {
-    cspine[tid] = counts[tid];
-  }
-}
-    
-template<typename T>
-__global__ void __mergeIndsP2(T *keys, T *okeys, int *counts, int *cspine, int n) {
-  __shared__ T dbuff[1024];
-  __shared__ T obuff[2048];
-  __shared__ int ocnts[2048];
-  __shared__ int icnts[1024];
-  int i, j, itodo, doit, lastcnt, lastocnt, obase, odone, total, coff;
-  T thisval, lastval, tmp;
-
-  int tid = threadIdx.x + threadIdx.y * blockDim.x;
-  int imin = (int)(((long long)n) * blockIdx.x / gridDim.x);
-  int imax = (int)(((long long)n) * (blockIdx.x + 1) / gridDim.x);
-  int nbthreads = blockDim.x * blockDim.y;
-  
-  if (blockIdx.x == 0) {
-    odone = 0;
-  } else {
-    odone = cspine[blockIdx.x - 1];
-  }
-  obase = 0;
-  lastocnt = imin;
-  if (tid == 0) {
-    lastval = keys[imin];
-  }
-  for (i = imin; i < imax; i += nbthreads) {
-    itodo = min(nbthreads, imax - i);
-    __syncthreads();
-    if (i + tid < imax) {                                       // Copy a block of input data into dbuff
-      thisval = keys[i + tid];
-      dbuff[tid] = thisval;
-    }
-    __syncthreads();
-    if (tid > 0 && i + tid < imax) lastval = dbuff[tid - 1];
-    __syncthreads();
-    if (i + tid < imax) {
-      icnts[tid] = (thisval == lastval) ? 0 : 1;                // Bit that indicates a change of index
-    }
-    __syncthreads();
-    for (j = 1; j < itodo; j = j << 1) {                        // Cumsum of these bits = where to put key
-      doit = tid + j < itodo;
-      if (doit) {
-        tmp = icnts[tid] + icnts[tid + j];
-      }
-      __syncthreads();
-      if (doit) {
-        icnts[tid + j] = tmp;
-      }
-      __syncthreads();
-    }
-    total = icnts[itodo-1];
-    __syncthreads();
-    if (i + tid < imax && thisval != lastval) {                 // and save the key/counts there in buffer memory
-      if (tid > 0) {
-        lastcnt = icnts[tid-1];
-      } else {
-        lastcnt = 0;
-      }
-      obuff[obase + lastcnt] = lastval;
-      ocnts[obase + lastcnt] = i + tid;
-    }
-    __syncthreads();
-    obase += total;
-    if (obase >= nbthreads) {                                   // Buffer full so flush it
-      okeys[odone+tid] = obuff[tid];
-      if (tid > 0) lastocnt = ocnts[tid-1];
-      coff = ocnts[tid] - lastocnt;
-      atomicAdd(&counts[odone+tid], coff); 
-      lastocnt = ocnts[nbthreads-1];
-      odone += nbthreads;
-    }
-    __syncthreads();
-    if (obase >= nbthreads) {                                   // Copy top to bottom of buffer
-      obuff[tid] = obuff[tid+nbthreads];
-      ocnts[tid] = ocnts[tid+nbthreads];
-      obase -= nbthreads;
-    }
-    __syncthreads();
-  }	   
-  if (tid == itodo-1) {
-    obuff[obase] = thisval;
-    ocnts[obase] = i - nbthreads + tid + 1;
-  }
-  __syncthreads();
-  if (tid <= obase) {                                            // Flush out anything that's left
-    okeys[odone+tid] = obuff[tid];
-    if (tid > 0) lastocnt = ocnts[tid-1];
-    coff = ocnts[tid] - lastocnt;
-    atomicAdd(&counts[odone+tid], coff); 
-  }
-}
-
-//
-// Accepts an array of int64 keys which should be sorted. Outputs an array okeys with unique copies of each key,
-// with corresponding counts in the *counts* array. cspine is a working storage array in GPUmem which should be
-// passed in. The size of cspine should be at least nb32 * 32 bytes with nb32 as below (maximum 2048 bytes). 
-// Returns the length of the output in cspine[0].
-//
-int mergeInds(long long *keys, long long *okeys, int *counts, int n, int *cspine) {
-  cudaError_t err;
-  int nthreads = min(n, 1024);
-  int nt32 = 32*(1 + (nthreads-1)/32);
-  int nblocks = min(1 + (n-1)/nthreads, 64);
-  int nb32 = 32*(1+(nblocks - 1)/32);
-  long long *ispine = (long long *)&cspine[2*nb32];
-  long long *vspine = (long long *)&cspine[4*nb32];
-
-  __mergeIndsP1<long long><<<nblocks,nt32>>>(keys, cspine, ispine, vspine, n);
-  cudaDeviceSynchronize();
-  err = cudaGetLastError();
-  if (err == 0) {
-    __fixSpine<long long><<<1,nblocks>>>(cspine, ispine, vspine, nblocks);
-    cudaDeviceSynchronize();
-    err = cudaGetLastError();
-  }
-  if (err == 0) {
-    __mergeIndsP2<long long><<<nblocks,nt32>>>(keys, okeys, counts, cspine, n);
-    cudaDeviceSynchronize();
-    err = cudaGetLastError();
-  }
-  if (err == 0) {
-    cudaMemcpy(cspine, &cspine[nblocks-1], 4, cudaMemcpyDeviceToDevice);
-    cudaDeviceSynchronize();
-    err = cudaGetLastError();
-  }
-  return err;
-}
-//
-// Support function for mergeInds. Returns the length of the output arrays in cspine[0].
-// cspine is a working storage array in GPUmem which should be passed in. 
-// The size of cspine should be at least nb32 * 32 bytes with nb32 as below (maximum 2048 bytes). 
-//
-
-int getMergeIndsLen(long long *keys, int n, int *cspine) {
-  cudaError_t err;
-  int nthreads = min(n, 1024);
-  int nt32 = 32*(1 + (nthreads-1)/32);
-  int nblocks = min(1 + (n-1)/nthreads, 64);
-  int nb32 = 32*(1+(nblocks - 1)/32);
-  long long *ispine = (long long *)&cspine[2*nb32];
-  long long *vspine = (long long *)&cspine[4*nb32];
-
-  __mergeIndsP1<long long><<<nblocks,nt32>>>(keys, cspine, ispine, vspine, n);
-  cudaDeviceSynchronize();
-  err = cudaGetLastError();
-  if (err == 0) {
-    __fixSpine<long long><<<1,nblocks>>>(cspine, ispine, vspine, nblocks);
-    cudaDeviceSynchronize();
-    err = cudaGetLastError();
-  }
-  if (err == 0) {
-    cudaMemcpy(cspine, &cspine[nblocks-1], 4, cudaMemcpyDeviceToDevice);
-    cudaDeviceSynchronize();
-    err = cudaGetLastError();
-  }
-  return err;
-}
-
 __global__ void __floatToInt(int n, float *in, int *out, int nbits) {
-  const int signbit = 0x80000000;
-  const int mag =     0x7fffffff;
   int fshift = 32 - nbits;
   int ip = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   for (int i = ip; i < n; i += blockDim.x * gridDim.x * gridDim.y) {
     float v = in[i];
-    int vi = *((int *)&v);
-    if (vi & signbit) {
-      vi = -(vi & mag);
-    }
-    int ival = ((unsigned int)vi) >> fshift;
+    int ival = getFloatBits(v, fshift);
     out[i] = ival;
   }
 }

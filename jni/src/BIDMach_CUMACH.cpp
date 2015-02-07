@@ -191,25 +191,19 @@ extern "C" {
     return findBoundaries(keys, jc, n, njc, shift);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_mergeInds
-  (JNIEnv *env, jobject obj, jobject jkeys, jobject jokeys, jobject jcounts, jint n, jobject jcspine)
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_treeWalk
+  (JNIEnv *env, jobject obj, jobject jfdata, jobject jinodes, jobject jfnodes, jobject jitrees, jobject jftrees, jobject jvtrees, jobject jctrees,
+   jint nrows, jint ncols, jint ntrees, jint nnodes, jint getcat, jint nbits, jint nlevels)
   {
-    long long *keys = (long long*)getPointer(env, jkeys);
-    long long *okeys = (long long*)getPointer(env, jokeys);
-    int *counts = (int*)getPointer(env, jcounts);
-    int *cspine = (int*)getPointer(env, jcspine);
+    float *fdata = (float*)getPointer(env, jfdata);
+    int *inodes = (int*)getPointer(env, jinodes);
+    float *fnodes = (float*)getPointer(env, jfnodes);
+    int *itrees = (int*)getPointer(env, jitrees);
+    int *ftrees = (int*)getPointer(env, jftrees);
+    int *vtrees = (int*)getPointer(env, jvtrees);
+    float *ctrees = (float*)getPointer(env, jctrees);
 
-    return mergeInds(keys, okeys, counts, n, cspine);
-  }
-
-
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_getMergeIndsLen
-  (JNIEnv *env, jobject obj, jobject jkeys, jint n, jobject jcspine)
-  {
-    long long *keys = (long long*)getPointer(env, jkeys);
-    int *cspine = (int*)getPointer(env, jcspine);
-
-    return getMergeIndsLen(keys, n, cspine);
+    return treeWalk(fdata, inodes, fnodes, itrees, ftrees, vtrees, ctrees, nrows, ncols, ntrees, nnodes, getcat, nbits, nlevels);  
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_floatToInt
