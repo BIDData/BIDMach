@@ -99,14 +99,16 @@ __global__ void __treePack(float *fdata, int *treenodes, int *icats, long long *
       ic = icats[j];
       for (itree = threadIdx.y; itree < ntrees; itree += blockDim.y) {
         if (jfeat < nsamps) {
-          int inode = treenodes[itree + j * ntrees];
+          int inode0 = treenodes[itree + j * ntrees];
+          int inode = inode0 & 0x7fffffff;
+          long long isign = ((long long)((inode0 & dtsignbit) ^ dtsignbit)) << 32;
           int ifeat = mmhash3(itree, inode, jfeat, nrows, seed);
           float v = fbuff[ifeat + (j - i) * nrows];
           int ival = getFloatBits(v, fshift);
           long long hdr = 
             (((long long)(tmask & itree)) << tshift) | (((long long)(nmask & inode)) << nshift) | 
             (((long long)(jmask & jfeat)) << jshift) | (((long long)(imask & ifeat)) << ishift) |
-            (((long long)(vmask & ival)) << vshift) | ((long long)(ic & cmask));
+            (((long long)(vmask & ival)) << vshift) | ((long long)(ic & cmask)) | isign;
           out[jfeat + nsamps * (itree + ntrees * j)] = hdr;
         }
       }
@@ -222,16 +224,20 @@ __global__ void __treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees
     for (j = threadIdx.y; j < ctodo; j += blockDim.y) {          // j is the (local SHMEM) column index
       for (itree = threadIdx.x; itree < ntrees; itree += blockDim.x) { // itree indexes the trees
         inode = 0;                                               // points to the current node
+        ipos = itree * nnodes;                                   // address in the tree arrays of this node     
         for (k = 0; k < nlevels; k++) {
-          ipos = inode + itree * nnodes;                         // address in the tree arrays of this node
           ichild = itrees[ipos];                                 // left child index
-          if (ichild == 0) break;                                // this is a leaf, so break
-          ftree = ftrees[ipos];                                  // otherwise get split feature index
           vtree = vtrees[ipos];                                  // and threshold 
+          if (vtree == -2) {                                     // non-splittable node, so mark inode
+            inode = inode | dtsignbit;
+          }
+          if (ichild == 0 || vtree == -2) break;                 // this is a leaf, so break
+          ftree = ftrees[ipos];                                  // otherwise get split feature index
           feat = fbuff[ftree + j * nrows];                       // get the feature pointed to 
           ifeat = getFloatBits(feat, fshift);
           big = ifeat > vtree;                                   // compare with the threshold
           inode = ichild + big;                                  // address of left child in the block
+          ipos = inode + itree * nnodes;                         // address in the tree arrays of this node
         }
         if (getcat) {                                            // save the leaf node index or the label
           ctree = ctrees[ipos];
@@ -255,6 +261,8 @@ int treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees, int *ftrees,
   int yblocks =  1 + (nblocks-1)/65536;
   int xblocks = 1 + (nblocks-1)/yblocks;
   dim3 blockdims(xblocks, yblocks, 1);
+  //  printf("nrows %d, ncols %d, ntrees %d, nnodes %d, getcat %d, nbits %d, nlevels %d, xthreads %d, ythreads %d, xblocks %d, yblocks %d\n",
+  //  nrows, ncols, ntrees, nnodes, getcat, nbits, nlevels, xthreads, ythreads, xblocks, yblocks);
   __treeWalk<<<blockdims,threaddims>>>(fdata, inodes, fnodes, itrees, ftrees, vtrees, ctrees, nrows, ncols, ntrees, nnodes, getcat, nbits, nlevels);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();

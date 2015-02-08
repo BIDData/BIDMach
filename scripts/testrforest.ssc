@@ -21,16 +21,17 @@ val nn = new Learner(             // make a learner instance
     opts)                         // pass the options to the learner as well
 
 
-opts.useGPU = false
+opts.useGPU = true
+opts.trace = 0
 opts.batchSize = 50000
-opts.depth =  20
-opts.ntrees = 32
+opts.depth =  30
+opts.ntrees = 20
 opts.nsamps = 32
 opts.nnodes = 500000
 opts.nbits = 16
 opts.gain = 0.001f
-opts.GPU = true
-opts.trace = 0
+opts.autoReset = false
+
 
 val rf = nn.model.asInstanceOf[RandomForest]
 
@@ -40,7 +41,7 @@ opts.nstart=70
 opts.nend=81
 opts.training=false
 
-nn.repredict
+// nn.repredict
 
 val err = mean(nn.results(0,?)) // The final test set error
 
