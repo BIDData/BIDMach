@@ -18,6 +18,10 @@ import jcuda.runtime.JCuda._
 import jcuda.runtime.cudaMemcpyKind._
 import scala.util.hashing.MurmurHash3
 import java.util.Arrays
+import scala.concurrent.Future
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Options) extends Model(opts) {
   
@@ -202,13 +206,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     lens0 += blockv.length;
     blockv = splittableNodes(blockv);
     lens1 += blockv.length;
-    t4 = toc;
-    runtimes(3) += t4 - t3;
+    t4 = toc;  runtimes(3) += t4 - t3;
     if (opts.trace > 1) println("collect/add %d %d" format (gout.length, blockv.length))
     totals.addSVec(blockv);
     iblock += 1;
-    t5 = toc;
-    runtimes(4) += t5 - t4;
+    t5 = toc; runtimes(4) += t5 - t4;
   }
 
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -286,7 +288,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   override def updatePass(ipass:Int) = { 
-//    midmerge
     val tt = totals.getSum;
     tt.checkInds;
     t6 = toc;
@@ -295,7 +296,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val totalcounts = tt.counts;
     val (jc0, jtree) = findBoundaries(totalinds, jc);
     var itree = 0;
-//    println("jc0="+jc0.t.toString);
     var impure = 0.0;
     while (itree < ntrees) {
       t0 = toc;
@@ -303,14 +303,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       impure += ifrac;
       t1 = toc;
       runtimes(6) += t1 - t0;
-//      println("jc1 %d gg %d %d" format (jc1.length, gg.nrows, gg.ncols))
-//      println("gg %s" format (gg.t.toString))
       val (vm, im) = maxi2(gg);                                         // Find feats with maximum -impurity gain
       val inds = im.t + icol(0->im.length) * gg.nrows;                  // Turn into an index for the "out" matrices
       val inodes = outn(inds);                                          // get the node indices
       ctrees(inodes, itree) = outc(inds);                               // Save the node class for these nodes
       vtrees(inodes, itree) = outv(inds);                               // Threshold values
-//      val reqgain = if (ipass < opts.depth - 1) opts.gain else Float.MaxValue;
       val reqgain = opts.gain
       val igain = find(vm > reqgain);                                   // find nodes above the impurity gain threshold
       gains(itree) = mean(vm).v
@@ -340,12 +337,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     println("purity gain %5.4f, fraction impure %4.3f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, lens1*1f/lens0, 2*mean(igains).v, mean(FMat(nodecounts)).v));
     lens0 = 0;
     lens1 = 0;
-//    if (ipass < opts.depth-1) { 
-//      totalinds = new LMat(1,0,totalinds.data)
-//    } else { 
-//      totalinds = null;
-//     totalcounts = null;
-//    }
   }
   
   def tochildren(itree:Int, inodes:IMat, left:FMat, right:FMat) {
@@ -550,6 +541,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def gtreeWalk(fdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, depth:Int, getcat:Boolean) = {
     val nrows = fdata.nrows;
     val ncols = fdata.ncols;
+    Mat.nflops += 1L * ncols * ntrees * depth;
     val err = CUMACH.treeWalk(fdata.data, tnodes.data, fnodes.data, itrees.data, ftrees.data, vtrees.data, ctrees.data, 
     		nrows, ncols, ntrees, nnodes, if (getcat) 1 else 0, nbits, depth);
     if (err != 0) {throw new RuntimeException("gtreeWalk: error " + cudaGetErrorString(err))}
@@ -558,7 +550,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def gtreeStep(gdata:GMat, tnodes:GIMat, fnodes:GMat, itrees:GIMat, ftrees:GIMat, vtrees:GIMat, ctrees:GMat, getcat:Boolean)  {}
     
   def gmakeV(keys:GLMat, vals:GIMat, tmpkeys:GLMat, tmpcounts:GIMat):SVec = {
-    Mat.nflops += keys.length;
     val (ginds, gcounts) = GLMat.collectLVec(keys, vals, tmpkeys, tmpcounts);
     Mat.nflops += 1L * keys.length;
     val ovec = SVec(ginds.length);
@@ -818,8 +809,31 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   // outg should be an nsamps * nnodes array holding the impurity gain (use maxi2 to get the best)
   // jc should be a zero-based array that points to the start and end of each group of fixed node, jfeat
 
+  def minImpurityx(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:FMat, outleft:FMat, outright:FMat, 
+		  jc:IMat, jtree:IMat, itree:Int, fnum:Int, regression:Boolean):(FMat, Double) = {
+      minImpurity_thread(keys, cnts, outv, outf, outn, outg, outc, outleft, outright, jc, jtree, itree, fnum, regression, 0, 1);
+  }
+
   def minImpurity(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:FMat, outleft:FMat, outright:FMat, 
 		  jc:IMat, jtree:IMat, itree:Int, fnum:Int, regression:Boolean):(FMat, Double) = {
+      val nthreads = 1 + (Mat.numThreads - 1)/2;
+      val fm = new Array[FMat](nthreads);
+      val impure = DMat(1, nthreads);
+      val futs = (0 until nthreads).map(i => {
+              Future {
+                  val (f, im) = minImpurity_thread(keys, cnts, outv, outf, outn, outg, outc, outleft, outright, jc, jtree, itree, fnum, regression, i, nthreads);
+                  fm(i) = f;
+                  impure(i) = im;
+                  true;
+              }
+          })
+      Await.ready(Future.sequence(futs), Duration.Inf);
+      (fm(0), mean(impure).v);
+  }
+
+
+  def minImpurity_thread(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:FMat, outleft:FMat, outright:FMat, 
+                         jc:IMat, jtree:IMat, itree:Int, fnum:Int, regression:Boolean, ithread:Int, nthreads:Int):(FMat, Double) = {
     
     val update = imptyFunArray(fnum).update
     val result = imptyFunArray(fnum).result
@@ -835,7 +849,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var tott = 0;
     var acc = 0.0;
     var acct = 0.0;
-    var i = 0;
+    var i = ithread;
     val todo = jtree(itree+1) - jtree(itree);
     Mat.nflops += todo * 4L * 10;
     var all = 0.0;
@@ -967,7 +981,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	  outright(i) = kmaxcnt;
       }
       outn(i) = inode;
-      i += 1;
+      i += nthreads;
     }
     if (opts.trace > 0) println("fraction of impure nodes %f" format impure/all);
     (new FMat(nsamps, todo/nsamps, outg.data), impure/all);
