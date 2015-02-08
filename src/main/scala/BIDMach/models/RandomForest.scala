@@ -18,9 +18,6 @@ import jcuda.runtime.JCuda._
 import jcuda.runtime.cudaMemcpyKind._
 import scala.util.hashing.MurmurHash3
 import java.util.Arrays
-import scala.concurrent.Future
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Options) extends Model(opts) {
@@ -843,15 +840,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       val nthreads = 1 + (Mat.numThreads - 1)/2;
       val fm = new Array[FMat](nthreads);
       val impure = DMat(1, nthreads);
-      val futs = (0 until nthreads).map(i => {
-              Future {
-                  val (f, im) = minImpurity_thread(keys, cnts, outv, outf, outn, outg, outc, outleft, outright, jc, jtree, itree, fnum, regression, i, nthreads);
-                  fm(i) = f;
-                  impure(i) = im;
-                  true;
-              }
-          })
-      Await.ready(Future.sequence(futs), Duration.Inf);
+      (0 until nthreads).par.map(i => {
+        val (f, im) = minImpurity_thread(keys, cnts, outv, outf, outn, outg, outc, outleft, outright, jc, jtree, itree, fnum, regression, i, nthreads);
+        fm(i) = f;
+        impure(i) = im;
+      })
       (fm(0), mean(impure).v);
   }
 
@@ -1026,21 +1019,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
 
   def addSVecs(a:Array[SVec], totals:Array[SVTree]) { 
-//    for (i <- 0 until a.length) totals(i).addSVec(a(i));
-    val futures = (0 until ntrees).map(i => {
-      Future {totals(i).addSVec(a(i));}
-    })
-    Await.ready(Future.sequence(futures), Duration.Inf);    
+    (0 until ntrees).par.map(i => {totals(i).addSVec(a(i));});
   }
 
   def getSum(totals:Array[SVTree]):Array[SVec] = { 
-    val out = new Array[SVec](totals.length);
-//    for (i <- 0 until totals.length) out(i) = totals(i).getSum;
-    val futures = (0 until ntrees).map(i => {
-      Future {out(i) = totals(i).getSum;}
-    })
-    Await.ready(Future.sequence(futures), Duration.Inf);    
-    out;
+    (0 until ntrees).par.map(i => {totals(i).getSum;}).toArray;
   }
 
 }
