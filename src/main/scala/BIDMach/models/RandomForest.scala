@@ -199,48 +199,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }       
   } 
 
-  def splittableNodes(blockv:SVec):Array[SVec] = { 
-    (0 until ntrees).par.map(i => { 
-      splittableNodes_thread(blockv, i);
-    }).toArray
-  }
-
-  def splittableNodes_thread(blockv:SVec, itree:Int):SVec = {
-    val keys = blockv.inds.data;
-    val istart = findIndex(blockv, itree);
-    val iend = findIndex(blockv, itree+1);
-    val out = SVec(iend - istart);
-    val body = (1L << 63) - 1;
-    var i = istart;
-    var j = 0;
-    while (i < iend) { 
-      var ki = keys(i);
-      ki = ki & body;
-      val itree = extractField(ITree, ki, fieldshifts, fieldmasks);
-      out.inds.data(j) = ki;
-      out.counts.data(j) = blockv.counts.data(i);
-      j += 1;
-      i += 1;
-    }
-    out;
-  }
-  
-  def findIndex(blockv:SVec, itree:Int):Int = { 
-    val keys = blockv.inds.data;
-    var istart = 0;
-    var iend = blockv.length;
-    val lsign = 1L << 63;
-    while (iend - istart > 1) {
-      var mid = (istart + iend)/2
-      val key = keys(mid);
-      val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
-      if (itree <= ktree) iend = mid else istart = mid
-    }
-    val key = keys(istart);
-    val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
-    if (itree == ktree) istart else iend;
-  }
-  
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
     val data = gmats(0);
     val cats = gmats(1);
@@ -358,7 +316,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   
   override def updatePass(ipass:Int) = { 
     val tt = getSum(totals);
-//    tt.checkInds;
     t6 = toc;
     runtimes(5) += t6 - t5;
     var itree = 0;
@@ -752,6 +709,48 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val err = CUMACH.jfeatsToIfeats(itree, gi.data, gf.data, gf.data, len, nfeats, seed);
     if (err != 0) {throw new RuntimeException("gjfeatsToIfeats: error " + cudaGetErrorString(err))}
     ifeats <-- gf;
+  }
+
+  def splittableNodes(blockv:SVec):Array[SVec] = { 
+    (0 until ntrees).par.map(i => { 
+      splittableNodes_thread(blockv, i);
+    }).toArray
+  }
+
+  def splittableNodes_thread(blockv:SVec, itree:Int):SVec = {
+    val keys = blockv.inds.data;
+    val istart = findIndex(blockv, itree);
+    val iend = findIndex(blockv, itree+1);
+    val out = SVec(iend - istart);
+    val body = (1L << 63) - 1;
+    var i = istart;
+    var j = 0;
+    while (i < iend) { 
+      var ki = keys(i);
+      ki = ki & body;
+      val itree = extractField(ITree, ki, fieldshifts, fieldmasks);
+      out.inds.data(j) = ki;
+      out.counts.data(j) = blockv.counts.data(i);
+      j += 1;
+      i += 1;
+    }
+    out;
+  }
+  
+  def findIndex(blockv:SVec, itree:Int):Int = { 
+    val keys = blockv.inds.data;
+    var istart = 0;
+    var iend = blockv.length;
+    val lsign = 1L << 63;
+    while (iend - istart > 1) {
+      var mid = (istart + iend)/2
+      val key = keys(mid);
+      val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
+      if (itree <= ktree) iend = mid else istart = mid
+    }
+    val key = keys(istart);
+    val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
+    if (itree == ktree) istart else iend;
   }
 
   // Find boundaries where JFeat or ITree changes
