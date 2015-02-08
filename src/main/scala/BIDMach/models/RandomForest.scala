@@ -66,8 +66,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var igains:FMat = null; 
   val fieldlengths = izeros(1,6);
   var gfieldlengths:GIMat = null;
-  var fieldmasks:IMat = null;
-  var fieldshifts:IMat = null;
+  var fieldmasks:Array[Int] = null;
+  var fieldshifts:Array[Int] = null;
   var t0 = 0f;
   var t1 = 0f;
   var t2 = 0f;
@@ -81,6 +81,51 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var useIfeats = false;
   var lens0 = 0L;
   var lens1 = 0L;
+
+  @inline def rhash(v1:Int, v2:Int, v3:Int, nb:Int):Int = {
+    math.abs(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3) % nb)
+  }
+  
+  @inline def rhash(v1:Int, v2:Int, v3:Int, v4:Int, nb:Int):Int = {
+    math.abs(MurmurHash3.mix(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3), v4) % nb)
+  }
+  
+  @inline def packFields(itree:Int, inode:Int, jfeat:Int, ifeat:Int, ivfeat:Int, icat:Int, fieldlengths:Array[Int]):Long = {
+    icat.toLong + 
+    ((ivfeat.toLong + 
+        ((ifeat.toLong + 
+            ((jfeat.toLong + 
+                ((inode.toLong + 
+                    (itree.toLong << fieldlengths(INode))
+                    ) << fieldlengths(JFeat))
+                ) << fieldlengths(IFeat))
+          ) << fieldlengths(IVFeat))
+      ) << fieldlengths(ICat))
+  }
+  
+  @inline def unpackFields(im:Long, fieldlengths:Array[Int]):(Int, Int, Int, Int, Int, Int) = {
+    var v = im;
+    val icat = (v & ((1 << fieldlengths(ICat))-1)).toInt;
+    v = v >>> fieldlengths(ICat);
+    val ivfeat = (v & ((1 << fieldlengths(IVFeat))-1)).toInt;
+    v = v >>> fieldlengths(IVFeat);
+    val ifeat = (v & ((1 << fieldlengths(IFeat))-1)).toInt;
+    v = v >>> fieldlengths(IFeat);
+    val jfeat = (v & ((1 << fieldlengths(JFeat))-1)).toInt;
+    v = v >>> fieldlengths(JFeat);
+    val inode = (v & ((1 << fieldlengths(INode))-1)).toInt;
+    v = v >>> fieldlengths(INode);
+    val itree = v.toInt;
+    (itree, inode, jfeat, ifeat, ivfeat, icat)
+  }
+  
+  @inline def extractAbove(fieldNum : Int, packedFields : Long, fieldshifts:Array[Int]) : Int = {
+    (packedFields >>> fieldshifts(fieldNum)).toInt
+  }
+
+  @inline def extractField(fieldNum : Int, packedFields : Long, fieldshifts:Array[Int], fieldmasks:Array[Int]) : Int = {
+    (packedFields >>> fieldshifts(fieldNum)).toInt & fieldmasks(fieldNum) 
+  }
   
   def init() = {
     mats = datasource.next;
@@ -154,43 +199,46 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }       
   } 
 
-  def splittableNodes(blockv:SVec):Array[SVec] = {
-    val len = blockv.length;
+  def splittableNodes(blockv:SVec):Array[SVec] = { 
+    (0 until ntrees).par.map(i => { 
+      splittableNodes_thread(blockv, i);
+    }).toArray
+  }
+
+  def splittableNodes_thread(blockv:SVec, itree:Int):SVec = {
     val keys = blockv.inds.data;
-    val tcounts = izeros(1, ntrees);
-    val out = new Array[SVec](ntrees);
-    var good = true;
-    var i = 0;
-    while (i < len & good) {
-      good = ((keys(i) & 0x8000000000000000L) != 0);
-      if (good) {
-        val itree = extractField(ITree, keys(i));
-        tcounts.data(itree) += 1;
-        i += 1;
-      }
-    }
-    i = 0;
-    while (i < ntrees) { 
-      out(i) = SVec(tcounts(i));
+    val istart = findIndex(blockv, itree);
+    val iend = findIndex(blockv, itree+1);
+    val out = SVec(iend - istart);
+    val body = (1L << 63) - 1;
+    var i = istart;
+    var j = 0;
+    while (i < iend) { 
+      var ki = keys(i);
+      ki = ki & body;
+      val itree = extractField(ITree, ki, fieldshifts, fieldmasks);
+      out.inds.data(j) = ki;
+      out.counts.data(j) = blockv.counts.data(i);
+      j += 1;
       i += 1;
     }
-    tcounts.clear;
-    good = true;
-    i = 0;
-    while (i < len & good) {
-      var ki = keys(i);
-      good = ((ki & 0x8000000000000000L) != 0);
-      ki = ki & 0x7fffffffffffffffL;
-      if (good) {
-        val itree = extractField(ITree, ki);
-        val tc = tcounts.data(itree);
-        out(itree).inds.data(tc) = ki;
-        out(itree).counts.data(tc) = blockv.counts.data(i);
-        tcounts.data(itree) += 1;
-        i += 1;
-      }
-    }
     out;
+  }
+  
+  def findIndex(blockv:SVec, itree:Int):Int = { 
+    val keys = blockv.inds.data;
+    var istart = 0;
+    var iend = blockv.length;
+    val lsign = 1L << 63;
+    while (iend - istart > 1) {
+      var mid = (istart + iend)/2
+      val key = keys(mid);
+      val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
+      if (itree <= ktree) iend = mid else istart = mid
+    }
+    val key = keys(istart);
+    val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
+    if (itree == ktree) istart else iend;
   }
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
@@ -371,53 +419,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 
   }
   
-  def rhash(v1:Int, v2:Int, v3:Int, nb:Int):Int = {
-    math.abs(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3) % nb)
-  }
-  
-  def rhash(v1:Int, v2:Int, v3:Int, v4:Int, nb:Int):Int = {
-    math.abs(MurmurHash3.mix(MurmurHash3.mix(MurmurHash3.mix(v1, v2), v3), v4) % nb)
-  }
-  
-  def packFields(itree:Int, inode:Int, jfeat:Int, ifeat:Int, ivfeat:Int, icat:Int):Long = {
-    icat.toLong + 
-    ((ivfeat.toLong + 
-        ((ifeat.toLong + 
-            ((jfeat.toLong + 
-                ((inode.toLong + 
-                    (itree.toLong << fieldlengths(INode))
-                    ) << fieldlengths(JFeat))
-                ) << fieldlengths(IFeat))
-          ) << fieldlengths(IVFeat))
-      ) << fieldlengths(ICat))
-  }
-  
-  def unpackFields(im:Long):(Int, Int, Int, Int, Int, Int) = {
-    var v = im;
-    val icat = (v & ((1 << fieldlengths(ICat))-1)).toInt;
-    v = v >>> fieldlengths(ICat);
-    val ivfeat = (v & ((1 << fieldlengths(IVFeat))-1)).toInt;
-    v = v >>> fieldlengths(IVFeat);
-    val ifeat = (v & ((1 << fieldlengths(IFeat))-1)).toInt;
-    v = v >>> fieldlengths(IFeat);
-    val jfeat = (v & ((1 << fieldlengths(JFeat))-1)).toInt;
-    v = v >>> fieldlengths(JFeat);
-    val inode = (v & ((1 << fieldlengths(INode))-1)).toInt;
-    v = v >>> fieldlengths(INode);
-    val itree = v.toInt;
-    (itree, inode, jfeat, ifeat, ivfeat, icat)
-  }
-  
-  def extractAbove(fieldNum : Int, packedFields : Long) : Int = {
-    (packedFields >>> fieldshifts(fieldNum)).toInt
-  }
 
-  def extractField(fieldNum : Int, packedFields : Long) : Int = {
-    (packedFields >>> fieldshifts(fieldNum)).toInt & fieldmasks(fieldNum) 
-  }
-
-  def getFieldShifts(fL : IMat) : IMat = {
-    val out = izeros(1, fL.length)
+  def getFieldShifts(fL : IMat) : Array[Int]= {
+    val out = new Array[Int](fL.length);
     var i = fL.length - 2
     while (i >= 0) {
       out(i) = out(i+1) + fL(i+1)
@@ -426,8 +430,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
 
-  def getFieldMasks(fL : IMat) : IMat = {
-    val out = izeros(1, fL.length)
+  def getFieldMasks(fL : IMat) : Array[Int] = {
+    val out = new Array[Int](fL.length);
     var i = 0
     while (i < fL.length) {
       out(i) = (1 << fL(i)) - 1
@@ -436,15 +440,15 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     out
   }
   
-  final val signbit:Int = 0x80000000;
-  final val mag:Int = 0x7fffffff;
+  final val signbit:Int = 1 << 31;
+  final val magnitude:Int = signbit - 1;
   
   @inline def floatConvert(a:Float):Int = {    
   	val vmask = fieldmasks(4);
   	val fshift = 32 - fieldlengths(4);
     var ai = java.lang.Float.floatToRawIntBits(a);
     if ((ai & signbit) > 0) {
-      ai = -(ai & mag);
+      ai = -(ai & magnitude);
     }
     ai += signbit;
     (ai >> fshift) & vmask;
@@ -465,15 +469,15 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       var itree = 0;
       while (itree < ntrees) {
         val inode0 = treenodes(itree, icolx);
-        val inode = inode0 & 0x7fffffff;
-        val isign = ((inode0 & 0x80000000) ^ 0x80000000).toLong << 32;
+        val inode = inode0 & magnitude
+        val isign = ((inode0 & signbit) ^ signbit).toLong << 32;
         if (inode >= 0) {
           var jfeat = 0;
           while (jfeat < nsamps) {
             val ifeat = rhash(seed, itree, inode, jfeat, nfeats);
             val ivfeat = floatConvert(fdata(ifeat, icolx));
             val ic = cats(icolx);
-            out.data(nxvals) = packFields(itree, inode, jfeat, if (useIfeats) ifeat else 0, ivfeat, ic) | isign;
+            out.data(nxvals) = packFields(itree, inode, jfeat, if (useIfeats) ifeat else 0, ivfeat, ic, fieldlengths.data) | isign;
             nxvals += 1;
             jfeat += 1;
           }
@@ -533,7 +537,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
           if (ileft == 0) {                           // This is a leaf, so              
             id = depth;                               // just skip out of the loop
             if (ithresh == -2) {                      // this node is not splittable
-              inode = inode | 0x80000000;             // so mark it negative
+              inode = inode | signbit;                // so mark it negative
             }
           } else {
             val ifeat = ftrees(inode, itree);         // Test this node and branch
@@ -547,7 +551,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
           id += 1;
         }
         if (getcat) {
-          fnodes(itree, icol) = ctrees(inode & 0x7fffffff, itree);
+          fnodes(itree, icol) = ctrees(inode & magnitude, itree);
         } else {
           tnodes(itree, icol) = inode;
         }
@@ -764,7 +768,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var i = 0
     var n = 0;
     while (i < keys.length) {
-      v = extractAbove(JFeat, keys(i));
+      v = extractAbove(JFeat, keys(i), fieldshifts);
       t = (keys(i) >>> tshift).toInt;
       while (t > nt) {
         tmat(nt+1) = n;
@@ -885,7 +889,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       while (j < jcn) {                     // First get the total counts for each group, and the most frequent cat
         val key = keys(j)
         val cnt = cnts(j)
-        val icat = extractField(ICat, key);
+        val icat = extractField(ICat, key, fieldshifts, fieldmasks);
         val newcnt = totcounts(icat) + cnt;
         totcounts(icat) = newcnt;
         totcats += cnt * icat;
@@ -896,8 +900,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         }
         j += 1;
       }
-      val inode = extractField(INode, keys(jci));
-      val ifeat = extractField(if (useIfeats) IFeat else JFeat, keys(jci));
+      val inode = extractField(INode, keys(jci), fieldshifts, fieldmasks);
+      val ifeat = extractField(if (useIfeats) IFeat else JFeat, keys(jci), fieldshifts, fieldmasks);
       var minImpty = 0.0;
       var lastImpty = 0.0;
       var nodeImpty = 0.0;
@@ -933,8 +937,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       	while (j < jcn) {     
       		val key = keys(j);
       		val cnt = cnts(j);
-      		val ival = extractField(IVFeat, key);
-      		val icat = extractField(ICat, key);  
+      		val ival = extractField(IVFeat, key, fieldshifts, fieldmasks);
+      		val icat = extractField(ICat, key, fieldshifts, fieldmasks);
 
       		if (j > jci && ival != lastival) {
       			lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // Dont compute every time!
@@ -970,8 +974,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         		j -= 1;
         		val key = keys(j);
         		val cnt = cnts(j);
-        		val ival = extractField(IVFeat, key);
-        		val icat = extractField(ICat, key);
+        		val ival = extractField(IVFeat, key, fieldshifts, fieldmasks);
+        		val icat = extractField(ICat, key, fieldshifts, fieldmasks);
         		val oldcnt = counts(icat);
         		val newcnt = oldcnt + cnt;
         		counts(icat) = newcnt;
