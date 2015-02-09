@@ -875,8 +875,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def regressVar(sumsq:Double, tott:Int, acc:Double, tot:Int, acct:Double, tot2:Int):Double = {
     (sumsq - (acc * acc / tot + acct * acct / tot2)) / tott;
   }
-    
-
   
   val imptyFunArray = Array[imptyType](entImpurity,giniImpurity)
   
@@ -973,8 +971,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       	j = 0;
       	if (regression) {            // Get the impurity for the node
       	  while (j < ncats) {
-      	    acct += j * totcounts(j);
-      	    sumsq += j * j * totcounts(j);
+      	    acct += 1.0 * j * totcounts(j);
+      	    sumsq += 1.0 * j * j * totcounts(j);
       	    j += 1;
       	  }
       	  val mmean = acct / tott;
@@ -1028,8 +1026,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       		val newcntt = totcounts(icat) - newcnt;
       		tot += cnt;
       		if (regression) {
-      		  acc += icat * cnt;
-      		  acct -= icat * cnt;
+      		  acc += 1.0 * icat * cnt;
+      		  acct -= 1.0 * icat * cnt;
       		} else {
       			acc += update(newcnt) - update(oldcnt);
       			acct += update(newcntt) - update(oldcntt);
