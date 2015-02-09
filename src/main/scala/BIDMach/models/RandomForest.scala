@@ -871,6 +871,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val result = resultfn _ ;
     val combine = combinefn _ ;
     }*/
+  
+  def regressVar(sumsq:Double, tott:Int, acc:Double, tot:Int, acct:Double, tot2:Int):Double = {
+    (sumsq - (acc * acc / tot + acct * acct / tot2)) / tott;
+  }
+    
 
   
   val imptyFunArray = Array[imptyType](entImpurity,giniImpurity)
@@ -899,7 +904,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       (fm(0), mean(impure).v);
   }
 
-
   def minImpurity_thread(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMat, outc:FMat, outleft:FMat, outright:FMat, 
                          jc:IMat, jtree:IMat, itree:Int, fnum:Int, regression:Boolean, ithread:Int, nthreads:Int):(FMat, Double) = {
     
@@ -917,6 +921,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var tott = 0;
     var acc = 0.0;
     var acct = 0.0;
+    var sumsq = 0.0;
     var i = ithread;
     val todo = jtree(itree+1) - jtree(itree);
     Mat.nflops += todo * 4L * 10;
@@ -963,19 +968,30 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         partv = -1;
         totcats = 0.0;
         impure += tott;
-      	acct = 0; 
+        acct = 0;
       	//      println("totcounts "+totcounts.toString);
       	j = 0;
-      	while (j < ncats) {                  // Get the impurity for the node
-      		acct += update(totcounts(j));
-      		j += 1
+      	if (regression) {            // Get the impurity for the node
+      	  while (j < ncats) {
+      	    acct += j * totcounts(j);
+      	    sumsq += j * j * totcounts(j);
+      	    j += 1;
+      	  }
+      	  val mmean = acct / tott;
+      	  nodeImpty = sumsq / tott - mmean * mmean;
+      	} else {
+      		while (j < ncats) {                 
+      			acct += update(totcounts(j));
+      			j += 1
+      		}
+      		nodeImpty = result(acct, tott);
       	}
-      	nodeImpty = result(acct, tott);
 
       	var lastival = -1;
       	minImpty = nodeImpty;
       	lastImpty = Double.MaxValue;
       	acc = 0;
+      	sumsq = 0;
       	tot = 0;
       	j = jci;
       	maxcnt = -1;
@@ -988,7 +1004,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       		val icat = extractField(ICat, key, fieldshifts, fieldmasks);
 
       		if (j > jci && ival != lastival) {
-      			lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // Dont compute every time!
+      		  if (regression) {
+      		  	lastImpty = regressVar(sumsq, tott, acc, tot, acct, tott - tot);
+      		  } else {
+      		  	lastImpty = combine(result(acc, tot), result(acct, tott - tot), tot, tott - tot);   // Dont compute every time!
+      		  }
       			if (lastImpty < minImpty) { 
       				minImpty = lastImpty;
       				partv = lastival;
@@ -1007,8 +1027,13 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       		val oldcntt = totcounts(icat) - oldcnt;
       		val newcntt = totcounts(icat) - newcnt;
       		tot += cnt;
-      		acc += update(newcnt) - update(oldcnt);
-      		acct += update(newcntt) - update(oldcntt);
+      		if (regression) {
+      		  acc += icat * cnt;
+      		  acct -= icat * cnt;
+      		} else {
+      			acc += update(newcnt) - update(oldcnt);
+      			acct += update(newcntt) - update(oldcntt);
+      		}
       		totcats += cnt * icat;
       		lastkey = key;
       		lastival = ival;
