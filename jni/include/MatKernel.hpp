@@ -20,6 +20,8 @@ int LDA_Gibbsv(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int
 
 int treePack(float *fdata, int *treenodes, int *icats, long long *out, int *fieldlens, int nrows, int ncols, int ntrees, int nsamps, int seed);
 
+int treePackfc(float *fdata, int *treenodes, float *fcats, long long *out, int *fieldlens, int nrows, int ncols, int ntrees, int nsamps, int seed);
+
 int treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fieldlens, int nrows, int ncols, int ntrees, int nsamps, int seed);
 
 int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg, int *outc, int *jc, int *fieldlens, 

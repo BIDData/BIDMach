@@ -203,8 +203,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val data = gmats(0);
     val cats = gmats(1);
     val t0 = toc;
-    (data, cats) match {
-    case (fdata:FMat, icats:IMat) => {
+    data match {
+    case (fdata:FMat) => {
         val nnodes = if (gmats.length > 2) gmats(2).asInstanceOf[IMat] else izeros(ntrees, data.ncols);
         if (gmats.length > 2) {
     	  treeStep(fdata, nnodes, null, itrees, ftrees, vtrees, ctrees, false);
@@ -212,20 +212,34 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	  treeWalk(fdata, nnodes, null, itrees, ftrees, vtrees, ctrees, ipass, false);
     	}
     	t1 = toc; runtimes(0) += t1 - t0;
-        lout = treePack(fdata, nnodes, icats, lout, seed);
+        cats match { 
+          case (icats:IMat) => { 
+            lout = treePack(fdata, nnodes, icats, lout, seed);
+          }
+          case (fcats:FMat) => { 
+            lout = treePack(fdata, nnodes, fcats, lout, seed);
+          }
+        }
         t2 = toc; runtimes(1) += t2 - t1;
         java.util.Arrays.sort(lout.data, 0, lout.length);
         Mat.nflops += lout.length * math.log(lout.length).toLong;
         t3 = toc; runtimes(2) += t3 - t2;
         blockv = makeV(lout);
     }
-    case (gdata:GMat, gicats:GIMat) => {
+    case (gdata:GMat) => {
     	gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false); 
     	t1 = toc; runtimes(0) += t1 - t0;
-    	gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
+        cats match { 
+          case (gicats:GIMat) => { 
+    	    gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
+          }
+          case (gfcats:GMat) => { 
+    	    gout = gtreePack(gdata, gtnodes, gfcats, gout, seed);
+          }
+        }
     	t2 = toc; runtimes(1) += t2 - t1;
     	gpsort(gout);  
-    	t3 = toc;	runtimes(2) += t3 - t2;
+    	t3 = toc; runtimes(2) += t3 - t2;
     	blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
     }
     case _ => {
@@ -246,8 +260,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
     val fnodes:FMat = zeros(ntrees, data.ncols);
-    (data, cats) match {
-      case (fdata:FMat, icats:IMat) => {
+    data match {
+      case fdata:FMat => {
         if (nnodes.asInstanceOf[AnyRef] != null) {
           val nn = nnodes.asInstanceOf[IMat];
           treeStep(fdata, nn, fnodes, itrees, ftrees, vtrees, ctrees, true);
@@ -255,15 +269,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
           treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, depth, true);
         }
       }
-      case (fdata:FMat, fcats:FMat) => {
-        if (nnodes.asInstanceOf[AnyRef] != null) {
-          val nn = nnodes.asInstanceOf[IMat];
-          treeStep(fdata, nn, fnodes, itrees, ftrees, vtrees, ctrees, true);
-        } else {
-          treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, depth, true);
-        }
-      }
-      case (gdata:GMat, gcats:GIMat) => {
+      case gdata:GMat => {
       	gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, depth, true);
       	val gff = new GMat(fnodes.nrows, fnodes.ncols, gfnodes.data, gfnodes.realsize);
       	fnodes <-- gff;
@@ -434,6 +440,38 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
             val ifeat = rhash(seed, itree, inode, jfeat, nfeats);
             val ivfeat = floatConvert(fdata(ifeat, icolx));
             val ic = cats(icolx);
+            out.data(nxvals) = packFields(itree, inode, jfeat, if (useIfeats) ifeat else 0, ivfeat, ic, fieldlengths.data) | isign;
+            nxvals += 1;
+            jfeat += 1;
+          }
+        }
+        itree += 1;
+      }
+      icolx += 1;
+    }
+    Mat.nflops += 50L * nxvals 
+    new LMat(nxvals, 1, out.data);
+  }
+
+  def treePack(fdata:FMat, treenodes:IMat, fcats:FMat, out:LMat, seed:Int):LMat = {
+    val nfeats = fdata.nrows;
+    val nitems = fdata.ncols;
+    val ntrees = treenodes.nrows;
+    val ionebased = Mat.ioneBased;
+    var icolx = 0;
+    var nxvals = 0;
+    while (icolx < nitems) {
+      var itree = 0;
+      while (itree < ntrees) {
+        val inode0 = treenodes(itree, icolx);
+        val inode = inode0 & magnitude
+        val isign = ((inode0 & signbit) ^ signbit).toLong << 32;
+        if (inode >= 0) {
+          var jfeat = 0;
+          while (jfeat < nsamps) {
+            val ifeat = rhash(seed, itree, inode, jfeat, nfeats);
+            val ivfeat = floatConvert(fdata(ifeat, icolx));
+            val ic = fcats(icolx).toInt;
             out.data(nxvals) = packFields(itree, inode, jfeat, if (useIfeats) ifeat else 0, ivfeat, ic, fieldlengths.data) | isign;
             nxvals += 1;
             jfeat += 1;
@@ -672,6 +710,16 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val nxvals = ncols * ntrees * nsamps;
     Mat.nflops += 1L * nxvals;
     val err= CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
+    if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
+    new GLMat(1, nxvals, gout.data, gout.realsize);
+  }
+
+  def gtreePack(gdata:GMat, gtnodes:GIMat, gcats:GMat, gout:GLMat, seed:Int):GLMat ={
+    val nrows = gdata.nrows
+    val ncols = gdata.ncols
+    val nxvals = ncols * ntrees * nsamps;
+    Mat.nflops += 1L * nxvals;
+    val err= CUMACH.treePackfc(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
     if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
     new GLMat(1, nxvals, gout.data, gout.realsize);
   }

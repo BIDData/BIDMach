@@ -33,6 +33,8 @@ public final class CUMACH {
 
     public static native int treePack(Pointer id, Pointer tn, Pointer icats, Pointer out, Pointer fl, int nrows, int ncols, int ntrees, int nsamps, int seed);
 
+    public static native int treePackfc(Pointer id, Pointer tn, Pointer icats, Pointer out, Pointer fl, int nrows, int ncols, int ntrees, int nsamps, int seed);
+
     public static native int treePackInt(Pointer id, Pointer tn, Pointer icats, Pointer out, Pointer fl, int nrows, int ncols, int ntrees, int nsamps, int seed);
     
     public static native int treeWalk(Pointer fdata, Pointer inodes, Pointer fnodes, Pointer itrees, Pointer ftrees, Pointer vtrees, Pointer ctrees,
