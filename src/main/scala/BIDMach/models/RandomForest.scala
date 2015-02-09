@@ -282,7 +282,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         cats <-- mm;
       }
       val diff = mm - FMat(cats)
-      -mean(abs(diff)) //on -(diff dotr diff)/diff.length
+      if (opts.MAE) -mean(abs(diff)) else -(diff dotr diff)/diff.length
     } else {
       val mm = tally(fnodes);
       if (datasource.opts.putBack == 1) {
@@ -1222,7 +1222,7 @@ object RandomForest {
      var regression = false;
      var seed = 1;
      var useIfeats = false; // explicitly save Ifeat indices (vs. compute them)
-     var GPU = true;
+     var MAE = true;
      var trace = 0;
   }
   
