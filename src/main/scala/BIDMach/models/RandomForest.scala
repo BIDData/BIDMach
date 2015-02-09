@@ -965,7 +965,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       var lefttot = 0;
       if (maxcnt < tott) { // This is not a pure node
         partv = -1;
-        totcats = 0.0;
         impure += tott;
         acct = 0;
       	//      println("totcounts "+totcounts.toString);
@@ -981,7 +980,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       		}
       		nodeImpty = result(acct, tott);
       	}
-
+      	totcats = 0.0;
       	var lastival = -1;
       	minImpty = nodeImpty;
       	lastImpty = Double.MaxValue;
