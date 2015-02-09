@@ -942,7 +942,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         val icat = extractField(ICat, key, fieldshifts, fieldmasks);
         val newcnt = totcounts(icat) + cnt;
         totcounts(icat) = newcnt;
-        totcats += cnt * icat;
+        totcats += 1.0 * cnt * icat;
         tott += cnt;
         if (newcnt > maxcnt) {
           maxcnt = newcnt;
@@ -967,6 +967,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         totcats = 0.0;
         impure += tott;
         acct = 0;
+        sumsq = 0;
       	//      println("totcounts "+totcounts.toString);
       	j = 0;
       	if (regression) {            // Get the impurity for the node
