@@ -215,7 +215,7 @@ int treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees, int *ftrees,
              int nrows, int ncols, int ntrees, int nnodes, int getcat, int nbits, int nlevels) {
   int nc = DBSIZE / nrows;
   int xthreads = min(ntrees,1024);
-  int ythreads = min(nc,1+1023/xthreads);
+  int ythreads = min(nc,1024/xthreads);
   dim3 threaddims(xthreads, ythreads, 1);
   int nblocks = 1 + (ncols-1) / 8 / nc;
   int yblocks =  1 + (nblocks-1)/65536;
