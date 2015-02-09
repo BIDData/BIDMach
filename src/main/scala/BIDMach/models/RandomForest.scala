@@ -990,7 +990,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       	minImpty = nodeImpty;
       	lastImpty = Double.MaxValue;
       	acc = 0;
-      	sumsq = 0;
       	tot = 0;
       	j = jci;
       	maxcnt = -1;
