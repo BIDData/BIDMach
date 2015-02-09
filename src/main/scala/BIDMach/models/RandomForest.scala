@@ -919,7 +919,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var tott = 0;
     var acc = 0.0;
     var acct = 0.0;
-    var sumsq = 0.0;
     var i = ithread;
     val todo = jtree(itree+1) - jtree(itree);
     Mat.nflops += todo * 4L * 10;
@@ -936,6 +935,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       var maxcnt = -1;
       var imaxcnt = -1;
       var totcats = 0.0;
+      var sumsq = 0.0;
       while (j < jcn) {                     // First get the total counts for each group, and the most frequent cat
         val key = keys(j)
         val cnt = cnts(j)
@@ -943,6 +943,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         val newcnt = totcounts(icat) + cnt;
         totcounts(icat) = newcnt;
         totcats += 1.0 * cnt * icat;
+        sumsq += 1.0 * icat * icat * cnt;
         tott += cnt;
         if (newcnt > maxcnt) {
           maxcnt = newcnt;
@@ -967,16 +968,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         totcats = 0.0;
         impure += tott;
         acct = 0;
-        sumsq = 0;
       	//      println("totcounts "+totcounts.toString);
       	j = 0;
       	if (regression) {            // Get the impurity for the node
-      	  while (j < ncats) {
-      	    acct += 1.0 * j * totcounts(j);
-      	    sumsq += 1.0 * j * j * totcounts(j);
-      	    j += 1;
-      	  }
-      	  val mmean = acct / tott;
+      	  acct = totcats;
+      	  val mmean = totcats / tott;
       	  nodeImpty = sumsq / tott - mmean * mmean;
       	} else {
       		while (j < ncats) {                 
