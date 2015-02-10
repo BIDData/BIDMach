@@ -68,6 +68,11 @@ case class Learner(
         here += datasource.opts.batchSize
         bytes += 12L*mats(0).nnz
         if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
+          if (opts.updateAll) {
+          	model.doblockg(mats, ipass, here);
+          	if (mixins != null) mixins map (_ compute(mats, here));
+          	updater.update(ipass, here);
+          }
         	val scores = model.evalblockg(mats, ipass, here)
         	reslist.append(scores.newcopy)
         	samplist.append(here)
@@ -667,6 +672,7 @@ object Learner {
   	var resFile:String = null
   	var autoReset = true
   	var useCache = true
+  	var updateAll = false
   }
   
     
