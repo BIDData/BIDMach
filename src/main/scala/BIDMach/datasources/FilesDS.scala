@@ -149,11 +149,8 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		  } else {
     		    val nr = omats(i).nrows;
     		    val nc = nrow - rowno + blockSize - todo - off;
-    		    println("omats1 %d %d %d guid %d" format (i, nr, nc, omats(i).GUID));
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
-    		    println("omats2 %d %d %d guid %d" format (i, nr, nc, omats(i).GUID));
     		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);
-    		  	println("omats3 %d %d %d guid %d\n" format (i, nr, nc, omats(i).GUID));
     		  }
 
     		  if (featType == 0) {
