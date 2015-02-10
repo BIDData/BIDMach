@@ -221,6 +221,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     val out = tmp match {
       case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, j, "FilesDS_FMat".##);
       case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, j, "FilesDS_IMat".##);
+      case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, j, "FilesDS_DMat".##);
       case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, j, "FilesDS_SMat".##);
     }
     out <-- tmp;
