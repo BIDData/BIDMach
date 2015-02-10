@@ -37,7 +37,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     tmats(0) = modelmats(0)
     tmats(1) = modelmats(0).zeros(targets.nrows/2,1)
     tmats(2) = modelmats(0).zeros(targets.nrows/2,1)
-    modelmats = tmats
+    setmodelmats(tmats)
     val umats = new Array[Mat](3)
     umats(0) = updatemats(0)
     umats(1) = updatemats(0).zeros(targets.nrows/2,1)

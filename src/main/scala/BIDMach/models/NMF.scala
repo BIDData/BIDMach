@@ -49,9 +49,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   override def init() = {
   	super.init()
   	mm = modelmats(0)
-    modelmats = new Array[Mat](2)
-    modelmats(0) = mm
-    modelmats(1) = mm.zeros(mm.nrows, mm.ncols)
+    setmodelmats(Array(mm, mm.zeros(mm.nrows, mm.ncols)));
   	updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     updatemats(1) = mm.zeros(mm.nrows, mm.ncols)

@@ -52,9 +52,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
     super.init()
     if (refresh) {
     	mm = modelmats(0);
-    	modelmats = new Array[Mat](2);
-    	modelmats(0) = mm;
-    	modelmats(1) = mm.ones(mm.nrows, 1);
+    	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
     }
     updatemats = new Array[Mat](2);
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols);

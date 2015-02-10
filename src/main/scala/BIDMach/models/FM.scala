@@ -105,7 +105,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     	mm2 = if (useGPU) GMat(rmat2) else rmat2;
     	ulim = if (useGPU) GMat(row(opts.lim)) else row(opts.lim)
     	llim = if (useGPU) GMat(row(-opts.lim)) else row(-opts.lim)
-    	modelmats = Array(mv, mm1, mm2);
+    	setmodelmats(Array(mv, mm1, mm2));
     	if (mask.asInstanceOf[AnyRef] != null) {
     		mv ~ mv ∘ mask;
     		mm1 ~ mm1 ∘ mask;

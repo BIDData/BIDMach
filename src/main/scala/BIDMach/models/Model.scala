@@ -8,7 +8,21 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var datasource:DataSource = null
   
-  var modelmats:Array[Mat] = null
+  var _modelmats:Array[Mat] = null
+  
+  var parent_model:Model = null
+  
+  def modelmats:Array[Mat] = {
+    if (_modelmats != null) {
+      _modelmats
+    } else {
+      parent_model._modelmats
+    }
+  }
+  
+  def setmodelmats(a:Array[Mat]) = {
+    _modelmats = a;
+  }
   
   var updatemats:Array[Mat] = null
   
@@ -26,7 +40,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   def copyTo(mod:Model) = {
     mod.datasource = datasource;
-    mod.modelmats = modelmats;
+    mod._modelmats = modelmats;
     mod.updatemats = updatemats;
     mod.mats = mats;
     mod.gmats = gmats;

@@ -36,7 +36,7 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
     val l = sum(ns).v
     val modelmat = rand(1, l)
     modelmat(1 until l by 2) = 1 - modelmat(0 until l-1 by 2)
-    modelmats = new Array[Mat](1)
+    setmodelmats(new Array[Mat](1))
     modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat
     
     // prepare cpt offset 

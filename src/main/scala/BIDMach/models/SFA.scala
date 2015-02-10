@@ -58,7 +58,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  itemsum = mm.zeros(nfeats, 1);
 	  itemcount = mm.zeros(nfeats, 1);
     mzero = mm.zeros(1,1)
-    modelmats = Array(mm, iavg)
+    setmodelmats(Array(mm, iavg));
     if (opts.doUsers) mm(0,?) = 1f
     updatemats = new Array[Mat](2)
   }

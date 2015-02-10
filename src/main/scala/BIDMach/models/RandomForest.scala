@@ -166,7 +166,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	ctrees.set(-1);
     	ctrees(0,?) = 0;
     	ftrees.set(-1)
-    	modelmats = Array(itrees, ftrees, vtrees, ctrees);
+    	setmodelmats(Array(itrees, ftrees, vtrees, ctrees));
     	// Small buffers hold results of batch treepack and sort
     	val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
         totals = new Array[SVTree](ntrees)

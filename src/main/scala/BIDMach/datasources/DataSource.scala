@@ -5,6 +5,9 @@ import BIDMat.SciFunctions._
 import java.io._
 
 abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) {   
+  private var _GUID = Mat.myrand.nextLong
+  def setGUID(v:Long):Unit = {_GUID = v} 
+  def GUID:Long = _GUID
   def next:Array[Mat]  
   def hasNext:Boolean
   def reset:Unit

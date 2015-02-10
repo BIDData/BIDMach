@@ -54,10 +54,7 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
     if (refresh) {
     	mm = modelmats(0);
     	//modelmats = new Array[Mat](2)
-    	modelmats = new Array[Mat](3);
-    	modelmats(0) = mm;
-    	modelmats(1) = mm.ones(mm.nrows, 1);
-    	modelmats(2) = mm.ones(mm.nrows, mm.ncols);
+    	setmodelmats(Array(mm, mm.ones(mm.nrows, 1), mm.ones(mm.nrows, mm.ncols)));
     }
     updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)

@@ -58,7 +58,7 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
     	mm = if (useGPU) GMat(mmi) else mmi;
     	mcounts = mm.zeros(mm.nrows, 1);
     	mweights = mm.zeros(mm.nrows, 1);
-    	modelmats = Array(mm, mcounts, mweights);
+    	setmodelmats(Array(mm, mcounts, mweights));
     }
     
     um = modelmats(0).zeros(mm.nrows, mm.ncols)

@@ -35,7 +35,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     if (refresh) {
     	mm = modelmats(0);
     	mmnorm = mm dotr mm;
-    	modelmats = Array(mm, mmnorm);
+    	setmodelmats(Array(mm, mmnorm));
     }
     um = updatemats(0)
     umcount = mm.zeros(mm.nrows, 1)

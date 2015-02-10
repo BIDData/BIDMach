@@ -33,7 +33,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     	layers = new Array[Layer](opts.layers.length);
     	var imodel = 0;
     	val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false});
-    	modelmats = new Array[Mat](nmodelmats);
+    	setmodelmats(Array[Mat](nmodelmats));
     	updatemats = new Array[Mat](nmodelmats);
 
     	for (i <- 0 until opts.layers.length) {
