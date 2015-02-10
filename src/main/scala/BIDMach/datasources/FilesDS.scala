@@ -149,10 +149,13 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		  } else {
     		    val nr = omats(i).nrows;
     		    val nc = nrow - rowno + blockSize - todo - off;
+    		    println("omats1 %d %d %d guid %d" format (i, nr, nc, omats(i).GUID));
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
-    		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
+    		    println("omats2 %d %d %d guid %d" format (i, nr, nc, omats(i).GUID));
+    		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);
+    		  	println("omats3 %d %d %d guid %d\n" format (i, nr, nc, omats(i).GUID));
     		  }
-    		  println("omats %d guid %d" format (i, omats(i).GUID))
+
     		  if (featType == 0) {
     		    min(1f, omats(i), omats(i));
     		  } else if (featType == 2) {
