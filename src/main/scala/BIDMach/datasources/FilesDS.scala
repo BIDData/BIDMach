@@ -141,8 +141,14 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		  matqnr = if (opts.dorows) matq.nrows else matq.ncols;
     		  nrow = math.min(rowno + todo, matqnr);
     		  if (opts.dorows) {
+    		    val nc = omats(i).ncols;
+    		    val nr = nrow - rowno;
+    		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
     		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
     		  } else {
+    		    val nr = omats(i).nrows;
+    		    val nc = nrow - rowno;
+    		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
     		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
     		  }
     		  if (featType == 0) {
@@ -196,12 +202,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
         val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
         for (i <- 0 until fnames.size) {
           matqueue(ifilex)(i) = if (fexists) {
-            val tmp = HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	
-            if (tmp.asInstanceOf[AnyRef] == matqueue(ifilex)(i).asInstanceOf[AnyRef]) {  // reusing the matrix worked
-              tmp
-            } else {
-              checkCaches(tmp, GUID, ifilex, i);                                         // otherwise, check for a cached copy
-            }
+            HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	
           } else {
             if (opts.throwMissing && inew < nend) {
               throw new RuntimeException("Missing file "+fnames(i)(pnew));
@@ -215,16 +216,13 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   	}
   }
   
-  def checkCaches(tmp:Mat, GUID:Long, i:Int, j:Int):Mat = {
-    val nr = tmp.nrows;
-    val nc = tmp.ncols;
+  def checkCaches(nr:Int, nc:Int, tmp:Mat, GUID:Long, i:Int):Mat = {
     val out = tmp match {
-      case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, j, "FilesDS_FMat".##);
-      case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, j, "FilesDS_IMat".##);
-      case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, j, "FilesDS_DMat".##);
-      case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, j, "FilesDS_SMat".##);
+      case a:FMat => FMat.newOrCheckFMat(nr, nc, tmp, GUID, i, "FilesDS_FMat".##);
+      case a:IMat => IMat.newOrCheckIMat(nr, nc, tmp, GUID, i, "FilesDS_IMat".##);
+      case a:DMat => DMat.newOrCheckDMat(nr, nc, tmp, GUID, i, "FilesDS_DMat".##);
+      case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, tmp, GUID, i, "FilesDS_SMat".##);
     }
-    out <-- tmp;
     out
   }
   
@@ -234,12 +232,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
       for (i <- 0 until fnames.size) {
         matqueue(0)(i) = if (fexists) {
-          val tmp = HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));  
-          if (tmp.asInstanceOf[AnyRef] == matqueue(0)(i).asInstanceOf[AnyRef]) {  // reusing the matrix worked
-          	tmp;
-          } else {
-          	checkCaches(tmp, GUID, 0, i);                                         // otherwise, check for a cached copy
-          }
+          HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));  
         } else {
           if (opts.throwMissing) {
             throw new RuntimeException("Missing file "+fnames(i)(pnew));
