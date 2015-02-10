@@ -143,12 +143,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		  if (opts.dorows) {
     		    val nc = omats(i).ncols;
     		    val nr = nrow - rowno;
-    		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
+    		    omats(i) = checkCaches(nr, nc, null, GUID, i);                                         // otherwise, check for a cached copy
     		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
     		  } else {
     		    val nr = omats(i).nrows;
     		    val nc = nrow - rowno;
-    		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
+    		    omats(i) = checkCaches(nr, nc, null, GUID, i); 
     		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
     		  }
     		  println("omats %d guid %d" format (i, omats(i).GUID))
