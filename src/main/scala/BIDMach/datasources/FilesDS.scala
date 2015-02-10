@@ -140,14 +140,15 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		if (matq.asInstanceOf[AnyRef] != null) {
     		  matqnr = if (opts.dorows) matq.nrows else matq.ncols;
     		  nrow = math.min(rowno + todo, matqnr);
+    		  val off = Mat.oneBased
     		  if (opts.dorows) {
     		    val nc = omats(i).ncols;
-    		    val nr = nrow - rowno;
+    		    val nr = nrow - rowno + blockSize - todo - off; 
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
     		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
     		  } else {
     		    val nr = omats(i).nrows;
-    		    val nc = nrow - rowno;
+    		    val nc = nrow - rowno + blockSize - todo - off;
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
     		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
     		  }
@@ -217,16 +218,13 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   	}
   }
   
-  def checkCaches(nr:Int, nc:Int, tmp:Mat, GUID:Long, i:Int):Mat = {
-    if (nr == tmp.nrows && nc == tmp.ncols) {
-      tmp
-    } else {
-    	tmp match {
-      case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, "FilesDS_FMat".##);
-      case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, "FilesDS_IMat".##);
-      case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, "FilesDS_DMat".##);
-      case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, "FilesDS_SMat".##);
-    }
+  def checkCaches(nr:Int, nc:Int, out:Mat, GUID:Long, i:Int):Mat = {
+    val tmp = if (nr == out.nrows && nc == out.ncols) out else null;
+    out match {
+    case a:FMat => FMat.newOrCheckFMat(nr, nc, tmp, GUID, i, "FilesDS_FMat".##);
+    case a:IMat => IMat.newOrCheckIMat(nr, nc, tmp, GUID, i, "FilesDS_IMat".##);
+    case a:DMat => DMat.newOrCheckDMat(nr, nc, tmp, GUID, i, "FilesDS_DMat".##);
+    case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, tmp, GUID, i, "FilesDS_SMat".##);
     }
   }
   
