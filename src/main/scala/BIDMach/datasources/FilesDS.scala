@@ -143,12 +143,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     		  if (opts.dorows) {
     		    val nc = omats(i).ncols;
     		    val nr = nrow - rowno;
-    		    omats(i) = checkCaches(nr, nc, null, GUID, i);                                         // otherwise, check for a cached copy
+    		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
     		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
     		  } else {
     		    val nr = omats(i).nrows;
     		    val nc = nrow - rowno;
-    		    omats(i) = checkCaches(nr, nc, null, GUID, i); 
+    		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
     		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);			  
     		  }
     		  println("omats %d guid %d" format (i, omats(i).GUID))
@@ -218,13 +218,16 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   }
   
   def checkCaches(nr:Int, nc:Int, tmp:Mat, GUID:Long, i:Int):Mat = {
-    val out = tmp match {
-      case a:FMat => FMat.newOrCheckFMat(nr, nc, tmp, GUID, i, "FilesDS_FMat".##);
-      case a:IMat => IMat.newOrCheckIMat(nr, nc, tmp, GUID, i, "FilesDS_IMat".##);
-      case a:DMat => DMat.newOrCheckDMat(nr, nc, tmp, GUID, i, "FilesDS_DMat".##);
-      case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, tmp, GUID, i, "FilesDS_SMat".##);
+    if (nr == tmp.nrows && nc == tmp.ncols) {
+      tmp
+    } else {
+    	tmp match {
+      case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, "FilesDS_FMat".##);
+      case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, "FilesDS_IMat".##);
+      case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, "FilesDS_DMat".##);
+      case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, "FilesDS_SMat".##);
     }
-    out
+    }
   }
   
   def fetch = {
