@@ -32,11 +32,14 @@ case class Learner(
   }
   
   def init = {
+    var cacheState = Mat.useCache
+    Mat.useCache = opts.useCache
     datasource.init
     model.bind(datasource)
     model.init
     if (mixins != null) mixins map (_ init(model))
     if (updater != null) updater.init(model)
+    Mat.useCache = cacheState;
     useGPU = model.useGPU
   }
     
