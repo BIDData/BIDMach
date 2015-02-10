@@ -221,10 +221,10 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   def checkCaches(nr:Int, nc:Int, out:Mat, GUID:Long, i:Int):Mat = {
     val tmp = if (nr == out.nrows && nc == out.ncols) out else null;
     out match {
-    case a:FMat => FMat.newOrCheckFMat(nr, nc, tmp, GUID, i, "FilesDS_FMat".##);
-    case a:IMat => IMat.newOrCheckIMat(nr, nc, tmp, GUID, i, "FilesDS_IMat".##);
-    case a:DMat => DMat.newOrCheckDMat(nr, nc, tmp, GUID, i, "FilesDS_DMat".##);
-    case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, tmp, GUID, i, "FilesDS_SMat".##);
+    case a:FMat => FMat.newOrCheckFMat(nr, nc, tmp, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_FMat".##);
+    case a:IMat => IMat.newOrCheckIMat(nr, nc, tmp, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_IMat".##);
+    case a:DMat => DMat.newOrCheckDMat(nr, nc, tmp, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_DMat".##);
+    case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, tmp, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_SMat".##);
     }
   }
   
