@@ -1,0 +1,68 @@
+:silent
+import BIDMach.models.RandomForest
+
+class xopts extends Learner.Options with MatDS.Opts with RandomForest.Opts with Batch.Opts
+val opts = new xopts
+
+val mdir = "/code/BIDMach/data/YearPrediction/"
+val data = loadFMat(mdir+"train.fmat.lz4");
+val cats = loadFMat(mdir+"cats.fmat.lz4");
+
+val rr = rand(1,data.ncols);
+val itrain = find(rr > 0.1f);
+val itest = find(rr <= 0.1f);
+    
+val train = data(?,itrain);
+val traincats = cats(?,itrain);
+val test = data(?,itest);
+val testcats = cats(?,itest);
+val preds = zeros(testcats.nrows, testcats.ncols);
+
+val ds = new MatDS(Array(train.asInstanceOf[Mat],traincats), opts);
+
+val dsp = new MatDS(Array(test.asInstanceOf[Mat],preds), opts);
+
+val nn = new Learner(             // make a learner instance
+    ds,                           // datasource
+    new RandomForest(opts),       // the model 
+    null,                         // list of mixins or regularizers
+    new Batch(opts),              // the optimization class to use
+    opts)                         // pass the options to the learner as well
+
+val mm = new Learner(             // make a predictor
+    dsp,                          // datasource
+    nn.model,
+    null,
+    null,
+    opts)                         // pass the options to the learner as well
+
+
+opts.useGPU = true
+opts.batchSize = 10000
+opts.depth = 20
+opts.ntrees = 100
+opts.ncats = 90
+
+opts.nsamps = 25
+opts.nnodes = 250000
+opts.nbits = 16
+opts.gain = 0.001f
+opts.regression = true
+opts.autoReset = false
+
+val rf = nn.model.asInstanceOf[RandomForest]
+
+nn.train
+
+opts.training=false
+opts.putBack = 1
+
+mm.predict
+
+val rr=zeros(nn.results.ncols/opts.depth, opts.depth);
+rr(?) = nn.results(0,?).t
+val diffs = DMat(preds - testcats);
+:silent
+val scores = mean(rr)
+val MSE = (diffs dotr diffs) / diffs.length;
+

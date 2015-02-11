@@ -24,11 +24,11 @@ val nn = new Learner(             // make a learner instance
 opts.useGPU = true
 opts.trace = 0
 opts.batchSize = 20000
-opts.depth =  3
-opts.ntrees = 10
+opts.depth =  30
+opts.ntrees = 20
 
 opts.nsamps = 32
-opts.nnodes = 250000
+opts.nnodes = 500000
 opts.nbits = 16
 opts.gain = 0.001f
 opts.autoReset = false
