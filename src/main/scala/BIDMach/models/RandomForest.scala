@@ -775,7 +775,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     ifeats <-- gf;
   }
   
-  def driver_thread(i:Int)(implicit ec:ExecutionContext) = {
+  def driver_thread(i:Int)(implicit ec:ExecutionContextExecutor) = {
     while (tflags(i) >= 0) {
       while (tflags(i) == 0) Thread.`yield`
       if (tflags(i) == 1) {
