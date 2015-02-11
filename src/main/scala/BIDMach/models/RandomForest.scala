@@ -38,9 +38,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var gpiones:GIMat = null;
   var gtmpcounts:GIMat = null;
   var totals:Array[SVTree] = null;
-  var tt:Array[SVec] = null;
+//  var tt:Array[SVec] = null;
   var nodecounts:IMat = null;
-  var tflags:IMat = null;
+//  var tflags:IMat = null;
   var itrees:IMat = null;                   // Index of left child (right child is at this value + 1)
   var ftrees:IMat = null;                   // The feature index for this node
   var vtrees:IMat = null;                   // The value to compare with for this node
@@ -165,9 +165,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	ctrees = zeros(nnodes, ntrees);
     	gains = zeros(ntrees,1);
     	igains = zeros(ntrees,1);
-    	tflags = izeros(ntrees,1);
-  	  implicit val ec = threadPool(ntrees) // make sure there are enough threads (more than the lookahead count)
-    	for (i <- 0 until ntrees) Future {driver_thread(i)(ec)}
+//    	tflags = izeros(ntrees,1);
+//  	  implicit val ec = threadPool(ntrees) // make sure there are enough threads (more than the lookahead count)
+//    	for (i <- 0 until ntrees) Future {driver_thread(i)(ec)}
     	nodecounts = iones(ntrees, 1);
     	ctrees.set(-1);
     	ctrees(0,?) = 0;
@@ -177,7 +177,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
     	totals = new Array[SVTree](ntrees);
     	for (i <- 0 until ntrees) totals(i) = new SVTree(20);
-    	tt = new Array[SVec](ntrees);
+//    	tt = new Array[SVec](ntrees);
     	outv = IMat(nsamps, nnodes);
     	outf = IMat(nsamps, nnodes);
     	outn = IMat(nsamps, nnodes);
@@ -232,7 +232,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         java.util.Arrays.sort(lout.data, 0, lout.length);
         Mat.nflops += lout.length * math.log(lout.length).toLong;
         t3 = toc; runtimes(2) += t3 - t2;
-        blockv0 = makeV(lout);
+        blockv = makeV(lout);
     }
     case (gdata:GMat) => {
     	gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false); 
@@ -248,21 +248,21 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	t2 = toc; runtimes(1) += t2 - t1;
     	gpsort(gout);  
     	t3 = toc; runtimes(2) += t3 - t2;
-    	blockv0 = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
+    	blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
     }
     case _ => {
     	throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
     }
     }
     lens0 += blockv0.length;
-    while (mini(tflags).v > 0) Thread.`yield`
-    blockv = blockv0.copy;
-    tflags.set(1);
-/*    val tblocks = splittableNodes(blockv);
+//    while (mini(tflags).v > 0) Thread.`yield`
+//    blockv = blockv0.copy;
+//    tflags.set(1);
+    val tblocks = splittableNodes(blockv);
     lens1 += tblocks.map(_.length).reduce(_+_);
     t4 = toc;  runtimes(3) += t4 - t3;
     addSVecs(tblocks, totals);
-    t5 = toc; runtimes(4) += t5 - t4; */
+    t5 = toc; runtimes(4) += t5 - t4; 
   }
 
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -332,12 +332,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   override def updatePass(ipass:Int) = { 
-  	while (mini(tflags).v > 0) Thread.`yield`
-  	tflags.set(2);
-//    val tt = getSum(totals);
-//    t6 = toc;
-//    runtimes(5) += t6 - t5;
-  	while (mini(tflags).v > 0) Thread.`yield`
+//  	while (mini(tflags).v > 0) Thread.`yield`
+//  	tflags.set(2);
+    val tt = getSum(totals);
+    t6 = toc;
+    runtimes(5) += t6 - t5;
+//  	while (mini(tflags).v > 0) Thread.`yield`
     var itree = 0;
     var impure = 0.0;
     while (itree < ntrees) {
