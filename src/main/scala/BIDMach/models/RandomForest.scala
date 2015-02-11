@@ -18,6 +18,8 @@ import jcuda.runtime.JCuda._
 import jcuda.runtime.cudaMemcpyKind._
 import scala.util.hashing.MurmurHash3
 import java.util.Arrays
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Options) extends Model(opts) {
@@ -37,7 +39,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var gpiones:GIMat = null;
   var gtmpcounts:GIMat = null;
   var totals:Array[SVTree] = null;
+  var tt:Array[SVec] = null;
   var nodecounts:IMat = null;
+  var tflags:IMat = null;
   var itrees:IMat = null;                   // Index of left child (right child is at this value + 1)
   var ftrees:IMat = null;                   // The feature index for this node
   var vtrees:IMat = null;                   // The value to compare with for this node
@@ -162,6 +166,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	ctrees = zeros(nnodes, ntrees);
     	gains = zeros(ntrees,1);
     	igains = zeros(ntrees,1);
+    	tflags = izeros(ntrees,1);
+    	for (i <- 0 until ntrees) Future {driver_thread(i)}
     	nodecounts = iones(ntrees, 1);
     	ctrees.set(-1);
     	ctrees(0,?) = 0;
@@ -169,8 +175,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	setmodelmats(Array(itrees, ftrees, vtrees, ctrees));
     	// Small buffers hold results of batch treepack and sort
     	val bsize = (opts.catsPerSample * batchSize * ntrees * nsamps).toInt;
-        totals = new Array[SVTree](ntrees)
-        for (i <- 0 until ntrees) totals(i) = new SVTree(20);
+    	totals = new Array[SVTree](ntrees);
+    	for (i <- 0 until ntrees) totals(i) = new SVTree(20);
+    	tt = new Array[SVec](ntrees);
     	outv = IMat(nsamps, nnodes);
     	outf = IMat(nsamps, nnodes);
     	outn = IMat(nsamps, nnodes);
@@ -203,6 +210,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val data = gmats(0);
     val cats = gmats(1);
     val t0 = toc;
+    var blockv0:SVec = null;
     data match {
     case (fdata:FMat) => {
         val nnodes = if (gmats.length > 2) gmats(2).asInstanceOf[IMat] else izeros(ntrees, data.ncols);
@@ -224,7 +232,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         java.util.Arrays.sort(lout.data, 0, lout.length);
         Mat.nflops += lout.length * math.log(lout.length).toLong;
         t3 = toc; runtimes(2) += t3 - t2;
-        blockv = makeV(lout);
+        blockv0 = makeV(lout);
     }
     case (gdata:GMat) => {
     	gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false); 
@@ -240,18 +248,21 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	t2 = toc; runtimes(1) += t2 - t1;
     	gpsort(gout);  
     	t3 = toc; runtimes(2) += t3 - t2;
-    	blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
+    	blockv0 = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
     }
     case _ => {
     	throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
     }
     }
-    lens0 += blockv.length;
-    val tblocks = splittableNodes(blockv);
+    lens0 += blockv0.length;
+    while (mini(tflags).v > 0) Thread.`yield`
+    blockv = blockv0.copy;
+    tflags.set(1);
+/*    val tblocks = splittableNodes(blockv);
     lens1 += tblocks.map(_.length).reduce(_+_);
     t4 = toc;  runtimes(3) += t4 - t3;
     addSVecs(tblocks, totals);
-    t5 = toc; runtimes(4) += t5 - t4;
+    t5 = toc; runtimes(4) += t5 - t4; */
   }
 
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -321,9 +332,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   override def updatePass(ipass:Int) = { 
-    val tt = getSum(totals);
-    t6 = toc;
-    runtimes(5) += t6 - t5;
+  	while (mini(tflags).v > 0) Thread.`yield`
+  	tflags.set(2);
+//    val tt = getSum(totals);
+//    t6 = toc;
+//    runtimes(5) += t6 - t5;
+  	while (mini(tflags).v > 0) Thread.`yield`
     var itree = 0;
     var impure = 0.0;
     while (itree < ntrees) {
@@ -369,6 +383,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     println("purity gain %5.4f, fraction impure %4.3f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, lens1*1f/lens0, 2*mean(igains).v, mean(FMat(nodecounts)).v));
     lens0 = 0;
     lens1 = 0;
+    if (ipass == opts.npasses-1) tflags.set(-1);
   }
   
   def tochildren(itree:Int, inodes:IMat, left:FMat, right:FMat) {
@@ -757,6 +772,29 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val err = CUMACH.jfeatsToIfeats(itree, gi.data, gf.data, gf.data, len, nfeats, seed);
     if (err != 0) {throw new RuntimeException("gjfeatsToIfeats: error " + cudaGetErrorString(err))}
     ifeats <-- gf;
+  }
+  
+  def driver_thread(i:Int) = {
+    while (tflags(i) >= 0) {
+      while (tflags(i) == 0) Thread.`yield`
+      if (tflags(i) == 1) {
+        val t3 = toc;
+        val sp = splittableNodes_thread(blockv, i);
+        val t4 = toc;  
+        runtimes(3) += t4 - t3;
+        totals(i).addSVec(sp);
+        val t5 = toc;
+        lens1 += sp.length;
+        runtimes(4) += t5 - t4;
+        tflags(i) == 0;
+      } else if (tflags(i) == 2) {
+      	val t5 = toc;
+        tt(i) = totals(i).getSum;
+        val t6 = toc;
+        runtimes(5) += t6 - t5;
+        tflags(i) == 0;
+      }
+    }   
   }
 
   def splittableNodes(blockv:SVec):Array[SVec] = { 
@@ -1154,6 +1192,12 @@ class SVec(val inds:LMat, val counts:IMat) {
       }
     }
     out
+  }
+  
+  def copy = {
+    val inds2 = inds.copy
+    val counts2 = counts.copy
+    new SVec(inds2, counts2);
   }
 
   def checkInds = { 
