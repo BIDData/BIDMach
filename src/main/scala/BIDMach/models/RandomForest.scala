@@ -383,7 +383,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     println("purity gain %5.4f, fraction impure %4.3f, nnew %2.1f, nnodes %2.1f" format (mean(gains).v, lens1*1f/lens0, 2*mean(igains).v, mean(FMat(nodecounts)).v));
     lens0 = 0;
     lens1 = 0;
-    if (ipass == opts.depth-1) tflags.set(-1);
+//    if (ipass == opts.depth-1) tflags.set(-1);
   }
   
   def tochildren(itree:Int, inodes:IMat, left:FMat, right:FMat) {
@@ -774,7 +774,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     ifeats <-- gf;
   }
   
-  def driver_thread(i:Int)(implicit ec:ExecutionContextExecutor) = {
+/*  def driver_thread(i:Int)(implicit ec:ExecutionContextExecutor) = {
     while (tflags(i) >= 0) {
       while (tflags(i) == 0) Thread.`yield`
       if (tflags(i) == 1) {
@@ -795,7 +795,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         tflags(i) == 0;
       }
     }   
-  }
+  } */
 
   def splittableNodes(blockv:SVec):Array[SVec] = { 
     (0 until ntrees).par.map(i => { 
