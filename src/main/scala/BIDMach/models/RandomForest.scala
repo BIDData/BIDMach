@@ -210,7 +210,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val data = gmats(0);
     val cats = gmats(1);
     val t0 = toc;
-    var blockv0:SVec = null;
+//    var blockv0:SVec = null;
     data match {
     case (fdata:FMat) => {
         val nnodes = if (gmats.length > 2) gmats(2).asInstanceOf[IMat] else izeros(ntrees, data.ncols);
@@ -254,7 +254,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
     }
     }
-    lens0 += blockv0.length;
+    lens0 += blockv.length;
 //    while (mini(tflags).v > 0) Thread.`yield`
 //    blockv = blockv0.copy;
 //    tflags.set(1);
