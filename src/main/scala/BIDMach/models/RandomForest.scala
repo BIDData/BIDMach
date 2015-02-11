@@ -20,7 +20,6 @@ import scala.util.hashing.MurmurHash3
 import java.util.Arrays
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContextExecutor
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Options) extends Model(opts) {
   
