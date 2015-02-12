@@ -35,9 +35,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     super.init()
     if (refresh) {
       mm = modelmats(0)
-      modelmats = new Array[Mat](2)
-      modelmats(0) = mm
-      modelmats(1) = mm.zeros(mm.nrows, 1)
+      setmodelmats(Array(mm, mm.zeros(mm.nrows, 1))); // New change
       //modelmats(2) = mkdiag(mm.ones(mm.nrows, 1)) // Has to start out like this, right?
     }
     updatemats = new Array[Mat](2)
@@ -104,7 +102,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * Computes objective function to minimize or maximize (I think both ways work). Just as in mupdate(),
    * summations and other operations are done using matrix operations so it can be tricky.
    */
-  def evalfun(data : Mat, user : Mat) : FMat = {
+  def evalfun(data : Mat, user : Mat, ipass : Int) : FMat = {
     val m = data.ncols
     val n = mm.ncols
     val (big_gwtx, stdNorm) = opts.G_function match {
