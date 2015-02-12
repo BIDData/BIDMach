@@ -48,6 +48,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   var alpha:Mat = null 
   var traceMem = false
   
+  /** Sets up the modelmats and updatemats arrays and initializes modelmats(0) randomly unless stated otherwise. */
   override def init() = {
     super.init()
     if (refresh) {
@@ -59,6 +60,18 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
     updatemats(1) = mm.zeros(mm.nrows, 1);
   }
   
+  /**
+   * Updates '''user''' according to the variational EM update process in the original (2003) LDA Paper.
+   * 
+   * This can be a bit tricky to understand. See Equation 2.2 in Huasha Zhao's PhD from UC Berkeley
+   * for details on the math and cross-reference it with the 2003 LDA journal paper.
+   * 
+   * @param sdata The word x document input data. Has dimension (# words x opts.batchSize), where batchSize is
+   *   typically much smaller than the total number of documents, so sdata is usually a portion of the full input.
+   * @param user An (opts.dim x opts.batchSize) matrix that stores some intermediate/temporary data and gets left-
+   *   multiplied by modelmats(0) to form sdata.
+   * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
+   */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     if (putBack < 0 || ipass == 0) user.set(1f)
     for (i <- 0 until opts.uiter) {
@@ -73,6 +86,15 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
     }	
   }
   
+  /**
+   * Updates '''modelmats(0)''', the topic x word matrix that is ultimately returned as output for the model.
+   * 
+   * @param sdata The word x document input data. Has dimension (# words x opts.batchSize), where batchSize is
+   *   typically much smaller than the total number of documents, so sdata is usually a portion of the full input.
+   * @param user An (opts.dim x opts.batchSize) matrix that stores some intermediate/temporary data and gets left-
+   *   multiplied by modelmats(0) to form sdata.
+   * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
+   */
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val preds = DDS(mm, user, sdata)
     val dc = sdata.contents
@@ -86,6 +108,15 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   	sum(ud, 2, updatemats(1))
   }
   
+  /** 
+   * Evaluates model log-likelihood on a held-out batchof the input data.
+   *  
+   * @param sdata The word x document input data. Has dimension (# words x opts.batchSize), where batchSize is
+   *   typically much smaller than the total number of documents, so sdata is usually a portion of the full input.
+   * @param user An (opts.dim x opts.batchSize) matrix that stores some intermediate/temporary data and gets left-
+   *   multiplied by modelmats(0) to form sdata.
+   * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
+   */
   def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {  
   	val preds = DDS(mm, user, sdata);
   	val dc = sdata.contents;
@@ -110,17 +141,17 @@ object LDA  {
   
   class Options extends Opts {}
   
+  /** Creates a new LDA model. */
   def mkLDAmodel(fopts:Model.Opts) = {
   	new LDA(fopts.asInstanceOf[LDA.Opts])
   }
   
+  /** Creates a new IncNorm updater. */
   def mkUpdater(nopts:Updater.Opts) = {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
    
-  /**
-   * Online Variational Bayes LDA algorithm
-   */
+  /** Online Variational Bayes LDA algorithm with a matrix datasource. */
   def learner(mat0:Mat, d:Int) = {
     class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
@@ -135,9 +166,7 @@ object LDA  {
     (nn, opts)
   }
   
-   /**
-   * Online Variational Bayes LDA algorithm with a files dataSource
-   */
+  /** Online Variational Bayes LDA algorithm with a files dataSource. */
   def learner(fnames:List[(Int)=>String], d:Int) = {
     class xopts extends Learner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
     val opts = new xopts
@@ -155,9 +184,7 @@ object LDA  {
     (nn, opts)
   }
      
-  /**
-   * Batch Variational Bayes LDA algorithm
-   */
+  /** Batch Variational Bayes LDA algorithm with a matrix datasource. */
   def learnBatch(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with BatchNorm.Opts
     val opts = new xopts
@@ -172,9 +199,7 @@ object LDA  {
     (nn, opts)
   }
   
-  /**
-   * Parallel online LDA algorithm
-   */ 
+  /** Parallel online LDA algorithm with a matrix datasource. */ 
   def learnPar(mat0:Mat, d:Int = 256) = {
     class xopts extends ParLearner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
@@ -190,9 +215,7 @@ object LDA  {
     (nn, opts)
   }
   
-  /**
-   * Parallel online LDA algorithm with multiple file datasources
-   */ 
+  /** Parallel online LDA algorithm with multiple file datasources. */ 
   def learnFParx(
       nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
       nend:Int=FilesDS.encodeDate(2012,12,1,0), 
@@ -214,9 +237,7 @@ object LDA  {
   	(nn, opts) 
   }
   
-  /**
-   * Parallel online LDA algorithm with one file datasource
-   */
+  /** Parallel online LDA algorithm with one file datasource. */
   def learnFPar(
       nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
       nend:Int=FilesDS.encodeDate(2012,12,1,0), 
