@@ -49,8 +49,8 @@ import java.lang.Math;
  */
 class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts) {
   
-  //var currentWhiteningMatrix:Mat = null // We DO NOT want this but keep for now
     /* // For whitening...
+    var currentWhiteningMatrix:Mat = null // We DO NOT want this but keep for now
     val sampleCov = getSampleCovariance(data)
     val eigDecomp = seig(FMat(sampleCov))
     val DnegSqrt = mkdiag(sqrt(1.0 / eigDecomp._1))
@@ -91,25 +91,22 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param ipass The current pass through the data.
    */
   def uupdate(data : Mat, user : Mat, ipass : Int) {
-    //println("\n\nINSIDE UUPDATE()")
-    //println("Line 2: modelmats(0) =\n" + modelmats(0))
-    //println("Line 3: mm =\n" + mm)
-    //println("Line 4: modelmats(2) =\n" + modelmats(2))
     if (ipass == 0) {
       batchIteration = batchIteration + 1.0
       modelmats(1) = (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
-      //println("Inside ipass = 0, batchIteration = " + batchIteration + " and modelmats(1).t = " + modelmats(1).t)
     }
     data ~ data - modelmats(1)
-    // Well, we DO want this part so keep that here. AFTER this, we "assume" the data is white.
+
+    // TODO Well, we DO want this part so keep that here. AFTER this, we "assume" the data is white.
     // data <-- modelmats(2) * data // This is why we need modelmats(2) to start out as a NON-zero matrix.
+
     // Don't we put orthogonalization here? This is "after" the real update from mupdate, which will change things no matter what I do.
     if (useGPU) {
       mm <-- GMat(orthogonalize(mm, data))
     } else {
       mm <-- orthogonalize(mm, data)
     }
-    user ~ mm * data // w^Tx, with whitened x (supposedly)
+    user ~ mm * data // w^Tx, WITH whitened x (supposedly)
   }
   
   /**
@@ -135,6 +132,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
       case "logcosh" => (g_logcosh(user), g_d_logcosh(user))
       case "exponent" => (g_exponent(user), g_d_exponent(user))
       case "kurtosis" => (g_kurtosis(user), g_d_kurtosis(user))
+      case _ => throw new RuntimeException("opts.G_function is not a valid value: " + opts.G_function)
     }
     val termBeta = mkdiag( -mean(user *@ gwtx, 2) )
     val termAlpha = mkdiag( -1.0 / (getdiag(termBeta) - (mean(g_wtx,2))) )
@@ -169,6 +167,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
       case "logcosh" => (G_logcosh(user), FMat(0.375)) // 0.375 obtained from Numpy sampling
       case "exponent" => (G_exponent(user), FMat(-1.0 / sqrt(2.0)))
       case "kurtosis" => (G_kurtosis(user), FMat(0.75))
+      case _ => throw new RuntimeException("opts.G_function is not a valid value: " + opts.G_function)
     }
     val rowMean = FMat(mean(big_gwtx,2)) - stdNorm
     return sum(rowMean *@ rowMean)
@@ -220,30 +219,42 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   }
   
   /** 
-   * For "orthogonalizing" W using the (WW^T)^{-1/2} * W technique; uses eigendecomposition of WW^T.
-   * TODO Update, we've added in a new matrix normalization process. Allow the user to select between the two.
+   * Takes in the model matrix and returns an orthogonal version of it, so WW^T = identity.
+   * 
+   * We use one of two methods depending on opts.orthogMethod. Both are from A. Hyvärinen and E. Oja (2000):
+   * 
+   *   (1) The preferred way is to use an iterative algorithm that uses a norm that is NOT the Frobenius norm,
+   *     and then iterate a W = 1.5*W - 0.5*W*^W*W update until convergence (it's quadratic in convergence).
+   *     This involves no eigendecompositions and should be fast. We use the maximum absolute row sum norm, so
+   *     we take the absolute value of elements, sum over the rows, and pick the largest of those values.
+   *   (2) A second way that might be slower is to use W = (W*^W)^{-1/2}*W, which requires the eigendecomposition
+   *     of the W*^W matrix (this is the same as W*W^T).
+   * 
+   * @param w The model matrix that we want to transform to be orthogonal.
+   * @param dat The data matrix, used to compute the covariance matrices if necessary.
    */
-  private def orthogonalize(matrix : Mat, dat : Mat) : FMat = {
-    val newWay = true
-    if (newWay) {
-      val WWT = matrix *^ matrix
-      var result = FMat(matrix / sqrt(maxi(sum(WWT, 2)))) // Maximum absolute row sum norm
+  private def orthogonalize(w : Mat, dat : Mat) : FMat = {
+    if (opts.orthogMethod != "iterative" && opts.orthogMethod != "symmetric") {
+      throw new RuntimeException("opts.orthogMethod is not a valid value: " + opts.orthogMethod)
+    }
+    if (opts.orthogMethod == "iterative") {
+      val WWT = w *^ w
+      var result = FMat(w / sqrt(maxi(sum(abs(WWT), 2)))) // Maximum ABSOLUTE, ROW, SUM, norm
       var a = 0
-      while (a < opts.dim) { // They claim in their paper that convergence is quadratic... so perhaps opts.dim is good?
+      while (a < opts.dim) { // Quadratic in convergence, so perhaps opts.dim is good?
         val newMatrix = FMat((1.5 * result) - 0.5 * (result *^ result * result))
         result = newMatrix
         a = a + 1
       }
       return result
-    } else {
-      val fmm = FMat(matrix) // For FMats only, not GMats.
+    }
+    else {
+      val fmm = FMat(w)
       val fdata = FMat(dat)
-      //val eigDecomp = seig(fmm * FMat(getSampleCovariance(fdata)) *^ fmm)
       val eigDecomp = seig(fmm *^ fmm)
       val DnegSqrt = mkdiag(sqrt(1.0 / eigDecomp._1))
       val Q = eigDecomp._2
-      val result = Q * DnegSqrt *^ Q * fmm
-      return result
+      return Q * DnegSqrt *^ Q * fmm 
     }
   }
 
@@ -272,12 +283,15 @@ object ICA {
   /**
    * Provides some settings for the ICA model.
    * 
-   * > G_function: possible values are "logcosh", "exponent", "kurtosis"
+   * > G_function: possible values are "logcosh", "exponent", "kurtosis". Using "logcosh" is recommended.
+   * > orthogMethod: possible values are "iterative", which corresponds to the W <- 1.5*W + .5*(W*^W*W)
+   *   case (recommended), or "symmetric" which is W <- (W*^W)^{-1/2}*W, which uses eigendecompositions.
    * > dataAlreadyWhtie: true if data has been pre-whitened (ideal), if not, no whitening will be done and
    *   results will likely be poor.
    */
   trait Opts extends FactorModel.Opts {
     val G_function:String = "logcosh"
+    val orthogMethod:String = "iterative"
     val dataAlreadyWhte:Boolean = true
   }
 
