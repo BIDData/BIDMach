@@ -219,16 +219,32 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     return 3 * (m *@ m)
   }
   
-  /** For "orthogonalizing" W using the (WW^T)^{-1/2} * W technique; uses eigendecomposition of WW^T. */
+  /** 
+   * For "orthogonalizing" W using the (WW^T)^{-1/2} * W technique; uses eigendecomposition of WW^T.
+   * TODO Update, we've added in a new matrix normalization process. Allow the user to select between the two.
+   */
   private def orthogonalize(matrix : Mat, dat : Mat) : FMat = {
-    val fmm = FMat(matrix) // For FMats only, not GMats.
-    val fdata = FMat(dat)
-    //val eigDecomp = seig(fmm * FMat(getSampleCovariance(fdata)) *^ fmm)
-    val eigDecomp = seig(fmm *^ fmm)
-    val DnegSqrt = mkdiag(sqrt(1.0 / eigDecomp._1))
-    val Q = eigDecomp._2
-    val result = Q * DnegSqrt *^ Q * fmm
-    return result
+    val newWay = true
+    if (newWay) {
+      val WWT = matrix *^ matrix
+      var result = FMat(matrix / sqrt(maxi(sum(WWT, 2)))) // Maximum absolute row sum norm
+      var a = 0
+      while (a < opts.dim) { // They claim in their paper that convergence is quadratic... so perhaps opts.dim is good?
+        val newMatrix = FMat((1.5 * result) - 0.5 * (result *^ result * result))
+        result = newMatrix
+        a = a + 1
+      }
+      return result
+    } else {
+      val fmm = FMat(matrix) // For FMats only, not GMats.
+      val fdata = FMat(dat)
+      //val eigDecomp = seig(fmm * FMat(getSampleCovariance(fdata)) *^ fmm)
+      val eigDecomp = seig(fmm *^ fmm)
+      val DnegSqrt = mkdiag(sqrt(1.0 / eigDecomp._1))
+      val Q = eigDecomp._2
+      val result = Q * DnegSqrt *^ Q * fmm
+      return result
+    }
   }
 
   /** Gets sample covariance matrix (one column of m is one sample). See Wikipedia for matrix formulation. */
