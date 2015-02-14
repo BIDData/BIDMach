@@ -10,9 +10,8 @@ import jcuda.NativePointerObject
 import java.lang.Math;
 
 /**
- * Independent Component Analysis, using FastICA. Currently it is somewhat incomplete due to issues with
- * whitening and matrix shapes, but otherwise should be functional (see below for details). In particular,
- * we currently require the data to be whitened for the most complete results.
+ * Independent Component Analysis, using FastICA. It has the ability to center and whiten data. See below
+ * for features and possible limitations.
  * 
  * Our algorithm is based on the method presented in:
  * 
@@ -31,52 +30,43 @@ import java.lang.Math;
  * {{{
  * modelmats(0) * (data - modelmats(1))
  * }}}
- *     That data is an n x N matrix, whereas modelmats(1) is an n x 1 matrix. For efficiency reasons, we
+ *     Here, data is an n x N matrix, whereas modelmats(1) is an n x 1 matrix. For efficiency reasons, we
  *     assume a constant batch size for each block of data so we take the mean across all batches. This is 
  *     true except for (usually) the last batch, but this often isn't enough to make a difference.
  *     
+ * Thus, modelmats(1) helps to center the data. The whitening in this algorithm happens during the updates
+ * to W in both the orthogonalization and the fixed point steps. The former uses the computed convariance 
+ * matrix and the latter relies on an approximation of W^T*W to the inverse covariance matrix. It is fine
+ * if the data is already pre-whitened before being passed to BIDMach.
+ *     
  * Currently, we are working on the following extensions:
  * 
- *   > Determining and updating a whitening matrix for the data, to be stored in modelmats(2). Right now,
- *     our model assumes the data is pre-whitened. We can change this with opts.dataAlreadyWhite, but then
- *     the results will not be great.
  *   > Allowing ICA to handle non-square mixing matrices. Most research about ICA assumes that A is n x n.
  *   > Improving the way we handle the computation of the mean, so it doesn't rely on the last batch being
- *     of similar size to all prior batches.
+ *     of similar size to all prior batches. Again, this is minor, especially for large data sets.
  * 
  * For additional references, see Aapo Hyvärinen's other papers, and visit:
  *   http://research.ics.aalto.fi/ica/fastica/
  */
 class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts) {
   
-    /* // For whitening...
-    var currentWhiteningMatrix:Mat = null // We DO NOT want this but keep for now
-    val sampleCov = getSampleCovariance(data)
-    val eigDecomp = seig(FMat(sampleCov))
-    val DnegSqrt = mkdiag(sqrt(1.0 / eigDecomp._1))
-    val Q = eigDecomp._2
-    currentWhiteningMatrix = Q * DnegSqrt *^ Q
-    */
-
-  var mm:Mat = null                     // Our W = A^{-1}.
-  var batchIteration = 0.0              // Used to keep track of the mean
+  var mm:Mat = null         // Our W = A^{-1}.
+  var batchIteration = 0.0  // Used to keep track of the mean
 
   override def init() {
     super.init()
     if (refresh) {
       mm = modelmats(0)
-      setmodelmats(Array(mm, mm.zeros(mm.nrows, 1)));
-      //modelmats(2) = mkdiag(mm.ones(mm.nrows, 1)) // Has to start out like this, right?
+      setmodelmats(Array(mm, mm.zeros(mm.nrows,1)))
     }
     updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.nrows)
     updatemats(1) = mm.zeros(mm.nrows,1) // Keep to avoid null pointer exceptions, but we don't use it
-    //updatemats(2) = mm.zeros(mm.nrows, mm.nrows)
-    println("Initial modelmats(0) =\n" + modelmats(0))
   }
     
   /** 
    * Store data in "user" for use in the next mupdate() call, and updates the moving average if necessary.
+   * Also "orthogonalizes" the model matrix.
    * 
    * First, it checks if this is the first pass over the data, and if so, updates the moving average assuming
    * that the number of data samples in each block is the same for all blocks. After the first pass, the data 
@@ -96,17 +86,12 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
       modelmats(1) = (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
     }
     data ~ data - modelmats(1)
-
-    // TODO Well, we DO want this part so keep that here. AFTER this, we "assume" the data is white.
-    // data <-- modelmats(2) * data // This is why we need modelmats(2) to start out as a NON-zero matrix.
-
-    // Don't we put orthogonalization here? This is "after" the real update from mupdate, which will change things no matter what I do.
-    if (useGPU) {
+    if (useGPU) { // After each update in mupdate(), mm must be orthogonalized.
       mm <-- GMat(orthogonalize(mm, data))
     } else {
       mm <-- orthogonalize(mm, data)
     }
-    user ~ mm * data // w^Tx, WITH whitened x (supposedly)
+    user ~ mm * data
   }
   
   /**
@@ -119,6 +104,9 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * useful intermediate values that represent the full data matrix X rather than a single column/element x.
    * The above update for W^+ goes in updatemats(0), except the additive W since that should be taken care
    * of by the ADAGrad updater.
+   * 
+   * I don't THINK anything here changes if the data is not white, since one of Hyvärinen's papers implied
+   * that the update here includes an approximation to the inverse covariance matrix.
    * 
    * @param data An n x batchSize matrix, where each column corresponds to a data sample.
    * @param user An intermediate matrix that stores (w_j^T) * (x^{i}) values.
@@ -149,8 +137,8 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    *   J(w^Tx) \approx ( Expec[G(w^Tx)] - Expec[G(v)] )^2,
    * 
    * where G is the function set at opts.G_function. So long as the W matrix (capital "W") is orthogonal, 
-   * which we enforce, then w^Tx satisfies the requirement that the variance be one. To extend this to the
-   * whole matrix W, take the sum over all the rows, so the problem is: maxmize{ \sum_w J(w^Tx) }.
+   * which we do enforce, then w^Tx satisfies the requirement that the variance be one. To extend this to
+   * the whole matrix W, take the sum over all the rows, so the problem is: maxmize{ \sum_w J(w^Tx) }.
    * 
    * On the other hand, the batchSize should be much greater than one, so "data" consists of many columns.
    * Denoting the data matrix as X, we can obtain the expectations by taking the sample means. In other words,
@@ -228,9 +216,11 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    *     This involves no eigendecompositions and should be fast. We use the maximum absolute row sum norm, so
    *     we take the absolute value of elements, sum over the rows, and pick the largest of those values.
    *   (2) A second way that might be slower is to use W = (W*^W)^{-1/2}*W, which requires the eigendecomposition
-   *     of the W*^W matrix (this is the same as W*W^T).
+   *     of the W*^W (this is the same as W*W^T) matrix.
+   *     
+   * The above assume that the covariance matrix of the data is the identity, i.e., C = I. If not, plug in C.
    * 
-   * @param w The model matrix that we want to transform to be orthogonal.
+   * @param w The model matrix that we want to transform to be orthogonal (often referred to as "mm" here).
    * @param dat The data matrix, used to compute the covariance matrices if necessary.
    */
   private def orthogonalize(w : Mat, dat : Mat) : FMat = {
@@ -238,11 +228,12 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
       throw new RuntimeException("opts.orthogMethod is not a valid value: " + opts.orthogMethod)
     }
     if (opts.orthogMethod == "iterative") {
-      val WWT = w *^ w
+      val C = FMat(getSampleCovariance(FMat(dat)))
+      val WWT = w * C *^ w
       var result = FMat(w / sqrt(maxi(sum(abs(WWT), 2)))) // Maximum ABSOLUTE, ROW, SUM, norm
       var a = 0
       while (a < opts.dim) { // Quadratic in convergence, so perhaps opts.dim is good?
-        val newMatrix = FMat((1.5 * result) - 0.5 * (result *^ result * result))
+        val newMatrix = FMat((1.5 * result) - 0.5 * (result * C *^ result * result))
         result = newMatrix
         a = a + 1
       }
@@ -250,8 +241,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     }
     else {
       val fmm = FMat(w)
-      val fdata = FMat(dat)
-      val eigDecomp = seig(fmm *^ fmm)
+      val eigDecomp = seig(fmm * FMat(getSampleCovariance(FMat(dat))) *^ fmm)
       val DnegSqrt = mkdiag(sqrt(1.0 / eigDecomp._1))
       val Q = eigDecomp._2
       return Q * DnegSqrt *^ Q * fmm 
@@ -265,16 +255,6 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     val F = m - (meanVec * onesRow)
     return (F *^ F) / (m.ncols - 1)
   }
-  
-  /** Gets the log of the absolute value of the determinant of the input, using QR decomposition. */
-  private def logAbsValDeterminantQR(matrix : Mat) : FMat = {
-    val (q,r) = matrix match {
-      case matrix : GMat => QRdecomp(FMat(matrix))
-      case _ => QRdecomp(matrix)
-    }
-    val x = sum(ln(abs(getdiag(r))))
-    return x.dv
-  }
 }
 
 
@@ -286,13 +266,10 @@ object ICA {
    * > G_function: possible values are "logcosh", "exponent", "kurtosis". Using "logcosh" is recommended.
    * > orthogMethod: possible values are "iterative", which corresponds to the W <- 1.5*W + .5*(W*^W*W)
    *   case (recommended), or "symmetric" which is W <- (W*^W)^{-1/2}*W, which uses eigendecompositions.
-   * > dataAlreadyWhtie: true if data has been pre-whitened (ideal), if not, no whitening will be done and
-   *   results will likely be poor.
    */
   trait Opts extends FactorModel.Opts {
     val G_function:String = "logcosh"
     val orthogMethod:String = "iterative"
-    val dataAlreadyWhte:Boolean = true
   }
 
   class Options extends Opts {}
