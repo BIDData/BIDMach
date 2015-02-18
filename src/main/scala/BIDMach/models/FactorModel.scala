@@ -5,6 +5,9 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
 
+/**
+ * An Abstract class with shared code for Factor Models
+ */
 abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opts) {
   
   def init() = {

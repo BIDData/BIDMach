@@ -4,6 +4,9 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
 
+/**
+ * Abstract class with shared code for all models
+ */
 abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var datasource:DataSource = null

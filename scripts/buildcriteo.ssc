@@ -24,7 +24,7 @@ println("Building feature matrices");
 val dicts = ivals.map(IDict(_));
 val offsets = izeros(27,1);
 for (i <- 0 until 26) { 
-  if (ivals(i).length < 1000000) { 
+  if (ivals(i).length < 20000000) { 
     offsets(i+1) = offsets(i) + ivals(i).length;
   } else { 
     offsets(i+1) = offsets(i);

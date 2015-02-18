@@ -8,7 +8,7 @@ import BIDMach.updaters._
 import BIDMach._
 
 /**
- * Bayes network using cooled Gibbs parameter estimation
+ * WIP: Bayes network using cooled Gibbs parameter estimation
  */
 
 class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {

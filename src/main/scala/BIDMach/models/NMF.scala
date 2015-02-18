@@ -26,16 +26,16 @@ import BIDMach._
  * 
  * a is a sparse word x document matrix
  * {{{
- * val (nn, opts) = NMF.learn(a)
+ * val (nn, opts) = NMF.learner(a)
  * opts.what             // prints the available options
  * opts.uiter=2          // customize options
- * nn.run                // run the learner
+ * nn.train              // train the model
  * nn.modelmat           // get the final model
  * nn.datamat            // get the other factor (requires opts.putBack=1)
  * 
  * val (nn, opts) = NMF.learnPar(a) // Build a parallel learner
  * opts.nthreads=2       // number of threads (defaults to number of GPUs)
- * nn.run                // run the learner
+ * nn.train              // run the model
  * nn.modelmat           // get the final model
  * nn.datamat            // get the other factor
  * }}}

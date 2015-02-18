@@ -8,6 +8,42 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.Learner
 
+/**
+ * Sparse Matrix Factorization with L2 loss (similar to ALS). 
+ * 
+ * '''Parameters'''
+ - dim(256): Model dimension
+ - uiter(5): Number of iterations on one block of data
+ - miter(5): Number of CG iterations for model updates - not currently used in the SGD implementation.
+ - lambdau(5f): Prior on the user (data) factor
+ - lambdam(5f): Prior on model 
+ - regumean(0f): prior on instance mean
+ - regmmean(0f): Prior on feature mean
+ - startup(1): Skip CG for this many iterations
+ - traceConvergence(false): Print out trace info for convergence of the u iterations.
+ - doUser(false): Apply the per-instance mean estimate. 
+ - weightByUser(false): Weight loss equally by users, rather than their number of choices. 
+ - ueps(1e-10f): A safety floor constant
+ - uconvg(1e-3f): Stop u iteration if error smaller than this. 
+ *
+ * Other key parameters inherited from the learner, datasource and updater:
+ - batchSize: the number of samples processed in a block
+ - npasses(2): number of complete passes over the dataset
+ - useGPU(true): Use GPU acceleration if available.
+ *
+ * '''Example:'''
+ * 
+ * a is a sparse word x document matrix
+ * {{{
+ * val (nn, opts) = SFA.learner(a)
+ * opts.what             // prints the available options
+ * opts.uiter=2          // customize options
+ * nn.train              // train the model
+ * nn.modelmat           // get the final model
+ * nn.datamat            // get the other factor (requires opts.putBack=1)
+ * }}}
+ */
+
 class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts) {
 
   var mm:Mat = null;
@@ -146,12 +182,12 @@ object SFA  {
   trait Opts extends FactorModel.Opts {
   	var ueps = 1e-10f
   	var uconvg = 1e-3f
-  	var miter = 8
+  	var miter = 5
   	var lambdau = 5f
   	var lambdam = 5f
   	var regumean = 0f
   	var regmmean = 0f
-  	var startup = 5
+  	var startup = 1
   	var traceConverge = false
   	var doUsers = true
   	var weightByUser = false

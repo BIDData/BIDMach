@@ -7,6 +7,9 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
 
+/**
+ * Abstract class with shared code for Regression Models
+ */
 abstract class RegressionModel(override val opts:RegressionModel.Opts) extends Model {
   var targmap:Mat = null
   var targets:Mat = null

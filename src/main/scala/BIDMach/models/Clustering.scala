@@ -7,6 +7,9 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
 
+/**
+ * An abstract class with shared code for Clustering Models
+ */
 abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends Model {
   var lastpos = 0L
   

@@ -1,7 +1,54 @@
 package BIDMach.models
 
-// Random Forest model (new version).
-// Computes a matrix representing the Forest.
+ /**
+  * Random Forests. Given a datasource of data and labels, compute a random classification or regression Forest. 
+  * 
+  *  * '''Options'''
+ - depth(20): Bound on the tree depth, also the number of passes over the dataset.
+ - ntrees(20): Number of trees in the Forest. 
+ - nsamps(32): Number of random features to try to split each node. 
+ - nnodes(200000): Bound on the size of each tree (number of nodes). 
+ - nbits(16): Number of bits to use for feature values. 
+ - gain(0.01f): Lower bound on impurity gain in order to split a node.
+ - catsPerSample(1f): Number of cats per sample for multilabel classification.
+ - ncats(0): Number of cats or regression values. 0 means guess from datasource. 
+ - training(true): Run for training (true) or prediction (false)
+ - impurity(0): Impurity type, 0=entropy, 1=Gini
+ - regression(false): Build a regression Forest (true) or classification Forest (false).
+ - seed(1): Random seed for selecting features. Use this to train distinct Forests in multiple runs.
+ - useIfeats(false): An internal var, when true use explicit feature indices vs compute them.
+ - MAE(true): true=Use Mean Absolute Error when reporting performance vs. false=Mean Squared Error
+ - trace(0): level of debugging information to print (0,1,2).
+ *
+ * NOTE: The algorithm uses a packed representation of the dataset statistics with fixed precision fields.
+ * Setting nbits selects how many bits to use from each input data. For integer data, the lower nbits are used.
+ * For floating point data, the leading nbits are used. So e.g. 16 float bits gives sign, 8 bits of exponent, 
+ * and 7 bits of mantissa with a leading 1. 
+ * 
+ * For regression, discrete (integer) target values should be used in the training data. The output will be continuous
+ * values interpolated from them.
+ * 
+ * Other key parameters inherited from the learner, datasource and updater:
+ - batchSize(10000): The number of samples processed in a block
+ - putBack(-1): Whether to put predictions back into the datasource target. Should be 1 for prediction.
+ - useGPU(true): Use GPU acceleration if available
+ *
+ * '''Example:'''
+ * 
+ * a is an nfeats x ninstances data matrix, c is a 1 x ninstances vector of labels
+ * {{{
+ * val (nn, opts) = RandomForest.learner(a,c)
+ * opts.what             // prints the available options
+ * opts.depth=25         // Set depth - something like log2(ninstances / 10) is good
+ * opts.ntrees=20        // Good starting value. Increasing this usually increases accuracy.
+ * opts.nsamps=30        // Typically sqrt(nfeats) is good. Larger values may work better. 
+ * opts.nnodes           // Bounded by 2^depth, but usually smaller than this.
+ * opts.ncats=10         // Its a good idea to set this - learner will try to guess it, but may get it wrong
+ * opts.nbits=10         // Number of bits to use from input data.
+ * nn.train              // train the learner.
+ * nn.modelmats          // get the final model (4 matrices)
+ * }}}
+ */
 
 
 import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
@@ -1271,11 +1318,11 @@ object SVec {
 object RandomForest {
     
   trait Opts extends Model.Opts { 
-     var depth = 32;
-     var ntrees = 32;
+     var depth = 20;
+     var ntrees = 20;
      var nsamps = 32;
-     var nnodes = 100000;
-     var nbits = 8;
+     var nnodes = 200000;
+     var nbits = 16;
      var gain = 0.01f;
      var catsPerSample = 1f;
      var ncats = 0;
@@ -1294,7 +1341,7 @@ object RandomForest {
   
   class RFSopts extends RFopts with MatDS.Opts;
   
-  def learner(data:IMat, labels:SMat) = {
+  def learner(data:IMat, labels:IMat) = {
     val opts = new RFSopts;
     opts.useGPU = false;
     opts.nbits = countbits(maxi(maxi(data)).dv.toInt);

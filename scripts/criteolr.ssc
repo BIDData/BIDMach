@@ -1,0 +1,76 @@
+:silent
+class xopts extends Learner.Options with FilesDS.Opts with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts
+val opts = new xopts
+
+val mdir = "d:/criteo/parts/"
+opts.fnames = List(FilesDS.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
+                   FilesDS.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
+opts.nend = 67;
+opts.lrate = 0.0003f;
+opts.reg1weight = 0.01f;
+opts.batchSize=30000;
+opts.npasses=200;
+opts.npasses=1;
+opts.eltsPerSample=60;
+opts.links = icol(1);
+opts.pstep = 0.001f;
+opts.lim = 8f;
+
+val ds = {
+  implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
+  new FilesDS(opts)               // the datasource
+}
+
+
+val nn = new Learner(                  // make a learner instance
+    ds,                                // datasource
+    new GLM(opts),                     // the model 
+    Array(new L1Regularizer(opts)),    // list of mixins or regularizers
+    new ADAGrad(opts),                 // the optimization class to use
+    opts)                              // pass the options to the learner as well
+
+
+nn.train
+
+val mm = FMat(nn.model.modelmats(0));
+
+val filesize = 600000;
+val tscores = dzeros(filesize*10, 1);
+val tcats = dzeros(filesize*10, 1);
+var len = 0;
+for (i <- 0 until 10) {
+  val a = loadSMat(mdir + "train%02d.smat.lz4" format i + 67);
+  val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + 67);
+  val sc = mm * a;
+  tscores(i * filesize -> (i * filesize + sc.length), 0) = DMat(sc.t);
+  tcats(i * filesize -> (i * filesize + sc.length), 0) = DMat(c.t);
+  len += c.length;
+  print(".");
+}
+val scores = tscores(0->len,0);
+val cats = tcats(0->len,0);
+
+val rr = roc(scores, cats, 1-cats, 1000)
+
+mean(rr)
+
+val bounds = 7.0
+val bscores = min(max(scores, drow(-bounds)), drow(bounds));
+val probs = 1/(1 + exp(-bscores));
+val lln = ((cats dot ln(probs)) + ((1-cats) dot ln(1-probs)))/probs.length
+
+println("roc area = %5.4f, ll = %5.4f" format (mean(rr).v, lln.v))
+:silent
+
+// npasses  batchSize     lrate      l1reg       ll        time         AUC
+//    2       1000        0.0003     0.0001    0.5176      3600
+//   20      10000        0.0003     0.0001    0.5072      3732
+//    5      10000        0.0003     0.0001    0.5242      941
+//    5      10000        0.0003     0.00001   0.5241      936
+//    5      10000        0.0003     0.001     0.5242      945
+//    5      10000        0.0003     0.01      0.5245      944
+//    5      10000        0.0003     0.1       0.5262      942
+//    5      30000        0.0003     0.01      0.5364      364
+//   15      30000        0.0003     0.01      0.5216      1096
+//   50      30000        0.0003     0.01      0.5062      3614         0.7473
+//  200      30000        0.0003     0.01      0.4922     14430         0.7592
