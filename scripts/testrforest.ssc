@@ -25,7 +25,7 @@ opts.useGPU = true
 opts.trace = 0
 opts.batchSize = 20000
 opts.depth =  30
-opts.ntrees = 20
+opts.ntrees = 33
 
 opts.nsamps = 32
 opts.nnodes = 500000

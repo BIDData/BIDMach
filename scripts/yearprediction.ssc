@@ -38,9 +38,9 @@ val mm = new Learner(             // make a predictor
 
 
 opts.useGPU = true
-opts.batchSize = 10000
+opts.batchSize = 20000
 opts.depth = 20
-opts.ntrees = 100
+opts.ntrees = 25
 opts.ncats = 90
 
 opts.nsamps = 25
