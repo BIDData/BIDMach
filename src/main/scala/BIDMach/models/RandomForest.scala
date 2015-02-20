@@ -1,5 +1,22 @@
 package BIDMach.models
 
+import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
+import BIDMach.Learner
+import BIDMach.datasources.{DataSource,MatDS}
+import BIDMach.updaters.Batch
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import edu.berkeley.bid.CUMAT
+import edu.berkeley.bid.CUMACH
+import edu.berkeley.bid.CUMACH
+import jcuda._
+import jcuda.runtime.JCuda._
+import jcuda.runtime.cudaMemcpyKind._
+import scala.util.hashing.MurmurHash3
+import java.util.Arrays
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContextExecutor
+
  /**
   * Random Forests. Given a datasource of data and labels, compute a random classification or regression Forest. 
   * 
@@ -51,22 +68,6 @@ package BIDMach.models
  */
 
 
-import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
-import BIDMach.Learner
-import BIDMach.datasources.{DataSource,MatDS}
-import BIDMach.updaters.Batch
-import BIDMat.MatFunctions._
-import BIDMat.SciFunctions._
-import edu.berkeley.bid.CUMAT
-import edu.berkeley.bid.CUMACH
-import edu.berkeley.bid.CUMACH
-import jcuda._
-import jcuda.runtime.JCuda._
-import jcuda.runtime.cudaMemcpyKind._
-import scala.util.hashing.MurmurHash3
-import java.util.Arrays
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContextExecutor
 
 class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Options) extends Model(opts) {
   
