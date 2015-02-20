@@ -184,7 +184,7 @@ int main(int argc, char ** argv) {
       linebuf[membuf-1] = 0;
       if (ifstr->fail()) {
         ifstr->clear();
-        ifstr->ignore(LONG_MAX,'\n');
+        ifstr->ignore(std::numeric_limits<long>::max(),'\n');
       }
       if (strlen(linebuf) > 0) {
         jmax++;
