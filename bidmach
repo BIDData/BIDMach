@@ -20,11 +20,12 @@ if [ `uname` = "Darwin" ]; then
   export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${DYLD_LIBRARY_PATH}"
 fi
 export LD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
-cd ${BIDMACH_ROOT}
+pushd ${BIDMACH_ROOT}
 if [ ! -e java_native_path.txt ]; then
   java getnativepath > java_native_path.txt
 fi
 export JAVA_NATIVE=`cat java_native_path.txt`
+popd
 if [ "$OS" = "Windows_NT" ]; then
     if [ ! "${JAVA_HOME}" = "" ]; then
         JAVA_HOME=`${BIDMACH_ROOT}/shortpath.bat "${JAVA_HOME}"`
