@@ -26,7 +26,7 @@ if [ ! -e docword.txt.gz ]; then
     ${WGET} http://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.${1}.txt.gz
     mv docword.${1}.txt.gz docword.txt.gz
 fi 
-if [ ! -e vocab.${1}.txt ]; then
+if [ ! -e vocab.txt ]; then
     ${WGET} http://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/vocab.${1}.txt
     mv vocab.${1}.txt vocab.txt
 fi 
