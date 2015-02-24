@@ -103,7 +103,7 @@ int parseLine(char * line, const char * delim1, const char * delim2, const char 
       *fpos = 0;
     }
     indx = si.checkword(here);
-    iv.push_back(indx);
+    iv.push_back(indx-1);
     fvec.push_back(fval);
     here = next;
   }
