@@ -393,8 +393,8 @@ int parseLine(char * line, int lineno, const char * delim1, ivector & tvec,
 string getfield(char * line, const char * delim1, int k);
 
 int parseFormat(string ffname, ivector & tvec, svector & dnames, svector & delims, int *grpsize) {
-  ifstream ifstr(ffname.c_str());
-  if (ifstr.bad() || ifstr.eof()) {
+  ifstream ifstr(ffname.c_str(), ios::in);
+  if (ifstr.fail() || ifstr.eof()) {
     cerr << "couldnt open format file" << endl;
     throw;
   }
