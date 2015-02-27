@@ -1,8 +1,7 @@
 '''
 A testing suite for ICA. This will run some Python code to build the data, then calls the ICA
 testing script that contains BIDMach commands, then comes back to this Python code to plot the data.
-Be sure, after the BIDMach code runs, to type in ":q" on the command line to quit appropriately.
-Also, the script needs to be in the BIDMach/scripts folder.
+This code should be in the BIDMach/scripts folder.
 
 (c) February 2015 by Daniel Seita
 '''
@@ -123,15 +122,15 @@ def rearrange_data(B, S):
             if j in rows_B_taken:
                 continue
             old_row = B[j,:]
-            norm1 = np.linalg.norm(old_row - new_row)
+            norm1 = np.linalg.norm(old_row + new_row)
             if norm1 < best_norm:
                 best_norm = norm1
                 best_row_index = j
-            norm2 = np.linalg.norm(old_row + new_row)
+                change_sign = True
+            norm2 = np.linalg.norm(old_row - new_row)
             if norm2 < best_norm:
                 best_norm = norm2
                 best_row_index = j
-                change_sign = True
         rows_B_taken.append(best_row_index)
         if change_sign:
             newS.append((-B[best_row_index,:]).tolist())
@@ -159,6 +158,7 @@ pre_zero_mean = True if sys.argv[3].lower() == "y" else False
 pre_whitened = True if sys.argv[4].lower() == "y" else False
 if data_group < 1 or data_group > 4:
     raise Exception("Data group = " + str(data_group) + " is out of range.")
+plot_extra_info = False # If true, plot the mixed input data (X) in addition to the real/predicted sources
 
 # With parameters in pace, generate source, mixing, and output matrices, and save them to files.
 np.random.seed(0)
@@ -185,14 +185,13 @@ newB = rearrange_data(B, S)
 
 # Extract data and plot results. Add more colors if needed but 5 is plenty.
 plt.figure()
-plot_extra_info = False # This plots the input data as well
 if plot_extra_info:
     models = [X.T, S.T, newB.T]
     names = ['Input to ICA','True Sources Before Mixing','BIDMach\'s FastICA']
 else:
     models = [S.T, newB.T]
     names = ['True Sources Before Mixing','BIDMach\'s FastICA']
-colors = ['darkcyan', 'blue', 'red', 'orange', 'yellow']
+colors = ['darkcyan', 'red', 'blue', 'orange', 'yellow']
 plot_xlim = min(n_samples-1, 10000)
 for ii, (model, name) in enumerate(zip(models, names), 1):
     if plot_extra_info:
@@ -203,7 +202,6 @@ for ii, (model, name) in enumerate(zip(models, names), 1):
     plt.xlim([0,plot_xlim])
     for sig, color in zip(model.T, colors):
         plt.plot(sig, color=color)
-#plt.subplots_adjust(0.09, 0.04, 0.94, 0.94, 0.26, 0.46)
-plt.tight_layout()
+plt.subplots_adjust(0.09, 0.04, 0.94, 0.94, 0.26, 0.46)
 plt.show()
 

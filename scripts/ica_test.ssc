@@ -9,7 +9,7 @@ val opts = new xopts
 // These are the main settings to set correctly ... ESPECIALLY the model dimension
 opts.batchSize = 75000
 opts.dim = 5
-opts.npasses = 12
+opts.npasses = 10
 opts.useGPU = true
 
 val nn = new Learner(new MatDS(Array(output), opts), new ICA(opts), null, new ADAGrad(opts), opts);
@@ -23,3 +23,5 @@ predMean.t
 val result = FMat(predW * (output - predMean))
 
 HMat.saveFMatTxt("ica_pred_source.txt", result)
+
+sys.exit

@@ -56,7 +56,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   var G_fun: Mat=>Mat = null
   var g_fun: Mat=>Mat = null
   var g_d_fun: Mat=>Mat = null
-  var stdNorm:FMat = null // TODO perhaps get rid of the FMat?
+  var stdNorm:FMat = null
   
   override def init() {
     super.init()
@@ -227,7 +227,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   private def orthogonalize(w : Mat, dat : Mat) : Mat = {
     val C = getSampleCovariance(dat)
     val WWT = w * C *^ w
-    var result = w / sqrt(maxi(sum(abs(WWT), 2))) // Maximum ABSOLUTE, ROW, SUM, norm
+    var result = w / sqrt(maxi(sum(abs(WWT), 2)))
     var a = 0
     while (a < opts.dim*opts.dim) { // Quadratic in convergence, so perhaps opts.dim^2 is good?
       val newMatrix = ((1.5 * result) - 0.5 * (result * C *^ result * result))
