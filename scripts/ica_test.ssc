@@ -7,7 +7,7 @@ class xopts extends Learner.Options with MatDS.Opts with ICA.Opts with ADAGrad.O
 val opts = new xopts
 
 // These are the main settings to set correctly ... ESPECIALLY the model dimension
-opts.batchSize = 200000
+opts.batchSize = 75000
 opts.dim = 5
 opts.npasses = 12
 opts.useGPU = true
