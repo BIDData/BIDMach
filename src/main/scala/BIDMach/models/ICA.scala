@@ -32,7 +32,7 @@ import java.lang.Math;
  * }}}
  *     Here, data is an n x N matrix, whereas modelmats(1) is an n x 1 matrix. For efficiency reasons, we
  *     assume a constant batch size for each block of data so we take the mean across all batches. This is 
- *     true except for (usually) the last batch, but this often isn't enough to make a difference.
+ *     true except for (usually) the last batch, but this almost always isn't enough to make a difference.
  *     
  * Thus, modelmats(1) helps to center the data. The whitening in this algorithm happens during the updates
  * to W in both the orthogonalization and the fixed point steps. The former uses the computed convariance 
@@ -52,7 +52,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   
   var mm:Mat = null         // Our W = A^{-1}.
   var batchIteration = 0.0  // Used to keep track of the mean
-
+  
   override def init() {
     super.init()
     if (refresh) {
@@ -66,7 +66,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     
   /** 
    * Store data in "user" for use in the next mupdate() call, and updates the moving average if necessary.
-   * Also "orthogonalizes" the model matrix.
+   * Also "orthogonalizes" the model matrix after each update, as required by the algorithm.
    * 
    * First, it checks if this is the first pass over the data, and if so, updates the moving average assuming
    * that the number of data samples in each block is the same for all blocks. After the first pass, the data 
@@ -86,11 +86,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
       modelmats(1) = (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
     }
     data ~ data - modelmats(1)
-    if (useGPU) { // After each update in mupdate(), mm must be orthogonalized.
-      mm <-- GMat(orthogonalize(mm, data))
-    } else {
-      mm <-- orthogonalize(mm, data)
-    }
+    mm <-- orthogonalize(mm,data)
     user ~ mm * data
   }
   
@@ -207,45 +203,27 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   }
   
   /** 
-   * Takes in the model matrix and returns an orthogonal version of it, so WW^T = identity.
-   * 
-   * We use one of two methods depending on opts.orthogMethod. Both are from A. Hyvärinen and E. Oja (2000):
-   * 
-   *   (1) The preferred way is to use an iterative algorithm that uses a norm that is NOT the Frobenius norm,
-   *     and then iterate a W = 1.5*W - 0.5*W*^W*W update until convergence (it's quadratic in convergence).
-   *     This involves no eigendecompositions and should be fast. We use the maximum absolute row sum norm, so
-   *     we take the absolute value of elements, sum over the rows, and pick the largest of those values.
-   *   (2) A second way that might be slower is to use W = (W*^W)^{-1/2}*W, which requires the eigendecomposition
-   *     of the W*^W (this is the same as W*W^T) matrix.
-   *     
-   * The above assume that the covariance matrix of the data is the identity, i.e., C = I. If not, plug in C.
+   * Takes in the model matrix and returns an orthogonal version of it, so WW^T = identity. We use a method 
+   * from from A. Hyvärinen and E. Oja (2000): an iterative algorithm that uses a norm that is NOT the 
+   * Frobenius norm, and then iterate a W = 1.5*W - 0.5*W*^W*W update until convergence (it's quadratic in
+   * convergence). This involves no eigendecompositions and should be fast. We use the maximum absolute row 
+   * sum norm, so we take the absolute value of elements, sum over the rows, and pick the largest of those values.
+   * The above assumes that the covariance matrix of the data is the identity, i.e., C = I. If not, plug in C.
    * 
    * @param w The model matrix that we want to transform to be orthogonal (often referred to as "mm" here).
    * @param dat The data matrix, used to compute the covariance matrices if necessary.
    */
-  private def orthogonalize(w : Mat, dat : Mat) : FMat = {
-    if (opts.orthogMethod != "iterative" && opts.orthogMethod != "symmetric") {
-      throw new RuntimeException("opts.orthogMethod is not a valid value: " + opts.orthogMethod)
+  private def orthogonalize(w : Mat, dat : Mat) : Mat = {
+    val C = getSampleCovariance(dat)
+    val WWT = w * C *^ w
+    var result = w / sqrt(maxi(sum(abs(WWT), 2))) // Maximum ABSOLUTE, ROW, SUM, norm
+    var a = 0
+    while (a < opts.dim*opts.dim) { // Quadratic in convergence, so perhaps opts.dim^2 is good?
+      val newMatrix = ((1.5 * result) - 0.5 * (result * C *^ result * result))
+      result = newMatrix
+      a = a + 1
     }
-    if (opts.orthogMethod == "iterative") {
-      val C = FMat(getSampleCovariance(FMat(dat)))
-      val WWT = w * C *^ w
-      var result = FMat(w / sqrt(maxi(sum(abs(WWT), 2)))) // Maximum ABSOLUTE, ROW, SUM, norm
-      var a = 0
-      while (a < opts.dim) { // Quadratic in convergence, so perhaps opts.dim is good?
-        val newMatrix = FMat((1.5 * result) - 0.5 * (result * C *^ result * result))
-        result = newMatrix
-        a = a + 1
-      }
-      return result
-    }
-    else {
-      val fmm = FMat(w)
-      val eigDecomp = seig(fmm * FMat(getSampleCovariance(FMat(dat))) *^ fmm)
-      val DnegSqrt = mkdiag(sqrt(1.0 / eigDecomp._1))
-      val Q = eigDecomp._2
-      return Q * DnegSqrt *^ Q * fmm 
-    }
+    return result
   }
 
   /** Gets sample covariance matrix (one column of m is one sample). See Wikipedia for matrix formulation. */
@@ -260,16 +238,8 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
 
 object ICA {
 
-  /**
-   * Provides some settings for the ICA model.
-   * 
-   * > G_function: possible values are "logcosh", "exponent", "kurtosis". Using "logcosh" is recommended.
-   * > orthogMethod: possible values are "iterative", which corresponds to the W <- 1.5*W + .5*(W*^W*W)
-   *   case (recommended), or "symmetric" which is W <- (W*^W)^{-1/2}*W, which uses eigendecompositions.
-   */
   trait Opts extends FactorModel.Opts {
     val G_function:String = "logcosh"
-    val orthogMethod:String = "iterative"
   }
 
   class Options extends Opts {}
