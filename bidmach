@@ -18,15 +18,15 @@ BIDMACH_ROOT=`pwd`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
 JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
+if [ ! -e java_native_path.txt ]; then
+  java getnativepath > java_native_path.txt
+fi
 if [ `uname` = "Darwin" ]; then
     export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${DYLD_LIBRARY_PATH}"
 else
     export LD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
 fi
-if [ ! -e java_native_path.txt ]; then
-  java getnativepath > java_native_path.txt
-fi
-export JAVA_NATIVE=`cat java_native_path.txt`
+export JAVA_NATIVE=`cat java_native_path.txt`:${LD_LIBRARY_PATH}:${DYLD_LIBRARY_PATH}:
 popd > /dev/null
 if [ "$OS" = "Windows_NT" ]; then
     if [ ! "${JAVA_HOME}" = "" ]; then
