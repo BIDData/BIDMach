@@ -49,30 +49,38 @@ $(LIBPREPEND)caffe$(LIBAPPEND): $(CUDA_OBJS)
 %.$(OBJ) : %.c
 	$(CC) $(CFLAGS) $(LAPACK_INCLUDES) $*.c $(CPPOUTFLG)$*.$(OBJ)
 
-cbin/%.$(OBJ) : layers/%.cpp
+cbin/%.$(OBJ) : layers/%.cpp cbin
 	$(CPP) $(CPPFLAGS) layers/$*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
-cbin/%.$(OBJ) : util/%.cpp
+cbin/%.$(OBJ) : util/%.cpp cbin
 	$(CPP) $(CPPFLAGS) util/$*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
-cbin/%.$(OBJ) : proto/%.cc
+cbin/%.$(OBJ) : proto/%.cc cbin
 	$(CPP) $(CPPFLAGS) proto/$*.cc $(CPPOUTFLG)cbin/$*.$(OBJ)
 
-cbin/%.$(OBJ) : %.cpp proto/caffe.pb.h proto/caffe_pretty_print.pb.h
+cbin/%.$(OBJ) : %.cpp proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
 	$(CPP) $(CPPFLAGS) $*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
-gbin/%.$(OBJ) : layers/%.cu
+gbin/%.$(OBJ) : layers/%.cu gbin
 	$(NVCC) $(NVCCFLAGS) layers/$*.cu $(NVCCOUTFLG)gbin/$*.$(OBJ)
 
-gbin/%.$(OBJ) : util/%.cu
+gbin/%.$(OBJ) : util/%.cu gbin
 	$(NVCC) $(NVCCFLAGS) util/$*.cu $(NVCCOUTFLG)gbin/$*.$(OBJ)
+
+cbin :
+	mkdir -p cbin
+
+gbin :
+	mkdir -p gbin
 
 proto/caffe.pb.cc: proto/caffe.proto
 	protoc --cpp_out=proto --proto_path=proto proto/caffe.proto
+	mkdir -p ../../include/caffe/proto
 	cp proto/caffe.pb.h ../../include/caffe/proto/caffe.pb.h
 
 proto/caffe_pretty_print.pb.cc: proto/caffe_pretty_print.proto
 	protoc --cpp_out=proto --proto_path=proto proto/caffe_pretty_print.proto
+	mkdir -p ../../include/caffe/proto
 	cp proto/caffe_pretty_print.pb.h ../../include/caffe/proto/caffe_pretty_print.pb.h
 
 
@@ -84,7 +92,7 @@ install: all
 	cp $(LIBPREPEND)caffe$(LIBAPPEND) $(INSTALL_DIR)
 
 clean:
-	rm -f *.$(OBJ) cbin/*.$(OBJ) gbin/*.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib
+	rm -f *.$(OBJ) cbin/*.$(OBJ) gbin/*.$(OBJ) proto/*.cc proto/*.h ../../include/caffe/proto/*.h *$(LIBAPPEND) *.pdb *.exp *.lib
 
 distclean: clean
 	rm -f  *.jnilib Makefile.incl
