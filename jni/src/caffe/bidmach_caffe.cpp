@@ -78,10 +78,16 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_CAFFE_DeviceQuery
 JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_netFromParamFile
 (JNIEnv * env, jobject calling_obj, jstring jparamfile) {
   const char *paramfile = (const char *)(env->GetStringUTFChars(jparamfile, 0));
-  CheckFile(paramfile);
-  Net<float> *net = new Net<float>(paramfile);
+  jlong retv = 0;
+  try {
+    CheckFile(paramfile);
+    Net<float> *net = new Net<float>(paramfile);
+    retv = (jlong)(new shared_ptr<Net<float> >(net));
+  } catch (std::exception e) {
+    std::cerr << e.what();
+  }
   env->ReleaseStringUTFChars(jparamfile, paramfile);
-  return (jlong)(new shared_ptr<Net<float> >(net));
+  return retv;
 }
 
 JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_netFromPretrained

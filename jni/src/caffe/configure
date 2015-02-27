@@ -101,14 +101,14 @@ if [ "$OS" = "apple" ] ; then
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="-L${CUDA_HOME}/lib -L${INSTALL_DIR} -lcudart"
+    GOOGLE_LIBS="-lprotobuf -lglog"
 elif [ "$OS" = "linux" ] ; then
     MKL_ROOT="/opt/intel/mkl"
-    BOOST_HOME="/opt/boost/"
+    BOOST_HOME="/usr/local/include"
     if [ "$JAVA_HOME" = "" ]; then
     JAVA_HOME="/usr/java/default"
     fi
     CUDA_HOME="/usr/local/cuda"
-    BOOST_HOME="/code/boost/"
     CC="gcc"
     CPP="g++"
     NVCC="nvcc"
@@ -124,8 +124,8 @@ elif [ "$OS" = "linux" ] ; then
     OUTFLG="-o "
     CPPOUTFLG="-o "
     NVCCOUTFLG="-o "
-    CPPFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ -DUSE_MKL -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
-    CFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ -DUSE_MKL -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    CPPFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ -DUSE_MKL -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$BOOST_HOME -I$CUDA_HOME/include -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    CFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ -DUSE_MKL -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BOOST_HOME -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
     LB="ar rc"    
     GLD="g++ -shared"
     LD="g++ -shared -z noexecstack"
@@ -153,11 +153,14 @@ elif [ "$OS" = "linux" ] ; then
         CULIB="lib64"
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
-    CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${INSTALL_DIR} -lcudart -lprotobuf"
+    CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${INSTALL_DIR} -lcudart"
+    GOOGLE_LIBS="-lprotobuf -lglog"
 elif [ "$OS" = "windows" ] ; then
     CUDA_HOME="$CUDA_PATH"
     MKL_ROOT="$MKLROOT"
-    BOOST_HOME="/code/boost/"
+    BOOST_HOME="/code/boost"
+    GLOG_HOME="/code/glog"
+    PROTOBUF_HOME="/code/protobuf"
     CC="cl"
     CPP="cl"
     NVCC="nvcc"
@@ -165,9 +168,9 @@ elif [ "$OS" = "windows" ] ; then
     OUTFLG="/OUT:"
     CPPOUTFLG="/Fo"
     NVCCOUTFLG="-o "
-    CPPFLAGS="/c /MT /DNDEBUG /D__BIDMACH__ /DUSE_MKL /O2 /EHsc /wd4661 $CFLAGS"    # static linking
-    CFLAGS="/c /MT /DNDEBUG /D__BIDMACH__ /DUSE_MKL /O2 /EHsc $CFLAGS"    # static linking
-    NVCCFLAGS="-c -use_fast_math -D__BIDMACH__ -DUSE_MKL -I$BIDMACH_ROOT/jni/include -I$BOOST_HOME\
+    CPPFLAGS="/c /MT /DNDEBUG /D__BIDMACH__ /DUSE_MKL /DGOOGLE_GLOG_DLL_DECL= /O2 /EHsc /wd4661 $CFLAGS"    # static linking
+    CFLAGS="/c /MT /DNDEBUG /D__BIDMACH__ /DUSE_MKL /DGOOGLE_GLOG_DLL_DECL= /O2 /EHsc $CFLAGS"    # static linking
+    NVCCFLAGS="-c -use_fast_math -D__BIDMACH__ -DUSE_MKL -DGOOGLE_GLOG_DLL_DECL= -I$BIDMACH_ROOT/jni/include -I$BOOST_HOME\
           -gencode arch=compute_20,code=sm_20 \
           -gencode arch=compute_30,code=sm_30 \
           -gencode arch=compute_35,code=sm_35 \
@@ -198,9 +201,10 @@ elif [ "$OS" = "windows" ] ; then
 	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_intel_thread.lib mkl_core.lib libiomp5mt.lib" 
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
-    CUDA_LIBS="cudart.lib curand.lib cublas.lib libprotobuf.lib"
+    CUDA_LIBS="cudart.lib curand.lib cublas.lib"
+    GOOGLE_LIBS="libprotobuf.lib libglog_static.lib"
     LIB="$MKL_ROOT/lib/${ARCHD};$JAVA_HOME/lib;$CUDA_HOME/lib/${CULIB};${INSTALL_DIR};$LIB"
-    INCLUDE="$JAVA_HOME/include;$JAVA_HOME/include/win32;$MKL_ROOT/include;${BIDMACH_ROOT}/jni/include;$CUDA_HOME/include;$BOOST_HOME;$INCLUDE"
+    INCLUDE="$JAVA_HOME/include;$JAVA_HOME/include/win32;$MKL_ROOT/include;${BIDMACH_ROOT}/jni/include;$CUDA_HOME/include;$BOOST_HOME;$PROTOBUF_HOME/src;$GLOG_HOME/src/windows;$INCLUDE"
 else
     echo "OS not supported"
     exit 1
@@ -226,6 +230,7 @@ echo "LIBAPPEND=$LIBAPPEND" >> Makefile.incl
 echo "LAPACK_INCLUDES=$LAPACK_INCLUDES" >> Makefile.incl
 echo "MKL_LIBS=$MKL_LIBS" >> Makefile.incl
 echo "CUDA_LIBS=$CUDA_LIBS" >> Makefile.incl
+echo "GOOGLE_LIBS=$GOOGLE_LIBS" >> Makefile.incl
 echo "FORTRAN_LIBS=$FORTRAN_LIBS" >> Makefile.incl
 echo "FC=$FC" >> Makefile.incl
 echo "FFLAGS=$FFLAGS" >> Makefile.incl

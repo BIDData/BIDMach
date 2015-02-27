@@ -5,20 +5,8 @@
 
 #ifndef __BIDMACH__
 #include <gflags/gflags.h>
-#include <glog/logging.h>
-#else
-#define CHECK_EQ(X,Y) if (X!=Y) std::cerr << X << " " << Y << " "
-#define CHECK_NE(X,Y) if (X==Y) std::cerr << X << " " << Y << " "
-#define CHECK_LE(X,Y) if (X>Y) std::cerr << X << " " << Y << " "
-#define CHECK_GE(X,Y) if (X<Y) std::cerr << X << " " << Y << " "
-#define CHECK_GT(X,Y) if (X<=Y) std::cerr << X << " " << Y << " "
-#define CHECK_LT(X,Y) if (X>=Y) std::cerr << X << " " << Y << " "
-#define CHECK_NOTNULL(X) if (X==NULL) std::cerr << X << " "; X
-#define CHECK(X) if (!X) std::cerr << "null value "
-#define DCHECK(X) if (!X) std::cerr << "null value "
-#define LOG(X) std::cerr
-#define DLOG(X) std::cerr
 #endif
+#include <glog/logging.h>
 
 #ifdef _MSC_VER
 #include <stdint.h>
