@@ -109,7 +109,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   }
   
   /** 
-   * Evaluates model log-likelihood on a held-out batchof the input data.
+   * Evaluates model log-likelihood on a held-out batch of the input data.
    *  
    * @param sdata The word x document input data. Has dimension (# words x opts.batchSize), where batchSize is
    *   typically much smaller than the total number of documents, so sdata is usually a portion of the full input.

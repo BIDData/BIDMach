@@ -1,0 +1,25 @@
+val source = loadFMat("ica_source.txt")
+val mixing = loadFMat("ica_mixing.txt")
+val output = loadFMat("ica_output.txt")
+
+import BIDMach.models.ICA
+class xopts extends Learner.Options with MatDS.Opts with ICA.Opts with ADAGrad.Opts
+val opts = new xopts
+
+// These are the main settings to set correctly ... ESPECIALLY the model dimension
+opts.batchSize = 200000
+opts.dim = 5
+opts.npasses = 12
+opts.useGPU = true
+
+val nn = new Learner(new MatDS(Array(output), opts), new ICA(opts), null, new ADAGrad(opts), opts);
+
+nn.train
+
+val predW = FMat(nn.modelmats(0))
+val predMean = FMat(nn.modelmats(1))
+predMean.t
+
+val result = FMat(predW * (output - predMean))
+
+HMat.saveFMatTxt("ica_pred_source.txt", result)
