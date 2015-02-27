@@ -14,8 +14,8 @@
 #define CHECK_GT(X,Y) if (X<=Y) std::cerr << X << " " << Y << " "
 #define CHECK_LT(X,Y) if (X>=Y) std::cerr << X << " " << Y << " "
 #define CHECK_NOTNULL(X) if (X==NULL) std::cerr << X << " "; X
-#define CHECK(X) if (!X) std::cerr 
-#define DCHECK(X) if (!X) std::cerr 
+#define CHECK(X) if (!X) std::cerr << "null value "
+#define DCHECK(X) if (!X) std::cerr << "null value "
 #define LOG(X) std::cerr
 #define DLOG(X) std::cerr
 #endif
