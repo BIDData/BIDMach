@@ -32,7 +32,7 @@ import java.lang.Math;
  * }}}
  *     Here, data is an n x N matrix, whereas modelmats(1) is an n x 1 matrix. For efficiency reasons, we
  *     assume a constant batch size for each block of data so we take the mean across all batches. This is 
- *     true except for (usually) the last batch, but this often isn't enough to make a difference.
+ *     true except for (usually) the last batch, but this almost always isn't enough to make a difference.
  *     
  * Thus, modelmats(1) helps to center the data. The whitening in this algorithm happens during the updates
  * to W in both the orthogonalization and the fixed point steps. The former uses the computed convariance 
@@ -66,7 +66,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     
   /** 
    * Store data in "user" for use in the next mupdate() call, and updates the moving average if necessary.
-   * Also "orthogonalizes" the model matrix.
+   * Also "orthogonalizes" the model matrix after each update, as required by the algorithm.
    * 
    * First, it checks if this is the first pass over the data, and if so, updates the moving average assuming
    * that the number of data samples in each block is the same for all blocks. After the first pass, the data 
@@ -86,7 +86,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
       modelmats(1) = (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
     }
     data ~ data - modelmats(1)
-    mm <-- orthogonalize(mm,data) // After each update in mupdate(), mm must be orthogonalized
+    mm <-- orthogonalize(mm,data)
     user ~ mm * data
   }
   
