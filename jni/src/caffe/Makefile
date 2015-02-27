@@ -49,13 +49,13 @@ $(LIBPREPEND)caffe$(LIBAPPEND): $(CUDA_OBJS)
 %.$(OBJ) : %.c
 	$(CC) $(CFLAGS) $(LAPACK_INCLUDES) $*.c $(CPPOUTFLG)$*.$(OBJ)
 
-cbin/%.$(OBJ) : layers/%.cpp cbin
+cbin/%.$(OBJ) : layers/%.cpp proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
 	$(CPP) $(CPPFLAGS) layers/$*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
-cbin/%.$(OBJ) : util/%.cpp cbin
+cbin/%.$(OBJ) : util/%.cpp proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
 	$(CPP) $(CPPFLAGS) util/$*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
-cbin/%.$(OBJ) : proto/%.cc cbin
+cbin/%.$(OBJ) : proto/%.cc proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
 	$(CPP) $(CPPFLAGS) proto/$*.cc $(CPPOUTFLG)cbin/$*.$(OBJ)
 
 cbin/%.$(OBJ) : %.cpp proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
@@ -73,12 +73,12 @@ cbin :
 gbin :
 	mkdir -p gbin
 
-proto/caffe.pb.cc: proto/caffe.proto
+proto/caffe.pb.cc proto/caffe.pb.h : proto/caffe.proto
 	protoc --cpp_out=proto --proto_path=proto proto/caffe.proto
 	mkdir -p ../../include/caffe/proto
 	cp proto/caffe.pb.h ../../include/caffe/proto/caffe.pb.h
 
-proto/caffe_pretty_print.pb.cc: proto/caffe_pretty_print.proto
+proto/caffe_pretty_print.pb.cc proto/caffe_pretty_print.pb.h: proto/caffe_pretty_print.proto
 	protoc --cpp_out=proto --proto_path=proto proto/caffe_pretty_print.proto
 	mkdir -p ../../include/caffe/proto
 	cp proto/caffe_pretty_print.pb.h ../../include/caffe/proto/caffe_pretty_print.pb.h
