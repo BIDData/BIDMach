@@ -28,6 +28,7 @@ class Net () {
       input_data(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
       input_diff(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
     }
+
     output_data = new Array[FND](num_outputs);
     output_diff = new Array[FND](num_outputs);
     for (i <- 0 until num_outputs) {
@@ -35,16 +36,17 @@ class Net () {
       output_data(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
       output_diff(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
     }
+
     _blobs = _net.blob_names.foldLeft(new TreeMap[String, FND])(
       (b:TreeMap[String, FND], a:String) => 
         b.insert(a, BLOBtoFND(_net.blob_by_name(a))));
+
     _params = _net.layer_names.foldLeft(new TreeMap[String, Array[FND]])(
       (b:TreeMap[String, Array[FND]], a:String) => {
   	val la = _net.layer_by_name(a);
-  	b.insert(a, 
-  		 (0 until la.num_blobs).map(
-  		   (i:Int) => BLOBtoFND(la.blob(i))
-  		 ).toArray);
+  	b.insert(a, (0 until la.num_blobs).map(
+  	  (i:Int) => BLOBtoFND(la.blob(i))
+        ).toArray);
       }
     );
   }
