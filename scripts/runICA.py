@@ -1,8 +1,7 @@
 '''
 A testing suite for ICA. This will run some Python code to build the data, then calls the ICA
 testing script that contains BIDMach commands, then comes back to this Python code to plot the data.
-Be sure, after the BIDMach code runs, to type in ":q" on the command line to quit appropriately.
-Also, the script needs to be in the BIDMach/scripts folder.
+This code should be in the BIDMach/scripts folder.
 
 (c) February 2015 by Daniel Seita
 '''
@@ -43,12 +42,18 @@ def get_source(group, time, num_samples):
         s4 = signal.sweep_poly(third * time, [1,2])
         S = np.c_[s1, s2, s3, s4]
     elif group == 3:
-        s1 = np.sin(first * time)                   # Signal 1: sinusoidal signal
-        #s2 = np.cos(int((first+second)/2) * time)   # Signal 2: cosineusoidal signal
-        s2 = np.cos(second * time)                  # Signal 2: cosineusoidal signal
-        s3 = np.sign(np.sin(second * time))         # Signal 3: square signal
-        s4 = signal.sawtooth(first * np.pi * time)  # Signal 4: saw tooth signal
-        s5 = signal.sweep_poly(third * time, [1,2]) # Signal 5: sweeping polynomial signal
+        s1 = np.cos(second * time)                  # Signal 1: cosineusoidal signal
+        s2 = np.sign(np.sin(second * time))         # Signal 2: square signal
+        s3 = signal.sawtooth(first * np.pi * time)  # Signal 3: saw tooth signal
+        s4 = signal.sweep_poly(third * time, [1,2]) # Signal 4: sweeping polynomial signal
+        s5 = np.sin(first * time)                   # Signal 5: sinusoidal signal
+        S = np.c_[s1, s2, s3, s4, s5]
+    elif group == 4:
+        s1 = np.sin(first * time)
+        s2 = signal.sawtooth(float(first/2.55) * np.pi * time)
+        s3 = np.sign(np.sin(second * time))
+        s4 = signal.sawtooth(first * np.pi * time)
+        s5 = signal.sweep_poly(third * time, [1,2])
         S = np.c_[s1, s2, s3, s4, s5]
     S += 0.2 * np.random.normal(size=S.shape)
     S /= S.std(axis=0)
@@ -82,7 +87,7 @@ def get_mixing_matrix(group, pre_whitened):
                           [-.1, -.1,   3, -.9],
                           [8,     1,   7,   1],
                           [1.5,  -2,   3,  -1]])
-    elif group == 3:
+    elif group == 3 or group == 4:
         if pre_whitened:
             A = np.array([[ 0.31571,  0.45390, -0.59557,  0.12972,  0.56837],
                           [-0.32657,  0.47508,  0.43818, -0.56815,  0.39129],
@@ -97,6 +102,42 @@ def get_mixing_matrix(group, pre_whitened):
                           [-.1,   4, -.1,   3, -.2]])
     return A
 
+'''
+Takes in the predicted source from BIDMach and the original source and attempts to change the order
+and cardinality of the predicted data to match the original one. This is purely for debugging. newS
+is the list of lists that forms the numpy array, and rows_B_taken ensures a 1-1 correspondence.
+
+> B is the predicted source from BIDMach
+> S is the actual source before mixing
+'''
+def rearrange_data(B, S):
+    newS = []
+    rows_B_taken = []
+    for i in range(S.shape[0]):
+        new_row = S[i,:]
+        change_sign = False
+        best_norm = 99999999
+        best_row_index = -1
+        for j in range(B.shape[0]):
+            if j in rows_B_taken:
+                continue
+            old_row = B[j,:]
+            norm1 = np.linalg.norm(old_row + new_row)
+            if norm1 < best_norm:
+                best_norm = norm1
+                best_row_index = j
+                change_sign = True
+            norm2 = np.linalg.norm(old_row - new_row)
+            if norm2 < best_norm:
+                best_norm = norm2
+                best_row_index = j
+        rows_B_taken.append(best_row_index)
+        if change_sign:
+            newS.append((-B[best_row_index,:]).tolist())
+        else:
+            newS.append(B[best_row_index,:].tolist())
+    return np.array(newS)
+
 
 ########
 # MAIN #
@@ -106,7 +147,7 @@ def get_mixing_matrix(group, pre_whitened):
 if len(sys.argv) != 5:
     print "\nUsage: python runICA.py <num_samples> <data_group> <pre_zero_mean> <pre_whitened>"
     print "<num_samples> should be an integer; recommended to be at least 10000"
-    print "<data_group> should be an integer; only {1,2,3} are supported"
+    print "<data_group> should be an integer; currently only {1,2,3,4} are supported"
     print "<pre_zero_mean> should be \'Y\' or \'y\' if you want the (mixed) data to have zero-mean"
     print "<pre_whitened> should be \'Y\' or \'y\' if you want the (mixed) data to be pre-whitened"
     print "You also need to call this code in the directory where you can call \'./bidmach scripts/ica_test.ssc\'\n"
@@ -115,8 +156,9 @@ n_samples = int(sys.argv[1])
 data_group = int(sys.argv[2])
 pre_zero_mean = True if sys.argv[3].lower() == "y" else False
 pre_whitened = True if sys.argv[4].lower() == "y" else False
-if data_group < 1 or data_group > 3:
+if data_group < 1 or data_group > 4:
     raise Exception("Data group = " + str(data_group) + " is out of range.")
+plot_extra_info = False # If true, plot the mixed input data (X) in addition to the real/predicted sources
 
 # With parameters in pace, generate source, mixing, and output matrices, and save them to files.
 np.random.seed(0)
@@ -137,15 +179,25 @@ print "\nNow calling ICA in BIDMach...\n"
 call(["./bidmach", "scripts/ica_test.ssc"])
 print "\nFinished with BIDMach. Now let us plot the data."
 
-# Done with BIDMach. Extract data and plot results. Add more colors if needed but 5 is plenty.
+# Done with BIDMach. First, for the sake of readability, get distributions in same order.
 B = pylab.loadtxt('ica_pred_source.txt')
+newB = rearrange_data(B, S)
+
+# Extract data and plot results. Add more colors if needed but 5 is plenty.
 plt.figure()
-models = [X.T, S.T, B.T]
-names = ['Input to ICA','True Sources Before Mixing','BIDMach\'s FastICA']
-colors = ['red', 'blue', 'yellow', 'orange', 'darkcyan']
+if plot_extra_info:
+    models = [X.T, S.T, newB.T]
+    names = ['Input to ICA','True Sources Before Mixing','BIDMach\'s FastICA']
+else:
+    models = [S.T, newB.T]
+    names = ['True Sources Before Mixing','BIDMach\'s FastICA']
+colors = ['darkcyan', 'red', 'blue', 'orange', 'yellow']
 plot_xlim = min(n_samples-1, 10000)
 for ii, (model, name) in enumerate(zip(models, names), 1):
-    plt.subplot(3, 1, ii)
+    if plot_extra_info:
+        plt.subplot(3, 1, ii)
+    else:
+        plt.subplot(2, 1, ii)
     plt.title(name)
     plt.xlim([0,plot_xlim])
     for sig, color in zip(model.T, colors):
