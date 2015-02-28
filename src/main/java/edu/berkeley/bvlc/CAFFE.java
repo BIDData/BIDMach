@@ -9,6 +9,8 @@ public final class CAFFE {
     } 
     
     public static native void set_mode(int mode);
+
+    public static native void init(int logtostderr, int stderrthreshold, int minloglevel, String jlogdir);
     
     public static native void set_phase(int phase);
     

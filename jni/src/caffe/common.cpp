@@ -1,6 +1,4 @@
-#ifndef __BIDMACH__
-#include <glog/logging.h> // this is included in common.hpp anyway
-#endif
+#include <glog/logging.h>
 #include <cstdio>
 #include <ctime>
 

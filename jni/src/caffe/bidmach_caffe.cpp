@@ -36,6 +36,22 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_CAFFE_set_1mode
   }
 }
 
+JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_CAFFE_init
+(JNIEnv * env, jobject calling_obj, jint logtostderr, jint stderrthreshold, jint minloglevel, jstring jlogdir) { 
+  char str[] = "bidmach_caffe";   
+  char *pstr = new char[strlen(str)+1];
+  strcpy(pstr, str);
+  const char* logdir = (const char *)(env->GetStringUTFChars(jlogdir, 0));
+  char* plogdir = new char[strlen(logdir)+1];
+  strcpy(plogdir, logdir);
+  FLAGS_log_dir = plogdir;
+  FLAGS_logtostderr = logtostderr;
+  FLAGS_stderrthreshold = stderrthreshold;
+  FLAGS_minloglevel = minloglevel;
+  ::google::InitGoogleLogging(pstr);
+  env->ReleaseStringUTFChars(jlogdir, logdir);
+}
+
 JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_CAFFE_set_1phase
 (JNIEnv * env, jobject calling_obj, int phase) { 
   if (phase == 0) {

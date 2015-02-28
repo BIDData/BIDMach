@@ -1,6 +1,8 @@
 import BIDMach.caffe._
 import edu.berkeley.bvlc.{CAFFE,BLOB,LAYER,NET,SGDSOLVER}
 
+CAFFE.init(1,0,0,"/home/jfc/logs")
+
 val nn = new Net;
 
 nn.init("/code/BIDMach/data/caffe/alexnet/train_val.prototxt")
