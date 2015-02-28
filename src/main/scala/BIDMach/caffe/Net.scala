@@ -16,21 +16,37 @@ class Net () {
   
   val _net = new NET
   
+  private var _blobs:TreeMap[String, FND] = null;
+
+  private var _params:TreeMap[String, Array[FND]] = null;
+  
   def initIO = {
     input_data = new Array[FND](num_inputs);
     input_diff = new Array[FND](num_inputs);
-   	for (i <- 0 until num_inputs) {
-   	  val iblob = _net.input_blob(i)
-   	  input_data(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
-   	  input_diff(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
-   	}
-   	output_data = new Array[FND](num_outputs);
-   	output_diff = new Array[FND](num_outputs);
-   	for (i <- 0 until num_outputs) {
-   	  val oblob = _net.output_blob(i)
-   	  output_data(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
-   	  output_diff(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
-   	}
+    for (i <- 0 until num_inputs) {
+      val iblob = _net.input_blob(i)
+      input_data(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
+      input_diff(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
+    }
+    output_data = new Array[FND](num_outputs);
+    output_diff = new Array[FND](num_outputs);
+    for (i <- 0 until num_outputs) {
+      val oblob = _net.output_blob(i)
+      output_data(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
+      output_diff(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
+    }
+    _blobs = _net.blob_names.foldLeft(new TreeMap[String, FND])(
+      (b:TreeMap[String, FND], a:String) => 
+        b.insert(a, BLOBtoFND(_net.blob_by_name(a))));
+    _params = _net.layer_names.foldLeft(new TreeMap[String, Array[FND]])(
+      (b:TreeMap[String, Array[FND]], a:String) => {
+  	val la = _net.layer_by_name(a);
+  	b.insert(a, 
+  		 (0 until la.num_blobs).map(
+  		   (i:Int) => BLOBtoFND(la.blob(i))
+  		 ).toArray);
+      }
+    );
   }
   
   def init(modelfile:String, paramfile:String) = {
@@ -61,23 +77,9 @@ class Net () {
   
   def num = _net.input_blob(0).num
   
-  def blobs:TreeMap[String,FND] = {
-    _net.blob_names.foldLeft(new TreeMap[String, FND])(
-        (b:TreeMap[String, FND], a:String) => 
-          b.insert(a, BLOBtoFND(_net.blob_by_name(a))));
-  }
+  def blobs:TreeMap[String,FND] = _blobs
   
-  def params:TreeMap[String,Array[FND]] = {
-  	_net.layer_names.foldLeft(new TreeMap[String, Array[FND]])(
-  			(b:TreeMap[String, Array[FND]], a:String) => {
-  			  val la = _net.layer_by_name(a);
-  			  b.insert(a, 
-  			      (0 until la.num_blobs).map(
-  			      		(i:Int) => BLOBtoFND(la.blob(i))
-  			      		).toArray);
-  			}
-  			);
-  }
+  def params:TreeMap[String,Array[FND]] = _params
   
   def set_mean(mfile:String, varname:String = "image_mean") = {
     var meanf:FND = load(mfile, varname)                                   // Matlab means file is W < H < D, BGR
