@@ -51,9 +51,9 @@ void GlobalInit(int* pargc, char*** pargv) {
 #ifndef __BIDMACH__
   // Google flags.
   ::gflags::ParseCommandLineFlags(pargc, pargv, true);
+#endif
   // Google logging.
   ::google::InitGoogleLogging(*(pargv)[0]);
-#endif
 }
 
 #ifdef CPU_ONLY  // CPU-only Caffe.
