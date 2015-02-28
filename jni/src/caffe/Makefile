@@ -38,42 +38,40 @@ CUDA_OBJS=gbin/math_functions.$(OBJ) gbin/im2col.$(OBJ) \
 
 .SUFFIXES: .$(OBJ) .c .cpp .cu
 
-all: $(LIBPREPEND)caffe$(LIBAPPEND) 
+all: cbin gbin $(LIBPREPEND)caffe$(LIBAPPEND) 
 
+# build the library
 $(LIBPREPEND)caffe$(LIBAPPEND): $(CPU_OBJS) $(CUDA_OBJS)
 	$(GLD) $(LDFLAGS) $(CPU_OBJS) $(CUDA_OBJS) $(CUDA_LIBS) $(MKL_LIBS) $(GOOGLE_LIBS) $(OUTFLG)$@
 
-%.$(OBJ) : %.c
-	$(CC) $(CFLAGS) $(LAPACK_INCLUDES) $*.c $(CPPOUTFLG)$*.$(OBJ)
-
 # compile layer CPU code
-cbin/%.$(OBJ) : layers/%.cpp cbin
+cbin/%.$(OBJ) : layers/%.cpp
 	$(CPP) $(CPPFLAGS) layers/$*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
 # layers that depend on protobuf headers
-cbin/base_data_layer.$(OBJ) cbin/data_layer.$(OBJ) : proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
+cbin/base_data_layer.$(OBJ) cbin/data_layer.$(OBJ) : proto/caffe.pb.h proto/caffe_pretty_print.pb.h
 
 # compile CPU utils
-cbin/%.$(OBJ) : util/%.cpp cbin
+cbin/%.$(OBJ) : util/%.cpp
 	$(CPP) $(CPPFLAGS) util/$*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
 # util files that depend on protobuf headers
-cbin/io.$(OBJ) cbin/upgrade_proto.$(OBJ) : proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
+cbin/io.$(OBJ) cbin/upgrade_proto.$(OBJ) : proto/caffe.pb.h proto/caffe_pretty_print.pb.h
 
 # compile protobuf code
-cbin/%.$(OBJ) : proto/%.cc proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
+cbin/%.$(OBJ) : proto/%.cc proto/caffe.pb.h proto/caffe_pretty_print.pb.h
 	$(CPP) $(CPPFLAGS) proto/$*.cc $(CPPOUTFLG)cbin/$*.$(OBJ)
 
 # compile main directory functions
-cbin/%.$(OBJ) : %.cpp proto/caffe.pb.h proto/caffe_pretty_print.pb.h cbin
+cbin/%.$(OBJ) : %.cpp proto/caffe.pb.h proto/caffe_pretty_print.pb.h
 	$(CPP) $(CPPFLAGS) $*.cpp $(CPPOUTFLG)cbin/$*.$(OBJ)
 
 # compile GPU layers
-gbin/%.$(OBJ) : layers/%.cu gbin
+gbin/%.$(OBJ) : layers/%.cu
 	$(NVCC) $(NVCCFLAGS) layers/$*.cu $(NVCCOUTFLG)gbin/$*.$(OBJ)
 
 # compile GPU utils
-gbin/%.$(OBJ) : util/%.cu gbin
+gbin/%.$(OBJ) : util/%.cu
 	$(NVCC) $(NVCCFLAGS) util/$*.cu $(NVCCOUTFLG)gbin/$*.$(OBJ)
 
 # make directories if needed
