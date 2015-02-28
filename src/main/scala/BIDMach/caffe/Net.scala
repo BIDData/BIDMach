@@ -62,25 +62,21 @@ class Net () {
   def num = _net.input_blob(0).num
   
   def blobs:TreeMap[String,FND] = {
-    val out = new TreeMap[String, FND]
-    for (bname <- _net.blob_names) {
-    	out.insert(bname, BLOBtoFND(_net.blob_by_name(bname)))
-    }
-    out
+    _net.blob_names.foldLeft(new TreeMap[String, FND])(
+        (b:TreeMap[String, FND], a:String) => 
+          b.insert(a, BLOBtoFND(_net.blob_by_name(a))));
   }
   
   def params:TreeMap[String,Array[FND]] = {
-    val out = new TreeMap[String, Array[FND]]
-    for (lname <- _net.layer_names) {
-      val layer = _net.layer_by_name(lname)
-      val nblobs = layer.num_blobs
-      if (nblobs > 0) {
-      	val bb = new Array[FND](nblobs);
-      	for (i <- 0 until nblobs) bb(i) = BLOBtoFND(layer.blob(i));
-      	out.insert(lname, bb);
-      }
-    }
-    out
+  	_net.layer_names.foldLeft(new TreeMap[String, Array[FND]])(
+  			(b:TreeMap[String, Array[FND]], a:String) => {
+  			  val la = _net.layer_by_name(a);
+  			  b.insert(a, 
+  			      (0 until la.num_blobs).map(
+  			      		(i:Int) => BLOBtoFND(la.blob(i))
+  			      		).toArray);
+  			}
+  			);
   }
   
   def set_mean(mfile:String, varname:String = "image_mean") = {
