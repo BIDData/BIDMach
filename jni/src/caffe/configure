@@ -145,7 +145,7 @@ elif [ "$OS" = "linux" ] ; then
 	    MKL_LIBS="-L$JAVA_HOME/lib -L${BIDMACH_ROOT}/lib/${ARCHD} \
             -Wl,--start-group $MKL_ROOT/lib/${ARCHD}/libmkl_intel${PTYPE}.a \
             $MKL_ROOT/lib/${ARCHD}/libmkl_core.a $MKL_ROOT/lib/${ARCHD}/libmkl_gnu_thread.a \
-            -Wl,--end-group -lomp -ldl -lpthread -lm"
+            -Wl,--end-group -lgomp -ldl -lpthread -lm"
     fi
     if [ "$ARCH" = "x86" ] ; then
         CULIB="lib"
