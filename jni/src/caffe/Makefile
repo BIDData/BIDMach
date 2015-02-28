@@ -41,7 +41,7 @@ CUDA_OBJS=gbin/math_functions.$(OBJ) gbin/im2col.$(OBJ) \
 all: $(LIBPREPEND)caffe$(LIBAPPEND) 
 
 $(LIBPREPEND)caffe$(LIBAPPEND): $(CPU_OBJS) $(CUDA_OBJS)
-	$(GLD) $(LDFLAGS) $(CPU_OBJS) $(CUDA_OBJS) $(GOOGLE_LIBS) $(CUDA_LIBS) $(MKL_LIBS) $(OUTFLG)$@
+	$(GLD) $(LDFLAGS) $(CPU_OBJS) $(CUDA_OBJS) $(CUDA_LIBS) $(MKL_LIBS) $(GOOGLE_LIBS) $(OUTFLG)$@
 
 %.$(OBJ) : %.c
 	$(CC) $(CFLAGS) $(LAPACK_INCLUDES) $*.c $(CPPOUTFLG)$*.$(OBJ)
