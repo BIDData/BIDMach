@@ -17,13 +17,15 @@ class Net () {
   val _net = new NET
   
   def initIO = {
-    input_data = new Array[FND](num_inputs)
+    input_data = new Array[FND](num_inputs);
+    input_diff = new Array[FND](num_inputs);
    	for (i <- 0 until num_inputs) {
    	  val iblob = _net.input_blob(i)
    	  input_data(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
    	  input_diff(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
    	}
-   	output_data = new Array[FND](num_outputs)
+   	output_data = new Array[FND](num_outputs);
+   	output_diff = new Array[FND](num_outputs);
    	for (i <- 0 until num_outputs) {
    	  val oblob = _net.output_blob(i)
    	  output_data(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
