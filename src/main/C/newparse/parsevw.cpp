@@ -1,6 +1,4 @@
-// Read a file and parse each line according to the format file.
-// Output integer matrices with lookup maps in either ascii text 
-// or matlab binary form. 
+// Basic VW reader. Not quite fully functional. Does namespaces but not weights or tags.
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -72,7 +70,7 @@ stringIndexer::
 
 
 int parseLine(char * line, const char * delim1, const char * delim2, const char *delim3,
-	      const char * delim4, stringIndexer & si, fvector &labels, imatrix & imat, fvector & fvec)  {
+              const char * delim4, stringIndexer &si, stringIndexer &ns, fvector &labels, imatrix &imat, ivector &nsv, fvector &fvec)  {
   char *here, *next, *fpos;
   int label, indx;
   float fval;
@@ -86,38 +84,52 @@ int parseLine(char * line, const char * delim1, const char * delim2, const char 
   labels.push_back(label);
 
   next = strpbrk(here, delim2);    // get the tag
-  *(next++) = 0;
+  *(next++) = 0;                   
   // Do nothing with the tag for now
-  here = next;  
+  here = next;                     // points just after the "|"
+  int nsi = 0;
+  if (*here != *delim3) {          // first char is a non-space, must be namespace id
+    next = strpbrk(here, delim3);  // go to space after the namespace id
+    *(next++) = 0;                   
+    nsi = ns.checkword(here);
+  }
   while (here != NULL) {
-
     next = strpbrk(here, delim3);   // get a feature/value pair
     if (next) {
       *(next++) = 0;
     }
     // Actually parse in here
-    fpos = strpbrk(here, delim4);   // get a value, if there is one
-    fval = 1.0;
-    if (fpos) {
-      sscanf(fpos+1, "%f", &fval);
-      *fpos = 0;
+    if (*here == *delim2) {          // namespace change
+      nsi = ns.checkword(here+1);
+      here = next;
+    } else {
+      fpos = strpbrk(here, delim4);   // get a value, if there is one
+      fval = 1.0;
+      if (fpos) {
+        sscanf(fpos+1, "%f", &fval);
+        *fpos = 0;
+      }
+      indx = si.checkword(here);
+      iv.push_back(indx-1);
+      if (nsi > 0) nsv.push_back(nsi-1);
+      fvec.push_back(fval);
+      here = next;
     }
-    indx = si.checkword(here);
-    iv.push_back(indx-1);
-    fvec.push_back(fval);
-    here = next;
   }
   imat.push_back(iv);
   return 0;
 }
 
 
-void writefiles(string fname, imatrix &imat, fvector &fvec, fvector &labels, string suffix, int &ifile, int membuf) {
+void writefiles(string fname, imatrix &imat, fvector &fvec, fvector &labels, ivector &nsv, string suffix, int &ifile, int membuf) {
   char num[6];
   sprintf(num, "%05d", ifile);
   writeIntVecs(imat, fname+"inds"+num+".imat"+suffix, membuf);
   writeFVec(fvec, fname+"vals"+num+".fmat"+suffix, membuf);
   writeFVec(labels, fname+"labels"+num+".fmat"+suffix, membuf);
+  if (nsv.size() > 0) {
+    writeIntVec(nsv, fname+"namespace"+num+".fmat"+suffix, membuf);
+  }
   ifile++;
   imat.clear();
   fvec.clear();
@@ -170,8 +182,10 @@ int main(int argc, char ** argv) {
   imatrix imat;
   fvector fvec;
   fvector labels;
+  ivector nsv;
   istream * ifstr;
-  stringIndexer si;
+  stringIndexer si; // for tokens
+  stringIndexer ns; // for namespaces
   linebuf = new char[membuf];
   readbuf = new char[membuf];
   if (dictname.size() == 0) dictname = odname+"dict";
@@ -192,7 +206,7 @@ int main(int argc, char ** argv) {
         numlines++;
         try {
           parseLine(linebuf, delim1.c_str(), delim2.c_str(), delim3.c_str(), delim4.c_str(),
-                    si, labels, imat, fvec);
+                    si, ns, labels, imat, nsv, fvec);
         } catch (int e) {
           cerr << "Continuing" << endl;
         }
@@ -202,11 +216,11 @@ int main(int argc, char ** argv) {
         cout.flush();
       }
       if ((numlines % nsplit) == 0) {
-        writefiles(odname, imat, fvec, labels, suffix, nfiles, membuf);
+        writefiles(odname, imat, fvec, labels, nsv, suffix, nfiles, membuf);
       }
     }
     if ((numlines % nsplit) != 0) {
-      writefiles(odname, imat, fvec, labels, suffix, nfiles, membuf);
+      writefiles(odname, imat, fvec, labels, nsv, suffix, nfiles, membuf);
     }
     if (ifstr) delete ifstr;
     cout<<"\r"<<numlines<<" lines processed";
@@ -219,4 +233,5 @@ int main(int argc, char ** argv) {
   }
   fprintf(stderr, "\nWriting Dictionary\n");
   si.writeMap(dictname, suffix);
+  if (ns.size > 0) writeSBVecs(ns.unh, dictname + "_namespace.sbmat" + suffix, BUFSIZE);
 }
