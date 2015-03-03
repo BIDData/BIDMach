@@ -50,8 +50,13 @@ import java.lang.Math;
  */
 class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts) {
   
-  var mm:Mat = null         // Our W = A^{-1}.
-  var batchIteration = 0.0  // Used to keep track of the mean
+  // Some temp variables. The most important one is mm, which is our W = A^{-1}.
+  var mm:Mat = null
+  var batchIteration = 0.0 
+  var G_fun: Mat=>Mat = null
+  var g_fun: Mat=>Mat = null
+  var g_d_fun: Mat=>Mat = null
+  var stdNorm:FMat = null
   
   override def init() {
     super.init()
@@ -62,6 +67,21 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.nrows)
     updatemats(1) = mm.zeros(mm.nrows,1) // Keep to avoid null pointer exceptions, but we don't use it
+    opts.G_function match {
+      case "logcosh" => {
+        G_fun = G_logcosh; g_fun = g_logcosh; g_d_fun = g_d_logcosh; 
+        stdNorm = FMat(0.375);
+      }
+      case "exponent" => {
+        G_fun = G_exponent; g_fun = g_exponent; g_d_fun = g_d_exponent; 
+        stdNorm = FMat(-1.0 / sqrt(2.0));
+      }
+      case "kurtosis" => {
+        G_fun = G_kurtosis; g_fun = g_kurtosis; g_d_fun = g_d_kurtosis;
+        stdNorm = FMat(0.75);
+      }
+      case _ => throw new RuntimeException("opts.G_function is not a valid value: " + opts.G_function)
+    }
   }
     
   /** 
@@ -112,12 +132,8 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     val m = data.ncols
     val n = mm.ncols
     val B = mm * user
-    val (gwtx,g_wtx) = opts.G_function match {
-      case "logcosh" => (g_logcosh(user), g_d_logcosh(user))
-      case "exponent" => (g_exponent(user), g_d_exponent(user))
-      case "kurtosis" => (g_kurtosis(user), g_d_kurtosis(user))
-      case _ => throw new RuntimeException("opts.G_function is not a valid value: " + opts.G_function)
-    }
+    val gwtx = g_fun(user)
+    val g_wtx = g_d_fun(user)
     val termBeta = mkdiag( -mean(user *@ gwtx, 2) )
     val termAlpha = mkdiag( -1.0 / (getdiag(termBeta) - (mean(g_wtx,2))) )
     val termExpec = (gwtx *^ user) / m
@@ -134,7 +150,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * 
    * where G is the function set at opts.G_function. So long as the W matrix (capital "W") is orthogonal, 
    * which we do enforce, then w^Tx satisfies the requirement that the variance be one. To extend this to
-   * the whole matrix W, take the sum over all the rows, so the problem is: maxmize{ \sum_w J(w^Tx) }.
+   * the whole matrix W, take the sum over all the rows, so the problem is: maximize{ \sum_w J(w^Tx) }.
    * 
    * On the other hand, the batchSize should be much greater than one, so "data" consists of many columns.
    * Denoting the data matrix as X, we can obtain the expectations by taking the sample means. In other words,
@@ -147,12 +163,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param ipass The current pass through the data.
    */
   def evalfun(data : Mat, user : Mat, ipass : Int) : FMat = {
-    val (big_gwtx, stdNorm) = opts.G_function match {
-      case "logcosh" => (G_logcosh(user), FMat(0.375)) // 0.375 obtained from Numpy sampling
-      case "exponent" => (G_exponent(user), FMat(-1.0 / sqrt(2.0)))
-      case "kurtosis" => (G_kurtosis(user), FMat(0.75))
-      case _ => throw new RuntimeException("opts.G_function is not a valid value: " + opts.G_function)
-    }
+    val big_gwtx = G_fun(user)
     val rowMean = FMat(mean(big_gwtx,2)) - stdNorm
     return sum(rowMean *@ rowMean)
   }
@@ -204,11 +215,11 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   
   /** 
    * Takes in the model matrix and returns an orthogonal version of it, so WW^T = identity. We use a method 
-   * from from A. Hyvärinen and E. Oja (2000): an iterative algorithm that uses a norm that is NOT the 
-   * Frobenius norm, and then iterate a W = 1.5*W - 0.5*W*^W*W update until convergence (it's quadratic in
-   * convergence). This involves no eigendecompositions and should be fast. We use the maximum absolute row 
-   * sum norm, so we take the absolute value of elements, sum over the rows, and pick the largest of those values.
-   * The above assumes that the covariance matrix of the data is the identity, i.e., C = I. If not, plug in C.
+   * from A. Hyvärinen and E. Oja (2000): an iterative algorithm that uses a norm that is NOT the Frobenius
+   * norm, and then iterate a W = 1.5*W - 0.5*W*^W*W update until convergence (it's quadratic in convergence).
+   * This involves no eigendecompositions and should be fast. We use the maximum absolute row sum norm, so we
+   * take the absolute value of elements, sum over rows, and pick the largest of the values. The above assumes 
+   * that the covariance matrix of the data is the identity, i.e., C = I. If not, plug in C.
    * 
    * @param w The model matrix that we want to transform to be orthogonal (often referred to as "mm" here).
    * @param dat The data matrix, used to compute the covariance matrices if necessary.
@@ -216,7 +227,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   private def orthogonalize(w : Mat, dat : Mat) : Mat = {
     val C = getSampleCovariance(dat)
     val WWT = w * C *^ w
-    var result = w / sqrt(maxi(sum(abs(WWT), 2))) // Maximum ABSOLUTE, ROW, SUM, norm
+    var result = w / sqrt(maxi(sum(abs(WWT), 2)))
     var a = 0
     while (a < opts.dim*opts.dim) { // Quadratic in convergence, so perhaps opts.dim^2 is good?
       val newMatrix = ((1.5 * result) - 0.5 * (result * C *^ result * result))
