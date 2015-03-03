@@ -92,6 +92,7 @@ int parseLine(char * line, const char * delim1, const char * delim2, const char 
     next = strpbrk(here, delim3);   // go to space after the namespace id
     *(next++) = 0;                  // skip that space and zero it
     nsi = ns.checkword(here);       // lookup the NS id. 
+    here = next;
   }
   while (here != NULL) {
     next = strpbrk(here, delim3);   // get the next non-space blob
