@@ -129,12 +129,13 @@ void writefiles(string fname, imatrix &imat, fvector &fvec, fvector &labels, ive
   writeFVec(fvec, fname+"vals"+num+".fmat"+suffix, membuf);
   writeFVec(labels, fname+"labels"+num+".fmat"+suffix, membuf);
   if (nsv.size() > 0) {
-    writeIntVec(nsv, fname+"namespace"+num+".fmat"+suffix, membuf);
+    writeIntVec(nsv, fname+"namespace"+num+".imat"+suffix, membuf);
   }
   ifile++;
   imat.clear();
   fvec.clear();
   labels.clear();
+  nsv.clear();
 }
 
 const char usage[] = 
