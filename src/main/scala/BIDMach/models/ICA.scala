@@ -5,15 +5,15 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMach._
+import BIDMach.datasources._
+import BIDMach.updaters._
 import java.lang.ref._
 import jcuda.NativePointerObject
 import java.lang.Math;
 
 /**
- * Independent Component Analysis, using FastICA. It has the ability to center and whiten data. See below
- * for features and possible limitations.
- * 
- * Our algorithm is based on the method presented in:
+ * Independent Component Analysis, using FastICA. It has the ability to center and whiten data. It is 
+ * based on the method presented in:
  * 
  * A. Hyvärinen and E. Oja. Independent Component Analysis: Algorithms and Applications. 
  * Neural Networks, 13(4-5):411-430, 2000.
@@ -35,15 +35,16 @@ import java.lang.Math;
  *     true except for (usually) the last batch, but this almost always isn't enough to make a difference.
  *     
  * Thus, modelmats(1) helps to center the data. The whitening in this algorithm happens during the updates
- * to W in both the orthogonalization and the fixed point steps. The former uses the computed convariance 
+ * to W in both the orthogonalization and the fixed point steps. The former uses the computed covariance 
  * matrix and the latter relies on an approximation of W^T*W to the inverse covariance matrix. It is fine
  * if the data is already pre-whitened before being passed to BIDMach.
  *     
- * Currently, we are working on the following extensions:
+ * Currently, we are thinking about the following extensions:
  * 
  *   > Allowing ICA to handle non-square mixing matrices. Most research about ICA assumes that A is n x n.
  *   > Improving the way we handle the computation of the mean, so it doesn't rely on the last batch being
  *     of similar size to all prior batches. Again, this is minor, especially for large data sets.
+ *   > Thinking of ways to make this scale better to a large variety of datasets
  * 
  * For additional references, see Aapo Hyvärinen's other papers, and visit:
  *   http://research.ics.aalto.fi/ica/fastica/
@@ -256,4 +257,21 @@ object ICA {
   }
 
   class Options extends Opts {}
+  
+  /** ICA with a single matrix datasource. A dimension d needs to be specified. */
+  def learner(mat0:Mat, d:Int) = {
+    class xopts extends Learner.Options with MatDS.Opts with ICA.Opts with ADAGrad.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.npasses = 10
+    opts.batchSize = math.min(100000, mat0.ncols/20 + 1) // Just a heuristic
+    val nn = new Learner(
+        new MatDS(Array(mat0:Mat), opts), 
+        new ICA(opts), 
+        null,
+        new ADAGrad(opts), 
+        opts)
+    (nn, opts)
+  }
+  
 }
