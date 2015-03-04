@@ -180,7 +180,9 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   
   /** Assumes g'(x) = d/dx tanh(x). This is pretty complicated; see WolframAlpha for confirmation. */
   private def g_d_logcosh(m : Mat) : Mat = {
-    return ( (2*cosh(m))/(cosh(2*m)+1) ) *@ ( (2*cosh(m))/(cosh(2*m)+1) )
+    val a = (2*cosh(m))/(cosh(2*m)+1)
+    a ~ a *@ a
+    return a
   }
   
   /** Assumes G(x) = -exp(-x^2/2), good if data is super-Gaussian or robustness is needed. */
