@@ -200,7 +200,9 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
 
   /** Assumes G(x) = x^4/4, a weak contrast function, but OK for sub-Gaussian data w/no outliers. */
   private def G_kurtosis(m: Mat) : Mat = {
-    return (m *@ m *@ m *@ m) / 4.0
+    val c = m *@ m
+    c ~ c *@ c 
+    return c / 4.0
   }
   
   /** Assumes g(x) = d/dx x^4/4 = x^3. */
@@ -239,9 +241,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
 
   /** Gets sample covariance matrix (one column of m is one sample). See Wikipedia for matrix formulation. */
   private def getSampleCovariance(m : Mat) : Mat = {
-    val meanVec = mean(m, 2)
-    val onesRow = ones(1, m.ncols)
-    val F = m - (meanVec * onesRow)
+    val F = m - mean(m,2)
     return (F *^ F) / (m.ncols - 1)
   }
 }
