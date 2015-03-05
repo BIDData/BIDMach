@@ -39,7 +39,7 @@ const char usage[] =
 ;
 
 int main(int argc, char ** argv) {
-  int iarg=1, membuf=1048576;
+  int pos, iarg=1, membuf=1048576;
   char *here;
   char *ifname = NULL;
   string odname="", dictname = "", suffix = "";
@@ -95,6 +95,9 @@ int main(int argc, char ** argv) {
     if (strstr(here, ".gz") - here == strlen(here) - 3) {
       rname = rname.substr(0, strlen(here) - 3);
     } 
+    pos = rname.rfind('/');
+    if (pos == string::npos) pos = rname.rfind('\\');
+    if (pos != string::npos) rname = rname.substr(pos+1, rname.size());
     writeIntVec(tokens, odname+rname+".imat"+suffix, membuf);
     tokens.clear();
     numlines = 0;
