@@ -267,14 +267,4 @@ extern "C" {
     return hashcross(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D, transpose);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_binorand
-  (JNIEnv *env, jobject obj, jint nvals, jobject jA, jobject jC, jobject jOut)
-  {
-    float *A = (float*)getPointer(env, jA);
-    int *C = (int*)getPointer(env, jC);
-    int *Out = (int*)getPointer(env, jOut);
-
-    return binorand(nvals, A, C, Out);
-  }
-
 }
