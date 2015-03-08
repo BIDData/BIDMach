@@ -267,4 +267,32 @@ extern "C" {
     return hashcross(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D, transpose);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_multinomial
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jA, jobject jB, jobject jNorm, jint nvals)
+  {
+    float *A = (float*)getPointer(env, jA);
+    int *B = (int*)getPointer(env, jB);
+    float *Norm = (float*)getPointer(env, jNorm);
+
+    return multinomial(nrows, ncols, A, B, Norm, nvals);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_multinomial2
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jA, jobject jB, jint nvals)
+  {
+    float *A = (float*)getPointer(env, jA);
+    int *B = (int*)getPointer(env, jB);
+
+    return multinomial2(nrows, ncols, A, B, nvals);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_cumsumc
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jA, jobject jB, jint nvals)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *B = (float*)getPointer(env, jB);
+
+    return cumsumc(nrows, ncols, A, B);
+  }
+
 }

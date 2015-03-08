@@ -1,8 +1,9 @@
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 #include <stdio.h>
 #include <MatKernel.hpp>
 
-#if __CUDA_ARCH__ > 200
+#if __CUDA_ARCH__ >= 300
 
 #define edcellupdate(RR,RP1,RP2,RPP,WUN,TMP)                                                               \
   asm("vmin4.s32.s32.s32.add" "%0, %1.b3210, %2.b4321, %3;": "=r" (RR) : "r" (RP1), "r" (RP2), "r" (WUN)); \
@@ -171,3 +172,311 @@ int hammingdists(int *a, int *b, int *w, int *op, int *ow, int n) {
   cudaError_t err = cudaGetLastError();
   return err;
 }    
+
+#define DBSIZE (5*1024)
+
+__global__ void __cumsumc(int nrows, int ncols, float *A, float *B) {
+  __shared__ float vec[DBSIZE];
+  __shared__ float tvec[DBSIZE];
+  int i, j, jbase, shift;
+  int fitcols = DBSIZE/nrows;
+  float vv, *avec, *bvec, *cvec;
+  float nrowsinv = 1.0f / nrows;
+  __syncthreads();
+  for (i = fitcols * blockIdx.x; i < ncols; i += fitcols * gridDim.x) {
+    avec = vec;
+    bvec = tvec;
+    __syncthreads();
+    for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
+      vec[j] = A[j + i * nrows];
+    }
+    __syncthreads();
+    for (shift = 1; shift < nrows; shift *= 2) {
+      for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
+        vv = avec[j];
+        jbase = ((int)floor((j + 0.5f)*nrowsinv))*nrows;
+        //        jbase = (j / nrows) * nrows;
+        if (j - shift >= jbase) {
+          vv += avec[j-shift];
+        }
+        bvec[j] = vv;
+      }
+      __syncthreads();
+      cvec = avec;
+      avec = bvec;
+      bvec = cvec;
+    }
+    for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
+      B[j + i * nrows] = avec[j];
+    }
+    __syncthreads();
+  } 
+}       
+
+__global__ void __multinomial2(int nrows, int ncols, float *A, int *B, curandState *rstates, int nvals) {
+  __shared__ float vec[DBSIZE];
+  __shared__ float tvec[DBSIZE];
+  int i, j, jcol, jcolnr, jbase, shift, *ivec;
+  int imin, imax, imid;
+  int fitcols = DBSIZE/nrows;
+  float vv, rval, *avec, *bvec, *cvec;
+  float nrowsinv = 1.0f / nrows;
+  float nvalsinv = 1.0f / nvals;
+  curandState *prstate = &rstates[threadIdx.x];
+  __syncthreads();
+  for (i = fitcols * blockIdx.x; i < ncols; i += fitcols * gridDim.x) {
+    avec = vec;
+    bvec = tvec;
+    __syncthreads();
+    for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
+      vec[j] = A[j + i * nrows];
+    }
+    __syncthreads();
+    for (shift = 1; shift < nrows; shift *= 2) {
+      for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
+        vv = avec[j];
+        jbase = ((int)floor((j + 0.5f)*nrowsinv))*nrows;
+        //        jbase = (j / nrows) * nrows;
+        if (j - shift >= jbase) {
+          vv += avec[j-shift];
+        }
+        bvec[j] = vv;
+      }
+      __syncthreads();
+      cvec = avec;
+      avec = bvec;
+      bvec = cvec;
+    }
+    ivec = (int *)bvec;
+    for (j = threadIdx.x; j < nrows*fitcols; j += blockDim.x) {
+      ivec[j] = 0;
+    }
+    __syncthreads();
+    for (j = threadIdx.x; j < nvals*fitcols; j += blockDim.x) {
+      jcol = (int)floor((j + 0.5f)*nvalsinv);
+      jcolnr = jcol * nrows;
+      rval = avec[jcolnr+nrows-1]*curand_uniform(prstate);
+      imin = 0;
+      imax = nrows;
+      while (imax - imin > 1) {
+        imid = (imin + imax) >> 1;
+        if (rval >= avec[imid + jcolnr]) {
+          imin = imid;
+        } else {
+          imax = imid;
+        }
+      }
+      atomicAdd(&ivec[imin + jcolnr], 1);
+    }
+    __syncthreads();
+    for (j = threadIdx.x; j < nrows*fitcols; j += blockDim.x) {
+      B[j + i * nrows] = ivec[j];
+    }
+    __syncthreads();
+  } 
+}       
+
+//
+// 
+
+__forceinline__ __device__ int __waittimeval(curandState *prstate, float p, int n) {
+  float q = - log(1-p);
+  float X = 0;
+  float sum = 0;
+  int i = 0;
+  while (i < 100 && sum <= q) {
+    float E = - log(curand_uniform(prstate));  // safe since curand_uniform wont return 0
+    sum += E / (n - X);
+    X += 1;
+    i += 1;
+  }
+  return X - 1;  
+}
+
+__forceinline__ __device__ int binorndval(float p, int n, curandState *prstate) {
+  bool pflipped;
+  float X, Y, V;
+  const float pi = 3.1415926f;
+
+  if (p > 0.5f) {                            // flip p so that its less than 1/2.
+    pflipped = true;
+    p = 1.0f - p;
+  } else {
+    pflipped = false;
+  }
+  float np = n * p;
+  if (np < 21) {
+    X = __waittimeval(prstate, p, n);           // Use a wait time method if small expected output
+  } else {
+    float oldp = p;                   
+    p = floor(np) / n;                       // round np to an integral value for the rejection stage
+    p = max(1e-7f, min(1 - 1e-7f, p));       // prevent divide-by-zeros
+    np = n * p;
+    float n1mp = n * (1-p);
+    float pvar = np * (1-p);
+    float delta1 = max(1.0f, floor(sqrt(pvar * log(128 * np / (81 * pi * (1-p))))));
+    float delta2 = max(1.0f, floor(sqrt(pvar * log(128 * n1mp / (pi * p)))));
+    float sigma1 = sqrt(pvar)*(1+delta1/(4*np));
+    float sigma2 = sqrt(pvar)*(1+delta2/(4*n1mp));
+    float sigma1sq = sigma1 * sigma1;
+    float sigma2sq = sigma2 * sigma2;
+    float c = 2 * delta1 / np;
+    float a1 = 0.5f * exp(c) * sigma1 * sqrt(2*pi);
+    float a2 = 0.5f * sigma2 * sqrt(2*pi);
+    float a3 = exp(delta1/n1mp - delta1*delta1/(2*sigma1sq))*2*sigma1sq/delta1;
+    float a4 = exp(-delta2*delta2/(2*sigma2sq))*2*sigma2sq/delta2;
+    float s = a1 + a2 + a3 + a4;
+    int i = 0;
+    while (i < 100) {                            // Give up eventually
+      i += 1;
+      float U = s * curand_uniform(prstate);
+      float E1 = - log(curand_uniform(prstate)); // safe since curand_uniform wont return 0
+      if (U <= a1 + a2) {
+        float N = curand_normal(prstate);
+        if (U <= a1) {
+          Y = sigma1 * abs(N);
+          if (Y >= delta1) continue;
+          X = floor(Y);
+          V = - E1 - N * N/2 + c;
+        } else {
+          Y = sigma2 * abs(N);
+          if (Y >= delta2) continue;
+          X = floor(-Y);
+          V = - E1 - N * N/2;
+        }
+      } else {
+        float E2 = - log(curand_uniform(prstate));
+        if (U <= a1 + a2 + a3) {
+          Y = delta1 + 2*sigma1sq*E1/delta1;
+          X = floor(Y);
+          V = - E2 - delta1*Y/(2*sigma1sq) + delta1/n1mp;
+        } else {
+          Y = delta2 + 2*sigma2sq*E1/delta2;
+          X = floor(-Y);
+          V = - E2 - delta2*Y/(2*sigma2sq);
+        }
+      }
+      if (X < - np || X > n1mp) continue;
+      if (V > lgamma(np+1) + lgamma(n1mp+1) - lgamma(np+X+1) - lgamma(n1mp-X+1) + X*log(p/(1-p))) continue;
+      break;
+    }
+    X += np;
+    X += __waittimeval(prstate, (oldp-p)/(1-p), n-X); // Now correct for rounding np to integer
+  }
+  if (pflipped) {                                  // correct for flipped p. 
+    X = n - X;
+  }
+  return (int)X;
+}
+
+//
+// i steps over blocks of 256 columns
+//   j steps down blocks of 32 rows
+//     Load a block of 32 x 256 words
+//     k steps down the rows of this block
+//       compute local p get bino sample "count" from remaining n
+//       decrement remaining n. 
+//
+
+__global__ void __multinomial(int nrows, int ncols, float *A, int *B, float *Norm, curandState *rstates, int nvals) {
+  __shared__ float mat[256][33];
+
+  int (*imat)[33] = (int (*)[33])mat;
+  int i, j, k, valsleft, count, iv;
+  float vnorm, vv;
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  curandState *prstate = &rstates[tid + blockIdx.x*blockDim.x*blockDim.y];
+  __syncthreads();
+  for (i = 256*blockIdx.x; i < ncols; i += 256*gridDim.x) {   // Loop across blocks of 256 columns
+    vnorm = 1.0f;
+    if (tid + i < ncols) {                                    // Load the norms for these 256 cols
+      vnorm = Norm[tid+i];
+    }
+    valsleft = nvals;                                         // Initialize the count of samples for this column
+    for (j = 0; j < nrows; j += blockDim.x) {                 // Loop over blocks of 32 rows
+      __syncthreads();
+      for (k = 0; k < min(256, ncols-i); k += 8) {            // Copy this 32x256 word block into SHMEM
+        vv = 0;
+        if (j+threadIdx.x < nrows) {
+          vv = A[j+threadIdx.x + (i+k+threadIdx.y)*nrows];
+        }
+        mat[k+threadIdx.y][threadIdx.x] = vv;
+      }
+      __syncthreads();
+      for (k = 0; k < min(32, nrows-j); k += 1) {             // Now walk down the columns with 256 threads
+        vv = min(mat[tid][k], vnorm);
+        count = binorndval(vv/vnorm, valsleft, prstate);      // get a binomial random count
+        count = min(count, valsleft);
+        valsleft -= count;                                    // subtract it from remaining count
+        vnorm -= vv;                                          // adjust remaining probability
+        imat[tid][k] = count;                                 // store count in the aliased SHMEM matrix
+      }
+      __syncthreads();
+      for (k = 0; k < min(256, ncols-i); k += 8) {            // Save this 32x256 block back into main memory
+        iv = imat[k+threadIdx.y][threadIdx.x];
+        if (j+threadIdx.x < nrows) {
+          B[j+threadIdx.x + (i+k+threadIdx.y)*nrows] = iv;
+        }
+      }
+      __syncthreads();
+    }
+  } 
+}       
+
+int cumsumc(int nrows, int ncols, float *A, float *B) {
+  int fitcols = DBSIZE/nrows;
+  int nthreads = 1024;
+  int nb =  1 + (ncols-1)/fitcols;
+  int nblocks = min(128, nb);
+  __cumsumc<<<nblocks,nthreads>>>(nrows, ncols, A, B);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+__global__ void __prandinit(curandState *rstates) {
+  int id = threadIdx.x + blockDim.x * blockIdx.x;
+  curand_init(1234, id, 0, &rstates[id]);
+}
+
+int multinomial2(int nrows, int ncols, float *A, int *B, int nvals) {
+  int fitcols = DBSIZE/nrows;
+  int nthreads = 1024;
+  int nb =  1 + (ncols-1)/fitcols;
+  int nblocks = min(128, nb);
+  curandState *rstates;
+  cudaError_t err = cudaMalloc(( void **)& rstates , nblocks * nthreads * sizeof(curandState));
+  if (err > 0) {
+    fprintf(stderr, "Error in cudaMalloc %d", err);
+    return err;
+  }
+  cudaDeviceSynchronize();
+  __prandinit<<<nblocks,nthreads>>>(rstates); 
+  cudaDeviceSynchronize();
+  __multinomial2<<<nblocks,nthreads>>>(nrows, ncols, A, B, rstates, nvals);
+  cudaDeviceSynchronize();
+  cudaFree(rstates);
+  err = cudaGetLastError();
+  return err;
+}
+
+int multinomial(int nrows, int ncols, float *A, int *B, float *Norm, int nvals) {
+  dim3 threads(32, 8, 1);
+  int nthreads = 256;
+  int nblocks = min(128, 1+ (ncols-1)/256);
+  curandState *rstates;
+  cudaError_t err = cudaMalloc(( void **)& rstates , nblocks * nthreads * sizeof(curandState));
+  if (err > 0) {
+    fprintf(stderr, "Error in cudaMalloc %d", err);
+    return err;
+  }
+  cudaDeviceSynchronize();
+  __prandinit<<<nblocks,nthreads>>>(rstates); 
+  cudaDeviceSynchronize();
+  __multinomial<<<nblocks,threads>>>(nrows, ncols, A, B, Norm, rstates, nvals);
+  cudaDeviceSynchronize();
+  cudaFree(rstates);
+  err = cudaGetLastError();
+  return err;
+}
+

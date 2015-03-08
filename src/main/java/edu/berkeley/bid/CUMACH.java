@@ -56,4 +56,9 @@ public final class CUMACH {
     
     public static native int hashCross(int nrows, int nfeats, int ncols, Pointer jA, Pointer jBdata, Pointer jBir, Pointer jBjc, Pointer jCdata, Pointer jCir, Pointer jCjc, Pointer D, int transpose);
     
+    public static native int cumsumc(int nrows, int ncols, Pointer jA, Pointer jB);
+    
+    public static native int multinomial(int nrows, int ncols, Pointer jA, Pointer jB, Pointer jNorm, int nvals);
+    
+    public static native int multinomial2(int nrows, int ncols, Pointer jA, Pointer jB, int nvals);
 }
