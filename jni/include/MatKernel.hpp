@@ -14,6 +14,8 @@ int hammingdists(int *a, int *b, int *w, int *op, int *ow, int n);
 
 int LDA_Gibbs(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float nsamps);
 
+int LDA_GibbsBino(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *Cv, float *P, int nsamps);
+
 int LDA_Gibbs1(int nrows, int nnz, float *A, float *B, int *Cir, int *Cic, float *P, int *Ms, int *Us, int k);
 
 int LDA_Gibbsv(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float* nsamps);
@@ -40,4 +42,8 @@ int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir,
 
 int hashcross(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *Cdata, int *Cir, int *Cjc, float *D, int transpose);
 
-int binorand(int nvals, float *A, int *C, int *Out);
+int cumsumc(int nrows, int ncols, float *A, float *B);
+
+int multinomial(int nrows, int ncols, float *A, int *B, float *Norm, int nvals);
+
+int multinomial2(int nrows, int ncols, float *A, int *B, int nvals);

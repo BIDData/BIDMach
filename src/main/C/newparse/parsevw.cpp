@@ -77,39 +77,40 @@ int parseLine(char * line, const char * delim1, const char * delim2, const char 
   ivector iv;
 
   here = line;
-  next = strpbrk(here, delim1);    // get the label(s)
+  next = strpbrk(here, delim1);     // get the label(s)
   *(next++) = 0;
   sscanf(here, "%d", &label);
   here = next;
   labels.push_back(label);
 
-  next = strpbrk(here, delim2);    // get the tag
+  next = strpbrk(here, delim2);     // get the tag
   *(next++) = 0;                   
   // Do nothing with the tag for now
-  here = next;                     // points just after the "|"
+  here = next;                      // points just after the "|"
   int nsi = 0;
-  if (*here != *delim3) {          // first char is a non-space, must be namespace id
-    next = strpbrk(here, delim3);  // go to space after the namespace id
-    *(next++) = 0;                   
-    nsi = ns.checkword(here);
+  if (*here != *delim3) {           // first char is a non-space, must be namespace id
+    next = strpbrk(here, delim3);   // go to space after the namespace id
+    *(next++) = 0;                  // skip that space and zero it
+    nsi = ns.checkword(here);       // lookup the NS id. 
+    here = next;
   }
   while (here != NULL) {
-    next = strpbrk(here, delim3);   // get a feature/value pair
+    next = strpbrk(here, delim3);   // get the next non-space blob
     if (next) {
       *(next++) = 0;
     }
     // Actually parse in here
-    if (*here == *delim2) {          // namespace change
+    if (*here == *delim2) {         // starts with "|", namespace change
       nsi = ns.checkword(here+1);
-      here = next;
-    } else {
-      fpos = strpbrk(here, delim4);   // get a value, if there is one
+      here = next;            
+    } else {                        // feature/value pair
+      fpos = strpbrk(here, delim4); // fget a value, if there is one
       fval = 1.0;
       if (fpos) {
         sscanf(fpos+1, "%f", &fval);
         *fpos = 0;
       }
-      indx = si.checkword(here);
+      indx = si.checkword(here);    // lookup the feature name
       iv.push_back(indx-1);
       if (nsi > 0) nsv.push_back(nsi-1);
       fvec.push_back(fval);
@@ -128,12 +129,13 @@ void writefiles(string fname, imatrix &imat, fvector &fvec, fvector &labels, ive
   writeFVec(fvec, fname+"vals"+num+".fmat"+suffix, membuf);
   writeFVec(labels, fname+"labels"+num+".fmat"+suffix, membuf);
   if (nsv.size() > 0) {
-    writeIntVec(nsv, fname+"namespace"+num+".fmat"+suffix, membuf);
+    writeIntVec(nsv, fname+"namespace"+num+".imat"+suffix, membuf);
   }
   ifile++;
   imat.clear();
   fvec.clear();
   labels.clear();
+  nsv.clear();
 }
 
 const char usage[] = 
