@@ -14,6 +14,8 @@ int hammingdists(int *a, int *b, int *w, int *op, int *ow, int n);
 
 int LDA_Gibbs(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float nsamps);
 
+int LDA_GibbsBino(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *Cv, float *P, int nsamps);
+
 int LDA_Gibbs1(int nrows, int nnz, float *A, float *B, int *Cir, int *Cic, float *P, int *Ms, int *Us, int k);
 
 int LDA_Gibbsv(int nrows, int nnz, float *A, float *B, float *AN, float *BN, int *Cir, int *Cic, float *P, float* nsamps);

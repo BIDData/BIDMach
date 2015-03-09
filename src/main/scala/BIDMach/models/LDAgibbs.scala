@@ -22,6 +22,7 @@ import BIDMach._
  - batchSize: the number of samples processed in a block
  - power(0.3f): the exponent of the moving average model' = a dmodel + (1-a)*model, a = 1/nblocks^power
  - npasses(10): number of complete passes over the dataset
+ - uesBino(false): use poisson (default) or binomial sampling (if true)
  *     
  * '''Example:'''
  * 
@@ -74,7 +75,7 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
     	val mnew = updatemats(0)
     	mnew.set(0f)
   
-    	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, opts.nsamps)
+    	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, dc, opts.nsamps, opts.useBino)
         
     	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
     	user ~ unew + opts.alpha
@@ -113,25 +114,30 @@ object LDAgibbs  {
     var alpha = 0.1f
     var beta = 0.1f
     var nsamps = 100f
+    var useBino = false // Use binomial or poisson (default) sampling
   }
   
   class Options extends Opts {}
   
-   def LDAsample(A:Mat, B:Mat, AN:Mat, BN:Mat, C:Mat, nsamps:Float):Unit = {
-    (A, B, AN, BN, C) match {
-     case (a:GMat, b:GMat, an:GMat, bn:GMat, c:GSMat) => doLDAgibbs(a, b, an, bn, c, nsamps):Unit
+  def LDAsample(A:Mat, B:Mat, AN:Mat, BN:Mat, C:Mat, D:Mat, nsamps:Float, doBino:Boolean):Unit = {
+    (A, B, AN, BN, C, D) match {
+     case (a:GMat, b:GMat, an:GMat, bn:GMat, c:GSMat, d:GMat) => doLDAgibbs(a, b, an, bn, c, d, nsamps, doBino):Unit
      case _ => throw new RuntimeException("LDAgibbs: arguments not recognized")
     }
   }
 
-  def doLDAgibbs(A:GMat, B:GMat, AN:GMat, BN:GMat, C:GSMat, nsamps:Float):Unit = {
+  def doLDAgibbs(A:GMat, B:GMat, AN:GMat, BN:GMat, C:GSMat, D:GMat, nsamps:Float, doBino:Boolean):Unit = {
     if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || 
         A.nrows != AN.nrows || A.ncols != AN.ncols || B.nrows != BN.nrows || B.ncols != BN.ncols) {
       throw new RuntimeException("LDAgibbs dimensions mismatch")
     }
-    var err = CUMACH.LDAgibbs(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, C.data, nsamps)
+    var err = if (doBino) {
+      CUMACH.LDAgibbsBino(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, D.data, C.data, nsamps.toInt)
+    } else {
+      CUMACH.LDAgibbs(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, C.data, nsamps)
+    }
     if (err != 0) throw new RuntimeException(("GPU %d LDAgibbs kernel error "+cudaGetErrorString(err)) format getGPU)
-    Mat.nflops += 12L * C.nnz * A.nrows   // Charge 10 for Poisson RNG
+    Mat.nflops += (if (doBino) 40L else 12L) * C.nnz * A.nrows   // Charge 10 for Poisson RNG
   }
   
   def doLDAgibbsx(A:GMat, B:GMat, C:GSMat, Ms:GIMat, Us:GIMat):Unit = {
