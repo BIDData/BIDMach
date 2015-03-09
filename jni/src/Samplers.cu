@@ -301,11 +301,10 @@ __global__ void __LDA_GibbsBino(int nrows, int nnz, float *A, float *B, float *A
 
       for (krow = 0; krow < min(blockDim.x, nrows-j); krow += 1) {    // Now walk down the columns with GBINOSIZE threads, krow is a local row index
         vv = min(mat[tid][krow], vnorm);                      // get the stored product value (guarded by vnorm)
-        //        count = curand_poisson(prstate, nsamps*vv/vnorm);
         count = __binorndgibbs(vv/vnorm, valsleft, prstate);  // get a binomial random count
         count = min(count, valsleft);
         valsleft -= count;                                    // subtract it from remaining count
-        vnorm -= vv;                                          // adjust remaining probability 
+        vnorm -= vv;                                          // adjust remaining probability
         mat[tid][krow] = (float)count;                        // store count back in SHMEM
       }
       __syncthreads();
