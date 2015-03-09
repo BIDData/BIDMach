@@ -17,12 +17,12 @@ import BIDMach._
  - alpha(0.001f) Dirichlet prior on document-topic weights
  - beta(0.0001f) Dirichlet prior on word-topic weights
  - nsamps(100) the number of repeated samples to take
+ - useBino(false): use poisson (default) or binomial sampling (if true)
  *
  * Other key parameters inherited from the learner, datasource and updater:
  - batchSize: the number of samples processed in a block
  - power(0.3f): the exponent of the moving average model' = a dmodel + (1-a)*model, a = 1/nblocks^power
  - npasses(10): number of complete passes over the dataset
- - uesBino(false): use poisson (default) or binomial sampling (if true)
  *     
  * '''Example:'''
  * 
