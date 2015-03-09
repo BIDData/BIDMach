@@ -21,11 +21,10 @@ import java.lang.Math;
  * In particular, we provide the logcosh, exponential, and kurtosis "G" functions.
  * 
  * This algorithm computes the following modelmats array:
- * 
- *   > modelmats(0) stores the inverse of the mixing matrix. If X = A*S represents the data, then it's the 
- *     estimated A^{-1}, which we assume is square and invertible for now.
- *   > modelmats(1) stores the mean vector of the data, which is computed entirely on the first pass. This
- *     means once we estimate A^{-1} in modelmats(0), we need to first shift the data by this amount, and
+ *   - modelmats(0) stores the inverse of the mixing matrix. If X = A*S represents the data, then it's the 
+ *     estimated A^-1^, which we assume is square and invertible for now.
+ *   - modelmats(1) stores the mean vector of the data, which is computed entirely on the first pass. This
+ *     means once we estimate A^-1^ in modelmats(0), we need to first shift the data by this amount, and
  *     then multiply to recover the (centered) sources. Example:
  * {{{
  * modelmats(0) * (data - modelmats(1))
@@ -36,15 +35,14 @@ import java.lang.Math;
  *     
  * Thus, modelmats(1) helps to center the data. The whitening in this algorithm happens during the updates
  * to W in both the orthogonalization and the fixed point steps. The former uses the computed covariance 
- * matrix and the latter relies on an approximation of W^T*W to the inverse covariance matrix. It is fine
+ * matrix and the latter relies on an approximation of W^T^*W to the inverse covariance matrix. It is fine
  * if the data is already pre-whitened before being passed to BIDMach.
  *     
  * Currently, we are thinking about the following extensions:
- * 
- *   > Allowing ICA to handle non-square mixing matrices. Most research about ICA assumes that A is n x n.
- *   > Improving the way we handle the computation of the mean, so it doesn't rely on the last batch being
+ *   - Allowing ICA to handle non-square mixing matrices. Most research about ICA assumes that A is n x n.
+ *   - Improving the way we handle the computation of the mean, so it doesn't rely on the last batch being
  *     of similar size to all prior batches. Again, this is minor, especially for large data sets.
- *   > Thinking of ways to make this scale better to a large variety of datasets
+ *   - Thinking of ways to make this scale better to a large variety of datasets
  * 
  * For additional references, see Aapo Hyvärinen's other papers, and visit:
  *   http://research.ics.aalto.fi/ica/fastica/
@@ -93,18 +91,18 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * that the number of data samples in each block is the same for all blocks. After the first pass, the data 
    * mean vector is fixed in modelmats(1). Then the data gets centered via: "data ~ data - modelmats(1)".
    * 
-   * We also use "user ~ mm * data" to store all (w_j^T) * (x^{i}) values, where w_j^T is the j^th row of our
-   * estimated W = A^{-1}, and x^{i} is the i^{th} sample in this block of data. These values are later used
+   * We also use "user ~ mm * data" to store all (w_j^T^) * (x^i^) values, where w_j^T^ is the j^th^ row of
+   * our estimated W = A^-1^, and x^i^ is the i^th^ sample in this block of data. These values are later used
    * as part of fixed point updates.
    * 
    * @param data An n x batchSize matrix, where each column corresponds to a data sample.
-   * @param user An intermediate matrix that stores (w_j^T) * (x^{i}) values.
+   * @param user An intermediate matrix that stores (w_j^T^) * (x^i^) values.
    * @param ipass The current pass through the data.
    */
   def uupdate(data : Mat, user : Mat, ipass : Int) {
     if (ipass == 0) {
       batchIteration = batchIteration + 1.0
-      modelmats(1) = (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
+      modelmats(1) <-- (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
     }
     data ~ data - modelmats(1)
     mm <-- orthogonalize(mm,data)
@@ -114,19 +112,19 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   /**
    * This performs the matrix fixed point update to the estimated W = A^{-1}:
    * 
-   *   W^+ = W + diag(alpha_i) * [ diag(beta_i) - Expec[g(Wx)*(Wx)^T] ] * W,
+   *   W^+^ = W + diag(alpha,,i,,) * [ diag(beta,,i,,) - Expec[g(Wx)*(Wx)^T^] ] * W,
    * 
-   * where g = G', beta_i = -Expec[(Wx)_ig(Wx)_i], and alpha_i = -1/(beta_i - Expec[g'(Wx)_i]). We need to
-   * be careful to take expectations of the appropriate items. The gwtx and g_wtx terms are matrices with
-   * useful intermediate values that represent the full data matrix X rather than a single column/element x.
-   * The above update for W^+ goes in updatemats(0), except the additive W since that should be taken care
-   * of by the ADAGrad updater.
+   * where g = G', beta,,i,, = -Expec[(Wx),,i,,g(Wx),,i,,], and alpha,,i,, = -1/(beta,,i,, - Expec[g'(Wx),,i,,]). 
+   * We need to be careful to take expectations of the appropriate items. The gwtx and g_wtx terms are matrices 
+   * with useful intermediate values that represent the full data matrix X rather than a single column/element x.
+   * The above update for W^+^ goes in updatemats(0), except the additive W since that should be taken care of by
+   * the ADAGrad updater.
    * 
-   * I don't THINK anything here changes if the data is not white, since one of Hyvärinen's papers implied
+   * I don't think anything here changes if the data is not white, since one of Hyvärinen's papers implied
    * that the update here includes an approximation to the inverse covariance matrix.
    * 
    * @param data An n x batchSize matrix, where each column corresponds to a data sample.
-   * @param user An intermediate matrix that stores (w_j^T) * (x^{i}) values.
+   * @param user An intermediate matrix that stores (w_j^T^) * (x^i^) values.
    * @param ipass The current pass through the data.
    */
   def mupdate(data : Mat, user : Mat, ipass : Int) {
@@ -136,7 +134,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     val gwtx = g_fun(user)
     val g_wtx = g_d_fun(user)
     val termBeta = mkdiag( -mean(user *@ gwtx, 2) )
-    val termAlpha = mkdiag( -1.0 / (getdiag(termBeta) - (mean(g_wtx,2))) )
+    val termAlpha = mkdiag( -1.0f / (getdiag(termBeta) - (mean(g_wtx,2))) )
     val termExpec = (gwtx *^ user) / m
     updatemats(0) <-- termAlpha * (termBeta + termExpec) * mm
   }
@@ -147,20 +145,20 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * To understand this, let w be a single row vector of W, let x be a single data vector, and let v be a
    * standard normal random variable. To find this one independent component, we maximize
    * 
-   *   J(w^Tx) \approx ( Expec[G(w^Tx)] - Expec[G(v)] )^2,
+   *   J(w^T^x) \approx ( Expec[G(w^T^x)] - Expec[G(v)] )^2^,
    * 
    * where G is the function set at opts.G_function. So long as the W matrix (capital "W") is orthogonal, 
-   * which we do enforce, then w^Tx satisfies the requirement that the variance be one. To extend this to
-   * the whole matrix W, take the sum over all the rows, so the problem is: maximize{ \sum_w J(w^Tx) }.
+   * which we do enforce, then w^T^x satisfies the requirement that the variance be one. To extend this to
+   * the whole matrix W, take the sum over all the rows, so the problem is: maximize{ \sum,,w,, J(w^T^x) }.
    * 
    * On the other hand, the batchSize should be much greater than one, so "data" consists of many columns.
    * Denoting the data matrix as X, we can obtain the expectations by taking the sample means. In other words,
    * we take the previous "user" matrix, W*X, apply the function G to the data, and THEN take the mean across
-   * rows, so mean(G(W*X),2). The mean across rows gives what we want since it's applying the same row of W to
-   * different x (column) vectors in our data.
+   * rows, so mean(G(W*X),2). The mean across rows gives what we want since it's applying the same row of W
+   * to different x (column) vectors in our data.
    * 
    * @param data An n x batchSize matrix, where each column corresponds to a data sample.
-   * @param user An intermediate matrix that stores (w_j^T) * (x^{i}) values.
+   * @param user An intermediate matrix that stores (w_j^T^) * (x^i^) values.
    * @param ipass The current pass through the data.
    */
   def evalfun(data : Mat, user : Mat, ipass : Int) : FMat = {
@@ -232,11 +230,11 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   private def orthogonalize(w : Mat, dat : Mat) : Mat = {
     val C = getSampleCovariance(dat)
     val WWT = w * C *^ w
-    var result = w / sqrt(maxi(sum(abs(WWT), 2)))
+    val result = w / sqrt(maxi(sum(abs(WWT), 2)))
     var a = 0
-    while (a < opts.dim*opts.dim) { // Quadratic in convergence, so perhaps opts.dim^2 is good?
-      val newMatrix = ((1.5 * result) - 0.5 * (result * C *^ result * result))
-      result = newMatrix
+    while (a < 50*opts.dim) { // Quadratic in convergence, so perhaps opts.dim is good?
+      val newResult = ((1.5 * result) - 0.5 * (result * C *^ result * result))
+      result <-- newResult
       a = a + 1
     }
     return result
@@ -253,7 +251,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
 object ICA {
 
   trait Opts extends FactorModel.Opts {
-    val G_function:String = "logcosh"
+    var G_function:String = "logcosh"
   }
 
   class Options extends Opts {}
