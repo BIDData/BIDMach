@@ -103,7 +103,13 @@ if [ "$OS" = "apple" ] ; then
     CUDA_LIBS="-L${CUDA_HOME}/lib -L${INSTALL_DIR} -lcudart"
     GOOGLE_LIBS="-lprotobuf -lglog"
 elif [ "$OS" = "linux" ] ; then
-    MKL_ROOT="/opt/intel/mkl"
+    if [ "$PARLIB" = "openblas" ] ; then
+	MKL_INCLUDES="-I/usr/include/openblas"
+	MKL_DEF=""
+    else 
+	MKL_INCLUDES="-I/opt/intel/mkl/include -I/opt/intel/mkl/include/${ARCHD}${SUBDIR}"
+	MKL_DEF="-DUSE_MKL"
+    fi
     BOOST_HOME="/usr/local/include"
     if [ "$JAVA_HOME" = "" ]; then
     JAVA_HOME="/usr/java/default"
@@ -112,9 +118,9 @@ elif [ "$OS" = "linux" ] ; then
     CC="gcc"
     CPP="g++"
     NVCC="nvcc"
-    NVCCFLAGS="-c -use_fast_math -D__BIDMACH__ -DUSE_MKL \
+    NVCCFLAGS="-c -use_fast_math -D__BIDMACH__ ${MKL_DEF} \
           -I$BIDMACH_ROOT/jni/include -I$BOOST_HOME \
-          -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR} \
+          ${MKL_INCLUDES} \
           -gencode arch=compute_20,code=sm_20 \
           -gencode arch=compute_30,code=sm_30 \
           -gencode arch=compute_35,code=sm_35 \
@@ -124,8 +130,8 @@ elif [ "$OS" = "linux" ] ; then
     OUTFLG="-o "
     CPPOUTFLG="-o "
     NVCCOUTFLG="-o "
-    CPPFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ -DUSE_MKL -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$BOOST_HOME -I$CUDA_HOME/include -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
-    CFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ -DUSE_MKL -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BOOST_HOME -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    CPPFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ ${MKL_DEF} -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$BOOST_HOME -I$CUDA_HOME/include ${MKL_INCLUDES}"
+    CFLAGS="-fPIC -c -O2 -DNDEBUG -D__BIDMACH__ ${MKL_DEF} -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BOOST_HOME ${MKL_INCLUDES}"
     LB="ar rc"    
     GLD="g++ -shared -z noexecstack"
     LD="g++ -shared -z noexecstack"
@@ -136,7 +142,9 @@ elif [ "$OS" = "linux" ] ; then
     FFLAGS="$CFLAGS"
     LAPACK_INCLUDES=""
     FORTRAN_LIBS="-lgfortran"
-    if [ "$PARLIB" = "sequential" ] ; then
+    if [ "$PARLIB" = "openblas" ] ; then
+	    MKL_LIBS="-lopenblas -lgomp -ldl -lpthread -lm"
+    elif [ "$PARLIB" = "sequential" ] ; then
 	    MKL_LIBS="-L$JAVA_HOME/lib -L${BIDMACH_ROOT}/lib \
             -Wl,--start-group $MKL_ROOT/lib/${ARCHD}/libmkl_intel${PTYPE}.a \
             $MKL_ROOT/lib/${ARCHD}/libmkl_core.a $MKL_ROOT/lib/${ARCHD}/libmkl_sequential.a \

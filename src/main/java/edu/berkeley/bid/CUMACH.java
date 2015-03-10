@@ -19,6 +19,8 @@ public final class CUMACH {
     
     public static native int LDAgibbs(int nr, int nnz, Pointer A, Pointer B, Pointer AN, Pointer BN, Pointer Cir, Pointer Cic, Pointer P, float nsamps);
 
+    public static native int LDAgibbsBino(int nr, int nnz, Pointer A, Pointer B, Pointer AN, Pointer BN, Pointer Cir, Pointer Cic, Pointer Cv, Pointer P, int nsamps);
+
     public static native int LDAgibbsx(int nr, int nnz, Pointer A, Pointer B, Pointer Cir, Pointer Cic, Pointer P, Pointer Ms, Pointer Us, int k);
     
     public static native int LDAgibbsv(int nr, int nnz, Pointer A, Pointer B, Pointer AN, Pointer BN, Pointer Cir, Pointer Cic, Pointer P, Pointer nsamps);
@@ -56,4 +58,9 @@ public final class CUMACH {
     
     public static native int hashCross(int nrows, int nfeats, int ncols, Pointer jA, Pointer jBdata, Pointer jBir, Pointer jBjc, Pointer jCdata, Pointer jCir, Pointer jCjc, Pointer D, int transpose);
     
+    public static native int cumsumc(int nrows, int ncols, Pointer jA, Pointer jB);
+    
+    public static native int multinomial(int nrows, int ncols, Pointer jA, Pointer jB, Pointer jNorm, int nvals);
+    
+    public static native int multinomial2(int nrows, int ncols, Pointer jA, Pointer jB, int nvals);
 }

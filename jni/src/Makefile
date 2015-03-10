@@ -22,8 +22,8 @@ $(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(CUDA_OBJS)
 %.$(OBJ) : %.cpp
 	$(GCC) $(CPPFLAGS) $(LAPACK_INCLUDES) $*.cpp
 
-#Dtree.$(OBJ) : Dtree.cu
-#	$(NVCC) $(NVCCFLAGS) -Xptxas -v Dtree.cu
+# Samplers.$(OBJ) : Samplers.cu
+#	$(NVCC) --maxrregcount=64 $(NVCCFLAGS) -Xptxas -v Samplers.cu
 
 %.$(OBJ) : %.cu
 	$(NVCC) $(NVCCFLAGS) $*.cu

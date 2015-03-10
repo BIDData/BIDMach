@@ -562,6 +562,7 @@ message MemoryDataParameter {
   optional uint32 channels = 2;
   optional uint32 height = 3;
   optional uint32 width = 4;
+  optional uint32 lookahead = 5;
 }
 
 // Message that stores parameters used by MVNLayer

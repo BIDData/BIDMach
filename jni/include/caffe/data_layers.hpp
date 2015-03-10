@@ -313,6 +313,9 @@ class MemoryDataLayer : public BaseDataLayer<Dtype> {
   Dtype* labels_;
   int n_;
   int pos_;
+#ifdef __BIDMACH__
+  int write_pos_;
+#endif
   Blob<Dtype> added_data_;
   Blob<Dtype> added_label_;
   bool has_new_data_;

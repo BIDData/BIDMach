@@ -44,6 +44,22 @@ extern "C" {
     return LDA_Gibbs(nrows, nnz, A, B, AN, BN, Cir, Cic, P, nsamps);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_LDAgibbsBino
+  (JNIEnv *env, jobject obj, jint nrows, jint nnz, jobject jA, jobject jB, jobject jAN, jobject jBN, 
+   jobject jCir, jobject jCic, jobject jCv, jobject jP, jint nsamps)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *B = (float*)getPointer(env, jB);
+    float *AN = (float*)getPointer(env, jAN);
+    float *BN = (float*)getPointer(env, jBN);
+    int *Cir = (int*)getPointer(env, jCir);
+    int *Cic = (int*)getPointer(env, jCic);
+    float *Cv = (float*)getPointer(env, jCv);
+    float *P = (float*)getPointer(env, jP);
+
+    return LDA_GibbsBino(nrows, nnz, A, B, AN, BN, Cir, Cic, Cv, P, nsamps);
+  }
+
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_LDAgibbsx
   (JNIEnv *env, jobject obj, jint nrows, jint nnz, jobject jA, jobject jB,
    jobject jCir, jobject jCic, jobject jP, jobject jMs, jobject jUs, int k)
@@ -266,5 +282,4 @@ extern "C" {
 
     return hashcross(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D, transpose);
   }
-
 }

@@ -338,7 +338,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     if (opts.regression) {
       var mm = mean(fnodes);
       if (datasource.opts.putBack == 1) {
-        cats <-- mm;
+        val pcats = if (cats.nrows == 1) mm else mm on sqrt(variance(fnodes))
+        cats <-- pcats;
       }
       val diff = mm - FMat(cats)
       if (opts.MAE) -mean(abs(diff)) else -(diff dotr diff)/diff.length

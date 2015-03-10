@@ -175,7 +175,7 @@ np.savetxt("ica_mixing.txt", A, delimiter=" ")
 np.savetxt("ica_output.txt", X, delimiter=" ")
 print "\nNow calling ICA in BIDMach...\n"
 
-# Call BIDMach. Note that the user (you) have to quit by typing ":q" to proceed with plotting.
+# Call BIDMach. Note that this will exit automatically with sys.exit, without user intervention.
 call(["./bidmach", "scripts/ica_test.ssc"])
 print "\nFinished with BIDMach. Now let us plot the data."
 
