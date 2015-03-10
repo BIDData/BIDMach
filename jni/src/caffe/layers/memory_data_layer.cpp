@@ -6,7 +6,6 @@
 // JFC: Modified to implement a circular buffer filled by an external thread
 
 #ifdef __BIDMACH__
-#define LOOKAHEAD 10
 #ifdef _MSC_VER
 #include <windows.h>
 #else
@@ -14,7 +13,6 @@
 #define Sleep(x) usleep((x)*1000)
 #endif
 #else
-#define LOOKAHEAD 1
 #endif
 
 namespace caffe {
@@ -34,7 +32,7 @@ void MemoryDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   (*top)[0]->Reshape(batch_size_, this->datum_channels_, this->datum_height_,
                      this->datum_width_);
   (*top)[1]->Reshape(batch_size_, 1, 1, 1);
-  n_ = LOOKAHEAD * batch_size_;
+  n_ = this->layer_param_.memory_data_param().lookahead() * batch_size_;
   added_data_.Reshape(n_, this->datum_channels_, this->datum_height_,
                       this->datum_width_);
   added_label_.Reshape(n_, 1, 1, 1);
