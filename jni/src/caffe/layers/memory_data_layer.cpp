@@ -88,8 +88,7 @@ void MemoryDataLayer<Dtype>::AddDatumVector(const vector<Datum>& datum_vector) {
 }
 
 template <typename Dtype>
-void MemoryDataLayer<Dtype>::AddData(Dtype *A, int num, int nchannels, int width, int height) {
-  size_t num = datum_vector.size();
+void MemoryDataLayer<Dtype>::AddData(Dtype *A, Dtype *B, int num, int nchannels, int width, int height) {
   CHECK_GT(num, 0) << "There is no datum to add";
   CHECK_EQ(nchannels, this->datum_channels_)<< "MemoryDataLayer: wrong number of channels";
   CHECK_EQ(width, this->datum_width_)<< "MemoryDataLayer: wrong width";
@@ -100,8 +99,8 @@ void MemoryDataLayer<Dtype>::AddData(Dtype *A, int num, int nchannels, int width
   Dtype* top_label = added_label_.mutable_cpu_data();
   for (int batch_item_id = 0; batch_item_id < num; ++batch_item_id) {
     // Apply data transformations (mirror, scale, crop...)
-    this->data_transformer_.Transform(write_pos_, A+(batch_item_id * this->datum_size_), this->mean_, top_data);
-    top_label[write_pos_] = datum_vector[batch_item_id].label();
+    //    this->data_transformer_.Transform(write_pos_, A+(batch_item_id * this->datum_size_), this->mean_, top_data);
+    top_label[write_pos_] = B[batch_item_id];
     write_pos_ = (write_pos_ + 1) % n_;
   }
 }

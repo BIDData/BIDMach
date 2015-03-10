@@ -297,6 +297,7 @@ class MemoryDataLayer : public BaseDataLayer<Dtype> {
   virtual inline int ExactNumTopBlobs() const { return 2; }
 
   virtual void AddDatumVector(const vector<Datum>& datum_vector);
+  virtual void AddData(Dtype *A, Dtype *B, int num, int nchannels, int width, int height);
 
   // Reset should accept const pointers, but can't, because the memory
   //  will be given to Blob, which is mutable

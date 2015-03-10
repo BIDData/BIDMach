@@ -9,6 +9,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/net.hpp"
 #include "caffe/solver.hpp"
+#include "caffe/data_layers.hpp"
 
 using namespace caffe;
 
@@ -402,10 +403,13 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_SGDSOLVER_SolveResume
 }
 
 JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_pushMemoryData
-(JNIEnv * env, jobject calling_obj, jlong layerRef, jfloatArray jA, jint num, jint nchannels, jint height, jint width) {
+(JNIEnv * env, jobject calling_obj, jlong layerRef, jfloatArray jA, jfloatArray jB, 
+ int num, int nchannels, int height, int width) {
   shared_ptr<MemoryDataLayer<float> > layer = *((shared_ptr<MemoryDataLayer<float> > *)layerRef);
-  jfloat *A = (jfloat *)(env->GetPrimitiveArrayCritical(jA, JNI_FALSE));
-  layer->AddData<float>(A, num, nchannels, height, width);
+  float *A = (jfloat *)(env->GetPrimitiveArrayCritical(jA, JNI_FALSE));
+  float *B = (jfloat *)(env->GetPrimitiveArrayCritical(jB, JNI_FALSE));
+  layer->AddData(A, B, num, nchannels, height, width);
+  env->ReleasePrimitiveArrayCritical(jB, B, 0);
   env->ReleasePrimitiveArrayCritical(jA, A, 0);
 }
   
