@@ -1,7 +1,7 @@
 import BIDMach.caffe._
 import edu.berkeley.bvlc.{CAFFE,BLOB,LAYER,NET,SGDSOLVER}
 
-CAFFE.init(0,0,0,"/cygwin/home/jfc/logs")
+CAFFE.init(0,0,0,"/home/jfc/logs")
 
 val nn = new Net;
 
