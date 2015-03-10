@@ -13,6 +13,7 @@
 #include <unistd.h>
 #define Sleep(x) usleep((x)*1000)
 #endif
+#else
 #define LOOKAHEAD 1;
 #endif
 
