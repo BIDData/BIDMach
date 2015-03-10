@@ -40,8 +40,10 @@ void MemoryDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   added_label_.Reshape(n_, 1, 1, 1);
   data_ = NULL;
   labels_ = NULL;
+  added_data_.cpu_data();
+  added_label_.cpu_data();
 #ifdef __BIDMACH__
-  Reset(added_data_.cpu_data(), added_label_.cpu_data(), n_);
+  Reset(added_data_.mutable_cpu_data(), added_label_.mutable_cpu_data(), n_);
 #endif
 }
 
