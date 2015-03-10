@@ -108,6 +108,7 @@ elif [ "$OS" = "linux" ] ; then
 	MKL_DEF=""
     else 
 	MKL_INCLUDES="-I/opt/intel/mkl/include -I/opt/intel/mkl/include/${ARCHD}${SUBDIR}"
+        MKL_ROOT="/opt/intel/mkl"
 	MKL_DEF="-DUSE_MKL"
     fi
     BOOST_HOME="/usr/local/include"
