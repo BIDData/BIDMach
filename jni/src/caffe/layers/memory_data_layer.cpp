@@ -6,9 +6,9 @@
 // JFC: Modified to implement a circular buffer filled by an external thread
 
 #ifdef __BIDMACH__
+#define LOOKAHEAD 10;
 #ifdef _MSC_VER
 #include <windows.h>
-#define LOOKAHEAD 10;
 #else
 #include <unistd.h>
 #define LOOKAHEAD 1;
