@@ -8,10 +8,10 @@
 #ifdef __BIDMACH__
 #ifdef _MSC_VER
 #include <windows.h>
-#define LOOKAHEAD = 10;
+#define LOOKAHEAD 10;
 #else
 #include <unistd.h>
-#define LOOKAHEAD = 1;
+#define LOOKAHEAD 1;
 #define Sleep(x) usleep((x)*1000)
 #endif
 #endif
