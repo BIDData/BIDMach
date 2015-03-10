@@ -400,4 +400,13 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_SGDSOLVER_SolveResume
   solver->Solve(savefile);
   env->ReleaseStringUTFChars(jsavefile, savefile);
 }
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_pushMemoryData
+(JNIEnv * env, jobject calling_obj, jlong layerRef, jfloatArray jA, jint num, jint nchannels, jint height, jint width) {
+  shared_ptr<MemoryDataLayer<float> > layer = *((shared_ptr<MemoryDataLayer<float> > *)layerRef);
+  jfloat *A = (jfloat *)(env->GetPrimitiveArrayCritical(jA, JNI_FALSE));
+  layer->AddData<float>(A, num, nchannels, height, width);
+  env->ReleasePrimitiveArrayCritical(jA, A, 0);
+}
+  
 }
