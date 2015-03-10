@@ -6,7 +6,7 @@
 // JFC: Modified to implement a circular buffer filled by an external thread
 
 #ifdef __BIDMACH__
-#define LOOKAHEAD 10;
+#define LOOKAHEAD 10
 #ifdef _MSC_VER
 #include <windows.h>
 #else
@@ -14,7 +14,7 @@
 #define Sleep(x) usleep((x)*1000)
 #endif
 #else
-#define LOOKAHEAD 1;
+#define LOOKAHEAD 1
 #endif
 
 namespace caffe {
