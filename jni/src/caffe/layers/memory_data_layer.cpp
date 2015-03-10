@@ -11,9 +11,9 @@
 #include <windows.h>
 #else
 #include <unistd.h>
-#define LOOKAHEAD 1;
 #define Sleep(x) usleep((x)*1000)
 #endif
+#define LOOKAHEAD 1;
 #endif
 
 namespace caffe {
