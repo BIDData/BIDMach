@@ -56,6 +56,8 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   var g_fun: Mat=>Mat = null
   var g_d_fun: Mat=>Mat = null
   var stdNorm:FMat = null
+
+  var debug = false
   
   override def init() {
     super.init()
@@ -128,14 +130,11 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param ipass The current pass through the data.
    */
   def mupdate(data : Mat, user : Mat, ipass : Int) {
-    val m = data.ncols
-    val n = mm.ncols
-    val B = mm * user
     val gwtx = g_fun(user)
     val g_wtx = g_d_fun(user)
     val termBeta = mkdiag( -mean(user *@ gwtx, 2) )
     val termAlpha = mkdiag( -1.0f / (getdiag(termBeta) - (mean(g_wtx,2))) )
-    val termExpec = (gwtx *^ user) / m
+    val termExpec = (gwtx *^ user) / data.ncols
     updatemats(0) <-- termAlpha * (termBeta + termExpec) * mm
   }
     
@@ -162,6 +161,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param ipass The current pass through the data.
    */
   def evalfun(data : Mat, user : Mat, ipass : Int) : FMat = {
+    println("Inside evalfun() with GPUmem = " + GPUmem)
     val big_gwtx = G_fun(user)
     val rowMean = FMat(mean(big_gwtx,2)) - stdNorm
     return sum(rowMean *@ rowMean)
@@ -232,7 +232,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     val WWT = w * C *^ w
     val result = w / sqrt(maxi(sum(abs(WWT), 2)))
     var a = 0
-    while (a < 50*opts.dim) { // Quadratic in convergence, so perhaps opts.dim is good?
+    while (a < math.max(10, math.sqrt(opts.dim).toInt)) { // Quadratic in convergence so maybe this is good?
       val newResult = ((1.5 * result) - 0.5 * (result * C *^ result * result))
       result <-- newResult
       a = a + 1
@@ -256,12 +256,12 @@ object ICA {
 
   class Options extends Opts {}
   
-  /** ICA with a single matrix datasource. A dimension d needs to be specified. */
-  def learner(mat0:Mat, d:Int) = {
+  /** ICA with a single matrix datasource. The dimension is based on the input matrix. */
+  def learner(mat0:Mat) = {
     class xopts extends Learner.Options with MatDS.Opts with ICA.Opts with ADAGrad.Opts
     val opts = new xopts
-    opts.dim = d
-    opts.npasses = 10
+    opts.dim = size(mat0)(0)
+    opts.npasses = 20
     opts.batchSize = math.min(100000, mat0.ncols/20 + 1) // Just a heuristic
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
