@@ -272,4 +272,21 @@ object ICA {
     (nn, opts)
   }
   
+  /** ICA with a files dataSource. */
+  def learner(fnames:List[(Int)=>String], d:Int) = {
+    class xopts extends Learner.Options with FilesDS.Opts with ICA.Opts with ADAGrad.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.fnames = fnames
+    opts.batchSize = 10000;
+    implicit val threads = threadPool(4)
+    val nn = new Learner(
+        new FilesDS(opts), 
+        new ICA(opts), 
+        null,
+        new ADAGrad(opts), 
+        opts)
+    (nn, opts)
+  }
+   
 }
