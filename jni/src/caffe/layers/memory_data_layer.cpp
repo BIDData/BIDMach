@@ -74,7 +74,7 @@ template <typename Dtype>
 void MemoryDataLayer<Dtype>::AddDatumVector(const vector<Datum>& datum_vector) {
   size_t num = datum_vector.size();
   CHECK_GT(num, 0) << "There is no datum to add";
-  while (num >= (pos_ - write_pos_ + n_) % n_) Sleep(1);   // Not enough space to add the item, so wait
+  while (((write_pos_ - pos_ + n_) % n_) + num >= n_) Sleep(1);   // Not enough space to add the item, so wait
 
   Dtype* top_data = added_data_.mutable_cpu_data();
   Dtype* top_label = added_label_.mutable_cpu_data();
@@ -93,15 +93,17 @@ void MemoryDataLayer<Dtype>::AddData(Dtype *A, Dtype *B, int num, int nchannels,
   CHECK_EQ(nchannels, this->datum_channels_)<< "MemoryDataLayer: wrong number of channels";
   CHECK_EQ(width, this->datum_width_)<< "MemoryDataLayer: wrong width";
   CHECK_EQ(height, this->datum_height_)<< "MemoryDataLayer: wrong height";
-  while (num >= (pos_ - write_pos_ + n_) % n_) Sleep(1);   // Not enough space to add the item, so wait
+  CHECK_EQ(num % batch_size_, 0) << "n must be a multiple of batch size";
+  while (((write_pos_ - pos_ + n_) % n_) + num >= n_) Sleep(1);   // Not enough space to add the item, so wait
 
   Dtype* top_data = added_data_.mutable_cpu_data();
   Dtype* top_label = added_label_.mutable_cpu_data();
-  for (int batch_item_id = 0; batch_item_id < num; ++batch_item_id) {
-    // Apply data transformations (mirror, scale, crop...)
-    //    this->data_transformer_.Transform(write_pos_, A+(batch_item_id * this->datum_size_), this->mean_, top_data);
-    top_label[write_pos_] = B[batch_item_id];
-    write_pos_ = (write_pos_ + 1) % n_;
+  // write in batches
+  int block_size = this->datum_size_ * sizeof(Dtype);
+  for (int i = 0; i < num; i += this->batch_size_) {
+    memcpy(top_data + write_pos_ * block_size, A + i * block_size, this->batch_size_ * block_size);
+    memcpy(top_label + write_pos_ * sizeof(Dtype), B + i * sizeof(Dtype), this->batch_size_ * sizeof(Dtype));
+    write_pos_ = (write_pos_ + this->batch_size_) % n_;
   }
 }
 #endif
@@ -134,9 +136,7 @@ void MemoryDataLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void MemoryDataLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       vector<Blob<Dtype>*>* top) {
-  while ((write_pos_ - pos_ + n_) % n_ < batch_size_) {  // Wait for enough data to read
-    Sleep(1);
-  }
+  while ((write_pos_ - pos_ + n_) % n_ < batch_size_) Spleep(1);  // Wait for enough data to read
   CHECK(data_) << "MemoryDataLayer needs to be initalized";
   memcpy((*top)[0]->mutable_cpu_data(), data_ + pos_ * this->datum_size_, batch_size_ * this->datum_size_ * sizeof(Dtype));
   memcpy((*top)[1]->mutable_cpu_data(), labels_ + pos_, batch_size_ * sizeof(Dtype));
