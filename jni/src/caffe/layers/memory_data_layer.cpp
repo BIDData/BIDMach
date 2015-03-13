@@ -99,10 +99,10 @@ void MemoryDataLayer<Dtype>::AddData(Dtype *A, Dtype *B, int num, int nchannels,
   Dtype* top_data = added_data_.mutable_cpu_data();
   Dtype* top_label = added_label_.mutable_cpu_data();
   // write in batches
-  int block_size = this->datum_size_ * sizeof(Dtype);
   for (int i = 0; i < num; i += this->batch_size_) {
-    memcpy(top_data + write_pos_ * block_size, A + i * block_size, this->batch_size_ * block_size);
-    memcpy(top_label + write_pos_ * sizeof(Dtype), B + i * sizeof(Dtype), this->batch_size_ * sizeof(Dtype));
+    memcpy(top_data + write_pos_ * this->datum_size_, A + i * this->datum_size_, 
+           this->batch_size_ * this->datum_size_ * sizeof(Dtype));
+    memcpy(top_label + write_pos_, B + i, this->batch_size_ * sizeof(Dtype));
     write_pos_ = (write_pos_ + this->batch_size_) % n_;
   }
 }
