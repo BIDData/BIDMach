@@ -136,7 +136,7 @@ void MemoryDataLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void MemoryDataLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       vector<Blob<Dtype>*>* top) {
-  while ((write_pos_ - pos_ + n_) % n_ < batch_size_) Spleep(1);  // Wait for enough data to read
+  while ((write_pos_ - pos_ + n_) % n_ < batch_size_) Sleep(1);  // Wait for enough data to read
   CHECK(data_) << "MemoryDataLayer needs to be initalized";
   memcpy((*top)[0]->mutable_cpu_data(), data_ + pos_ * this->datum_size_, batch_size_ * this->datum_size_ * sizeof(Dtype));
   memcpy((*top)[1]->mutable_cpu_data(), labels_ + pos_, batch_size_ * sizeof(Dtype));
