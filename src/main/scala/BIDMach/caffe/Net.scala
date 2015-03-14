@@ -12,64 +12,50 @@ import scala.collection.Iterable
 
 // Caffe Images are W < H < D (< N), Java images are D < W < H, Matlab means file is W < H < D
 
-class OrderedDict[T](val tmap:TreeMap[String, T], val indx:Array[T], val names:Array[String]) {
-	def apply(a:String):T = tmap(a);
-	def apply(i:Int):T = indx(i);
-	def name(i:Int):String = names(i);
-}
-
 class Net () {
   
   val _net = new NET
   
-  private var _blobs:TreeMap[String, FND] = null;
+  private var _blobs:TreeMap[String, Blob] = null;
   
   private var _blob_names:Array[String] = null;
 
-  private var _params:TreeMap[String, Array[FND]] = null;
+  private var _params:TreeMap[String, Array[Blob]] = null;
   
   private var _param_names:Array[String] = null;
   
   def initIO = {
     input_data = new Array[FND](num_inputs);
-    input_diff = new Array[FND](num_inputs);
     for (i <- 0 until num_inputs) {
       val iblob = _net.input_blob(i)
-      input_data(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
-      input_diff(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
+      input_data(i) = FND(iblob.dims)
     }
 
     output_data = new Array[FND](num_outputs);
-    output_diff = new Array[FND](num_outputs);
     for (i <- 0 until num_outputs) {
-      val oblob = _net.output_blob(i)
-      output_data(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
-      output_diff(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
+      val oblob = _net.output_blob(i);
+      output_data(i) = FND(oblob.dims)
     }
 
     _blob_names = _net.blob_names
     
-    _blobs = _net.blob_names.foldLeft(new TreeMap[String, FND])(
-    		(b:TreeMap[String, FND], a:String) => 
-    		b.insert(a, BLOBtoFND(_net.blob_by_name(a))));
+    _blobs = _net.blob_names.foldLeft(new TreeMap[String, Blob])(
+    		(b:TreeMap[String, Blob], a:String) => 
+    		b.insert(a, Blob(_net.blob_by_name(a))));
 
-    _params = _net.layer_names.foldLeft(new TreeMap[String, Array[FND]])(
-    		(b:TreeMap[String, Array[FND]], a:String) => {
+    _params = _net.layer_names.foldLeft(new TreeMap[String, Array[Blob]])(
+    		(b:TreeMap[String, Array[Blob]], a:String) => {
     			val la = _net.layer_by_name(a);
-    			if (la.num_blobs > 0) { 
-    				b.insert(a, (0 until la.num_blobs).map(
-    						(i:Int) => BLOBtoFND(la.blob(i))
-    						).toArray);
-    			} else b;
+    			b.insert(a, (0 until la.num_blobs).map(
+    					(i:Int) => Blob(la.blob(i))
+    					).toArray);
     		}
     		);
     
     _param_names = _net.layer_names.foldRight(List[String]())(
     		(a:String, b:List[String]) => {
     			val la = _net.layer_by_name(a);
-    			if (la.num_blobs > 0) { 
     				a :: b;
-    			} else b;
     		}
     		).toArray;
   }
@@ -102,11 +88,11 @@ class Net () {
   
   def num = _net.input_blob(0).num
   
-  def blobs:TreeMap[String,FND] = _blobs
+  def blobs:TreeMap[String,Blob] = _blobs
   
   def blob_names:Array[String] = _blob_names
   
-  def params:TreeMap[String,Array[FND]] = _params
+  def params:TreeMap[String,Array[Blob]] = _params
   
   def param_names:Array[String] = _param_names
   
@@ -279,13 +265,6 @@ class Net () {
   		_net.input_blob(i).get_diff(input_diff(i).data)
   	}
   }
-  
-  def BLOBtoFND(b:BLOB):FND = {
-    val out = FND(b.width, b.height, b.channels, b.num)
-    b.put_data(out.data)
-    out
-  }
-    
   
   private var _mean:FND = null
   
