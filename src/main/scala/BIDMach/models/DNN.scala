@@ -90,9 +90,9 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   class Layer {
     var data:Mat = null;
-    var target:Mat = null;
     var deriv:Mat = null;
     var input:Layer = null;
+    var target:Mat = null;
     def forward = {};
     def backward = {};
     def score:FMat = zeros(1,1);
