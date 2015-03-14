@@ -110,7 +110,8 @@ class Net {
   /// @brief returns the blobs
   inline const vector<shared_ptr<Blob<Dtype> > >& blobs() { return blobs_; }
   /// @brief returns the layers
-  inline const vector<shared_ptr<Layer<Dtype> > >& layers() { return layers_; }
+  inline const vector<shared_ptr<Layer<Dtype> > >& layers
+() { return layers_; }
   /**
    * @brief returns the bottom vecs for each layer -- usually you won't
    *        need this unless you do per-layer checks such as gradients.
