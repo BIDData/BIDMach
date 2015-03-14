@@ -3,6 +3,8 @@ import edu.berkeley.bvlc.{CAFFE,BLOB,LAYER,NET,SGDSOLVER}
 
 CAFFE.init(0,0,0,"/home/jfc/logs")
 
-val nn = new Net;
+val net = new Net;
 
-nn.init("/code/BIDMach/data/caffe/alexnet/train_val.prototxt")
+net.init("/code/BIDMach/data/caffe/alexnet/train_val.prototxt")
+
+val blobs = net.blobs

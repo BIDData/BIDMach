@@ -147,6 +147,11 @@ class Net {
 
   void set_debug_info(const bool value) { debug_info_ = value; }
 
+#ifdef __BIDMACH__
+  inline vector<vector<int> >& bottom_id_vecs() { return bottom_id_vecs_;}
+  inline vector<vector<int> >& top_id_vecs() { return top_id_vecs_;}
+#endif
+
   // Helpers for Init.
   /**
    * @brief Remove layers that the user specified should be excluded given the current

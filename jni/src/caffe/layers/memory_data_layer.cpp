@@ -22,8 +22,8 @@ void MemoryDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
      vector<Blob<Dtype>*>* top) {
   batch_size_ = this->layer_param_.memory_data_param().batch_size();
   this->datum_channels_ = this->layer_param_.memory_data_param().channels();
-  this->datum_height_ = this->layer_param_.memory_data_param().height();
   this->datum_width_ = this->layer_param_.memory_data_param().width();
+  this->datum_height_ = this->layer_param_.memory_data_param().height();
   this->datum_size_ = this->datum_channels_ * this->datum_height_ *
       this->datum_width_;
   CHECK_GT(batch_size_ * this->datum_size_, 0) <<
@@ -32,7 +32,11 @@ void MemoryDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   (*top)[0]->Reshape(batch_size_, this->datum_channels_, this->datum_height_,
                      this->datum_width_);
   (*top)[1]->Reshape(batch_size_, 1, 1, 1);
+#ifdef __BIDMACH__
   n_ = this->layer_param_.memory_data_param().lookahead() * batch_size_;
+#else
+  n_ = 1;
+#endif
   added_data_.Reshape(n_, this->datum_channels_, this->datum_height_,
                       this->datum_width_);
   added_label_.Reshape(n_, 1, 1, 1);
@@ -88,7 +92,7 @@ void MemoryDataLayer<Dtype>::AddDatumVector(const vector<Datum>& datum_vector) {
 }
 
 template <typename Dtype>
-void MemoryDataLayer<Dtype>::AddData(Dtype *A, Dtype *B, int num, int nchannels, int width, int height) {
+void MemoryDataLayer<Dtype>::AddData(Dtype *A, Dtype *B, int nchannels, int width, int height, int num) {
   CHECK_GT(num, 0) << "There is no datum to add";
   CHECK_EQ(nchannels, this->datum_channels_)<< "MemoryDataLayer: wrong number of channels";
   CHECK_EQ(width, this->datum_width_)<< "MemoryDataLayer: wrong width";
@@ -99,11 +103,11 @@ void MemoryDataLayer<Dtype>::AddData(Dtype *A, Dtype *B, int num, int nchannels,
   Dtype* top_data = added_data_.mutable_cpu_data();
   Dtype* top_label = added_label_.mutable_cpu_data();
   // write in batches
-  for (int i = 0; i < num; i += this->batch_size_) {
+  for (int i = 0; i < num; i += batch_size_) {
     memcpy(top_data + write_pos_ * this->datum_size_, A + i * this->datum_size_, 
-           this->batch_size_ * this->datum_size_ * sizeof(Dtype));
-    memcpy(top_label + write_pos_, B + i, this->batch_size_ * sizeof(Dtype));
-    write_pos_ = (write_pos_ + this->batch_size_) % n_;
+           batch_size_ * this->datum_size_ * sizeof(Dtype));
+    memcpy(top_label + write_pos_, B + i, batch_size_ * sizeof(Dtype));
+    write_pos_ = (write_pos_ + batch_size_) % n_;
   }
 }
 #endif

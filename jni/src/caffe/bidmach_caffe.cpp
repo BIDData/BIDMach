@@ -215,6 +215,13 @@ JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_blob_1by_1name
   return ref;
 }
 
+JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_blob_1by_1id
+(JNIEnv * env, jobject calling_obj, jlong netRef, jint id) {
+  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
+  jlong ref = (jlong)(new shared_ptr<Blob<float> >(net->blobs().at(id)));
+  return ref;
+}
+
 JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_layer_1by_1name
 (JNIEnv * env, jobject calling_obj, jlong netRef, jstring jbname) {
   shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
@@ -224,9 +231,55 @@ JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_layer_1by_1name
   return ref;
 }
 
+JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_layer_1by_1id
+(JNIEnv * env, jobject calling_obj, jlong netRef, jint id) {
+  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
+  jlong ref = (jlong)(new shared_ptr<Layer<float> >(net->layers().at(id)));
+  return ref;
+}
+
 JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_NET_clearNet
 (JNIEnv * env, jobject calling_obj, jlong addr) { 
   delete (shared_ptr<Net<float> > *)addr;
+}
+
+
+JNIEXPORT jobjectArray JNICALL Java_edu_berkeley_bvlc_NET_bottom_1ids
+(JNIEnv * env, jobject calling_obj, jlong netRef) {
+  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
+  int size = net->layers().size();
+  vector<vector<int> > idvecs = net->bottom_id_vecs();
+  jclass intarrayCls = env->FindClass("[I");
+  jobjectArray result = env->NewObjectArray(size, intarrayCls, NULL);
+  for (int i = 0; i < size; i++) {
+    int sz = idvecs[i].size();
+    jintArray vec = NULL;
+    if (sz > 0) {
+      vec = env->NewIntArray(sz);
+      env->SetIntArrayRegion(vec, 0, sz, &(idvecs[i][0]));
+    }
+    env->SetObjectArrayElement(result, i, vec); 
+  }
+  return result;
+}
+
+JNIEXPORT jobjectArray JNICALL Java_edu_berkeley_bvlc_NET_top_1ids
+(JNIEnv * env, jobject calling_obj, jlong netRef) {
+  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
+  int size = net->layers().size();
+  vector<vector<int> > idvecs = net->top_id_vecs();
+  jclass intarrayCls = env->FindClass("[I");
+  jobjectArray result = env->NewObjectArray(size, intarrayCls, NULL);
+  for (int i = 0; i < size; i++) {
+    int sz = idvecs[i].size();
+    jintArray vec = NULL;
+    if (sz > 0) {
+      vec = env->NewIntArray(sz);
+      env->SetIntArrayRegion(vec, 0, sz, &(idvecs[i][0]));
+    }
+    env->SetObjectArrayElement(result, i, vec); 
+  }
+  return result;
 }
 
 // BLOB class methods
@@ -360,6 +413,29 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_clearLayer
   delete (shared_ptr<Layer<float> > *)addr;
 }
 
+JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_pushMemoryData
+(JNIEnv * env, jobject calling_obj, jlong layerRef, jfloatArray jA, jfloatArray jB, 
+ int num, int nchannels, int height, int width) {
+  shared_ptr<MemoryDataLayer<float> > layer = *((shared_ptr<MemoryDataLayer<float> > *)layerRef);
+  float *A = (jfloat *)(env->GetPrimitiveArrayCritical(jA, JNI_FALSE));
+  float *B = (jfloat *)(env->GetPrimitiveArrayCritical(jB, JNI_FALSE));
+  layer->AddData(A, B, num, nchannels, height, width);
+  env->ReleasePrimitiveArrayCritical(jB, B, 0);
+  env->ReleasePrimitiveArrayCritical(jA, A, 0);
+}
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_forwardFromTo
+(JNIEnv * env, jobject calling_obj, jlong netRef, jint from, jint to) {
+  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
+  net->ForwardFromTo(from, to);
+}
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_backwardFromTo
+(JNIEnv * env, jobject calling_obj, jlong netRef, jint from, jint to) {
+  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
+  net->BackwardFromTo(from, to);
+}
+
   /*JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_im2col
 (JNIEnv * env, jobject calling_obj, jfloatArray ja, jint nchannels, jint height, jint width, jint ksize,
  jint pad, jint stride, jfloatArray jb) {
@@ -371,6 +447,10 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_clearLayer
   env->ReleasePrimitiveArrayCritical(jb, b, 0);
   env->ReleasePrimitiveArrayCritical(ja, a, 0);
   }*/
+
+//
+// SGDSOLVER params
+//
 
 JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_SGDSOLVER_fromParams
 (JNIEnv * env, jobject calling_obj, jstring jparamfile) {
@@ -402,15 +482,4 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_SGDSOLVER_SolveResume
   env->ReleaseStringUTFChars(jsavefile, savefile);
 }
 
-JNIEXPORT void JNICALL Java_edu_berkeley_bvlc_LAYER_pushMemoryData
-(JNIEnv * env, jobject calling_obj, jlong layerRef, jfloatArray jA, jfloatArray jB, 
- int num, int nchannels, int height, int width) {
-  shared_ptr<MemoryDataLayer<float> > layer = *((shared_ptr<MemoryDataLayer<float> > *)layerRef);
-  float *A = (jfloat *)(env->GetPrimitiveArrayCritical(jA, JNI_FALSE));
-  float *B = (jfloat *)(env->GetPrimitiveArrayCritical(jB, JNI_FALSE));
-  layer->AddData(A, B, num, nchannels, height, width);
-  env->ReleasePrimitiveArrayCritical(jB, B, 0);
-  env->ReleasePrimitiveArrayCritical(jA, A, 0);
-}
-  
 }
