@@ -12,7 +12,7 @@ import scala.collection.Iterable
 
 // Caffe Images are W < H < D (< N), Java images are D < W < H, Matlab means file is W < H < D
 
-class Blob(val dims:Array[Int], blob:BLOB) {
+class Blob(val dims:Array[Int], val blob:BLOB) {
 	val data = FND(dims);
 	val diff = FND(dims);
 }

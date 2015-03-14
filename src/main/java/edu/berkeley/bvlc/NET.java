@@ -44,7 +44,7 @@ public final class NET {
     	}
     }
     
-    public BLOB input_blob(int i) {
+    public int input_blob(int i) {
     	if (_shptr == 0) {
     		throw new RuntimeException("Net uninitialized");
     	} else {
@@ -52,11 +52,11 @@ public final class NET {
     		if (i < 0 || i >= n) {
     			throw new RuntimeException("Net input blob index "+i+" out of range (0, "+(n-1)+")");
     		}
-    		return new BLOB(input_blob(_shptr, i));
+    		return input_blob(_shptr, i);
     	}
     }
        
-    public BLOB output_blob(int i) {
+    public int output_blob(int i) {
     	if (_shptr == 0) {
     		throw new RuntimeException("Net uninitialized");
     	} else {
@@ -64,7 +64,7 @@ public final class NET {
     		if (i < 0 || i >= n) {
     			throw new RuntimeException("Net output blob index "+i+" out of range (0, "+(n-1)+")");
     		}
-    		return new BLOB(output_blob(_shptr, i));
+    		return output_blob(_shptr, i);
     	}
     }
 
@@ -83,10 +83,6 @@ public final class NET {
     public String [] blob_names() {if (_shptr != 0) return blob_names(_shptr); else throw new RuntimeException("Net uninitialized");}
 
     public String [] layer_names() {if (_shptr != 0) return layer_names(_shptr); else throw new RuntimeException("Net uninitialized");}
-
-    public BLOB blob_by_name(String s) {if (_shptr != 0) return new BLOB(blob_by_name(_shptr, s)); else throw new RuntimeException("Net uninitialized");}
-
-    public LAYER layer_by_name(String s) {if (_shptr != 0) return new LAYER(layer_by_name(_shptr, s)); else throw new RuntimeException("Net uninitialized");}
 
     public void forward() {if (_shptr != 0) forward(_shptr); else throw new RuntimeException("Net uninitialized");}
 
@@ -121,16 +117,16 @@ public final class NET {
 
     private static native long blob(long ref, int i);
     
-    private static native long input_blob(long ref, int i);
+    private static native int input_blob(long ref, int i);
     
-    private static native long output_blob(long ref, int i);
+    private static native int output_blob(long ref, int i);
 
     private static native String [] blob_names(long ref);
 
     private static native String [] layer_names(long ref);
-
-    private static native long blob_by_name(long ref, String s);
-
-    private static native long layer_by_name(long ref, String s);
+    
+    private static native int[][] bottom_ids(long ref);
+    
+    private static native int[][] top_ids(long ref);
 
 }

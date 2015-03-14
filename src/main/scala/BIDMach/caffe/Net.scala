@@ -16,48 +16,59 @@ class Net () {
   
   val _net = new NET
   
-  private var _blobs:TreeMap[String, Blob] = null;
+  private var _blobs:Array[Blob] = null;
+  
+  private var _blob_name_map:TreeMap[String, Blob] = null;
   
   private var _blob_names:Array[String] = null;
+  
+  private var _layer_names:Array[String] = null;
 
-  private var _params:TreeMap[String, Array[Blob]] = null;
+  private var _param_name_map:TreeMap[String, Array[Blob]] = null;
   
   private var _param_names:Array[String] = null;
   
+  private var _mean:FND = null
+  
+  private var _scale:Float = 1f
+  
+  private var _channel_swap:IMat = null
+  
+  private var _image_dims:Array[Int] = null
+  
+  var input_data:Array[FND] = null
+  
+  var input_diff:Array[FND] = null
+  
+  var output_data:Array[FND] = null
+  
+  var output_diff:Array[FND] = null
+  
   def initIO = {
+    
+  	_blob_names = _net.blob_names;
+  	
+  	_layer_names = _net.layer_names;
+    
+    _blobs = new Array[Blob](num_blobs);
+    for (i <- 0 until num_blobs) {
+    	_blobs(i) = Blob(_net.blob(i));
+    }
+    
     input_data = new Array[FND](num_inputs);
-    for (i <- 0 until num_inputs) {
-      val iblob = _net.input_blob(i)
-      input_data(i) = FND(iblob.dims)
+    for (i <- 0 until num_inputs) { 
+      input_data(i) = _blobs(_net.input_blob(i)).data;
     }
 
     output_data = new Array[FND](num_outputs);
     for (i <- 0 until num_outputs) {
-      val oblob = _net.output_blob(i);
-      output_data(i) = FND(oblob.dims)
+      output_data(i) = _blobs(_net.output_blob(i)).data;
     }
-
-    _blob_names = _net.blob_names
     
-    _blobs = _net.blob_names.foldLeft(new TreeMap[String, Blob])(
-    		(b:TreeMap[String, Blob], a:String) => 
-    		b.insert(a, Blob(_net.blob_by_name(a))));
-
-    _params = _net.layer_names.foldLeft(new TreeMap[String, Array[Blob]])(
-    		(b:TreeMap[String, Array[Blob]], a:String) => {
-    			val la = _net.layer_by_name(a);
-    			b.insert(a, (0 until la.num_blobs).map(
-    					(i:Int) => Blob(la.blob(i))
-    					).toArray);
-    		}
-    		);
+    _blob_name_map = (0 until num_blobs).foldLeft(new TreeMap[String, Blob])(
+    		(b:TreeMap[String, Blob], a:Int) => 
+    		b.insert(_blob_names(a), _blobs(a)));
     
-    _param_names = _net.layer_names.foldRight(List[String]())(
-    		(a:String, b:List[String]) => {
-    			val la = _net.layer_by_name(a);
-    				a :: b;
-    		}
-    		).toArray;
   }
   
   def init(modelfile:String, paramfile:String) = {
@@ -73,28 +84,34 @@ class Net () {
   def num_inputs = _net.num_inputs()
   
   def num_outputs = _net.num_outputs()
+  
+  def num_blobs = _net.num_blobs()
+  
+  def num_layers = _net.num_layers()
 
-  def inchannels = _net.input_blob(0).channels
+  def inchannels = _input_blob(0).channels
   
-  def inwidth = _net.input_blob(0).width
+  def inwidth = _input_blob(0).width
   
-  def inheight = _net.input_blob(0).height
+  def inheight = _input_blob(0).height
   
-  def outchannels = _net.output_blob(0).channels
+  def outchannels = _output_blob(0).channels
   
-  def outwidth = _net.output_blob(0).width
+  def outwidth = _output_blob(0).width
   
-  def outheight = _net.output_blob(0).height
+  def outheight = _output_blob(0).height
   
-  def num = _net.input_blob(0).num
+  def num = _input_blob(0).num
   
-  def blobs:TreeMap[String,Blob] = _blobs
+  def blob(s:String) = _blob_name_map(s)
   
   def blob_names:Array[String] = _blob_names
   
-  def params:TreeMap[String,Array[Blob]] = _params
-  
   def param_names:Array[String] = _param_names
+  
+  def _input_blob(i:Int) = _blobs(_net.input_blob(i)).blob
+  
+  def _output_blob(i:Int) = _blobs(_net.output_blob(i)).blob
   
   def set_mean(mfile:String, varname:String = "image_mean") = {
     var meanf:FND = load(mfile, varname)                                   // Matlab means file is W < H < D, BGR
@@ -113,12 +130,13 @@ class Net () {
   
   def set_image_dims(dd:Array[Int]) = {_image_dims = dd};  
   
+
   def forward() = {
     push_inputs
     _net.forward
     pull_outputs
   }
-  
+  /*
   def forward(outputs:TreeMap[String,FND]) = {
     push_inputs
     _net.forward
@@ -163,7 +181,7 @@ class Net () {
       	}
       }
     });
-  }
+  } */
   
   def checkBlobDims(blob:BLOB, fnd:FND, fname:String) {
     if (blob.width != fnd.dims(0) || blob.height != fnd.dims(1) || blob.channels != fnd.dims(2) || blob.num != fnd.dims(3)) {
@@ -171,6 +189,7 @@ class Net () {
     }
   }
   
+  /*
   def pull(blobs:Iterable[(String,FND)]) = {
     blobs.foreach((x:Tuple2[String,FND]) => {
       val bname = x._1;
@@ -200,6 +219,7 @@ class Net () {
       blob.put_data(fnd.data);
     })
   }
+  */
   
   def preprocess(im:Image):FND = {                                          // Preprocess a D < W < H image
     var cafimg = im.toFND;
@@ -237,9 +257,9 @@ class Net () {
   		input_data(i).clear 
   	}
   }
-  
+ 
   def add_input(im:FND, i:Int, j:Int) = {
-    val inblob = _net.input_blob(0)
+    val inblob = _input_blob(0)
     if (im.dims(0) != inblob.width || im.dims(1) != inblob.height || im.dims(2) != inblob.channels) {
       throw new RuntimeException("add_input dimensions mismatch")
     } else if (i < 0 || i >= num) {
@@ -247,40 +267,24 @@ class Net () {
     }
     input_data(i)(?,?,?,j) = im
   }
-  
+
   def push_inputs = {
     for (i <- 0 until num_inputs) {
-    	_net.input_blob(i).put_data(input_data(i).data)
+    	_input_blob(i).put_data(input_data(i).data)
     }
   }
   
   def pull_outputs = {
   	for (i <- 0 until num_outputs) {
-  		_net.output_blob(i).get_data(output_data(i).data)
+  		_output_blob(i).get_data(output_data(i).data)
   	}
   }
   
   def pull_input_diffs = {
   	for (i <- 0 until num_inputs) {
-  		_net.input_blob(i).get_diff(input_diff(i).data)
+  		_input_blob(i).get_diff(input_diff(i).data)
   	}
   }
-  
-  private var _mean:FND = null
-  
-  private var _scale:Float = 1f
-  
-  private var _channel_swap:IMat = null
-  
-  private var _image_dims:Array[Int] = null
-  
-  var input_data:Array[FND] = null
-  
-  var input_diff:Array[FND] = null
-  
-  var output_data:Array[FND] = null
-  
-  var output_diff:Array[FND] = null
   
 }
 
