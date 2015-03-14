@@ -12,13 +12,23 @@ import scala.collection.Iterable
 
 // Caffe Images are W < H < D (< N), Java images are D < W < H, Matlab means file is W < H < D
 
+class OrderedDict[T](val tmap:TreeMap[String, T], val indx:Array[T], val names:Array[String]) {
+	def apply(a:String):T = tmap(a);
+	def apply(i:Int):T = indx(i);
+	def name(i:Int):String = names(i);
+}
+
 class Net () {
   
   val _net = new NET
   
   private var _blobs:TreeMap[String, FND] = null;
+  
+  private var _blob_names:Array[String] = null;
 
   private var _params:TreeMap[String, Array[FND]] = null;
+  
+  private var _param_names:Array[String] = null;
   
   def initIO = {
     input_data = new Array[FND](num_inputs);
@@ -37,18 +47,31 @@ class Net () {
       output_diff(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
     }
 
+    _blob_names = _net.blob_names
+    
     _blobs = _net.blob_names.foldLeft(new TreeMap[String, FND])(
-      (b:TreeMap[String, FND], a:String) => 
-        b.insert(a, BLOBtoFND(_net.blob_by_name(a))));
+    		(b:TreeMap[String, FND], a:String) => 
+    		b.insert(a, BLOBtoFND(_net.blob_by_name(a))));
 
     _params = _net.layer_names.foldLeft(new TreeMap[String, Array[FND]])(
-      (b:TreeMap[String, Array[FND]], a:String) => {
-  	val la = _net.layer_by_name(a);
-  	b.insert(a, (0 until la.num_blobs).map(
-  	  (i:Int) => BLOBtoFND(la.blob(i))
-        ).toArray);
-      }
-    );
+    		(b:TreeMap[String, Array[FND]], a:String) => {
+    			val la = _net.layer_by_name(a);
+    			if (la.num_blobs > 0) { 
+    				b.insert(a, (0 until la.num_blobs).map(
+    						(i:Int) => BLOBtoFND(la.blob(i))
+    						).toArray);
+    			} else b;
+    		}
+    		);
+    
+    _param_names = _net.layer_names.foldRight(List[String]())(
+    		(a:String, b:List[String]) => {
+    			val la = _net.layer_by_name(a);
+    			if (la.num_blobs > 0) { 
+    				a :: b;
+    			} else b;
+    		}
+    		).toArray;
   }
   
   def init(modelfile:String, paramfile:String) = {
@@ -81,7 +104,11 @@ class Net () {
   
   def blobs:TreeMap[String,FND] = _blobs
   
+  def blob_names:Array[String] = _blob_names
+  
   def params:TreeMap[String,Array[FND]] = _params
+  
+  def param_names:Array[String] = _param_names
   
   def set_mean(mfile:String, varname:String = "image_mean") = {
     var meanf:FND = load(mfile, varname)                                   // Matlab means file is W < H < D, BGR
