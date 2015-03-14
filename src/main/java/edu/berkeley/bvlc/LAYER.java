@@ -39,5 +39,7 @@ public final class LAYER {
     private static native long blob(long ref, int i);
 
     private static native int clearLayer(long ref);
+    
+    private static native void pushMemoryData(long ref, float[] A, float[] B, int num, int channels, int height, int width);
 
 }
