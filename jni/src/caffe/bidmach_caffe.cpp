@@ -156,16 +156,16 @@ JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_blob
   return (jlong)(new shared_ptr<Blob<float> >(net->blobs().at(i)));
 }
 
-JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_input_1blob
+JNIEXPORT jint JNICALL Java_edu_berkeley_bvlc_NET_input_1blob
 (JNIEnv * env, jobject calling_obj, jlong netRef, jint i) {
   shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
-  return (jlong)(new shared_ptr<Blob<float> >(net->blobs().at(net->input_blob_indices().at(i))));
+  return net->input_blob_indices().at(i);
 }
 
-JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_output_1blob
+JNIEXPORT jint JNICALL Java_edu_berkeley_bvlc_NET_output_1blob
 (JNIEnv * env, jobject calling_obj, jlong netRef, jint i) {
   shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
-  return (jlong)(new shared_ptr<Blob<float> >(net->blobs().at(net->output_blob_indices().at(i))));
+  return net->output_blob_indices().at(i);
 }
 
 JNIEXPORT jobjectArray JNICALL Java_edu_berkeley_bvlc_NET_blob_1names
@@ -215,26 +215,12 @@ JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_blob_1by_1name
   return ref;
 }
 
-JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_blob_1by_1id
-(JNIEnv * env, jobject calling_obj, jlong netRef, jint id) {
-  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
-  jlong ref = (jlong)(new shared_ptr<Blob<float> >(net->blobs().at(id)));
-  return ref;
-}
-
 JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_layer_1by_1name
 (JNIEnv * env, jobject calling_obj, jlong netRef, jstring jbname) {
   shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
   const char *bname = (const char *)(env->GetStringUTFChars(jbname, 0));
   jlong ref = (jlong)(new shared_ptr<Layer<float> >(net->layer_by_name(bname)));
   env->ReleaseStringUTFChars(jbname, bname);
-  return ref;
-}
-
-JNIEXPORT jlong JNICALL Java_edu_berkeley_bvlc_NET_layer_1by_1id
-(JNIEnv * env, jobject calling_obj, jlong netRef, jint id) {
-  shared_ptr<Net<float> > net = *((shared_ptr<Net<float> > *)netRef);
-  jlong ref = (jlong)(new shared_ptr<Layer<float> >(net->layers().at(id)));
   return ref;
 }
 
