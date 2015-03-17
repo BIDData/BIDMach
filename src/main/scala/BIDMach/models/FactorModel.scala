@@ -24,7 +24,7 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     	val msum = sum(modelmat, 2);
     	modelmat ~ modelmat / msum;
     	setmodelmats(Array[Mat](1));
-    	modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat;
+    	modelmats(0) = convertMat(modelmat);
     }
     
     if (mats.size > 1) {
