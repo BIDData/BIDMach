@@ -1,7 +1,7 @@
 
 name := "BIDMach"
 
-version := "0.9.8"
+version := "1.0.0"
 
 organization := "edu.berkeley.bid"
 

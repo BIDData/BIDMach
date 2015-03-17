@@ -13,7 +13,7 @@ println("\n<<<<<<< Testing without GPU >>>>>>>")
 useGPU = false
 :load workout_slave.ssc
 
-println("\n<<<<<<< Testing without no MKL >>>>>>>")
+println("\n<<<<<<< Testing without MKL >>>>>>>")
 Mat.useMKL = false
 :load workout_slave.ssc
 :silent
