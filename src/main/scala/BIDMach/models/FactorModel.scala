@@ -75,6 +75,7 @@ object FactorModel {
       case aa:GSMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GSMat.reuseuser".##)
       case aa:GMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GMat.reuseuser".##)
       case aa:GDMat => GDMat.newOrCheckGDMat(dim, a.ncols, null, a.GUID, "GDMat.reuseuser".##)
+      case aa:GSDMat => GDMat.newOrCheckGDMat(dim, a.ncols, null, a.GUID, "GSDMat.reuseuser".##)
     }
     out.set(ival)
     out
