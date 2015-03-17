@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMACH
@@ -69,15 +69,31 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links;
     iweight = opts.iweight;
-    if (iweight.asInstanceOf[AnyRef] != null && useGPU) iweight = GMat(iweight);
+    if (iweight.asInstanceOf[AnyRef] != null && useGPU) iweight = convertMat(iweight);
     if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask;
     totflops = 0L;
     for (i <- 0 until opts.links.length) {
       totflops += linkArray(opts.links(i)).fnflops;
     }
-    ulim = if (useGPU) GMat(row(opts.lim)) else row(opts.lim);
+    ulim = convertMat(opts.lim)
     llim = - ulim;
     hashFeatures = opts.hashFeatures;
+  }
+  
+  def convertMat(a:Mat):Mat = {
+    if (useGPU) {
+      if (opts.useDouble) {
+        GDMat(a)
+      } else {
+        GMat(a)
+      }
+    } else {
+      if (opts.useDouble) {  
+        DMat(a)
+      } else {
+        a
+      }
+    }
   }
     
   def mupdate(in:Mat) = {
