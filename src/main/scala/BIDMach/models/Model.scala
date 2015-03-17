@@ -119,6 +119,23 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   def updatePass(ipass:Int) = {}
   
+    
+  def convertMat(a:Mat):Mat = {
+    if (useGPU) {
+      if (opts.useDouble) {
+        GDMat(a)
+      } else {
+        GMat(a)
+      }
+    } else {
+      if (opts.useDouble) {  
+        DMat(a)
+      } else {
+        a
+      }
+    }
+  }
+  
 }
 
 

@@ -79,22 +79,6 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     llim = - ulim;
     hashFeatures = opts.hashFeatures;
   }
-  
-  def convertMat(a:Mat):Mat = {
-    if (useGPU) {
-      if (opts.useDouble) {
-        GDMat(a)
-      } else {
-        GMat(a)
-      }
-    } else {
-      if (opts.useDouble) {  
-        DMat(a)
-      } else {
-        a
-      }
-    }
-  }
     
   def mupdate(in:Mat) = {
     val targs = targets * in
