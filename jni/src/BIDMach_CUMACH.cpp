@@ -158,6 +158,48 @@ extern "C" {
     return apply_derivs(nativeA, nativeB, nativeL, nativeC, nrows, ncols);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applydlinks
+  (JNIEnv *env, jobject obj, jobject jA, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    double *nativeA = (double*)getPointer(env, jA);
+    int *nativeL = (int*)getPointer(env, jL);
+    double *nativeC = (double*)getPointer(env, jC);
+
+    return apply_dlinks(nativeA, nativeL, nativeC, nrows, ncols);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applydpreds
+  (JNIEnv *env, jobject obj, jobject jA, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    double *nativeA = (double*)getPointer(env, jA);
+    int *nativeL = (int*)getPointer(env, jL);
+    double *nativeC = (double*)getPointer(env, jC);
+
+    return apply_dpreds(nativeA, nativeL, nativeC, nrows, ncols);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applydlls
+  (JNIEnv *env, jobject obj, jobject jA, jobject jB, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    double *nativeA = (double*)getPointer(env, jA);
+    double *nativeB = (double*)getPointer(env, jB);
+    int *nativeL = (int*)getPointer(env, jL);
+    double *nativeC = (double*)getPointer(env, jC);
+
+    return apply_dlls(nativeA, nativeB, nativeL, nativeC, nrows, ncols);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applydderivs
+  (JNIEnv *env, jobject obj, jobject jA, jobject jB, jobject jL, jobject jC, jint nrows, jint ncols) 
+  {
+    double *nativeA = (double*)getPointer(env, jA);
+    double *nativeB = (double*)getPointer(env, jB);
+    int *nativeL = (int*)getPointer(env, jL);
+    double *nativeC = (double*)getPointer(env, jC);
+
+    return apply_dderivs(nativeA, nativeB, nativeL, nativeC, nrows, ncols);
+  }
+
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_treePack
   (JNIEnv *env, jobject obj, jobject jfdata, jobject jtreenodes, jobject jicats, jobject jout, jobject jfieldlens, jint nrows, jint ncols, jint ntrees, jint nsamps, jint seed) 
   {

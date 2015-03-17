@@ -319,6 +319,11 @@ object GLM {
         CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
         out
       }
+      case (geta:GDMat, gilinks:GIMat, gout:GDMat) => {
+        Mat.nflops += totflops * geta.ncols
+        CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        out
+      }
     }
   }
   
@@ -345,6 +350,12 @@ object GLM {
         CUMACH.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
         out
       }
+      case (gpred:GDMat, gtarg:GDMat, gilinks:GIMat) => {
+        Mat.nflops += totflops * gpred.ncols
+        val out = (gpred + 3f)
+        CUMACH.applydlls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
+        out
+      }
     }
   }
   
@@ -367,6 +378,11 @@ object GLM {
       case (gpred:GMat, gtarg:GMat, gout:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        gout
+      }
+      case (gpred:GDMat, gtarg:GDMat, gout:GDMat, gilinks:GIMat) => {
+        Mat.nflops += totflops * gpred.ncols
+        CUMACH.applydderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
         gout
       }
     }

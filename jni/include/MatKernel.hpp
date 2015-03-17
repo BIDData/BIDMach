@@ -8,6 +8,14 @@ int apply_lls(float *A, float *B, int *L, float *C, int nrows, int ncols);
 
 int apply_derivs(float *A, float *B, int *L, float *C, int nrows, int ncols);
 
+int apply_dlinks(double *A, int *L, double *C, int nrows, int ncols);
+
+int apply_dpreds(double *A, int *L, double *C, int nrows, int ncols);
+
+int apply_dlls(double *A, double *B, int *L, double *C, int nrows, int ncols);
+
+int apply_dderivs(double *A, double *B, int *L, double *C, int nrows, int ncols);
+
 int veccmp(int *A, int *B, int *C);
 
 int hammingdists(int *a, int *b, int *w, int *op, int *ow, int n);

@@ -17,6 +17,14 @@ public final class CUMACH {
     
     public static native int applyderivs(Pointer A, Pointer B, Pointer L, Pointer C, int nrows, int ncols);
     
+    public static native int applydlinks(Pointer A, Pointer L, Pointer C, int nrows, int ncols);
+    
+    public static native int applydpreds(Pointer A, Pointer L, Pointer C, int nrows, int ncols);
+    
+    public static native int applydlls(Pointer A, Pointer B, Pointer L, Pointer C, int nrows, int ncols);
+    
+    public static native int applydderivs(Pointer A, Pointer B, Pointer L, Pointer C, int nrows, int ncols);
+    
     public static native int LDAgibbs(int nr, int nnz, Pointer A, Pointer B, Pointer AN, Pointer BN, Pointer Cir, Pointer Cic, Pointer P, float nsamps);
 
     public static native int LDAgibbsBino(int nr, int nnz, Pointer A, Pointer B, Pointer AN, Pointer BN, Pointer Cir, Pointer Cic, Pointer Cv, Pointer P, int nsamps);
