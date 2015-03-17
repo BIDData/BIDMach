@@ -79,11 +79,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  } else {
 	    gmats = mats;
 	  }  
-	  if (useGPU) {
-	    if (useDouble) mm = GDMat(mm) else mm = GMat(mm);
-	  } else {
-	    if (useDouble) mm = DMat(mm);
-	  }
+	  mm = convertMat(mm)
 	  Minv = mm.zeros(d, d);
 	  Minv <-- diagM;
     lamu = mm.ones(d, 1) ∘ opts.lambdau 
