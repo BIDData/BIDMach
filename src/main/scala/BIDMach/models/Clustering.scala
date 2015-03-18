@@ -18,12 +18,13 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = data0.nrows
-    val mmi = rand(opts.dim, m);
-    
-    setmodelmats(Array[Mat](1));
-    modelmats(0) = convertMat(mmi)
+    if (refresh) {
+    	val mmi = rand(opts.dim, m);   
+    	setmodelmats(Array(mmi));
+    }
+    modelmats(0) = convertMat(modelmats(0))
     updatemats = new Array[Mat](1)
-    updatemats(0) = modelmats(0).zeros(mmi.nrows, mmi.ncols)
+    updatemats(0) = modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols)
     lastpos = 0;
   } 
   

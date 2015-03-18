@@ -43,8 +43,9 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     
     if (refresh) {
     	val mm = zeros(d,m);
-    	setmodelmats(Array(convertMat(mm)));
+      setmodelmats(Array(mm))
     }
+    setmodelmats(Array(convertMat(modelmats(0))));
     updatemats = Array(modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols));
     targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else opts.targmap
     if (! targetData) {

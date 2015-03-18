@@ -32,11 +32,14 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   
   override def init() = {
     super.init()
+    mm = modelmats(0);
     if (refresh) {
-    	mm = modelmats(0);
     	mmnorm = mm dotr mm;
     	setmodelmats(Array(mm, mmnorm));
     }
+    for (i <- 0 until modelmats.length) modelmats(i) = convertMat(modelmats(i))
+    mm = modelmats(0)
+    mmnorm = modelmats(1)
     um = updatemats(0)
     umcount = mm.zeros(mm.nrows, 1)
     updatemats = Array(um, umcount)
@@ -105,13 +108,14 @@ object KMeans  {
   	    new Batch(opts), opts)
     (nn, opts)
   }
+  class fsopts extends Learner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts
   
+  class memopts extends Learner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
   /**
    * KMeans with a files dataSource
    */
   def learner(fnames:List[(Int)=>String], d:Int) = {
-    class xopts extends Learner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts
-    val opts = new xopts
+    val opts = new fsopts
     opts.dim = d
     opts.fnames = fnames
     opts.batchSize = 10000;
@@ -123,6 +127,25 @@ object KMeans  {
   	    new Batch(opts), 
   	    opts)
     (nn, opts)
+  }
+  
+  def learner(fnames:String, d:Int):(Learner, fsopts) = learner(List(FilesDS.simpleEnum(fnames,1,0)), d) 
+  
+    // This function constructs a predictor from an existing model 
+  def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, memopts) = {
+    val nopts = new memopts;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    nopts.putBack = 1
+    val newmod = new KMeans(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod)
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        newmod, 
+        null,
+        null,
+        nopts)
+    (nn, nopts)
   }
    
   def learnPar(mat0:Mat, d:Int = 256) = {

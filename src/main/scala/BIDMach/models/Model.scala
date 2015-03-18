@@ -49,6 +49,12 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     mod.gmats = gmats;
   }
   
+  def copyFrom(mod:Model) = {
+    for (i <- 0 until modelmats.length) {
+      modelmats(i) <-- mod.modelmats(i)
+    }
+  }
+  
   def bind(ds:DataSource):Unit = {
 	  datasource = ds;
 	  mats = datasource.next;

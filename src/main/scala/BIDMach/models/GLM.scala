@@ -571,6 +571,9 @@ object GLM {
     if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
     nopts.links.set(d)
     nopts.putBack = 1
+    val newmod = new GLM(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod)
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
         model, 
