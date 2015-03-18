@@ -1,0 +1,15 @@
+
+import java.util.Random
+
+val randgen = new Random
+
+def rw(n:Int) = {
+    var i = 0;
+    var sum = 0f;
+    while (i < n) {
+          sum += randgen.nextFloat
+          i += 1;
+    }
+    sum
+}
+    

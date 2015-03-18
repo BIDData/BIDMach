@@ -50,8 +50,6 @@ int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir,
 
 int hashcross(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *Cdata, int *Cir, int *Cjc, float *D, int transpose);
 
-int cumsumc(int nrows, int ncols, float *A, float *B);
-
 int multinomial(int nrows, int ncols, float *A, int *B, float *Norm, int nvals);
 
 int multinomial2(int nrows, int ncols, float *A, int *B, int nvals);

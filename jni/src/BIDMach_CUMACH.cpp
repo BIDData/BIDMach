@@ -344,13 +344,4 @@ extern "C" {
     return multinomial2(nrows, ncols, A, B, nvals);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_cumsumc
-  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jA, jobject jB, jint nvals)
-  {
-    float *A = (float*)getPointer(env, jA);
-    float *B = (float*)getPointer(env, jB);
-
-    return cumsumc(nrows, ncols, A, B);
-  }
-
 }

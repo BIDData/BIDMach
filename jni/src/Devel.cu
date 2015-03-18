@@ -173,45 +173,8 @@ int hammingdists(int *a, int *b, int *w, int *op, int *ow, int n) {
   return err;
 }    
 
-#define DBSIZE (5*1024)
 
-__global__ void __cumsumc(int nrows, int ncols, float *A, float *B) {
-  __shared__ float vec[DBSIZE];
-  __shared__ float tvec[DBSIZE];
-  int i, j, jbase, shift;
-  int fitcols = DBSIZE/nrows;
-  float vv, *avec, *bvec, *cvec;
-  float nrowsinv = 1.0f / nrows;
-  __syncthreads();
-  for (i = fitcols * blockIdx.x; i < ncols; i += fitcols * gridDim.x) {
-    avec = vec;
-    bvec = tvec;
-    __syncthreads();
-    for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
-      vec[j] = A[j + i * nrows];
-    }
-    __syncthreads();
-    for (shift = 1; shift < nrows; shift *= 2) {
-      for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
-        vv = avec[j];
-        jbase = ((int)floor((j + 0.5f)*nrowsinv))*nrows;
-        //        jbase = (j / nrows) * nrows;
-        if (j - shift >= jbase) {
-          vv += avec[j-shift];
-        }
-        bvec[j] = vv;
-      }
-      __syncthreads();
-      cvec = avec;
-      avec = bvec;
-      bvec = cvec;
-    }
-    for (j = threadIdx.x; j < nrows * fitcols; j += blockDim.x) {
-      B[j + i * nrows] = avec[j];
-    }
-    __syncthreads();
-  } 
-}       
+#define DBSIZE (5*1024)
 
 __global__ void __multinomial2(int nrows, int ncols, float *A, int *B, curandState *rstates, int nvals) {
   __shared__ float vec[DBSIZE];
@@ -422,17 +385,6 @@ __global__ void __multinomial(int nrows, int ncols, float *A, int *B, float *Nor
     }
   } 
 }       
-
-int cumsumc(int nrows, int ncols, float *A, float *B) {
-  int fitcols = DBSIZE/nrows;
-  int nthreads = 1024;
-  int nb =  1 + (ncols-1)/fitcols;
-  int nblocks = min(128, nb);
-  __cumsumc<<<nblocks,nthreads>>>(nrows, ncols, A, B);
-  cudaDeviceSynchronize();
-  cudaError_t err = cudaGetLastError();
-  return err;
-}
 
 __global__ void __prandinit(curandState *rstates) {
   int id = threadIdx.x + blockDim.x * blockIdx.x;
