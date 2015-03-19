@@ -96,15 +96,13 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
-    iweight = if (useGPU && opts.iweight.asInstanceOf[AnyRef] != null) GMat(opts.iweight) else opts.iweight
+    iweight = if (opts.iweight.asInstanceOf[AnyRef] != null) convertMat(opts.iweight) else null
     if (refresh) {
     	mv = modelmats(0);
-    	val rmat1 = normrnd(0, opts.initscale/math.sqrt(opts.dim1).toFloat, opts.dim1, mv.ncols);
-    	mm1 = if (useGPU) GMat(rmat1) else rmat1;
-    	val rmat2 = normrnd(0, opts.initscale/math.sqrt(opts.dim2).toFloat, opts.dim2, mv.ncols)
-    	mm2 = if (useGPU) GMat(rmat2) else rmat2;
-    	ulim = if (useGPU) GMat(row(opts.lim)) else row(opts.lim)
-    	llim = if (useGPU) GMat(row(-opts.lim)) else row(-opts.lim)
+    	mm1 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim1).toFloat, opts.dim1, mv.ncols));
+    	mm2 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim2).toFloat, opts.dim2, mv.ncols));
+    	ulim = convertMat(row(opts.lim))
+    	llim = convertMat(row(-opts.lim))
     	setmodelmats(Array(mv, mm1, mm2));
     	if (mask.asInstanceOf[AnyRef] != null) {
     		mv ~ mv ∘ mask;
@@ -112,6 +110,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     		mm2 ~ mm2 ∘ mask;
     	}
     }
+    (0 until 3).map((i) => modelmats(i) = convertMat(modelmats(i)))
     uv = updatemats(0)
     um1 = uv.zeros(opts.dim1, uv.ncols)
     um2 = uv.zeros(opts.dim2, uv.ncols)
@@ -326,9 +325,12 @@ object FM {
     if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
     nopts.links.set(d)
     nopts.putBack = 1
+    val newmod = new FM(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod)
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
-        model, 
+        newmod, 
         null,
         null,
         nopts)

@@ -166,10 +166,13 @@ object LDA  {
     (nn, opts)
   }
   
+  class FsOpts extends Learner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
+  
+  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FilesDS.simpleEnum(fpattern, 0, 1)), d)
+  
   /** Online Variational Bayes LDA algorithm with a files dataSource. */
-  def learner(fnames:List[(Int)=>String], d:Int) = {
-    class xopts extends Learner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
-    val opts = new xopts
+  def learner(fnames:List[(Int)=>String], d:Int):(Learner, FsOpts) = { 
+    val opts = new FsOpts
     opts.dim = d
     opts.fnames = fnames
     opts.batchSize = 100000;

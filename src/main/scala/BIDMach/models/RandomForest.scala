@@ -235,23 +235,28 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	outright = FMat(nsamps, nnodes);
     	jc = IMat(1, ntrees * nnodes * nsamps);
     	lout = LMat(1, batchSize * nsamps * ntrees);
-    	
     	if (useGPU) {
-    		gfieldlengths = GIMat(fieldlengths);
-    		gpiones = giones(1, bsize);
+    	  gpiones = giones(1, bsize);
     		gtmpinds = glzeros(1, bsize);
     		gtmpcounts = gizeros(1, bsize);
     		gout = GLMat(1, batchSize * nsamps * ntrees);
-    		gtnodes = GIMat(ntrees, batchSize);
-    		gfnodes = GMat(ntrees, batchSize);
-        gftree = GIMat(nnodes, 1);
-        gitree = GIMat(nnodes, 1);
-        gitrees = GIMat(itrees);
-        gftrees = GIMat(ftrees);
-        gvtrees = GIMat(vtrees);
-        gctrees = GMat(ctrees);
     	}
-    }       
+    }
+    itrees = modelmats(0).asInstanceOf[IMat];
+    ftrees = modelmats(1).asInstanceOf[IMat];
+    vtrees = modelmats(2).asInstanceOf[IMat];
+    ctrees = modelmats(3).asInstanceOf[FMat];   	
+    if (useGPU) {
+    	gfieldlengths = GIMat(fieldlengths);
+    	gtnodes = GIMat(ntrees, batchSize);
+    	gfnodes = GMat(ntrees, batchSize);
+    	gftree = GIMat(nnodes, 1);
+    	gitree = GIMat(nnodes, 1);
+    	gitrees = GIMat(itrees);
+    	gftrees = GIMat(ftrees);
+    	gvtrees = GIMat(vtrees);
+    	gctrees = GMat(ctrees);
+    }    
   } 
 
   def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {

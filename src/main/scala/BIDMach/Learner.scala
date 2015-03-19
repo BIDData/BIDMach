@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
@@ -685,6 +685,9 @@ object Learner {
         case g:GMat => mats(i) = FMat(g)
         case g:GSMat => mats(i) = SMat(g)
         case g:GIMat => mats(i) = IMat(g)
+        case g:GDMat => mats(i) = DMat(g)
+        case g:GLMat => mats(i) = LMat(g)
+        case g:GSDMat => mats(i) = SDMat(g)
         case _ => {}
       }
     }
