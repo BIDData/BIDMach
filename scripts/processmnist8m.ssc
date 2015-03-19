@@ -7,6 +7,6 @@ for (i <- 0 to 80) {
 //    saveFMat("cats%02d.fmat.lz4" format i, fc);
     val alls = (fc * 10000f) on fd;
     saveFMat("alls%02d.fmat.lz4" format i, alls);
-    saveFMat("allst%02d.fmat.txt" format i, alls.t);
+//    saveFMat("allst%02d.fmat.txt" format i, alls.t);
     print(".");
 }
