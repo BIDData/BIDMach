@@ -352,7 +352,12 @@ case class ParLearner(
     datasource.close
     val gf = gflop
     Mat.useCache = cacheState
-    println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*here, bytes/gf._2/1e6))
+    if (useGPU) {
+	for (i <- 0 until opts.nthreads) {
+	    if (i != thisGPU) disconnect(i);
+	}
+    }    
+    println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*opts.nthreads*here, bytes/gf._2/1e6))
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   

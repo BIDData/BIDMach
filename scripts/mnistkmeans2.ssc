@@ -1,0 +1,40 @@
+import BIDMach.{ParLearner,ParLearnerF}
+
+class SFDSopts extends ParLearner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts;
+  
+def _learnFPar(fnames:List[(Int) => String], d:Int = 256):(ParLearnerF, SFDSopts) = {
+    val opts = new SFDSopts;
+    opts.dim = d;
+    opts.npasses = 4;
+    opts.fnames = fnames;
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+//    opts.resFile = "../data/results.mat"
+    implicit val threads = threadPool(4)
+    val nn = new ParLearnerF(
+			     new FilesDS(opts),
+			     opts, KMeans.mkKMeansModel _, 
+			     null, null, 
+			     opts, KMeans.mkUpdater _,
+			     opts
+			     )
+    (nn, opts);
+};
+
+def learnFPar(fnames:String, d:Int = 256):(ParLearnerF, SFDSopts) = _learnFPar(List(FilesDS.simpleEnum(fnames, 0, 1)), d);
+
+val dir = "../data/MNIST8M/parts/";
+
+val (nn, opts) = learnFPar(dir+"alls%02d.fmat.lz4", 1024);
+
+opts.nend = 70;
+opts.nthreads=4;
+opts.coolit = 0
+
+opts.batchSize = 20000;
+opts.npasses = 3;
+
+
+
+
+

@@ -82,30 +82,30 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   
   override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat]) = {}
   
-  override def mergeModelPassFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) = {
+  override def mergeModelPassFn(models:Array[Model], mmx:Array[Mat], umx:Array[Mat], ipass:Int) = {
     val nmodels = models.length;
-    mm(0).clear
+    mmx(0).clear
     if (ipass == 0) {                     // on first pass, model is random samples, so take a mixed sample
       val m0 = models(0).modelmats(0);
       val isel = m0.zeros(m0.nrows, 1);
       val vsel = min((nmodels-1).toFloat, floor(nmodels*rand(m0.nrows, 1)));
       for (i <- 0 until nmodels) {
         isel <-- (vsel == i.toFloat);
-        um(0) <-- models(i).modelmats(0);
-        um(0) ~ isel *@ um(0);
-        mm(0) ~ mm(0) + um(0);
+        umx(0) <-- models(i).modelmats(0);
+        umx(0) ~ isel *@ umx(0);
+        mmx(0) ~ mmx(0) + umx(0);
       }
     } else {                              // on later passes, average the centers
       for (i <- 0 until nmodels) {
-        um(0) <-- models(i).modelmats(0);
-        mm(0) ~ mm(0) + um(0);
+        umx(0) <-- models(i).modelmats(0);
+        mmx(0) ~ mmx(0) + umx(0);
       }
-      mm(0) ~ mm(0) * (1f/nmodels);
+      mmx(0) ~ mmx(0) * (1f/nmodels);
     }
-    mm(1) ~ mm(0) dotr mm(0);
+    mmx(1) ~ mmx(0) dotr mmx(0);
     for (i <- 0 until nmodels) {
-    	models(i).modelmats(0) <-- mm(0);
-    	models(i).modelmats(1) <-- mm(1);
+    	models(i).modelmats(0) <-- mmx(0);
+    	models(i).modelmats(1) <-- mmx(1);
     }
   }
 }

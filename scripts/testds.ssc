@@ -1,0 +1,28 @@
+
+val opts = new SFilesDS.Options;
+
+def getDS() = {
+    implicit val threads = threadPool(4)
+    new SFilesDS(opts);
+}
+
+val ds=getDS;
+
+opts.nend=10;
+opts.fnames=List(FilesDS.simpleEnum("../data/uci/pubmed_parts/part%02d.smat.lz4", 1, 0));
+opts.batchSize = 100000;
+opts.fcounts = 141043
+opts.eltsPerSample = 400;
+ds.init;
+
+var i = 0;
+var total = 0L;
+tic;
+while (ds.hasNext) {
+    val mats = ds.next;
+    total += mats(0).asInstanceOf[SMat].nnz * 8L;
+    val t=toc;
+    println("Speed %4.3f MB/s, %4.3f GB in %4.3f secs" format (total/t/1e6, total/1e9, t));
+}
+    
+

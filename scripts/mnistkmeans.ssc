@@ -1,0 +1,37 @@
+
+class SFDSopts extends Learner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts;
+  
+def _learn(fnames:List[(Int) => String], d:Int = 256):(Learner, SFDSopts) = {
+    val opts = new SFDSopts;
+    opts.dim = d;
+    opts.npasses = 4;
+    opts.fnames = fnames;
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+//    opts.resFile = "../data/results.mat"
+    implicit val threads = threadPool(4)
+    val nn = new Learner(
+			 new FilesDS(opts),
+			 new KMeans(opts),
+			 null,  
+			 new Batch(opts),
+			 opts
+			 )
+    (nn, opts);
+};
+
+def learn(fnames:String, d:Int = 256):(Learner, SFDSopts) = _learn(List(FilesDS.simpleEnum(fnames, 0, 1)), d);
+
+val dir = "../data/MNIST8M/parts/";
+
+val (nn, opts) = learn(dir+"alls%02d.fmat.lz4", 1024);
+
+opts.nend = 70;
+
+opts.batchSize = 20000;
+opts.npasses = 3;
+
+
+
+
+
