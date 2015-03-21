@@ -195,7 +195,7 @@ case class ParLearner(
     val models:Array[Model], 
     val mixins:Array[Array[Mixin]], 
     val updaters:Array[Updater], 
-	val opts:ParLearner.Options = new ParLearner.Options) {
+    val opts:ParLearner.Options = new ParLearner.Options) {
   
   var um:Array[Mat] = null
   var mm:Array[Mat] = null
@@ -379,6 +379,11 @@ case class ParLearner(
     models(ithread).modelmats(0) <-- mm(0)
     updaters(ithread).init(models(ithread))      
   }
+  def datamats = datasource.asInstanceOf[MatDS].mats
+  def modelmats = models(0).modelmats
+  def datamat = datasource.asInstanceOf[MatDS].mats(0)
+  def modelmat = models(0).modelmats(0)
+}
 
 
 /**
@@ -638,12 +643,7 @@ class ParLearnerxF(
     learner.retrain
   }
 }
-  
-  def datamats = datasource.asInstanceOf[MatDS].mats
-  def modelmats = models(0).modelmats
-  def datamat = datasource.asInstanceOf[MatDS].mats(0)
-  def modelmat = models(0).modelmats(0)
-}
+
 
 /**
  * Single-datasource parallel Learner which takes function arguments.
