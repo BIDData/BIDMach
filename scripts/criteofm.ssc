@@ -1,0 +1,65 @@
+:silent
+class xopts extends Learner.Options with FilesDS.Opts with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts
+val opts = new xopts
+
+val mdir = "d:/criteo/parts/"
+opts.fnames = List(FilesDS.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
+                   FilesDS.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
+opts.nend = 77;
+opts.lrate = 3e-12f*row(1,0,0) + 1e-12f*row(0,1,1)
+opts.lrate = 1e-4f*row(1,0,0) + 1e-8f*row(0,1,1)
+opts.reg1weight = 0.001f*row(1,0,0) + 0.0001*row(0,1,1)
+opts.dim1 = 32;
+opts.dim2 = 32;
+opts.batchSize=10000;
+opts.npasses=5;
+opts.eltsPerSample=60;
+opts.links = icol(1);
+opts.pstep = 0.001f;
+opts.lim = 8f;
+opts.initscale = 0.00001f;
+opts.strictFM = true;
+
+val ds = {
+  implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
+  new FilesDS(opts)               // the datasource
+}
+
+
+val nn = new Learner(                  // make a learner instance
+    ds,                                // datasource
+    new FM(opts),                     // the model 
+    Array(new L1Regularizer(opts)),    // list of mixins or regularizers
+    new BIDMach.updaters.ADAGrad(opts),                 // the optimization class to use
+    opts)                              // pass the options to the learner as well
+
+
+nn.train
+
+val mm = FMat(nn.model.modelmats(0));
+
+val filesize = 600000;
+val tscores = dzeros(filesize*10, 1);
+val tcats = dzeros(filesize*10, 1);
+var len = 0;
+for (i <- 0 until 10) {
+  val a = loadSMat(mdir + "train%02d.smat.lz4" format i + 67);
+  val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + 67);
+  val sc = mm * a;
+  tscores(i * filesize -> (i * filesize + sc.length), 0) = DMat(sc.t);
+  tcats(i * filesize -> (i * filesize + sc.length), 0) = DMat(c.t);
+  len += c.length;
+  print(".");
+}
+val scores = tscores(0->len,0);
+val cats = tcats(0->len,0);
+
+val rr = roc(scores, cats, 1-cats, 1000)
+
+mean(rr)
+
+val res=nn.results(0,?)
+val mn = mean(res(10->res.ncols))
+
+:silent
+

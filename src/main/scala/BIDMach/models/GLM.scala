@@ -576,7 +576,7 @@ object GLM {
     model.copyTo(newmod)
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
-        model, 
+        newmod, 
         null,
         null,
         nopts)

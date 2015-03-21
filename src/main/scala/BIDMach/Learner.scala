@@ -13,6 +13,9 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
+/**
+ *  Basic sequential Learner class with a single datasource 
+ */
 case class Learner(
     val datasource:DataSource,
     val model:Model, 
@@ -181,6 +184,11 @@ case class Learner(
   def datamat = datasource.asInstanceOf[MatDS].mats(0)
   def modelmat = model.modelmats(0)
 }
+
+/**
+ * Parallel Learner class with multiple datasources, models, mixins, and updaters. 
+ * i.e. several independent Learners whose models are synchronized periodically. 
+ */
 
 case class ParLearnerx(
     val datasources:Array[DataSource], 
@@ -386,6 +394,11 @@ case class ParLearnerx(
 
 }
 
+/**
+ * Parallel multi-datasource Learner that takes function arguments. 
+ * This allows classes to be initialized later, when the learner is setup. 
+ */
+
 class ParLearnerxF(
     dopts:DataSource.Opts,
 		ddfun:(DataSource.Opts, Int)=>DataSource,
@@ -429,6 +442,10 @@ class ParLearnerxF(
     learner.retrain
   }
 }
+
+/** 
+ * Parallel Learner with a single datasource.
+ */
 
 case class ParLearner(
     val datasource:DataSource, 
@@ -582,6 +599,7 @@ case class ParLearner(
         updaters(i).updateM(ipass)
       }
       setGPU(thisGPU)
+      ParLearner.syncmodelsPass(models, mm, um, ipass)
       ipass += 1
       if (opts.resFile != null) {
       	saveAs(opts.resFile, Learner.scores2FMat(reslist) on row(samplist.toList), "results")
@@ -624,6 +642,10 @@ case class ParLearner(
   def datamat = datasource.asInstanceOf[MatDS].mats(0)
   def modelmat = models(0).modelmats(0)
 }
+
+/**
+ * Single-datasource parallel Learner which takes function arguments.
+ */
 
 class ParLearnerF(
 		val ds:DataSource,
@@ -736,18 +758,12 @@ object ParLearner {
   	var coolit = 60
   }
   
+  def syncmodelsPass(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) = {
+    models(0).mergeModelPassFn(models, mm, um, ipass);
+  }
+  
   def syncmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], useGPU:Boolean) = {
-	  for (j <- 0 until models(0).modelmats.length) {
-	  	mm(j).clear
-	  	for (i <- 0 until models.length) {
-	  		um(j) <-- models(i).modelmats(j)
-	  		mm(j) ~ mm(j) + um(j)
-	  	}
-	  	mm(j) ~ mm(j) * (1f/models.length)
-	  	for (i <- 0 until models.length) {
-	  		models(i).modelmats(j) <-- mm(j)
-	  	}
-	  }
+    models(0).mergeModelFn(models, mm, um);
   }
   
 }

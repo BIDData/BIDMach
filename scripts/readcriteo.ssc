@@ -42,20 +42,21 @@ def readcritfile(fname:String, haslabel:Int):(FMat, IMat, IMat) = {
   (labels, numpart, bpart);
 }
 
-val dir = "d:/criteo/parts/"
-/*println("reading and converting training data")
-for (i <- 0 to 76) { 
-  val (a,b,c) = readcritfile(dir+("train%02d" format i), 1);
-  saveFMat(dir+("trainlabel%02d.fmat.lz4" format i), a);
-  saveIMat(dir+("traindata%02d.imat.lz4" format i), b);
-  saveIMat(dir+("trainnz%02d.imat.lz4" format i), c);
+val dir = "../data/criteo/parts/"
+println("reading and converting training data")
+for (i <- 0 to 91) { 
+  val (a,b,c) = readcritfile(dir+("train%03d" format i), 1);
+  saveFMat(dir+("trainlabel%03d.fmat.lz4" format i), a);
+  saveIMat(dir+("traindata%03d.imat.lz4" format i), b);
+  saveIMat(dir+("trainnz%03d.imat.lz4" format i), c);
   print(".")
-}*/
+}
 
-println("reading and converting test data")
-for (i <- 0 to 10) { 
-  val (a,b,c) = readcritfile(dir+("test%02d" format i), 0);
-  saveFMat(dir+("testdata%02d.fmat.lz4" format i), b);
-  saveIMat(dir+("testnz%02d.imat.lz4" format i), c);
+println("\nreading and converting test data")
+for (i <- 0 to 12) { 
+  val (a,b,c) = readcritfile(dir+("test%03d" format i), 0);
+  saveFMat(dir+("testlabel%03d.fmat.lz4" format i), b);
+  saveIMat(dir+("testdata%03d.imat.lz4" format i), b);
+  saveIMat(dir+("testnz%03d.imat.lz4" format i), c);
   print(".")
 }

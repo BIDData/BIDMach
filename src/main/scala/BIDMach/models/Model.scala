@@ -41,6 +41,23 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var refresh = true
   
+  def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat]) = {
+    val mlen = models(0).modelmats.length;
+    for (j <- 0 until mlen) {
+      mm(j).clear
+      for (i <- 0 until models.length) {
+      	um(j) <-- models(i).modelmats(j);
+      	mm(j) ~ mm(j) + um(j);
+      }
+      mm(j) ~ mm(j) * (1f/models.length);
+      for (i <- 0 until models.length) {
+      	models(i).modelmats(j) <-- mm(j);
+    	}
+    }
+  }
+  
+  def mergeModelPassFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) {}
+  
   def copyTo(mod:Model) = {
     mod.datasource = datasource;
     mod._modelmats = modelmats;

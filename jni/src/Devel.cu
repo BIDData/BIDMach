@@ -432,3 +432,6 @@ int multinomial(int nrows, int ncols, float *A, int *B, float *Norm, int nvals) 
   return err;
 }
 
+template<typename KEY, typename V1, typename V2, typename RET, class C>
+  __global__ void prodSelect(int n, int *groups, KEY *keys1, KEY *keys2, V1 *vals1, V2 *vals2, KEY *kout, RET *ret) {
+}

@@ -45,8 +45,8 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     			nfeats = fcs.outsize;
     			imodel += 1;
     		}
-    		case rls:DNN.Rect => {
-    			layers(i) = new RectLayer;
+    		case rls:DNN.ReLU => {
+    			layers(i) = new ReLULayer;
     		}
     		case ils:DNN.Input => {
     			layers(i) = new InputLayer;
@@ -109,7 +109,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
   }
   
-  class RectLayer extends Layer {
+  class ReLULayer extends Layer {
     override def forward = {
       data = max(input.data, 0f)
     }
@@ -163,7 +163,7 @@ object DNN  {
   
   class FC(val outsize:Int) extends ModelLayerSpec {}
   
-  class Rect extends LayerSpec {}
+  class ReLU extends LayerSpec {}
   
   class Input extends LayerSpec {}
   
@@ -184,7 +184,7 @@ object DNN  {
     		layers(i) = new FC(w);
     		w = (taper*w).toInt;
     	} else {
-    		layers(i) = new Rect;
+    		layers(i) = new ReLU;
     	}
     }
     layers(0) = new Input;

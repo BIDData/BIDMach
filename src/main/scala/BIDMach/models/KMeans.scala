@@ -79,6 +79,35 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     }
     mmnorm ~ mm dotr mm;
   }
+  
+  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat]) = {}
+  
+  override def mergeModelPassFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) = {
+    val nmodels = models.length;
+    mm(0).clear
+    if (ipass == 0) {                     // on first pass, model is random samples, so take a mixed sample
+      val m0 = models(0).modelmats(0);
+      val isel = m0.zeros(m0.nrows, 1);
+      val vsel = min((nmodels-1).toFloat, floor(nmodels*rand(m0.nrows, 1)));
+      for (i <- 0 until nmodels) {
+        isel <-- (vsel == i.toFloat);
+        um(0) <-- models(i).modelmats(0);
+        um(0) ~ isel *@ um(0);
+        mm(0) ~ mm(0) + um(0);
+      }
+    } else {                              // on later passes, average the centers
+      for (i <- 0 until nmodels) {
+        um(0) <-- models(i).modelmats(0);
+        mm(0) ~ mm(0) + um(0);
+      }
+      mm(0) ~ mm(0) * (1f/nmodels);
+    }
+    mm(1) ~ mm(0) dotr mm(0);
+    for (i <- 0 until nmodels) {
+    	models(i).modelmats(0) <-- mm(0);
+    	models(i).modelmats(1) <-- mm(1);
+    }
+  }
 }
 
 object KMeans  {
@@ -163,47 +192,7 @@ object KMeans  {
   	    opts)
     (nn, opts)
   }
-  
-  def learnFParx(
-      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-      d:Int = 256
-      ) = {
-  	class xopts extends ParLearner.Options with KMeans.Opts with SFilesDS.Opts with Batch.Opts
-  	val opts = new xopts
-  	opts.dim = d
-  	opts.npasses = 10
-  	opts.resFile = "/big/twitter/test/results.mat"
-  	val nn = new ParLearnerxF(
-  	    null, 
-  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
-  	    opts, mkKMeansModel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    opts
-  	)
-  	(nn, opts) 
-  }
-  
-  def learnFPar(
-      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-      d:Int = 256
-      ) = {	
-  	class xopts extends ParLearner.Options with KMeans.Opts with SFilesDS.Opts with Batch.Opts
-  	val opts = new xopts
-  	opts.dim = d
-  	opts.npasses = 4
-  	opts.resFile = "/big/twitter/test/results.mat"
-  	val nn = new ParLearnerF(
-  	    Experiments.Twitter.twitterWords(nstart, nend), 
-  	    opts, mkKMeansModel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    opts
-  	)
-  	(nn, opts)
-  }
+
 }
 
 

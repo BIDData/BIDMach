@@ -4,6 +4,7 @@
 BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_SCRIPTS=`readlink -f "${BIDMACH_SCRIPTS}"`
+  export WGET='wget --no-check-certificate'
 else 
   while [ -L "${BIDMACH_SCRIPTS}" ]; do
     BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`

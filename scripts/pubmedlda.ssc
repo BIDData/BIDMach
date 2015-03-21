@@ -16,7 +16,7 @@ def learnPubmed(dim:Int = 256) = {
 
 val (nn, opts) = learnPubmed(256);
 
-val dir = "/data/uci/"
+val dir = "../data/uci/"
 opts.fnames = List(FilesDS.simpleEnum(dir+"/pubmed_parts/part%02d.smat.lz4", 1, 0))
 opts.nstart = 0;
 opts.nend = 9;
