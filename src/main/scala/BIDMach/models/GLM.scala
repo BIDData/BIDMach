@@ -117,7 +117,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {        
     val ftarg = full(targ);
     val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
-    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.bound1, opts.bound2) else modelmats(0) * in 
+    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in 
     if (opts.lim > 0) {
       max(eta, llim, eta);
       min(eta, ulim, eta);
@@ -126,7 +126,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     GLM.derivs(eta, targs, eta, mylinks, totflops);
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights;
     if (hashFeatures > 0) {
-      updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols, opts.bound1, opts.bound2);
+      updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols, opts.hashBound1, opts.hashBound2);
     } else {
     	updatemats(0) ~ eta *^ in;
     }
@@ -147,7 +147,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
     val ftarg = full(targ);
     val targs = if (!(putBack >= 0) && targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
-    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.bound1, opts.bound2) else modelmats(0) * in;
+    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in;
     GLM.preds(eta, eta, mylinks, totflops);
     val v = GLM.llfun(eta, targs, mylinks, totflops);
     if (putBack >= 0) {targ <-- eta};
@@ -167,8 +167,8 @@ object GLM {
     var iweight:FMat = null;
     var lim = 0f;
     var hashFeatures = 0;
-    var bound1 = 0;
-    var bound2 = 0;
+    var hashBound1 = 0;
+    var hashBound2 = 0;
   }
   
   val linear = 0;
