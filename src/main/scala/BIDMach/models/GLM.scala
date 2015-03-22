@@ -56,7 +56,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   var ulim:Mat = null
   var llim:Mat = null
   var totflops = 0L
-  var hashFeatures = false
+  var hashFeatures = 0
   
   override def copyTo(mod:Model) = {
     super.copyTo(mod);
@@ -66,7 +66,32 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
   
   override def init() = {
-    super.init()
+  	useGPU = opts.useGPU && Mat.hasCUDA > 0
+    val data0 = mats(0)
+    val m = if (opts.hashFeatures > 0) opts.hashFeatures else size(data0, 1)
+    val targetData = mats.length > 1
+    val d = if (opts.targmap.asInstanceOf[AnyRef] != null) {
+      opts.targmap.nrows 
+    } else if (opts.targets.asInstanceOf[AnyRef] != null) {
+      opts.targets.nrows 
+    } else {
+      mats(1).nrows  
+    }
+    val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
+    sp = sdat / sum(sdat)
+    println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
+    
+    if (refresh) {
+    	val mm = zeros(d,m);
+      setmodelmats(Array(mm))
+    }
+    modelmats(0) = convertMat(modelmats(0));
+    updatemats = Array(modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols));
+    targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else opts.targmap
+    if (! targetData) {
+      targets = if (opts.targets.asInstanceOf[AnyRef] != null) convertMat(opts.targets) else opts.targets
+      mask =    if (opts.rmask.asInstanceOf[AnyRef] != null) convertMat(opts.rmask) else opts.rmask
+    } 
     mylinks = if (useGPU) GIMat(opts.links) else opts.links;
     iweight = opts.iweight;
     if (iweight.asInstanceOf[AnyRef] != null && useGPU) iweight = convertMat(iweight);
@@ -92,7 +117,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {        
     val ftarg = full(targ);
     val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
-    val eta = if (hashFeatures) GLM.hashMult(modelmats(0), in) else modelmats(0) * in 
+    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.bound1, opts.bound2) else modelmats(0) * in 
     if (opts.lim > 0) {
       max(eta, llim, eta);
       min(eta, ulim, eta);
@@ -100,8 +125,8 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     GLM.preds(eta, eta, mylinks, totflops);
     GLM.derivs(eta, targs, eta, mylinks, totflops);
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights;
-    if (hashFeatures) {
-      updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols);
+    if (hashFeatures > 0) {
+      updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols, opts.bound1, opts.bound2);
     } else {
     	updatemats(0) ~ eta *^ in;
     }
@@ -122,7 +147,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
     val ftarg = full(targ);
     val targs = if (!(putBack >= 0) && targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
-    val eta = if (hashFeatures) GLM.hashMult(modelmats(0), in) else modelmats(0) * in;
+    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.bound1, opts.bound2) else modelmats(0) * in;
     GLM.preds(eta, eta, mylinks, totflops);
     val v = GLM.llfun(eta, targs, mylinks, totflops);
     if (putBack >= 0) {targ <-- eta};
@@ -141,7 +166,9 @@ object GLM {
     var links:IMat = null;
     var iweight:FMat = null;
     var lim = 0f;
-    var hashFeatures = false;
+    var hashFeatures = 0;
+    var bound1 = 0;
+    var bound2 = 0;
   }
   
   val linear = 0;
@@ -388,29 +415,29 @@ object GLM {
     }
    }
    
-  def hashMult(a:GMat, b:GSMat):GMat = {
+  def hashMult(a:GMat, b:GSMat, bound1:Int, bound2:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashMult".##);
     c.clear;
-    CUMACH.hashMult(a.nrows, a.ncols, b.ncols, a.data, b.data, b.ir, b.jc, c.data, 0);
+    CUMACH.hashMult(a.nrows, a.ncols, b.ncols, bound1, bound2, a.data, b.data, b.ir, b.jc, c.data, 0);
     c
   }
   
-  def hashMult(a:Mat, b:Mat):Mat = {
+  def hashMult(a:Mat, b:Mat, bound1:Int, bound2:Int):Mat = {
   	(a, b) match {
-  	  case (ga:GMat, gb:GSMat) => hashMult(ga, gb)
+  	  case (ga:GMat, gb:GSMat) => hashMult(ga, gb, bound1, bound2)
   	}
   }
   
-  def hashMultT(a:GMat, b:GSMat, nfeats:Int):GMat = {
+  def hashMultT(a:GMat, b:GSMat, nfeats:Int, bound1:Int, bound2:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, nfeats, null, a.GUID, b.GUID, nfeats, "hashMultT".##);
     c.clear;
-    CUMACH.hashMult(a.nrows, nfeats, b.ncols, a.data, b.data, b.ir, b.jc, c.data, 1);
+    CUMACH.hashMult(a.nrows, nfeats, b.ncols, bound1, bound2, a.data, b.data, b.ir, b.jc, c.data, 1);
     c
   }
   
-  def hashMultT(a:Mat, b:Mat, nfeats:Int):Mat = {
+  def hashMultT(a:Mat, b:Mat, nfeats:Int, bound1:Int, bound2:Int):Mat = {
   	(a, b) match {
-  	  case (ga:GMat, gb:GSMat) => hashMultT(ga, gb, nfeats)
+  	  case (ga:GMat, gb:GSMat) => hashMultT(ga, gb, nfeats, bound1, bound2)
   	}
   }
   
