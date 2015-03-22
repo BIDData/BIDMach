@@ -46,7 +46,7 @@ int jfeatsToIfeats(int itree, int *inodes, int *jfeats, int *ifeats, int n, int 
 
 int findBoundaries(long long *keys, int *jc, int n, int njc, int shift);
 
-int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose);
+int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose);
 
 int hashcross(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *Cdata, int *Cir, int *Cjc, float *D, int transpose);
 

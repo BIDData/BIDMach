@@ -89,7 +89,8 @@ __forceinline__ __device__ int solve1(int j) {
 
 // Given dense A and sparse B, for each column of B, enumerate all pairs of features, hash to a single feature index, and multiply by A into C
 
-__global__ void __hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+__global__ void __hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+  bool doit = false;
   int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
   int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
   for (int i = istart; i < iend ; i++) {                     // i is the column index
@@ -105,23 +106,32 @@ __global__ void __hashmult(int nrows, int nfeats, int ncols, float *A, float *Bd
       int r1 = Bir[jstart + j1];                             // And their row indices
       int r2 = Bir[jstart + j2];
       int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
-
-      if (transpose > 0) {
-        float sum = A[threadIdx.x + nrows * i] * f1 * f2;    // Do the product
-        atomicAdd(&C[threadIdx.x + nrows * ind], sum);
+      float prod = f1;
+      if (j1 != j2) {
+        prod *= f2;
+        doit = (r1 < bound1);
       } else {
-        float sum = A[threadIdx.x + nrows * ind] * f1 * f2;  // Do the product
-        atomicAdd(&C[threadIdx.x + nrows * i], sum);
+        long long bigind = ((long long)r1) * r2;
+        doit = (bigind < bound2);
+      }
+      if (doit) {
+        if (transpose > 0) {
+          float sum = A[threadIdx.x + nrows * i] * f1 * f2;    // Do the product
+          atomicAdd(&C[threadIdx.x + nrows * ind], sum);
+        } else {
+          float sum = A[threadIdx.x + nrows * ind] * f1 * f2;  // Do the product
+          atomicAdd(&C[threadIdx.x + nrows * i], sum);
+        }
       }
     }
   }
 }
 
-int hashmult(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
   int nt = max(1, 256/nrows);
   dim3 threadDim(nrows, nt, 1);
   int nblocks = min(MAXXGRID, ncols);
-  __hashmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, C, transpose);
+  __hashmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;

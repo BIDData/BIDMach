@@ -296,7 +296,7 @@ extern "C" {
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashMult
-  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, 
+  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jint bound1, jint bound2,
    jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC, jint transpose)
   {
     float *A = (float*)getPointer(env, jA);
@@ -305,7 +305,7 @@ extern "C" {
     int *Bjc = (int*)getPointer(env, jBjc);
     float *C = (float*)getPointer(env, jC);
 
-    return hashmult(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, C, transpose);
+    return hashmult(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashCross
