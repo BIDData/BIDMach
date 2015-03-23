@@ -45,10 +45,11 @@ println("ROC AUC cat6 %5.4f" format mean(rr2).dv)
 
 if (useGPU) resetGPU
 
-if (doTwitter) {
-println("\n<<<<<<< Testing parallel LDA on Twitter >>>>>>>")
-val (mm4,opts4) = LDA.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
+if (Mat.hasCUDA > 1) {
+println("\n<<<<<<< Testing parallel LDA on RCV1 >>>>>>>")
+val (mm4,opts4) = LDA.learnPar(a, 512)
 opts4.useGPU=useGPU
+opts4.nthreads = Mat.hasCUDA
 opts4.npasses=2
 mm4.train
 } else if (Mat.hasCUDA > 0) {
@@ -103,11 +104,12 @@ opts7.useGPU=useGPU
 mm7.train
 }
 
-if (doTwitter) {
-println("\n<<<<<<< Testing parallel NMF on Twitter >>>>>>>")
-val (mm8,opts8) = NMF.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
+if (Mat.hasCUDA > 1) {
+println("\n<<<<<<< Testing parallel NMF on RCV1 >>>>>>>")
+val (mm8,opts8) = NMF.learnPar(a, 512)
 opts8.useGPU=useGPU
 opts8.npasses=2
+opts8.nthreads=Mat.hasCUDA
 mm8.train
 } else {
 println("\n<<<<<<< Testing NMF on RCV1 >>>>>>>")
