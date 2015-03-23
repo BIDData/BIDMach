@@ -353,10 +353,14 @@ case class ParLearner(
     val gf = gflop
     Mat.useCache = cacheState
     if (useGPU) {
-	for (i <- 0 until opts.nthreads) {
-	    if (i != thisGPU) disconnect(i);
-	}
-    }    
+    	for (i <- 0 until opts.nthreads) {
+    		if (i != thisGPU) disconnect(i);
+    	}
+    } 
+    if (opts.autoReset) {
+      Learner.toCPU(models(0).modelmats)
+      resetGPUs
+    }
     println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*opts.nthreads*here, bytes/gf._2/1e6))
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
@@ -384,6 +388,7 @@ case class ParLearner(
     models(ithread).modelmats(0) <-- mm(0)
     updaters(ithread).init(models(ithread))      
   }
+    
   def datamats = datasource.asInstanceOf[MatDS].mats
   def modelmats = models(0).modelmats
   def datamat = datasource.asInstanceOf[MatDS].mats(0)
