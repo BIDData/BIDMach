@@ -208,7 +208,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var sconst:Mat = null
     
     override def forward = {
-      data = input.data + 0f;
+      data = input.data;  
     }
     
     override def backward = {
@@ -228,7 +228,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var randmat:Mat = null;
     
     override def forward = {
-      randmat = input.data + 20f;
+      randmat = input.data + 20f;   // Hack to make a cached container to hold the random data
       if (useGPU) {
         grand(randmat.asInstanceOf[GMat]); 
       } else {
