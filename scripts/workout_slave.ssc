@@ -4,7 +4,7 @@ val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
 val ta = loadSMat(dir+"/data/rcv1/testdocs.smat.lz4")
 val tc = loadFMat(dir+"/data/rcv1/testcats.fmat.lz4")
 
-println("\n<<<<<<< Testing GLM on RCV1 >>>>>>>")
+println("\n<<<<<<< Testing GLM on RCV1 (2 passes) >>>>>>>")
 val pc = zeros(tc.nrows, tc.ncols);
 val (mm1,opts1,nn1,nopts1) = GLM.learner(a,c,ta,pc,1)
 opts1.useGPU=useGPU
@@ -18,7 +18,7 @@ val nt = sum(c,2)(0->100, 0)
 val wt = nt / sum(nt);
 println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))
  
-println("\n<<<<<<< Testing FM on RCV1 >>>>>>>")
+println("\n<<<<<<< Testing FM on RCV1 (2 passes) >>>>>>>")
 //min(a,1f,a)
 //min(ta,1f,ta)
 val c6 = c(6,?)
@@ -45,22 +45,25 @@ println("ROC AUC cat6 %5.4f" format mean(rr2).dv)
 
 if (useGPU) resetGPU
 
-if (Mat.hasCUDA > 1) {
-println("\n<<<<<<< Testing parallel LDA on RCV1 >>>>>>>")
+val a = loadSMat(dir+"/data/uci/nytimes.smat.lz4")
+
+if (useGPU && Mat.hasCUDA > 1) {
+println("\n<<<<<<< Testing parallel LDA on NYTimes (2 passes) >>>>>>>")
 val (mm4,opts4) = LDA.learnPar(a, 512)
+opts4.batchSize = 5000
 opts4.useGPU=useGPU
 opts4.nthreads = Mat.hasCUDA
 opts4.npasses=2
 mm4.train
 } else if (Mat.hasCUDA > 0) {
-println("\n<<<<<<< Testing LDA on RCV1 >>>>>>>")
+println("\n<<<<<<< Testing LDA on NYTimes (2 passes) >>>>>>>")
 val (mm4,opts4) = LDA.learner(a, 128)
 opts4.useGPU=useGPU
 opts4.npasses=2
 mm4.train
 }
 
-println("\n<<<<<<< Testing SFA on MovieLens 10M Data >>>>>>>")
+println("\n<<<<<<< Testing SFA on MovieLens 10M Data (5 passes) >>>>>>>")
 val a5=loadSMat(dir+"/data/movielens/train.smat.lz4")
 val ta5=loadSMat(dir+"/data/movielens/test.smat.lz4")
 
@@ -86,8 +89,7 @@ val rmse = sqrt((diff ^* diff) / diff.length)
 println("RMSE = %f" format rmse.v);
 
 if ((new java.io.File("../data/uci/pubmed_parts/part00.smat.lz4")).exists) {
-println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed >>>>>>>")
-
+println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed (2 passes) >>>>>>>")
 val (mm6,opts6) = LDA.learner(List((n:Int)=> ("../data/uci/pubmed_parts/part%02d.smat.lz4" format n)), 128)
 opts6.npasses=2
 opts6.useGPU=useGPU
@@ -95,25 +97,37 @@ mm6.train
 }
 
 if ((new java.io.File("../data/MNIST8M/parts/alls00.fmat.lz4")).exists) {
-println("\n<<<<<<< Testing KMeans with FilesDS on MNIST8M >>>>>>>")
-
-val (mm7,opts7) = KMeans.learner(List((n:Int)=> ("../data/MNIST8M/parts/alls%02d.fmat.lz4" format n)), 256)
-opts7.npasses=6
+if (useGPU && Mat.hasCUDA > 1) {
+println("\n<<<<<<< Testing parallel KMeans with FilesDS on MNIST8M (4 passes) >>>>>>>")
+val (mm7,opts7) = KMeans.learnPar("../data/MNIST8M/parts/alls%02d.fmat.lz4", 4096)
+opts7.npasses=4
 opts7.nend=70
+opts7.batchSize=20000
+opts7.nthreads=Mat.hasCUDA
+mm7.train
+} else {
+println("\n<<<<<<< Testing KMeans with FilesDS on MNIST8M (4 passes) >>>>>>>")
+val (mm7,opts7) = KMeans.learner(List((n:Int)=> ("../data/MNIST8M/parts/alls%02d.fmat.lz4" format n)), 256)
+opts7.npasses=4
+opts7.nend=70
+opts7.batchSize=100000
 opts7.useGPU=useGPU
 mm7.train
 }
+}
 
-if (Mat.hasCUDA > 1) {
-println("\n<<<<<<< Testing parallel NMF on RCV1 >>>>>>>")
-val (mm8,opts8) = NMF.learnPar(a, 512)
+if (useGPU && Mat.hasCUDA > 1) {
+println("\n<<<<<<< Testing parallel NMF on NYTimes (2 passes) >>>>>>>")
+val (mm8,opts8) = NMF.learnPar(a, 256)
+opts8.batchSize = 5000
 opts8.useGPU=useGPU
 opts8.npasses=2
 opts8.nthreads=Mat.hasCUDA
 mm8.train
 } else {
-println("\n<<<<<<< Testing NMF on RCV1 >>>>>>>")
+println("\n<<<<<<< Testing NMF on NYTimes (2 passes) >>>>>>>")
 val (mm8,opts8) = NMF.learner(a, 128)
+opts8.batchSize = 5000
 opts8.useGPU=useGPU
 opts8.npasses=2
 mm8.train
@@ -141,7 +155,7 @@ mask(0,32) = 0
 mask(0,33) = 0
 mask(1,33) = 0
 
-println("\n<<<<<<< Testing IPTW estimators >>>>>>>")
+println("\n<<<<<<< Testing IPTW estimators (10 passes) >>>>>>>")
 val (mm10,opts10) = IPTW.learner(aa)
 opts10.useGPU=useGPU
 opts10.targets = targetmat
