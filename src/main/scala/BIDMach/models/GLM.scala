@@ -354,6 +354,29 @@ object GLM {
     }
   }
   
+  def preds(eta:Mat, links:Mat, totflops:Long):Mat = {
+    (eta, links) match {
+      case (feta:FMat, ilinks:IMat) => {
+        val fout = FMat.newOrCheckFMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+        Mat.nflops += totflops * feta.ncols
+        meanHelper(feta, fout, ilinks, 0, feta.ncols)
+        fout
+      }
+      case (geta:GMat, gilinks:GIMat) => {
+        val gout = GMat.newOrCheckGMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+        Mat.nflops += totflops * geta.ncols
+        CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        gout
+      }
+      case (geta:GDMat, gilinks:GIMat) => {
+      	val gout = GDMat.newOrCheckGDMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+        Mat.nflops += totflops * geta.ncols
+        CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        gout
+      }
+    }
+  }
+  
   def llfun(pred:Mat, targ:Mat, links:Mat, totflops:Long):Mat = {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
@@ -386,21 +409,21 @@ object GLM {
     }
   }
   
-   def derivs(pred:Mat, targ:Mat, out:Mat, links:Mat, totflops:Long) = {
+  def derivs(pred:Mat, targ:Mat, out:Mat, links:Mat, totflops:Long) = {
     (pred, targ, out, links) match {
       case (fpred:FMat, ftarg:FMat, fout:FMat, ilinks:IMat) => {
-        Mat.nflops += 10L * ftarg.length
-            var i = 0
-            while (i < ftarg.ncols) {
-                var j = 0
-                while (j < ftarg.nrows) {
-                    val fun = GLM.linkArray(ilinks(j)).derivfn
-                    fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
-                    j += 1
-                }
-                i += 1
-            }
-            mean(out,2)
+      	Mat.nflops += 10L * ftarg.length;
+      	var i = 0;
+      	while (i < ftarg.ncols) {
+      		var j = 0;
+      		while (j < ftarg.nrows) {
+      			val fun = GLM.linkArray(ilinks(j)).derivfn;
+      			fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+      			j += 1;
+      		}
+      		i += 1;
+      	}
+      	fout;
       }
       case (gpred:GMat, gtarg:GMat, gout:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
@@ -413,7 +436,39 @@ object GLM {
         gout
       }
     }
-   }
+  }
+   
+  def derivs(pred:Mat, targ:Mat, links:Mat, totflops:Long) = {
+    (pred, targ, links) match {
+      case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
+      	val fout = FMat.newOrCheckFMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        Mat.nflops += 10L * ftarg.length;
+      	var i = 0;
+      	while (i < ftarg.ncols) {
+      		var j = 0
+      				while (j < ftarg.nrows) {
+      					val fun = GLM.linkArray(ilinks(j)).derivfn;
+      					fout.data(j + i * fout.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+      					j += 1;
+      				}
+      		i += 1;
+      	}
+      	fout;
+      }
+      case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
+      	val gout = GMat.newOrCheckGMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        Mat.nflops += totflops * gpred.ncols
+        CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        gout
+      }
+      case (gpred:GDMat, gtarg:GDMat, gilinks:GIMat) => {
+        val gout = GDMat.newOrCheckGDMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        Mat.nflops += totflops * gpred.ncols
+        CUMACH.applydderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        gout
+      }
+    }
+  }
    
   def hashMult(a:GMat, b:GSMat, bound1:Int, bound2:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashMult".##);
