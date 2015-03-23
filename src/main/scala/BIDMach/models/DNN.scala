@@ -9,7 +9,7 @@ import BIDMach.mixins._
 import BIDMach._
 
 /**
- * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 11 layer types:
+ * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 12 layer types:
  - InputLayer: just a placeholder for the first layer which is loaded with input data blocks. No learnable params. 
  - FCLayer: Fully-Connected Linear layer. Has a matrix of learnable params which is the input-output map. 
  - RectLayer: Rectifying one-to-one layer. No params.
@@ -22,14 +22,17 @@ import BIDMach._
  - Softmax: a softmax (normalized exponential) layer.
  - Tanh: Hyperbolic tangent non-linearity.
  - Sigmoid: Logistic function non-linearity.
+ - Cut: needed in each cycle of cyclic networks to allow caching to work. 
  *
  * The network topology is specified by opts.layers which is a sequence of "LayerSpec" objects. There is a LayerSpec
  * Class for each Layer class, which holds the params for defining that layer. Currently only four LayerSpec types need params:
- - FC: holds the output dimensions of the FClayer (input dimension set by previous layer). 
- - GLM: holds the links matrix (integer specs for loss types, see GLM), for the output of that layer. Its size should match the number of targets.
- - Norm: holds a target per-element norm, and a weight for this term in the derivative calculation.
- - Dopout: holds the fraction of neurons to retain.
+ - FC: "outside" holds the output dimensions of the FClayer (input dimension set by previous layer). 
+ - GLM: "links" holds the links matrix (integer specs for loss types, see GLM), for the output of that layer. Its size should match the number of targets.
+ - Norm: "targetNorm" holds a target per-element norm, and "weight" is the weight for this term in the derivative calculation.
+ - Dropout: "frac" holds the fraction of neurons to retain.
  *
+ * Each LayerSpec instance has up to two inputs which are other LayerSpec instances (or null). This graph structure can be cyclic. 
+ * When the model is created, the Layer structure mimics the LayerSpec structure. 
  */
 
 class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
@@ -86,8 +89,13 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     		case sls:DNN.Sigmoid => {
     			layers(i) = new SigmoidLayer;
     		}
+    		case cls:DNN.Cut => {
+    			layers(i) = new CutLayer;
+    		}
     		}
     		opts.layers(i).myLayer = layers(i);
+    	}
+    	for (i <- 0 until opts.layers.length) {
     		if (opts.layers(i).input.asInstanceOf[AnyRef] != null) layers(i).input = opts.layers(i).input.myLayer.asInstanceOf[DNN.this.Layer];
     		if (opts.layers(i).input2.asInstanceOf[AnyRef] != null) layers(i).input2 = opts.layers(i).input2.myLayer.asInstanceOf[DNN.this.Layer];
     	}
@@ -335,6 +343,25 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       }
     }
   }
+  
+  /**
+   * Cut layer. Need to insert these in cyclic networks so that caching works. 
+   */
+  
+  class CutLayer extends Layer {
+    
+    override def forward = {
+      if (data.asInstanceOf[AnyRef] == null) {
+        data = input.data.zeros(input.data.nrows, input.data.ncols);
+        input.deriv = input.data.zeros(input.data.nrows, input.data.ncols);
+      }
+      data <-- input.data;
+    }
+    
+    override def backward = {
+      input.deriv <-- deriv;      
+    }
+  }
 }
 
 object DNN  {
@@ -375,6 +402,8 @@ object DNN  {
   class Tanh(input:LayerSpec) extends LayerSpec(input, null) {}
   
   class Sigmoid(input:LayerSpec) extends LayerSpec(input, null) {}
+  
+  class Cut(input:LayerSpec) extends LayerSpec(input, null) {}
   
   /**
    * Build a stack of layer specs. layer(0) is an input layer, layer(n-1) is a GLM layer. 
