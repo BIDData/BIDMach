@@ -192,6 +192,27 @@ object KMeans  {
   	    opts)
     (nn, opts)
   }
+  
+  class KSFopts extends ParLearner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts
+  
+  def learnPar(fnames:String, d:Int):(ParLearnerF, KSFopts) = learnPar(List(FilesDS.simpleEnum(fnames,1,0)), d)
+  
+  def learnPar(fnames:List[(Int)=>String], d:Int):(ParLearnerF, KSFopts) = {
+    val opts = new KSFopts
+    opts.dim = d
+    opts.npasses = 10
+    opts.coolit = 0 // Assume we dont need cooling on a matrix input
+    opts.fnames = fnames
+    opts.batchSize = 20000;
+    implicit val threads = threadPool(4)
+  	val nn = new ParLearnerF(
+  	    new FilesDS(opts), 
+  	    opts, mkKMeansModel _, 
+  	    null, null, 
+  	    opts, mkUpdater _,
+  	    opts)
+    (nn, opts)
+  }
 
 }
 
