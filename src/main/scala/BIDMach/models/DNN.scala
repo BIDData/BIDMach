@@ -504,13 +504,13 @@ object DNN  {
   	val nn = new Learner(
   	    new MatDS(Array(mat0, targ), opts), 
   	    new DNN(opts), 
-  	    null,
+  	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts
+  class FDSopts extends Learner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
   		                                                                  FilesDS.simpleEnum(fn2,1,0)));
@@ -526,7 +526,7 @@ object DNN  {
   	val nn = new Learner(
   			ds, 
   	    new DNN(opts), 
-  	    null,
+  	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
     (nn, opts)
