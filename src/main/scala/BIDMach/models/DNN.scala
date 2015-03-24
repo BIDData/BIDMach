@@ -509,15 +509,18 @@ object DNN  {
   	    opts)
     (nn, opts)
   }
+  
+  class FDSopts extends Learner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts
+  
+  def learner(fnames:List[String]):(Learner, FDSopts) = learner(fnames.map((x:String) => FilesDS.simpleEnum(x,1,0)));
 
-  def learner(fnames:List[(Int)=>String]) = {
-    class xopts extends Learner.Options with DNN.Opts with SFilesDS.Opts with ADAGrad.Opts
-    val opts = new xopts
+  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+    val opts = new FDSopts
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new SFilesDS(opts)
+    val ds = new FilesDS(opts)
 //    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
