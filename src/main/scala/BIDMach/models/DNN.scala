@@ -495,10 +495,10 @@ object DNN  {
     
   class LearnOptions extends Learner.Options with DNN.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
-  def learner(mat0:Mat, targ:Mat, d:Int) = {
+  def learner(mat0:Mat, targ:Mat) = {
     val opts = new LearnOptions
     if (opts.links == null) opts.links = izeros(1,targ.nrows)
-    opts.links.set(d)
+    opts.links.set(1)
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
@@ -510,10 +510,9 @@ object DNN  {
     (nn, opts)
   }
 
-  def learner(fnames:List[(Int)=>String], d:Int) = {
+  def learner(fnames:List[(Int)=>String]) = {
     class xopts extends Learner.Options with DNN.Opts with SFilesDS.Opts with ADAGrad.Opts
     val opts = new xopts
-    opts.dim = d
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
@@ -529,7 +528,7 @@ object DNN  {
     (nn, opts)
   } 
     // This function constructs a learner and a predictor. 
-  def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
+  def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat):(Learner, LearnOptions, Learner, LearnOptions) = {
     val mopts = new LearnOptions;
     val nopts = new LearnOptions;
     mopts.lrate = 1f
@@ -537,7 +536,6 @@ object DNN  {
     mopts.autoReset = false
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     nopts.links = mopts.links
-    mopts.links.set(d)
     nopts.batchSize = mopts.batchSize
     nopts.putBack = 1
     dlayers(3, 0, 1f, targ.nrows, mopts)                   // default to a 3-layer network
