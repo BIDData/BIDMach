@@ -187,47 +187,7 @@ object NMF  {
   			opts)
     (nn, opts)
   }
-  
-  def learnFParx(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-		d:Int = 256
-		) = {
-  	class xopts extends ParLearner.Options with NMF.Opts with SFilesDS.Opts with IncNorm.Opts
-  	val opts = new xopts
-  	opts.dim = d
-  	opts.npasses = 4
-  	opts.resFile = "/big/twitter/test/results.mat"
-  	val nn = new ParLearnerxF(
-  	    null, 
-  			(dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
-  			opts, mkNMFmodel _, 
-  			null, null, 
-  	    opts, mkUpdater _,
-  	    opts
-  	)
-  	(nn, opts)
-  }
-  
-  def learnFPar(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-		d:Int = 256
-		) = {	
-  	class xopts extends ParLearner.Options with NMF.Opts with SFilesDS.Opts with IncNorm.Opts
-  	val opts = new xopts
-  	opts.dim = d
-  	opts.npasses = 4
-  	opts.resFile = "/big/twitter/test/results.mat"
-  	val nn = new ParLearnerF(
-  	    Experiments.Twitter.twitterWords(nstart, nend), 
-  	    opts, mkNMFmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    opts
-  	)
-  	(nn, opts)
-  }
+ 
 } 
 
 

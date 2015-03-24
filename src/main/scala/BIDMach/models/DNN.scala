@@ -39,67 +39,69 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   var layers:Array[Layer] = null
 
   override def init() = {
-    if (refresh) {
-    	mats = datasource.next;
-    	var nfeats = mats(0).nrows;
-    	datasource.reset;
-    	layers = new Array[Layer](opts.layers.length);
-    	var imodel = 0;
-    	val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false});
-    	setmodelmats(Array[Mat](nmodelmats));
-    	updatemats = new Array[Mat](nmodelmats);
+	  mats = datasource.next;
+	  var nfeats = mats(0).nrows;
+	  datasource.reset;
+	  layers = new Array[Layer](opts.layers.length);
+	  var imodel = 0;
+	  if (refresh) {
+	  	val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false});
+	    setmodelmats(new Array[Mat](nmodelmats));
+	  }
+	  for (i <- 0 until opts.layers.length) {
+	  	opts.layers(i) match {
 
-    	for (i <- 0 until opts.layers.length) {
-    		opts.layers(i) match {
-    		  
-    		case fcs:DNN.FC => {
-    			layers(i) = new FCLayer(imodel);
-    			modelmats(imodel) = if (useGPU) gnormrnd(0, 1, fcs.outsize, nfeats) else normrnd(0, 1, fcs.outsize, nfeats);
-    			updatemats(imodel) = modelmats(imodel).zeros(fcs.outsize, nfeats);
-    			nfeats = fcs.outsize;
-    			imodel += 1;
-    		}
-    		case rls:DNN.ReLU => {
-    			layers(i) = new ReLULayer;
-    		}
-    		case ils:DNN.Input => {
-    			layers(i) = new InputLayer;
-    		}
-    		case ols:DNN.GLM => {
-    			layers(i) = new GLMLayer(ols.links);
-    		}
-    		case nls:DNN.Norm => {
-    			layers(i) = new NormLayer(nls.targetNorm, nls.weight);
-    		}
-    		case dls:DNN.Dropout => {
-    			layers(i) = new DropoutLayer(dls.frac);
-    		}
-    		case als:DNN.Add => {
-    			layers(i) = new AddLayer;
-    		}
-    		case mls:DNN.Mul => {
-    			layers(i) = new MulLayer;
-    		}
-    		case mls:DNN.Softmax => {
-    			layers(i) = new SoftmaxLayer;
-    		}
-    		case tls:DNN.Tanh => {
-    			layers(i) = new TanhLayer;
-    		}
-    		case sls:DNN.Sigmoid => {
-    			layers(i) = new SigmoidLayer;
-    		}
-    		case cls:DNN.Cut => {
-    			layers(i) = new CutLayer;
-    		}
-    		}
-    		opts.layers(i).myLayer = layers(i);
-    	}
-    	for (i <- 0 until opts.layers.length) {
-    		if (opts.layers(i).input.asInstanceOf[AnyRef] != null) layers(i).input = opts.layers(i).input.myLayer.asInstanceOf[DNN.this.Layer];
-    		if (opts.layers(i).input2.asInstanceOf[AnyRef] != null) layers(i).input2 = opts.layers(i).input2.myLayer.asInstanceOf[DNN.this.Layer];
-    	}
-    }
+	  	case fcs:DNN.FC => {
+	  		layers(i) = new FCLayer(imodel);
+	  		if (refresh) modelmats(imodel) = normrnd(0, 1, fcs.outsize, nfeats);
+	  		nfeats = fcs.outsize;
+	  		imodel += 1;
+	  	}
+	  	case rls:DNN.ReLU => {
+	  		layers(i) = new ReLULayer;
+	  	}
+	  	case ils:DNN.Input => {
+	  		layers(i) = new InputLayer;
+	  	}
+	  	case ols:DNN.GLM => {
+	  		layers(i) = new GLMLayer(ols.links);
+	  	}
+	  	case nls:DNN.Norm => {
+	  		layers(i) = new NormLayer(nls.targetNorm, nls.weight);
+	  	}
+	  	case dls:DNN.Dropout => {
+	  		layers(i) = new DropoutLayer(dls.frac);
+	  	}
+	  	case als:DNN.Add => {
+	  		layers(i) = new AddLayer;
+	  	}
+	  	case mls:DNN.Mul => {
+	  		layers(i) = new MulLayer;
+	  	}
+	  	case mls:DNN.Softmax => {
+	  		layers(i) = new SoftmaxLayer;
+	  	}
+	  	case tls:DNN.Tanh => {
+	  		layers(i) = new TanhLayer;
+	  	}
+	  	case sls:DNN.Sigmoid => {
+	  		layers(i) = new SigmoidLayer;
+	  	}
+	  	case cls:DNN.Cut => {
+	  		layers(i) = new CutLayer;
+	  	}
+	  	}
+	  	opts.layers(i).myLayer = layers(i);
+	  }
+	  updatemats = new Array[Mat](modelmats.length);
+	  for (i <- 0 until modelmats.length) {
+	    modelmats(i) = convertMat(modelmats(i));
+	    updatemats(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
+	  } 		
+	  for (i <- 0 until opts.layers.length) {
+	  	if (opts.layers(i).input.asInstanceOf[AnyRef] != null) layers(i).input = opts.layers(i).input.myLayer.asInstanceOf[DNN.this.Layer];
+	  	if (opts.layers(i).input2.asInstanceOf[AnyRef] != null) layers(i).input2 = opts.layers(i).input2.myLayer.asInstanceOf[DNN.this.Layer];
+	  }
   }
   
   
@@ -120,7 +122,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
     layers(0).data = gmats(0);
     val targ = gmats(1);
-    layers(layers.length-1).data = targ;
+    layers(layers.length-1).target = targ;
     var i = 1;
     while (i < layers.length) {
       layers(i).forward;
@@ -221,7 +223,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     
     override def backward = {
     	if (sconst.asInstanceOf[AnyRef] == null) sconst = data.zeros(1,1);
-      sconst.set((targetNorm - norm(data)/data.length).toFloat * weight);
+      sconst.set(math.min(0.1f, math.max(-0.1f, (targetNorm - norm(data)/data.length).toFloat * weight)));
       input.deriv = data ∘ sconst;
       input.deriv ~ input.deriv + deriv;
     }
@@ -464,7 +466,7 @@ object DNN  {
    */
   
   def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts):Array[LayerSpec] = {
-    val depth = (depth0/4)*4 - 1;              // Round up to a multiple of 4 - 1
+    val depth = ((depth0+1)/4)*4 - 1;              // Round up to a multiple of 4 - 1
     val layers = new Array[LayerSpec](depth);
     var w = width;
     layers(0) = new Input;
@@ -490,10 +492,11 @@ object DNN  {
     opts.layers = layers
     layers
   }
+    
+  class LearnOptions extends Learner.Options with DNN.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, targ:Mat, d:Int) = {
-    class xopts extends Learner.Options with DNN.Opts with MatDS.Opts with ADAGrad.Opts
-    val opts = new xopts
+    val opts = new LearnOptions
     if (opts.links == null) opts.links = izeros(1,targ.nrows)
     opts.links.set(d)
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
@@ -525,9 +528,6 @@ object DNN  {
   	    opts)
     (nn, opts)
   } 
-  
-  class LearnOptions extends Learner.Options with DNN.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
-    
     // This function constructs a learner and a predictor. 
   def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
     val mopts = new LearnOptions;
@@ -555,7 +555,28 @@ object DNN  {
         nopts)
     (mm, mopts, nn, nopts)
   }
-
+  
+  def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
+    val model = model0.asInstanceOf[DNN];
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    opts.links = model.opts.links;
+    opts.layers = model.opts.layers;
+    opts.addConstFeat = model.opts.asInstanceOf[DataSource.Opts].addConstFeat;
+    opts.putBack = 1;
+    opts.dropout = 1f;
+    
+    val newmod = new DNN(opts);
+    newmod.refresh = false;
+    newmod.copyFrom(model)
+    val nn = new Learner(
+        new MatDS(Array(mat0, preds), opts), 
+        newmod, 
+        null,
+        null, 
+        opts);
+    (nn, opts)
+  }
 }
 
 

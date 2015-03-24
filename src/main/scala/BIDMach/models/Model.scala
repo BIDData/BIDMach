@@ -67,8 +67,9 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   }
   
   def copyFrom(mod:Model) = {
+    setmodelmats(new Array[Mat](mod.modelmats.length));
     for (i <- 0 until modelmats.length) {
-      modelmats(i) <-- mod.modelmats(i)
+      modelmats(i) = mod.modelmats(i);
     }
   }
   

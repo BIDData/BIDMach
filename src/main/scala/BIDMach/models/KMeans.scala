@@ -201,7 +201,6 @@ object KMeans  {
     val opts = new KSFopts
     opts.dim = d
     opts.npasses = 10
-    opts.coolit = 0 // Assume we dont need cooling on a matrix input
     opts.fnames = fnames
     opts.batchSize = 20000;
     implicit val threads = threadPool(4)

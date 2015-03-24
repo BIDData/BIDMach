@@ -106,20 +106,21 @@ __global__ void __hashmult(int nrows, int nfeats, int ncols, int bound1, int bou
       int r1 = Bir[jstart + j1];                             // And their row indices
       int r2 = Bir[jstart + j2];
       int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
+      long long rank = r1 + 1;
       float prod = f1;
-      if (j1 != j2) {
-        prod *= f2;
-        doit = (r1 < bound1);
+      if (j1 == j2) {
+        doit = (rank < bound1);
       } else {
-        long long bigind = ((long long)r1) * r2;
-        doit = (bigind < bound2);
+        prod *= f2;
+	rank *= r2 + 1;
+        doit = (rank < bound2);
       }
       if (doit) {
         if (transpose > 0) {
-          float sum = A[threadIdx.x + nrows * i] * f1 * f2;    // Do the product
+          float sum = A[threadIdx.x + nrows * i] * prod;    // Do the product
           atomicAdd(&C[threadIdx.x + nrows * ind], sum);
         } else {
-          float sum = A[threadIdx.x + nrows * ind] * f1 * f2;  // Do the product
+          float sum = A[threadIdx.x + nrows * ind] * prod;  // Do the product
           atomicAdd(&C[threadIdx.x + nrows * i], sum);
         }
       }

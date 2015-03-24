@@ -218,34 +218,12 @@ object LDA  {
     (nn, opts)
   }
   
-  /** Parallel online LDA algorithm with multiple file datasources. */ 
-  def learnFParx(
-      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
-      d:Int = 256
-      ) = {
-  	class xopts extends ParLearner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
-  	val opts = new xopts
-  	opts.dim = d
-  	opts.npasses = 4
-  	opts.resFile = "/big/twitter/test/results.mat"
-  	val nn = new ParLearnerxF(
-  	    null, 
-  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
-  	    opts, mkLDAmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    opts
-  	)
-  	(nn, opts) 
-  }
-  
   class SFDSopts extends ParLearner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
   
-  def learnFPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnFPar(List(FilesDS.simpleEnum(fnames, 0, 1)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FilesDS.simpleEnum(fnames, 0, 1)), d);
   
   /** Parallel online LDA algorithm with one file datasource. */
-  def learnFPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {
+  def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {
   	val opts = new SFDSopts;
   	opts.dim = d;
   	opts.npasses = 4;
