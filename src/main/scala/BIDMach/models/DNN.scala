@@ -512,7 +512,8 @@ object DNN  {
   
   class FDSopts extends Learner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts
   
-  def learner(fnames:List[String]):(Learner, FDSopts) = learner(fnames.map((x:String) => FilesDS.simpleEnum(x,1,0)));
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
+  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
 
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
