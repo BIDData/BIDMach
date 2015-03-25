@@ -166,6 +166,9 @@ object GLM {
     var links:IMat = null;
     var iweight:FMat = null;
     var lim = 0f;
+    var hashFeatures = 0;
+    var hashBound1:Int = 1000000;
+    var hashBound2:Int = 1000000;
   }
   
   val linear = 0;
