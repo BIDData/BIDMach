@@ -656,6 +656,15 @@ object GLM {
     val newmod = new GLM(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);
+    val mopts = model.opts.asInstanceOf[GLM.Opts];
+    nopts.targmap = mopts.targmap;
+    nopts.links = mopts.links;
+    nopts.targets = mopts.targets;
+    nopts.iweight = mopts.iweight;
+    nopts.lim = mopts.lim;
+    nopts.hashFeatures = mopts.hashFeatures;
+    nopts.hashBound1 = mopts.hashBound1;
+    nopts.hashBound2 = mopts.hashBound2;   
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
         newmod, 
