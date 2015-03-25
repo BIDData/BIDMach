@@ -492,6 +492,18 @@ object DNN  {
     opts.layers = layers
     layers
   }
+  
+  def mkDNNModel(fopts:Model.Opts) = {
+    new DNN(fopts.asInstanceOf[DNN.Opts])
+  }
+  
+  def mkUpdater(nopts:Updater.Opts) = {
+    new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
+  } 
+  
+  def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
+  }
     
   class LearnOptions extends Learner.Options with DNN.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
@@ -577,6 +589,25 @@ object DNN  {
         null,
         null, 
         opts);
+    (nn, opts)
+  }
+  
+  class LearnParOptions extends ParLearner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  
+  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)))}
+  
+  def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
+    val opts = new LearnParOptions;
+    opts.batchSize = 10000;
+    opts.lrate = 1f;
+    opts.fnames = fnames;
+    implicit val threads = threadPool(4)
+    val nn = new ParLearnerF(
+        new FilesDS(opts), 
+        opts, mkDNNModel _,
+        opts, mkRegularizer _,
+        opts, mkUpdater _, 
+        opts)
     (nn, opts)
   }
 }
