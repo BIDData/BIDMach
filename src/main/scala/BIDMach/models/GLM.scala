@@ -647,15 +647,14 @@ object GLM {
   }
   
   // This function constructs a predictor from an existing model 
-  def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
+  def predictor(model0:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
+    val model = model0.asInstanceOf[GLM]
     val nopts = new LearnOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
-    nopts.links.set(d)
     nopts.putBack = 1
     val newmod = new GLM(nopts);
     newmod.refresh = false
-    model.copyTo(newmod)
+    newmod.copyFrom(model);
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
         newmod, 
