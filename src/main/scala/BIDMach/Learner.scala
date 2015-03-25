@@ -174,7 +174,11 @@ case class Learner(
     }
     val gf = gflop
     Mat.useCache = cacheState
-    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
+    if (opts.autoReset) {
+      Learner.toCPU(modelmats)
+      resetGPUs
+    }
     datasource.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
