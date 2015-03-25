@@ -166,9 +166,6 @@ object GLM {
     var links:IMat = null;
     var iweight:FMat = null;
     var lim = 0f;
-    var hashFeatures = 0;
-    var hashBound1 = 0;
-    var hashBound2 = 0;
   }
   
   val linear = 0;
@@ -482,6 +479,7 @@ object GLM {
   	  case (ga:GMat, gb:GSMat) => hashMult(ga, gb, bound1, bound2)
   	}
   }
+
   
   def hashMultT(a:GMat, b:GSMat, nfeats:Int, bound1:Int, bound2:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, nfeats, null, a.GUID, b.GUID, nfeats, "hashMultT".##);
@@ -495,7 +493,7 @@ object GLM {
   	  case (ga:GMat, gb:GSMat) => hashMultT(ga, gb, nfeats, bound1, bound2)
   	}
   }
-  
+
   def hashCross(a:GMat, b:GSMat, c:GSMat):GMat = {
     val d = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashCross".##);
     d.clear;

@@ -28,7 +28,7 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   def init() = {
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
-    val m = size(data0, 1)
+    val m = if (opts.hashFeatures > 0) opts.hashFeatures else data0.nrows;
     val targetData = mats.length > 1
     val d = if (opts.targmap.asInstanceOf[AnyRef] != null) {
       opts.targmap.nrows 
@@ -84,6 +84,9 @@ object RegressionModel {
     var targets:FMat = null
     var targmap:FMat = null
     var rmask:FMat = null
+    var hashFeatures = 0;
+    var hashBound1:Int = 1000000;
+    var hashBound2:Int = 1000000;
   }
   
   class Options extends Opts {}
