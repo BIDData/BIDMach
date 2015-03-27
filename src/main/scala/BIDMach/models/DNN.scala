@@ -36,12 +36,16 @@ import BIDMach._
  */
 
 class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
-  var layers:Array[Layer] = null
+  var layers:Array[Layer] = null;
+  var targmap:Mat = null;
+  var mask:Mat = null;
 
   override def init() = {
 	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
 	  datasource.reset;
+	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
+	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  layers = new Array[Layer](opts.layers.length);
 	  var imodel = 0;
 	  if (refresh) {
@@ -106,8 +110,15 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   
   def doblock(gmats:Array[Mat], ipass:Int, i:Long):Unit = {
-    layers(0).data = gmats(0);
-    layers(layers.length-1).target = gmats(1);
+  	layers(0).data = gmats(0);
+    if (targmap.asInstanceOf[AnyRef] != null) {
+    	layers(layers.length-1).target = targmap * gmats(0);
+    } else {
+    	layers(layers.length-1).target = gmats(1);
+    }
+    if (mask.asInstanceOf[AnyRef] != null) {
+    	modelmats(0) ~ modelmats(0) ∘ mask;
+    }
     var i = 1
     while (i < layers.length) {
       layers(i).forward;
@@ -117,12 +128,22 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       i -= 1;
       layers(i).backward;
     }
+    if (mask.asInstanceOf[AnyRef] != null) {
+    	updatemats(0) ~ updatemats(0) ∘ mask;
+    }
   }
   
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
     layers(0).data = gmats(0);
-    val targ = gmats(1);
+    val targ = if (targmap.asInstanceOf[AnyRef] != null) {
+    	targmap * gmats(0);
+    } else {
+    	gmats(1);
+    }
     layers(layers.length-1).target = targ;
+    if (mask.asInstanceOf[AnyRef] != null) {
+    	modelmats(0) ~ modelmats(0) ∘ mask;
+    }
     var i = 1;
     while (i < layers.length) {
       layers(i).forward;
@@ -373,6 +394,8 @@ object DNN  {
     var nweight:Float = 0.1f;
     var dropout:Float = 0.5f;
     var targetNorm:Float = 1f;
+    var targmap:Mat = null;
+    var dmask:Mat = null;
   }
   
   class Options extends Opts {}
