@@ -135,7 +135,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
     layers(0).data = gmats(0);
-    val targ = if (targmap.asInstanceOf[AnyRef] != null) {
+    val targ = if (targmap.asInstanceOf[AnyRef] != null && putBack < 0) {
     	targmap * gmats(0);
     } else {
     	gmats(1);
