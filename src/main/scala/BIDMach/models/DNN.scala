@@ -56,8 +56,8 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  	opts.layers(i) match {
 
 	  	case fcs:DNN.FC => {
-	  		layers(i) = new FCLayer(imodel);
-	  		if (refresh) modelmats(imodel) = normrnd(0, 1, fcs.outsize, nfeats);
+	  		layers(i) = new FCLayer(imodel, fcs.constFeat);
+	  		if (refresh) modelmats(imodel) = normrnd(0, 1, fcs.outsize, nfeats + (if (fcs.constFeat) 1 else 0));
 	  		nfeats = fcs.outsize;
 	  		imodel += 1;
 	  	}
@@ -169,14 +169,33 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
    * Includes a model matrix that contains the linear map. 
    */
   
-  class FCLayer(val imodel:Int) extends Layer {
+  class FCLayer(val imodel:Int, val constFeat:Boolean) extends Layer {
+    var constRow:Mat = null;
     override def forward = {
-      data = modelmats(imodel) * input.data;
+      val inmat = if (constFeat) {
+        if (constRow.asInstanceOf[AnyRef] == null) constRow = input.data.ones(1, input.data.ncols);
+        constRow on input.data;
+      } else {
+      	input.data;
+      }
+      data = modelmats(imodel) * inmat;
     }
     
     override def backward = {
-      if (imodel > 0) input.deriv = modelmats(imodel) ^* deriv;
-      updatemats(imodel) = deriv *^ input.data;
+      if (imodel > 0) {
+      	val mm = if (constFeat) {
+      		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
+      	} else {
+      		modelmats(imodel);
+      	}
+      	input.deriv = mm ^* deriv;
+      }
+      val inmat = if (constFeat) {
+        constRow on input.data;
+      } else {
+      	input.data;
+      }
+      updatemats(imodel) = deriv *^ inmat;
     }
   }
   
@@ -396,6 +415,7 @@ object DNN  {
     var targetNorm:Float = 1f;
     var targmap:Mat = null;
     var dmask:Mat = null;
+    var constFeat:Boolean = false;
   }
   
   class Options extends Opts {}
@@ -406,7 +426,7 @@ object DNN  {
   
   class ModelLayerSpec(input:LayerSpec) extends LayerSpec(input, null){}
   
-  class FC(input:LayerSpec, val outsize:Int) extends ModelLayerSpec(input) {}
+  class FC(input:LayerSpec, val outsize:Int, val constFeat:Boolean) extends ModelLayerSpec(input) {}
   
   class ReLU(input:LayerSpec) extends LayerSpec(input, null) {}
   
@@ -443,13 +463,13 @@ object DNN  {
     layers(0) = new Input;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new FC(layers(i-1), w);
+    		layers(i) = new FC(layers(i-1), w, opts.constFeat);
     		w = (taper*w).toInt;
     	} else {
     		layers(i) = new ReLU(layers(i-1));
     	}
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -468,7 +488,7 @@ object DNN  {
     layers(0) = new Input;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new FC(layers(i-1), w);
+    		layers(i) = new FC(layers(i-1), w, opts.constFeat);
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     		layers(i) = new ReLU(layers(i-1));
@@ -476,7 +496,7 @@ object DNN  {
     	  layers(i) = new Norm(layers(i-1), opts.targetNorm, opts.nweight);
     	}
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -496,7 +516,7 @@ object DNN  {
     for (i <- 1 until depth - 2) {
       (i % 4) match {
         case 1 => {
-        	layers(i) = new FC(layers(i-1), w);
+        	layers(i) = new FC(layers(i-1), w, opts.constFeat);
         	w = (taper*w).toInt;
         }
         case 2 => {
@@ -510,7 +530,7 @@ object DNN  {
         }
       }
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
