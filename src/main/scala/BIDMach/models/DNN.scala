@@ -170,15 +170,15 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
    */
   
   class FCLayer(val imodel:Int, val constFeat:Boolean) extends Layer {
-    var constRow:Mat = null;
+
     override def forward = {
-      val inmat = if (constFeat) {
-        if (constRow.asInstanceOf[AnyRef] == null) constRow = input.data.ones(1, input.data.ncols);
-        constRow on input.data;
-      } else {
-      	input.data;
-      }
-      data = modelmats(imodel) * inmat;
+    	val mm = if (constFeat) {
+    		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
+    	} else {
+    		modelmats(imodel);
+    	}
+    	data = mm * input.data;
+    	if (constFeat) data ~ data + modelmats(imodel).colslice(0, 1);
     }
     
     override def backward = {
@@ -190,12 +190,8 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       	}
       	input.deriv = mm ^* deriv;
       }
-      val inmat = if (constFeat) {
-        constRow on input.data;
-      } else {
-      	input.data;
-      }
-      updatemats(imodel) = deriv *^ inmat;
+      val dprod = deriv *^ input.data;
+      updatemats(imodel) = if (constFeat) (sum(deriv,2) \ dprod) else dprod;
     }
   }
   
