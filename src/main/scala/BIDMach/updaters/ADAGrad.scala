@@ -139,7 +139,7 @@ object ADAGrad {
   
   
   def multUpdateHelperT(a:FMat, b:SMat, mm:FMat, ssq:FMat, mask:FMat, lrate:FMat, vexp:FMat, texp:FMat, 
-      istep:Float, addgrad:Boolean, epsilon:Float, ithread:Int, numThreads:Int) = {
+      istep:Float, addgrad:Int, epsilon:Float, ithread:Int, numThreads:Int) = {
   	val nr = a.nrows;
   	val lrdim = lrate.length;
   	val vedim = vexp.length;
@@ -157,7 +157,7 @@ object ADAGrad {
     		while (k < iend) {
     			val grad = a.data(k+i*nr)*dval;
     			ssq.data(k+ival*nr) += grad*grad + epsilon;
-    			if (addgrad) {
+    			if (addgrad > 0) {
     				val lr = if (lrdim > 1) lrate.data(k) else lrate.data(0);
     				val ve = if (vedim > 1) vexp.data(k) else vexp.data(0);
     				val te = if (tedim > 1) texp.data(k) else texp.data(0);
@@ -194,7 +194,7 @@ object ADAGrad {
    */
   def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int) = {
     val istep = 1f/step;
-    val addgrad = (step > waitsteps - 0.5f);
+    val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
     val nc = b.ncols;
     (a, b, mm, sumSq, lrate, texp, vexp) match {
