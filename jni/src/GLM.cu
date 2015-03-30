@@ -324,13 +324,58 @@ __global__ void __multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bd
   }
 }
 
+__global__ void __multADAGradx(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, float *MM, 
+                              float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                              float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
+  float aval, lr, ve, te, pve, ste, grad, ngrad;
+  int i, ihere;
+  int bid = threadIdx.y + blockDim.y * blockIdx.x;
+  int nb = blockDim.y * gridDim.x;
+  int jstart = ((long long)bid) * nnz / nb;
+  int jend = ((long long)(bid + 1)) * nnz / nb;
+  i = threadIdx.x;
+  aval = 0;
+  for (int j = jstart; j < jend ; j++) {
+    if (j == jstart || Bic[j-1] != Bic[j]) {
+      aval = A[i + nrows * Bic[j]];
+    }
+    grad = aval * Bdata[j];
+    ihere = i + nrows * Bir[j];
+    Sumsq[ihere] += grad * grad + epsilon;
+    if (addgrad) {
+      lr =  (lrlen > 1) ? lrate[i] : lrate[0];
+      ve =  (vexplen > 1) ? vexp[i] : vexp[0];
+      te =  (texplen > 1) ? texp[i] : texp[0];
+      pve = (ve == 0) ? 1.0f : pow(Sumsq[ihere] * istep, ve);
+      ste = pow(istep, te);
+      ngrad = grad * lr * ste / pve;
+      atomicAdd(&MM[ihere], ngrad);
+    }
+    if (Mask != NULL) {
+      if (maskrows > 1) {
+        if (Mask[ihere] == 0) MM[ihere] = 0;
+      } else {
+        if (Mask[Bir[j]] == 0) MM[ihere] = 0;
+      }
+    }
+  }
+}
+
 int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, float *MM, 
                 float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                 float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
-  int nthreads = min(1024, 32*(1+(nrows-1)/32));
-  int nblocks = min(128, ncols);
-  __multADAGrad<<<nblocks,nthreads>>>(nrows, ncols, nnz, A, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
-                                      vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+  if (nrows < 128) {
+    int nt = max(1, min(ncols/2, 256/nrows));
+    dim3 threadDim(nrows, nt, 1);
+    int nblocks = min(256, max(1, 1 + (ncols-1)/nt));
+    __multADAGradx<<<nblocks,threadDim>>>(nrows, ncols, nnz, A, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
+                                         vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+  } else {
+    int nthreads = min(1024, 32*(1+(nrows-1)/32));
+    int nblocks = min(128, ncols);
+    __multADAGrad<<<nblocks,nthreads>>>(nrows, ncols, nnz, A, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
+                                        vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+  }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;

@@ -111,7 +111,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     ulim = convertMat(opts.lim)
     llim = - ulim;
     hashFeatures = opts.hashFeatures;
-    if (opts.ADAGradUpdate) initADAGrad(d, m);
+    if (opts.GLM_ADAGrad) initADAGrad(d, m);
   }
   
   def initADAGrad(d:Int, m:Int) = {
@@ -146,7 +146,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     GLM.preds(eta, eta, mylinks, totflops);
     GLM.derivs(eta, targs, eta, mylinks, totflops);
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights;
-    if (opts.ADAGradUpdate) {
+    if (opts.GLM_ADAGrad) {
       if (firststep <= 0) firststep = pos.toFloat;
       val istep = (pos + firststep)/firststep;
     	ADAGrad.multUpdate(eta, in, modelmats(0), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
@@ -196,7 +196,7 @@ object GLM {
     var hashFeatures = 0;
     var hashBound1:Int = 1000000;
     var hashBound2:Int = 1000000;
-    var ADAGradUpdate:Boolean = false;
+    var GLM_ADAGrad:Boolean = false;
   }
   
   val linear = 0;
