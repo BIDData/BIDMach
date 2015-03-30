@@ -121,7 +121,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     }
   }
     
-  def mupdate(in:Mat) = {
+  def mupdate(in:Mat, ipass:Int, pos:Long) = {
     val targs = targets * in
     min(targs, 1f, targs)
     val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
@@ -129,7 +129,7 @@ class FM(opts:FM.Opts) extends RegressionModel(opts) {
     mupdate3(in, alltargs, dweights)
   }
   
-  def mupdate2(in:Mat, targ:Mat) = mupdate3(in, targ, null);
+  def mupdate2(in:Mat, targ:Mat, ipass:Int, pos:Long) = mupdate3(in, targ, null);
   
   // Update the positive/negative factorizations
   def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {

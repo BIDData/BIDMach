@@ -61,7 +61,7 @@ object Grad {
   trait Opts extends Updater.Opts {
     var lrate:FMat = 1f
     var texp:FMat = 0.5f
-    var waitsteps = 2
+    var waitsteps = 3
     var mask:FMat = null
   }
   

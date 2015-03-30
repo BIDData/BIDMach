@@ -51,12 +51,20 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   val linkArray = GLM.linkArray
   
-  var mylinks:Mat = null
-  var iweight:Mat = null
-  var ulim:Mat = null
-  var llim:Mat = null
-  var totflops = 0L
-  var hashFeatures = 0
+  var mylinks:Mat = null;
+  var iweight:Mat = null;
+  var ulim:Mat = null;
+  var llim:Mat = null;
+  var totflops = 0L;
+  var hashFeatures = 0;
+  // For integrated ADAGrad updater
+  var vexp:Mat = null;
+  var texp:Mat = null;
+  var lrate:Mat = null;
+  var sumsq:Mat = null;
+  var firststep = -1f;
+  var waitsteps = 0;
+  var epsilon = 0f;
   
   override def copyTo(mod:Model) = {
     super.copyTo(mod);
@@ -103,18 +111,31 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     ulim = convertMat(opts.lim)
     llim = - ulim;
     hashFeatures = opts.hashFeatures;
+    if (opts.ADAGradUpdate) initADAGrad(d, m);
+  }
+  
+  def initADAGrad(d:Int, m:Int) = {
+    val aopts = opts.asInstanceOf[ADAGrad.Opts];
+    firststep = -1f;
+    lrate = convertMat(aopts.lrate);
+    texp = convertMat(aopts.texp);
+    vexp = convertMat(aopts.vexp);
+    sumsq = convertMat(zeros(d, m));
+    sumsq.set(aopts.initsumsq);
+    waitsteps = aopts.waitsteps;
+    epsilon = aopts.epsilon;
   }
     
-  def mupdate(in:Mat) = {
+  def mupdate(in:Mat, ipass:Int, pos:Long) = {
     val targs = targets * in
     min(targs, 1f, targs)
     val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null
-    mupdate3(in, targs, dweights)
+    mupdate3(in, targs, dweights, ipass, pos)
   }
   
-  def mupdate2(in:Mat, targ:Mat) = mupdate3(in, targ, null)
+  def mupdate2(in:Mat, targ:Mat, ipass:Int, pos:Long) = mupdate3(in, targ, null, ipass, pos)
   
-  def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {        
+  def mupdate3(in:Mat, targ:Mat, dweights:Mat, ipass:Int, pos:Long) = {        
     val ftarg = full(targ);
     val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in 
@@ -125,13 +146,19 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     GLM.preds(eta, eta, mylinks, totflops);
     GLM.derivs(eta, targs, eta, mylinks, totflops);
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights;
-    if (hashFeatures > 0) {
-      updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols, opts.hashBound1, opts.hashBound2);
+    if (opts.ADAGradUpdate) {
+      if (firststep <= 0) firststep = pos.toFloat;
+      val istep = (pos + firststep)/firststep;
+    	ADAGrad.multUpdate(eta, in, modelmats(0), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
-    	updatemats(0) ~ eta *^ in;
-    }
-    if (mask.asInstanceOf[AnyRef] != null) {
-      updatemats(0) ~ updatemats(0) ∘ mask
+    	if (hashFeatures > 0) {
+    		updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols, opts.hashBound1, opts.hashBound2);
+    	} else {
+    		updatemats(0) ~ eta *^ in;
+    	}
+    	if (mask.asInstanceOf[AnyRef] != null) {
+    		updatemats(0) ~ updatemats(0) ∘ mask
+    	}
     }
   }
   
@@ -169,6 +196,7 @@ object GLM {
     var hashFeatures = 0;
     var hashBound1:Int = 1000000;
     var hashBound2:Int = 1000000;
+    var ADAGradUpdate:Boolean = false;
   }
   
   val linear = 0;

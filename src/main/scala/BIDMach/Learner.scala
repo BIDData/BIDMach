@@ -61,7 +61,7 @@ case class Learner(
     var here = 0L
     var lasti = 0
     var bytes = 0L
-    updater.clear
+    if (updater != null) updater.clear
     val reslist = new ListBuffer[FMat]
     val samplist = new ListBuffer[Float]
     while (ipass < opts.npasses && ! done) {
@@ -77,7 +77,7 @@ case class Learner(
           if (opts.updateAll) {
           	model.doblockg(mats, ipass, here);
           	if (mixins != null) mixins map (_ compute(mats, here));
-          	updater.update(ipass, here);
+          	if (updater != null) updater.update(ipass, here);
           }
         	val scores = model.evalblockg(mats, ipass, here)
         	reslist.append(scores.newcopy)
@@ -85,7 +85,7 @@ case class Learner(
         } else {
         	model.doblockg(mats, ipass, here)
         	if (mixins != null) mixins map (_ compute(mats, here))
-        	updater.update(ipass, here)
+        	if (updater != null) updater.update(ipass, here)
         }  
         if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
         istep += 1
@@ -107,7 +107,7 @@ case class Learner(
         	lasti = reslist.length
         }
       }
-      updater.updateM(ipass)
+      if (updater != null) updater.updateM(ipass)
       ipass += 1
     }
     val gf = gflop

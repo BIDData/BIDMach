@@ -344,4 +344,24 @@ extern "C" {
     return multinomial2(nrows, ncols, A, B, nvals);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_multADAGrad
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, int nnz, jobject jA, jobject jBdata, jobject jBir, jobject jBic,
+   jobject jMM, jobject jSumsq, jobject jMask, int maskrows, jobject jlrate, jint lrlen, jobject jvexp, jint vexplen,
+   jobject jtexp, jint texplen, float istep, jint addgrad, float epsilon)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *Bdata = (float*)getPointer(env, jBdata);
+    int *Bir = (int*)getPointer(env, jBir);
+    int *Bic = (int*)getPointer(env, jBic);
+    float *MM = (float*)getPointer(env, jMM);
+    float *Sumsq = (float*)getPointer(env, jSumsq);
+    float *Mask = (float*)getPointer(env, jMask);
+    float *lrate = (float*)getPointer(env, jlrate);
+    float *vexp = (float*)getPointer(env, jvexp);
+    float *texp = (float*)getPointer(env, jtexp);
+
+    return multADAGrad(nrows, ncols, nnz, A, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
+                       vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+  }
+
 }
