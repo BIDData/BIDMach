@@ -262,6 +262,23 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
 
 object FilesDS {
   
+  def apply(opts:FilesDS.Opts, nthreads:Int=4) = {
+    implicit val ec = threadPool(nthreads);
+    new FilesDS(opts);
+  }
+  
+  def apply(fname:String, opts:FilesDS.Opts, nthreads:Int=4) = {
+    opts.fnames = List(simpleEnum(fname, 1, 0));
+    implicit val ec = threadPool(nthreads);
+    new FilesDS(opts);
+  }
+  
+  def apply(fn1:String, fn2:String, opts:FilesDS.Opts, nthreads:Int=4) = {
+    opts.fnames = List(simpleEnum(fn1, 1, 0), simpleEnum(fn2, 1, 0));
+    implicit val ec = threadPool(nthreads);
+    new FilesDS(opts);
+  }
+  
   def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = (((12*yy + mm) * 31) + dd)*24 + hh
   
   def decodeDate(n:Int):(Int, Int, Int, Int) = {
