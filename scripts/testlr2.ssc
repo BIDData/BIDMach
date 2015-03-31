@@ -1,5 +1,5 @@
 :silent
-val dir="c:/code/BIDMach/data/rcv1/"
+val dir="../data/rcv1/"
 
 val a = loadSMat(dir + "docs.smat.lz4")
 val c = loadFMat(dir + "cats.fmat.lz4")
