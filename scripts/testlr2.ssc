@@ -22,7 +22,7 @@ val nn = new Learner(
     opts);
 
 
-opts.batchSize=20000
+opts.batchSize=10000
 opts.GLM_ADAGrad =true
 opts.lrate =0.1f;
 opts.reg1weight = 0.01
@@ -42,5 +42,5 @@ val mr = mean(rc)(0, 0->100)
 val nt = sum(c,2)(0->100, 0)
 val wt = nt / sum(nt);
 
-println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))
+println("ROC AUC: cat6 %5.4f, mean %5.4f" format (mr(6), (mr*wt).dv))
 :silent
