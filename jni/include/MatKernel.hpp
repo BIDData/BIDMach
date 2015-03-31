@@ -54,6 +54,10 @@ int multinomial(int nrows, int ncols, float *A, int *B, float *Norm, int nvals);
 
 int multinomial2(int nrows, int ncols, float *A, int *B, int nvals);
 
-int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, float *MM, 
-                float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen,
-                float *texp, int texplen, float istep, int addgrad, float epsilon);
+int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, 
+                float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);
+
+int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose, 
+                    float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                    float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);

@@ -215,8 +215,39 @@ object ADAGrad {
         CUMACH.multADAGrad(nr, nc, b.nnz, ga.data, gsb.data, gsb.ir, gsb.ic, gmm.data, gssq.data, gmaskdata, masknr,
             glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps)
       }
-    }
-    
+    }    
+  }
+  
+  
+  /**
+   * Integrate the last stage of a gradient update (sparse, transposed multiply) with ADAGRAD. 
+   * Supports both CPU and GPU implementation.
+   */
+  def hashmultUpdate(a:Mat, b:Mat, nfeats:Int, bound1:Int, bound2:Int, transpose:Int,
+  		mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int) = {
+    val istep = 1f/step;
+    val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
+    val nr = a.nrows;
+    val nc = b.ncols;
+    Mat.nflops += 2L * nr * b.nnz;
+    (a, b, mm, sumSq, lrate, texp, vexp) match {
+      case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
+        val fmask = mask.asInstanceOf[FMat];
+      	if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
+    			(0 until Mat.numThreads).par.map((ithread:Int) => 
+    			  multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, ithread, Mat.numThreads));
+    		} else {
+    			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, 0, 1);
+    		}
+      }
+      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+        val gmask0 = mask.asInstanceOf[GMat];
+        val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
+        val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
+        CUMACH.hashmultADAGrad(nr, nfeats, nc, bound1,  bound2, ga.data, gsb.data, gsb.ir, gsb.jc, transpose,
+            gmm.data, gssq.data, gmaskdata, masknr, glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps)
+      }
+    }    
   }
 }
 

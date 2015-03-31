@@ -364,4 +364,24 @@ extern "C" {
                        vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashmultADAGrad
+  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jint bound1, jint bound2, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jint transpose,
+   jobject jMM, jobject jSumsq, jobject jMask, int maskrows, jobject jlrate, jint lrlen, jobject jvexp, jint vexplen,
+   jobject jtexp, jint texplen, float istep, jint addgrad, float epsilon)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *Bdata = (float*)getPointer(env, jBdata);
+    int *Bir = (int*)getPointer(env, jBir);
+    int *Bjc = (int*)getPointer(env, jBjc);
+    float *MM = (float*)getPointer(env, jMM);
+    float *Sumsq = (float*)getPointer(env, jSumsq);
+    float *Mask = (float*)getPointer(env, jMask);
+    float *lrate = (float*)getPointer(env, jlrate);
+    float *vexp = (float*)getPointer(env, jvexp);
+    float *texp = (float*)getPointer(env, jtexp);
+
+    return hashmultADAGrad(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, transpose,
+                           MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+  }
+
 }

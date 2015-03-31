@@ -75,4 +75,7 @@ public final class CUMACH {
     public static native int multADAGrad(int nrows, int ncols, int nnz, Pointer A, Pointer Bdata, Pointer Bir, Pointer Bic, Pointer MM, Pointer Sumsq, 
     		Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon);
 
+    public static native int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, Pointer A, Pointer Bdata, Pointer Bir, Pointer Bjc, int transpose,
+    		Pointer MM, Pointer Sumsq, Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon);
+
 }
