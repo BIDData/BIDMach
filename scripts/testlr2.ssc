@@ -1,0 +1,46 @@
+:silent
+val dir="c:/code/BIDMach/data/rcv1/"
+
+val a = loadSMat(dir + "docs.smat.lz4")
+val c = loadFMat(dir + "cats.fmat.lz4")
+val ta = loadSMat(dir + "testdocs.smat.lz4")
+val tc = loadFMat(dir + "testcats.fmat.lz4")
+
+//val a=a0(?,0->100000);
+//val c=c0(?,0->100000);
+
+val pc = zeros(tc.nrows, tc.ncols)
+
+class Lopts extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with MatDS.Opts
+val opts = new Lopts;
+
+val nn = new Learner(
+    new MatDS(Array(a,c), opts),
+    new GLM(opts),
+    null,
+    null,
+    opts);
+
+
+opts.batchSize=20000
+opts.GLM_ADAGrad =true
+opts.lrate =0.1f;
+opts.reg1weight = 0.01
+opts.npasses=3
+opts.links = iones(103,1)
+opts.addConstFeat=true;
+
+nn.train
+
+val (mm, mopts) = GLM.predictor(nn.model, ta, pc);
+mopts.addConstFeat=true;
+
+mm.predict
+
+val rc = roc2(pc, tc, 1-tc, 1000)
+val mr = mean(rc)(0, 0->100)
+val nt = sum(c,2)(0->100, 0)
+val wt = nt / sum(nt);
+
+println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))
+:silent
