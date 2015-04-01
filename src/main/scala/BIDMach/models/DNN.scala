@@ -9,7 +9,7 @@ import BIDMach.mixins._
 import BIDMach._
 
 /**
- * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 15 layer types:
+ * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 16 layer types:
  - InputLayer: just a placeholder for the first layer which is loaded with input data blocks. No learnable params. 
  - FCLayer: Fully-Connected Linear layer. Has a matrix of learnable params which is the input-output map. 
  - RectLayer: Rectifying one-to-one layer. No params.
@@ -22,6 +22,7 @@ import BIDMach._
  - Softmax: a softmax (normalized exponential) layer.
  - Tanh: Hyperbolic tangent non-linearity.
  - Sigmoid: Logistic function non-linearity.
+ - Softplus: smooth ReLU unit.
  - Cut: needed in each cycle of cyclic networks to allow caching to work. 
  - Ln: natural logarithm
  - Exp: exponential
@@ -337,7 +338,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   }
   
   /**
-   * Computes the sum of two input layers. 
+   * Computes the sum of input layers. 
    */
   
   class AddLayer extends Layer { 
