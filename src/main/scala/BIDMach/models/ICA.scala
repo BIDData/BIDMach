@@ -232,7 +232,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     val WWT = w * C *^ w
     val result = w / sqrt(maxi(sum(abs(WWT), 2)))
     var a = 0
-    while (a < math.max(10, math.sqrt(opts.dim).toInt)) { // Quadratic in convergence so maybe this is good?
+    while (a < math.min(5, 1+math.sqrt(opts.dim).toInt)) { // Has to be small
       val newResult = ((1.5 * result) - 0.5 * (result * C *^ result * result))
       result <-- newResult
       a = a + 1
