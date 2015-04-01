@@ -9,7 +9,7 @@ import BIDMach.mixins._
 import BIDMach._
 
 /**
- * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 12 layer types:
+ * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 15 layer types:
  - InputLayer: just a placeholder for the first layer which is loaded with input data blocks. No learnable params. 
  - FCLayer: Fully-Connected Linear layer. Has a matrix of learnable params which is the input-output map. 
  - RectLayer: Rectifying one-to-one layer. No params.
@@ -17,12 +17,15 @@ import BIDMach._
  - NormLayer: normalizing layer that adds a derivative term based on the difference between current layer norm and a target norm. 
    No learnable params. The target norm and weight of this derivative term can be specified. 
  - DropoutLayer: A layer that implements random dropout. No learnable params, but dropout fraction can be specified. 
- - AddLayer: adds two input layers element-wise.
- - MulLayer: multiplies two input layers element-wise. Will also perform edge operations (one input can be a scalar). 
+ - AddLayer: adds input layers element-wise.
+ - MulLayer: multiplies input layers element-wise. Will also perform edge operations (one input can be a scalar). 
  - Softmax: a softmax (normalized exponential) layer.
  - Tanh: Hyperbolic tangent non-linearity.
  - Sigmoid: Logistic function non-linearity.
  - Cut: needed in each cycle of cyclic networks to allow caching to work. 
+ - Ln: natural logarithm
+ - Exp: exponential
+ - Sum: column-wise sum
  *
  * The network topology is specified by opts.layers which is a sequence of "LayerSpec" objects. There is a LayerSpec
  * Class for each Layer class, which holds the params for defining that layer. Currently only four LayerSpec types need params:
@@ -56,9 +59,11 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  	opts.layers(i) match {
 
 	  	case fcs:DNN.FC => {
-	  		layers(i) = new FCLayer(imodel, fcs.constFeat);
-	  		if (refresh) modelmats(imodel) = normrnd(0, 1, fcs.outsize, nfeats + (if (fcs.constFeat) 1 else 0));
+	  	  val fclayer = new FCLayer(imodel, fcs.constFeat, fcs.aopts);
+	  		layers(i) = fclayer;
+	  		if (refresh) modelmats(imodel) = convertMat(normrnd(0, 1, fcs.outsize, nfeats + (if (fcs.constFeat) 1 else 0)));
 	  		nfeats = fcs.outsize;
+	  		if (fcs.aopts != null) fclayer.initADAGrad
 	  		imodel += 1;
 	  	}
 	  	case rls:DNN.ReLU => {
@@ -91,8 +96,20 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  	case sls:DNN.Sigmoid => {
 	  		layers(i) = new SigmoidLayer;
 	  	}
+	  	case sls:DNN.Softplus => {
+	  		layers(i) = new SoftplusLayer;
+	  	}
 	  	case cls:DNN.Cut => {
 	  		layers(i) = new CutLayer;
+	  	}
+	  	case cls:DNN.Ln => {
+	  		layers(i) = new LnLayer;
+	  	}
+	  	case cls:DNN.Exp => {
+	  		layers(i) = new ExpLayer;
+	  	}
+	  	case cls:DNN.Sum => {
+	  		layers(i) = new SumLayer;
 	  	}
 	  	}
 	  	opts.layers(i).myLayer = layers(i);
@@ -104,12 +121,14 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  } 		
 	  for (i <- 0 until opts.layers.length) {
 	  	if (opts.layers(i).input.asInstanceOf[AnyRef] != null) layers(i).input = opts.layers(i).input.myLayer.asInstanceOf[DNN.this.Layer];
-	  	if (opts.layers(i).input2.asInstanceOf[AnyRef] != null) layers(i).input2 = opts.layers(i).input2.myLayer.asInstanceOf[DNN.this.Layer];
+	  	if (opts.layers(i).inputs != null) {
+	  	  (0 until opts.layers(i).inputs.length).map((j:Int) => layers(i).inputs(j) = opts.layers(i).inputs(j).myLayer.asInstanceOf[DNN.this.Layer]);
+	  	} 
 	  }
   }
   
   
-  def doblock(gmats:Array[Mat], ipass:Int, i:Long):Unit = {
+  def doblock(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
   	layers(0).data = gmats(0);
     if (targmap.asInstanceOf[AnyRef] != null) {
     	layers(layers.length-1).target = targmap * gmats(0);
@@ -126,7 +145,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
     while (i > 1) {
       i -= 1;
-      layers(i).backward;
+      layers(i).backward(ipass, pos);
     }
     if (mask.asInstanceOf[AnyRef] != null) {
     	updatemats(0) ~ updatemats(0) ∘ mask;
@@ -158,9 +177,10 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var target:Mat = null;
     var deriv:Mat = null;
     var input:Layer = null;
-    var input2:Layer = null;
+    var inputs:Array[Layer] = null;
     def forward = {};
-    def backward = {};
+    def backward:Unit = {};
+    def backward(ipass:Int, pos:Long):Unit = backward;
     def score:FMat = zeros(1,1);
   }
   
@@ -169,8 +189,15 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
    * Includes a model matrix that contains the linear map. 
    */
   
-  class FCLayer(val imodel:Int, val constFeat:Boolean) extends Layer {
-
+  class FCLayer(val imodel:Int, val constFeat:Boolean, val aopts:ADAGrad.Opts) extends Layer {
+  	var vexp:Mat = null;
+    var texp:Mat = null;
+    var lrate:Mat = null;
+    var sumsq:Mat = null;
+    var firststep = -1f;
+    var waitsteps = 0;
+    var epsilon = 0f;
+    
     override def forward = {
     	val mm = if (constFeat) {
     		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
@@ -181,7 +208,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     	if (constFeat) data ~ data + modelmats(imodel).colslice(0, 1);
     }
     
-    override def backward = {
+    override def backward(ipass:Int, pos:Long) = {
       if (imodel > 0) {
       	val mm = if (constFeat) {
       		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
@@ -190,8 +217,28 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       	}
       	input.deriv = mm ^* deriv;
       }
-      val dprod = deriv *^ input.data;
-      updatemats(imodel) = if (constFeat) (sum(deriv,2) \ dprod) else dprod;
+      if (aopts != null) {
+        if (firststep <= 0) firststep = pos.toFloat;
+        val istep = (pos + firststep)/firststep;
+      	ADAGrad.multUpdate(deriv, input.data, modelmats(imodel), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
+      } else {
+      	val dprod = deriv *^ input.data;
+      	updatemats(imodel) = if (constFeat) (sum(deriv,2) \ dprod) else dprod;
+      }
+    }
+    
+    def initADAGrad {
+      val mm = modelmats(imodel); 
+      val d = mm.nrows;
+      val m = mm.ncols;
+    	firststep = -1f;
+    	lrate = convertMat(aopts.lrate);
+    	texp = convertMat(aopts.texp);
+    	vexp = convertMat(aopts.vexp);
+    	sumsq = convertMat(zeros(d, m));
+    	sumsq.set(aopts.initsumsq);
+    	waitsteps = aopts.waitsteps;
+    	epsilon = aopts.epsilon;
     }
   }
   
@@ -293,31 +340,41 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
    * Computes the sum of two input layers. 
    */
   
-  class AddLayer extends Layer {    
+  class AddLayer extends Layer { 
     
     override def forward = {
-      data = input.data + input2.data;
+      if (data.asInstanceOf[AnyRef] == null) data = inputs(0).data.zeros(inputs(0).data.nrows, inputs(0).data.ncols);
+      data <-- inputs(0).data;
+      (1 until inputs.length).map((i:Int) => data ~ data + inputs(i).data);
     }
     
     override def backward = {
-      input.deriv = deriv;
-      input2.deriv = deriv;
+      (0 until inputs.length).map((i:Int) => {
+      	if (inputs(i).deriv.asInstanceOf[AnyRef] == null) inputs(i).deriv = deriv.zeros(deriv.nrows, deriv.ncols);
+      	inputs(i).deriv <-- deriv
+      });
     }
   }
   
   /**
-   * Computes the product of two input layers. 
+   * Computes the product of its input layers. 
    */
   
-  class MulLayer extends Layer {    
+  class MulLayer extends Layer {  
     
     override def forward = {
-      data = input.data ∘ input2.data;
+    	if (data.asInstanceOf[AnyRef] == null) data = inputs(0).data.zeros(inputs(0).data.nrows, inputs(0).data.ncols);
+      data <-- inputs(0).data;
+      (1 until inputs.length).map((i:Int) => data ~ data ∘ inputs(i).data);
     }
+
     
     override def backward = {
-      input.deriv = deriv ∘ input2.data;
-      input2.deriv = deriv ∘ input.data;
+      val ddata = deriv ∘ data
+      (0 until inputs.length).map((i:Int) => {
+      	if (inputs(i).deriv.asInstanceOf[AnyRef] == null) inputs(i).deriv = deriv.zeros(deriv.nrows, deriv.ncols);
+      	inputs(i).deriv <-- ddata / inputs(i).data;
+      });
     }
   }
   
@@ -375,10 +432,33 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
     
     override def backward = {
-      input.deriv = GLM.derivs(data, target, ilinks, totflops)
-      if (deriv.asInstanceOf[AnyRef] != null) {
-        input.deriv ~ input.deriv ∘ deriv;
+      input.deriv = data - (data ∘ data);
+      input.deriv ~ input.deriv ∘ deriv;
+    }
+  }
+  
+  /**
+   * Softplus layer.  
+   */
+  
+  class SoftplusLayer extends Layer {
+  	var ilinks:Mat = null;
+    var totflops = 0L;
+   
+    override def forward = {
+      val big = input.data > 60f;      
+      data = (1 - big) ∘ ln(1f + exp(min(60f, input.data))) + big ∘ input.data;
+    }
+    
+    override def backward = {
+      if (ilinks.asInstanceOf[AnyRef] == null) {
+        ilinks = izeros(input.data.nrows, 1)
+        ilinks.set(GLM.logistic);
       }
+      if (totflops == 0L) totflops = input.data.nrows * GLM.linkArray(1).fnflops
+      if (useGPU) ilinks = GIMat(ilinks);
+      input.deriv = GLM.preds(input.data, ilinks, totflops)
+      input.deriv ~ input.deriv ∘ deriv;
     }
   }
   
@@ -400,11 +480,68 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       input.deriv <-- deriv;      
     }
   }
+  
+  /**
+   * Natural Log layer. 
+   */
+  
+  class LnLayer extends Layer {
+    
+    override def forward = {
+      data = ln(input.data);
+    }
+    
+    override def backward = {
+      input.deriv = deriv/input.data;    
+    }
+  }
+  
+  /**
+   * Exponential layer. 
+   */
+  
+  class ExpLayer extends Layer {
+    
+    override def forward = {
+      data = exp(input.data);
+    }
+    
+    override def backward = {
+      input.deriv = deriv ∘ data;    
+    }
+  }
+  
+  /**
+   * Sum layer. 
+   */
+  
+  class SumLayer extends Layer {
+    var vmap:Mat = null;
+    
+    override def forward = {
+      data = sum(input.data);
+    }
+    
+    override def backward = {
+      if (vmap.asInstanceOf[AnyRef] == null) vmap = deriv.ones(data.nrows, 1);
+      input.deriv = vmap * deriv;    
+    }
+  }
+  
+  class blockGemm extends Layer {
+    override def forward = {
+      
+    }
+    
+    override def backward = {
+    
+    }
+  }
 }
 
 object DNN  {
   trait Opts extends Model.Opts {
-	var layers:Seq[LayerSpec] = null;
+	  var layers:Seq[LayerSpec] = null;
     var links:IMat = null;
     var nweight:Float = 0.1f;
     var dropout:Float = 0.5f;
@@ -412,17 +549,18 @@ object DNN  {
     var targmap:Mat = null;
     var dmask:Mat = null;
     var constFeat:Boolean = false;
+    var aopts:ADAGrad.Opts = null;
   }
   
   class Options extends Opts {}
   
-  class LayerSpec(val input:LayerSpec, val input2:LayerSpec) {
+  class LayerSpec(val input:LayerSpec, val inputs:Array[LayerSpec]) {
     var myLayer:DNN#Layer = null;
   }
   
   class ModelLayerSpec(input:LayerSpec) extends LayerSpec(input, null){}
   
-  class FC(input:LayerSpec, val outsize:Int, val constFeat:Boolean) extends ModelLayerSpec(input) {}
+  class FC(input:LayerSpec, val outsize:Int, val constFeat:Boolean, val aopts:ADAGrad.Opts) extends ModelLayerSpec(input) {}
   
   class ReLU(input:LayerSpec) extends LayerSpec(input, null) {}
   
@@ -434,9 +572,9 @@ object DNN  {
   
   class Dropout(input:LayerSpec, val frac:Float) extends LayerSpec(input, null) {}
   
-  class Add(input:LayerSpec, input2:LayerSpec) extends LayerSpec(input, input2) {}
+  class Add(inputs:Array[LayerSpec]) extends LayerSpec(null, inputs) {}
   
-  class Mul(input:LayerSpec, input2:LayerSpec) extends LayerSpec(input, input2) {}
+  class Mul(inputs:Array[LayerSpec]) extends LayerSpec(null, inputs) {}
   
   class Softmax(input:LayerSpec) extends LayerSpec(input, null) {}
   
@@ -444,7 +582,15 @@ object DNN  {
   
   class Sigmoid(input:LayerSpec) extends LayerSpec(input, null) {}
   
+  class Softplus(input:LayerSpec) extends LayerSpec(input, null) {}
+  
   class Cut(input:LayerSpec) extends LayerSpec(input, null) {}
+  
+  class Ln(input:LayerSpec) extends LayerSpec(input, null) {}
+  
+  class Exp(input:LayerSpec) extends LayerSpec(input, null) {}
+  
+  class Sum(input:LayerSpec) extends LayerSpec(input, null) {}
   
   /**
    * Build a stack of layer specs. layer(0) is an input layer, layer(n-1) is a GLM layer. 
@@ -452,20 +598,25 @@ object DNN  {
    * First FC layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts):Array[LayerSpec] = {
+  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Array[LayerSpec] = {
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
     val layers = new Array[LayerSpec](depth);
     var w = width;
     layers(0) = new Input;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new FC(layers(i-1), w, opts.constFeat);
+    		layers(i) = new FC(layers(i-1), w, opts.constFeat, opts.aopts);
     		w = (taper*w).toInt;
     	} else {
-    		layers(i) = new ReLU(layers(i-1));
+    	  nonlin match {
+    	    case 1 => layers(i) = new Tanh(layers(i-1));
+    	    case 2 => layers(i) = new Sigmoid(layers(i-1));
+    	    case 3 => layers(i) = new ReLU(layers(i-1));
+    	    case 4 => layers(i) = new Softplus(layers(i-1));
+    	  }
     	}
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat, opts.aopts);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -477,22 +628,27 @@ object DNN  {
    * First FC layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts):Array[LayerSpec] = {
+  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Array[LayerSpec] = {
     val depth = (depth0/3)*3;              // Round up to a multiple of 3 
     val layers = new Array[LayerSpec](depth);
     var w = width;
     layers(0) = new Input;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new FC(layers(i-1), w, opts.constFeat);
+    		layers(i) = new FC(layers(i-1), w, opts.constFeat, opts.aopts);
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
-    		layers(i) = new ReLU(layers(i-1));
+    	  nonlin match {
+    	    case 1 => layers(i) = new Tanh(layers(i-1));
+    	    case 2 => layers(i) = new Sigmoid(layers(i-1));
+    	    case 3 => layers(i) = new ReLU(layers(i-1));
+    	    case 4 => layers(i) = new Softplus(layers(i-1));
+    	  }
     	} else {
     	  layers(i) = new Norm(layers(i-1), opts.targetNorm, opts.nweight);
     	}
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat, opts.aopts);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -504,7 +660,7 @@ object DNN  {
    * First FC layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts):Array[LayerSpec] = {
+  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Array[LayerSpec] = {
     val depth = ((depth0+1)/4)*4 - 1;              // Round up to a multiple of 4 - 1
     val layers = new Array[LayerSpec](depth);
     var w = width;
@@ -512,11 +668,16 @@ object DNN  {
     for (i <- 1 until depth - 2) {
       (i % 4) match {
         case 1 => {
-        	layers(i) = new FC(layers(i-1), w, opts.constFeat);
+        	layers(i) = new FC(layers(i-1), w, opts.constFeat, opts.aopts);
         	w = (taper*w).toInt;
         }
         case 2 => {
-        	layers(i) = new ReLU(layers(i-1));
+        	nonlin match {
+        	case 1 => layers(i) = new Tanh(layers(i-1));
+        	case 2 => layers(i) = new Sigmoid(layers(i-1));
+        	case 3 => layers(i) = new ReLU(layers(i-1));
+        	case 4 => layers(i) = new Softplus(layers(i-1));
+        	}
         }
         case 3 => {
           layers(i) = new Norm(layers(i-1), opts.targetNorm, opts.nweight);
@@ -526,7 +687,7 @@ object DNN  {
         }
       }
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat, opts.aopts);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -561,6 +722,21 @@ object DNN  {
     (nn, opts)
   }
   
+  def learnerX(mat0:Mat, targ:Mat) = {
+    val opts = new LearnOptions
+    if (opts.links == null) opts.links = izeros(1,targ.nrows)
+    opts.links.set(1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0, targ), opts), 
+  	    new DNN(opts), 
+  	    null,
+  	    null, 
+  	    opts)
+    (nn, opts)
+  }
+  
   class FDSopts extends Learner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
@@ -584,6 +760,28 @@ object DNN  {
   	    opts)
     (nn, opts)
   } 
+  
+  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0),
+  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
+  
+  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0)));
+  
+  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+    val opts = new FDSopts
+    opts.fnames = fnames
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+    implicit val threads = threadPool(4);
+    val ds = new FilesDS(opts)
+//    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
+  	val nn = new Learner(
+  			ds, 
+  	    new DNN(opts), 
+  	    null,
+  	    null, 
+  	    opts)
+    (nn, opts)
+  }
     // This function constructs a learner and a predictor. 
   def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat):(Learner, LearnOptions, Learner, LearnOptions) = {
     val mopts = new LearnOptions;

@@ -215,6 +215,21 @@ object ADAGrad {
         CUMACH.multADAGrad(nr, nc, b.nnz, ga.data, gsb.data, gsb.ir, gsb.ic, gmm.data, gssq.data, gmaskdata, masknr,
             glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps)
       }
+      case _ => {
+        val grad = a *^ b;
+        sumSq ~ sumSq + (grad ∘ grad);
+        sumSq ~ sumSq + eps;
+        val ssq = sumSq + 0f;
+        ssq ~ ssq * istep;
+        ssq ~ ssq ^ vexp;
+        val te = texp + 0f;
+        te.set(istep);
+        te ~ te ^ texp;
+        grad ~ grad ∘ lrate;
+        grad ~ grad ∘ te;
+        grad ~ grad / ssq;
+        mm ~ mm + grad;
+      }
     }    
   }
   
