@@ -342,8 +342,8 @@ __global__ void __convCols(int nrows, int ncols, int *W, float *A, float *B, flo
   float bb[WLEN + SHIFT];
   float prods[WLEN][window];
   int word[WLEN + SHIFT];
-  __shared__ float CC[WLEN*BYDIM][window];
-  int i, j, k, icol, jcol, ic, ir;
+  __shared__ float CC[WLEN*BYDIM*window];
+  int i, j, k, icol, jcol;
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   int dxy = blockDim.x * blockDim.y;
 
@@ -360,9 +360,8 @@ __global__ void __convCols(int nrows, int ncols, int *W, float *A, float *B, flo
 #pragma unroll
     for (j = 0; j < WLEN; j++) {
 #pragma unroll
-      for (k = 0; k <= SHIFT; k++) {
-        prods[j][SHIFT+k] = 0;
-        prods[j][SHIFT-k] = 0;
+      for (k = 0; k <= 2*SHIFT; k++) {
+        prods[j][k] = 0;
       }
     }
     for (i = tid; i < nrows; i += dxy) {
@@ -376,6 +375,9 @@ __global__ void __convCols(int nrows, int ncols, int *W, float *A, float *B, flo
 #pragma unroll
         for (k = 0; k <= SHIFT; k++) {
           prods[j][SHIFT+k] += aa[j] * bb[j+k];
+        }
+#pragma unroll
+        for (k = 1; k <= SHIFT; k++) {
           prods[j][SHIFT-k] += aa[j+k] * bb[j];
         }
       }
@@ -397,26 +399,22 @@ __global__ void __convCols(int nrows, int ncols, int *W, float *A, float *B, flo
       for (j = 0; j < WLEN; j++) {
 #pragma unroll
         for (k = 0; k < window; k++) {
-          CC[j + WLEN * threadIdx.y][k] = prods[j][k];
+          CC[k + window * (j + WLEN * threadIdx.y)] = prods[j][k];
         }
       }
     }
     __syncthreads();
     for (j = 0; j < WLEN * window; j += dxy) {
-      ic = (j + tid) / window;
-      ir = (j + tid) - ic * window;
       for (k = 1; k < blockDim.y; k++) {
         if (j + tid < WLEN * window) {
-          CC[ic][ir] += CC[ic + k * WLEN][ir];
+          CC[j + tid] += CC[j + tid + k * WLEN * window];
         }
         __syncthreads();
       } 
-      if (j + tid < WLEN * window && ic + jcol < ncols) {
-        //        int x = ir + (ic + jcol) * window;
-        //        if (x > window * ncols) printf("ir %d, ic %d, jcol %d\n", ir, ic, jcol);
-        C[ir + (ic + jcol) * window] = CC[ic][ir];
+      if (j + tid < WLEN * window && j + tid + jcol * window < ncols * window) {
+        C[j + tid + jcol * window] = CC[j + tid];
       }
-      }
+    }
   }
 }
 
