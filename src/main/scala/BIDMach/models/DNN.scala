@@ -59,58 +59,61 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  for (i <- 0 until opts.layers.length) {
 	  	opts.layers(i) match {
 
-	  	case fcs:DNN.FC => {
-	  	  val fclayer = new FCLayer(imodel, fcs.constFeat, fcs.aopts);
+	  	case lspec:DNN.FC => {
+	  	  val fclayer = new FCLayer(imodel, lspec.constFeat, lspec.aopts);
 	  		layers(i) = fclayer;
-	  		if (refresh) modelmats(imodel) = convertMat(normrnd(0, 1, fcs.outsize, nfeats + (if (fcs.constFeat) 1 else 0)));
-	  		nfeats = fcs.outsize;
-	  		if (fcs.aopts != null) fclayer.initADAGrad
+	  		if (refresh) modelmats(imodel) = convertMat(normrnd(0, 1, lspec.outsize, nfeats + (if (lspec.constFeat) 1 else 0)));
+	  		nfeats = lspec.outsize;
+	  		if (lspec.aopts != null) fclayer.initADAGrad
 	  		imodel += 1;
 	  	}
-	  	case rls:DNN.ReLU => {
+	  	case lspec:DNN.ReLU => {
 	  		layers(i) = new ReLULayer;
 	  	}
-	  	case ils:DNN.Input => {
+	  	case lspec:DNN.Input => {
 	  		layers(i) = new InputLayer;
 	  	}
-	  	case ols:DNN.GLM => {
-	  		layers(i) = new GLMLayer(ols.links);
+	  	case lspec:DNN.GLM => {
+	  		layers(i) = new GLMLayer(lspec.links);
 	  	}
-	  	case nls:DNN.Norm => {
-	  		layers(i) = new NormLayer(nls.targetNorm, nls.weight);
+	  	case lspec:DNN.Norm => {
+	  		layers(i) = new NormLayer(lspec.targetNorm, lspec.weight);
 	  	}
-	  	case dls:DNN.Dropout => {
-	  		layers(i) = new DropoutLayer(dls.frac);
+	  	case lspec:DNN.Dropout => {
+	  		layers(i) = new DropoutLayer(lspec.frac);
 	  	}
-	  	case als:DNN.Add => {
+	  	case lspec:DNN.Add => {
 	  		layers(i) = new AddLayer;
 	  	}
-	  	case mls:DNN.Mul => {
+	  	case lspec:DNN.Mul => {
 	  		layers(i) = new MulLayer;
 	  	}
-	  	case mls:DNN.Softmax => {
+	  	case lspec:DNN.Softmax => {
 	  		layers(i) = new SoftmaxLayer;
 	  	}
-	  	case tls:DNN.Tanh => {
+	  	case lspec:DNN.Tanh => {
 	  		layers(i) = new TanhLayer;
 	  	}
-	  	case sls:DNN.Sigmoid => {
+	  	case lspec:DNN.Sigmoid => {
 	  		layers(i) = new SigmoidLayer;
 	  	}
-	  	case sls:DNN.Softplus => {
+	  	case lspec:DNN.Softplus => {
 	  		layers(i) = new SoftplusLayer;
 	  	}
-	  	case cls:DNN.Cut => {
+	  	case lspec:DNN.Cut => {
 	  		layers(i) = new CutLayer;
 	  	}
-	  	case cls:DNN.Ln => {
+	  	case lspec:DNN.Ln => {
 	  		layers(i) = new LnLayer;
 	  	}
-	  	case cls:DNN.Exp => {
+	  	case lspec:DNN.Exp => {
 	  		layers(i) = new ExpLayer;
 	  	}
-	  	case cls:DNN.Sum => {
+	  	case lspec:DNN.Sum => {
 	  		layers(i) = new SumLayer;
+	  	}
+	  	case lspec:DNN.Lag => {
+	  		layers(i) = new LagLayer(lspec.siz);
 	  	}
 	  	}
 	  	opts.layers(i).myLayer = layers(i);
@@ -528,13 +531,61 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       input.deriv = vmap * deriv;    
     }
   }
+  /**
+   * Creates a copy of the input grown by a small piece of the last minibatch to support lagged updates
+   * e.g. for word2vec
+   */
   
-  class blockGemm extends Layer {
+  class LagLayer(siz:Int) extends Layer {
+    var lastBatch:Mat = null;
+    
     override def forward = {
+      if (lastBatch.asInstanceOf[AnyRef] == null) {
+        data = input.data.zeros(input.data.nrows, siz, 0) \ input.data;
+      } else {
+        data = data.colslice(input.data.ncols, input.data.ncols+siz, data);
+        data = input.data.colslice(0, input.data.ncols, data, siz);
+      }      
+    }
+  }
+  
+  /**
+   * Block matrix-matrix multiply. Each output block is nr x nc. nc needs to be a submultiple of the minibatch size. 
+   * Each element of the block moves by step in the corresponding matrix. 
+   */
+  
+  class blockGemmLayer(nr:Int, nc:Int, step:Int, reps:Int, inshift:Int) extends Layer {
+  	val aspect = nr / nc;
+  	val astep = if (step == 1) nc else 1;
+  	val shift0 = if (inshift >= 0) inshift else 0;
+  	val shift1 = if (inshift < 0) - inshift else 0;
+  	
+    override def forward = {
+      val nrows = inputs(0).data.nrows;
+      val nrowsa = nrows * aspect;
+      if (data.asInstanceOf[AnyRef] == null) data = inputs(0).data.zeros(nr, nc * reps);
       
+      inputs(0).data.blockGemm(1, 0, nr, nc, reps, 
+                          shift0*nrowsa, step*nrowsa, astep*nrowsa, 
+      		inputs(1).data, shift1*nrows,  step*nrows,  astep*nrows, 
+      		data,           0,             step*nr,     astep*nr);      
     }
     
     override def backward = {
+      val nrows = inputs(0).data.nrows;
+      val nrowsa = nrows * aspect;
+      if (inputs(0).deriv.asInstanceOf[AnyRef] == null) inputs(0).deriv = inputs(0).data.zeros(nrows, inputs(0).data.ncols);
+      if (inputs(1).deriv.asInstanceOf[AnyRef] == null) inputs(1).deriv = inputs(1).data.zeros(nrows, inputs(1).data.ncols);
+      
+      inputs(1).data.blockGemm(0, 1, nrows, nc, reps, 
+      		                 shift1*nrows,  step*nrows,  astep*nrows, 
+      		deriv,           0,             step*nr,     astep*nr, 
+      		inputs(0).deriv, shift0*nrowsa, step*nrowsa, astep*nrowsa);
+      
+      inputs(0).data.blockGemm(0, 0, nrows, nr, reps, 
+      		                 shift0*nrowsa, step*nrowsa, astep*nrowsa, 
+      		deriv,           0,             step*nr,     astep*nr, 
+      		inputs(1).deriv, shift1*nrows,  step*nrows,  astep*nrows);
     
     }
   }
@@ -592,6 +643,8 @@ object DNN  {
   class Exp(input:LayerSpec) extends LayerSpec(input, null) {}
   
   class Sum(input:LayerSpec) extends LayerSpec(input, null) {}
+  
+  class Lag(input:LayerSpec, val siz:Int) extends LayerSpec(input, null) {}
   
   /**
    * Build a stack of layer specs. layer(0) is an input layer, layer(n-1) is a GLM layer. 

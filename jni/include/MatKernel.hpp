@@ -61,3 +61,9 @@ int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir,
 int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose, 
                     float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                     float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);
+
+int word2vecBlock(int nrows, int ncols, int nwords, int shift, int npos, int nneg, int *W, float *D, float *C, float lrate);
+
+int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int ldb, float *C);
+
+int convCols(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C);
