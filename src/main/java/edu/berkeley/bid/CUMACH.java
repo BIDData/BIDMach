@@ -82,6 +82,8 @@ public final class CUMACH {
 
     public static native int convRows(int nrows, int ncols, int shift, Pointer A, int lda, Pointer B, int ldb, Pointer C);
     
-    public static native int convCols(int nrows, int ncols, int shift, Pointer W, Pointer A, Pointer B, Pointer C);
+    public static native int word2vecFwd(int nrows, int ncols, int shift, Pointer W, Pointer A, Pointer B, Pointer C);
+    
+    public static native int word2vecBwd(int nrows, int ncols, int shift, Pointer W, Pointer A, Pointer B, Pointer C, float lrate);
 
 }

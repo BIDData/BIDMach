@@ -8,6 +8,7 @@
 #define NTB (32/NTZ)
 
 #define WLEN 6
+#define WLENB 16
 #define BYDIM 2
 
 /*
@@ -418,6 +419,60 @@ __global__ void __convCols(int nrows, int ncols, int *W, float *A, float *B, flo
   }
 }
 
+template<int SHIFT, int WINLEN, int HEIGHT>
+__global__ void __word2vecBwd(int nrows, int ncols, int *W, float *A, float *B, float *C) {
+  const int window = 2*SHIFT+1;
+  __shared__ float cc[(WINLEN + SHIFT) * window];
+  float aa[(WINLEN + 2*SHIFT)];
+  int word[WLEN+SHIFT];
+  int tid = threadIdx.x;
+  int fid = threadIdx.x + blockDim.x * threadIdx.z;
+  int icol, i, j;
+  float sum;
+
+  for (icol = WINLEN * blockIdx.x; icol < ncols; icol += WINLEN * gridDim.x) {
+#pragma unroll
+    for (i = 0; i < WLEN+SHIFT; i++) {
+      if (i + icol < ncols) {
+        word[i] = W[i + icol];
+      } else {
+        word[i] = 0;
+      }
+    } 
+    __syncthreads();
+
+#pragma unroll
+    for (i = 0; i < WINLEN; i++) {
+      if (tid < nrows && i + icol < ncols) {
+        aa[i] = A[tid + word[i] * nrows];
+      }
+      if (fid < window * WINLEN && fid + icol * window < ncols * window) {
+        cc[fid] = C[fid + icol * window];
+      }
+    }
+    __syncthreads();
+#pragma unroll
+    for (i = 0; i < WINLEN; i++) {
+      sum = 0;
+#pragma unroll
+      for (j = 0; j <= SHIFT; j++) {
+        if (tid < nrows && i + icol < ncols) {
+          sum += aa[i + j] * cc[j + window * i];
+        }
+      }
+#pragma unroll
+      for (j = 1; j <= SHIFT; j++) {
+        if (tid < nrows && i + icol < ncols) {
+          sum += aa[i] * cc[j + i + window * i];
+        }
+      }
+      if (tid < nrows && i + icol < ncols) {
+        atomicAdd(&B[tid + word[i] * nrows], sum);
+      }
+    }
+  }  
+}
+
 
 #else
 
@@ -426,6 +481,10 @@ __global__ void __convRows(int nrows, int ncols, float *A, int lda, float *B, in
 
 template<int SHIFT>
 __global__ void __convCols(int nrows, int ncols, int *W, float *A, float *B, float *C) {}
+
+template<int SHIFT, int WINLEN, int HEIGHT>
+__global__ void __word2vecBwd(int nrows, int ncols, int *W, float *A, float *B, float *C) {}
+
 
 #endif
 
@@ -445,11 +504,20 @@ int convCols(int nrows, int ncols, int shift, int *W, float *A, float *B, float 
   //  dim3 threads(32, 1, NTZ);
   //  int nblocks = min(2048, 2 + (ncols - 1)/(32 - 2*shift));
   dim3 threads(32, BYDIM, 1);
-  int nblocks = min(2048, 2 + (ncols - 1)/5);
+  int nblocks = min(4*2048, 2 + (ncols - 1)/WLEN);
   switch(shift) {
   case 5 : __convCols<5><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;
     //  case 10 : __convCols<7><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;
   }
+  cudaDeviceSynchronize();
+  int err = cudaGetLastError();
+  return err;
+}
+
+int word2vecBwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C) {
+  dim3 threads(320, 1, 1);
+  int nblocks = min(4*2048, 2 + (ncols - 1)/WLENB);
+  __word2vecBwd<5,WLENB,301><<<nblocks,threads>>>(nrows, ncols, W, A, B, C);
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
