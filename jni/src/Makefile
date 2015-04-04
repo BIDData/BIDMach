@@ -2,7 +2,7 @@ include Makefile.incl
 
 MKL_OBJS=
 
-CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ) HashMult.$(OBJ) \
+CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ) HashMult.$(OBJ) DNN63.$(OBJ) DNN127.$(OBJ) \
           Logger.$(OBJ) JNIUtils.$(OBJ) PointerUtils.$(OBJ)
 
 .SUFFIXES: .$(OBJ) .c .cpp .cu
@@ -22,8 +22,11 @@ $(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(CUDA_OBJS)
 %.$(OBJ) : %.cpp
 	$(GCC) $(CPPFLAGS) $(LAPACK_INCLUDES) $*.cpp
 
-# Samplers.$(OBJ) : Samplers.cu
-#	$(NVCC) --maxrregcount=64 $(NVCCFLAGS) -Xptxas -v Samplers.cu
+DNN63.$(OBJ) : DNN63.cu
+	$(NVCC) --maxrregcount=63 $(NVCCFLAGS) -Xptxas -v DNN63.cu
+
+DNN127.$(OBJ) : DNN127.cu
+	$(NVCC) --maxrregcount=127 $(NVCCFLAGS) -Xptxas -v DNN127.cu
 
 %.$(OBJ) : %.cu
 	$(NVCC) $(NVCCFLAGS) $*.cu

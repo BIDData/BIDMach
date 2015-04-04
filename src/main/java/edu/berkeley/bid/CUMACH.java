@@ -77,5 +77,13 @@ public final class CUMACH {
 
     public static native int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, Pointer A, Pointer Bdata, Pointer Bir, Pointer Bjc, int transpose,
     		Pointer MM, Pointer Sumsq, Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon);
+    
+    public static native int word2vecBlock(int nrows, int ncols, int nwords, int shift, int npos, int nneg, Pointer W, Pointer D, Pointer C, float lrate);
+
+    public static native int convRows(int nrows, int ncols, int shift, Pointer A, int lda, Pointer B, int ldb, Pointer C);
+    
+    public static native int word2vecFwd(int nrows, int ncols, int shift, Pointer W, Pointer A, Pointer B, Pointer C);
+    
+    public static native int word2vecBwd(int nrows, int ncols, int shift, Pointer W, Pointer A, Pointer B, Pointer C, float lrate, int AnotB);
 
 }
