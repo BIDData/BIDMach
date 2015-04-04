@@ -3,12 +3,8 @@
 #include <stdio.h>
 #include <MatKernel.hpp>
 
-
-#define NTZ 8
-#define NTB (32/NTZ)
-
+// Window length and ydim for forward word2vec
 #define WLEN 6
-#define WLENB 16
 #define BYDIM 2
 
 #if __CUDA_ARCH__ >= 300
@@ -272,7 +268,7 @@ int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int l
 
 int word2vecFwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C) {
   dim3 threads(32, BYDIM, 1);
-  int nblocks = min(4*2048, 2 + (ncols - 1)/WLEN);
+  int nblocks = min(2048, 2 + (ncols - 1)/WLEN);
   switch(shift) {
   case 5 : __word2vecFwd<5,WLEN,BYDIM><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;
     //  case 10 : __convCols<7><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;

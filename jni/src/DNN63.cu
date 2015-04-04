@@ -3,10 +3,8 @@
 #include <stdio.h>
 #include <MatKernel.hpp>
 
-#define WLENB 16
+#define WLENB 8
 #define BYDIM 2
-
-
 
 #if __CUDA_ARCH__ >= 300
 
@@ -126,7 +124,7 @@ template<int SKIP, int WINLEN, int HEIGHT, int AnotB>
 
 int word2vecBwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C, float lrate, int AnotB) {
   dim3 threads(320, 1, 1);
-  int nblocks = min(4*2048, 2 + (ncols - 1)/WLENB);
+  int nblocks = min(2048, 2 + (ncols - 1)/WLENB);
   if (AnotB > 0) {
     __word2vecBwd<5,WLENB,301,1><<<nblocks,threads>>>(nrows, ncols, W, A, B, C, lrate);
   } else {
