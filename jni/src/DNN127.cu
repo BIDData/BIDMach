@@ -37,7 +37,7 @@ __global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, 
   int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
 
 #pragma unroll
-  for (i = 0; i < 2*SKIP; i++) {                           // init context words on edges
+  for (i = 0; i < 2*SKIP; i++) {                            // init context words on edges
     if (i + istart - SKIP > 0) {
       word[i + WINLEN] = W[i + istart - SKIP];
     }
@@ -45,7 +45,7 @@ __global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, 
 
   for (icol = istart; icol < iend; icol += WINLEN) {        // Iterate over columns in blocks of WINLEN
 #pragma unroll
-    for (j = 0; j < 2*SKIP; j++) {                         // Shift edge words from last time
+    for (j = 0; j < 2*SKIP; j++) {                          // Shift edge words from last time
       word[j] = word[j + WINLEN];
     }
 #pragma unroll
@@ -56,14 +56,14 @@ __global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, 
         word[i + 2*SKIP] = 0;
       }
 #pragma unroll
-      for (j = 0; j <= 2*SKIP; j++) {                      // clear the products matrix
+      for (j = 0; j <= 2*SKIP; j++) {                       // clear the products matrix
         prods[i][j] = 0;
       }
     }
 
     for (i = tid; i < nrows; i += dxy) {                    // Now iterate over the rows of this block
 #pragma unroll
-      for (j = 0; j < WINLEN + 2*SKIP ; j++) {             // Read A with edges
+      for (j = 0; j < WINLEN + 2*SKIP ; j++) {              // Read A with edges
         aa[j] = A[i + word[j] * nrows];
       }
 #pragma unroll
