@@ -68,4 +68,4 @@ int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int l
 
 int word2vecFwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C);
 
-int word2vecBwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C, float lrate);
+int word2vecBwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C, float lrate, int AnotB);

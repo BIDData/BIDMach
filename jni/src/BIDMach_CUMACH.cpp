@@ -419,14 +419,14 @@ extern "C" {
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_word2vecBwd
-  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint shift, jobject jW, jobject jA, jobject jB, jobject jC, jfloat lrate)
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint shift, jobject jW, jobject jA, jobject jB, jobject jC, jfloat lrate, jint AnotB)
   {
     int *W = (int*)getPointer(env, jW);
     float *A = (float*)getPointer(env, jA);
     float *B = (float*)getPointer(env, jB);
     float *C = (float*)getPointer(env, jC);
 
-    return word2vecBwd(nrows, ncols, shift, W, A, B, C, lrate);
+    return word2vecBwd(nrows, ncols, shift, W, A, B, C, lrate, AnotB);
   }
 
 }
