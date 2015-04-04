@@ -20,7 +20,7 @@
  *  SKIP is the max skip-gram length
  *  WINLEN is the length of a block of columns to process
  *
- *  Columns of the output matrix C are <window> (2*SKIP+1) long, contain inner products with corresponding columns of B. 
+ *  Columns of the output matrix C are <window> = 2*SKIP+1 long, and contain inner products with corresponding columns of B. 
  *  the row index of C specifies an offset from -SKIP ... SKIP into A, which is the column used for the inner product.
  *  i.e. C(i,j) = <B(:,j), A(:,j-SKIP+i)>
  *
