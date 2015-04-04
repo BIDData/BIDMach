@@ -11,6 +11,105 @@
 
 /*
  *
+ * Simple forward convolution kernel for word2vec. Computes inner products of columns from A with columns from B. 
+ * The column indices are specified by two "word" matrices. The inner products are computed as an outer product
+ * of the word matrices.
+ * 
+ *  SKIP is the max skip-gram length
+ *  WINLEN is the length of a block of columns to process
+ *
+ *  Columns of the output matrix C are <window> = 2*SKIP+1 long, and contain inner products with corresponding columns of B. 
+ *  the row index of C specifies an offset from -SKIP ... SKIP into A, which is the column used for the inner product.
+ *  i.e. C(i,j) = <B(:,j), A(:,j-SKIP+i)>
+ *
+ */
+
+template<int NWA, int NWB, int BDIM>
+  __global__ void __word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {
+  const int nwab = NWA*NWB;
+  __shared__ float CC[NWA*NWB*BDIM];
+  float aa[NWA];
+  float bb[NWB];
+  float prods[NWA][NWB];
+  int wa[NWA];
+  int wb[NWB];
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  int dxy = blockDim.x * blockDim.y;
+  int i, j, k, icol;
+  int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
+  int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+
+  for (icol = istart; icol < iend; icol++) {            // Iterate over columns
+#pragma unroll
+    for (i = 0; i < NWA; i++) {
+      for (j = 0; j < NWB; j++) {                       // clear the products matrix
+        prods[i][j] = 0;
+      }
+      wa[i] = WA[i + icol * NWA];                       // Fill the A word matrix
+    }
+    for (i = 0; i < NWB; i++) {
+      wb[i] = WB[i + icol * NWB];                       // Fill the B word matrix
+    }
+
+    for (i = tid; i < nrows; i += dxy) {                // Now iterate over the rows of this block
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                       // Read A
+        aa[j] = A[i + wa[j] * nrows];
+      }
+#pragma unroll
+      for (j = 0; j < NWB ; j++) {                      // Read B
+        bb[j] = B[i + wb[j] * nrows];
+      }
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                        // Computes the products of these elements
+#pragma unroll
+        for (k = 0; k < NWB; k++) {
+          prods[j][k] += aa[j] * bb[k];
+        }
+      }
+    }                                                    // Finished the entire block
+
+#pragma unroll
+    for (i = 0; i < NWA; i++) {                          // Reduce the products within each warp
+#pragma unroll
+      for (j = 0; j < NWB; j++) {
+#pragma unroll
+        for (k = 1; k < 32; k = k+k) {
+          float tmp = __shfl_down(prods[i][j], k);
+          prods[i][j] += tmp;
+        }
+      }
+    }
+
+    __syncthreads();
+    if (threadIdx.x == 0) {                               // Save the products to SHMEM (one copy per warp)
+#pragma unroll
+      for (i = 0; i < NWA; i++) {
+#pragma unroll
+        for (j = 0; j < NWB; j++) {
+          CC[j + NWB * (i + NWA * threadIdx.y)] = prods[i][j];
+        }
+      }
+    }
+
+    __syncthreads();
+    for (i = 1; i < blockDim.y; i++) {
+      __syncthreads();
+      for (j = tid; j < nwab; j += dxy) {                   // Reduce the products across warps
+        CC[j] += CC[j + i * nwab];
+      } 
+    } 
+    __syncthreads();
+    for (i = tid; i < nwab; i += dxy) {                     // Save to main memory
+      C[i + icol * nwab] = CC[i];  
+        //atomicAdd(&C[i + icol * nwab], CC[i]); 
+    }
+    __syncthreads();
+  }
+}
+
+/*
+ *
  * Simple forward convolution kernel for word2vec. Computes the inner products of each column of A with a nearby column of B. 
  * 
  *  SKIP is the max skip-gram length
@@ -23,7 +122,7 @@
  */
 
 template<int SKIP, int WINLEN, int BDIM>
-__global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, float *C) {
+__global__ void __word2vecFwdx(int nrows, int ncols, int *W, float *A, float *B, float *C) {
   const int window = 2*SKIP+1;
   float aa[WINLEN + 2*SKIP];
   float bb[WINLEN];
@@ -118,6 +217,7 @@ __global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, 
     __syncthreads();
   }
 }
+
 
 // Custom convolution kernel for vectors
 
@@ -248,8 +348,8 @@ __global__ void __convColsx(int nrows, int ncols, int *W, float *A, float *B, fl
 template<int SKIP>
 __global__ void __convRows(int nrows, int ncols, float *A, int lda, float *B, int ldb, float *C) {}
 
-template<int SKIP, int WINLEN, int BDIM>
-__global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, float *C) {}
+template<int NWA, int NWB, int BDIM>
+__global__ void __word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {}
 
 
 #endif
@@ -266,13 +366,10 @@ int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int l
   return err;
 }
 
-int word2vecFwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C) {
+int word2vecFwd(int nrows, int ncols, int *WA, int nwa, int *WB, int nwb, float *A, float *B, float *C) {
   dim3 threads(32, BYDIM, 1);
   int nblocks = min(2048, 2 + (ncols - 1)/WLEN);
-  switch(shift) {
-  case 5 : __word2vecFwd<5,WLEN,BYDIM><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;
-    //  case 10 : __convCols<7><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;
-  }
+  __word2vecFwd<5,11,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C);
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
