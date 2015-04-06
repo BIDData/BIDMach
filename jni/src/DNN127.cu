@@ -14,8 +14,8 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
   float daa[NELTS][NWINDOW];
   float bb[NELTS];
   float dbb[NELTS];
-  __shared__ float prods[NYDIM][32];
-  __shared__ int wb[NNEG];
+  __shared__ float prods[NYDIM][NNEG*NWINDOW];
+  __shared__ int wb[NNEG*NWINDOW];
 
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   int dxy = blockDim.x * blockDim.y;
@@ -26,8 +26,8 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
   bool good = false;
 
 #pragma unroll
-  for (icol = 0; icol < NWINDOW; icol++) {                  // Fill up the data WINDOW
-    thiscol = istart - NSKIP + icol + 1;
+  for (icol = 0; icol < NSKIP; icol++) {                  // Fill up the data WINDOW
+    thiscol = istart + icol + 1;
     good = (thiscol > 0 && thiscol < ncols);
     if (good) {
       wa = WA[thiscol];
@@ -37,9 +37,9 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
 #pragma unroll
     for (i = 0; i < NELTS; i++) {                           // get the column data in NELTS sections
       if (good && tid + i*dxy < nrows) {
-        aa[i][icol] = A[tid + i*dxy + wa * nrows];          // Load the new data
+        aa[i][icol+NSKIP+1] = A[tid + i*dxy + wa * nrows];          // Load the new data
       } else {
-        aa[i][icol] = 0;
+        aa[i][icol+NSKIP+1] = 0;
       }
     }
   }
@@ -61,6 +61,9 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
         aa[i][j] = aa[i][j+1];
         daa[i][j] = daa[i][j+1];
       }
+    }
+#pragma unroll
+    for (i = 0; i < NELTS; i++) {                           // get the column data in NELTS sections
       if (good && tid + i*dxy < nrows) {
         aa[i][NWINDOW-1] = A[tid + i*dxy + wa * nrows];     // Load the new data
       } else {
@@ -71,31 +74,31 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
 
     // Get negative column indices
     __syncthreads();
-    if (tid < NNEG) {                                  
-      wb[tid] = WB[tid + icol * NNEG];
+    if (tid < NNEG*NWINDOW) {                                  
+      wb[tid] = WB[tid + NNEG * NWINDOW * icol];
     }
     __syncthreads();
-    // Iterate over the negatives
-    for (jneg = 0; jneg < NNEG; jneg++) {                   // Iterate over the negatives
-#pragma unroll
-      for (i = 0; i < NELTS; i++) {                         // load the current negative column in NELTS sections
-        if (tid + i*dxy < nrows) {
-          bb[i] = B[tid + i*dxy + wb[jneg] * nrows]; 
-        } else {
-          bb[i] = 0;
-        }
-        dbb[i] = 0;
-      }
-
       // Compute all the inner products with the current negative
 #pragma unroll
-      for (j = 0; j < NWINDOW; j++) {     
-        f = 0;
+    for (j = 0; j < NWINDOW; j++) {     
+    // Iterate over the negatives
 #pragma unroll
-        for (i = 0; i < NELTS; i++) {                       // load the current negative column in NELTS sections
-          f += aa[i][j] * bb[i];                            // partial product
+      for (jneg = 0; jneg < NNEG; jneg++) {                   // Iterate over the negatives
+#pragma unroll
+        for (i = 0; i < NELTS; i++) {                         // load the current negative column in NELTS sections
+          if (tid + i*dxy < nrows) {
+            bb[i] = B[tid + i*dxy + wb[jneg + NNEG*j] * nrows]; 
+          } else {
+            bb[i] = 0;
+          }
+          dbb[i] = 0;
         }
 
+        f = 0;
+#pragma unroll
+        for (i = 0; i < NELTS; i++) {                         // load the current negative column in NELTS sections
+          f += aa[i][j] * bb[i];                            // partial product
+        }
         // This section reduces f over the column
 #pragma unroll
         for (k = 1; k < 32; k = k+k) {                      // Reduce f in a warp
@@ -104,39 +107,48 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
         }
         __syncthreads();
         if (threadIdx.x == 0) {                             // Save f to SHMEM
-          prods[threadIdx.y][j] = f;
+          prods[threadIdx.y][jneg+NNEG*j] = f;
         }
       }
-      __syncthreads();
+    }
+    __syncthreads();
 #pragma unroll
-      for (i = 1; i < NYDIM; i++) {                         // Reduce in SHMEM 
-        if (tid < NWINDOW) {
-          prods[0][tid] += prods[i][tid];
-        }
-        __syncthreads();
+    for (i = 1; i < NYDIM; i++) {                         // Reduce in SHMEM 
+#pragma unroll
+      for (j = tid; j < NWINDOW * NNEG; j += dxy) {
+        prods[0][tid] += prods[i][tid];
       }
       __syncthreads();
-#pragma unroll
-      for (j = 0; j < NWINDOW; j++) {     
-        f = prods[0][j];                                    // Get the value back to register memory
-
+    }
+    for (j = tid; j < NWINDOW * NNEG; j += dxy) {
+      f = prods[0][tid];
         // Compute g from f
-        label = (jneg == 0);
-        if (f > 12.0f) {
-          g = 1.0f;
-        } else {
-          float expf = exp(f);
-          g = expf / (1.0f + expf);
-        }
-        g = (label - g) * lrate;
+      label = tid % NNEG;
+      if (f > 12.0f) {
+        g = 1.0f;
+      } else {
+        float expf = exp(f);
+        g = expf / (1.0f + expf);
+      }
+      g = (label - g) * lrate;
+      prods[0][tid] = g;
+    }
+    __syncthreads();
 
-        // Update the gradients
+#pragma unroll
+    for (j = 0; j < NWINDOW; j++) {     
+#pragma unroll
+      for (jneg = 0; jneg < NNEG; jneg++) {                   // Iterate over the negatives
+        g = prods[0][jneg + NNEG * i];
 #pragma unroll
         for (i = 0; i < NELTS; i++) {     
           daa[i][j] += g * bb[i];
           dbb[i] += g * aa[i][j];
         }
       }
+    }
+#pragma unroll
+    for (j = 0; j < NWINDOW; j++) {     
       __syncthreads();
 #pragma unroll
       for (i = 0; i < NELTS; i++) {                         // Save the update to the negative column
@@ -509,7 +521,7 @@ __global__ void __word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, 
 
 int word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {
   const int NSKIP = 5;
-  const int NNEG = 6;
+  const int NNEG = 5;
   const int NELTS = 5;
   const int NYDIM = 2; 
   dim3 threads(32, NYDIM, 1);
