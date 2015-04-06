@@ -26,7 +26,7 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
 
   for (icol = istart; icol < iend; icol++) {                // Iterate over columns
 
-    // Load WINDOW columns for A into registers
+    // Load NWINDOW columns for A into registers
     thiscol = icol + NSKIP;
     if (thiscol < ncols) {
       wa = WA[thiscol];                                     // get the word index
@@ -107,7 +107,7 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
           float expf = exp(f);
           g = expf / (1.0f + expf);
         }
-        g = label - g;
+        g = (label - g) * lrate;
 
         // Update the gradients
 #pragma unroll
