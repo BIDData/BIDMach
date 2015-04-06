@@ -107,53 +107,36 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
         }
         __syncthreads();
         if (threadIdx.x == 0) {                             // Save f to SHMEM
-          prods[threadIdx.y][jneg+NNEG*j] = f;
+          prods[threadIdx.y][0] = f;
         }
-      }
-    }
-    __syncthreads();
-#pragma unroll
-    for (i = 1; i < NYDIM; i++) {                         // Reduce in SHMEM 
-#pragma unroll
-      for (j = tid; j < NWINDOW * NNEG; j += dxy) {
-        prods[0][tid] += prods[i][tid];
-      }
-      __syncthreads();
-    }
-    for (j = tid; j < NWINDOW * NNEG; j += dxy) {
-      f = prods[0][tid];
+        __syncthreads();
+        if (tid == 0) {
+          for (i = 1; i < NYDIM; i++) {                         // Reduce in SHMEM 
+            prods[0][0] += prods[i][0];
+          }
+        }
+        __syncthreads();
+        f = prods[0][0];
         // Compute g from f
-      label = tid % NNEG;
-      if (f > 12.0f) {
-        g = 1.0f;
-      } else {
-        float expf = exp(f);
-        g = expf / (1.0f + expf);
-      }
-      g = (label - g) * lrate;
-      prods[0][tid] = g;
-    }
-    __syncthreads();
+        label = (jneg == 0);
+        if (f > 12.0f) {
+          g = 1.0f;
+        } else {
+          float expf = exp(f);
+          g = expf / (1.0f + expf);
+        } 
+        g = (label - g) * lrate;
 
-#pragma unroll
-    for (j = 0; j < NWINDOW; j++) {     
-#pragma unroll
-      for (jneg = 0; jneg < NNEG; jneg++) {                   // Iterate over the negatives
-        g = prods[0][jneg + NNEG * i];
 #pragma unroll
         for (i = 0; i < NELTS; i++) {     
           daa[i][j] += g * bb[i];
           dbb[i] += g * aa[i][j];
         }
-      }
-    }
 #pragma unroll
-    for (j = 0; j < NWINDOW; j++) {     
-      __syncthreads();
-#pragma unroll
-      for (i = 0; i < NELTS; i++) {                         // Save the update to the negative column
-        if (tid + i*dxy < nrows) {
-          atomicAdd(&B[tid + i*dxy + wb[jneg] * nrows], dbb[i]);
+        for (i = 0; i < NELTS; i++) {                         // Save the update to the negative column
+          if (tid + i*dxy < nrows) {
+            atomicAdd(&B[tid + i*dxy + wb[jneg] * nrows], dbb[i]);
+          }
         }
       }
     } 
@@ -547,7 +530,7 @@ int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int l
 int word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {
   dim3 threads(32, BYDIM, 1);
   int nblocks = min(4096, 2 + (ncols - 1));
-  __word2vecFwd<11,6,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C);
+  __word2vecFwd<8,8,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C);
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;

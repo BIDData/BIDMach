@@ -4,7 +4,7 @@
 #include <MatKernel.hpp>
 
 #define WLENB 8
-#define BYDIM 10
+#define BYDIM 5
 
 #if __CUDA_ARCH__ >= 300
 
@@ -19,81 +19,67 @@
  */
 
 
-template<int NWA, int NWB, int AnotB>
+template<int NWA, int NWB, int MAXDIM>
   __global__ void __word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
   const int nwab = NWA * NWB;
-  __shared__ float cc[nwab];
-  float aa[NWA];
-  float bb[NWB];
+  float dd[MAXDIM];
   int wa[NWA];
   int wb[NWB];
+  __shared__ float cc[NWA*NWB];
   int tid = threadIdx.x;
   int fid = threadIdx.x + blockDim.x * threadIdx.y; 
   int dxy = blockDim.x * blockDim.y;
   int icol, i, j, k;
+  float sum;
   int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
   int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
 
   for (icol = istart; icol < iend; icol++) {            // iterate in columns
+#pragma unroll
+    for (j = 0; j < NWA; j++) {
+      wa[j] = WA[j + icol * NWA];                       // Load the A word matrix
+    }
     __syncthreads();
-    for (i = fid; i < nwab; i += dxy) {                 // Load C
+#pragma unroll 
+    for (j = 0; j < NWB; j++) {
+      wb[j] = WB[j + icol * NWB];                       // Load the B word matrix
+    }
+    for (i = fid; i < nwab; i += dxy) {
       cc[i] = C[i + icol * nwab];
     }
     __syncthreads();
-    for (i = tid; i < nrows; i += blockDim.x) {
+    for (i = tid; i < nrows; i += dxy) {
 #pragma unroll
-      for (j = 0; j < NWA; j++) {
-        wa[j] = WA[j + icol * NWA];                       // Load the A word matrix
-      }
-#pragma unroll
-      for (j = 0; j < NWB; j++) {
-        wb[j] = WB[j + icol * NWB];                       // Load the B word matrix
-      }
-      if (AnotB) {
-#pragma unroll
-        for (j = 0; j < NWA; j++) {                       // Clear A, the output vector;
-          aa[j] = 0;
-        }
-#pragma unroll
-        for (j = 0; j < NWB; j++) {                       // Load the data
-          bb[j] = B[i + wb[j] * nrows];
-        }
-      } else {
-#pragma unroll
-        for (j = 0; j < NWB; j++) {                       // Clear B, the output vector;
-          bb[j] = 0;      
-        }
-#pragma unroll
-        for (j = 0; j < NWA; j++) {                       // Load the data
-          aa[j] = A[i + wa[j] * nrows];
-        }
+      for (j = 0; j < NWB; j++) {                       // Load the data
+        dd[j] = B[i + wb[j] * nrows];
       }
 
-#pragma unroll
       for (j = 0; j < NWA; j++) {                         // Now do the product
+        sum = 0;
 #pragma unroll
         for (k = 0; k < NWB; k++) {                       
-          if (AnotB) {
-            aa[j] += cc[j + k * NWA] * bb[k];
-          } else {
-            bb[k] += cc[j + k * NWA] * aa[j];
-          }
+          float xx =  cc[j + k * NWA];
+          sum += xx * dd[k];
         }
+        atomicAdd(&A[i + wa[j] * nrows], sum * lrate);
       }
 
-      if (AnotB) {
 #pragma unroll
-        for (j = 0; j < NWA; j++) {                         // Output the product
-          atomicAdd(&A[i + wa[j] * nrows], aa[j] * lrate);
-        }
-      } else {
+      for (j = 0; j < NWA; j++) {                       // Load the data
+        dd[j] = A[i + wa[j] * nrows];
+      }
+
+      for (j = 0; j < NWB; j++) {                         // Now do the product
+        sum = 0;
 #pragma unroll
-        for (j = 0; j < NWB; j++) {                         // Output the product
-          atomicAdd(&B[i + wb[j] * nrows], bb[j] * lrate);
+        for (k = 0; k < NWA; k++) {                       
+          float xx =  cc[k + j * NWA];
+          sum += xx * dd[k];
         }
+        atomicAdd(&B[i + wb[j] * nrows], sum * lrate);
       }
     }
-  }  
+  }
 }
 
 /*
@@ -106,7 +92,7 @@ template<int NWA, int NWB, int AnotB>
  *
  */
 
-
+/*
 template<int SKIP, int WINLEN, int HEIGHT, int AnotB>
   __global__ void __word2vecBwdx(int nrows, int ncols, int *W, float *A, float *B, float *C, float lrate) {
   const int window = 2*SKIP+1;
@@ -200,11 +186,11 @@ template<int SKIP, int WINLEN, int HEIGHT, int AnotB>
     }
   }  
 }
-
+*/
 
 #else 
 
-template<int NWA, int NWB, int AnotB>
+template<int NWA, int NWB, int MAXDIM>
   __global__ void __word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {}
 
 
@@ -213,10 +199,10 @@ template<int NWA, int NWB, int AnotB>
 int word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
   dim3 threads(32*BYDIM, 1, 1);
   int nblocks = min(2048, 2 + (ncols - 1)/WLENB);
-  __word2vecBwd<11,6,1><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
+  __word2vecBwd<5,5,8><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
   cudaDeviceSynchronize();
-  __word2vecBwd<11,6,0><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
-  cudaDeviceSynchronize();
+  //  __word2vecBwd<8,8,0><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
+  //  cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
 }
