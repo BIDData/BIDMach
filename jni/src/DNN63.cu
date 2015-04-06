@@ -14,7 +14,7 @@
  * Computes the gradient for A given B or vice-versa, and does an SGD update.
  * 
  *  SKIP is the max skip-gram length
- *  WINLEN is the length of a block of columns to process
+ *  WINLEN is the length of a block of columns to process 
  *
  */
 
@@ -28,7 +28,7 @@ template<int NWA, int NWB, int AnotB>
   int wa[NWA];
   int wb[NWB];
   int tid = threadIdx.x;
-  int fid = threadIdx.x + blockDim.x * threadIdx.y;
+  int fid = threadIdx.x + blockDim.x * threadIdx.y; 
   int dxy = blockDim.x * blockDim.y;
   int icol, i, j, k;
   int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
@@ -41,31 +41,27 @@ template<int NWA, int NWB, int AnotB>
     }
     __syncthreads();
     for (i = tid; i < nrows; i += blockDim.x) {
+#pragma unroll
+      for (j = 0; j < NWA; j++) {
+        wa[j] = WA[j + icol * NWA];                       // Load the A word matrix
+      }
+#pragma unroll
+      for (j = 0; j < NWB; j++) {
+        wb[j] = WB[j + icol * NWB];                       // Load the B word matrix
+      }
       if (AnotB) {
 #pragma unroll
         for (j = 0; j < NWA; j++) {                       // Clear A, the output vector;
           aa[j] = 0;
         }
+#pragma unroll
+        for (j = 0; j < NWB; j++) {                       // Load the data
+          bb[j] = B[i + wb[j] * nrows];
+        }
       } else {
 #pragma unroll
         for (j = 0; j < NWB; j++) {                       // Clear B, the output vector;
           bb[j] = 0;      
-        }
-      }
-
-#pragma unroll
-      for (j = 0; j < NWA; j++) {
-        wa[j] = WA[j + icol * NWA];                       // Load the A word matrix
-    }
-#pragma unroll
-      for (j = 0; j < NWB; j++) {
-        wb[j] = WB[j + icol * NWB];                       // Load the B word matrix
-      }
-
-      if (AnotB) {
-#pragma unroll
-        for (j = 0; j < NWB; j++) {                       // Load the data
-          bb[j] = B[i + wb[j] * nrows];
         }
 #pragma unroll
         for (j = 0; j < NWA; j++) {                       // Load the data
@@ -206,7 +202,7 @@ template<int SKIP, int WINLEN, int HEIGHT, int AnotB>
 }
 
 
-#else
+#else 
 
 template<int NWA, int NWB, int AnotB>
   __global__ void __word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {}
@@ -214,14 +210,12 @@ template<int NWA, int NWB, int AnotB>
 
 #endif
 
-int word2vecBwd(int nrows, int ncols, int *WA, int nwa, int *WB, int nwb, float *A, float *B, float *C, float lrate, int AnotB) {
+int word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
   dim3 threads(32*BYDIM, 1, 1);
   int nblocks = min(2048, 2 + (ncols - 1)/WLENB);
-  if (AnotB > 0) {
-    __word2vecBwd<5,11,1><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
-  } else {
-    __word2vecBwd<5,11,0><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
-  }
+  __word2vecBwd<11,6,1><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
+  cudaDeviceSynchronize();
+  __word2vecBwd<11,6,0><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;

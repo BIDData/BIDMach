@@ -3,11 +3,140 @@
 #include <stdio.h>
 #include <MatKernel.hpp>
 
-// Window length and ydim for forward word2vec
-#define WLEN 6
 #define BYDIM 2
 
 #if __CUDA_ARCH__ >= 300
+
+template<int NSKIP, int NNEG, int NELTS, int NYDIM>
+  __global__ void __word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {
+  const int NWINDOW = 1 + 2 * NSKIP;
+  float aa[NELTS][NWINDOW];
+  float daa[NELTS][NWINDOW];
+  float bb[NELTS];
+  float dbb[NELTS];
+  __shared__ float prods[NYDIM][32];
+  __shared__ int wb[NNEG];
+
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  int dxy = blockDim.x * blockDim.y;
+  int i, j, k, icol, jneg, thiscol, wa;
+  float f, g, label;
+  int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
+  int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+
+  for (icol = istart; icol < iend; icol++) {                // Iterate over columns
+
+    // Load WINDOW columns for A into registers
+    thiscol = icol + NSKIP;
+    if (thiscol < ncols) {
+      wa = WA[thiscol];                                     // get the word index
+    } else {
+      wa = 0;
+    }
+#pragma unroll
+    for (i = 0; i < NELTS; i++) {                           // get the column data in NELTS sections
+#pragma unroll
+      for (j = 0; j < NWINDOW-1; j++) {                     // Need to shift the saved data (register arrays not indexable)
+        aa[i][j] = aa[i][j+1];
+        daa[i][j] = daa[i][j+1];
+      }
+      if (tid + i*dxy < nrows) {
+        aa[i][NWINDOW-1] = A[tid + i*dxy + wa * nrows];     // Load the new data
+      } else {
+        aa[i][NWINDOW-1] = 0;   
+      }
+      daa[i][NWINDOW-1] = 0;                                // Clear the derivative
+    }
+
+    // Get negative column indices
+    __syncthreads();
+    if (tid < NNEG) {                                  
+      wb[tid] = WB[tid + icol * NNEG];
+    }
+    __syncthreads();
+    // Iterate over the negatives
+    for (jneg = 0; jneg < NNEG; jneg++) {                   // Iterate over the negatives
+#pragma unroll
+      for (i = 0; i < NELTS; i++) {                         // load the current negative column in NELTS sections
+        if (tid + i*dxy < nrows) {
+          bb[i] = B[tid + i*dxy + wb[jneg] * nrows]; 
+        } else {
+          bb[i] = 0;
+        }
+        dbb[i] = 0;
+      }
+
+      // Compute all the inner products with the current negative
+#pragma unroll
+      for (j = 0; j < NWINDOW; j++) {     
+        f = 0;
+#pragma unroll
+        for (i = 0; i < NELTS; i++) {                       // load the current negative column in NELTS sections
+          f += aa[i][j] * bb[i];                            // partial product
+        }
+
+        // This section reduces f over the column
+#pragma unroll
+        for (k = 1; k < 32; k = k+k) {                      // Reduce f in a warp
+          float tmp = __shfl_down(f, k);
+          f += tmp;
+        }
+        __syncthreads();
+        if (threadIdx.x == 0) {                             // Save f to SHMEM
+          prods[threadIdx.y][j] = f;
+        }
+      }
+      __syncthreads();
+#pragma unroll
+      for (i = 1; i < NYDIM; i++) {                         // Reduce in SHMEM 
+        if (tid < NWINDOW) {
+          prods[0][tid] += prods[i][tid];
+        }
+        __syncthreads();
+      }
+      __syncthreads();
+#pragma unroll
+      for (j = 0; j < NWINDOW; j++) {     
+        f = prods[0][j];                                    // Get the value back to register memory
+
+        // Compute g from f
+        label = (jneg == 0);
+        if (f > 12.0f) {
+          g = 1.0f;
+        } else {
+          float expf = exp(f);
+          g = expf / (1.0f + expf);
+        }
+        g = label - g;
+
+        // Update the gradients
+#pragma unroll
+        for (i = 0; i < NELTS; i++) {     
+          daa[i][j] += g * bb[i];
+          dbb[i] += g * aa[i][j];
+        }
+      }
+      __syncthreads();
+#pragma unroll
+      for (i = 0; i < NELTS; i++) {                         // Save the update to the negative column
+        if (tid + i*dxy < nrows) {
+          atomicAdd(&B[tid + i*dxy + wb[jneg] * nrows], dbb[i]);
+        }
+      }
+    } 
+    __syncthreads();
+    thiscol = icol - NSKIP;
+    if (thiscol >= 0 && thiscol < ncols) {
+      wa = WA[thiscol];                                     // get the word index
+#pragma unroll
+      for (i = 0; i < NELTS; i++) {                 
+        if (tid + i*dxy < nrows) {
+          atomicAdd(&A[tid + i*dxy + wa * nrows], daa[i][0]);
+        }
+      }
+    }
+  }
+}
 
 /*
  *
@@ -345,6 +474,9 @@ __global__ void __convColsx(int nrows, int ncols, int *W, float *A, float *B, fl
 
 #else
 
+template<int NSKIP, int NNEG, int NELTS, int NYDIM>
+  __global__ void __word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {}
+
 template<int SKIP>
 __global__ void __convRows(int nrows, int ncols, float *A, int lda, float *B, int ldb, float *C) {}
 
@@ -353,6 +485,19 @@ __global__ void __word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, 
 
 
 #endif
+
+int word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {
+  const int NSKIP = 5;
+  const int NNEG = 6;
+  const int NELTS = 5;
+  const int NYDIM = 2; 
+  dim3 threads(32, NYDIM, 1);
+  int nblocks = min(4096, 2 + (ncols - 1));
+  __word2vec<NSKIP,NNEG,NELTS,NYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate);
+  cudaDeviceSynchronize(); 
+  int err = cudaGetLastError();
+  return err;
+}
 
 int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int ldb, float *C) {
   dim3 threads(32, 32, 1);
@@ -366,12 +511,12 @@ int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int l
   return err;
 }
 
-int word2vecFwd(int nrows, int ncols, int *WA, int nwa, int *WB, int nwb, float *A, float *B, float *C) {
+int word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {
   dim3 threads(32, BYDIM, 1);
-  int nblocks = min(2048, 2 + (ncols - 1)/WLEN);
-  __word2vecFwd<5,11,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C);
+  int nblocks = min(4096, 2 + (ncols - 1));
+  __word2vecFwd<11,6,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C);
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
-}
+  }
 
