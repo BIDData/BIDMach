@@ -23,12 +23,33 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
   float f, g, label;
   int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
   int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+  bool good = false;
+
+#pragma unroll
+  for (icol = 0; icol < NWINDOW; icol++) {                  // Fill up the data WINDOW
+    thiscol = istart - NSKIP + icol + 1;
+    good = (thiscol > 0 && thiscol < ncols);
+    if (good) {
+      wa = WA[thiscol];
+    } else {
+      wa = 0;
+    }
+#pragma unroll
+    for (i = 0; i < NELTS; i++) {                           // get the column data in NELTS sections
+      if (good && tid + i*dxy < nrows) {
+        aa[i][icol] = A[tid + i*dxy + wa * nrows];          // Load the new data
+      } else {
+        aa[i][icol] = 0;
+      }
+    }
+  }
 
   for (icol = istart; icol < iend; icol++) {                // Iterate over columns
 
-    // Load NWINDOW columns for A into registers
+    // Load the last column in the window into register memory
     thiscol = icol + NSKIP;
-    if (thiscol < ncols) {
+    good = (thiscol < ncols);
+    if (good) {
       wa = WA[thiscol];                                     // get the word index
     } else {
       wa = 0;
@@ -40,7 +61,7 @@ template<int NSKIP, int NNEG, int NELTS, int NYDIM>
         aa[i][j] = aa[i][j+1];
         daa[i][j] = daa[i][j+1];
       }
-      if (tid + i*dxy < nrows) {
+      if (good && tid + i*dxy < nrows) {
         aa[i][NWINDOW-1] = A[tid + i*dxy + wa * nrows];     // Load the new data
       } else {
         aa[i][NWINDOW-1] = 0;   
@@ -492,7 +513,7 @@ int word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float l
   const int NELTS = 5;
   const int NYDIM = 2; 
   dim3 threads(32, NYDIM, 1);
-  int nblocks = min(4096, 2 + (ncols - 1));
+  int nblocks = min(1024, 2 + (ncols - 1));
   __word2vec<NSKIP,NNEG,NELTS,NYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate);
   cudaDeviceSynchronize(); 
   int err = cudaGetLastError();
