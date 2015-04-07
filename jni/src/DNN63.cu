@@ -196,13 +196,17 @@ template<int NWA, int NWB, int MAXDIM>
 
 #endif
 
-int word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
+int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
   dim3 threads(32*BYDIM, 1, 1);
   int nblocks = min(2048, 2 + (ncols - 1)/WLENB);
-  __word2vecBwd<5,5,8><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
+  int which = nwa*10000 + nwb;
+  switch (which) {
+  case 10005: __word2vecBwd<1,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 50005: __word2vecBwd<5,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 110005: __word2vecBwd<11,5,11><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 80006: __word2vecBwd<8,6,8><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  }
   cudaDeviceSynchronize();
-  //  __word2vecBwd<8,8,0><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate);
-  //  cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
 }

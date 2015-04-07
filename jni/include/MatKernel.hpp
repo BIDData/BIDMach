@@ -66,8 +66,8 @@ int word2vecBlock(int nrows, int ncols, int nwords, int shift, int npos, int nne
 
 int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int ldb, float *C);
 
-int word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C);
+int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C);
 
-int word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate);
+int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C, float lrate);
 
 int word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate);

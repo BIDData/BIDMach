@@ -2,8 +2,8 @@ include Makefile.incl
 
 MKL_OBJS=
 
-CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ) HashMult.$(OBJ) DNN63.$(OBJ) DNN127.$(OBJ) \
-          Logger.$(OBJ) JNIUtils.$(OBJ) PointerUtils.$(OBJ)
+CUDA_OBJS=BIDMach_CUMACH.$(OBJ) BIDMach_CPUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ) HashMult.$(OBJ) \
+          DNN63.$(OBJ) DNN127.$(OBJ) Logger.$(OBJ) JNIUtils.$(OBJ) PointerUtils.$(OBJ)
 
 .SUFFIXES: .$(OBJ) .c .cpp .cu
 

@@ -1,4 +1,4 @@
-:silent
+//:silent
 val dir="c:/code/BIDMach/data/rcv1/"
 
 val a0 = loadSMat(dir + "docs.smat.lz4")(0->100000,?)

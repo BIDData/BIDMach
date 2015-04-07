@@ -527,10 +527,16 @@ int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int l
   return err;
 }
 
-int word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {
+int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C) {
   dim3 threads(32, BYDIM, 1);
   int nblocks = min(4096, 2 + (ncols - 1));
-  __word2vecFwd<8,8,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C);
+  int which = nwa*10000 + nwb;
+  switch (which) {
+  case 10005: __word2vecFwd<1,5,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  case 50005: __word2vecFwd<5,5,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  case 110005: __word2vecFwd<11,5,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  case 80006: __word2vecFwd<8,6,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
