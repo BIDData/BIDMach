@@ -488,6 +488,80 @@ __global__ void __convColsx(int nrows, int ncols, int *W, float *A, float *B, fl
   }
 }
 
+/*
+ *
+ * Simple backward convolution kernel for word2vec. 
+ * Computes the gradient for A given B or vice-versa, and does an SGD update.
+ * 
+ *  SKIP is the max skip-gram length
+ *  WINLEN is the length of a block of columns to process 
+ *
+ */
+
+
+template<int NWA, int NWB, int MAXDIM>
+  __global__ void __word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
+  const int nwab = NWA * NWB;
+  float dd[MAXDIM];
+  int wa[NWA];
+  int wb[NWB];
+  __shared__ float cc[NWA*NWB];
+  int tid = threadIdx.x;
+  int fid = threadIdx.x + blockDim.x * threadIdx.y; 
+  int dxy = blockDim.x * blockDim.y;
+  int icol, i, j, k;
+  float sum;
+  int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
+  int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+
+  for (icol = istart; icol < iend; icol++) {            // iterate in columns
+#pragma unroll
+    for (j = 0; j < NWA; j++) {
+      wa[j] = WA[j + icol * NWA];                       // Load the A word matrix
+    }
+    __syncthreads();
+#pragma unroll 
+    for (j = 0; j < NWB; j++) {
+      wb[j] = WB[j + icol * NWB];                       // Load the B word matrix
+    }
+    for (i = fid; i < nwab; i += dxy) {
+      cc[i] = C[i + icol * nwab];
+    }
+    __syncthreads();
+    for (i = tid; i < nrows; i += dxy) {
+#pragma unroll
+      for (j = 0; j < NWB; j++) {                       // Load the data
+        dd[j] = B[i + wb[j] * nrows];
+      }
+
+      for (j = 0; j < NWA; j++) {                         // Now do the product
+        sum = 0;
+#pragma unroll
+        for (k = 0; k < NWB; k++) {                       
+          float xx =  cc[j + k * NWA];
+          sum += xx * dd[k];
+        }
+        atomicAdd(&A[i + wa[j] * nrows], sum * lrate);
+      }
+
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                       // Load the data
+        dd[j] = A[i + wa[j] * nrows];
+      }
+
+      for (j = 0; j < NWB; j++) {                         // Now do the product
+        sum = 0;
+#pragma unroll
+        for (k = 0; k < NWA; k++) {                       
+          float xx =  cc[k + j * NWA];
+          sum += xx * dd[k];
+        }
+        atomicAdd(&B[i + wb[j] * nrows], sum * lrate);
+      }
+    }
+  }
+}
+
 #else
 
 template<int NSKIP, int NNEG, int NELTS, int NYDIM>
@@ -498,6 +572,9 @@ __global__ void __convRows(int nrows, int ncols, float *A, int lda, float *B, in
 
 template<int NWA, int NWB, int BDIM>
 __global__ void __word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {}
+
+template<int NWA, int NWB, int MAXDIM>
+  __global__ void __word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {}
 
 
 #endif
@@ -536,9 +613,25 @@ int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
   case 50005: __word2vecFwd<5,5,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
   case 110005: __word2vecFwd<11,5,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
   case 80006: __word2vecFwd<8,6,BYDIM><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  default : printf("word2vecFwd unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
   }
 
+int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
+  dim3 threads(32*BYDIM, 1, 1);
+  int nblocks = min(2048, 2 + (ncols - 1));
+  int which = nwa*10000 + nwb;
+  switch (which) {
+  case 10005: __word2vecBwd<1,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 50005: __word2vecBwd<5,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 110005: __word2vecBwd<11,5,11><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 80006: __word2vecBwd<8,6,8><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  default : printf("word2vecBwd unsupport size combination %d %d\n", nwa, nwb); return 1;
+  }
+  cudaDeviceSynchronize();
+  int err = cudaGetLastError();
+  return err;
+}

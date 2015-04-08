@@ -150,12 +150,12 @@ elif [ "$OS" = "linux" ] ; then
 elif [ "$OS" = "windows" ] ; then
     CUDA_HOME="$CUDA_PATH"
     MKL_ROOT="$MKLROOT"
-    CC="cl"
+    CC="icl"
     GCC="cl"
     NVCC="nvcc"
     OBJ="obj"
     OUTFLG="/OUT:"
-    CFLAGS="/c /MT /DNDEBUG /O2 /EHsc $CFLAGS"    # static linking
+    CFLAGS="/openmp /c /MT /DNDEBUG /O2 /EHsc $CFLAGS"    # static linking
     CPPFLAGS="/c /MT /DNDEBUG /O2 /EHsc $CFLAGS"    # static linking
     NVCCFLAGS="-c -use_fast_math  -I$BIDMAT_ROOT/jni/include \
           -gencode arch=compute_20,code=sm_20 \
@@ -183,9 +183,9 @@ elif [ "$OS" = "windows" ] ; then
     LAPACK_INCLUDES=""
     FORTRAN_LIBS=""
     if [ "$PARLIB" = "sequential" ] ; then
-	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_sequential.lib mkl_core.lib libiomp5mt.lib"   
+	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_sequential.lib mkl_core.lib"   
     else
-	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_intel_thread.lib mkl_core.lib libiomp5mt.lib" 
+	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_intel_thread.lib mkl_core.lib" 
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="cudart.lib"
