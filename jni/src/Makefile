@@ -35,7 +35,7 @@ DNN127.$(OBJ) : DNN127.cu
 
 install: all
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
-	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
+#	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
 
 clean:
 	rm -f *.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib
