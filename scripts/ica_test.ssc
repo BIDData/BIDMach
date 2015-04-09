@@ -1,7 +1,7 @@
 
 val output = loadFMat("ica_output.txt")
-val (nn, opts) = BIDMach.models.ICA.learner(output, 5)
-opts.npasses = 40
+val (nn, opts) = BIDMach.models.ICA.learner(output)
+opts.npasses = 20
 nn.train
 
 val predW = FMat(nn.modelmats(0))

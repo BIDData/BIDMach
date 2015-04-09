@@ -3,86 +3,202 @@
 #include <stdio.h>
 #include <MatKernel.hpp>
 
-// Window length and ydim for forward word2vec
-#define WLEN 6
-#define BYDIM 2
+#define BYDIMF 2
+#define BYDIMB 5
+#define CDIM 2
 
 #if __CUDA_ARCH__ >= 300
 
 /*
- *
- * Simple forward convolution kernel for word2vec. Computes the inner products of each column of A with a nearby column of B. 
- * 
- *  SKIP is the max skip-gram length
- *  WINLEN is the length of a block of columns to process
- *
- *  Columns of the output matrix C are <window> = 2*SKIP+1 long, and contain inner products with corresponding columns of B. 
- *  the row index of C specifies an offset from -SKIP ... SKIP into A, which is the column used for the inner product.
- *  i.e. C(i,j) = <B(:,j), A(:,j-SKIP+i)>
- *
+ * Combined forward-backward word2vec kernel
  */
 
-template<int SKIP, int WINLEN, int BDIM>
-__global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, float *C) {
-  const int window = 2*SKIP+1;
-  float aa[WINLEN + 2*SKIP];
-  float bb[WINLEN];
-  float prods[WINLEN][window];
-  int word[WINLEN + 2*SKIP];
-  __shared__ float CC[WINLEN*BDIM*window];
-  int i, j, k, icol;
+template<int NWA, int NWB, int MAXDIM>
+  __global__ void __word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {
+  const int nwab = NWA*NWB;
+  __shared__ float CC[NWA*NWB*BYDIMF];
+  float aa;
+  float bb[NWB];
+  float dd[MAXDIM];
+  float prods[NWA][NWB];
+  float v, sum;
+  int wa[NWA];
+  int wb[NWB];
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   int dxy = blockDim.x * blockDim.y;
+  int i, j, k, icol;
   int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
   int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
 
+  for (icol = istart; icol < iend; icol++) {                // Iterate over columns
 #pragma unroll
-  for (i = 0; i < 2*SKIP; i++) {                            // init context words on edges
-    if (i + istart - SKIP > 0) {
-      word[i + WINLEN] = W[i + istart - SKIP];
-    }
-  }
-
-  for (icol = istart; icol < iend; icol += WINLEN) {        // Iterate over columns in blocks of WINLEN
+    for (i = 0; i < NWA; i++) {
+      wa[i] = WA[i + icol * NWA];                           // Fill the A word matrix
 #pragma unroll
-    for (j = 0; j < 2*SKIP; j++) {                          // Shift edge words from last time
-      word[j] = word[j + WINLEN];
-    }
-#pragma unroll
-    for (i = 0; i < WINLEN; i++) {                          // Get the new words in this window
-      if (i + icol + 2*SKIP < ncols) {
-        word[j + 2*SKIP] = W[i + icol + 2*SKIP];
-      } else {
-        word[i + 2*SKIP] = 0;
-      }
-#pragma unroll
-      for (j = 0; j <= 2*SKIP; j++) {                       // clear the products matrix
+      for (j = 0; j < NWB; j++) {                           // clear the products matrix
         prods[i][j] = 0;
       }
+    }
+#pragma unroll
+    for (i = 0; i < NWB; i++) {
+      wb[i] = WB[i + icol * NWB];                           // Fill the B word matrix
     }
 
     for (i = tid; i < nrows; i += dxy) {                    // Now iterate over the rows of this block
 #pragma unroll
-      for (j = 0; j < WINLEN + 2*SKIP ; j++) {              // Read A with edges
-        aa[j] = A[i + word[j] * nrows];
+      for (j = 0; j < NWB ; j++) {                          // Read B
+        bb[j] = B[i + wb[j] * nrows];
       }
 #pragma unroll
-      for (j = 0; j < WINLEN ; j++) {                       // Read B w/o edges, offset by SKIP
-        bb[j] = B[i + word[j + SKIP] * nrows];
-      }
+      for (j = 0; j < NWA; j++) {                           // Compute the products of these elements
+        aa = A[i + wa[j] * nrows];
 #pragma unroll
-      for (j = 0; j < WINLEN; j++) {                        // Computes the products of these elements
-#pragma unroll
-        for (k = 0; k <= 2*SKIP; k++) {
-          prods[j][k] += aa[j+k] * bb[j];
+        for (k = 0; k < NWB; k++) {
+          prods[j][k] += aa * bb[k];
         }
       }
     }                                                       // Finished the entire block
 
 #pragma unroll
-    for (i = 0; i < WINLEN; i++) {                          // Reduce the products within each warp
+    for (i = 0; i < NWA; i++) {                             // Reduce the products within each warp
 #pragma unroll
-      for (j = 0; j <= 2*SKIP; j++) {
+      for (j = 0; j < NWB; j++) {
+#pragma unroll
+        for (k = 1; k < 32; k = k+k) {
+          float tmp = __shfl_down(prods[i][j], k);
+          prods[i][j] += tmp;
+        }
+      }
+    }
+    __syncthreads();
+    if (threadIdx.x == 0) {                                 // Save the products to SHMEM (one copy per warp)
+#pragma unroll
+      for (i = 0; i < NWA; i++) {
+#pragma unroll
+        for (j = 0; j < NWB; j++) {
+          CC[j + NWB * (i + NWA * threadIdx.y)] = prods[i][j];
+        }
+      }
+    }
+    __syncthreads();
+    for (i = 1; i < blockDim.y; i++) {
+      __syncthreads();
+      for (j = tid; j < nwab; j += dxy) {                   // Reduce the products across warps
+        CC[j] += CC[j + i * nwab];
+      } 
+    } 
+    __syncthreads();
+
+    for (i = tid; i < NWA*NWB; i+= dxy) {                   // Compute logistic function on all products
+      v = CC[i];
+      if (v > 16.0f) {
+        v = 1.0f;
+      } else {
+        v = exp(v);
+        v = v / (1.0f + v);
+      }
+      CC[i] = -v;                                           // All these pairs have label 0
+    }
+
+    __syncthreads();
+    for (i = tid; i < nrows; i += dxy) {
+#pragma unroll
+      for (j = 0; j < NWB; j++) {                           // Load B data
+        dd[j] = B[i + wb[j] * nrows];
+      }
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                           // Now do the product
+        sum = 0;
+#pragma unroll
+        for (k = 0; k < NWB; k++) {                       
+          float xx = CC[j + k * NWA];
+          sum += xx * dd[k];
+        }
+        atomicAdd(&A[i + wa[j] * nrows], sum * lrate);
+      }
+
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                           // Load A data
+        dd[j] = A[i + wa[j] * nrows];
+      }
+#pragma unroll
+      for (j = 0; j < NWB; j++) {                           // Now do the product
+        sum = 0;
+#pragma unroll
+        for (k = 0; k < NWA; k++) {                       
+          float xx = CC[k + j * NWA];
+          sum += xx * dd[k];
+        }
+        atomicAdd(&B[i + wb[j] * nrows], sum * lrate);
+      }
+    } 
+    __syncthreads();
+
+  }
+}
+
+
+/*
+ *
+ * Simple forward kernel for word2vec. Computes inner products of columns from A with columns from B. 
+ * The column indices are specified by two "word" matrices. The inner products are computed as an outer product
+ * of the word matrices.
+ * 
+ *  NWA is the number of words per column in WA
+ *  NWB is the number of words per column in WB
+ *
+ *  Columns of the output matrix C are <window> = NWA*NWB long, and contain inner products with corresponding columns of B. 
+ *
+ */
+
+template<int NWA, int NWB, int BDIM>
+__global__ void __word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {
+  const int nwab = NWA*NWB;
+  __shared__ float CC[NWA*NWB*BDIM];
+  float aa;
+  float bb[NWB];
+  float prods[NWA][NWB];
+  int wa[NWA];
+  int wb[NWB];
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  int dxy = blockDim.x * blockDim.y;
+  int i, j, k, icol;
+  int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
+  int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+
+  for (icol = istart; icol < iend; icol++) {                // Iterate over columns
+#pragma unroll
+    for (i = 0; i < NWA; i++) {
+      wa[i] = WA[i + icol * NWA];                           // Fill the A word matrix
+#pragma unroll
+      for (j = 0; j < NWB; j++) {                           // clear the products matrix
+        prods[i][j] = 0;
+      }
+    }
+#pragma unroll
+    for (i = 0; i < NWB; i++) {
+      wb[i] = WB[i + icol * NWB];                           // Fill the B word matrix
+    }
+
+    for (i = tid; i < nrows; i += dxy) {                    // Now iterate over the rows of this block
+#pragma unroll
+      for (j = 0; j < NWB ; j++) {                          // Read B
+        bb[j] = B[i + wb[j] * nrows];
+      }
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                           // Computes the products of these elements
+        aa = A[i + wa[j] * nrows];
+#pragma unroll
+        for (k = 0; k < NWB; k++) {
+          prods[j][k] += aa * bb[k];
+        }
+      }
+    }                                                       // Finished the entire block
+
+#pragma unroll
+    for (i = 0; i < NWA; i++) {                             // Reduce the products within each warp
+#pragma unroll
+      for (j = 0; j < NWB; j++) {
 #pragma unroll
         for (k = 1; k < 32; k = k+k) {
           float tmp = __shfl_down(prods[i][j], k);
@@ -94,187 +210,322 @@ __global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, 
     __syncthreads();
     if (threadIdx.x == 0) {                                 // Save the products to SHMEM (one copy per warp)
 #pragma unroll
-      for (j = 0; j < WINLEN; j++) {
+      for (i = 0; i < NWA; i++) {
 #pragma unroll
-        for (k = 0; k < window; k++) {
-          CC[k + window * (j + WINLEN * threadIdx.y)] = prods[j][k];
+        for (j = 0; j < NWB; j++) {
+          CC[j + NWB * (i + NWA * threadIdx.y)] = prods[i][j];
         }
       }
     }
 
     __syncthreads();
-    for (j = 0; j < WINLEN * window; j += dxy) {            // Reduce the products across warps
-      for (k = 1; k < blockDim.y; k++) {
-        __syncthreads();
-        if (j + tid < WINLEN * window) {
-          CC[j + tid] += CC[j + tid + k * WINLEN * window];
-        }
+    for (i = 1; i < blockDim.y; i++) {
+      __syncthreads();
+#pragma unroll
+      for (j = tid; j < nwab; j += dxy) {                   // Reduce the products across warps
+        CC[j] += CC[j + i * nwab];
       } 
-      __syncthreads();
-      if (j + tid < WINLEN * window && j + tid + icol * window < iend * window) {
-        C[j + tid + icol * window] = CC[j + tid];   // Save the results
-      }
+    } 
+    __syncthreads();
+    for (i = tid; i < nwab; i += dxy) {                     // Save to main memory
+      C[i + icol * nwab] = CC[i];  
+        //atomicAdd(&C[i + icol * nwab], CC[i]); 
     }
     __syncthreads();
   }
 }
 
-// Custom convolution kernel for vectors
+/*
+ *
+ * Simple backward kernel for word2vec. 
+ * Computes the gradient for A given B or vice-versa, and does an SGD update.
+ * 
+ *  NWA is the number of words per column in WA
+ *  NWB is the number of words per column in WB
+ *
+ */
 
-template<int SKIP>
-__global__ void __convRows(int nrows, int ncols, float *A, int lda, float *B, int ldb, float *C) {
-  const int window = 2*SKIP+1; 
-  const int height = 32 - 2 * SKIP;
-  float prods[window];
-  int i, j, k;
-  int gid = threadIdx.y + blockDim.y * blockIdx.x;
-  int tid = threadIdx.x + height * gid;
-  float a, b;
-  if (tid < nrows) {
+
+template<int NWA, int NWB, int MAXDIM>
+  __global__ void __word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
+  const int nwab = NWA * NWB;
+  float dd[MAXDIM];
+  int wa[NWA];
+  int wb[NWB];
+  __shared__ float cc[NWA*NWB];
+  int tid = threadIdx.x;
+  int fid = threadIdx.x + blockDim.x * threadIdx.y; 
+  int dxy = blockDim.x * blockDim.y;
+  int icol, i, j, k;
+  float sum;
+  int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
+  int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+
+  for (icol = istart; icol < iend; icol++) {                // iterate in columns
 #pragma unroll
-    for (k = 0; k < window; k++) {
-      prods[k] = 0;
+    for (j = 0; j < NWA; j++) {
+      wa[j] = WA[j + icol * NWA];                           // Load the A word matrix
     }
-    for (i = 0; i < ncols; i++) {
-      a = A[tid + i*lda];
-      b = B[tid + i*ldb];
+    __syncthreads();
+#pragma unroll 
+    for (j = 0; j < NWB; j++) {
+      wb[j] = WB[j + icol * NWB];                           // Load the B word matrix
+    }
+    for (i = fid; i < nwab; i += dxy) {
+      cc[i] = C[i + icol * nwab];
+    }
+    __syncthreads();
+    for (i = tid; i < nrows; i += dxy) {
 #pragma unroll
-      for (j = 0; j < height; j++) {
-#pragma unroll
-        for (k = -SKIP; k <= 0; k++) {
-          prods[k+SKIP] += a * __shfl_up(b, -k);
-        }
-#pragma unroll
-        for (k = 1; k <= SKIP; k++) {
-          prods[k+SKIP] += a * __shfl_down(b, k);
-        }
+      for (j = 0; j < NWB; j++) {                           // Load the data
+        dd[j] = B[i + wb[j] * nrows];
       }
-    }
-    if (threadIdx.x >= SKIP && threadIdx.x < 32-SKIP) {
+
 #pragma unroll
-      for (k = 0; k < window; k++) {
-        C[k + window * (tid - SKIP)] = prods[k];
+      for (j = 0; j < NWA; j++) {                           // Now do the product
+        sum = 0;
+#pragma unroll
+        for (k = 0; k < NWB; k++) {                       
+          float xx =  cc[j + k * NWA];
+          sum += xx * dd[k];
+        }
+        atomicAdd(&A[i + wa[j] * nrows], sum * lrate);
+      }
+
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                           // Load the data
+        dd[j] = A[i + wa[j] * nrows];
+      }
+
+#pragma unroll
+      for (j = 0; j < NWB; j++) {                           // Now do the product
+        sum = 0;
+#pragma unroll
+        for (k = 0; k < NWA; k++) {                       
+          float xx =  cc[k + j * NWA];
+          sum += xx * dd[k];
+        }
+        atomicAdd(&B[i + wb[j] * nrows], sum * lrate);
       }
     }
   }
 }
 
-template<int SKIP>
-__global__ void __convColsx(int nrows, int ncols, int *W, float *A, float *B, float *C) {
-  const int window = 2*SKIP+1; 
-  const int width = 32 - 2*SKIP;
-  __shared__ float AA[width][33];
-  __shared__ float BB[32][33];
-  __shared__ float CC[window][33];
-  __shared__ int WW[32];
-  float prods[window];
+/*
+ * Convolutional kernel for word2vec. This handles the positively-label word pairs with
+ * one context word and the current word. 
+ */
 
-  int i, j, k, tid, fid, jcol, word, dxy;
-  float a, b;
-  dxy = blockDim.x * blockDim.y;
+template<int SKIP, int YDIM, int NREPS>
+__global__ void __word2vecConv(int nrows, int ncols, int *W, float *A, float *B, float lrate) {
+  const int nwindow = 2*SKIP+1; 
+  int words[nwindow];
+  float adata[NREPS][nwindow];
+  float bdata[NREPS];
+  float dbdata[NREPS];
+  __shared__ float CC[YDIM * nwindow];
+
+  int i, j, k, tid, indx, icol, dxy;
+  float prod, v, av;
   tid = threadIdx.x + blockDim.x * threadIdx.y;
-  fid = tid + dxy * threadIdx.z;
-  __syncthreads();                                 
-  for (jcol = width * blockIdx.x; jcol < ncols; jcol += width * gridDim.x) {
+  dxy = blockDim.x * blockDim.y;
+  bool good;
 
-    __syncthreads();                                 
-    if (tid + jcol < ncols) {                             // Load the words for this chunk
-      WW[tid] = W[tid + jcol];
+  int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
+  int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+
+#pragma unroll
+  for (i = 0; i < nwindow; i++) {                           // Prefill the word and adata window buffers
+    if (istart + i - SKIP - 1 > 0) {
+      words[i] = W[istart + i - SKIP - 1];                  // Get a new word
     } else {
-      WW[tid] = 0;
+      words[i] = -1;
     }
-    __syncthreads();                           
+    good = (words[i] >= 0);
+#pragma unroll
+    for (j = 0; j < NREPS; j++) {                           // Get the A vector for this word
+      indx = tid + j * dxy;
+      if (good && indx < nrows) {
+        adata[j][i] = A[indx + words[i] * nrows];
+      } else {
+        adata[j][i] = 0;
+      }
+    }
+  }
 
-    for (j = threadIdx.z; j < window; j+= blockDim.z) {   // Clear the shared product store
-      CC[j][tid] = 0;
+  for (icol = istart; icol < iend; icol++) {                // Iterate over columns
+#pragma unroll
+    for (i = 0; i < nwindow-1; i++) {                       // slide words down
+      words[i] = words[i+1];
+#pragma unroll
+      for (j = 0; j < NREPS; j++) {
+        adata[j][i] = adata[j][i+1];                         // slide data down
+      }
     }
 
+    good = (icol + SKIP < ncols);
+    if (good) {
+      words[nwindow - 1] = W[icol + SKIP];                  // Get a new word
+    } else {
+      words[nwindow - 1] = -1;
+    }
+    good = good && words[nwindow-1] >= 0;
+
+#pragma unroll
+    for (j = 0; j < NREPS; j++) {                           // Get a new A column
+      indx = tid + j * dxy;
+      if (good && indx < nrows) {
+        adata[j][nwindow - 1] = A[tid + j * dxy + words[nwindow - 1] * nrows];
+      } else {
+        adata[j][nwindow - 1] = 0;
+      }
+      if (words[SKIP] >= 0 && indx < nrows) {               // Get a new B column
+        bdata[j] = B[indx + words[SKIP] * nrows];
+      } else {
+        bdata[j] = 0;
+      }
+    }
     __syncthreads();
+
 #pragma unroll                 
-    for (k = 0; k < window; k++) {                        // Clear the register product store
-      prods[k] = 0;
-    }
-    for (i = 0; i < nrows; i += dxy) {                    // process a block of this column
-      __syncthreads();
-      for (j = threadIdx.z; j < dxy; j += blockDim.z) {   // load data into SHMEM
-        word = WW[j];
-        if (i + tid < nrows) {
-          if (j >= SKIP && j < dxy - SKIP) {
-            AA[j-SKIP][tid] = A[i + tid + word * nrows];
-          }
-          BB[j][tid] = B[i + tid + word * nrows];
-        }
+    for (i = 0; i < nwindow; i++) {                         // Iterate across the window for A cols
+      prod = 0;
+#pragma unroll                 
+      for (j = 0; j < NREPS; j++) {                         // Iterate over blocks of elements
+        prod += adata[i][j] * bdata[j];                     // Compute the product between current A, B cols
       }
-      __syncthreads();
-#pragma unroll
-      for (j = 0; j < NTB; j++) {                         // Get some SHMEM data into registers
-        if (tid < width) {
-          a = AA[tid][j + NTB*threadIdx.z];
-        }
-        b = BB[tid][j + NTB*threadIdx.z];
-#pragma unroll
-        for (k = 0; k < window; k++) {                    // compute shifted products
-          prods[k] += a * __shfl_down(b, k);
-        }
-      }
-      __syncthreads();
-    }
-  
-    if (fid < 32) {
-#pragma unroll
-      for (k = 0; k < window; k++) {                      // move shifted products to SHMEM
-        CC[k][tid] = prods[k];
+#pragma unroll                 
+      for (k = 1; k < 32; k = k + k) {
+        prod += __shfl_down(prod, k);                       // Reduce within warp
+      }  
+      if (threadIdx.x == 0) {
+        CC[i + threadIdx.y * nwindow] = prod;               // Save to SHMEM
       }
     }
+
     __syncthreads();
-    if (fid >= 32) {
-#pragma unroll
-      for (k = 0; k < window; k++) {                      // move shifted products to SHMEM
-        atomicAdd(&CC[k][tid], prods[k]);
+    for (i = 0; i < blockDim.y; i++) {                      // Reduce across warps
+      for (k = tid; k < nwindow; k += dxy) { 
+        CC[k] = CC[k + i * nwindow];
+      }
+      __syncthreads();
+    }
+
+    __syncthreads();                                        //  Apply the sigmoid map
+    for (i = tid; i < nwindow; i += dxy) { 
+      v = CC[i];
+      if (v > 20.0f) {
+        v = 1.0f;
+      } else {
+        v = exp(v);
+        v = v / (1.0f + v);
+      }
+      CC[i] = 1.0f - v;                                     // All pairs have label 1
+    }
+      
+    __syncthreads();  
+#pragma unroll                 
+    for (j = 0; j < NREPS; j++) {
+      dbdata[j] = 0;
+    }
+#pragma unroll                 
+    for (i = 0; i < nwindow; i++) {                         // Iterate across the window for A cols
+      v = lrate * CC[i];
+#pragma unroll                 
+      for (j = 0; j < NREPS; j++) {
+        av = adata[i][j];
+        adata[i][j] += v * bdata[j];                        // Compute the product with the current A, B cols
+        dbdata[j] += v * av;
       }
     }
-    __syncthreads();                                      // save out to main memory
-    if (tid + jcol < ncols) {
-      for (i = threadIdx.z; i < window; i += blockDim.z) {
-        C[i + (tid + jcol) * window] = CC[i][tid];
+#pragma unroll                 
+    for (j = 0; j < NREPS; j++) {
+      if (words[SKIP] >= 0 && tid + j * dxy < nrows) {      // Save the B column
+        B[tid + j * dxy + words[SKIP] * nrows] = bdata[j] + dbdata[j];
       }
     }
     __syncthreads();  
+    if (icol - SKIP >= 0 && words[0] >= 0) {
+      for (j = 0; j < NREPS; j++) {                         // Save the A column
+        if (tid + j * dxy < nrows) {
+          A[tid + j * dxy + words[0] * nrows] = adata[j][0];
+        }
+      } 
+    }
   }
 }
+
 
 #else
 
-template<int SKIP>
-__global__ void __convRows(int nrows, int ncols, float *A, int lda, float *B, int ldb, float *C) {}
+template<int NWA, int NWB, int MAXDIM>
+  __global__ void __word2vec(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {}
 
-template<int SKIP, int WINLEN, int BDIM>
-__global__ void __word2vecFwd(int nrows, int ncols, int *W, float *A, float *B, float *C) {}
+template<int NWA, int NWB, int BDIM>
+__global__ void __word2vecFwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C) {}
 
+template<int NWA, int NWB, int MAXDIM>
+  __global__ void __word2vecBwd(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *C, float lrate) {}
+
+template<int SKIP, int YDIM, int NREPS>
+__global__ void __word2vecConv(int nrows, int ncols, int *W, float *A, float *B, float lrate) {}
 
 #endif
 
-int convRows(int nrows, int ncols, int shift, float *A, int lda, float *B, int ldb, float *C) {
-  dim3 threads(32, 32, 1);
+int word2vecConv(int nrows, int ncols, int skip, int *W, float *A, float *B, float lrate) {
+  dim3 threads(32, CDIM, 1);
   int nblocks = 1 + (nrows - 1)/threads.y;
-  switch(shift) {
-  case 5 : __convRows<5><<<nblocks,threads>>>(nrows, ncols, A, lda, B, ldb, C); break;
-  case 10 : __convRows<10><<<nblocks,threads>>>(nrows, ncols, A, lda, B, ldb, C); break;
+  switch(skip) {
+  case 5 : __word2vecConv<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, A, B, lrate); break;
   }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
 }
 
-int word2vecFwd(int nrows, int ncols, int shift, int *W, float *A, float *B, float *C) {
-  dim3 threads(32, BYDIM, 1);
-  int nblocks = min(2048, 2 + (ncols - 1)/WLEN);
-  switch(shift) {
-  case 5 : __word2vecFwd<5,WLEN,BYDIM><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;
-    //  case 10 : __convCols<7><<<nblocks,threads>>>(nrows, ncols, W, A, B, C); break;
+int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C) {
+  dim3 threads(32, BYDIMF, 1);
+  int nblocks = min(4096, 2 + (ncols - 1));
+  int which = nwa*10000 + nwb;
+  switch (which) {
+  case 50001: __word2vecFwd<5,1,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  case 50005: __word2vecFwd<5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  case 100005: __word2vecFwd<10,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  default : printf("word2vecFwd unsupport size combination %d %d\n", nwa, nwb); return 1;
+  }
+  cudaDeviceSynchronize();
+  int err = cudaGetLastError();
+  return err;
+  }
+
+int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C, float lrate) {
+  dim3 threads(32*BYDIMB, 1, 1);
+  int nblocks = min(2048, 2 + (ncols - 1));
+  int which = nwa*10000 + nwb;
+  switch (which) {
+  case 50001: __word2vecBwd<5,1,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 50005: __word2vecBwd<5,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 100005: __word2vecBwd<10,5,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  default : printf("word2vecBwd unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
 }
 
+int word2vec(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate) {
+  dim3 threads(32, BYDIMF, 1);
+  int nblocks = min(2048, 2 + (ncols - 1));
+  int which = nwa*10000 + nwb;
+  switch (which) {
+  case 50001: __word2vec<5,1,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+  case 50005: __word2vec<5,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+  case 100005: __word2vec<10,5,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+    //  case 100010: __word2vec<10,10,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+    //  case 150010: __word2vec<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+  default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+  }
+  cudaDeviceSynchronize();
+  int err = cudaGetLastError();
+  return err;
+}
