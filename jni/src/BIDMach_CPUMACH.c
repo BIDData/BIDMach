@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <mkl.h>
 #include <omp.h>
+#include <math.h>
 
 JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vec
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint nwa, const jint nwb, jintArray jWA, jintArray jWB, 
