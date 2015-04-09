@@ -489,10 +489,8 @@ int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
   int which = nwa*10000 + nwb;
   switch (which) {
   case 50001: __word2vecFwd<5,1,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
-  case 110001: __word2vecFwd<11,1,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
   case 50005: __word2vecFwd<5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
-  case 110005: __word2vecFwd<11,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
-  case 80006: __word2vecFwd<8,6,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
+  case 100005: __word2vecFwd<10,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
   default : printf("word2vecFwd unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
   cudaDeviceSynchronize();
@@ -506,10 +504,8 @@ int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
   int which = nwa*10000 + nwb;
   switch (which) {
   case 50001: __word2vecBwd<5,1,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
-  case 110001: __word2vecBwd<11,1,11><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
   case 50005: __word2vecBwd<5,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
-  case 110005: __word2vecBwd<11,5,11><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
-  case 80006: __word2vecBwd<8,6,8><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
+  case 100005: __word2vecBwd<10,5,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
   default : printf("word2vecBwd unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
   cudaDeviceSynchronize();
@@ -523,10 +519,10 @@ int word2vec(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A,
   int which = nwa*10000 + nwb;
   switch (which) {
   case 50001: __word2vec<5,1,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
-  case 110001: __word2vec<11,1,11><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
   case 50005: __word2vec<5,5,5><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
-  case 110005: __word2vec<11,5,11><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
-  case 80006: __word2vec<8,6,8><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+  case 100005: __word2vec<10,5,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+    //  case 100010: __word2vec<10,10,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+    //  case 150010: __word2vec<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
   default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
   cudaDeviceSynchronize();
