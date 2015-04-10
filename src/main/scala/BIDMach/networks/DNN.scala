@@ -183,6 +183,10 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     layers(layers.length-1).score
   }
   
+  /* 
+   * Deal with annoying sub-sized minibatches
+   */
+  
   def extendData(mat:Mat, batchSize:Int):Mat = {
     val nrows = mat.nrows;
     val ncols = mat.ncols;
@@ -190,14 +194,14 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     if (bsize > 0) {
     	val newGUID = MurmurHash3.mix(MurmurHash3.mix((mat.GUID >> 32).toInt, mat.GUID.toInt),"extendData".##);
     	mat match {
-    	case a:FMat => {bufmat = zeros(nrows, bsize); a \ bufmat}
-    	case a:DMat => {bufmat = dzeros(nrows, bsize); a \ bufmat}
-    	case a:IMat => {bufmat = izeros(nrows, bsize); a \ bufmat}
-    	case a:LMat => {bufmat = lzeros(nrows, bsize); a \ bufmat}
-    	case a:GMat => {bufmat = gzeros(nrows, bsize); a \ bufmat}
-    	case a:GDMat => {bufmat = gdzeros(nrows, bsize); a \ bufmat}
-    	case a:GIMat => {bufmat = gizeros(nrows, bsize); a \ bufmat}   
-    	case a:GLMat => {bufmat = glzeros(nrows, bsize); a \ bufmat}
+    	case a:FMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = zeros(nrows, bsize); a \ bufmat}
+    	case a:DMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = dzeros(nrows, bsize); a \ bufmat}
+    	case a:IMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = izeros(nrows, bsize); a \ bufmat}
+    	case a:LMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = lzeros(nrows, bsize); a \ bufmat}
+    	case a:GMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = gzeros(nrows, bsize); a \ bufmat}
+    	case a:GDMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = gdzeros(nrows, bsize); a \ bufmat}
+    	case a:GIMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = gizeros(nrows, bsize); a \ bufmat}   
+    	case a:GLMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = glzeros(nrows, bsize); a \ bufmat}
     	case a:SMat => {val b = new SMat(nrows, ncols, a.nnz, a.ir, a.jc, a.data); b.setGUID(newGUID); b}
     	case a:SDMat => {val b = new SDMat(nrows, ncols, a.nnz, a.ir, a.jc, a.data); b.setGUID(newGUID); b}
     	case a:GSMat => {val b = new GSMat(nrows, ncols, a.nnz, a.ir, a.ic, a.jc, a.data, a.realnnz); b.setGUID(newGUID); b}
