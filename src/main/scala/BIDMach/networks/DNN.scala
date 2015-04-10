@@ -132,9 +132,9 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   }
   
   
-  def doblock(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
+  def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
-    if (batchSize == gmats(0).ncols) {                                    // Dont deal with odd-sized minibatches
+    if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
     	layers(0).data = gmats(0);
     	if (targmap.asInstanceOf[AnyRef] != null) {
     		layers(layers.length-1).target = targmap * gmats(0);
@@ -160,7 +160,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
   }
   
-  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
   	if (batchSize < 0) batchSize = gmats(0).ncols;
     layers(0).data = extendData(gmats(0), batchSize);
     val targ = extendData(if (targmap.asInstanceOf[AnyRef] != null && putBack < 0) {

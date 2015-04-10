@@ -34,7 +34,7 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
   
   def evalfun(data:Mat, targ:Mat):FMat = {col(0)}
   
-  def doblock(gmats:Array[Mat], ipass:Int, here:Long) = {
+  def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
     val mm = modelmats(0);
     val gm = gmats(0);
     if (ipass == 0) {
@@ -62,7 +62,7 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
     }
   }
   
-  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
   	lastpos = here;
   	if (mats.length == 1) {
   		evalfun(gmats(0));

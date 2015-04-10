@@ -259,7 +259,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }    
   } 
 
-  def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
+  def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
     val data = gmats(0);
     val cats = gmats(1);
     val t0 = toc;
@@ -304,7 +304,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     	blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
     }
     case _ => {
-    	throw new RuntimeException("RandomForest doblock types dont match %s %s" format (data.mytype, cats.mytype))
+    	throw new RuntimeException("RandomForest dobatch types dont match %s %s" format (data.mytype, cats.mytype))
     }
     }
     lens0 += blockv.length;
@@ -318,7 +318,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     t5 = toc; runtimes(4) += t5 - t4; 
   }
 
-  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val depth = if (opts.training) ipass else opts.depth
     val data = gmats(0);
     val cats = gmats(1);

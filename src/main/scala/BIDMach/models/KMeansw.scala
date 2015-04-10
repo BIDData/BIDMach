@@ -67,7 +67,7 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
   } 
 
   
-  def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
+  def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
     if (gmats.length > 1) {
       mupdate(gmats(0), gmats(1), ipass)
     } else {
@@ -75,7 +75,7 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
     }
   }
   
-  def evalblock(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (gmats.length > 1) {
       evalfun(gmats(0), gmats(1))
     } else {

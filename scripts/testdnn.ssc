@@ -20,7 +20,7 @@ opts.reg1weight = 0.0001
 
 opts.aopts = opts
 
-opts.npasses=3
+opts.npasses=10
 opts.addConstFeat=false;
 opts.links = iones(100,1);
 opts.lrate = 0.4f // best for 6-layer
@@ -37,7 +37,6 @@ val dnn = nn.model.asInstanceOf[DNN]
 val (mm,mopts) = DNN.predictor(dnn, ta, pc);
 mopts.batchSize=1000
 mopts.predict=true;
-//mopts.dropout=1;
 
 
 mm.predict

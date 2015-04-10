@@ -75,15 +75,15 @@ case class Learner(
         bytes += 12L*mats(0).nnz
         if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
           if (opts.updateAll) {
-          	model.doblockg(mats, ipass, here);
+          	model.dobatchg(mats, ipass, here);
           	if (mixins != null) mixins map (_ compute(mats, here));
           	if (updater != null) updater.update(ipass, here);
           }
-        	val scores = model.evalblockg(mats, ipass, here)
+        	val scores = model.evalbatchg(mats, ipass, here)
         	reslist.append(scores.newcopy)
         	samplist.append(here)
         } else {
-        	model.doblockg(mats, ipass, here)
+        	model.dobatchg(mats, ipass, here)
         	if (mixins != null) mixins map (_ compute(mats, here))
         	if (updater != null) updater.update(ipass, here)
         }  
@@ -150,7 +150,7 @@ case class Learner(
       val mats = datasource.next    
       here += datasource.opts.batchSize
       bytes += 12L*mats(0).nnz
-      val scores = model.evalblockg(mats, 0, here)
+      val scores = model.evalbatchg(mats, 0, here)
       reslist.append(scores.newcopy)
       samplist.append(here)
       if (dopts.putBack >= 0) datasource.putBack(mats, dopts.putBack)
@@ -277,11 +277,11 @@ case class ParLearner(
     			while (done(ithread) == 1) Thread.sleep(1)
     			try {
     				if ((istep + ithread + 1) % opts.evalStep == 0 || !datasource.hasNext ) {
-    					val scores = models(ithread).evalblockg(cmats(ithread), ipass, here)
+    					val scores = models(ithread).evalbatchg(cmats(ithread), ipass, here)
     					reslist.synchronized { reslist.append(scores(0)) }
     					samplist.synchronized { samplist.append(here) }
     				} else {
-    					models(ithread).doblockg(cmats(ithread), ipass, here)
+    					models(ithread).dobatchg(cmats(ithread), ipass, here)
     					if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here))
     					updaters(ithread).update(ipass, here)
     				}
@@ -489,12 +489,12 @@ case class ParLearnerx(
 	  				}
 	  				try {
 	  					if (istep % opts.evalStep == 0) {
-	  						val scores = models(ithread).synchronized {models(ithread).evalblockg(mats, ipass, here)}
+	  						val scores = models(ithread).synchronized {models(ithread).evalbatchg(mats, ipass, here)}
 	  						reslist.synchronized { reslist.append(scores) }
 	  						samplist.synchronized { samplist.append(here) }
 	  					} else {
 	  						models(ithread).synchronized {
-	  							models(ithread).doblockg(mats, ipass, here)
+	  							models(ithread).dobatchg(mats, ipass, here)
 	  							if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(mats, here))
 	  							updaters(ithread).update(ipass, here)
 	  						}

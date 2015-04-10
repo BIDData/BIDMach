@@ -89,13 +89,13 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   def init():Unit
   
-  def doblock(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
+  def dobatch(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
   
-  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat                                        // Scores (log likelihoods)
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat                                        // Scores (log likelihoods)
   
-  def doblockg(amats:Array[Mat], ipass:Int, here:Long) = {
+  def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
     if (useGPU) copyMats(amats, gmats)            		
-    doblock(gmats, ipass, here)
+    dobatch(gmats, ipass, here)
     if ((useGPU || useDouble) && putBack >= 0) {
     	for (i <- 1 to putBack) {
     		amats(i) <-- gmats(i)
@@ -103,9 +103,9 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     }
   }
   
-  def evalblockg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (useGPU) copyMats(amats, gmats)
-    val v = evalblock(gmats, ipass, here)
+    val v = evalbatch(gmats, ipass, here)
     if ((useGPU || useDouble) && putBack >= 0) {
       for (i <- 1 to putBack) {
         amats(i) <-- gmats(i)
