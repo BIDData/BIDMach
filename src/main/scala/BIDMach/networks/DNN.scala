@@ -1,15 +1,17 @@
-package BIDMach.models
+package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.mixins._
+import BIDMach.models._
 import BIDMach._
+import scala.util.hashing.MurmurHash3
 
 /**
- * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 16 layer types:
+ * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 15 layer types:
  - InputLayer: just a placeholder for the first layer which is loaded with input data blocks. No learnable params. 
  - FCLayer: Fully-Connected Linear layer. Has a matrix of learnable params which is the input-output map. 
  - RectLayer: Rectifying one-to-one layer. No params.
@@ -22,8 +24,7 @@ import BIDMach._
  - Softmax: a softmax (normalized exponential) layer.
  - Tanh: Hyperbolic tangent non-linearity.
  - Sigmoid: Logistic function non-linearity.
- - Softplus: smooth ReLU unit.
- - Cut: needed in each cycle of cyclic networks to allow caching to work. 
+ - Softplus: smooth ReLU unit. 
  - Ln: natural logarithm
  - Exp: exponential
  - Sum: column-wise sum
@@ -43,6 +44,8 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   var layers:Array[Layer] = null;
   var targmap:Mat = null;
   var mask:Mat = null;
+  var bufmat:Mat = null;
+  var batchSize = -1;
 
   override def init() = {
 	  mats = datasource.next;
@@ -100,9 +103,6 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  	case lspec:DNN.Softplus => {
 	  		layers(i) = new SoftplusLayer;
 	  	}
-	  	case lspec:DNN.Cut => {
-	  		layers(i) = new CutLayer;
-	  	}
 	  	case lspec:DNN.Ln => {
 	  		layers(i) = new LnLayer;
 	  	}
@@ -133,48 +133,81 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   
   def doblock(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
-  	layers(0).data = gmats(0);
-    if (targmap.asInstanceOf[AnyRef] != null) {
-    	layers(layers.length-1).target = targmap * gmats(0);
-    } else {
-    	layers(layers.length-1).target = gmats(1);
-    }
-    if (mask.asInstanceOf[AnyRef] != null) {
-    	modelmats(0) ~ modelmats(0) ∘ mask;
-    }
-    var i = 1
-    while (i < layers.length) {
-      layers(i).forward;
-      i += 1;
-    }
-    while (i > 1) {
-      i -= 1;
-      layers(i).backward(ipass, pos);
-    }
-    if (mask.asInstanceOf[AnyRef] != null) {
-    	updatemats(0) ~ updatemats(0) ∘ mask;
+    if (batchSize < 0) batchSize = gmats(0).ncols;
+    if (batchSize == gmats(0).ncols) {                                    // Dont deal with odd-sized minibatches
+    	layers(0).data = gmats(0);
+    	if (targmap.asInstanceOf[AnyRef] != null) {
+    		layers(layers.length-1).target = targmap * gmats(0);
+    	} else {
+    		layers(layers.length-1).target = gmats(1);
+    	}
+    	if (mask.asInstanceOf[AnyRef] != null) {
+    		modelmats(0) ~ modelmats(0) ∘ mask;
+    	}
+    	var i = 1
+    			while (i < layers.length) {
+    				layers(i).forward;
+    				i += 1;
+    			}
+    	layers(i-1).deriv.set(1);
+    	while (i > 1) {
+    		i -= 1;
+    		layers(i).backward(ipass, pos);
+    	}
+    	if (mask.asInstanceOf[AnyRef] != null) {
+    		updatemats(0) ~ updatemats(0) ∘ mask;
+    	}
     }
   }
   
   def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
-    layers(0).data = gmats(0);
-    val targ = if (targmap.asInstanceOf[AnyRef] != null && putBack < 0) {
+  	if (batchSize < 0) batchSize = gmats(0).ncols;
+    layers(0).data = extendData(gmats(0), batchSize);
+    val targ = extendData(if (targmap.asInstanceOf[AnyRef] != null && putBack < 0) {
     	targmap * gmats(0);
     } else {
     	gmats(1);
-    }
+    }, batchSize);
     layers(layers.length-1).target = targ;
     if (mask.asInstanceOf[AnyRef] != null) {
     	modelmats(0) ~ modelmats(0) ∘ mask;
     }
     var i = 1;
     while (i < layers.length) {
-      layers(i).forward;
-      i += 1;
+    	layers(i).forward;
+    	i += 1;
     }
-    if (putBack >= 0) {targ <-- layers(layers.length-1).data}
+    if (putBack >= 0) {
+    	layers(layers.length-1).data.colslice(0, gmats(0).ncols, gmats(1));
+    }
     layers(layers.length-1).score
   }
+  
+  def extendData(mat:Mat, batchSize:Int):Mat = {
+    val nrows = mat.nrows;
+    val ncols = mat.ncols;
+    val bsize = batchSize - ncols;
+    if (bsize > 0) {
+    	val newGUID = MurmurHash3.mix(MurmurHash3.mix((mat.GUID >> 32).toInt, mat.GUID.toInt),"extendData".##);
+    	mat match {
+    	case a:FMat => {bufmat = zeros(nrows, bsize); a \ bufmat}
+    	case a:DMat => {bufmat = dzeros(nrows, bsize); a \ bufmat}
+    	case a:IMat => {bufmat = izeros(nrows, bsize); a \ bufmat}
+    	case a:LMat => {bufmat = lzeros(nrows, bsize); a \ bufmat}
+    	case a:GMat => {bufmat = gzeros(nrows, bsize); a \ bufmat}
+    	case a:GDMat => {bufmat = gdzeros(nrows, bsize); a \ bufmat}
+    	case a:GIMat => {bufmat = gizeros(nrows, bsize); a \ bufmat}   
+    	case a:GLMat => {bufmat = glzeros(nrows, bsize); a \ bufmat}
+    	case a:SMat => {val b = new SMat(nrows, ncols, a.nnz, a.ir, a.jc, a.data); b.setGUID(newGUID); b}
+    	case a:SDMat => {val b = new SDMat(nrows, ncols, a.nnz, a.ir, a.jc, a.data); b.setGUID(newGUID); b}
+    	case a:GSMat => {val b = new GSMat(nrows, ncols, a.nnz, a.ir, a.ic, a.jc, a.data, a.realnnz); b.setGUID(newGUID); b}
+    	case a:GSDMat => {val b = new GSDMat(nrows, ncols, a.nnz, a.ir, a.ic, a.jc, a.data, a.realnnz); b.setGUID(newGUID); b}
+    	}
+    } else {
+      mat;
+    }
+  }
+  
   
   class Layer {
     var data:Mat = null;
@@ -186,6 +219,19 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     def backward:Unit = {};
     def backward(ipass:Int, pos:Long):Unit = backward;
     def score:FMat = zeros(1,1);
+    
+    def createData = {
+      if (data.asInstanceOf[AnyRef] == null) data = input.data.zeros(input.data.nrows, input.data.ncols);
+    }
+    
+    def createData(nrows:Int, ncols:Int) = {
+      if (data.asInstanceOf[AnyRef] == null) data = input.data.zeros(nrows, ncols);
+    }
+    
+    def clearDeriv = {
+    	if (deriv.asInstanceOf[AnyRef] == null) deriv = data.zeros(data.nrows, data.ncols);
+    	deriv.clear;
+    }
   }
   
   /**
@@ -208,26 +254,26 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     	} else {
     		modelmats(imodel);
     	}
-    	data = mm * input.data;
+    	createData(mm.nrows, input.data.ncols)
+    	data ~ mm * input.data;
     	if (constFeat) data ~ data + modelmats(imodel).colslice(0, 1);
+    	clearDeriv;
     }
     
     override def backward(ipass:Int, pos:Long) = {
-      if (imodel > 0) {
-      	val mm = if (constFeat) {
-      		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
-      	} else {
-      		modelmats(imodel);
-      	}
-      	input.deriv = mm ^* deriv;
-      }
+    	val mm = if (constFeat && imodel > 0) {
+    		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
+    	} else {
+    		modelmats(imodel);
+    	}
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (mm ^* deriv);
       if (aopts != null) {
         if (firststep <= 0) firststep = pos.toFloat;
         val istep = (pos + firststep)/firststep;
       	ADAGrad.multUpdate(deriv, input.data, modelmats(imodel), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
       } else {
       	val dprod = deriv *^ input.data;
-      	updatemats(imodel) = if (constFeat) (sum(deriv,2) \ dprod) else dprod;
+      	updatemats(imodel) <-- (if (constFeat) (sum(deriv,2) \ dprod) else dprod);
       }
     }
     
@@ -252,11 +298,13 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   class ReLULayer extends Layer {
     override def forward = {
-      data = max(input.data, 0f)
+      createData
+      data <-- max(input.data, 0f)
+      clearDeriv
     }
     
     override def backward = {
-      input.deriv = deriv ∘ (input.data > 0f);
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (deriv ∘ (input.data > 0f));
     }
   }
   
@@ -280,14 +328,13 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
     
     override def forward = {
-      data = GLM.preds(input.data, ilinks, totflops)
+      createData
+      data <-- GLM.preds(input.data, ilinks, totflops)
+      clearDeriv;
     }
     
     override def backward = {
-      input.deriv = GLM.derivs(data, target, ilinks, totflops)
-      if (deriv.asInstanceOf[AnyRef] != null) {
-        input.deriv ~ input.deriv ∘ deriv;
-      }
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (deriv ∘ GLM.derivs(data, target, ilinks, totflops));
     }
     
     override def score:FMat = { 
@@ -305,14 +352,18 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var sconst:Mat = null
     
     override def forward = {
-      data = input.data;  
+      createData;
+      data <-- input.data;
+      clearDeriv;
     }
     
     override def backward = {
-    	if (sconst.asInstanceOf[AnyRef] == null) sconst = data.zeros(1,1);
-      sconst.set(math.min(0.1f, math.max(-0.1f, (targetNorm - norm(data)/data.length).toFloat * weight)));
-      input.deriv = data ∘ sconst;
-      input.deriv ~ input.deriv + deriv;
+      if (input.deriv.asInstanceOf[AnyRef] != null) {
+      	if (sconst.asInstanceOf[AnyRef] == null) sconst = data.zeros(1,1);
+      	sconst.set(math.min(0.1f, math.max(-0.1f, (targetNorm - norm(data)/data.length).toFloat * weight)));
+      	input.deriv = data ∘ sconst;
+      	input.deriv ~ input.deriv + deriv;
+      }
     }
   }
   
@@ -325,18 +376,24 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var randmat:Mat = null;
     
     override def forward = {
+      createData
       randmat = input.data + 20f;   // Hack to make a cached container to hold the random data
-      if (useGPU) {
-        grand(randmat.asInstanceOf[GMat]); 
+      if (opts.predict) {
+      	data ~ input.data * frac;
       } else {
-        rand(randmat.asInstanceOf[FMat]);
+      	if (useGPU) {
+      		grand(randmat.asInstanceOf[GMat]); 
+      	} else {
+      		rand(randmat.asInstanceOf[FMat]);
+      	}
+      	randmat ~ (randmat < frac)
+      	data ~ input.data ∘ randmat;
       }
-      randmat ~ (randmat < frac)
-      data = input.data ∘ randmat;
+      clearDeriv
     }
     
     override def backward = {
-      input.deriv = deriv ∘ randmat;
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + deriv ∘ randmat;
     }
   }
   
@@ -347,15 +404,15 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class AddLayer extends Layer { 
     
     override def forward = {
-      if (data.asInstanceOf[AnyRef] == null) data = inputs(0).data.zeros(inputs(0).data.nrows, inputs(0).data.ncols);
+      createData(inputs(0).data.nrows, inputs(0).data.ncols);
       data <-- inputs(0).data;
       (1 until inputs.length).map((i:Int) => data ~ data + inputs(i).data);
+      clearDeriv
     }
     
     override def backward = {
       (0 until inputs.length).map((i:Int) => {
-      	if (inputs(i).deriv.asInstanceOf[AnyRef] == null) inputs(i).deriv = deriv.zeros(deriv.nrows, deriv.ncols);
-      	inputs(i).deriv <-- deriv
+      	if (inputs(i).deriv.asInstanceOf[AnyRef] != null) inputs(i).deriv ~ inputs(i).deriv + deriv
       });
     }
   }
@@ -367,17 +424,16 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class MulLayer extends Layer {  
     
     override def forward = {
-    	if (data.asInstanceOf[AnyRef] == null) data = inputs(0).data.zeros(inputs(0).data.nrows, inputs(0).data.ncols);
+    	createData(inputs(0).data.nrows, inputs(0).data.ncols);
       data <-- inputs(0).data;
       (1 until inputs.length).map((i:Int) => data ~ data ∘ inputs(i).data);
+      clearDeriv
     }
-
     
     override def backward = {
       val ddata = deriv ∘ data
       (0 until inputs.length).map((i:Int) => {
-      	if (inputs(i).deriv.asInstanceOf[AnyRef] == null) inputs(i).deriv = deriv.zeros(deriv.nrows, deriv.ncols);
-      	inputs(i).deriv <-- ddata / inputs(i).data;
+      	if (inputs(i).deriv.asInstanceOf[AnyRef] != null) inputs(i).deriv ~ inputs(i).deriv + ddata / inputs(i).data;
       });
     }
   }
@@ -389,15 +445,18 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class SoftmaxLayer extends Layer {    
     
     override def forward = {
+      createData;
       val exps = exp(input.data);
-      data = exps / sum(exps);
+      data ~ exps / sum(exps);
+      clearDeriv
     }
     
     override def backward = {
       val exps = exp(input.data);
       val sumexps = sum(exps);
       val isum = 1f / (sumexps ∘ sumexps);
-      input.deriv = ((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))) ;
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~
+        input.deriv + ((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))) ;
     }
   }
   
@@ -408,12 +467,14 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class TanhLayer extends Layer {    
     
     override def forward = {
-      data = tanh(input.data);
+      createData;
+      data <-- tanh(input.data);
+      clearDeriv
     }
     
     override def backward = {
       val tmp = tanh(input.data);
-      input.deriv = (1 - tmp ∘ tmp) ∘ deriv;
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (1 - tmp ∘ tmp) ∘ deriv;
     }
   }
   
@@ -426,18 +487,20 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var totflops = 0L;
     
     override def forward = {
+      createData
       if (ilinks.asInstanceOf[AnyRef] == null) {
         ilinks = izeros(input.data.nrows, 1)
         ilinks.set(GLM.logistic);
+        if (useGPU) ilinks = GIMat(ilinks);
       }
       if (totflops == 0L) totflops = input.data.nrows * GLM.linkArray(1).fnflops
-      if (useGPU) ilinks = GIMat(ilinks);
-      data = GLM.preds(input.data, ilinks, totflops)
+      data <-- GLM.preds(input.data, ilinks, totflops)
+      clearDeriv
     }
     
     override def backward = {
-      input.deriv = data - (data ∘ data);
-      input.deriv ~ input.deriv ∘ deriv;
+      val tmp = data - (data ∘ data);
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + tmp ∘ deriv;
     }
   }
   
@@ -450,8 +513,10 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var totflops = 0L;
    
     override def forward = {
+      createData
       val big = input.data > 60f;      
-      data = (1 - big) ∘ ln(1f + exp(min(60f, input.data))) + big ∘ input.data;
+      data ~ ((1 - big) ∘ ln(1f + exp(min(60f, input.data)))) + big ∘ input.data;
+      clearDeriv;
     }
     
     override def backward = {
@@ -459,29 +524,12 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
         ilinks = izeros(input.data.nrows, 1)
         ilinks.set(GLM.logistic);
       }
-      if (totflops == 0L) totflops = input.data.nrows * GLM.linkArray(1).fnflops
+      if (totflops == 0L) totflops = input.data.nrows * GLM.linkArray(1).fnflops;
       if (useGPU) ilinks = GIMat(ilinks);
-      input.deriv = GLM.preds(input.data, ilinks, totflops)
-      input.deriv ~ input.deriv ∘ deriv;
-    }
-  }
-  
-  /**
-   * Cut layer. Need to insert these in cyclic networks so that caching works. 
-   */
-  
-  class CutLayer extends Layer {
-    
-    override def forward = {
-      if (data.asInstanceOf[AnyRef] == null) {
-        data = input.data.zeros(input.data.nrows, input.data.ncols);
-        input.deriv = input.data.zeros(input.data.nrows, input.data.ncols);
+      if (input.deriv.asInstanceOf[AnyRef] != null) {
+      	val tmp = GLM.preds(input.data, ilinks, totflops);
+      	input.deriv ~ input.deriv + tmp ∘ deriv;
       }
-      data <-- input.data;
-    }
-    
-    override def backward = {
-      input.deriv <-- deriv;      
     }
   }
   
@@ -492,11 +540,13 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class LnLayer extends Layer {
     
     override def forward = {
-      data = ln(input.data);
+      createData
+      data <-- ln(input.data);
+      clearDeriv
     }
     
     override def backward = {
-      input.deriv = deriv/input.data;    
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + deriv/input.data;    
     }
   }
   
@@ -507,11 +557,13 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class ExpLayer extends Layer {
     
     override def forward = {
-      data = exp(input.data);
+      createData
+      data <-- exp(input.data);
+      clearDeriv;
     }
     
     override def backward = {
-      input.deriv = deriv ∘ data;    
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + deriv ∘ data;    
     }
   }
   
@@ -523,12 +575,14 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var vmap:Mat = null;
     
     override def forward = {
-      data = sum(input.data);
+      createData(1, input.data.ncols);
+      data <-- sum(input.data);
+      clearDeriv;
     }
     
     override def backward = {
       if (vmap.asInstanceOf[AnyRef] == null) vmap = deriv.ones(data.nrows, 1);
-      input.deriv = vmap * deriv;    
+      if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + vmap * deriv;    
     }
   }
   /**
@@ -540,12 +594,9 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var lastBatch:Mat = null;
     
     override def forward = {
-      if (lastBatch.asInstanceOf[AnyRef] == null) {
-        data = input.data.zeros(input.data.nrows, siz, 0) \ input.data;
-      } else {
-        data = data.colslice(input.data.ncols, input.data.ncols+siz, data);
-        data = input.data.colslice(0, input.data.ncols, data, siz);
-      }      
+      createData(input.data.nrows, input.data.ncols + siz);
+      data.colslice(input.data.ncols, input.data.ncols+siz, data);
+      input.data.colslice(0, input.data.ncols, data, siz);
     }
   }
   
@@ -597,6 +648,7 @@ object DNN  {
     var links:IMat = null;
     var nweight:Float = 0.1f;
     var dropout:Float = 0.5f;
+    var predict:Boolean = false;
     var targetNorm:Float = 1f;
     var targmap:Mat = null;
     var dmask:Mat = null;
@@ -635,8 +687,6 @@ object DNN  {
   class Sigmoid(input:LayerSpec) extends LayerSpec(input, null) {}
   
   class Softplus(input:LayerSpec) extends LayerSpec(input, null) {}
-  
-  class Cut(input:LayerSpec) extends LayerSpec(input, null) {}
   
   class Ln(input:LayerSpec) extends LayerSpec(input, null) {}
   

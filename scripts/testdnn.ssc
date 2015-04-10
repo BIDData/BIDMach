@@ -1,4 +1,4 @@
-//:silent
+:silent
 val dir="c:/code/BIDMach/data/rcv1/"
 
 val a0 = loadSMat(dir + "docs.smat.lz4")(0->100000,?)
@@ -20,24 +20,25 @@ opts.reg1weight = 0.0001
 
 opts.aopts = opts
 
-opts.npasses=5
+opts.npasses=3
 opts.addConstFeat=false;
-opts.links = iones(100,1)
+opts.links = iones(100,1);
 opts.lrate = 0.4f // best for 6-layer
 opts.lrate = 0.2f 
 opts.texp = 0.4f
 opts.nweight = 1e-4f
-DNN.dlayers3(6,500,0.5f,100,opts,2)
 
-//Mat.debugMem = true
+DNN.dlayers4(11,500,0.5f,100,opts,2)
 
 nn.train
 
 val dnn = nn.model.asInstanceOf[DNN]
-//val dl = dnn.layers(3).asInstanceOf[DNN.DropoutLayer]
 
 val (mm,mopts) = DNN.predictor(dnn, ta, pc);
-mopts.dropout=1f;
+mopts.batchSize=1000
+mopts.predict=true;
+//mopts.dropout=1;
+
 
 mm.predict
 
