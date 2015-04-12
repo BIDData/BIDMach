@@ -6,15 +6,16 @@ val mdir = "d:/criteo/parts/"
 opts.fnames = List(FilesDS.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
                    FilesDS.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
 opts.nend = 67;
-opts.lrate = 0.0003f;
-opts.reg1weight = 0.01f;
-opts.batchSize=30000;
-opts.npasses=200;
-opts.npasses=1;
+opts.lrate = 0.0001f;
+opts.reg1weight = 0.001f;
+opts.batchSize=2000;
+opts.npasses=20;
+//opts.npasses=1;
 opts.eltsPerSample=60;
 opts.links = icol(1);
-opts.pstep = 0.001f;
+//opts.pstep = 0.001f;
 opts.lim = 8f;
+opts.aopts = opts;
 
 val ds = {
   implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
@@ -26,7 +27,8 @@ val nn = new Learner(                  // make a learner instance
     ds,                                // datasource
     new GLM(opts),                     // the model 
     Array(new L1Regularizer(opts)),    // list of mixins or regularizers
-    new ADAGrad(opts),                 // the optimization class to use
+//    new ADAGrad(opts),                 // the optimization class to use
+    null,
     opts)                              // pass the options to the learner as well
 
 

@@ -56,16 +56,21 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  layers = new Array[Layer](opts.layers.length);
 	  var imodel = 0;
 	  if (refresh) {
-	  	val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false});
-	    setmodelmats(new Array[Mat](nmodelmats));
+	    if (opts.nmodelmats < 0) {
+	    	val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false});
+	    	setmodelmats(new Array[Mat](nmodelmats));
+	    } else {
+	      setmodelmats(new Array[Mat](opts.nmodelmats));
+	    }
 	  }
 	  for (i <- 0 until opts.layers.length) {
 	  	opts.layers(i) match {
 
 	  	case lspec:DNN.FC => {
-	  	  val fclayer = new FCLayer(imodel, lspec.constFeat, lspec.aopts);
+	  	  val thismodel = if (opts.nmodelmats > 0) lspec.imodel else imodel;
+	  	  val fclayer = new FCLayer(thismodel, lspec.constFeat, lspec.aopts);
 	  		layers(i) = fclayer;
-	  		if (refresh) modelmats(imodel) = convertMat(normrnd(0, 1, lspec.outsize, nfeats + (if (lspec.constFeat) 1 else 0)));
+	  		if (refresh) modelmats(thismodel) = convertMat(normrnd(0, 1, lspec.outsize, nfeats + (if (lspec.constFeat) 1 else 0)));
 	  		nfeats = lspec.outsize;
 	  		if (lspec.aopts != null) fclayer.initADAGrad
 	  		imodel += 1;
@@ -144,12 +149,13 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     	if (mask.asInstanceOf[AnyRef] != null) {
     		modelmats(0) ~ modelmats(0) ∘ mask;
     	}
-    	var i = 1
-    			while (i < layers.length) {
-    				layers(i).forward;
-    				i += 1;
-    			}
+    	var i = 1;
+    	while (i < layers.length) {
+    		layers(i).forward;
+    		i += 1;
+    	}
     	layers(i-1).deriv.set(1);
+    	for (j <- 0 until updatemats.length) updatemats(j).clear;
     	while (i > 1) {
     		i -= 1;
     		layers(i).backward(ipass, pos);
@@ -277,7 +283,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       	ADAGrad.multUpdate(deriv, input.data, modelmats(imodel), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
       } else {
       	val dprod = deriv *^ input.data;
-      	updatemats(imodel) <-- (if (constFeat) (sum(deriv,2) \ dprod) else dprod);
+      	updatemats(imodel) ~ updatemats(imodel) + (if (constFeat) (sum(deriv,2) \ dprod) else dprod);
       }
     }
     
@@ -302,9 +308,9 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   
   class ReLULayer extends Layer {
     override def forward = {
-      createData
-      data <-- max(input.data, 0f)
-      clearDeriv
+      createData;
+      data <-- max(input.data, 0f);
+      clearDeriv;
     }
     
     override def backward = {
@@ -332,8 +338,8 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     }
     
     override def forward = {
-      createData
-      data <-- GLM.preds(input.data, ilinks, totflops)
+      createData;
+      data <-- GLM.preds(input.data, ilinks, totflops);
       clearDeriv;
     }
     
@@ -380,7 +386,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var randmat:Mat = null;
     
     override def forward = {
-      createData
+      createData;
       randmat = input.data + 20f;   // Hack to make a cached container to hold the random data
       if (opts.predict) {
       	data ~ input.data * frac;
@@ -393,7 +399,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       	randmat ~ (randmat < frac)
       	data ~ input.data ∘ randmat;
       }
-      clearDeriv
+      clearDeriv;
     }
     
     override def backward = {
@@ -411,7 +417,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       createData(inputs(0).data.nrows, inputs(0).data.ncols);
       data <-- inputs(0).data;
       (1 until inputs.length).map((i:Int) => data ~ data + inputs(i).data);
-      clearDeriv
+      clearDeriv;
     }
     
     override def backward = {
@@ -431,11 +437,11 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     	createData(inputs(0).data.nrows, inputs(0).data.ncols);
       data <-- inputs(0).data;
       (1 until inputs.length).map((i:Int) => data ~ data ∘ inputs(i).data);
-      clearDeriv
+      clearDeriv;
     }
     
     override def backward = {
-      val ddata = deriv ∘ data
+      val ddata = deriv ∘ data;
       (0 until inputs.length).map((i:Int) => {
       	if (inputs(i).deriv.asInstanceOf[AnyRef] != null) inputs(i).deriv ~ inputs(i).deriv + ddata / inputs(i).data;
       });
@@ -452,7 +458,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       createData;
       val exps = exp(input.data);
       data ~ exps / sum(exps);
-      clearDeriv
+      clearDeriv;
     }
     
     override def backward = {
@@ -472,8 +478,8 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     
     override def forward = {
       createData;
-      data <-- tanh(input.data);
-      clearDeriv
+      tanh(input.data, data);
+      clearDeriv;
     }
     
     override def backward = {
@@ -491,7 +497,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var totflops = 0L;
     
     override def forward = {
-      createData
+      createData;
       if (ilinks.asInstanceOf[AnyRef] == null) {
         ilinks = izeros(input.data.nrows, 1)
         ilinks.set(GLM.logistic);
@@ -499,7 +505,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       }
       if (totflops == 0L) totflops = input.data.nrows * GLM.linkArray(1).fnflops
       data <-- GLM.preds(input.data, ilinks, totflops)
-      clearDeriv
+      clearDeriv;
     }
     
     override def backward = {
@@ -517,7 +523,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var totflops = 0L;
    
     override def forward = {
-      createData
+      createData;
       val big = input.data > 60f;      
       data ~ ((1 - big) ∘ ln(1f + exp(min(60f, input.data)))) + big ∘ input.data;
       clearDeriv;
@@ -544,9 +550,9 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class LnLayer extends Layer {
     
     override def forward = {
-      createData
-      data <-- ln(input.data);
-      clearDeriv
+      createData;
+      ln(input.data, data);
+      clearDeriv;
     }
     
     override def backward = {
@@ -561,8 +567,8 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   class ExpLayer extends Layer {
     
     override def forward = {
-      createData
-      data <-- exp(input.data);
+      createData;
+      exp(input.data, data);
       clearDeriv;
     }
     
@@ -658,6 +664,7 @@ object DNN  {
     var dmask:Mat = null;
     var constFeat:Boolean = false;
     var aopts:ADAGrad.Opts = null;
+    var nmodelmats = -1;
   }
   
   class Options extends Opts {}
@@ -668,7 +675,7 @@ object DNN  {
   
   class ModelLayerSpec(input:LayerSpec) extends LayerSpec(input, null){}
   
-  class FC(input:LayerSpec, val outsize:Int, val constFeat:Boolean, val aopts:ADAGrad.Opts) extends ModelLayerSpec(input) {}
+  class FC(input:LayerSpec, val outsize:Int, val constFeat:Boolean, val aopts:ADAGrad.Opts, val imodel:Int = 0) extends ModelLayerSpec(input) {}
   
   class ReLU(input:LayerSpec) extends LayerSpec(input, null) {}
   

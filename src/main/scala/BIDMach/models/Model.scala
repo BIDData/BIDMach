@@ -122,12 +122,16 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
         	case aa:FMat => GDMat(aa)
         	case aa:IMat => GIMat(aa)
         	case aa:SMat => GSDMat(aa)
+        	case aa:GDMat => aa
+        	case aa:GMat => GDMat(aa)
         	}         
         } else {
         	to(i) = from(i) match {
         	case aa:FMat => GMat(aa)
         	case aa:IMat => GIMat(aa)        	
         	case aa:SMat => GSMat(aa)
+        	case aa:GMat => aa
+        	case aa:GDMat => GMat(aa)
         	}
         }
       } else {
@@ -145,17 +149,39 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
     
   def convertMat(a:Mat):Mat = {
-    if (useGPU) {
-      if (opts.useDouble) {
-        GDMat(a)
+    a match {
+      case f:FMat =>
+      if (useGPU) {
+      	if (opts.useDouble) {
+      		GDMat(f);
+      	} else {
+      		GMat(f);
+      	}
       } else {
-        GMat(a)
+      	if (opts.useDouble) {  
+      		DMat(f);
+      	} else {
+      		f
+      	}
       }
-    } else {
-      if (opts.useDouble) {  
-        DMat(a)
+      case i:IMat =>
+      if (useGPU) {
+        GIMat(i);
       } else {
-        a
+        i;
+      }
+      case g:GMat => if (useGPU) {
+      	if (opts.useDouble) {
+      		GDMat(g);
+      	} else {
+      	  g
+      	} 
+      } else {
+      	if (opts.useDouble) {
+      	  DMat(FMat(g));
+      	} else {
+      		FMat(g);
+      	}
       }
     }
   }

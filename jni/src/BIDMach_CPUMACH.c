@@ -3,12 +3,12 @@
 #include <omp.h>
 #include <math.h>
 
-JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecConv
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint skip, jintArray jW, jfloatArray jA, jfloatArray jB, jfloat lrate)
 {
   int i, j, k, c, ia, ib, coff;
   float cv;
-  int * W = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWA, JNI_FALSE));
+  int * W = (jint *)((*env)->GetPrimitiveArrayCritical(env, jW, JNI_FALSE));
   float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
   float * B = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jB, JNI_FALSE));
   float * C, * Btmp;
@@ -66,7 +66,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecConv
   (*env)->ReleasePrimitiveArrayCritical(env, jW, W, 0);
 }
 
-JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vec
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint nwa, const jint nwb, jintArray jWA, jintArray jWB, 
  jfloatArray jA, jfloatArray jB, jfloat lrate)
 {

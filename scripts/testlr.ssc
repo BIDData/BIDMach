@@ -22,27 +22,28 @@ println("applying amap")
 val aa = amap * a
 val taa = amap * ta */
 
-val (nn,opts,mm,mopts)=GLM.learner(a,c,ta,pc,1)
+val (nn,opts)=GLM.learnerX(a,c,1)
 
-opts.batchSize=20000
-mopts.batchSize=20000
-//opts.npasses=3
-opts.reg1weight = 0.01
+
+opts.batchSize=5000
+opts.lrate = 0.1f
+opts.npasses=3
+opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
-mopts.addConstFeat=true;
+opts.aopts = opts;
 
 //val dd = mkdiag(ones(103,1));
 //val tmap = dd on dd on dd on dd
-
 //opts.targmap = tmap
 //mopts.targmap = opts.targmap
-mopts.links = opts.links
-
-//opts.useGPU=false
-//mopts.useGPU=false
 
 nn.train
+
+val (mm, mopts) = GLM.predictor(nn.model, ta, pc)
+mopts.addConstFeat=true;
+mopts.batchSize=20000
+mopts.links = opts.links
 mm.predict
 
 //val tc2= tmap * tc

@@ -14,13 +14,14 @@ val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,?)
 val pc = zeros(tc.nrows, tc.ncols)
 
 val (nn,opts)=DNN.learnerX(a,c)
-
-opts.batchSize=1000
-opts.reg1weight = 0.0001
-
 opts.aopts = opts
 
-opts.npasses=10
+
+opts.batchSize=2000
+opts.reg1weight = 0.0001
+
+
+opts.npasses=5
 opts.addConstFeat=false;
 opts.links = iones(100,1);
 opts.lrate = 0.4f // best for 6-layer
@@ -28,7 +29,7 @@ opts.lrate = 0.2f
 opts.texp = 0.4f
 opts.nweight = 1e-4f
 
-DNN.dlayers4(11,500,0.5f,100,opts,2)
+DNN.dlayers4(7,500,0.5f,100,opts,2)
 
 nn.train
 

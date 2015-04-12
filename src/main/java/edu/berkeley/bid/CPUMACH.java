@@ -12,7 +12,9 @@ public final class CPUMACH {
   
   public static native  void word2vecBwd(int nrows, int ncols, int nwa, int nwb, int [] WA, int [] WB, float [] A, float [] B, float [] DA, float [] DB, float [] C, float lrate);
   
-  public static native  void word2vec(int nrows, int ncols, int nwa, int nwb, int [] WA, int [] WB, float [] A, float [] B, float lrate);
+  public static native  void word2vecNeg(int nrows, int ncols, int nwa, int nwb, int [] WA, int [] WB, float [] A, float [] B, float lrate);
+  
+  public static native int word2vecPos(int nrows, int ncols, int shift, int [] W, float [] A, float [] B, float lrate);
 
 }
 

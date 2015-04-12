@@ -62,10 +62,10 @@ int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, fl
                     float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                     float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);
 
-int word2vecConv(int nrows, int ncols, int shift, int *W, float *A, float *B, float lrate);
+int word2vecPos(int nrows, int ncols, int shift, int *W, float *A, float *B, float lrate);
+
+int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate);
 
 int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C);
 
 int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C, float lrate);
-
-int word2vec(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate);

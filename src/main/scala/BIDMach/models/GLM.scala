@@ -111,7 +111,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     ulim = convertMat(opts.lim)
     llim = - ulim;
     hashFeatures = opts.hashFeatures;
-    if (opts.GLM_ADAGrad) initADAGrad(d, m);
+    if (opts.aopts != null) initADAGrad(d, m);
   }
   
   def initADAGrad(d:Int, m:Int) = {
@@ -146,7 +146,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     GLM.preds(eta, eta, mylinks, totflops);
     GLM.derivs(eta, targs, eta, mylinks, totflops);
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights;
-    if (opts.GLM_ADAGrad) {
+    if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
       val step = (pos + firststep)/firststep;
       if (hashFeatures == 0) {
@@ -201,7 +201,7 @@ object GLM {
     var hashFeatures = 0;
     var hashBound1:Int = 1000000;
     var hashBound2:Int = 1000000;
-    var GLM_ADAGrad:Boolean = false;
+    var aopts:ADAGrad.Opts = null;
   }
   
   val linear = 0;
@@ -592,9 +592,26 @@ object GLM {
   	    new ADAGrad(opts), 
   	    opts)
     (nn, opts)
-  }  
+  } 
     
   def learner(mat0:Mat):(Learner, LearnOptions) = learner(mat0, 0)
+  
+    // Basic in-memory learner with generated target
+  def learnerX(mat0:Mat, d:Int = 0) = { 
+    val opts = new LearnOptions
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    opts.lrate = 1f
+    opts.aopts = opts
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new GLM(opts), 
+  	    mkRegularizer(opts),
+  	    null, 
+  	    opts)
+    (nn, opts)
+  } 
+    
+  def learnerX(mat0:Mat):(Learner, LearnOptions) = learnerX(mat0, 0)
   
   // Basic in-memory learner with explicit target
   def learner(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = {
@@ -609,6 +626,25 @@ object GLM {
         model, 
         mkRegularizer(mopts),
         new ADAGrad(mopts), 
+        mopts)
+    (mm, mopts)
+  }
+
+  
+  // Basic in-memory learner with explicit target
+  def learnerX(mat0:Mat, targ:Mat, d:Int):(Learner, LearnOptions) = {
+    val mopts = new LearnOptions;
+    mopts.lrate = 1f
+    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    if (mopts.links == null) mopts.links = izeros(1,targ.nrows)
+    mopts.links.set(d)
+    val model = new GLM(mopts)
+    mopts.aopts = mopts;
+    val mm = new Learner(
+        new MatDS(Array(mat0, targ), mopts), 
+        model, 
+        mkRegularizer(mopts),
+        null, 
         mopts)
     (mm, mopts)
   }
@@ -658,6 +694,21 @@ object GLM {
         model, 
         mkRegularizer(mopts),
         new ADAGrad(mopts), mopts)
+    (mm, mopts)
+  }
+  
+  def learnerX(ds:DataSource):(Learner, GOptions) = {
+    val mopts = new GOptions;
+    mopts.lrate = 1f
+    mopts.autoReset = false
+    mopts.aopts = mopts;
+    val model = new GLM(mopts)
+    val mm = new Learner(
+        ds, 
+        model, 
+        mkRegularizer(mopts),
+        null,
+        mopts);
     (mm, mopts)
   }
   
