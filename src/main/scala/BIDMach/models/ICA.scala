@@ -227,13 +227,24 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param dat The data matrix, used to compute the covariance matrices if necessary.
    */
   private def orthogonalize(w : Mat, dat : Mat) : Mat = {
-    val C = getSampleCovariance(dat)
+    var C:Mat = null
+    if (opts.preWhitened) {
+      C = mkdiag(ones(dat.nrows,1))
+    } else {
+      C = getSampleCovariance(dat)
+    }
     val WWT = w * C *^ w
     val result = w / sqrt(maxi(sum(abs(WWT), 2)))
+    if (sum(sum(result)).dv.isNaN) {
+      println("Error: sum(sum(result)) = NaN, indicating issues wiht sqrt(maxi(sum(abs(WWT),2))).")
+    }
     var a = 0
-    while (a < math.min(10, 5+math.sqrt(opts.dim).toInt)) { // Just a guess. It has to be small to avoid NaNs.
+    while (a < opts.numOrthogIter) { // Can result in NaNs, be careful.
       val newResult = ((1.5f * result) - 0.5f * (result * C *^ result * result))
       result <-- newResult
+      if (sum(sum(result)).dv.isNaN) {
+        println("Error: sum(sum(result)) = NaN, indicating that NaNs are appearing.")
+      }
       a = a + 1
     }
     return result
@@ -251,6 +262,8 @@ object ICA {
 
   trait Opts extends FactorModel.Opts {
     var G_function:String = "logcosh"
+    var numOrthogIter:Int = 10
+    var preWhitened:Boolean = false
   }
 
   class Options extends Opts {}
@@ -260,8 +273,9 @@ object ICA {
     class xopts extends Learner.Options with MatDS.Opts with ICA.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = size(mat0)(0)
-    opts.npasses = 20
+    opts.npasses = 10
     opts.batchSize = math.min(250000, mat0.ncols/15 + 1) // Just a heuristic
+    opts.numOrthogIter = math.min(10, 5+math.sqrt(opts.dim).toInt)
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
         new ICA(opts), 
@@ -286,6 +300,11 @@ object ICA {
         new ADAGrad(opts), 
         opts)
     (nn, opts)
+  }
+
+  /** Ranks the independent components by their contribution to the original data. */
+  def rankComponents() = {
+    println("rankComponents() not yet implemented.")
   }
    
 }
