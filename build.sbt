@@ -7,6 +7,10 @@ organization := "edu.berkeley.bid"
 
 scalaVersion := "2.11.2"
 
+artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
+  "../../BIDMach.jar"
+}
+
 resolvers ++= Seq(
   "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
   "Scala Mirror" at "https://oss.sonatype.org/content/repositories/releases/"

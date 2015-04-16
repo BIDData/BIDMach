@@ -51,7 +51,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   
   // Some temp variables. The most important one is mm, which is our W = A^{-1}.
   var mm:Mat = null
-  var batchIteration = 0.0 
+  var batchIteration = 0.0f
   var G_fun: Mat=>Mat = null
   var g_fun: Mat=>Mat = null
   var g_d_fun: Mat=>Mat = null
@@ -103,7 +103,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    */
   def uupdate(data : Mat, user : Mat, ipass : Int) {
     if (ipass == 0) {
-      batchIteration = batchIteration + 1.0
+      batchIteration = batchIteration + 1.0f
       modelmats(1) <-- (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
     }
     data ~ data - modelmats(1)
@@ -161,7 +161,6 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param ipass The current pass through the data.
    */
   def evalfun(data : Mat, user : Mat, ipass : Int) : FMat = {
-    println("Inside evalfun() with GPUmem = " + GPUmem)
     val big_gwtx = G_fun(user)
     val rowMean = FMat(mean(big_gwtx,2)) - stdNorm
     return sum(rowMean *@ rowMean)
@@ -186,24 +185,24 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   
   /** Assumes G(x) = -exp(-x^2/2), good if data is super-Gaussian or robustness is needed. */
   private def G_exponent(m : Mat) : Mat = {
-    return -exp(-0.5 * (m *@ m))
+    return -exp(-0.5f * (m *@ m))
   }
   
   /** Assumes g(x) = d/dx -exp(-x^2/2) = x*exp(-x^2/2). */
   private def g_exponent(m : Mat) : Mat = {
-    return m *@ exp(-0.5 * (m *@ m))
+    return m *@ exp(-0.5f * (m *@ m))
   }
   
   /** Assumes g'(x) = d/dx x*exp(-x^2/2) = (1-x^2)*exp(-x^2/2). */
   private def g_d_exponent(m : Mat) : Mat = {
-    return (1 - (m *@ m)) *@ exp(-0.5 * (m *@ m))
+    return (1 - (m *@ m)) *@ exp(-0.5f * (m *@ m))
   }
 
   /** Assumes G(x) = x^4/4, a weak contrast function, but OK for sub-Gaussian data w/no outliers. */
   private def G_kurtosis(m: Mat) : Mat = {
     val c = m *@ m
     c ~ c *@ c 
-    return c / 4.0
+    return c / 4.0f
   }
   
   /** Assumes g(x) = d/dx x^4/4 = x^3. */
@@ -232,8 +231,8 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     val WWT = w * C *^ w
     val result = w / sqrt(maxi(sum(abs(WWT), 2)))
     var a = 0
-    while (a < math.min(5, 1+math.sqrt(opts.dim).toInt)) { // Needs to be small to make manageable
-      val newResult = ((1.5 * result) - 0.5 * (result * C *^ result * result))
+    while (a < math.min(10, 5+math.sqrt(opts.dim).toInt)) { // Just a guess. It has to be small to avoid NaNs.
+      val newResult = ((1.5f * result) - 0.5f * (result * C *^ result * result))
       result <-- newResult
       a = a + 1
     }
@@ -262,7 +261,7 @@ object ICA {
     val opts = new xopts
     opts.dim = size(mat0)(0)
     opts.npasses = 20
-    opts.batchSize = math.min(100000, mat0.ncols/20 + 1) // Just a heuristic
+    opts.batchSize = math.min(250000, mat0.ncols/15 + 1) // Just a heuristic
     val nn = new Learner(
         new MatDS(Array(mat0:Mat), opts), 
         new ICA(opts), 
@@ -278,7 +277,7 @@ object ICA {
     val opts = new xopts
     opts.dim = d
     opts.fnames = fnames
-    opts.batchSize = 10000;
+    opts.batchSize = 25000;
     implicit val threads = threadPool(4)
     val nn = new Learner(
         new FilesDS(opts), 
