@@ -106,7 +106,7 @@ elif [ "$OS" = "linux" ] ; then
     JAVA_HOME="/usr/java/default"
     fi
     CUDA_HOME="/usr/local/cuda"
-    CC="gcc"
+    CC="icc"
     GCC="g++"
     NVCC="nvcc"
     NVCCFLAGS="-c -use_fast_math -I$BIDMACH_ROOT/jni/include \
@@ -118,7 +118,7 @@ elif [ "$OS" = "linux" ] ; then
     OBJ="o"
     OUTFLG="-o "
     CPPFLAGS="-fPIC -c -O2 -DNDEBUG  -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include" 
-    CFLAGS="-fopenmp -fPIC -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    CFLAGS="-openmp -fPIC -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
     LB="ar rc"    
     GLD="g++ -shared"
     LD="g++ -shared -z noexecstack"
@@ -133,7 +133,7 @@ elif [ "$OS" = "linux" ] ; then
 	    MKL_LIBS="-L$JAVA_HOME/lib -L${BIDMACH_ROOT}/lib \
              -lpthread -lm"
     else 
-	    MKL_LIBS="-L$JAVA_HOME/lib -L${BIDMACH_ROOT}/lib/${ARCHD} \
+	    MKL_LIBS="-L$JAVA_HOME/lib -L${BIDMACH_ROOT}/lib \
              -liomp5 -ldl -lpthread -lm"
     fi
     if [ "$ARCH" = "x86" ] ; then
