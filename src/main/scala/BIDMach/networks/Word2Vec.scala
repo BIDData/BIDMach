@@ -124,7 +124,7 @@ object Word2Vec  {
   					} else if (cv < -16.0f) {
   						cv = 0.0f;
   					} else {
-  						cv = math.exp(cv).toFloat;
+ // 						cv = math.exp(cv).toFloat;
   						cv = 1.0f / (1.0f + cv);
   					}
 
