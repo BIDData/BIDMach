@@ -6,8 +6,7 @@
 JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint skip, jintArray jW, jfloatArray jA, jfloatArray jB, jfloat lrate)
 {
-  int i, j, k, c, ia, ib, coff;
-  float cv;
+  int i;
   int * W = (jint *)((*env)->GetPrimitiveArrayCritical(env, jW, JNI_FALSE));
   float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
   float * B = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jB, JNI_FALSE));
@@ -18,6 +17,8 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
 
 #pragma omp parallel for
   for (i = 0; i < ncols; i++) {
+    int j, k, c, ia, ib, coff;
+    float cv;
     ib = W[i];
     for (j = -skip; j <= skip; j++) {
       if (j != 0 && i + j >= 0 && i + j < ncols) {
