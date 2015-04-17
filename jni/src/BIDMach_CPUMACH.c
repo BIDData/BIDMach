@@ -70,8 +70,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint nwa, const jint nwb, jintArray jWA, jintArray jWB, 
  jfloatArray jA, jfloatArray jB, jfloat lrate)
 {
-  int i, j, k, c, ia, ib, coff;
-  float cv;
+  int i;
   int * WA = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWA, JNI_FALSE));
   int * WB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWB, JNI_FALSE));
   float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
@@ -83,6 +82,8 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
 
 #pragma omp parallel for
   for (i = 0; i < ncols; i++) {
+    int j, k, c, ia, ib, coff;
+    float cv;
     for (j = 0; j < nwa; j++) {
       ia = nrows*WA[j+i*nwa];
       for (k = 0; k < nwb; k++) {
@@ -139,8 +140,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecFwd
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint nwa, const jint nwb, jintArray jWA, jintArray jWB, 
  jfloatArray jA, jfloatArray jB, jfloatArray jC)
 {
-  int i, j, k, c, ia, ib, coff;
-  float sum;
+  int i;
   jint * WA = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWA, JNI_FALSE));
   jint * WB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWB, JNI_FALSE));
   jfloat * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
@@ -149,6 +149,8 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecFwd
 
 #pragma omp parallel for
   for (i = 0; i < ncols; i++) {
+    int j, k, c, ia, ib, coff;
+    float sum;
     for (j = 0; j < nwa; j++) {
       ia = nrows*WA[j+i*nwa];
       for (k = 0; k < nwb; k++) {
