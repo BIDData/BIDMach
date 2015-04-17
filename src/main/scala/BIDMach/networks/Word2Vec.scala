@@ -81,7 +81,7 @@ object Word2Vec  {
     val nwords = words.ncols;
     (words, model1, model2) match {
       case (w:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate);
-      case (w:IMat, m1:FMat, m2:FMat) => CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate);
+      case (w:IMat, m1:FMat, m2:FMat) => CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate, Mat.numThreads);
     }
   }
   
@@ -91,7 +91,7 @@ object Word2Vec  {
     val nwords = wordsa.ncols;
     (wordsa, wordsb, modela, modelb) match {
       case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
-      case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
+      case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads);
 //      case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
     }
   }
