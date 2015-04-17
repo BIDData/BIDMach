@@ -24,7 +24,10 @@ cp /etc/httpd/conf/httpd.conf /etc/httpd/conf/httpd_bkup.conf
 cp /home/ec2-user/httpd.conf /etc/httpd/conf/httpd.conf
 apachectl -k graceful
 
-spark/bin/spark-shell
+# need more driver memory for several models, e.g. multiclass and word2vec
+spark/bin/spark-shell 
+spark/bin/spark-shell --driver-memory 16g --conf "spark.driver.maxResultSize=8g"
+
 
 exit
 
