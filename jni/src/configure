@@ -179,9 +179,9 @@ elif [ "$OS" = "windows" ] ; then
     LAPACK_INCLUDES=""
     FORTRAN_LIBS=""
     if [ "$PARLIB" = "sequential" ] ; then
-	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_sequential.lib mkl_core.lib"   
+	    MKL_LIBS=""
     else
-	    MKL_LIBS="mkl_intel${PTYPE}.lib mkl_intel_thread.lib mkl_core.lib" 
+	    MKL_LIBS="libiomp5md.lib" 
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="cudart.lib"
