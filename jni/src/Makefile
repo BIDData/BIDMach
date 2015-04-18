@@ -1,7 +1,5 @@
 include Makefile.incl
 
-MKL_OBJS=
-
 CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ) HashMult.$(OBJ) \
           DNN127.$(OBJ) Logger.$(OBJ) JNIUtils.$(OBJ) PointerUtils.$(OBJ)
 
@@ -10,6 +8,10 @@ CPU_OBJS=BIDMach_CPUMACH.$(OBJ)
 .SUFFIXES: .$(OBJ) .c .cpp .cu
 
 all: $(LIBPREPEND)bidmachcuda$(LIBAPPEND)  $(LIBPREPEND)bidmachcpu$(LIBAPPEND) 
+
+cudalib: $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
+
+cpulib: $(LIBPREPEND)bidmachcpu$(LIBAPPEND) 
 
 $(LIBPREPEND)bidmachcpu$(LIBAPPEND): $(CPU_OBJS)
 	$(LD) $(LDFLAGS) $(CPU_OBJS) $(MKL_LIBS) $(OUTFLG)$@
@@ -34,6 +36,12 @@ DNN127.$(OBJ) : DNN127.cu
 
 install: all
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
+
+installcudalib: cudalib
+	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
+
+installcpulib: cpulib
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
 
 clean:
