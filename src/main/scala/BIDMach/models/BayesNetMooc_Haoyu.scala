@@ -27,7 +27,7 @@ object BayesNetMooc3 {
   var graph: Graph = null
   var sdata: SMat = null
   var tdata: SMat = null
-  var statesPerNode: IMat = null
+  var statesPerNode: IMat = null  
   var cpt: FMat = null
   var cptOffset: IMat = null
   var state: FMat = null
@@ -67,10 +67,11 @@ object BayesNetMooc3 {
     init(nodepath, dagpath, stateSizePath)
     loadData(datapath, numQuestions, numStudents)   
     setup
-    //sampleAll
-    println("Node map is: " + nodeMap)
-    println("Graph DAG is: " + graph.dag)
-    println("statesPerNode is: " + statesPerNode)
+    println("start sample All")
+    sampleAll
+    //println("Node map is: " + nodeMap)
+    //println("Graph DAG is: " + graph.dag)
+    //println("statesPerNode is: " + statesPerNode)
   }
 
   /** Loads the nodes, the DAG, and create a graph with coloring and moralizing capabilities. */
@@ -88,8 +89,10 @@ object BayesNetMooc3 {
   def loadData(datapath:String, nq: Int, ns: Int) = {
     sdata = loadSData(datapath, nq, ns)
     tdata = loadTData(datapath, nq, ns)
-    println("finish load Data")
-    println(sdata)
+    //println("finish load Data")
+    //println("the full s data is " + full(sdata))
+    //println("the full t data is " + full(tdata))
+
   }
 
   /**
@@ -114,12 +117,18 @@ object BayesNetMooc3 {
     graph.color
     val parentsPerNode = sum(graph.dag)
     pproject = graph.dag + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
-    val numSlotsInCpt = IMat(exp(pproject.t * ln(statesPerNode).t))     // TODO errors here
+    //println("run here")
+    //println(full(pproject.t))
+   
+    val numSlotsInCpt = IMat(exp(DMat(full(pproject.t)) * ln(DMat(statesPerNode))) + 1e-3)     
+    // here add 1e-3 just to ensure that IMat can get the correct Int
+    
     val lengthCPT = sum(numSlotsInCpt).v
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cpt = rand(lengthCPT,1)
-
+    //println("the tot len of the cpt array is " + lengthCPT)
+    println("the cptOffset array is " + cptOffset)
     // TODO Daniel: I'll leave this here for now but come up with a better way to normalize
     for (i <- 0 until graph.n-1) {
       var offset = cptOffset(i)
@@ -137,7 +146,7 @@ object BayesNetMooc3 {
       lastOffset = lastOffset + statesPerNode(graph.n-1)
     }
     //println("\nNORMALIZED cpt.t = " + cpt.t)
-
+    //println("the normalize cpt is " + cpt)
     // Compute iproject here (pproject already computed) 
     iproject = (pproject.copy).t
     for (i <- 0 until graph.n) {
@@ -149,6 +158,7 @@ object BayesNetMooc3 {
         iproject(i, parents(n - j - 1)) = cumRes.toFloat
       }
     }
+    println("the iproject is + " + full(iproject))
     predprobs = rand(graph.n, batchSize)
   }
 
@@ -159,16 +169,19 @@ object BayesNetMooc3 {
    */
   def sampleAll = {
     val ndata = size(sdata, 2)
+    println("the num of data is " + ndata)
     for (k <- 0 until niter) {
       var j = 0;
       batchSize = batchSize
       for (i <- 0 until ndata by batchSize) { // Default is to do this just once
-        sample(sdata(?, i until math.min(ndata, i + batchSize)), k)
+        val data = sdata(?, i until math.min(ndata, i + batchSize))
+        val realBatchSize = data.ncols
+        sample(data, k)
         updateCpt
         eval
       }
       //println("delta: %f, %f, %f, %f" format (eval2._1, eval2._2, eval2._3, llikelihood))
-      pred(k)
+      //pred(k)
       //println("ll: %f" format llikelihood)
       llikelihood = 0f
       //println("dist cpt - cpt0: %f" format ((cpt-cpt0) dot (cpt-cpt0)).v )
@@ -196,15 +209,23 @@ object BayesNetMooc3 {
     for (c <- 0 until graph.ncolors) {
       // TODO Investigate the impact of stateSet and pSet on the matrix caching for GPUs.
       val idInColor = find(graph.colors == c)
-      val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2) + 1).v
+      println("color in this group is " + idInColor)
+      //val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2) + 1).v // here we don't need to add 1
+      val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
+      println("numState is " + numState)
       var stateSet = new Array[FMat](numState)
       var pSet = new Array[FMat](numState)
       var pMatrix = zeros(idInColor.length, batchSize)
       for (i <- 0 until numState) {
-        val ids = idInColor(statesPerNode(idInColor) >= i)
+        //println("the statePerNode in idInColor is " + (statesPerNode(idInColor) >= 0))
+        val saveID = find(statesPerNode(idInColor) >= i)
+        val ids = idInColor(saveID)
         val pids = find(sum(pproject(ids, ?), 1))
+
+        println("the ids is " + ids)
+        println("the pids is " + pids)
         initStateColor(fdata, ids, i, stateSet)
-        computeP(ids, pids, i, pSet, pMatrix, stateSet(i) )
+        computeP(ids, pids, i, pSet, pMatrix, stateSet(i), saveID, idInColor.length)
       }
       sampleColor(fdata, numState, idInColor, pSet, pMatrix)
     }
@@ -212,17 +233,23 @@ object BayesNetMooc3 {
 
   /**
    * this method init the state matrix (a global variable) with the input training data "fdata"
-   * this method needs normalize the probablity
-   * Daniel: not sure why this method needs to normalize the probability, maybe you can clarify?
+   * I assume the rule is: unknown variable is -1, the valid value is from 0, 1, 2...
+   * Thus, for this data (i.e fdata), we just need to copy the fdata to the state
    */
   def initState(fdata: FMat) = {
+    /**
     state = rand(graph.n, batchSize)
     // Tricky: for each row i, randomly initialize it {0,1,...,k-1} where k = statesPerNode(i).
     // TODO Not done with the previously mentioned step, because rand(...) needs to be broken down into integers
-    val innz = find(fdata)
+    println(full(fdata))
+    println((fdata >= 0))
+    val innz = find(fdata >= 0)
     state(innz) = 0
     // I think the following line should work
     state = state + fdata(innz) // If fdata is -1 at unknowns (innz will skip), and 0, 1, ..., k at known values.
+    **/
+    state = fdata.copy
+    //println("the state is " + state)
   }
 
   /**
@@ -232,40 +259,84 @@ object BayesNetMooc3 {
    */
   def initStateColor(fdata: FMat, ids: IMat, i: Int, stateSet: Array[FMat]) = {
     var statei = state.copy
+    //println("the original statei is " + statei)
     statei(ids,?) = i
-    val innz = find(fdata)
+    val innz = find(fdata >= 0)   // since we assume that -1 represents the null in the data set
     statei(innz) = 0
     // TODO One last step, but depends on how our fdata is. We need to put in all "known" values. Something like:
-    statei = statei + fdata(innz) // IF fdata is -1 at unknowns (innz will skip), and 0, 1, ..., k at known values.
+    //println("the innz is " + innz)
+    //println("the fdata is " + fdata)
+    //println(fdata(innz))
+    //println(statei)
+    statei(innz) = statei(innz) + fdata(innz) // IF fdata is -1 at unknowns (innz will skip), and 0, 1, ..., k at known values.
+    //println("the updated statei is " + statei)
     stateSet(i) = statei
   }
 
   /** 
    * this method calculate the Pi to prepare to compute the real probability 
    */
-  def computeP(ids: IMat, pids: IMat, i: Int, pi: Array[FMat], pMatrix: FMat, statei: FMat) = {
+  def computeP(ids: IMat, pids: IMat, i: Int, pi: Array[FMat], pMatrix: FMat, statei: FMat, saveID: IMat, numPi: Int) = {
     val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + 1e-10)
-    pi(i) = exp(pproject(ids, pids) * nodei)   // Un-normalized probs, i.e., Pr(X_i | parents_i)
-    pMatrix(ids, ?) = pMatrix(ids, ?) + pi(i)      // Save this un-normalized prob into the pMatrix for norm later
+    //println("nodei is " + nodei)
+    /**
+    println("offsect debug")
+    println("the statei is ")
+    println("the offsect is " + cptOffset)
+    printMatrix(statei)
+    println("the pids is " + pids)
+    println((cptOffset(pids) + IMat(iproject(pids, ?) * statei)))
+    println("end of debug")
+    **/
+    var pii = zeros(numPi, batchSize)
+    pii(saveID, ?) = exp(pproject(ids, pids) * nodei)   // Un-normalized probs, i.e., Pr(X_i | parents_i)
+    //println("pi is " + pi(i))
+    //println("the ids is " + ids)
+    //println("the saveID is " + saveID)
+    //println("the pm(ids, ?) is " + pMatrix(saveID, ?))
+    pi(i) = pii
+    pMatrix(saveID, ?) = pMatrix(saveID, ?) + pii(saveID, ?)      // Save this un-normalized prob into the pMatrix for norm later
+    
+    println(pii)
+    println(pMatrix)
   }
 
   /** This method sample the state for the given color group */
-  def sampleColor(fdata: FMat, num_state: Int, id_in_color: IMat, pSet: Array[FMat], pMatrix: FMat) = {
-    val sampleMatrix = rand(id_in_color.length, batchSize)     // A matrix w/random values for sampling
-    for (i <- 0 until num_state) {
-      val ids = id_in_color(statesPerNode(id_in_color) >= i)  
+  def sampleColor(fdata: FMat, numState: Int, idInColor: IMat, pSet: Array[FMat], pMatrix: FMat) = {
+    val sampleMatrix = rand(idInColor.length, batchSize)     // A matrix w/random values for sampling
+    //var sampleProb = new Array[FMat](numState)          // It's ugly here, but easy to map the data..
+    println("begin sample color")
+    println("sample matrix is " + sampleMatrix)
+    println("num_state is " + numState)
+    for (i <- 0 until numState) {
+      val saveID = find(statesPerNode(idInColor) >= i)
+      val saveID_before = find(statesPerNode(idInColor) >= (i - 1))
+      val ids = idInColor(saveID)
       val pids = find(sum(pproject(ids, ?), 1))
-      pSet(i) = pSet(i) / pMatrix(ids, ?)  // Normalize
+      
+      // problem! here it is not cumulateive!!! TODO here
+      //println("the normalized matrix is " + pSet(i))
       // update the state matrix by sampleMatrix random value
       if (i == 0) {
-        state(ids, ?) = i * (sampleMatrix <= pSet(i))
+        pSet(i) = pSet(i) / pMatrix  // Normalize and get the cumulative prob
+        state(ids, ?) = i * (sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?))
+        //println((sampleMatrix <= pSet(i)))
+        //println("if *2: " + 2* (sampleMatrix <= pSet(i)))
       } else {
-        // TODO unfortunately, we have error: "value && is not a member of BIDMat.FMat"
-        //state(ids, ?) = i * ((sampleMatrix <= pSet(i)) && (sampleMatrix >= pSet(i - 1)))
+        pSet(i) = pSet(i) / pMatrix + pSet(i-1) // Normalize and get the cumulative prob
+        //println("<=: " + ((sampleMatrix(saveID, ?) <= pSet(i))))
+        //println(">=: " + (sampleMatrix(saveID,?) >= pSet(i - 1)))
+        //println("*: " + ((sampleMatrix(saveID, ?) <= pSet(i)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1))))
+        //println("state(ids: " + state(ids, ?))
+        state(ids, ?) = i * ((sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
       }
+      println("the normalized matrix is " + pSet(i))
     }
     // then re-write the known state into the state matrix
-    state(?, 0 until batchSize) = fdata(fdata >= 0)       // here we assume the unknown state to be -1 
+    //println(fdata(find(fdata >= 0)))
+    val saveIndex = find(fdata >= 0)
+    state(saveIndex) = fdata(saveIndex)       // here we assume the unknown state to be -1 
+    println("the updated state is " + state)
   }
 
   /** Returns a conditional probability table specified by indices from the "index" matrix. */
@@ -278,18 +349,82 @@ object BayesNetMooc3 {
   }
 
   // update the cpt method
-  def updateCpt() = {
-    // TODO
+  def updateCpt = {
+    val nstate = size(state, 2)       // num of students
+    val maxState = maxi(statesPerNode, 1).v
+    //println("the max state is " + maxState)
+    // here we need count each different state value by a loop
+    println("updateCPT")
+    printMatrix(state)
+    println((state>0))
+    val index = IMat(cptOffset + iproject * state)
+    var counts = zeros(cpt.length, 1)
+    for (i <- 0 until nstate) {
+      counts(index(?, i)) = counts(index(?, i)) + 1
+    }
+    counts = counts + beta
+
+    for (i <- 0 until graph.n-1) {
+      var offset = cptOffset(i)
+      val endOffset = cptOffset(i+1)
+      while (offset < endOffset) {
+        val normConst = sum( counts(offset until offset+statesPerNode(i)) )
+        counts(offset until offset+statesPerNode(i)) = counts(offset until offset+statesPerNode(i)) / normConst
+        offset = offset + statesPerNode(i)
+      }
+    }
+    var lastOffset = cptOffset(graph.n-1)
+    while (lastOffset < counts.length) {
+      val normConst = sum( counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) )
+      counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) = counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) / normConst
+      lastOffset = lastOffset + statesPerNode(graph.n-1)
+    }
+    cpt = (1 - alpha) * cpt + alpha * counts
+    println("the cpt is")
+    printMatrix(cpt)
+    
   }
 
   // evaluation method
   def eval() = {
-    // TODO
+    
   }
 
   // prediction method, i = Gibbs sampling iteration number
   def pred(i: Int) = {
-    // TODO
+    /**
+    val ndata = size(sdata, 1)
+    for (j <- 0 until ndata by batchSize) {
+      //val jend = math.min(ndata, j + opts.batchSize)
+      //val minidata = data(j until jend, ?)
+      val minidata = sdata
+      // sample mini-batch of data
+      sample(minidata, 0)
+      // update parameters
+    }
+    //val vdatat = loadSMat("C:/data/zp_dlm_FT_code_and_data/train4.smat")
+    //val vdata = vdatat.t
+    val (r, c, v) = find3(tdata)
+    var correct = 0f
+    var tot = 0f
+    for (i <- 0 until tdata.nnz) {
+      val ri = r(i).toInt
+      val ci = c(i).toInt
+      if (predprobs(ri, ci).v != 0.5) {
+        val pred = (predprobs(ri, ci).v >= 0.5)
+        val targ = (v(i).v >= 0)
+        //println(probs(ri, ci).v, v(i).v)
+        //println(pred, targ)
+        if (pred == targ) {
+          correct = correct + 1
+        }
+        tot = tot + 1
+      }
+    }
+    //println(sdata.nnz, tot, correct)
+
+    println(i + "," + correct / tot)
+    **/
   }
 
   // The subsequent methods are all for preparing the data, so not relevant to Gibbs Sampling. 
@@ -331,8 +466,8 @@ object BayesNetMooc3 {
     var lines = scala.io.Source.fromFile(path).getLines
     for (l <- lines) {
       var t = l.split(",")
-      println(l)
-      println("the node id is: " + nodeMap(t(0)))
+      //println(l)
+      //println("the node id is: " + nodeMap(t(0)))
       statesPerNode(nodeMap(t(0))) = t(1).toInt
     }
 
@@ -347,6 +482,7 @@ object BayesNetMooc3 {
    * @param path The path to the dag file (e.g., dag.txt).
    * @return An adjacency matrix (of type SMat) for use to create a graph.
    */
+   // TODO: we need to change it to be read into the 1,2,3,4,.., and fill unknown with -1
   def loadDag(path: String, n: Int) = {
     var row = izeros(bufsize, 1)
     var col = izeros(bufsize, 1)
@@ -418,12 +554,14 @@ object BayesNetMooc3 {
       if (t(5) == "1") {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = (t(3).toFloat - 0.5) * 2
+        // I change this one to be:
+        // orgininal one: v(ptr) = (t(3).toFloat - 0.5) * 2
+        v(ptr) = t(3).toFloat
         ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    (s > 0) - (s < 0)
+    s
   }
 
   /**
@@ -459,12 +597,12 @@ object BayesNetMooc3 {
       if (t(5) == "0") {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = (t(3).toFloat - 0.5) * 2
+        v(ptr) = t(3).toFloat
         ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    (s > 0) - (s < 0)
+    s
   }
 
   /**
@@ -490,5 +628,16 @@ object BayesNetMooc3 {
     }
     writer.close
   }
- 
+  
+  //-----------------------------------------------------------------------------------------------//
+  // debug method below
+  def printMatrix(mat: FMat) = {
+    
+    for(i <- 0 until mat.nrows) {
+      for (j <- 0 until mat.ncols) {
+        print(mat(i,j) + " ")
+      }
+      println()
+    }
+  }
 }
