@@ -12,7 +12,7 @@ import java.io._
  * 
  * Haoyu Chen and Daniel Seita are building off of Huasha Zhao's original code.
  */
-object BayesNetMooc2 {
+object BayesNetMooc3 {
 
   /*
    * nodeMap, maps questions/concept codes (start with "I" or "M") into {0,1,...}
@@ -63,27 +63,33 @@ object BayesNetMooc2 {
     val numStudents = args(4).toInt
     batchSize = numStudents
     niter = args(5).toInt
-    init(nodepath, dagpath)
+    val stateSizePath = args(6)       // here I add a stateSizePath to read in the state size
+    init(nodepath, dagpath, stateSizePath)
     loadData(datapath, numQuestions, numStudents)   
     setup
     //sampleAll
-    //println("Node map is: " + nodeMap)
-    //println("Graph DAG is: " + graph.dag)
-    //println("statesPerNode is: " + statesPerNode)
+    println("Node map is: " + nodeMap)
+    println("Graph DAG is: " + graph.dag)
+    println("statesPerNode is: " + statesPerNode)
   }
 
   /** Loads the nodes, the DAG, and create a graph with coloring and moralizing capabilities. */
-  def init(nodepath: String, dagpath: String) = {
+  def init(nodepath: String, dagpath: String, stateSizePath: String) = {
     loadNodeMap(nodepath)
     val n = nodeMap.size
     val dag = loadDag(dagpath, n)
     graph = new Graph(dag, n)
+    loadStateSize(stateSizePath, n)
+    println("finish the init")
+    println(statesPerNode)
   }
 
   /** Puts train/test data in sdata/tdata, respectively. The train/test split should be known in advance. */
   def loadData(datapath:String, nq: Int, ns: Int) = {
     sdata = loadSData(datapath, nq, ns)
     tdata = loadTData(datapath, nq, ns)
+    println("finish load Data")
+    println(sdata)
   }
 
   /**
@@ -108,7 +114,7 @@ object BayesNetMooc2 {
     graph.color
     val parentsPerNode = sum(graph.dag)
     pproject = graph.dag + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
-    val numSlotsInCpt = IMat(exp(pproject.t * ln(statesPerNode).t))
+    val numSlotsInCpt = IMat(exp(pproject.t * ln(statesPerNode).t))     // TODO errors here
     val lengthCPT = sum(numSlotsInCpt).v
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
@@ -197,8 +203,8 @@ object BayesNetMooc2 {
       for (i <- 0 until numState) {
         val ids = idInColor(statesPerNode(idInColor) >= i)
         val pids = find(sum(pproject(ids, ?), 1))
-        initStateColor(fdata, ids, i, stateSet(i))
-        computeP(ids, pids, i, pSet(i), pMatrix, stateSet(i) )
+        initStateColor(fdata, ids, i, stateSet)
+        computeP(ids, pids, i, pSet, pMatrix, stateSet(i) )
       }
       sampleColor(fdata, numState, idInColor, pSet, pMatrix)
     }
@@ -224,22 +230,23 @@ object BayesNetMooc2 {
    * it should fill the unknown values at ids location with the int i
    * then we can use it to compute the pi in the function computeP
    */
-  def initStateColor(fdata: FMat, ids: IMat, i: Int, statei: FMat) = {
-    statei = state.copy
+  def initStateColor(fdata: FMat, ids: IMat, i: Int, stateSet: Array[FMat]) = {
+    var statei = state.copy
     statei(ids,?) = i
     val innz = find(fdata)
-    state(innz) = 0
+    statei(innz) = 0
     // TODO One last step, but depends on how our fdata is. We need to put in all "known" values. Something like:
-    state = state + fdata(innz) // IF fdata is -1 at unknowns (innz will skip), and 0, 1, ..., k at known values.
+    statei = statei + fdata(innz) // IF fdata is -1 at unknowns (innz will skip), and 0, 1, ..., k at known values.
+    stateSet(i) = statei
   }
 
   /** 
    * this method calculate the Pi to prepare to compute the real probability 
    */
-  def computeP(ids: IMat, pids: IMat, i: Int, pi: FMat, pMatrix: FMat, statei: FMat) = {
+  def computeP(ids: IMat, pids: IMat, i: Int, pi: Array[FMat], pMatrix: FMat, statei: FMat) = {
     val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + 1e-10)
-    pi = exp(pproject(ids, pids) * nodei)   // Un-normalized probs, i.e., Pr(X_i | parents_i)
-    pMatrix(ids, ?) = pMatrix(ids, ?) + pi      // Save this un-normalized prob into the pMatrix for norm later
+    pi(i) = exp(pproject(ids, pids) * nodei)   // Un-normalized probs, i.e., Pr(X_i | parents_i)
+    pMatrix(ids, ?) = pMatrix(ids, ?) + pi(i)      // Save this un-normalized prob into the pMatrix for norm later
   }
 
   /** This method sample the state for the given color group */
@@ -254,7 +261,7 @@ object BayesNetMooc2 {
         state(ids, ?) = i * (sampleMatrix <= pSet(i))
       } else {
         // TODO unfortunately, we have error: "value && is not a member of BIDMat.FMat"
-        state(ids, ?) = i * ((sampleMatrix <= pSet(i)) && (sampleMatrix >= pSet(i - 1)))
+        //state(ids, ?) = i * ((sampleMatrix <= pSet(i)) && (sampleMatrix >= pSet(i - 1)))
       }
     }
     // then re-write the known state into the state matrix
@@ -310,7 +317,25 @@ object BayesNetMooc2 {
       tempNodeMap += (t(0) -> (t(1).toInt - 1))
     }
     nodeMap = tempNodeMap
-    statesPerNode = IMat(2 * ones(1,nodeMap.size)) // TODO For now...
+    // statesPerNode = IMat(2 * ones(1,nodeMap.size)) // TODO For now... I separate into another file
+  }
+
+  /**
+   *  this method loads the size of state to create state size array: statesPerNode
+   * In the input file, each line looks like N1, 3 (i.e. means there are 3 states for N1 node, which are 0, 1, 2) 
+   * @param path the state size file
+   * @param n: the number of the nodes
+   */
+  def loadStateSize(path: String, n: Int) = {
+    statesPerNode = izeros(n, 1)
+    var lines = scala.io.Source.fromFile(path).getLines
+    for (l <- lines) {
+      var t = l.split(",")
+      println(l)
+      println("the node id is: " + nodeMap(t(0)))
+      statesPerNode(nodeMap(t(0))) = t(1).toInt
+    }
+
   }
 
   /** 
@@ -364,6 +389,8 @@ object BayesNetMooc2 {
    * @return An (nq x ns) sparse matrix that represents the training data. It's sparse because
    *    students only answered a few questions each, and values will be {-1, 0, 1}.
    */
+
+   // TODO: we need to change it to be read into the 1,2,3,4,.., and fill unknown with -1
   def loadSData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
@@ -383,6 +410,7 @@ object BayesNetMooc2 {
       }
       var t = l.split(",")
       val shash = t(0)
+      // add this new line to hash table
       if (!(sMap contains shash)) {
         sMap += (shash -> sid)
         sid = sid + 1
@@ -407,6 +435,7 @@ object BayesNetMooc2 {
    * @return An (nq x ns) sparse matrix that represents the training data. It's sparse because
    *    students only answered a few questions each, and values will be {-1, 0, 1}.
    */
+   // TODO: we need to change it to be read into the 1,2,3,4,.., and fill unknown with -1
   def loadTData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
