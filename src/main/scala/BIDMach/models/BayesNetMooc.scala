@@ -8,9 +8,9 @@ import BIDMat.Plotting._
 import java.io._
 
 /**
- * A Bayesian Network implementation with fast parallel Gibbs Sampling on a MOOC dataset.
- * 
- * Originally by Huasha Zhao, and then hopefully continued by Daniel Seita.
+ * A Bayesian Network implementation with fast parallel Gibbs Sampling on a MOOC dataset. 
+ * This is Huasha Zhao's versions, with comments added by Daniel Seita.
+ * Do not use this version. Use BayesNetMooc2.scala.
  */
 object BayesNetMooc {
 
