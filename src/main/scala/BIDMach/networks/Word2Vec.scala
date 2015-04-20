@@ -117,46 +117,50 @@ object Word2Vec  {
     	  var c = 0;
     	  var cv = 0f;
 
-    	  val ia = W(i);
-    	  c = 0;
-    	  while (c < nrows) {                                    // Current word
-    	  	Atmp(c) = 0;                                         // delta for the A matrix (maps current and random words). 
-    	  	c += 1;
-    	  }
-    	  j = -skip;
-    	  while (j <= skip) {
-    	  	cv = 0f;
-    	  	if (j != 0 && i + j >= 0 && i + j < ncols) {
-    	  		val ib = W(i + j);
-    	  		c = 0;
-    	  		while (c < nrows) {
-    	  			cv += A(c + ia) * B(c + ib);
-    	  			c += 1;
-    	  		}
-
-    	  		if (cv > 16.0f) {
-    	  			cv = 1.0f;
-    	  		} else if (cv < -16.0f) {
-    	  			cv = 0.0f;
-    	  		} else {
-    	  			cv = math.exp(cv).toFloat;
-    	  			cv = 1.0f / (1.0f + cv);
-    	  		}
-    	  		cv = lrate * (1.0f - cv);
-
-    	  		c = 0;
-    	  		while (c < nrows) {
-    	  			Atmp(c) += cv * B(c + ib);
-    	  			B(c + ia) += cv * A(c + ia);
-    	  			c += 1;
-    	  		}
+    	  val ia = nrows * W(i);                                       // Get the current word (as a model offset). 
+    	  if (ia >= 0) {                                               // Check for OOV words
+    	  	c = 0;
+    	  	while (c < nrows) {                                        // Current word
+    	  		Atmp(c) = 0;                                             // delta for the A matrix (maps current and random words). 
+    	  		c += 1;
     	  	}
-    	  	j += 1;
-    	  }
-    	  c = 0;
-    	  while (c < nrows) {
-    	  	A(c + ia) += Atmp(c);
-    	  	c += 1;
+    	  	j = -skip;
+    	  	while (j <= skip) {                                        // Iterate over neighbors in the skip window
+    	  		cv = 0f;
+    	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
+    	  			val ib = nrows * W(i + j);                             // Get the context word and check it. 
+    	  			if (ib >= 0) {
+    	  				c = 0;
+    	  				while (c < nrows) {                                  // Inner product between current and context words. 
+    	  					cv += A(c + ia) * B(c + ib);
+    	  					c += 1;
+    	  				}
+
+    	  				if (cv > 16.0f) {                                    // Apply logistic function with guards
+    	  					cv = 1.0f;
+    	  				} else if (cv < -16.0f) {
+    	  					cv = 0.0f;
+    	  				} else {
+    	  					cv = math.exp(cv).toFloat;
+    	  					cv = 1.0f / (1.0f + cv);
+    	  				}
+    	  				cv = lrate * (1.0f - cv);                            // Subtract prediction from target (1.0), and scale by learning rate. 
+
+    	  				c = 0;
+    	  				while (c < nrows) {
+    	  					Atmp(c) += cv * B(c + ib);                         // Compute backward derivatives for A and B. 
+    	  					B(c + ia) += cv * A(c + ia);
+    	  					c += 1;
+    	  				}
+    	  			}
+    	  		}
+    	  		j += 1;
+    	  	}
+    	  	c = 0;
+    	  	while (c < nrows) {                                        // Add derivative for A to A. 
+    	  		A(c + ia) += Atmp(c);
+    	  		c += 1;
+    	  	}
     	  }
     	  i += 1;
     	}
@@ -177,43 +181,47 @@ object Word2Vec  {
   			var c = 0;
 
   			k = 0;
-  			while (k < nwb) {
-  				val ib = nrows * WB(k+i*nwb);
-  				c = 0;
-  				while (c < nrows) {
-  				  Btmp(c) = 0;
-  				  c += 1;
-  				}
-  				j = 0;
-  				while (j < nwa) {
-  					val ia = nrows * WA(j+i*nwb); 					
-  					var cv = 0f;
+  			while (k < nwb) {                                            // Iterate over "B" (context) words.  
+  				val ib = nrows * WB(k+i*nwb);                              // Get the word and check it. 
+  				if (ib >= 0) {
   					c = 0;
-  					while (c < nrows) {
-  						cv += A(c + ia) * B(c + ib);
+  					while (c < nrows) {                                      // Clear the B update matrix
+  						Btmp(c) = 0;
   						c += 1;
   					}
-  					if (cv > 16.0f) {
-  						cv = 1.0f;
-  					} else if (cv < -16.0f) {
-  						cv = 0.0f;
-  					} else {
-  						cv = math.exp(cv).toFloat;
-  						cv = 1.0f / (1.0f + cv);
+  					j = 0;
+  					while (j < nwa) {                                        // Now iterate over "A" (random) words. 
+  						val ia = nrows * WA(j+i*nwb); 		                     // Get an A word and check it. 
+  						if (ia >= 0) {
+  							var cv = 0f;
+  							c = 0;
+  							while (c < nrows) {                                  // Inner product between A and B columns
+  								cv += A(c + ia) * B(c + ib);
+  								c += 1;
+  							}
+  							if (cv > 16.0f) {                                    // Guarded logistic function
+  								cv = 1.0f;
+  							} else if (cv < -16.0f) {
+  								cv = 0.0f;
+  							} else {
+  								cv = math.exp(cv).toFloat;
+  								cv = 1.0f / (1.0f + cv);
+  							}
+  							cv = - cv * lrate;                                   // Scale derivative by learning rate. 
+  							c = 0;
+  							while (c < nrows) {                                  // Update A and B columns. 
+  								Btmp(c) += cv * A(c + ia);
+  								A(c + ia) += cv * B(c + ib);
+  								c += 1;
+  							}
+  						}
+  						j += 1;
   					}
-  					cv = - cv * lrate;
   					c = 0;
-  					while (c < nrows) {
-  						Btmp(c) += cv * A(c + ia);
-  						A(c + ia) += cv * B(c + ib);
+  					while (c < nrows) {                                      // Save B's update. 
+  						B(c + ib) += Btmp(c);
   						c += 1;
   					}
-  					j += 1;
-  				}
-  				c = 0;
-  				while (c < nrows) {
-  					B(c + ib) = Btmp(c)
-  					c += 1;
   				}
   				k += 1;
   			}
