@@ -25,6 +25,7 @@ object BayesNetMooc2 {
    * state, a (# nodes) x (batchSize) matrix that contains sampled values.
    * iproject, a matrix that provides LOCAL offsets in the CPT for Pr(X_i | parents_i).
    * pproject, a matrix that gets left multiplied to parameters to get Pr(X_i | all other nodes).
+   * globalPMatrices, an array of matrices that contain all the probabilities we need for predictions.
    */
   var nodeMap: scala.collection.mutable.HashMap[String, Int] = null
   var graph: Graph = null
@@ -36,6 +37,7 @@ object BayesNetMooc2 {
   var state: FMat = null
   var iproject: SMat = null
   var pproject: SMat = null
+  var globalPMatrices: Array[FMat] = null
 
   /*
    * bufSize, the default size of matrices we create for data
@@ -98,7 +100,8 @@ object BayesNetMooc2 {
    *  - creates numSlotsInCpt, a 1-D vector that records the size of CPT for each node
    *  - creates cptOffset, so cptOffset[i] = index in the cpt where node i's CPT block begins
    *  - initialize cpt randomly, and normalize it for each node's "block"
-   *  - finally, initialize iproject, a lower-triangular matrix with ones on the diagonal
+   *  - initialize iproject, a lower-triangular matrix with ones on the diagonal
+   *  - finally, initialize globalPMatrices so that we can assign to them and use for predictions 
    */
   def setup = {
     graph.color
@@ -138,6 +141,13 @@ object BayesNetMooc2 {
         cumRes = cumRes * statesPerNode(parents(n - j))
         iproject(i, parents(n - j - 1)) = cumRes.toFloat
       }
+    }
+    
+    // Initializing everything to 0 because later we assign to it, so if we never assign to it, it's still 0.
+    val maxState = maxi(maxi(statesPerNode,1),2).v
+    globalPMatrices = new Array[FMat](maxState)
+    for (i <- 0 until maxState) {
+      globalPMatrices(i) = zeros(graph.n, batchSize)
     }
   }
 
@@ -266,6 +276,7 @@ object BayesNetMooc2 {
    * 
    * To start, we use a matrix of random values. Then, we go through each of the possible states and
    * if random values fall in a certain range, we assign the range's corresponding integer {0,1,...,k}.
+   * Important! BEFORE changing pSet(i)'s, store them in the globalPMatrices to save for later.
    * 
    * @param fdata Training data matrix, with unknowns of -1 and known values in {0,1,...,k}.
    * @param numState The maximum number of state/values possible of any variable in this color group.
@@ -274,6 +285,14 @@ object BayesNetMooc2 {
    * @param pMatrix The matrix that represents normalizing constants for probabilities.
    */
   def sampleColor(fdata: FMat, numState: Int, idInColor: IMat, pSet: Array[FMat], pMatrix: FMat) = {
+    
+    // Put inside globalPMatrices now because later we overwrite these pSet(i) matrices.
+    // For this particular sampling, we are only concerned with idInColor nodes.
+    // TODO Check dimensions. pSet(i) should have dim (idInColor.length, batchSize).
+    for (i <- 0 until numState) {
+      globalPMatrices(i)(idInColor,?) = pSet(i).copy
+    }
+    
     val sampleMatrix = rand(idInColor.length, batchSize)
     pSet(0) = pSet(0) / pMatrix
     state(idInColor,?) = 0 * state(idInColor,?)
@@ -294,7 +313,10 @@ object BayesNetMooc2 {
     state(saveIndex) = fdata(saveIndex)
   }
 
-  /** After doing sampling with all color groups, update the CPT according to the state matrix. */
+  /** 
+   * After doing sampling with all color groups, update the CPT according to the state matrix.
+   * We use beta for a smoothing parameter and alpha in case we want to have a weighed average.
+   */
   def updateCpt = {
     val nstate = size(state, 2)
     val index = IMat(cptOffset + iproject * state)
@@ -346,7 +368,6 @@ object BayesNetMooc2 {
    * @param i The Gibbs sampling iteration number.
    */
   def pred(i: Int) = {
-    
     // For now, start with this since Huasha had it, and it should still work in our code
     // Normally, update parameters on mini-batch of data. But here, use full data.
     val ndata = size(sdata, 1)
@@ -358,20 +379,24 @@ object BayesNetMooc2 {
     val (row, col, values) = find3(tdata >= 0)
     var correct = 0f
     var tot = 0f
-
     for (i <- 0 until values.length) {
       val rIndex = row(i).toInt
+      val maxState = statesPerNode(rIndex)
       val cIndex = col(i).toInt
       val trueValue = values(i).toInt
-
-      // TODO Need to loop through pred Values array (we don't have those...)
-      val predictedValue = -1
-      // TODO missing some stuff
-
+      var maxProb = globalPMatrices(0)(rIndex,cIndex)
+      var predictedValue = 0
+      for (j <- 1 until maxState) { // maxState <= globalPMatrices.length
+        val newProb = globalPMatrices(1)(rIndex,cIndex)
+        if (newProb > maxProb) {
+          maxProb = newProb 
+          predictedValue = j
+        }
+      }
       if (predictedValue == trueValue) {
         correct = correct + 1
       }
-      tot = tot+1
+      tot = tot + 1
     }
     println(i + "," + correct/tot)
   }
@@ -383,10 +408,6 @@ object BayesNetMooc2 {
    * Loads the node file to create a node map. The node file has each line like:
    *   question_or_concept_ID,integer_index
    * Thus, we can form one entry of the map with one line in the file.
-   *
-   * UPDATE! We now need the number of states per node. In general, we probably should force the
-   * node.txt file to have a third argument which is the number of states. For now, let's make the
-   * default number as 2.
    *
    * We can assign the values directly here because the two data structures are global variables.
    * The first is a map from strings (i.e., questions/concepts) to integers (0 to n-1), and the
@@ -402,25 +423,22 @@ object BayesNetMooc2 {
       tempNodeMap += (t(0) -> (t(1).toInt - 1))
     }
     nodeMap = tempNodeMap
-    // statesPerNode = IMat(2 * ones(1,nodeMap.size)) // TODO For now... I separate into another file
   }
 
   /**
-   *  this method loads the size of state to create state size array: statesPerNode
-   * In the input file, each line looks like N1, 3 (i.e. means there are 3 states for N1 node, which are 0, 1, 2) 
-   * @param path the state size file
-   * @param n: the number of the nodes
+   * Loads the size of state to create state size array: statesPerNode. In the input file, each
+   * line looks like N1, 3 (i.e. means there are 3 states for N1 node, which are 0, 1, 2) 
+   * 
+   * @param path The state size file
+   * @param n The number of the nodes
    */
   def loadStateSize(path: String, n: Int) = {
     statesPerNode = izeros(n, 1)
     var lines = scala.io.Source.fromFile(path).getLines
     for (l <- lines) {
       var t = l.split(",")
-      //println(l)
-      //println("the node id is: " + nodeMap(t(0)))
       statesPerNode(nodeMap(t(0))) = t(1).toInt
     }
-
   }
 
   /** 
@@ -459,24 +477,18 @@ object BayesNetMooc2 {
    *
    * The path refers to a text file that consists of five columns: the first is the line's hash, the
    * second is the student number, the third is the question number, the fourth is a 0 or a 1, and
-   * the fifth is the concept ID.
-   *
-   * There's a little bit of out-of-place code here because the PrintWriter will create a data file
-   * "sdata_new" that augments the original sdata we have (in "sdata_cleaned") with a 0 or a 1 at
-   * the end of each line, randomly chosen in a ratio we pick. A "1" indicates that the line should
-   * be part of training; a "0" means it should be test data.
-   *
-   * If we do already have sdata_new, we do not need the PrintWriter code and can directly split the
-   * lines to put data in "row", "col" and "v", which are then put into an (nq x ns) sparse matrix.
+   * the fifth is the concept ID. We should be able to directly split the lines to put data in "row", 
+   * "col" and "v", which are then put into an (nq x ns) sparse matrix.
+   * 
+   * Note: with new data, the fourth column should probably be an arbitrary value in {0,1,...,k}.
    * 
    * @param path The path to the sdata_new.txt file, assuming that's what we're using.
-   * @param nq The number of questions (334 on the MOOC data)
-   * @param ns The number of students (4367 on the MOOC data)
-   * @return An (nq x ns) sparse matrix that represents the training data. It's sparse because
-   *    students only answered a few questions each, and values will be {-1, 0, 1}.
+   * @param nq The number of nodes (334 "concepts/questions" on the MOOC data)
+   * @param ns The number of columns (4367 "students" on the MOOC data)
+   * @return An (nq x ns) sparse training data matrix, should have values in {-1,0,1,...,k} where the
+   *    -1 indicates an unknown value.
    */
-
-   // TODO: we need to change it to be read into the 1,2,3,4,.., and fill unknown with -1
+  // TODO Have to deal with sparse matrices, and with {-1,0,1,2,...,k} values.
   def loadSData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
@@ -504,8 +516,7 @@ object BayesNetMooc2 {
       if (t(5) == "1") {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
-        // I change this one to be:
-        // orgininal one: v(ptr) = (t(3).toFloat - 0.5) * 2
+        // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
         v(ptr) = t(3).toFloat
         ptr = ptr + 1
       }
@@ -518,8 +529,8 @@ object BayesNetMooc2 {
    * Loads the data and stores the testing samples in 'tdata' in a similar manner as loadSData().
    * 
    * @param path The path to the sdata_new.txt file, assuming that's what we're using.
-   * @param nq The number of questions (334 on the MOOC data)
-   * @param ns The number of students (4367 on the MOOC data)
+   * @param nq The number of nodes (334 "concepts/questions" on the MOOC data)
+   * @param ns The number of columns (4367 "students" on the MOOC data)
    * @return An (nq x ns) sparse matrix that represents the training data. It's sparse because
    *    students only answered a few questions each, and values will be {-1, 0, 1}.
    */
