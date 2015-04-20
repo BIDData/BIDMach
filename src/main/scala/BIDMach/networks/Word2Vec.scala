@@ -212,7 +212,7 @@ object Word2Vec  {
   				}
   				c = 0;
   				while (c < nrows) {
-  					Btmp(c + ib) = Btmp(c)
+  					B(c + ib) = Btmp(c)
   					c += 1;
   				}
   				k += 1;
