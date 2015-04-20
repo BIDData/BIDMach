@@ -17,14 +17,17 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
     int iend = (1L * (ithread+1) * ncols)/nthreads;
     int i, j, k, c, ia, ib, coff;
     float cv;
-    float * C = (float *)malloc((2*skip+1)*sizeof(float));
-    float * Btmp = (float *)malloc(nrows*sizeof(float));  
+    float * Atmp = (float *)malloc(nrows*sizeof(float));  
+
     for (i = istart; i < iend; i++) {
-      ib = W[i];
+      ia = W[i];
+      for (c = 0; c < nrows; c++) {
+        Atmp[c] = 0;
+      }
       for (j = -skip; j <= skip; j++) {
+        cv = 0;
         if (j != 0 && i + j >= 0 && i + j < ncols) {
-          ia = W[i + j];
-          cv = 0;
+          ib = W[i + j];
           for (c = 0; c < nrows; c++) {
             cv += A[c + ia] * B[c + ib];
           }
@@ -38,30 +41,18 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
             cv = 1.0f / (1.0f + cv);
           }
 
-          C[j + skip] = 1.0f - cv;
-        }
-      } 
-
-      for (j = -skip; j <= skip; j++) {
-        ib = W[i];
-        for (c = 0; c < nrows; c++) {
-          Btmp[c] = 0;
-        }
-        if (j != 0 && i + j >= 0 && i + j < ncols) {
-          ia = W[i + j];
-          cv = lrate * C[j + skip];
+          cv = lrate * (1.0f - cv);
           for (c = 0; c < nrows; c++) {
-            Btmp[c] += cv * A[c + ia];
-            A[c + ia] += cv * B[c + ib];
+            Atmp[c] += cv * B[c + ib];
+            B[c + ib] += cv * A[c + ia];
           }
         }
         for (c = 0; c < nrows; c++) {
-          B[c + ib] += Btmp[c];
+          A[c + ia] += Atmp[c];
         }
       }
     }
-    free(Btmp);
-    free(C);
+    free(Atmp);
   }
 
   (*env)->ReleasePrimitiveArrayCritical(env, jB, B, 0);
@@ -85,13 +76,16 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
     float cv;
     int istart = (1L * ithread * ncols)/nthreads;
     int iend = (1L * (ithread+1) * ncols)/nthreads;
-    float *C = (float *)malloc(nwa*nwb*sizeof(float));
+    float * Btmp = (float *)malloc(nrows*sizeof(float));  
 
     for (i = istart; i < iend; i++) {
-      for (j = 0; j < nwa; j++) {
-        ia = nrows*WA[j+i*nwa];
-        for (k = 0; k < nwb; k++) {
-          ib = nrows*WB[k+i*nwb];
+      for (k = 0; k < nwb; k++) {
+        ib = nrows*WB[k+i*nwb];
+        for (c = 0; c < nrows; c++) {
+          Btmp[c] = 0;
+        }
+        for (j = 0; j < nwa; j++) {
+          ia = nrows*WA[j+i*nwa];
           cv = 0;
           for (c = 0; c < nrows; c++) {
             cv += A[c + ia] * B[c + ib];
@@ -105,34 +99,18 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
             cv = exp(cv);
             cv = 1.0f / (1.0f + cv);
           }
-
-          C[j + k * nwa] = -cv;
-        }
-      } 
-
-      for (j = 0; j < nwa; j++) {
-        ia = nrows*WA[j+i*nwa];
-        for (k = 0; k < nwb; k++) {
-          ib = nrows*WB[k+i*nwb];
-          cv = lrate * C[j + nwa * k];
+          cv = - lrate * cv;
           for (c = 0; c < nrows; c++) {
+            Btmp[c] += cv * A[c + ia];
             A[c + ia] += cv * B[c + ib];
           }
         }
-      }
-
-      for (k = 0; k < nwb; k++) {
-        ib = nrows*WB[k+i*nwb];
-        for (j = 0; j < nwa; j++) {
-          ia = nrows*WA[j+i*nwa];
-          cv = lrate * C[j + nwa * k];
-          for (c = 0; c < nrows; c++) {
-            B[c + ib] += cv * A[c + ia];
-          }
+        for (c = 0; c < nrows; c++) {
+          B[c + ib] += Btmp[c];
         }
       }
     }
-    free(C);
+    free(Btmp);
   }
 
   (*env)->ReleasePrimitiveArrayCritical(env, jB, B, 0);

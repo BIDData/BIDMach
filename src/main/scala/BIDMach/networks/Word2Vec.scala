@@ -81,7 +81,11 @@ object Word2Vec  {
     val nwords = words.ncols;
     (words, model1, model2) match {
       case (w:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate);
-      case (w:IMat, m1:FMat, m2:FMat) => CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate, Mat.numThreads);
+      case (w:IMat, m1:FMat, m2:FMat) => if (Mat.useMKL) {
+        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate, Mat.numThreads);
+      } else {
+        procPosCPU(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate, Mat.numThreads);
+      }
     }
   }
   
@@ -94,28 +98,95 @@ object Word2Vec  {
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => if (Mat.useMKL) {
         CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads);
       } else {
-      	procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
+      	procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads);
       }
     }
   }
   
-  def procNegCPU(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], A:Array[Float], B:Array[Float], lrate:Float) = {
 
-  	(0 until Mat.numThreads).par.map((ithread:Int) => {
-  		val istart = ((1L * nwords * ithread) / Mat.numThreads).toInt;
-  		val iend = ((1L * nwords * (ithread+1)) / Mat.numThreads).toInt;
-  		val C = new Array[Float](nwa*nwb);
+  def procPosCPU(nrows:Int, ncols:Int, skip:Int, W:Array[Int], A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int) = {
+
+    (0 until nthreads).par.map((ithread:Int) => {
+    	val istart = ((1L * ithread * ncols)/nthreads).toInt;
+    	val iend = ((1L * (ithread+1) * ncols)/nthreads).toInt;
+    	val Atmp = new Array[Float](nrows);
+    	var i = istart;
+    	while (i < iend) {
+    	  var j = 0;
+    	  var k = 0;
+    	  var c = 0;
+    	  var cv = 0f;
+
+    	  val ia = W(i);
+    	  c = 0;
+    	  while (c < nrows) {                                    // Current word
+    	  	Atmp(c) = 0;                                         // delta for the A matrix (maps current and random words). 
+    	  	c += 1;
+    	  }
+    	  j = -skip;
+    	  while (j <= skip) {
+    	  	cv = 0f;
+    	  	if (j != 0 && i + j >= 0 && i + j < ncols) {
+    	  		val ib = W(i + j);
+    	  		c = 0;
+    	  		while (c < nrows) {
+    	  			cv += A(c + ia) * B(c + ib);
+    	  			c += 1;
+    	  		}
+
+    	  		if (cv > 16.0f) {
+    	  			cv = 1.0f;
+    	  		} else if (cv < -16.0f) {
+    	  			cv = 0.0f;
+    	  		} else {
+    	  			cv = math.exp(cv).toFloat;
+    	  			cv = 1.0f / (1.0f + cv);
+    	  		}
+    	  		cv = lrate * (1.0f - cv);
+
+    	  		c = 0;
+    	  		while (c < nrows) {
+    	  			Atmp(c) += cv * B(c + ib);
+    	  			B(c + ia) += cv * A(c + ia);
+    	  			c += 1;
+    	  		}
+    	  	}
+    	  	j += 1;
+    	  }
+    	  c = 0;
+    	  while (c < nrows) {
+    	  	A(c + ia) += Atmp(c);
+    	  	c += 1;
+    	  }
+    	  i += 1;
+    	}
+    });
+  }
+
+  
+  def procNegCPU(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int) = {
+
+  	(0 until nthreads).par.map((ithread:Int) => {
+  		val istart = ((1L * nwords * ithread) / nthreads).toInt;
+  		val iend = ((1L * nwords * (ithread+1)) / nthreads).toInt;
+  		val Btmp = new Array[Float](nrows);
   		var i = istart;
   		while (i < iend) {
   			var j = 0;
   			var k = 0;
   			var c = 0;
-  			j = 0;
-  			while (j < nwa) {
-  				val ia = nrows*WA(j+i*nwa);
-  				k = 0;
-  				while (k < nwb) {
-  					val ib = nrows*WB(k+i*nwb);
+
+  			k = 0;
+  			while (k < nwb) {
+  				val ib = nrows * WB(k+i*nwb);
+  				c = 0;
+  				while (c < nrows) {
+  				  Btmp(c) = 0;
+  				  c += 1;
+  				}
+  				j = 0;
+  				while (j < nwa) {
+  					val ia = nrows * WA(j+i*nwb); 					
   					var cv = 0f;
   					c = 0;
   					while (c < nrows) {
@@ -127,46 +198,22 @@ object Word2Vec  {
   					} else if (cv < -16.0f) {
   						cv = 0.0f;
   					} else {
- // 						cv = math.exp(cv).toFloat;
+  						cv = math.exp(cv).toFloat;
   						cv = 1.0f / (1.0f + cv);
   					}
-
-  					C(j + k * nwa) = -cv;
-  					k += 1;
-  				}
-  				j += 1;
-  			}
-
-  			j = 0;
-  			while (j < nwa) {
-  				val ia = nrows*WA(j+i*nwa);
-  				k = 0;
-  				while (k < nwb) {
-  					val ib = nrows*WB(k+i*nwb);
-  					val cv = lrate * C(j + nwa * k);
+  					cv = - cv * lrate;
   					c = 0;
   					while (c < nrows) {
+  						Btmp(c) += cv * A(c + ia);
   						A(c + ia) += cv * B(c + ib);
   						c += 1;
   					}
-  					k += 1;
-  				}
-  				j += 1;
-  			}
-
-  			k = 0;
-  			while (k < nwb) {
-  				val ib = nrows*WB(k+i*nwb);
-  				j = 0;
-  				while  (j < nwa) {
-  					val ia = nrows*WA(j+i*nwa);
-  					val cv = lrate * C(j + nwa * k);
-  					c = 0;
-  					while (c < nrows) {
-  						B(c + ib) += cv * A(c + ia);
-  						c += 1;
-  					}
   					j += 1;
+  				}
+  				c = 0;
+  				while (c < nrows) {
+  					Btmp(c + ib) = Btmp(c)
+  					c += 1;
   				}
   				k += 1;
   			}
