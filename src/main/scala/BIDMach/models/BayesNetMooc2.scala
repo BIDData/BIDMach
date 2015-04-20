@@ -189,7 +189,7 @@ object BayesNetMooc2 {
    * @param k Iteration of Gibbs sampling.
    */
   def sample(data: SMat, k: Int) = {
-    val fdata = full(data)
+    val fdata = full(data)-1
     if (k == 0) {
       initState(fdata)
     }
@@ -450,7 +450,6 @@ object BayesNetMooc2 {
    * @param path The path to the dag file (e.g., dag.txt).
    * @return An adjacency matrix (of type SMat) for use to create a graph.
    */
-   // TODO: we need to change it to be read into the 1,2,3,4,.., and fill unknown with -1
   def loadDag(path: String, n: Int) = {
     var row = izeros(bufsize, 1)
     var col = izeros(bufsize, 1)
@@ -482,13 +481,14 @@ object BayesNetMooc2 {
    * 
    * Note: with new data, the fourth column should probably be an arbitrary value in {0,1,...,k}.
    * 
+   * Note: the data is still sparse, but later we do full(data)-1 to get -1 as unknowns.
+   * 
    * @param path The path to the sdata_new.txt file, assuming that's what we're using.
    * @param nq The number of nodes (334 "concepts/questions" on the MOOC data)
    * @param ns The number of columns (4367 "students" on the MOOC data)
    * @return An (nq x ns) sparse training data matrix, should have values in {-1,0,1,...,k} where the
    *    -1 indicates an unknown value.
    */
-  // TODO Have to deal with sparse matrices, and with {-1,0,1,2,...,k} values.
   def loadSData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
@@ -517,7 +517,7 @@ object BayesNetMooc2 {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
         // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
-        v(ptr) = t(3).toFloat
+        v(ptr) = t(3).toFloat+1
         ptr = ptr + 1
       }
     }
@@ -528,13 +528,14 @@ object BayesNetMooc2 {
   /**
    * Loads the data and stores the testing samples in 'tdata' in a similar manner as loadSData().
    * 
+   * Note: the data is still sparse, but later we do full(data)-1 to get -1 as unknowns.
+   * 
    * @param path The path to the sdata_new.txt file, assuming that's what we're using.
    * @param nq The number of nodes (334 "concepts/questions" on the MOOC data)
    * @param ns The number of columns (4367 "students" on the MOOC data)
    * @return An (nq x ns) sparse matrix that represents the training data. It's sparse because
    *    students only answered a few questions each, and values will be {-1, 0, 1}.
    */
-   // TODO: we need to change it to be read into the 1,2,3,4,.., and fill unknown with -1
   def loadTData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
@@ -558,7 +559,7 @@ object BayesNetMooc2 {
       if (t(5) == "0") {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = t(3).toFloat
+        v(ptr) = t(3).toFloat+1
         ptr = ptr + 1
       }
     }
