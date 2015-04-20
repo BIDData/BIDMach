@@ -40,8 +40,8 @@ object BayesNetMooc {
   var state1: FMat = null
 
   // These are various parameters; note that batchSize gets overriden with user-determined arguments.
-  var alpha = 1f
-  var beta = 0.1f
+  var alpha = 1f  // How much weight we want to put on the new cpt (1 = we put all weight on it)
+  var beta = 0.1f // Smoothing parameter for counts in the cpt
   var batchSize = 1
   var niter = 100
   var nsampls = 1
@@ -257,7 +257,9 @@ object BayesNetMooc {
 
   /** 
    * Updates the CPT after each sampling round, by using the "state" matrix that contains samples.
-   * The "index" dictates the indices of "counts" that are incremented for each iteration.
+   * The "index" dictates the indices of "counts" that are incremented for each iteration. Note
+   * that normcounts is the same as counts, except for every 2 consecutive spots, the elements are
+   * flipped. Then normcounts + counts solves things and gets a correct normalizing constant.
    */
   def updateCpt = {
     val nstate = size(state, 2)
@@ -290,6 +292,7 @@ object BayesNetMooc {
    * then the Gibbs sampler thinks this question/student pair is 1 (i.e., student answered
    * correctly) with probability p. If it's at least 0.5, we pick true, else it's false.  We check
    * the true value in tdata. Accuracy is simply total correct divided by total possible.
+   * I am not sure why we need to sample before doing this again, because we have already sampled...
    *
    * @param i The current iteration of Gibbs Sampling.
    */

@@ -6,6 +6,7 @@ import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Plotting._
 import java.io._
+import scala.util.Random
 
 /**
  * A Bayesian Network implementation with fast parallel Gibbs Sampling on a MOOC dataset.
@@ -16,12 +17,14 @@ object BayesNetMooc2 {
 
   /*
    * nodeMap, maps questions/concept codes (start with "I" or "M") into {0,1,...}
-   * graph, the Graph data structure of the Bayesian network, with moralizing and coloring capabilities
-   * sdata/tdata, the train/test data, respectively
+   * graph, the Graph data structure of the Bayesian network, with moralizing/coloring capabilities
+   * sdata/tdata, train/test data, respectively; a -1 indicates unknowns, {0,1,..,k} are known values.
    * statesPerNode, array [s0,s1,...] where index i means number of possible states for node i
-   * cpt is an array where each component indicates Pr(X_i = k | parent combos), ordered by X_i
-   * cptOffset determines correct offset in the cpt array where we look up probabilities
-   * state TODO
+   * cpt, an array where each component indicates Pr(X_i = k | parent combos), ordered by X_i
+   * cptOffset, determines correct offset in the cpt array where we look up probabilities
+   * state, a (# nodes) x (batchSize) matrix that contains sampled values.
+   * iproject, a matrix that provides LOCAL offsets in the CPT for Pr(X_i | parents_i).
+   * pproject, a matrix that gets left multiplied to parameters to get Pr(X_i | all other nodes).
    */
   var nodeMap: scala.collection.mutable.HashMap[String, Int] = null
   var graph: Graph = null
@@ -31,30 +34,31 @@ object BayesNetMooc2 {
   var cpt: FMat = null
   var cptOffset: IMat = null
   var state: FMat = null
-
-  // variables I added (Daniel: these should be SMats, not FMats, also should explain their purpose later TODO)
   var iproject: SMat = null
   var pproject: SMat = null
 
   /*
    * bufSize, the default size of matrices we create for data
-   * batchSize, the number of columns we analyze at a time
-   * niter, the number of Gibbs sampling iterations
-   * predprobs TODO explain clearly, it's what we use to compute if we're right/wrong I think
-   * llikelihood TODO explain clearly what data's log-l we are measuring.
-   * alpha TODO
-   * beta TODO
+   * batchSize, the number of columns of data we analyze at a time
+   * niter, the number of Gibbs sampling iterations (100 seems like a reasonable amount)
+   * llikelihood, log likelihood and measures sum over all log probabilities for a given state matrix.
+   * alpha, a parameter in [0,1] to determine how closely we want to follow current data.
+   * beta, a smoothing parameter we add in to the counts to allow nonzero probability for everything
+   * verbose, a parameter that we can tick to true if we want to have more verbose output
    */
   val bufsize = 100000
   var batchSize = 1
   var niter = 100
-  var predprobs: FMat = null
   var llikelihood = 0f
   var alpha = 1f
   var beta = 0.1f
+  var verbose = false
 
-
-  /** Set up paths and variables. Then sample. */
+  /**
+   * Set up paths and variables. Then sample. 
+   * 
+   * Usage: BayesNetMooc2 <node> <dag> <data> <#nodes> <#columns> <#iters> <state_size>
+   */
   def main(args: Array[String]) { 
     val nodepath = args(0)
     val dagpath = args(1)
@@ -63,15 +67,11 @@ object BayesNetMooc2 {
     val numStudents = args(4).toInt
     batchSize = numStudents
     niter = args(5).toInt
-    val stateSizePath = args(6)       // here I add a stateSizePath to read in the state size
+    val stateSizePath = args(6)
     init(nodepath, dagpath, stateSizePath)
     loadData(datapath, numQuestions, numStudents)   
     setup
-    println("start sample All")
     sampleAll
-    //println("Node map is: " + nodeMap)
-    //println("Graph DAG is: " + graph.dag)
-    //println("statesPerNode is: " + statesPerNode)
   }
 
   /** Loads the nodes, the DAG, and create a graph with coloring and moralizing capabilities. */
@@ -81,55 +81,37 @@ object BayesNetMooc2 {
     val dag = loadDag(dagpath, n)
     graph = new Graph(dag, n)
     loadStateSize(stateSizePath, n)
-    println("finish the init")
-    println(statesPerNode)
   }
 
   /** Puts train/test data in sdata/tdata, respectively. The train/test split should be known in advance. */
   def loadData(datapath:String, nq: Int, ns: Int) = {
     sdata = loadSData(datapath, nq, ns)
     tdata = loadTData(datapath, nq, ns)
-    //println("finish load Data")
-    //println("the full s data is " + full(sdata))
-    //println("the full t data is " + full(tdata))
-
   }
 
   /**
    * Performs several crucial steps before we can begin sampling (e.g., sets the CPTs).
    *
-   * numSlotsInCpt is a 1-D vector that records the size of CPT for each node
-   * 
-   * (0) Keep the graph as it is, so no coloring, yet (TODO).
-   * (1) Create numSlotsInCpt, so i^{th} index = # of slots the i^{th} variable needs for all
-   *    combinations to be present in the CPT. If i^{th} variable has parents indexed at
-   *    {p1,...,pk}, then # of slots is numStates(i)*numStates(p1)*...*numStates(pk). I hope a for
-   *    loop here is not too bad, since this is a one-time setup.
-   * (2) The cpt is initialized randomly, but then it must be normalized for each node's "block"
-   *    (this is really each node's CPT, but all are concatenated together in this giant table we
-   *    call "cpt"). For instance, the first node, index 0, may not have any parents, and may take
-   *    on three values. Thus, its slot block is 3 and those 3 elements must sum to one.
-   * (3) Create cptOffset, so cptOffset[i] = index in the cpt where node i's CPT ("block") begins.
-   *    Use the cumulative sum of numSlotsInCpt.
-   * (4) Then randomly initialize predprobs, which was what Huasha had originally.
+   * Specifically, it performs the following steps:
+   *  - colors the graph to get "moralized" graph
+   *  - creates pproject, which is just Dag + Identity
+   *  - creates numSlotsInCpt, a 1-D vector that records the size of CPT for each node
+   *  - creates cptOffset, so cptOffset[i] = index in the cpt where node i's CPT block begins
+   *  - initialize cpt randomly, and normalize it for each node's "block"
+   *  - finally, initialize iproject, a lower-triangular matrix with ones on the diagonal
    */
   def setup = {
     graph.color
     val parentsPerNode = sum(graph.dag)
     pproject = graph.dag + sparse(IMat(0 until graph.n), IMat(0 until graph.n), ones(1, graph.n))
-    //println("run here")
-    //println(full(pproject.t))
-   
     val numSlotsInCpt = IMat(exp(DMat(full(pproject.t)) * ln(DMat(statesPerNode))) + 1e-3)     
     // here add 1e-3 just to ensure that IMat can get the correct Int
-    
+
     val lengthCPT = sum(numSlotsInCpt).v
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cpt = rand(lengthCPT,1)
-    //println("the tot len of the cpt array is " + lengthCPT)
-    println("the cptOffset array is " + cptOffset)
-    // TODO Daniel: I'll leave this here for now but come up with a better way to normalize
+
     for (i <- 0 until graph.n-1) {
       var offset = cptOffset(i)
       val endOffset = cptOffset(i+1)
@@ -145,21 +127,18 @@ object BayesNetMooc2 {
       cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) = cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) / normConst
       lastOffset = lastOffset + statesPerNode(graph.n-1)
     }
-    //println("\nNORMALIZED cpt.t = " + cpt.t)
-    //println("the normalize cpt is " + cpt)
-    // Compute iproject here (pproject already computed) 
+
+    // Compute iproject. Note that parents = indices of i's parents AND itself, and that we use cumulative sizes.
     iproject = (pproject.copy).t
     for (i <- 0 until graph.n) {
-      val parents = find(pproject(?, i))   // parents is the index of i's parents AND itself
+      val parents = find(pproject(?, i))
       var cumRes = 1
       val n = parents.length
       for (j <- 1 until n) {
-        cumRes = cumRes * statesPerNode(parents(n - j))    // it's the cumulative size
+        cumRes = cumRes * statesPerNode(parents(n - j))
         iproject(i, parents(n - j - 1)) = cumRes.toFloat
       }
     }
-    println("the iproject is + " + full(iproject))
-    predprobs = rand(graph.n, batchSize)
   }
 
   /** 
@@ -169,37 +148,35 @@ object BayesNetMooc2 {
    */
   def sampleAll = {
     val ndata = size(sdata, 2)
-    println("the num of data is " + ndata)
     for (k <- 0 until niter) {
       var j = 0;
-      batchSize = batchSize
       for (i <- 0 until ndata by batchSize) { // Default is to do this just once
         val data = sdata(?, i until math.min(ndata, i + batchSize))
-        val realBatchSize = data.ncols
         sample(data, k)
         updateCpt
         eval
       }
-      //println("delta: %f, %f, %f, %f" format (eval2._1, eval2._2, eval2._3, llikelihood))
-      //pred(k)
-      //println("ll: %f" format llikelihood)
+      pred(k)
+      if (verbose) {
+        println("ll: %f" format llikelihood)
+      }
       llikelihood = 0f
-      //println("dist cpt - cpt0: %f" format ((cpt-cpt0) dot (cpt-cpt0)).v )
     }
   }
 
   /** 
-   * Main framework for the sampling, which iterates through the color groups and samples in parallel.
+   * Main framework for the sampling, which iterates through color groups and samples in parallel.
    * 
-   * > numState is the max number of states for this color group, so we know how many state_i matrices to make.
-   * > stateSet holds all the state_i matrices, which we use for sampling.
-   * > pSet holds all the P_i matrices, which we use for predictions.
-   * > pMatrix records the sum of all P_i matrices, for normalizing purposes.
-   * > ids is the indices of nodes in a color group, AND who have >= i states, so we can use statei with them.
-   * > pids is the same as ids, except we augment it with the collective children indices of ids.
+   * Some details on the variables:
+   *  - numState, max number of states for this color group, so we know the # of state_i matrices.
+   *  - stateSet holds all the state_i matrices, which we use for sampling.
+   *  - pSet holds all the P_i matrices, which we use for predictions.
+   *  - pMatrix records the sum of all P_i matrices, for normalizing purposes.
+   *  - ids, the indices of nodes in a color group, AND who have >= i states, so we can use statei.
+   *  - pids is the same as ids, except we augment it with the collective CHILDREN indices of ids.
    * 
-   * @param data Training data matrix. Rows = nodes/variables, columns = instances of variable assignments.
-   * @param k Iteration of Gibbs sampling we are on.
+   * @param data Training data matrix. Rows = nodes, columns = instances of variable assignments.
+   * @param k Iteration of Gibbs sampling.
    */
   def sample(data: SMat, k: Int) = {
     val fdata = full(data)
@@ -209,21 +186,14 @@ object BayesNetMooc2 {
     for (c <- 0 until graph.ncolors) {
       // TODO Investigate the impact of stateSet and pSet on the matrix caching for GPUs.
       val idInColor = find(graph.colors == c)
-      println("color in this group is " + idInColor)
-      //val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2) + 1).v // here we don't need to add 1
       val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
-      println("numState is " + numState)
       var stateSet = new Array[FMat](numState)
       var pSet = new Array[FMat](numState)
       var pMatrix = zeros(idInColor.length, batchSize)
       for (i <- 0 until numState) {
-        //println("the statePerNode in idInColor is " + (statesPerNode(idInColor) >= 0))
         val saveID = find(statesPerNode(idInColor) >= i)
         val ids = idInColor(saveID)
         val pids = find(sum(pproject(ids, ?), 1))
-
-        println("the ids is " + ids)
-        println("the pids is " + pids)
         initStateColor(fdata, ids, i, stateSet)
         computeP(ids, pids, i, pSet, pMatrix, stateSet(i), saveID, idInColor.length)
       }
@@ -232,131 +202,101 @@ object BayesNetMooc2 {
   }
 
   /**
-   * this method init the state matrix (a global variable) with the input training data "fdata"
-   * I assume the rule is: unknown variable is -1, the valid value is from 0, 1, 2...
-   * Thus, for this data (i.e fdata), we just need to copy the fdata to the state
+   * Initialize the state matrix with the input training data.
+   * 
+   * In general, we will have sparse data, with mostly -1s for the elements. Those are the places
+   * where we randomize the value, but be careful to randomize appropriately. Rows corresponding
+   * to binary variables must only randomize between {0,1}, ternary in {0,1,2}, and so on. To do
+   * this, create a random row, rand(1,batchSize), multiply by statesPerNode(row), then IMat(...)
+   * will truncate the result. It will truncate, not round, and that distinction is important.
+   * 
+   * @param fdata Training data matrix, with -1 at unknown values and known values in {0,1,...,k}.
    */
   def initState(fdata: FMat) = {
-    /**
-    state = rand(graph.n, batchSize)
-    // Tricky: for each row i, randomly initialize it {0,1,...,k-1} where k = statesPerNode(i).
-    // TODO Not done with the previously mentioned step, because rand(...) needs to be broken down into integers
-    println(full(fdata))
-    println((fdata >= 0))
+    state = fdata.copy
+    for (row <- 0 until state.nrows) {
+      state(row,?) = IMat(statesPerNode(row) * rand(1,batchSize))
+    }
     val innz = find(fdata >= 0)
     state(innz) = 0
-    // I think the following line should work
-    state = state + fdata(innz) // If fdata is -1 at unknowns (innz will skip), and 0, 1, ..., k at known values.
-    **/
-    state = fdata.copy
-    //println("the state is " + state)
+    state = state + fdata(innz)
   }
 
   /**
-   * this method init the statei for the data 
-   * it should fill the unknown values at ids location with the int i
-   * then we can use it to compute the pi in the function computeP
+   * Initializes the statei matrix for this particular color group and for this particular value.
+   * It fills in the unknown values at the ids locations with i, then we can use it in computeP.
+   * 
+   * @param fdata Training data matrix, with unknowns of -1 and known values in {0,1,...,k}.
+   * @param ids Indices of nodes in this color group that can also attain value/state i.
+   * @param i An integer representing a value/state (we use these terms interchangeably).
+   * @param stateSet An array of statei matrices, each of which has "i" in the unknowns of "ids".
    */
   def initStateColor(fdata: FMat, ids: IMat, i: Int, stateSet: Array[FMat]) = {
     var statei = state.copy
-    //println("the original statei is " + statei)
     statei(ids,?) = i
-    val innz = find(fdata >= 0)   // since we assume that -1 represents the null in the data set
+    val innz = find(fdata >= 0)
     statei(innz) = 0
-    // TODO One last step, but depends on how our fdata is. We need to put in all "known" values. Something like:
-    //println("the innz is " + innz)
-    //println("the fdata is " + fdata)
-    //println(fdata(innz))
-    //println(statei)
-    statei(innz) = statei(innz) + fdata(innz) // IF fdata is -1 at unknowns (innz will skip), and 0, 1, ..., k at known values.
-    //println("the updated statei is " + statei)
+    statei(innz) = statei(innz) + fdata(innz)
     stateSet(i) = statei
   }
 
   /** 
-   * this method calculate the Pi to prepare to compute the real probability 
+   * Computes the un-normalized probability matrix for attaining a particular state. We also do
+   * the cumulative sum for pMatrix so we can eventually use it as a normalizing constant.
+   * 
+   * @param ids Indices of nodes in this color group that can also attain value/state i.
+   * @param pids Indices of nodes in "ids" AND the union of all the children of "ids" nodes.
+   * @param i An integer representing a value/state (we use these terms interchangeably).
+   * @param pSet The array of matrices, each of which represents probabilities of nodes attaining i.
+   * @param pMatrix The matrix that represents normalizing constants for probabilities.
+   * @param statei The matrix with unknown values at "ids" locations of "i".
+   * @param saveID Indices of nodes in this color group that can attain i. (TODO Is this needed?)
+   * @param numPi The number of nodes in the color group of "ids", including those that can't get i.
    */
-  def computeP(ids: IMat, pids: IMat, i: Int, pi: Array[FMat], pMatrix: FMat, statei: FMat, saveID: IMat, numPi: Int) = {
+  def computeP(ids: IMat, pids: IMat, i: Int, pSet: Array[FMat], pMatrix: FMat, statei: FMat, saveID: IMat, numPi: Int) = {
     val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + 1e-10)
-    //println("nodei is " + nodei)
-    /**
-    println("offsect debug")
-    println("the statei is ")
-    println("the offsect is " + cptOffset)
-    printMatrix(statei)
-    println("the pids is " + pids)
-    println((cptOffset(pids) + IMat(iproject(pids, ?) * statei)))
-    println("end of debug")
-    **/
     var pii = zeros(numPi, batchSize)
-    pii(saveID, ?) = exp(pproject(ids, pids) * nodei)   // Un-normalized probs, i.e., Pr(X_i | parents_i)
-    //println("pi is " + pi(i))
-    //println("the ids is " + ids)
-    //println("the saveID is " + saveID)
-    //println("the pm(ids, ?) is " + pMatrix(saveID, ?))
-    pi(i) = pii
-    pMatrix(saveID, ?) = pMatrix(saveID, ?) + pii(saveID, ?)      // Save this un-normalized prob into the pMatrix for norm later
-    
-    println(pii)
-    println(pMatrix)
+    pii(saveID, ?) = exp(pproject(ids, pids) * nodei)
+    pSet(i) = pii
+    pMatrix(saveID, ?) = pMatrix(saveID, ?) + pii(saveID, ?)
   }
 
-  /** This method sample the state for the given color group */
+  /** 
+   * For a given color group, after we have gone through all its state possibilities, we sample it.
+   * 
+   * To start, we use a matrix of random values. Then, we go through each of the possible states and
+   * if random values fall in a certain range, we assign the range's corresponding integer {0,1,...,k}.
+   * 
+   * @param fdata Training data matrix, with unknowns of -1 and known values in {0,1,...,k}.
+   * @param numState The maximum number of state/values possible of any variable in this color group.
+   * @param idInColor Indices of nodes in this color group.
+   * @param pSet The array of matrices, each of which represents probabilities of nodes attaining i.
+   * @param pMatrix The matrix that represents normalizing constants for probabilities.
+   */
   def sampleColor(fdata: FMat, numState: Int, idInColor: IMat, pSet: Array[FMat], pMatrix: FMat) = {
-    val sampleMatrix = rand(idInColor.length, batchSize)     // A matrix w/random values for sampling
-    //var sampleProb = new Array[FMat](numState)          // It's ugly here, but easy to map the data..
-    println("begin sample color")
-    println("sample matrix is " + sampleMatrix)
-    println("num_state is " + numState)
-    for (i <- 0 until numState) {
+    val sampleMatrix = rand(idInColor.length, batchSize)
+    pSet(0) = pSet(0) / pMatrix
+    state(idInColor,?) = 0 * state(idInColor,?)
+    
+    // Each time, we check to make sure it's <= pSet(i), but ALSO exceeds the previous \sum (pSet(j)).
+    for (i <- 1 until numState) {
       val saveID = find(statesPerNode(idInColor) >= i)
       val saveID_before = find(statesPerNode(idInColor) >= (i - 1))
       val ids = idInColor(saveID)
       val pids = find(sum(pproject(ids, ?), 1))
-      
-      // problem! here it is not cumulateive!!! TODO here
-      //println("the normalized matrix is " + pSet(i))
-      // update the state matrix by sampleMatrix random value
-      if (i == 0) {
-        pSet(i) = pSet(i) / pMatrix  // Normalize and get the cumulative prob
-        state(ids, ?) = i * (sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?))
-        //println((sampleMatrix <= pSet(i)))
-        //println("if *2: " + 2* (sampleMatrix <= pSet(i)))
-      } else {
-        pSet(i) = pSet(i) / pMatrix + pSet(i-1) // Normalize and get the cumulative prob
-        //println("<=: " + ((sampleMatrix(saveID, ?) <= pSet(i))))
-        //println(">=: " + (sampleMatrix(saveID,?) >= pSet(i - 1)))
-        //println("*: " + ((sampleMatrix(saveID, ?) <= pSet(i)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1))))
-        //println("state(ids: " + state(ids, ?))
-        state(ids, ?) = i * ((sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
-      }
-      println("the normalized matrix is " + pSet(i))
+      pSet(i) = (pSet(i) / pMatrix) + pSet(i-1) // Normalize and get the cumulative prob
+      // Use Hadamard product to ensure that both requirements are held.
+      state(ids, ?) = state(ids,?) + i * ((sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
     }
-    // then re-write the known state into the state matrix
-    //println(fdata(find(fdata >= 0)))
+
+    // Finally, re-write the known state into the state matrix
     val saveIndex = find(fdata >= 0)
-    state(saveIndex) = fdata(saveIndex)       // here we assume the unknown state to be -1 
-    println("the updated state is " + state)
+    state(saveIndex) = fdata(saveIndex)
   }
 
-  /** Returns a conditional probability table specified by indices from the "index" matrix. */
-  def getCpt(index: IMat) = {
-    var cptindex = zeros(index.nr, index.nc)
-    for (i <- 0 until index.nc) {
-      cptindex(?, i) = cpt(index(?, i))
-    }
-    cptindex
-  }
-
-  // update the cpt method
+  /** After doing sampling with all color groups, update the CPT according to the state matrix. */
   def updateCpt = {
-    val nstate = size(state, 2)       // num of students
-    val maxState = maxi(statesPerNode, 1).v
-    //println("the max state is " + maxState)
-    // here we need count each different state value by a loop
-    println("updateCPT")
-    printMatrix(state)
-    println((state>0))
+    val nstate = size(state, 2)
     val index = IMat(cptOffset + iproject * state)
     var counts = zeros(cpt.length, 1)
     for (i <- 0 until nstate) {
@@ -364,6 +304,7 @@ object BayesNetMooc2 {
     }
     counts = counts + beta
 
+    // Somewhat ugly normalizing, its the same as what we did at the start
     for (i <- 0 until graph.n-1) {
       var offset = cptOffset(i)
       val endOffset = cptOffset(i+1)
@@ -379,55 +320,64 @@ object BayesNetMooc2 {
       counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) = counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) / normConst
       lastOffset = lastOffset + statesPerNode(graph.n-1)
     }
+
     cpt = (1 - alpha) * cpt + alpha * counts
-    println("the cpt is")
-    printMatrix(cpt)
-    
   }
 
-  // evaluation method
+  /** Returns a conditional probability table specified by indices from the "index" matrix. */
+  def getCpt(index: IMat) = {
+    var cptindex = zeros(index.nr, index.nc)
+    for (i <- 0 until index.nc) {
+      cptindex(?, i) = cpt(index(?, i))
+    }
+    cptindex
+  }
+
+  /** Evaluates log likelihood based on the "state" matrix. */
   def eval() = {
-    
+    val index = IMat(cptOffset + iproject * state)
+    val ll = sum(sum(ln(getCpt(index))))
+    llikelihood += ll.v   
   }
 
-  // prediction method, i = Gibbs sampling iteration number
+  /**
+   * Predict on the test data using the probabilities we have computed earlier.
+   * 
+   * @param i The Gibbs sampling iteration number.
+   */
   def pred(i: Int) = {
-    /**
+    
+    // For now, start with this since Huasha had it, and it should still work in our code
+    // Normally, update parameters on mini-batch of data. But here, use full data.
     val ndata = size(sdata, 1)
     for (j <- 0 until ndata by batchSize) {
-      //val jend = math.min(ndata, j + opts.batchSize)
-      //val minidata = data(j until jend, ?)
-      val minidata = sdata
-      // sample mini-batch of data
-      sample(minidata, 0)
-      // update parameters
+      sample(sdata, 0)
     }
-    //val vdatat = loadSMat("C:/data/zp_dlm_FT_code_and_data/train4.smat")
-    //val vdata = vdatat.t
-    val (r, c, v) = find3(tdata)
+    
+    // Now load the test data and perform predictions on all known values (i.e., those >= 0).
+    val (row, col, values) = find3(tdata >= 0)
     var correct = 0f
     var tot = 0f
-    for (i <- 0 until tdata.nnz) {
-      val ri = r(i).toInt
-      val ci = c(i).toInt
-      if (predprobs(ri, ci).v != 0.5) {
-        val pred = (predprobs(ri, ci).v >= 0.5)
-        val targ = (v(i).v >= 0)
-        //println(probs(ri, ci).v, v(i).v)
-        //println(pred, targ)
-        if (pred == targ) {
-          correct = correct + 1
-        }
-        tot = tot + 1
-      }
-    }
-    //println(sdata.nnz, tot, correct)
 
-    println(i + "," + correct / tot)
-    **/
+    for (i <- 0 until values.length) {
+      val rIndex = row(i).toInt
+      val cIndex = col(i).toInt
+      val trueValue = values(i).toInt
+
+      // TODO Need to loop through pred Values array (we don't have those...)
+      val predictedValue = -1
+      // TODO missing some stuff
+
+      if (predictedValue == trueValue) {
+        correct = correct + 1
+      }
+      tot = tot+1
+    }
+    println(i + "," + correct/tot)
   }
 
-  // The subsequent methods are all for preparing the data, so not relevant to Gibbs Sampling. 
+  //-----------------------------------------------------------------------------------------------//
+  // The subsequent methods are for debugging or preparing the data, so not relevant to Gibbs Sampling
 
   /** 
    * Loads the node file to create a node map. The node file has each line like:
@@ -629,10 +579,8 @@ object BayesNetMooc2 {
     writer.close
   }
   
-  //-----------------------------------------------------------------------------------------------//
-  // debug method below
+  /** A debugging method to print matrices */
   def printMatrix(mat: FMat) = {
-    
     for(i <- 0 until mat.nrows) {
       for (j <- 0 until mat.ncols) {
         print(mat(i,j) + " ")
