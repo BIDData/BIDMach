@@ -20,35 +20,39 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
     float * Atmp = (float *)malloc(nrows*sizeof(float));  
 
     for (i = istart; i < iend; i++) {
-      ia = W[i];
-      for (c = 0; c < nrows; c++) {
-        Atmp[c] = 0;
-      }
-      for (j = -skip; j <= skip; j++) {
-        cv = 0;
-        if (j != 0 && i + j >= 0 && i + j < ncols) {
-          ib = W[i + j];
-          for (c = 0; c < nrows; c++) {
-            cv += A[c + ia] * B[c + ib];
-          }
-
-          if (cv > 16.0f) {
-            cv = 1.0f;
-          } else if (cv < -16.0f) {
-            cv = 0.0f;
-          } else {
-            cv = exp(cv);
-            cv = 1.0f / (1.0f + cv);
-          }
-
-          cv = lrate * (1.0f - cv);
-          for (c = 0; c < nrows; c++) {
-            Atmp[c] += cv * B[c + ib];
-            B[c + ib] += cv * A[c + ia];
-          }
-        }
+      ia = nrows * W[i];
+      if (ia >= 0) {
         for (c = 0; c < nrows; c++) {
-          A[c + ia] += Atmp[c];
+          Atmp[c] = 0;
+        }
+        for (j = -skip; j <= skip; j++) {
+          cv = 0;
+          if (j != 0 && i + j >= 0 && i + j < ncols) {
+            ib = nrows * W[i + j];
+            if (ib >= 0) {
+              for (c = 0; c < nrows; c++) {
+                cv += A[c + ia] * B[c + ib];
+              }
+
+              if (cv > 16.0f) {
+                cv = 1.0f;
+              } else if (cv < -16.0f) {
+                cv = 0.0f;
+              } else {
+                cv = exp(cv);
+                cv = 1.0f / (1.0f + cv);
+              }
+
+              cv = lrate * (1.0f - cv);
+              for (c = 0; c < nrows; c++) {
+                Atmp[c] += cv * B[c + ib];
+                B[c + ib] += cv * A[c + ia];
+              }
+            }
+          }
+          for (c = 0; c < nrows; c++) {
+            A[c + ia] += Atmp[c];
+          }
         }
       }
     }
@@ -80,33 +84,37 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
 
     for (i = istart; i < iend; i++) {
       for (k = 0; k < nwb; k++) {
-        ib = nrows*WB[k+i*nwb];
-        for (c = 0; c < nrows; c++) {
-          Btmp[c] = 0;
-        }
-        for (j = 0; j < nwa; j++) {
-          ia = nrows*WA[j+i*nwa];
-          cv = 0;
+        ib = nrows * WB[k+i*nwb];
+        if (ib >= 0) {
           for (c = 0; c < nrows; c++) {
-            cv += A[c + ia] * B[c + ib];
+            Btmp[c] = 0;
           }
+          for (j = 0; j < nwa; j++) {
+            ia = nrows * WA[j+i*nwa];
+            if (ia >= 0) {
+              cv = 0;
+              for (c = 0; c < nrows; c++) {
+                cv += A[c + ia] * B[c + ib];
+              }
 
-          if (cv > 16.0f) {
-            cv = 1.0f;
-          } else if (cv < -16.0f) {
-            cv = 0.0f;
-          } else {
-            cv = exp(cv);
-            cv = 1.0f / (1.0f + cv);
+              if (cv > 16.0f) {
+                cv = 1.0f;
+              } else if (cv < -16.0f) {
+                cv = 0.0f;
+              } else {
+                cv = exp(cv);
+                cv = 1.0f / (1.0f + cv);
+              }
+              cv = - lrate * cv;
+              for (c = 0; c < nrows; c++) {
+                Btmp[c] += cv * A[c + ia];
+                A[c + ia] += cv * B[c + ib];
+              }
+            }
           }
-          cv = - lrate * cv;
           for (c = 0; c < nrows; c++) {
-            Btmp[c] += cv * A[c + ia];
-            A[c + ia] += cv * B[c + ib];
+            B[c + ib] += Btmp[c];
           }
-        }
-        for (c = 0; c < nrows; c++) {
-          B[c + ib] += Btmp[c];
         }
       }
     }
