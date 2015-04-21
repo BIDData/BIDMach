@@ -189,7 +189,7 @@ object BayesNetMooc2 {
    * @param k Iteration of Gibbs sampling.
    */
   def sample(data: SMat, k: Int) = {
-    val fdata = full(data)-1
+    val fdata = full(data)-1 // Note the -1 here!
     if (k == 0) {
       initState(fdata)
     }
@@ -224,12 +224,23 @@ object BayesNetMooc2 {
    */
   def initState(fdata: FMat) = {
     state = fdata.copy
+    if (!checkState(state)) {
+      println("problem with start of initState(), max elem is " + maxi(maxi(state,1),2).dv)
+    }
     for (row <- 0 until state.nrows) {
-      state(row,?) = FMat(IMat(statesPerNode(row) * rand(1,batchSize)))
+      state(row,?) = min(FMat(IMat(statesPerNode(row) * rand(1,batchSize))), 1)
+      if (!checkState(state)) {
+        println("problem with initState(), for loop, max elem is " + maxi(maxi(state,1),2).dv)
+        println("we are in row = " + row + ", with statesPerNode(row) = " + statesPerNode(row))
+        println("here is state(row,?):\n" + state(row,?))
+      }
     }
     val innz = find(fdata >= 0)
     state(innz) = 0
     state(innz) = state(innz) + fdata(innz)
+    if (!checkState(state)) {
+      println("problem with end of initState(), max elem is " + maxi(maxi(state,1),2).dv)
+    }
   }
 
   /**
@@ -244,9 +255,15 @@ object BayesNetMooc2 {
   def initStateColor(fdata: FMat, ids: IMat, i: Int, stateSet: Array[FMat]) = {
     var statei = state.copy
     statei(ids,?) = i
+    if (!checkState(statei)) {
+      println("problem with initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
+    }
     val innz = find(fdata >= 0)
     statei(innz) = 0
     statei(innz) = statei(innz) + fdata(innz)
+    if (!checkState(statei)) {
+      println("problem with end of initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
+    }
     stateSet(i) = statei
   }
 
@@ -310,11 +327,17 @@ object BayesNetMooc2 {
       pSet(i) = (pSet(i) / pMatrix) + pSet(i-1) // Normalize and get the cumulative prob
       // Use Hadamard product to ensure that both requirements are held.
       state(ids, ?) = state(ids,?) + i * ((sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
+      if (!checkState(state)) {
+        println("problem with loop in sampleColor(), max elem is " + maxi(maxi(state,1),2).dv)
+      }
     }
 
     // Finally, re-write the known state into the state matrix
     val saveIndex = find(fdata >= 0)
     state(saveIndex) = fdata(saveIndex)
+    if (!checkState(state)) {
+      println("problem with end of sampleColor(), max elem is " + maxi(maxi(state,1),2).dv)
+    }
   }
 
   /** 
@@ -501,6 +524,7 @@ object BayesNetMooc2 {
   def loadSData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
+    var coordinatesMap = new scala.collection.mutable.HashMap[(Int,Int), Int]()
     var row = izeros(bufsize, 1)
     var col = izeros(bufsize, 1)
     var v = zeros(bufsize, 1)
@@ -523,17 +547,26 @@ object BayesNetMooc2 {
         sid = sid + 1
       }
       if (t(5) == "1") {
-        row(ptr) = sMap(shash)
-        col(ptr) = nodeMap("I" + t(2))
-        // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
-        //v(ptr) = t(3).toFloat+1
-        v(ptr) = (t(3).toFloat - 0.5)*2
-        ptr = ptr + 1
+        // NEW! Only add this if we have never seen the pair...
+        val a = sMap(shash)
+        val b = nodeMap("I"+t(2))
+        if (!(coordinatesMap contains (a,b))) {
+          coordinatesMap += ((a,b) -> 1)
+          row(ptr) = a
+          col(ptr) = b
+          // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
+          v(ptr) = t(3).toFloat+1
+          ptr = ptr + 1
+        }
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    (s>0)+1
-    //min(s,2) // TODO Not finished ... this only works on binary data.
+
+    // Sanity check, to make sure that no element here exceeds max of all possible states
+    if (maxi(maxi(s,1),2).dv > maxi(maxi(statesPerNode,1),2).dv) {
+      println("ERROR, max value is " + maxi(maxi(s,1),2).dv)
+    }
+    s
   }
 
   /**
@@ -550,6 +583,7 @@ object BayesNetMooc2 {
   def loadTData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
+    var coordinatesMap = new scala.collection.mutable.HashMap[(Int,Int), Int]()
     var row = izeros(bufsize, 1)
     var col = izeros(bufsize, 1)
     var v = zeros(bufsize, 1)
@@ -568,16 +602,25 @@ object BayesNetMooc2 {
         sid = sid + 1
       }
       if (t(5) == "0") {
-        row(ptr) = sMap(shash)
-        col(ptr) = nodeMap("I" + t(2))
-        //v(ptr) = t(3).toFloat+1
-        v(ptr) = (t(3).toFloat - 0.5)*2
-        ptr = ptr + 1
+        val a = sMap(shash)
+        val b = nodeMap("I"+t(2))
+        if (!(coordinatesMap contains (a,b))) {
+          coordinatesMap += ((a,b) -> 1)
+          row(ptr) = a
+          col(ptr) = b
+          // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
+          v(ptr) = t(3).toFloat+1
+          ptr = ptr + 1
+        }
       }
     }
+
+    // Sanity check, to make sure that no element here exceeds max of all possible states
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    (s>0)+1
-    //min(s,2) // TODO Not finished ... this only works on binary data.
+    if (maxi(maxi(s,1),2).dv > maxi(maxi(statesPerNode,1),2).dv) {
+      println("ERROR, max value is " + maxi(maxi(s,1),2).dv)
+    }
+    s
   }
 
   /**
@@ -613,4 +656,25 @@ object BayesNetMooc2 {
       println()
     }
   }
+
+  /** Returns FALSE if there's an element at least size 2, which is BAD. */
+  def checkState(state: FMat) : Boolean = {
+    val a = maxi(maxi(state,2),1).dv
+    if (a >= 2) {
+      return false
+    }
+    return true
+  }
+
+  /*
+  def checkState(stateToCheck: FMat) = {
+    for (i<- 0 until stateToCheck.nrows) {
+      for (j <- 0 until stateToCheck.ncols) {
+        if (stateToCheck(i,j) >=  2) {
+          println("ERROR!!!! We have state(i,j) = " + stateToCheck(i,j))
+        }
+      }
+    }
+  } */
 }
+
