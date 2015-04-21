@@ -75,28 +75,28 @@ object Word2Vec  {
   
   class Options extends Opts {}
   
-  def procPositives(nskip:Int, words:Mat, model1:Mat, model2:Mat, lrate:Float) = {
+  def procPositives(nskip:Int, words:Mat, model1:Mat, model2:Mat, lrate:Float):Int = {
     val nrows = model1.nrows;
     val ncols = model1.ncols;
     val nwords = words.ncols;
     (words, model1, model2) match {
       case (w:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate);
       case (w:IMat, m1:FMat, m2:FMat) => if (Mat.useMKL) {
-        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate, Mat.numThreads);
+        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate, Mat.numThreads); 0;
       } else {
         procPosCPU(nrows, nwords, nskip, w.data, m1.data, m2.data, lrate, Mat.numThreads);
       }
     }
   }
   
-  def procNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat, lrate:Float) = {
+  def procNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat, lrate:Float):Int = {
     val nrows = modela.nrows;
     val ncols = modela.ncols;
     val nwords = wordsa.ncols;
     (wordsa, wordsb, modela, modelb) match {
       case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => if (Mat.useMKL) {
-        CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads);
+        CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads); 0;
       } else {
       	procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads);
       }
@@ -104,7 +104,7 @@ object Word2Vec  {
   }
   
 
-  def procPosCPU(nrows:Int, ncols:Int, skip:Int, W:Array[Int], A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int) = {
+  def procPosCPU(nrows:Int, ncols:Int, skip:Int, W:Array[Int], A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int):Int = {
 
     (0 until nthreads).par.map((ithread:Int) => {
     	val istart = ((1L * ithread * ncols)/nthreads).toInt;
@@ -149,7 +149,7 @@ object Word2Vec  {
     	  				c = 0;
     	  				while (c < nrows) {
     	  					Atmp(c) += cv * B(c + ib);                         // Compute backward derivatives for A and B. 
-    	  					B(c + ia) += cv * A(c + ia);
+    	  					B(c + ib) += cv * A(c + ia);
     	  					c += 1;
     	  				}
     	  			}
@@ -165,10 +165,11 @@ object Word2Vec  {
     	  i += 1;
     	}
     });
+    0;
   }
 
   
-  def procNegCPU(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int) = {
+  def procNegCPU(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int):Int = {
 
   	(0 until nthreads).par.map((ithread:Int) => {
   		val istart = ((1L * nwords * ithread) / nthreads).toInt;
@@ -228,6 +229,7 @@ object Word2Vec  {
   			i += 1;
   		}
   	});
+  	0;
   }
 }
 
