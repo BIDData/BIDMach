@@ -174,7 +174,11 @@ object Word2Vec  {
   	(0 until nthreads).par.map((ithread:Int) => {
   		val istart = ((1L * nwords * ithread) / nthreads).toInt;
   		val iend = ((1L * nwords * (ithread+1)) / nthreads).toInt;
-  		val Btmp = new Array[Float](nrows);
+  		val ia = new Array[Int](nwa);
+  		val ib = new Array[Int](nwb);
+  		val bb = new Array[Float](nwb * nrows);
+  		val aa = new Array[Float](nrows);
+  		val prods = new Array[Float](nwa*nwb);
   		var i = istart;
   		while (i < iend) {
   			var j = 0;
@@ -183,21 +187,16 @@ object Word2Vec  {
 
   			k = 0;
   			while (k < nwb) {                                            // Iterate over "B" (context) words.  
-  				val ib = nrows * WB(k+i*nwb);                              // Get the word and check it. 
-  				if (ib >= 0) {
-  					c = 0;
-  					while (c < nrows) {                                      // Clear the B update matrix
-  						Btmp(c) = 0;
-  						c += 1;
-  					}
+  				ib(k) = nrows * WB(k+i*nwb);                               // Get the word and check it. 
+  				if (ib(k) >= 0) {
   					j = 0;
   					while (j < nwa) {                                        // Now iterate over "A" (random) words. 
-  						val ia = nrows * WA(j+i*nwb); 		                     // Get an A word and check it. 
-  						if (ia >= 0) {
-  							var cv = 0f;
+  						ia(j) = nrows * WA(j+i*nwb); 		                       // Get an A word and check it. 
+  						var cv = 0f;
+  						if (ia(j) >= 0) {
   							c = 0;
   							while (c < nrows) {                                  // Inner product between A and B columns
-  								cv += A(c + ia) * B(c + ib);
+  								cv += A(c + ia(j)) * B(c + ib(k));
   								c += 1;
   							}
   							if (cv > 16.0f) {                                    // Guarded logistic function
@@ -209,22 +208,56 @@ object Word2Vec  {
   								cv = 1.0f / (1.0f + cv);
   							}
   							cv = - cv * lrate;                                   // Scale derivative by learning rate. 
+  						}
+  						prods(j + k * nwa) = cv;
+  						j += 1;
+  					}
+  				} 
+  				k += 1;
+  			}
+  			
+  			k = 0;
+  			while (k < nwb) {
+  			  c = 0;
+  			  while (c < nrows) {
+  			  	bb(c + k * nrows) = 0; 
+  			  	c += 1;
+  			  }
+  			  k += 1;
+  			}
+  			j = 0;
+  			while (j < nwa) {
+  				if (ia(j) >= 0) {
+  				  c = 0; while (c < nrows) {aa(c) = 0; c += 1;}
+  					k = 0;
+  					while (k < nwb) {
+  						if (ib(k) >= 0) {
+  							val v = prods(j + k * nwa);
   							c = 0;
-  							while (c < nrows) {                                  // Update A and B columns. 
-  								Btmp(c) += cv * A(c + ia);
-  								A(c + ia) += cv * B(c + ib);
+  							while (c < nrows) {
+  							  bb(c + k * nrows) += v * A(c + ia(j));
+  							  aa(c) += v * B(c + ib(k));
   								c += 1;
   							}
   						}
-  						j += 1;
+  						k += 1;
   					}
   					c = 0;
-  					while (c < nrows) {                                      // Save B's update. 
-  						B(c + ib) += Btmp(c);
+  					while (c < nrows) {
+  						A(c + ia(j)) += aa(c);
   						c += 1;
   					}
   				}
-  				k += 1;
+  				j += 1;
+  			}
+  			k = 0;
+  			while (k < nwb) {
+  			  c = 0;
+  			  while (c < nrows) {
+  			    B(c + ib(k)) += bb(c + k * nrows);
+  			    c += 1;
+  			  }
+  			  k += 1;
   			}
   			i += 1;
   		}
