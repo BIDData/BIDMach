@@ -201,7 +201,7 @@ object BayesNetMooc2 {
       var pSet = new Array[FMat](numState)
       var pMatrix = zeros(idInColor.length, batchSize)
       for (i <- 0 until numState) {
-        val saveID = find(statesPerNode(idInColor) >= i)
+        val saveID = find(statesPerNode(idInColor) > i)
         val ids = idInColor(saveID)
         val pids = find(sum(pproject(ids, ?), 1))
         initStateColor(fdata, ids, i, stateSet)
@@ -225,11 +225,11 @@ object BayesNetMooc2 {
   def initState(fdata: FMat) = {
     state = fdata.copy
     for (row <- 0 until state.nrows) {
-      state(row,?) = IMat(statesPerNode(row) * rand(1,batchSize))
+      state(row,?) = FMat(IMat(statesPerNode(row) * rand(1,batchSize)))
     }
     val innz = find(fdata >= 0)
     state(innz) = 0
-    state = state + fdata(innz)
+    state(innz) = state(innz) + fdata(innz)
   }
 
   /**
@@ -264,6 +264,11 @@ object BayesNetMooc2 {
    * @param numPi The number of nodes in the color group of "ids", including those that can't get i.
    */
   def computeP(ids: IMat, pids: IMat, i: Int, pSet: Array[FMat], pMatrix: FMat, statei: FMat, saveID: IMat, numPi: Int) = {
+    val a = cptOffset(pids) + IMat(iproject(pids, ?) * statei)
+    val b = maxi(maxi(a,1),2).dv
+    if (b >= cpt.length) {
+      println("ERROR! In computeP(), we have max index " + b + ", but cpt.length = " + cpt.length)
+    }
     val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + 1e-10)
     var pii = zeros(numPi, batchSize)
     pii(saveID, ?) = exp(pproject(ids, pids) * nodei)
@@ -288,7 +293,6 @@ object BayesNetMooc2 {
     
     // Put inside globalPMatrices now because later we overwrite these pSet(i) matrices.
     // For this particular sampling, we are only concerned with idInColor nodes.
-    // TODO Check dimensions. pSet(i) should have dim (idInColor.length, batchSize).
     for (i <- 0 until numState) {
       globalPMatrices(i)(idInColor,?) = pSet(i).copy
     }
@@ -299,8 +303,8 @@ object BayesNetMooc2 {
     
     // Each time, we check to make sure it's <= pSet(i), but ALSO exceeds the previous \sum (pSet(j)).
     for (i <- 1 until numState) {
-      val saveID = find(statesPerNode(idInColor) >= i)
-      val saveID_before = find(statesPerNode(idInColor) >= (i - 1))
+      val saveID = find(statesPerNode(idInColor) > i)
+      val saveID_before = find(statesPerNode(idInColor) > (i - 1))
       val ids = idInColor(saveID)
       val pids = find(sum(pproject(ids, ?), 1))
       pSet(i) = (pSet(i) / pMatrix) + pSet(i-1) // Normalize and get the cumulative prob
@@ -357,6 +361,11 @@ object BayesNetMooc2 {
 
   /** Evaluates log likelihood based on the "state" matrix. */
   def eval() = {
+    val a = cptOffset + IMat(iproject * state)
+    val b = maxi(maxi(a,1),2).dv
+    if (b >= cpt.length) {
+      println("ERROR! In eval(), we have max index " + b + ", but cpt.length = " + cpt.length)
+    }
     val index = IMat(cptOffset + iproject * state)
     val ll = sum(sum(ln(getCpt(index))))
     llikelihood += ll.v   
@@ -517,12 +526,14 @@ object BayesNetMooc2 {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
         // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
-        v(ptr) = t(3).toFloat+1
+        //v(ptr) = t(3).toFloat+1
+        v(ptr) = (t(3).toFloat - 0.5)*2
         ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    s
+    (s>0)+1
+    //min(s,2) // TODO Not finished ... this only works on binary data.
   }
 
   /**
@@ -559,12 +570,14 @@ object BayesNetMooc2 {
       if (t(5) == "0") {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = t(3).toFloat+1
+        //v(ptr) = t(3).toFloat+1
+        v(ptr) = (t(3).toFloat - 0.5)*2
         ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    s
+    (s>0)+1
+    //min(s,2) // TODO Not finished ... this only works on binary data.
   }
 
   /**
@@ -591,7 +604,7 @@ object BayesNetMooc2 {
     writer.close
   }
   
-  /** A debugging method to print matrices */
+  /** A debugging method to print matrices, without being constrained by the command line's cropping. */
   def printMatrix(mat: FMat) = {
     for(i <- 0 until mat.nrows) {
       for (j <- 0 until mat.ncols) {
