@@ -397,14 +397,16 @@ extern "C" {
   */
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_word2vecPos
-  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint shift, jobject jW, jobject jA, jobject jB, jfloat lrate)
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint shift, jobject jW, jobject jLB, jobject jUB, jobject jA, jobject jB, jfloat lrate)
 
   {
     int *W = (int*)getPointer(env, jW);
+    int *LB = (int*)getPointer(env, jLB);
+    int *UB = (int*)getPointer(env, jUB);
     float *A = (float*)getPointer(env, jA);
     float *B = (float*)getPointer(env, jB);
 
-    return word2vecPos(nrows, ncols, shift, W, A, B, lrate);
+    return word2vecPos(nrows, ncols, shift, W, LB, UB, A, B, lrate);
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_word2vecNeg
