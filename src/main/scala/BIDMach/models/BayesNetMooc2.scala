@@ -227,22 +227,11 @@ object BayesNetMooc2 {
     if (!checkState(state)) {
       println("problem with start of initState(), max elem is " + maxi(maxi(state,1),2).dv)
     }
-    /* // Old way
-    for (row <- 0 until state.nrows) {
-      state(row,?) = min(FMat(IMat(statesPerNode(row) * rand(1,batchSize))), 1)
-      if (!checkState(state)) {
-        println("problem with initState(), for loop, max elem is " + maxi(maxi(state,1),2).dv)
-        println("we are in row = " + row + ", with statesPerNode(row) = " + statesPerNode(row))
-        println("here is state(row,?):\n" + state(row,?))
-      }
-    } */
-    // New way, try something different
+    // New way of randomizing. Wrap a min() around it since rand can sometimes return 1.0.
     state = rand(graph.n, batchSize)
     for (row <- 0 until state.nrows) {
-        state(row,?) = min(FMat(IMat(statesPerNode(row)*state(row,?))),1) // TODO Generalize by using max of statesPerNode instead of 1
+        state(row,?) = min(FMat(IMat(statesPerNode(row)*state(row,?))), statesPerNode(row)-1)
     }
-
-    // Back to normal
     val innz = find(fdata >= 0)
     state(innz) = 0
     state(innz) = state(innz) + fdata(innz)
@@ -519,15 +508,16 @@ object BayesNetMooc2 {
    * the fifth is the concept ID. We should be able to directly split the lines to put data in "row", 
    * "col" and "v", which are then put into an (nq x ns) sparse matrix.
    * 
-   * Note: with new data, the fourth column should probably be an arbitrary value in {0,1,...,k}.
+   * Note: with new data, the fourth column should probably be an arbitrary value in {0,1,...,k}. In
+   * general, check with the data rather than these comments.
    * 
    * Note: the data is still sparse, but later we do full(data)-1 to get -1 as unknowns.
    * 
    * @param path The path to the sdata_new.txt file, assuming that's what we're using.
-   * @param nq The number of nodes (334 "concepts/questions" on the MOOC data)
-   * @param ns The number of columns (4367 "students" on the MOOC data)
-   * @return An (nq x ns) sparse training data matrix, should have values in {-1,0,1,...,k} where the
-   *    -1 indicates an unknown value.
+   * @param nq The number of nodes (e.g., 334 "concepts/questions" on the MOOC data)
+   * @param ns The number of columns (e.g., 4367 "students" on the MOOC data)
+   * @return An (nq x ns) sparse training data matrix, should have values in {0,1,...,k} where the 0
+   *    indicates an unknown value.
    */
   def loadSData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
@@ -585,8 +575,8 @@ object BayesNetMooc2 {
    * @param path The path to the sdata_new.txt file, assuming that's what we're using.
    * @param nq The number of nodes (334 "concepts/questions" on the MOOC data)
    * @param ns The number of columns (4367 "students" on the MOOC data)
-   * @return An (nq x ns) sparse matrix that represents the training data. It's sparse because
-   *    students only answered a few questions each, and values will be {-1, 0, 1}.
+   * @return An (nq x ns) sparse training data matrix, should have values in {0,1,...,k} where the 0
+   *    indicates an unknown value.
    */
   def loadTData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines

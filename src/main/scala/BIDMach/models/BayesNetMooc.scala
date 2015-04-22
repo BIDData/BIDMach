@@ -19,7 +19,6 @@ object BayesNetMooc {
    * graph is the graph data structure of the bayesian network, with moralizing and coloring capabilities
    * sdata/tdata are the train/test data, respectively
    * cpt is an array where each component indicates Pr(X_i = {0,1} | parent combos), ordred by X_i.
-   * cpt_old TODO
    * cptoffset determines correct offset in the cpt array where we look up probabilities
    * iproject is the dag transposed, plus extra 2s, 4s, 8s, and 16s, plus the identity matrix.
    * pproject is the dag + identity matrix, or the A_{\mathcal{V}_c} matrix in Huasha's writeup.
@@ -31,7 +30,6 @@ object BayesNetMooc {
   var sdata: SMat = null
   var tdata: SMat = null
   var cpt: FMat = null
-  var cpt_old: FMat = null
   var cptoffset: IMat = null
   var iproject: SMat = null
   var pproject: SMat = null
@@ -97,7 +95,7 @@ object BayesNetMooc {
     cpt(1 until lcpt by 2) = 1 - cpt(0 until lcpt by 2)
     cptoffset = izeros(graph.n, 1)
     cptoffset(1 until graph.n) = cumsum(ns)(0 until graph.n - 1)
-    // Prepare projection matrix
+    // Prepare projection matrix (this matrix gives LOCAL cpt offsets for Pr(X_i | parents))
     val dag = graph.dag
     iproject = dag.t
     for (i <- 0 until graph.n) {
@@ -134,11 +132,8 @@ object BayesNetMooc {
         updateCpt
         eval
       }
-      //println("delta: %f, %f, %f, %f" format (eval2._1, eval2._2, eval2._3, llikelihood))
       pred(k)
-      //println("ll: %f" format llikelihood)
       llikelihood = 0f
-      //println("dist cpt - cpt0: %f" format ((cpt-cpt0) dot (cpt-cpt0)).v )
     }
   }
 
@@ -219,7 +214,6 @@ object BayesNetMooc {
    * not exactly the same as in Huasha's writeup, but the outcome should be equivalent.
    *
    * TODO Double check if the NaNs are going to be a problem (from the p1 / (p0 + p1) line).
-   * TODO Can verify the indexing from iproject for nodep0/nodep1, but that would take a lot of work.
    *
    * @param fdata the sparse data matrix consisting of -1s and 1s.
    * @param ids Indices of the nodes we are coloring.
@@ -275,7 +269,6 @@ object BayesNetMooc {
     normcounts(1 until counts.length by 2) = counts(0 until counts.length - 1 by 2)
     normcounts = normcounts + counts
     counts = counts / normcounts
-    cpt_old = counts.copy // Daniel: we never use this? It's only "counts" we use
     cpt = (1 - alpha) * cpt + alpha * counts
   }
 
@@ -479,26 +472,14 @@ object BayesNetMooc {
         sid = sid + 1
       }
       if (t(5) == "1") {
-
-        val a = sMap(shash)
-        val b = nodeMap("I"+t(2))
-        if (!(coordinatesMap contains (a,b))) {
-          coordinatesMap += ((a,b) -> 1)
-          row(ptr) = a
-          col(ptr) = b
-          v(ptr) = (t(3).toFloat - 0.5) * 2
-          ptr = ptr + 1
-        }
-
-        //row(ptr) = sMap(shash)
-        //col(ptr) = nodeMap("I" + t(2))
-        //v(ptr) = (t(3).toFloat - 0.5) * 2
-        //ptr = ptr + 1
+        row(ptr) = sMap(shash)
+        col(ptr) = nodeMap("I" + t(2))
+        v(ptr) = (t(3).toFloat - 0.5) * 2
+        ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    s = (s > 0) - (s < 0)
-    s
+    (s > 0) - (s < 0)
   }
 
   /**
@@ -533,21 +514,10 @@ object BayesNetMooc {
         sid = sid + 1
       }
       if (t(5) == "0") {
-
-        val a = sMap(shash)
-        val b = nodeMap("I"+t(2))
-        if (!(coordinatesMap contains (a,b))) {
-          coordinatesMap += ((a,b) -> 1)
-          row(ptr) = a
-          col(ptr) = b
-          v(ptr) = (t(3).toFloat - 0.5) * 2
-          ptr = ptr + 1
-        }
-
-        //row(ptr) = sMap(shash)
-        //col(ptr) = nodeMap("I" + t(2))
-        //v(ptr) = (t(3).toFloat - 0.5) * 2
-        //ptr = ptr + 1
+        row(ptr) = sMap(shash)
+        col(ptr) = nodeMap("I" + t(2))
+        v(ptr) = (t(3).toFloat - 0.5) * 2
+        ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
