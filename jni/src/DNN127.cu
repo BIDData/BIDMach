@@ -19,10 +19,10 @@ template<int SKIP, int YDIM, int NREPS>
   __global__ void __word2vecPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float lrate) {
   const int nwindow = 2*SKIP+1; 
   int words[nwindow];
-  float aa[NREPS][nwindow];
-  float daa[NREPS][nwindow];
-  float bb[NREPS];
-  float dbb[NREPS];
+  float aa[NREPS];
+  float daa[NREPS];
+  float bb[NREPS][nwindow];
+  float dbb[NREPS][nwindow];
   __shared__ float CC[YDIM * nwindow];
 
   int i, j, k, tid, indx, icol, dxy, lb, ub;
@@ -36,21 +36,21 @@ template<int SKIP, int YDIM, int NREPS>
 
 #pragma unroll
   for (i = 0; i < nwindow; i++) {                           // Prefill the word and aa window buffers
-    if (istart + i - SKIP - 1 > 0) {
+    if (istart + i - SKIP - 1 >= 0) {
       words[i] = nrows * W[istart + i - SKIP - 1];          // Get a new word
     } else {
       words[i] = -1;
     }
     good = (words[i] >= 0);
 #pragma unroll
-    for (j = 0; j < NREPS; j++) {                           // Get the A vector for this word
+    for (j = 0; j < NREPS; j++) {                           // Get the B vector for this word
       indx = tid + j * dxy;
       if (good && indx < nrows) {
-        aa[j][i] = A[indx + words[i]];
+        bb[j][i] = B[indx + words[i]];
       } else {
-        aa[j][i] = 0;
+        bb[j][i] = 0;
       }
-      daa[j][i] = 0;
+      dbb[j][i] = 0;
     }
   }
 
@@ -60,8 +60,8 @@ template<int SKIP, int YDIM, int NREPS>
       words[i] = words[i+1];
 #pragma unroll
       for (j = 0; j < NREPS; j++) {
-        aa[j][i] = aa[j][i+1];                              // slide data down
-        daa[j][i] = daa[j][i+1];                            // slide deriv down
+        bb[j][i] = bb[j][i+1];                              // slide data down
+        dbb[j][i] = dbb[j][i+1];                            // slide deriv down
       }
     }
 
@@ -74,46 +74,46 @@ template<int SKIP, int YDIM, int NREPS>
     good = good && words[nwindow-1] >= 0;
 
 #pragma unroll
-    for (j = 0; j < NREPS; j++) {                           // Get a new A column
+    for (j = 0; j < NREPS; j++) {                           // Get a new B column
       indx = tid + j * dxy;
       if (good && indx < nrows) {
-        aa[j][nwindow - 1] = A[indx + words[nwindow - 1]];
+        bb[j][nwindow - 1] = B[indx + words[nwindow - 1]];
       } else {
-        aa[j][nwindow - 1] = 0;
+        bb[j][nwindow - 1] = 0;
       }
-      if (words[SKIP] >= 0 && indx < nrows) {               // Get a new B column
-        bb[j] = B[indx + words[SKIP]];
+      if (words[SKIP] >= 0 && indx < nrows) {               // Get a new A column
+        aa[j] = A[indx + words[SKIP]];
       } else {
-        bb[j] = 0;
+        aa[j] = 0;
       }
     }
-    __syncthreads();
-    
     lb = LB[icol];
     ub = UB[icol];
 
+    __syncthreads();
 #pragma unroll                 
-    for (i = 0; i < nwindow; i++) {                         // Iterate across the window for A cols
+    for (i = 0; i < nwindow; i++) {                         // Iterate across the window for B cols
       prod = 0;
       if (i >= SKIP + lb && i <= SKIP + ub) {
 #pragma unroll                 
         for (j = 0; j < NREPS; j++) {                       // Iterate over blocks of elements
-          prod += aa[j][i] * bb[j];                         // Compute the product between current A, B cols
+          prod += bb[j][i] * aa[j];                         // Compute the product between current A, B cols
         }
 #pragma unroll                 
         for (k = 1; k < 32; k = k + k) {
-          prod += __shfl_down(prod, k);                     // Reduce within warp
+          v = __shfl_down(prod, k);                         // Reduce within warp
+          prod += v;
         }  
         if (threadIdx.x == 0) {
-          CC[i - SKIP -lb + threadIdx.y * nwindow] = prod;  // Save to SHMEM
+          CC[i - SKIP - lb + threadIdx.y * nwindow] = prod;  // Save to SHMEM
         }
       }
     }
 
     __syncthreads();
-    for (i = 0; i < blockDim.y; i++) {                      // Reduce across warps
+    for (i = 1; i < blockDim.y; i++) {                      // Reduce across warps
       for (k = tid; k <= ub - lb; k += dxy) { 
-        CC[k] = CC[k + i * nwindow];
+        CC[k] += CC[k + i * nwindow];
       }
       __syncthreads();
     }
@@ -123,6 +123,8 @@ template<int SKIP, int YDIM, int NREPS>
       v = CC[i];
       if (v > 16.0f) {
         v = 1.0f;
+      } else if (v < -16.0f) {
+        v = 0.0f;
       } else {
         v = exp(v);
         v = v / (1.0f + v);
@@ -133,30 +135,46 @@ template<int SKIP, int YDIM, int NREPS>
     __syncthreads();  
 #pragma unroll                 
     for (j = 0; j < NREPS; j++) {
-      dbb[j] = 0;
+      daa[j] = 0;
     }
 #pragma unroll                 
     for (i = 0; i < nwindow; i++) {                         // Iterate across the window for A cols
-      if (i >= SKIP + lb && i <= SKIP + ub) {
+      if (i >= SKIP + lb && i <= SKIP + ub && i != SKIP) {
         v = lrate * CC[i - SKIP - lb];
+        //        v = 1;
 #pragma unroll                 
         for (j = 0; j < NREPS; j++) {
-          dbb[j] += v * aa[j][i];
-          daa[j][i] += v * bb[j];                           // Compute the product with the current A, B cols
+          daa[j] += v * bb[j][i];                           // Update the local B cache after each current word
+          dbb[j][i] += v * aa[j];                           // Compute the product with the current A, B cols
         }
       }
     }
+    __syncthreads();  
+    if (words[SKIP] >= 0) {
 #pragma unroll                 
-    for (j = 0; j < NREPS; j++) { 
-      if (words[SKIP] >= 0 && tid + j * dxy < nrows) {      // Save the B column
-        atomicAdd(&B[tid + j * dxy + words[SKIP]], dbb[j]);
+      for (j = 0; j < NREPS; j++) { 
+        if (tid + j * dxy < nrows) {                        // Save the A column
+          atomicAdd(&A[tid + j * dxy + words[SKIP]], daa[j]);
+        }
       }
     }
-    __syncthreads();  
-    if (icol - SKIP >= 0 && words[0] >= 0) {
-      for (j = 0; j < NREPS; j++) {                         // Save the A column
+    if (words[0] >= 0) {
+#pragma unroll                 
+      for (j = 0; j < NREPS; j++) {                         // Save the B column
         if (tid + j * dxy < nrows) {
-          atomicAdd(&A[tid + j * dxy + words[0]], daa[j][0]);
+          atomicAdd(&B[tid + j * dxy + words[0]], dbb[j][0]);
+        }
+      } 
+    }
+  }
+
+#pragma unroll      
+  for (i = 1; i < nwindow; i++) {                           // Clear out the derivative queue
+    if (words[i] >= 0) {
+#pragma unroll                 
+      for (j = 0; j < NREPS; j++) {                         // Save the B column
+        if (tid + j * dxy < nrows) {
+          atomicAdd(&B[tid + j * dxy + words[i]], dbb[j][i]);
         }
       } 
     }
@@ -388,11 +406,11 @@ template<int NWA, int NWB, int MAXD, int BYDIM>
           dv += v * bb[k];
           prods[0][k] += v * aa[j];
         }
-        atomicAdd(&A[i + ia[j]], dv);
+        atomicAdd(&A[i + ia[j]], dv);                      // Update A
       }
 #pragma unroll
       for (k = 0; k < NWB; k++) {                       
-        atomicAdd(&B[i + ib[k]], prods[0][k]);
+        atomicAdd(&B[i + ib[k]], prods[0][k]);             // Update B
       }
     } 
     __syncthreads();

@@ -43,7 +43,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
                 cv = 0.0f;
               } else {
                 cv = exp(cv);
-                cv = 1.0f / (1.0f + cv);
+                cv = cv / (1.0f + cv);
               }
 
               cv = lrate * (1.0f - cv);
@@ -113,7 +113,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
             cv = 0.0f;
           } else {
             cv = exp(cv);
-            cv = 1.0f / (1.0f + cv);
+            cv = cv / (1.0f + cv);
           } 
 
           cv = - lrate * cv;

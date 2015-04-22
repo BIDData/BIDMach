@@ -110,7 +110,7 @@ object Word2Vec  {
     (0 until nthreads).par.map((ithread:Int) => {
     	val istart = ((1L * ithread * ncols)/nthreads).toInt;
     	val iend = ((1L * (ithread+1) * ncols)/nthreads).toInt;
-    	val Atmp = new Array[Float](nrows);
+    	val daa = new Array[Float](nrows);
     	var i = istart;
     	while (i < iend) {
     	  var j = 0;
@@ -122,7 +122,7 @@ object Word2Vec  {
     	  if (ia >= 0) {                                               // Check for OOV words
     	  	c = 0;
     	  	while (c < nrows) {                                        // Current word
-    	  		Atmp(c) = 0;                                             // delta for the A matrix (maps current and random words). 
+    	  		daa(c) = 0;                                              // delta for the A matrix (maps current and negative words). 
     	  		c += 1;
     	  	}
     	  	j = LB(i);
@@ -143,13 +143,13 @@ object Word2Vec  {
     	  					cv = 0.0f;
     	  				} else {
     	  					cv = math.exp(cv).toFloat;
-    	  					cv = 1.0f / (1.0f + cv);
+    	  					cv = cv / (1.0f + cv);
     	  				}
     	  				cv = lrate * (1.0f - cv);                            // Subtract prediction from target (1.0), and scale by learning rate. 
 
     	  				c = 0;
     	  				while (c < nrows) {
-    	  					Atmp(c) += cv * B(c + ib);                         // Compute backward derivatives for A and B. 
+    	  					daa(c) += cv * B(c + ib);                          // Compute backward derivatives for A and B. 
     	  					B(c + ib) += cv * A(c + ia);
     	  					c += 1;
     	  				}
@@ -159,7 +159,7 @@ object Word2Vec  {
     	  	}
     	  	c = 0;
     	  	while (c < nrows) {                                        // Add derivative for A to A. 
-    	  		A(c + ia) += Atmp(c);
+    	  		A(c + ia) += daa(c);
     	  		c += 1;
     	  	}
     	  }
@@ -219,7 +219,7 @@ object Word2Vec  {
   						cv = 0.0f;
   					} else {
   						cv = math.exp(cv).toFloat;
-  						cv = 1.0f / (1.0f + cv);
+  						cv = cv / (1.0f + cv);
   					}
   					cv = - cv * lrate;                                       // Scale derivative by learning rate. 
 
