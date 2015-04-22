@@ -444,6 +444,7 @@ object BayesNetMooc {
   def loadSData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
+    var coordinatesMap = new scala.collection.mutable.HashMap[(Int,Int), Int]()
     val bufsize = 100000
     var row = izeros(bufsize, 1)
     var col = izeros(bufsize, 1)
@@ -478,14 +479,26 @@ object BayesNetMooc {
         sid = sid + 1
       }
       if (t(5) == "1") {
-        row(ptr) = sMap(shash)
-        col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = (t(3).toFloat - 0.5) * 2
-        ptr = ptr + 1
+
+        val a = sMap(shash)
+        val b = nodeMap("I"+t(2))
+        if (!(coordinatesMap contains (a,b))) {
+          coordinatesMap += ((a,b) -> 1)
+          row(ptr) = a
+          col(ptr) = b
+          v(ptr) = (t(3).toFloat - 0.5) * 2
+          ptr = ptr + 1
+        }
+
+        //row(ptr) = sMap(shash)
+        //col(ptr) = nodeMap("I" + t(2))
+        //v(ptr) = (t(3).toFloat - 0.5) * 2
+        //ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
-    (s > 0) - (s < 0)
+    s = (s > 0) - (s < 0)
+    s
   }
 
   /**
@@ -500,6 +513,7 @@ object BayesNetMooc {
   def loadTData(path: String, nq: Int, ns: Int) = {
     var lines = scala.io.Source.fromFile(path).getLines
     var sMap = new scala.collection.mutable.HashMap[String, Int]()
+    var coordinatesMap = new scala.collection.mutable.HashMap[(Int,Int), Int]()
     val bufsize = 100000
     var row = izeros(bufsize, 1)
     var col = izeros(bufsize, 1)
@@ -519,10 +533,21 @@ object BayesNetMooc {
         sid = sid + 1
       }
       if (t(5) == "0") {
-        row(ptr) = sMap(shash)
-        col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = (t(3).toFloat - 0.5) * 2
-        ptr = ptr + 1
+
+        val a = sMap(shash)
+        val b = nodeMap("I"+t(2))
+        if (!(coordinatesMap contains (a,b))) {
+          coordinatesMap += ((a,b) -> 1)
+          row(ptr) = a
+          col(ptr) = b
+          v(ptr) = (t(3).toFloat - 0.5) * 2
+          ptr = ptr + 1
+        }
+
+        //row(ptr) = sMap(shash)
+        //col(ptr) = nodeMap("I" + t(2))
+        //v(ptr) = (t(3).toFloat - 0.5) * 2
+        //ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)

@@ -227,6 +227,7 @@ object BayesNetMooc2 {
     if (!checkState(state)) {
       println("problem with start of initState(), max elem is " + maxi(maxi(state,1),2).dv)
     }
+    /* // Old way
     for (row <- 0 until state.nrows) {
       state(row,?) = min(FMat(IMat(statesPerNode(row) * rand(1,batchSize))), 1)
       if (!checkState(state)) {
@@ -234,7 +235,14 @@ object BayesNetMooc2 {
         println("we are in row = " + row + ", with statesPerNode(row) = " + statesPerNode(row))
         println("here is state(row,?):\n" + state(row,?))
       }
+    } */
+    // New way, try something different
+    state = rand(graph.n, batchSize)
+    for (row <- 0 until state.nrows) {
+        state(row,?) = min(FMat(IMat(statesPerNode(row)*state(row,?))),1) // TODO Generalize by using max of statesPerNode instead of 1
     }
+
+    // Back to normal
     val innz = find(fdata >= 0)
     state(innz) = 0
     state(innz) = state(innz) + fdata(innz)
