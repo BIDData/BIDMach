@@ -212,6 +212,7 @@ object Word2Vec  {
   						cv += A(c + ia) * B(c + ib);
   						c += 1;
   					}
+  					if (i == 0) println("%d %d %f" format (j, k, cv))
   					
   					if (cv > 16.0f) {                                        // Guarded logistic function
   						cv = 1.0f;

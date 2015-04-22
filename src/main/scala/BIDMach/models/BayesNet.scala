@@ -148,14 +148,14 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
   	row(0f, 0f)
   }
   
-  def doblock(gmats:Array[Mat], ipass:Int, i:Long) = {
+  def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
     uupdate(sdata, user, ipass)
     mupdate(sdata, user, ipass)
   }
   
-  def evalblock(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
     uupdate(sdata, user, ipass)
