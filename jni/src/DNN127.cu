@@ -360,7 +360,7 @@ template<int NWA, int NWB, int MAXD, int BYDIM>
       for (i = 0; i < NWA; i++) {
 #pragma unroll
         for (j = 0; j < NWB; j++) {
-          CC[j + NWB * (i + NWA * threadIdx.y)] = prods[i][j];
+          CC[i + NWA * (j + NWB * threadIdx.y)] = prods[i][j];
         }
       }
     }
