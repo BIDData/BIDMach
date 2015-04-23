@@ -21,12 +21,18 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var firstPos = -1L;
   var wordtab:Mat = null;
   var randpermute:Mat = null;
+  var ubound:Mat = null;
   var minusone:Mat = null;
+  var wordmask:Mat = null;
+  var allones:Mat = null;
+  var randwords:Mat = null;
+  var nfeats = 0;
+  var ncols = 0;
 
   override def init() = {
     mats = datasource.next;
-	  var nfeats = mats(0).nrows;
-	  var ncols = mats(0).ncols;
+	  nfeats = mats(0).nrows;
+	  ncols = mats(0).ncols;
 	  datasource.reset;
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
@@ -35,30 +41,62 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     }
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
-    wordtab = convertMat(max(0, min(ncols, iones(nwindow, 1) * irow(1 -> (ncols+1)) + icol((- nskip) -> nskip))));
+    val skipcol = icol((- nskip) -> nskip)
+    wordtab = convertMat(max(0, min(ncols+1, iones(nwindow, 1) * irow(1 -> (ncols+1)) + skipcol)));
+    wordmask = convertMat(skipcol * iones(1, ncols));
     randpermute = convertMat(zeros(nwindow, ncols));
+    ubound = convertMat(zeros(1, ncols));
     minusone = convertMat(irow(-1));
+    allones = convertMat(iones(1, ncols));
+    randwords = convertMat(zeros(opts.nneg, ncols));
   }
   
-  
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
-    val words = gmats(0);
     if (firstPos < 0) firstPos = pos;
     val nsteps = 1f * pos / firstPos;
     val lrate = opts.lrate * math.pow(nsteps, opts.texp).toFloat;
-    
-//    Word2Vec.procPositives(opts.nskip, gmats(0), modelmats(0), modelmats(1), lrate);
-    
-    val iwords = minusone \ words;
-    val cwords = iwords(wordtab);
-    rand(randpermute);
-//    kvSort(randpermute.contents, cwords.contents);
-    
-   
+    val (words, lb, ub, trandwords, goodwords) = wordMats(mats, ipass, pos);
+  
+    Word2Vec.procPositives(opts.nskip, words, lb, ub, modelmats(0), modelmats(1), lrate);
+    Word2Vec.procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(0), modelmats(1), lrate); 
   }
   
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
+  def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {
+  	val (words, lb, ub, trandwords, goodwords) = wordMats(mats, ipass, pos);
   	zeros(1,1)
+  }
+  
+  def wordMats(mats:Array[Mat], ipass:Int, pos:Long):(Mat, Mat, Mat, Mat, Mat) = {
+  
+    val wordsens = mats(0);
+    val words = wordsens(0,?);
+    
+    rand(ubound);                                                              // get random upper and lower bounds
+    val ubrand = int(ubound * opts.nskip);
+    val lbrand = - ubrand;
+    
+    val sentencenum = wordsens(1,?);                                           // Get the nearest sentence boundaries
+    val lbsentence = - cumsumByKey(allones, sentencenum) + 1;
+    val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
+    val lb = max(lbrand, lbsentence);                                          // Combine the bounds
+    val ub = min(ubrand, ubsentence);
+       
+    val iwords = minusone \ words \ minusone;                                  // Build a convolution matrix.
+    val cwords = iwords(wordtab);
+    val pgoodwords = (wordmask >= lb) ∘ (wordmask <= ub) ∘ (cwords >= 0);      // Find words satisfying the bound
+    rand(randpermute);
+    randpermute ~ pgoodwords + (pgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1. 
+    val (vv, ii) = sortdown2(randpermute(?));
+    val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
+    val ngoodcols = ngood / opts.nreuse;
+    
+    rand(randwords);                                                           // Compute some random negatives
+    val irandwords = min(nfeats-1, int(nfeats * randwords));
+    
+    val trandwords = irandwords.view(opts.nneg, ngoodcols);                    // shrink the matrices to the available data
+    val goodwords = cwords(ii).view(opts.nreuse, ngoodcols);
+    
+    (words, lb, ub, trandwords, goodwords);
   }
 }
 
@@ -69,8 +107,7 @@ object Word2Vec  {
     var lrate = 0.1f;
     var texp = 0.5f;
     var nneg = 5;
-    var nreuse = 5;
-    
+    var nreuse = 5;    
   }
   
   class Options extends Opts {}
