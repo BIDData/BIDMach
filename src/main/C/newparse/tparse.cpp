@@ -618,11 +618,11 @@ int main(int argc, char ** argv) {
       srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_string: case ftype_group: 
-      ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
+      ftv[i].writeIVecs(ofname + dnames[i] + ".imat" + suffix);
       srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_igroup:
-      ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
+      ftv[i].writeIVecs(ofname + dnames[i] + ".imat" + suffix);
       break;
     case ftype_digroup:
       ftv[i].writeDIVecs(ofname + dnames[i]);
