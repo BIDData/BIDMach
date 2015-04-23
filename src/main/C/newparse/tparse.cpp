@@ -35,7 +35,7 @@ class fieldtype {
   dvector dv;
   imatrix im;
   dimatrix dim;
-  fieldtype() : iv(0), div(0), fv(0), dv(0), im(0), dim(0) {};
+ fieldtype() : iv(0), div(0), fv(0), dv(0), im(0), dim(0) {};
   int writeInts(string fname) {return writeIntVec(iv, fname, BUFSIZE);}
   int writeDInts(string fname) {return writeDIntVec(div, fname, BUFSIZE);}
   int writeQInts(string fname) {return writeQIntVec(qv, fname, BUFSIZE);}
@@ -44,7 +44,6 @@ class fieldtype {
   int writeIVecs(string fname) {return writeIntVecs(im, fname, BUFSIZE);}
   int writeIntVecsTxt(string fname);
   int writeDIVecs(string fname) {return writeDIntVecs(dim, fname, BUFSIZE);}
-  void remap(ivector &);
 };
 
 typedef vector<fieldtype> ftvector;
@@ -55,12 +54,11 @@ class stringIndexer {
   unhash unh;
   ivector count;
   int size;
-  int threshold;
   char * linebuf;
-  stringIndexer(int sz) : htab(sz), unh(sz), count(sz), size(sz), threshold(1) {
+  stringIndexer(int sz) : htab(sz), unh(sz), count(sz), size(sz) {
     linebuf = new char[BUFSIZE];
   };
-  stringIndexer() : htab(0), unh(0), count(0), size(0), threshold(1) {
+  stringIndexer() : htab(0), unh(0), count(0), size(0) {
     linebuf = new char[BUFSIZE];
   };
   stringIndexer(const stringIndexer & si);
@@ -68,18 +66,16 @@ class stringIndexer {
   stringIndexer(char *);
   int writeMap(string fname, string suffix) {
     writeIntVec(count, fname + ".cnt.imat" + suffix, BUFSIZE);
-    //    return writeSBVecs(unh, fname + ".sbmat" + suffix, BUFSIZE);
-    return writeCSVecs(unh, fname + ".csmat" + suffix, BUFSIZE);
+    return writeSBVecs(unh, fname + ".sbmat" + suffix, BUFSIZE);
   }
   int checkword(char *str);
   ivector checkstring(char *, const char *);
   ivector checkstrings(char **, const char *, int);
   ivector checkgroup(char ** here, const char * delim2, int len);
   divector checkdgroup(char ** here, const char * delim2, int len);
-  stringIndexer shrink(ivector &);
-  stringIndexer shrink_to_size(int, ivector &);  
+  stringIndexer shrink(int);
+  stringIndexer shrink_to_size(int);  
   ivector indexMap(stringIndexer &);
-  float fracAbove();
 };
 
 
@@ -193,7 +189,7 @@ checkdgroup(char ** here, const char * delim2, int len) {
 
 // Need a deep copy constructor for stringIndexer for this to work
 stringIndexer stringIndexer::
-shrink(ivector &imap) {
+shrink(int threshold) {
   int i, newc;
   char * newstr;
   for (i = 0, newc = 0; i < size; i++) {
@@ -209,22 +205,18 @@ shrink(ivector &imap) {
 	strcpy(newstr, unh[i]);
 	retval.count[newc] = count[i];
 	retval.unh[newc] = newstr;
-	imap[i] = newc;
 	retval.htab[newstr] = ++newc;
-      } else {
-	imap[i] = -1;
       }
     }
   } catch (std::bad_alloc) {
     cerr << "stringIndexer:shrink: allocation error" << endl;
     throw;
   }
-  retval.threshold = threshold;
   return retval;
 }
 
 stringIndexer stringIndexer::
-shrink_to_size(int newsize, ivector & imap) {
+shrink_to_size(int newsize) {
   int i, newc, minth=1, maxth=0, midth;
   for (i = 0, newc = 0; i < size; i++) {
     if (count[i] >= maxth) {
@@ -244,22 +236,21 @@ shrink_to_size(int newsize, ivector & imap) {
       maxth = midth;
     }
   }
-  threshold = maxth;
-  return shrink(imap);
+  return shrink(maxth);
 }
 
 ivector stringIndexer::
 indexMap(stringIndexer & A) {
   int i;
-  ivector imap(size);
+  ivector remap(size);
   for (i = 0; i < size; i++) {
     if (A.htab.count(unh[i])) {
-      imap[i] = A.htab[unh[i]];
+      remap[i] = A.htab[unh[i]];
     } else {
-      imap[i] = 0;
+      remap[i] = 0;
     }
   }
-  return imap;
+  return remap;
 }
 // Deep copy constructor
 stringIndexer::
@@ -279,15 +270,6 @@ stringIndexer(const stringIndexer & si) :
   linebuf = new char[BUFSIZE];
 }
 
-float stringIndexer::
-fracAbove() {
-  int i, nabove = 0;
-  for (i = 0; i < size; i++) {
-    if (count[i] > threshold) nabove++;
-  }
-  return ((float) nabove)/size;
-}
-
 stringIndexer::
 ~stringIndexer() {
   int i;
@@ -303,24 +285,8 @@ stringIndexer::
   }
 }
 
-typedef vector<stringIndexer> srivector;
 
-void fieldtype::
-remap(ivector & imap) {
-  if (iv.size() > 0) {
-    for (int i = 0; i < iv.size(); i++) {
-      iv[i] = imap[iv[i]];
-    }
-  }
-  if (im.size() > 0) {
-    for (int i = 0; i < im.size(); i++) {
-      ivector jv = im[i];
-      for (int j = 0; j < jv.size(); j++) {
-	jv[j] = imap[jv[j]];
-      }
-    }
-  }
-}
+typedef vector<stringIndexer> srivector;
 
 int parseLine(char * line, int lineno, const char * delim1, ivector & tvec, 
 	       svector & delims, srivector & srv, ftvector & out, int grpsize) {
@@ -391,13 +357,13 @@ int parseLine(char * line, int lineno, const char * delim1, ivector & tvec,
     case ftype_mdate:
       ival = parsemdate(here);
       if (ival < 0)
-	printf("\nWarning: bad mdate on line %d\n", lineno);
+	printf("\nWarning: bad mdate on line %d\n", lineno, here);
       out[i].iv.push_back(ival);
       break;
     case ftype_cmdate:
       ival = parsecmdate(here);
       if (ival < 0)
-	printf("\nWarning: bad cmdate on line %d\n", lineno);
+	printf("\nWarning: bad cmdate on line %d\n", lineno, here);
       out[i].iv.push_back(ival);
       break;
     case ftype_group:
@@ -514,12 +480,11 @@ const char usage[] =
 "          <dictfile><varname>.sbmat[.gz]\n"
 "   -d <dstring>    delimiter string for input fields. Defaults to tab.\n"
 "   -s N            set buffer size to N.\n"
-"   -c              produce compressed (gzipped) output files.\n"
-"   -n N            maximum dictionary size.\n\n"		
+"   -c              produce compressed (gzipped) output files.\n\n"
 ;
 
 int main(int argc, char ** argv) {
-  int iline=0, i, iarg=1, nfields=1, jmax=0, writetxt=0, writemat=0, grpsize=1, threshold = 1, dictsize = 100000;
+  int iline=0, i, iarg=1, nfields=1, jmax=0, writetxt=0, writemat=0, grpsize=1;
   int membuf=1048576;
   char * here, *linebuf, *readbuf;
   string ifname = "", ofname = "", mfname = "", ffname = "", matfname = "", fdelim="\t", suffix="";
@@ -542,8 +507,6 @@ int main(int argc, char ** argv) {
       ofname = argv[++iarg];
     } else if (strncmp(argv[iarg], "-s", 2) == 0) {
       membuf = strtol(argv[++iarg],NULL,10);
-    } else if (strncmp(argv[iarg], "-n", 2) == 0) {
-      dictsize = strtol(argv[++iarg],NULL,10);
     } else if (strncmp(argv[iarg], "-?", 2) == 0) {
       printf("%s", usage);
       return 1;
@@ -585,20 +548,6 @@ int main(int argc, char ** argv) {
         cerr << "Continuing" << endl;
       }
     }
-    for (i = 0; i < nfields; i++) {
-      switch (tvec[i]) {
-      case ftype_word: case ftype_string:
-	if (srv[i].size > dictsize) {
-	  if (srv[i].fracAbove() > 1.5f / (1 + threshold)) {
-	    srv[i].threshold++;
-	  }
-	  ivector imap(srv[i].size);
-	  srv[i] = srv[i].shrink(imap);
-	  ftv[i].remap(imap);
-	}
-      }
-    }	    
-
     if ((jmax % 100000) == 0) {
       cout<<"\r"<<jmax<<" lines processed";
       cout.flush();
@@ -630,11 +579,11 @@ int main(int argc, char ** argv) {
       srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_string: case ftype_group: 
-      ftv[i].writeIVecs(ofname + dnames[i] + ".imat" + suffix);
+      ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
       srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_igroup:
-      ftv[i].writeIVecs(ofname + dnames[i] + ".imat" + suffix);
+      ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
       break;
     case ftype_digroup:
       ftv[i].writeDIVecs(ofname + dnames[i]);

@@ -176,8 +176,6 @@ int writeDIntVecs(dimatrix & im, string fname, int buffsize);
 
 int writeSBVecs(unhash & unh, string fname, int buffsize);
 
-int writeCSVecs(unhash & unh, string fname, int buffsize);
-
 void addtok(int tok, ivector &tokens);
 
 extern "C" {

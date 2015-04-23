@@ -39,6 +39,7 @@ void valusorts(sfvector::iterator p1, sfvector::iterator p2) {
   stable_sort(p1, p2, valult<float>);
 }
 
+
 void strtoupper(char * str) {
   if (str)
     while (*str) {
@@ -526,33 +527,6 @@ int writeSBVecs(unhash & unh, string fname, int buffsize) {
   ofstr->write((const char *)&ncols, 4);
   ofstr->write((const char *)&nnz, 4);
   ofstr->write((const char *)&cols[0], 4 * (ncols+1));
-  for (i=0; i<ncols; i++) {
-    ofstr->write(unh[i], cols[i+1] - cols[i]);
-  }
-  closeos(ofstr);
-  return 0;
-}
-
-int writeCSVecs(unhash & unh, string fname, int buffsize) {
-  int i, s, fmt, ncols;
-  int64 nnz;
-  ostream *ofstr = open_out_buf(fname.c_str(), buffsize);
-  fmt = 302; // 3=sparse(no rows), 0=byte, 2=long
-  ncols = unh.size();
-  divector cols;
-  cols.push_back(0);
-  for (i=0, nnz=0; i<ncols; i++) {
-    s = strlen(unh[i]);
-    nnz = nnz + s;
-    cols.push_back(nnz);
-  }
-  if (nnz > 0x7fffffffL) nnz = 0x7fffffffL;
-  ofstr->write((const char *)&fmt, 4);
-  ofstr->write((const char *)&ncols, 4);
-  ncols = 1;
-  ofstr->write((const char *)&ncols, 4);
-  ofstr->write((const char *)&nnz, 4);
-  ofstr->write((const char *)&cols[0], 8 * (ncols+1));
   for (i=0; i<ncols; i++) {
     ofstr->write(unh[i], cols[i+1] - cols[i]);
   }
