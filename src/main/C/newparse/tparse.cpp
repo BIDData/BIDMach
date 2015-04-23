@@ -79,6 +79,7 @@ class stringIndexer {
   stringIndexer shrink(ivector &);
   stringIndexer shrink_to_size(int, ivector &);  
   ivector indexMap(stringIndexer &);
+  float fracAbove();
 };
 
 
@@ -218,6 +219,7 @@ shrink(ivector &imap) {
     cerr << "stringIndexer:shrink: allocation error" << endl;
     throw;
   }
+  retval.threshold = threshold;
   return retval;
 }
 
@@ -277,6 +279,15 @@ stringIndexer(const stringIndexer & si) :
   linebuf = new char[BUFSIZE];
 }
 
+float stringIndexer::
+fracAbove() {
+  int i, nabove = 0;
+  for (i = 0; i < size; i++) {
+    if (count[i] > threshold) nabove++;
+  }
+  return ((float) nabove)/size;
+}
+
 stringIndexer::
 ~stringIndexer() {
   int i;
@@ -291,7 +302,6 @@ stringIndexer::
     linebuf = NULL;
   }
 }
-
 
 typedef vector<stringIndexer> srivector;
 
@@ -579,7 +589,9 @@ int main(int argc, char ** argv) {
       switch (tvec[i]) {
       case ftype_word: case ftype_string:
 	if (srv[i].size > dictsize) {
-	  srv[i].threshold++;
+	  if (srv[i].fracAbove() > 1.5f / (1 + threshold)) {
+	    srv[i].threshold++;
+	  }
 	  ivector imap(srv[i].size);
 	  srv[i] = srv[i].shrink(imap);
 	  ftv[i].remap(imap);
