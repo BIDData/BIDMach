@@ -288,26 +288,24 @@ stringIndexer::
 
 typedef vector<stringIndexer> srivector;
 
-int parseLine(char * line, int lineno, const char * delim1, ivector & tvec, 
+int parseLine(char * line, int membuf, int lineno, const char * delim1, ivector & tvec, 
 	       svector & delims, srivector & srv, ftvector & out, int grpsize) {
   int i, ival;
   int64 dival;
   qint qval;
   float fval;
   double dval;
-  char * here, * next;
+  char * here, * next; 
 
   here = line;
   for (i = 0; i < tvec.size(); i++) {
-    if (i < tvec.size()-1) {
-      next = strpbrk(here, delim1);
-      if (!next) {
-	cerr << "parseLine: format error line " << lineno << endl;
-	cerr << "  contents: " << line << " ... " << here << endl;
-	throw 10;
-      }
-      *(next++) = 0;
+    next = strpbrk(here, delim1);
+    if (!next && i < tvec.size()-1) {
+      cerr << "parseLine: format error line " << lineno << endl;
+      cerr << "  contents: " << line << " ... " << here << endl;
+      throw 10;
     }
+    if (next && *next) *(next++) = 0;
     switch (tvec[i]) {
     case ftype_int:
       sscanf(here, "%d", &ival);
@@ -543,7 +541,7 @@ int main(int argc, char ** argv) {
     if (strlen(linebuf) > 0) {
       jmax++;
       try {
-        parseLine(linebuf, ++iline, fdelim.c_str(), tvec, delims, srv, ftv, grpsize);
+        parseLine(linebuf, membuf, ++iline, fdelim.c_str(), tvec, delims, srv, ftv, grpsize);
       } catch (int e) {
         cerr << "Continuing" << endl;
       }
@@ -579,11 +577,11 @@ int main(int argc, char ** argv) {
       srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_string: case ftype_group: 
-      ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
+      ftv[i].writeIVecs(ofname + dnames[i] + ".imat" + suffix);
       srv[i].writeMap(mfname + dnames[i], suffix);
       break;
     case ftype_igroup:
-      ftv[i].writeIVecs(ofname + dnames[i] + ".smat" + suffix);
+      ftv[i].writeIVecs(ofname + dnames[i] + ".imat" + suffix);
       break;
     case ftype_digroup:
       ftv[i].writeDIVecs(ofname + dnames[i]);
