@@ -533,4 +533,3 @@ int writeSBVecs(unhash & unh, string fname, int buffsize) {
   closeos(ofstr);
   return 0;
 }
-
