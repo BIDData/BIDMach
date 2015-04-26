@@ -20,7 +20,7 @@ cp ${source}/lib/*.dll ${BIDMACH_ROOT}/lib
 cp ${source}/lib/*.dylib ${BIDMACH_ROOT}/lib
 cp ${source}/lib/*.jnilib ${BIDMACH_ROOT}/lib
 
-cp ${source}/BIDMat.jar ${BIDMACH_ROOT}
+cp ${source}/BIDMach.jar ${BIDMACH_ROOT}
 
 mkdir -p ${BIDMACH_ROOT}/cbin
 cp ${source}/cbin/* ${BIDMACH_ROOT}/cbin
