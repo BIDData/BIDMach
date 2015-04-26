@@ -16,12 +16,9 @@ val pc = zeros(tc.nrows, tc.ncols)
 val (nn,opts)=DNN.learnerX(a,c)
 opts.aopts = opts
 
-
 opts.batchSize=2000
 opts.reg1weight = 0.0001
-
-
-opts.npasses=5
+opts.npasses = 5
 opts.addConstFeat=false;
 opts.links = iones(100,1);
 opts.lrate = 0.4f // best for 6-layer
@@ -45,5 +42,5 @@ mm.predict
 val rc = roc2(pc, tc, 1-tc, 1000)
 val counts = sum(tc,2);
 :silent
-println("roc6 = %5.4f, roc mean = %5.4f" format (mean(rc)(6), (mean(rc) * counts / sum(counts)).dv));
+println("auc6 = %5.4f, auc weighted mean = %5.4f" format (mean(rc)(6), (mean(rc) * counts / sum(counts)).dv));
 

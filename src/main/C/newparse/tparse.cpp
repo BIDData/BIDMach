@@ -299,15 +299,13 @@ int parseLine(char * line, int lineno, const char * delim1, ivector & tvec,
 
   here = line;
   for (i = 0; i < tvec.size(); i++) {
-    if (i < tvec.size()-1) {
-      next = strpbrk(here, delim1);
-      if (!next) {
-	cerr << "parseLine: format error line " << lineno << endl;
-	cerr << "  contents: " << line << " ... " << here << endl;
-	throw 10;
-      }
-      *(next++) = 0;
+    next = strpbrk(here, delim1);
+    if (!next && i < tvec.size()-1) {
+      cerr << "parseLine: format error line " << lineno << endl;
+      cerr << "  contents: " << line << " ... " << here << endl;
+      throw 10;
     }
+    if (next) *(next++) = 0;
     switch (tvec[i]) {
     case ftype_int:
       sscanf(here, "%d", &ival);

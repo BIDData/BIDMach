@@ -8,7 +8,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.util.MLUtils
 import scala.compat.Platform._ 
 
-val nnodes = 8
+val nnodes = 1
 
 val t0=currentTime
 // Load training data in LIBSVM format.
@@ -25,7 +25,7 @@ val t1=currentTime;
 val lrAlg = new LogisticRegressionWithLBFGS()
 
 lrAlg.setNumClasses(103).optimizer.
-  setNumIterations(3).
+  setNumIterations(30).
   setRegParam(1e-10).
   setUpdater(new L1Updater)
 
@@ -53,7 +53,10 @@ println("Area under ROC = " + auROC)
 println("load time %f, train %f, predict %f" format ((t1-t0)/1000f,(t2-t1)/1000f, (t3-t2)/1000f))
 
 val ts = model.weights.toString;
-scala.tools.nsc.io.File("/home/ec2-user/weights.txt").writeAll(ts.substring(1,ts.length-1))
+scala.tools.nsc.io.File("/home/ec2-user/weights2.txt").writeAll(ts.substring(1,ts.length-1))
 
-
-
+// On an 8-node (r3.2xlarge) cluster, 4 tasks/node
+// 3 iterations in 200 seconds, weighted AUC 0.85, cat6 0.67
+// 10 iterations in 767 seconds, weighted AUC 0.904, cat6 0.76
+// 30 iterations in 2000 seconds, weighted AUC 0.92, cat6 0.774
+//
