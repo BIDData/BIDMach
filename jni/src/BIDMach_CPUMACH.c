@@ -276,7 +276,7 @@ JNIEXPORT jdouble JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecEvalPos
                 cv = cv / (1.0f + cv);
               }
 
-              dv += log(max((double)cv, 1.0e-40));
+              dv += log(fmax((double)cv, 1.0e-40));
             }
           }
         }
@@ -346,7 +346,7 @@ JNIEXPORT jdouble JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecEvalNeg
             cv = exp(cv);
             cv = cv / (1.0f + cv);
           } 
-          dv += log(max(1.0 - (double)cv, 1.0e-40));
+          dv += log(fmax(1.0 - (double)cv, 1.0e-40));
         }
       }
     }
