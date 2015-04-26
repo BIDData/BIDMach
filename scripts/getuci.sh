@@ -33,8 +33,8 @@ fi
 
 echo "Uncompressing docword.${1}.txt.gz"
 gunzip -c "docword.txt.gz" | tail -n +4 > "docword.txt"
-${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "docword.txt" -f "${UCI}/../../uci_fmt.txt" -o "" -m "" -d " " -c
-${BIDMACH_SCRIPTS}/../bin/tparse.exe -i "vocab.txt" -f "${UCI}/../../uci_wfmt.txt" -o "" -m "" -c
+${BIDMACH_SCRIPTS}/../cbin/tparse.exe -i "docword.txt" -f "${UCI}/../../uci_fmt.txt" -o "" -m "" -d " " -c
+${BIDMACH_SCRIPTS}/../cbin/tparse.exe -i "vocab.txt" -f "${UCI}/../../uci_wfmt.txt" -o "" -m "" -c
 cd ${BIDMACH_SCRIPTS}/..
 cd ${UCI}
 ${BIDMACH_SCRIPTS}/../bidmach ${BIDMACH_SCRIPTS}/getuci.ssc

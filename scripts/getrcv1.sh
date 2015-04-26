@@ -53,10 +53,10 @@ if [ "$OS" = "Windows_NT" ]; then
     gunzip -c lyrl2004_tokens_train.dat.gz > lyrl2004_tokens_train.dat
     allfiles=`echo $allfiles | sed s/\.dat\.gz/.dat/g`
 fi
-${BIDMACH_SCRIPTS}/../bin/trec.exe -i $allfiles -o tokenized/ -c
+${BIDMACH_SCRIPTS}/../cbin/trec.exe -i $allfiles -o tokenized/ -c
 
 # Parse the topic assignment file
-${BIDMACH_SCRIPTS}/../bin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/../rcv1_fmt.txt" -o "./" -m "./" -d " "
+${BIDMACH_SCRIPTS}/../cbin/tparse.exe -i rcv1-v2.topics.qrels.gz -f "${RCV1}/../rcv1_fmt.txt" -o "./" -m "./" -d " "
 
 # Call bidmach to put the data together
 cd ${BIDMACH_SCRIPTS}/..
