@@ -304,13 +304,13 @@ object Word2Vec  {
     val ncols = model1.ncols;
     val nwords = words.ncols;
     (words, lbound, ubound, model1, model2) match {
-//      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate);
+      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data);
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => 
-//        if (Mat.useMKL) {
-//        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, Mat.numThreads); 0;
-//      } else {
+        if (Mat.useMKL) {
+        CPUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads); 0;
+      } else {
         evalPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
-//      }
+      }
     }
   }
   
@@ -319,13 +319,13 @@ object Word2Vec  {
     val ncols = modela.ncols;
     val nwords = wordsa.ncols;
     (wordsa, wordsb, modela, modelb) match {
-//      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
+      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data);
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => 
-//        if (Mat.useMKL) {
-//        CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads); 0;
-//      } else {
+        if (Mat.useMKL) {
+        CPUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads); 0;
+      } else {
       	evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
-//      }
+      }
     }
   }
   

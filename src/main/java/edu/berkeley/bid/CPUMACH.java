@@ -15,6 +15,10 @@ public final class CPUMACH {
   public static native  void word2vecNeg(int nrows, int ncols, int nwa, int nwb, int [] WA, int [] WB, float [] A, float [] B, float lrate, int nthreads);
   
   public static native int word2vecPos(int nrows, int ncols, int shift, int [] W, int [] LB, int [] UB, float [] A, float [] B, float lrate, int nthreads);
+  
+  public static native  void word2vecEvalNeg(int nrows, int ncols, int nwa, int nwb, int [] WA, int [] WB, float [] A, float [] B, int nthreads);
+  
+  public static native int word2vecEvalPos(int nrows, int ncols, int shift, int [] W, int [] LB, int [] UB, float [] A, float [] B, int nthreads);
 
 }
 

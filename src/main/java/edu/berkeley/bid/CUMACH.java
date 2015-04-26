@@ -78,12 +78,16 @@ public final class CUMACH {
     public static native int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, Pointer A, Pointer Bdata, Pointer Bir, Pointer Bjc, int transpose,
     		Pointer MM, Pointer Sumsq, Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon);
     
-    public static native int word2vecPos(int nrows, int ncols, int shift, Pointer W, Pointer LB, Pointer UB, Pointer A, Pointer B, float lrate);
-    
     public static native int word2vecFwd(int nrows, int ncols, int nwa, int nwb, Pointer WA, Pointer WB, Pointer A, Pointer B, Pointer C);
     
-    public static native int word2vecBwd(int nrows, int ncols, int nwa, int nwb, Pointer WA, Pointer WB, Pointer A, Pointer B, Pointer C, float lrate);
+    public static native int word2vecBwd(int nrows, int ncols, int nwa, int nwb, Pointer WA, Pointer WB, Pointer A, Pointer B, Pointer C, float lrate);   
+    
+    public static native int word2vecPos(int nrows, int ncols, int shift, Pointer W, Pointer LB, Pointer UB, Pointer A, Pointer B, float lrate);
      
     public static native int word2vecNeg(int nrows, int ncols, int nwa, int nwb, Pointer WA, Pointer WB, Pointer A, Pointer B, float lrate);
+    
+    public static native int word2vecEvalPos(int nrows, int ncols, int shift, Pointer W, Pointer LB, Pointer UB, Pointer A, Pointer B);
+    
+    public static native int word2vecEvalNeg(int nrows, int ncols, int nwa, int nwb, Pointer WA, Pointer WB, Pointer A, Pointer B);
 
 }

@@ -229,3 +229,138 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecBwd
   (*env)->ReleasePrimitiveArrayCritical(env, jWB, WB, 0);
   (*env)->ReleasePrimitiveArrayCritical(env, jWA, WA, 0);
 }
+
+JNIEXPORT jdouble JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecEvalPos
+(JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint skip, jintArray jW, jintArray jLB, jintArray jUB,
+ jfloatArray jA, jfloatArray jB, jint nthreads)
+{
+  int i, ithread;
+  int * W = (jint *)((*env)->GetPrimitiveArrayCritical(env, jW, JNI_FALSE));
+  int * LB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jLB, JNI_FALSE));
+  int * UB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jUB, JNI_FALSE));
+  float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
+  float * B = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jB, JNI_FALSE));
+  double * pv = (double *)malloc(nthreads);
+  double sum;
+
+#pragma omp parallel for
+  for (ithread = 0; ithread < nthreads; ithread++) {
+    int istart = (1L * ithread * ncols)/nthreads;
+    int iend = (1L * (ithread+1) * ncols)/nthreads;
+    int i, j, k, c, ia, ib, coff;
+    float cv;
+    double dv = 0;
+    float * daa = (float *)malloc(nrows*sizeof(float)); 
+ 
+    for (i = istart; i < iend; i++) {
+      ia = nrows * W[i];
+      if (ia >= 0) {
+        for (c = 0; c < nrows; c++) {
+          daa[c] = 0;
+        }
+        for (j = LB[i]; j <= UB[i]; j++) {
+          cv = 0;
+          if (j != 0 && i + j >= 0 && i + j < ncols) {
+            ib = nrows * W[i + j];
+            if (ib >= 0) {
+              for (c = 0; c < nrows; c++) {
+                cv += A[c + ia] * B[c + ib];
+              }
+
+              if (cv > 16.0f) {
+                cv = 1.0f;
+              } else if (cv < -16.0f) {
+                cv = 0.0f;
+              } else {
+                cv = exp(cv);
+                cv = cv / (1.0f + cv);
+              }
+
+              dv += log(max((double)cv, 1.0e-40));
+            }
+          }
+        }
+      }
+    }
+    free(daa);
+    pv[ithread] = dv;
+  }
+  free(pv);
+  (*env)->ReleasePrimitiveArrayCritical(env, jB, B, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jUB, UB, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jLB, LB, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jW, W, 0);
+  for (i = 0; i < nthreads; i++) {
+    sum += pv[i];
+  }
+  return sum;
+}
+
+JNIEXPORT jdouble JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecEvalNeg
+(JNIEnv *env, jobject obj, jint nrows, jint ncols, const jint nwa, const jint nwb, jintArray jWA, jintArray jWB, 
+ jfloatArray jA, jfloatArray jB, jint nthreads)
+{
+  int i, ithread;
+  int * WA = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWA, JNI_FALSE));
+  int * WB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWB, JNI_FALSE));
+  float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
+  float * B = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jB, JNI_FALSE));
+  double * pv = (double *)malloc(nthreads);
+  double sum;
+
+#pragma omp parallel for
+  for (ithread = 0; ithread < nthreads; ithread++) {
+    int i, j, k, c, ia, ib, ja;
+    float cv;
+    double dv = 0;
+    int istart = (1L * ithread * ncols)/nthreads;
+    int iend = (1L * (ithread+1) * ncols)/nthreads;
+    float * daa = (float *)malloc(nwa*nrows*sizeof(float));  
+    float * dbb = (float *)malloc(nrows*sizeof(float));  
+
+    for (i = istart; i < iend; i++) {
+      for (j = 0; j < nwa; j++) {
+        ja = j * nrows;
+        for (c = 0; c < nrows; c++) {
+          daa[c + ja] = 0;
+        }
+      }
+      for (k = 0; k < nwb; k++) {
+        ib = nrows * WB[k+i*nwb];
+        for (c = 0; c < nrows; c++) {
+          dbb[c] = 0;
+        }
+        for (j = 0; j < nwa; j++) {
+          ia = nrows * WA[j+i*nwa];
+          cv = 0;
+          for (c = 0; c < nrows; c++) {
+            cv += A[c + ia] * B[c + ib];
+          }
+
+          if (cv > 16.0f) {
+            cv = 1.0f;
+          } else if (cv < -16.0f) {
+            cv = 0.0f;
+          } else {
+            cv = exp(cv);
+            cv = cv / (1.0f + cv);
+          } 
+          dv += log(max(1.0 - (double)cv, 1.0e-40));
+        }
+      }
+    }
+    free(dbb);
+    free(daa);
+    pv[ithread] = dv;
+  }
+
+  (*env)->ReleasePrimitiveArrayCritical(env, jB, B, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jWB, WB, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jWA, WA, 0);
+  for (i = 0; i < nthreads; i++) {
+    sum += pv[i];
+  }
+  return sum;
+}
