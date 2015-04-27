@@ -60,7 +60,7 @@ if [ "$OS" = "apple" ] ; then
 	JAVA_HOME=`/usr/libexec/java_home`
     fi
     CUDA_HOME="/usr/local/cuda"
-    CC="gcc"
+    CC="icc"
     GCC="g++"
     NVCC="nvcc"
     NVCCFLAGS="-c -ccbin=clang -use_fast_math  -I$BIDMACH_ROOT/jni/include \
@@ -72,9 +72,9 @@ if [ "$OS" = "apple" ] ; then
     OBJ="o"
     OUTFLG="-o "
     CPPFLAGS="-fPIC -c -O2 -g -DNDEBUG -I$JAVA_HOME/include  -I$JAVA_HOME/include/darwin -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include"
-    CFLAGS="-fPIC -c -O2 -g -DNDEBUG -I$JAVA_HOME/include  -I$JAVA_HOME/include/darwin -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
+    CFLAGS="-openmp -fPIC -c -O2 -g -DNDEBUG -I$JAVA_HOME/include  -I$JAVA_HOME/include/darwin -I$MKL_ROOT/include -I$MKL_ROOT/include/${ARCHD}${SUBDIR}"
     LB="ar rc"    
-    LD="g++ -shared"
+    LD="icc -dynamiclib"
     GLD="nvcc -shared -Xlinker -rpath -Xlinker ${CUDA_HOME}/lib -lstdc++"
     LDFLAGS="$LDFLAGS"
     LIBPREPEND="lib"
