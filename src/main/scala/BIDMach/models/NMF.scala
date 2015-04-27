@@ -144,7 +144,6 @@ object NMF  {
     class xopts extends Learner.Options with NMF.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
     opts.uiter = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
@@ -160,7 +159,6 @@ object NMF  {
     class xopts extends Learner.Options with NMF.Opts with MatDS.Opts with BatchNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
     opts.uiter = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(

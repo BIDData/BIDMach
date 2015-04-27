@@ -21,6 +21,8 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
   var permfn:(Int)=>Int = null
   var totalSize = 0
   var fprogress:Float = 0
+  var lastMat:Array[Mat] = null;
+  var lastFname:Array[String] = null;
   
   def softperm(nstart:Int, nend:Int) = {
     val dd1 = nstart / 24
@@ -57,11 +59,13 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     fileno = nstart;                                                           // Number of the current output file      
     matqueue = new Array[Array[Mat]](math.max(1,opts.lookahead))               // Queue of matrices for each output matrix
     for (i <- 0 until math.max(1,opts.lookahead)) {
-      matqueue(i) = new Array[Mat](fnames.size)
+      matqueue(i) = new Array[Mat](fnames.size);
     }
+    lastMat = new Array[Mat](fnames.size);
+    lastFname = new Array[String](fnames.size);
     for (i <- 0 until opts.lookahead) {
       Future {
-        prefetch(nstart + i)
+        prefetch(nstart + i);
       }
     }
   }
@@ -96,7 +100,9 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       val ifilex = ifile % math.max(opts.lookahead, 1)
       ready(ifilex) = ifile - math.max(1, opts.lookahead)
     } 
-    totalSize = nend - nstart
+    totalSize = nend - nstart;
+    for (i <- 0 until lastMat.length) {lastMat(i) = null;}
+    for (i <- 0 until lastFname.length) {lastFname(i) = null;}
   }
   
   def init = {
@@ -236,10 +242,16 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       val pnew = permfn(fileno);
       val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
       for (i <- 0 until fnames.size) {
+        if (fexists && lastMat(i).asInstanceOf[AnyRef] != null) {
+          HMat.saveMat(lastFname(i), lastMat(i));
+        }
         matqueue(0)(i) = if (fexists) {
-          HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));  
+          val tmp = HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));
+          lastFname(i) = fnames(i)(pnew);
+          lastMat(i) = tmp;
+          tmp;
         } else {
-          if (opts.throwMissing) {
+          if ((opts.sampleFiles >= 1.0f) && opts.throwMissing) {
             throw new RuntimeException("Missing file "+fnames(i)(pnew));
           }
           null;              
