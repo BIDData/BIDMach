@@ -61,12 +61,12 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     for (i <- 0 until math.max(1,opts.lookahead)) {
       matqueue(i) = new Array[Mat](fnames.size);
     }
-    lastMat = new Array[Mat](fnames.size);
-    lastFname = new Array[String](fnames.size);
-    for (i <- 0 until opts.lookahead) {
-      Future {
-        prefetch(nstart + i);
-      }
+    if (opts.putBack < 0) {
+    	for (i <- 0 until opts.lookahead) {
+    		Future {
+    			prefetch(nstart + i);
+    		}
+    	}
     }
   }
   
@@ -101,6 +101,8 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       ready(ifilex) = ifile - math.max(1, opts.lookahead)
     } 
     totalSize = nend - nstart;
+    lastMat = new Array[Mat](fnames.size);
+    lastFname = new Array[String](fnames.size);
     for (i <- 0 until lastMat.length) {lastMat(i) = null;}
     for (i <- 0 until lastFname.length) {lastFname(i) = null;}
   }
@@ -135,7 +137,7 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
     	var nrow = rowno;
     	val filex = fileno % math.max(1, opts.lookahead);
 //    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
-    	if (opts.lookahead > 0) {
+    	if (opts.putBack < 0 && opts.lookahead > 0) {
     	  while (ready(filex) < fileno) Thread.`yield`
     	} else {
     	  fetch

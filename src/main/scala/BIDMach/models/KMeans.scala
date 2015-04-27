@@ -161,10 +161,11 @@ object KMeans  {
   def learner(fnames:String, d:Int):(Learner, fsopts) = learner(List(FilesDS.simpleEnum(fnames,1,0)), d) 
   
     // This function constructs a predictor from an existing model 
-  def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, memopts) = {
+  def predictor(model:Model, mat1:Mat, preds:Mat):(Learner, memopts) = {
     val nopts = new memopts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.putBack = 1
+    nopts.dim = model.opts.dim;
     val newmod = new KMeans(nopts);
     newmod.refresh = false
     model.copyTo(newmod)
