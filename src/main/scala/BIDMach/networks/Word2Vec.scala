@@ -10,6 +10,7 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CUMACH
 import edu.berkeley.bid.CPUMACH
+import jcuda.runtime.JCuda._
 import scala.util.hashing.MurmurHash3
 
 /**
@@ -27,11 +28,14 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var allones:Mat = null;
   var randwords:Mat = null;
   var randsamp:Mat = null;
+  var retEvalPos:GMat = null;
+  var retEvalNeg:GMat = null;
   var nfeats = 0;
   var ncols = 0;
   var expt = 0f;
   var vexp = 0f;
   var salpha = 0f;
+
   
   var test1:Mat = null;
   var test2:Mat = null;
@@ -63,6 +67,10 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val gopts = opts.asInstanceOf[ADAGrad.Opts];
     vexp = gopts.vexp.v;
     salpha = opts.wsample * math.log(nfeats).toFloat;
+    if (useGPU) {
+      retEvalPos = GMat(1,1);
+      retEvalNeg = GMat(1,1);
+    }
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
@@ -140,7 +148,12 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nwords = words.ncols;
     Mat.nflops += 6L * nwords * nskip * nrows;
     (words, lbound, ubound, model1, model2) match {
-      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate);
+      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => {
+        val err = CUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate);
+        if (err != 0) {
+          throw new RuntimeException("CUMACH.word2vecPos error " + cudaGetErrorString(err))
+        }
+      }
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => if (Mat.useMKL) {
         CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
       } else {
@@ -155,7 +168,12 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nwords = wordsa.ncols;
     Mat.nflops += 6L * nwords * nwa * nwb * nrows;
     (wordsa, wordsb, modela, modelb) match {
-      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
+      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => {
+        val err = CUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
+        if (err != 0) {
+          throw new RuntimeException("CUMACH.word2vecNeg error " + cudaGetErrorString(err))
+        }
+      }
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => if (Mat.useMKL) {
         CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
       } else {
@@ -170,7 +188,17 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nwords = words.ncols;
     Mat.nflops += 2L * nwords * nskip * nrows;
     (words, lbound, ubound, model1, model2) match {
-      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data);
+      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => {
+        retEvalPos.clear
+        val err = CUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, retEvalPos.data);
+        
+        val vv = CPUMACH.word2vecEvalPos(nrows, nwords, nskip, IMat(w).data, IMat(lb).data, IMat(ub).data, FMat(m1).data, FMat(m2).data, Mat.numThreads);
+    		if (err != 0) {
+    			throw new RuntimeException("CUMACH.word2vecEvalPos error " + cudaGetErrorString(err));
+    		}
+        retEvalPos.dv;
+        vv;
+      }
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => 
       if (Mat.useMKL) {
       	CPUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
@@ -186,7 +214,16 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nwords = wordsa.ncols;
     Mat.nflops += 2L * nwords * nwa * nwb * nrows;
     (wordsa, wordsb, modela, modelb) match {
-      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data);
+      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => {
+        retEvalNeg.clear
+        val err = CUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, retEvalNeg.data);
+        val vv = CPUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, IMat(wa).data, IMat(wb).data, FMat(ma).data, FMat(mb).data, Mat.numThreads);
+    		if (err != 0) {
+    			throw new RuntimeException("CUMACH.word2vecEvalNeg error " + cudaGetErrorString(err));
+    		}
+        retEvalNeg.dv;
+       
+      }
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => 
       if (Mat.useMKL) {
       	CPUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads); 
