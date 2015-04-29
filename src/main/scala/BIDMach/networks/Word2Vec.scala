@@ -35,7 +35,18 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var expt = 0f;
   var vexp = 0f;
   var salpha = 0f;
-
+  
+  var ntimes = 12;
+  var times:FMat = null;
+  var delays:FMat = null;
+  
+  def addTime(itime:Int, lasti:Int = -1) = {
+    val t = toc
+    times(itime) = t;
+    if (itime > 0) {
+    	delays(itime) += times(itime) - times(itime + lasti);
+    } 
+  }
   
   var test1:Mat = null;
   var test2:Mat = null;
@@ -71,9 +82,12 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       retEvalPos = GMat(1,1);
       retEvalNeg = GMat(1,1);
     }
+    times = zeros(1, ntimes);
+    delays = zeros(1, ntimes);
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
+    addTime(0);
     if (firstPos < 0) firstPos = pos;
     val nsteps = 1f * pos / firstPos;
     val gopts = opts.asInstanceOf[ADAGrad.Opts];
@@ -84,13 +98,18 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
 //    val lrneg = lrpos/opts.nneg;  
     val lrneg = lrpos;
     procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos);
+    addTime(8);
     procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg); 
+    addTime(9);
   }
   
   def evalbatch(gmats:Array[Mat], ipass:Int, pos:Long):FMat = {
+  	addTime(0);
   	val (words, lb, ub, trandwords, goodwords) = wordMats(gmats, ipass, pos);
   	val epos = evalPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0));
+  	addTime(10,-3);
     val eneg = evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0));
+    addTime(11)
 //  	val score = ((epos + eneg / opts.nneg) /opts.nskip / words.ncols);
   	val score = ((epos + eneg) / goodwords.length);
   	row(score)
@@ -101,43 +120,46 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val wordsens = mats(0);
     val words = wordsens(0,?);
     val wgood = words < opts.vocabSize;                                        // Find OOV words 
-                                       
+    addTime(1);
+    
     rand(randsamp);                                                            // Take a random sample
     val wrat = float(words+1) * salpha;
     wrat ~ sqrt(wrat) + wrat;
     wgood ~ wgood ∘ int(randsamp < wrat);
     words ~ wgood + (wgood ∘ words - 1);                                       // Set OOV or skipped samples to -1
-       
+    addTime(2);
+        
     rand(ubound);                                                              // get random upper and lower bounds   
     val ubrand = int(ubound * opts.nskip);
     val lbrand = - ubrand;
+    addTime(3);
     
     val sentencenum = wordsens(1,?);                                           // Get the nearest sentence boundaries
     val lbsentence = - cumsumByKey(allones, sentencenum) + 1;
     val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
     val lb = max(lbrand, lbsentence);                                          // Combine the bounds
     val ub = min(ubrand, ubsentence);
-       
+    addTime(4);
+    
     val iwords = minusone \ words \ minusone;                                  // Build a convolution matrix.
     val cwords = iwords(wordtab);
     val pgoodwords = (wordmask >= lb) ∘ (wordmask <= ub) ∘ (cwords >= 0);      // Find words satisfying the bound
     val fgoodwords = float(pgoodwords);
+    addTime(5);
     
     rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
     randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1. 
     val (vv, ii) = sortdown2(randpermute(?));                                  // Permute the good words
     val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
     val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
-    
+    addTime(6);
+        
     rand(randwords);                                                           // Compute some random negatives
     val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));    
     val trandwords = irandwords.view(opts.nneg, ngoodcols);                    // shrink the matrices to the available data
     val cwi = cwords(ii);
     val goodwords = cwi.view(opts.nreuse, ngoodcols);
-    
-    test1 = words;
-    test2 = trandwords;
-    test3 = cwords;
+    addTime(7);
     
     (words, lb, ub, trandwords, goodwords);
   }
