@@ -229,9 +229,7 @@ object BayesNetMooc2 {
     }
     // New way of randomizing. Wrap a min() around it since rand can sometimes return 1.0.
     state = rand(graph.n, batchSize)
-    for (row <- 0 until state.nrows) {
-        state(row,?) = min(FMat(IMat(statesPerNode(row)*state(row,?))), statesPerNode(row)-1)
-    }
+    state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
     val innz = find(fdata >= 0)
     state(innz) = 0
     state(innz) = state(innz) + fdata(innz)
