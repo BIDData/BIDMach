@@ -150,9 +150,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     (words, lbound, ubound, model1, model2) match {
       case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => {
         val err = CUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate);
-        if (err != 0) {
-          throw new RuntimeException("CUMACH.word2vecPos error " + cudaGetErrorString(err))
-        }
+        if (err != 0)  throw new RuntimeException("CUMACH.word2vecPos error " + cudaGetErrorString(err));
       }
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => if (Mat.useMKL) {
         CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
@@ -170,9 +168,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     (wordsa, wordsb, modela, modelb) match {
       case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => {
         val err = CUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
-        if (err != 0) {
-          throw new RuntimeException("CUMACH.word2vecNeg error " + cudaGetErrorString(err))
-        }
+        if (err != 0) throw new RuntimeException("CUMACH.word2vecNeg error " + cudaGetErrorString(err));
       }
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => if (Mat.useMKL) {
         CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
@@ -191,13 +187,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => {
         retEvalPos.clear
         val err = CUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, retEvalPos.data);
-        
-        val vv = CPUMACH.word2vecEvalPos(nrows, nwords, nskip, IMat(w).data, IMat(lb).data, IMat(ub).data, FMat(m1).data, FMat(m2).data, Mat.numThreads);
-    		if (err != 0) {
-    			throw new RuntimeException("CUMACH.word2vecEvalPos error " + cudaGetErrorString(err));
-    		}
+    		if (err != 0) throw new RuntimeException("CUMACH.word2vecEvalPos error " + cudaGetErrorString(err));
         retEvalPos.dv;
-        vv;
       }
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => 
       if (Mat.useMKL) {
@@ -217,12 +208,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => {
         retEvalNeg.clear
         val err = CUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, retEvalNeg.data);
-        val vv = CPUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, IMat(wa).data, IMat(wb).data, FMat(ma).data, FMat(mb).data, Mat.numThreads);
-    		if (err != 0) {
-    			throw new RuntimeException("CUMACH.word2vecEvalNeg error " + cudaGetErrorString(err));
-    		}
-        retEvalNeg.dv;
-       
+    		if (err != 0) throw new RuntimeException("CUMACH.word2vecEvalNeg error " + cudaGetErrorString(err));
+        retEvalNeg.dv;      
       }
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => 
       if (Mat.useMKL) {

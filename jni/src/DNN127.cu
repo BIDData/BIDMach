@@ -4,8 +4,10 @@
 #include <MatKernel.hpp>
 
 #define BYDIMF 2
-#define BYDIMB 5
 #define CDIM 5
+
+#define BYDIMB 5
+
 
 #if __CUDA_ARCH__ >= 300
 
@@ -17,7 +19,7 @@
 template<int SKIP, int YDIM, int NREPS>
   __global__ void __word2vecPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float lrate) {
   const int nwindow = 2*SKIP+1; 
-  int words[nwindow];
+  int awords[nwindow];
   float aa[NREPS];
   float daa[NREPS];
   float bb[NREPS][nwindow];
@@ -36,16 +38,16 @@ template<int SKIP, int YDIM, int NREPS>
 #pragma unroll
   for (i = 0; i < nwindow; i++) {                           // Prefill the word and aa window buffers
     if (istart + i - SKIP - 1 >= 0) {
-      words[i] = W[istart + i - SKIP - 1];          // Get a new word
+      awords[i] = nrows * W[istart + i - SKIP - 1];         // Get a new word address
     } else {
-      words[i] = -1;
+      awords[i] = -1;
     }
-    good = (words[i] >= 0);
+    good = (awords[i] >= 0);
 #pragma unroll
     for (j = 0; j < NREPS; j++) {                           // Get the B vector for this word
       indx = tid + j * dxy;
       if (good && indx < nrows) {
-        bb[j][i] = B[indx + nrows * words[i]];
+        bb[j][i] = B[indx + awords[i]];
       } else {
         bb[j][i] = 0;
       }
@@ -55,8 +57,8 @@ template<int SKIP, int YDIM, int NREPS>
 
   for (icol = istart; icol < iend; icol++) {                // Iterate over columns
 #pragma unroll
-    for (i = 0; i < nwindow-1; i++) {                       // slide words down
-      words[i] = words[i+1];
+    for (i = 0; i < nwindow-1; i++) {                       // slide awords down
+      awords[i] = awords[i+1];
 #pragma unroll
       for (j = 0; j < NREPS; j++) {
         bb[j][i] = bb[j][i+1];                              // slide data down
@@ -66,22 +68,22 @@ template<int SKIP, int YDIM, int NREPS>
 
     good = (icol + SKIP < ncols);
     if (good) {
-      words[nwindow - 1] = W[icol + SKIP];          // Get a new word
+      awords[nwindow - 1] = nrows * W[icol + SKIP];         // Get a new word address
     } else {
-      words[nwindow - 1] = -1;
+      awords[nwindow - 1] = -1;
     }
-    good = good && words[nwindow-1] >= 0;
+    good = good && awords[nwindow-1] >= 0;
 
 #pragma unroll
     for (j = 0; j < NREPS; j++) {                           // Get a new B column
       indx = tid + j * dxy;
       if (good && indx < nrows) {
-        bb[j][nwindow - 1] = B[indx + nrows * words[nwindow - 1]];
+        bb[j][nwindow - 1] = B[indx + awords[nwindow - 1]];
       } else {
         bb[j][nwindow - 1] = 0;
       }
-      if (words[SKIP] >= 0 && indx < nrows) {               // Get a new A column
-        aa[j] = A[indx + nrows * words[SKIP]];
+      if (awords[SKIP] >= 0 && indx < nrows) {               // Get a new A column
+        aa[j] = A[indx + awords[SKIP]];
       } else {
         aa[j] = 0;
       }
@@ -148,19 +150,19 @@ template<int SKIP, int YDIM, int NREPS>
       }
     }
     __syncthreads();  
-    if (words[SKIP] >= 0) {
+    if (awords[SKIP] >= 0) {
 #pragma unroll                 
       for (j = 0; j < NREPS; j++) { 
         if (tid + j * dxy < nrows) {                        // Save the A column
-          atomicAdd(&A[tid + j * dxy + nrows * words[SKIP]], daa[j]);
+          atomicAdd(&A[tid + j * dxy + awords[SKIP]], daa[j]);
         }
       }
     }
-    if (words[0] >= 0) {
+    if (awords[0] >= 0) {
 #pragma unroll                 
       for (j = 0; j < NREPS; j++) {                         // Save the B column
         if (tid + j * dxy < nrows) {
-          atomicAdd(&B[tid + j * dxy + nrows * words[0]], dbb[j][0]);
+          atomicAdd(&B[tid + j * dxy + awords[0]], dbb[j][0]);
         }
       } 
     }
@@ -168,11 +170,11 @@ template<int SKIP, int YDIM, int NREPS>
 
 #pragma unroll      
   for (i = 1; i < nwindow; i++) {                           // Clear out the derivative queue
-    if (words[i] >= 0) {
+    if (awords[i] >= 0) {
 #pragma unroll                 
       for (j = 0; j < NREPS; j++) {                         // Save the B column
         if (tid + j * dxy < nrows) {
-          atomicAdd(&B[tid + j * dxy + nrows * words[i]], dbb[j][i]);
+          atomicAdd(&B[tid + j * dxy + awords[i]], dbb[j][i]);
         }
       } 
     }
@@ -187,7 +189,7 @@ template<int SKIP, int YDIM, int NREPS>
 template<int SKIP, int YDIM, int NREPS>
   __global__ void __word2vecEvalPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float *Retval) {
   const int nwindow = 2*SKIP+1; 
-  int words[nwindow];
+  int awords[nwindow];
   float aa[NREPS];
   float bb[NREPS][nwindow];
   __shared__ float CC[YDIM * nwindow];
@@ -205,16 +207,16 @@ template<int SKIP, int YDIM, int NREPS>
 #pragma unroll
   for (i = 0; i < nwindow; i++) {                           // Prefill the word and aa window buffers
     if (istart + i - SKIP - 1 >= 0) {
-      words[i] = nrows * W[istart + i - SKIP - 1];          // Get a new word
+      awords[i] = nrows * W[istart + i - SKIP - 1];          // Get a new word
     } else {
-      words[i] = -1;
+      awords[i] = -1;
     }
-    good = (words[i] >= 0);
+    good = (awords[i] >= 0);
 #pragma unroll
     for (j = 0; j < NREPS; j++) {                           // Get the B vector for this word
       indx = tid + j * dxy;
       if (good && indx < nrows) {
-        bb[j][i] = B[indx + words[i]];
+        bb[j][i] = B[indx + awords[i]];
       } else {
         bb[j][i] = 0;
       }
@@ -223,8 +225,8 @@ template<int SKIP, int YDIM, int NREPS>
 
   for (icol = istart; icol < iend; icol++) {                // Iterate over columns
 #pragma unroll
-    for (i = 0; i < nwindow-1; i++) {                       // slide words down
-      words[i] = words[i+1];
+    for (i = 0; i < nwindow-1; i++) {                       // slide awords down
+      awords[i] = awords[i+1];
 #pragma unroll
       for (j = 0; j < NREPS; j++) {
         bb[j][i] = bb[j][i+1];                              // slide data down
@@ -233,22 +235,22 @@ template<int SKIP, int YDIM, int NREPS>
 
     good = (icol + SKIP < ncols);
     if (good) {
-      words[nwindow - 1] = nrows * W[icol + SKIP];          // Get a new word
+      awords[nwindow - 1] = nrows * W[icol + SKIP];          // Get a new word
     } else {
-      words[nwindow - 1] = -1;
+      awords[nwindow - 1] = -1;
     }
-    good = good && words[nwindow-1] >= 0;
+    good = good && awords[nwindow-1] >= 0;
 
 #pragma unroll
     for (j = 0; j < NREPS; j++) {                           // Get a new B column
       indx = tid + j * dxy;
       if (good && indx < nrows) {
-        bb[j][nwindow - 1] = B[indx + words[nwindow - 1]];
+        bb[j][nwindow - 1] = B[indx + awords[nwindow - 1]];
       } else {
         bb[j][nwindow - 1] = 0;
       }
-      if (words[SKIP] >= 0 && indx < nrows) {               // Get a new A column
-        aa[j] = A[indx + words[SKIP]];
+      if (awords[SKIP] >= 0 && indx < nrows) {               // Get a new A column
+        aa[j] = A[indx + awords[SKIP]];
       } else {
         aa[j] = 0;
       }
@@ -295,7 +297,11 @@ template<int SKIP, int YDIM, int NREPS>
         v = exp(v);
         v = v / (1.0f + v);
       }
-      CC[i] = log(max(v, 1.0e-20f));                        // Compute the loss
+      if (i == - lb) {
+        CC[i] = 0;                                          // Zero loss for the current word
+      } else {
+        CC[i] = log(max(v, 1.0e-20f));                      // Compute the loss
+      }
     }
     __syncthreads();
     for (i = 1; i <= ub - lb; i = i + i) {
