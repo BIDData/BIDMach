@@ -39,7 +39,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   
 
   override def init() = {
-    mats = datasource.next;
+    val mats = datasource.next;
 	  nfeats = opts.vocabSize;
 	  ncols = mats(0).ncols;
 	  datasource.reset;
@@ -70,7 +70,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nsteps = 1f * pos / firstPos;
     val gopts = opts.asInstanceOf[ADAGrad.Opts];
     val lrate = gopts.lrate.dv.toFloat * math.pow(nsteps, - gopts.texp.dv).toFloat;
-    val (words, lb, ub, trandwords, goodwords) = wordMats(mats, ipass, pos);
+    val (words, lb, ub, trandwords, goodwords) = wordMats(gmats, ipass, pos);
     
     val lrpos = lrate.dv.toFloat;
 //    val lrneg = lrpos/opts.nneg;  
@@ -79,8 +79,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg); 
   }
   
-  def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {
-  	val (words, lb, ub, trandwords, goodwords) = wordMats(mats, ipass, pos);
+  def evalbatch(gmats:Array[Mat], ipass:Int, pos:Long):FMat = {
+  	val (words, lb, ub, trandwords, goodwords) = wordMats(gmats, ipass, pos);
   	val epos = evalPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0));
     val eneg = evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0));
 //  	val score = ((epos + eneg / opts.nneg) /opts.nskip / words.ncols);
