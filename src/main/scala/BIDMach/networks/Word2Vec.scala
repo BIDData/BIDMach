@@ -26,10 +26,12 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var wordmask:Mat = null;
   var allones:Mat = null;
   var randwords:Mat = null;
+  var randsamp:Mat = null;
   var nfeats = 0;
   var ncols = 0;
   var expt = 0f;
   var vexp = 0f;
+  var salpha = 0f;
   
   var test1:Mat = null;
   var test2:Mat = null;
@@ -50,15 +52,17 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nwindow = nskip * 2 + 1;
     val skipcol = icol((- nskip) to nskip);
     expt = 1f / (1f - opts.wexpt);
-    wordtab = convertMat(max(0, min(ncols+1, iones(nwindow, 1) * irow(1 -> (ncols+1)) + skipcol)));
-    wordmask = convertMat(skipcol * iones(1, ncols));
-    randpermute = convertMat(zeros(nwindow, ncols));
-    ubound = convertMat(zeros(1, ncols));
+    wordtab = convertMat(max(0, min(ncols+1, iones(nwindow, 1) * irow(1 -> (ncols+1)) + skipcol)));  // Indices for convolution matrix
+    wordmask = convertMat(skipcol * iones(1, ncols));                                   // columns = distances from center word
+    randpermute = convertMat(zeros(nwindow, ncols));                                    // holds random values for permuting negative context words
+    ubound = convertMat(zeros(1, ncols));                                               // upper bound random matrix
     minusone = convertMat(irow(-1));
     allones = convertMat(iones(1, ncols));
-    randwords = convertMat(zeros(opts.nneg, ncols));
+    randwords = convertMat(zeros(1, (1.01 * opts.nneg * nskip * ncols / opts.nreuse).toInt)); // generates random negative words
+    randsamp = convertMat(zeros(1, ncols));                                             // For sub-sampling frequent words
     val gopts = opts.asInstanceOf[ADAGrad.Opts];
     vexp = gopts.vexp.v;
+    salpha = opts.wsample * math.log(nfeats).toFloat;
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
@@ -71,7 +75,6 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val lrpos = lrate.dv.toFloat;
 //    val lrneg = lrpos/opts.nneg;  
     val lrneg = lrpos;
-//    println("check %d %d" format (trandwords.length, goodwords.length))
     procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos);
     procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg); 
   }
@@ -81,7 +84,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   	val epos = evalPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0));
     val eneg = evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0));
 //  	val score = ((epos + eneg / opts.nneg) /opts.nskip / words.ncols);
-  	val score = ((epos + eneg) /opts.nskip / words.ncols);
+  	val score = ((epos + eneg) / goodwords.length);
   	row(score)
   }
   
@@ -89,9 +92,14 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   
     val wordsens = mats(0);
     val words = wordsens(0,?);
-    val wgood = words < opts.vocabSize;
-    words ~ wgood + (wgood ∘ words - 1);                                       // Set OOV words to zero
-    
+    val wgood = words < opts.vocabSize;                                        // Find OOV words 
+                                       
+    rand(randsamp);                                                            // Take a random sample
+    val wrat = float(words+1) * salpha;
+    wrat ~ sqrt(wrat) + wrat;
+    wgood ~ wgood ∘ int(randsamp < wrat);
+    words ~ wgood + (wgood ∘ words - 1);                                       // Set OOV or skipped samples to -1
+       
     rand(ubound);                                                              // get random upper and lower bounds   
     val ubrand = int(ubound * opts.nskip);
     val lbrand = - ubrand;
@@ -477,6 +485,7 @@ object Word2Vec  {
     var nreuse = 5;  
     var vocabSize = 100000;
     var wexpt = 0.75f;
+    var wsample = 1e-4f;
   }
   
   class Options extends Opts {}
@@ -495,20 +504,8 @@ object Word2Vec  {
   }
     
   class LearnOptions extends Learner.Options with Word2Vec.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
-
-  def learner(mat0:Mat, targ:Mat) = {
-    val opts = new LearnOptions;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
-  	val nn = new Learner(
-  	    new MatDS(Array(mat0, targ), opts), 
-  	    new Word2Vec(opts), 
-  	    Array(new L1Regularizer(opts)),
-  	    new Grad(opts), 
-  	    opts)
-    (nn, opts)
-  }
   
-  def learnerX(mat0:Mat, targ:Mat) = {
+  def learner(mat0:Mat, targ:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
@@ -526,29 +523,8 @@ object Word2Vec  {
   		                                                                  FilesDS.simpleEnum(fn2,1,0)));
   
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
-
+  
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
-    val opts = new FDSopts
-    opts.fnames = fnames
-    opts.batchSize = 100000;
-    opts.eltsPerSample = 500;
-    implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts)
-  	val nn = new Learner(
-  			ds, 
-  	    new Word2Vec(opts), 
-  	    Array(new L1Regularizer(opts)),
-  	    new Grad(opts), 
-  	    opts)
-    (nn, opts)
-  } 
-  
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0),
-  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
-  
-  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0)));
-  
-  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
     opts.fnames = fnames;
     opts.batchSize = 100000;
