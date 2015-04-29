@@ -29,20 +29,26 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var nfeats = 0;
   var ncols = 0;
   var expt = 0f;
+  var vexp = 0f;
+  
+  var test1:Mat = null;
+  var test2:Mat = null;
+  var test3:Mat = null;
+  
 
   override def init() = {
     mats = datasource.next;
-	  nfeats = mats(0).nrows;
+	  nfeats = opts.vocabSize;
 	  ncols = mats(0).ncols;
 	  datasource.reset;
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
-    	modelmats(0) = convertMat(zeros(opts.dim, nfeats));
-    	modelmats(1) = convertMat(rand(opts.dim, nfeats));
+    	modelmats(0) = convertMat((rand(opts.dim, nfeats) - 0.5f)/opts.dim);              // syn0 - context model
+    	modelmats(1) = convertMat(zeros(opts.dim, nfeats));                               // syn1neg - target word model
     }
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
-    val skipcol = icol((- nskip) -> nskip);
+    val skipcol = icol((- nskip) to nskip);
     expt = 1f / (1f - opts.wexpt);
     wordtab = convertMat(max(0, min(ncols+1, iones(nwindow, 1) * irow(1 -> (ncols+1)) + skipcol)));
     wordmask = convertMat(skipcol * iones(1, ncols));
@@ -51,23 +57,31 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     minusone = convertMat(irow(-1));
     allones = convertMat(iones(1, ncols));
     randwords = convertMat(zeros(opts.nneg, ncols));
+    val gopts = opts.asInstanceOf[ADAGrad.Opts];
+    vexp = gopts.vexp.v;
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (firstPos < 0) firstPos = pos;
     val nsteps = 1f * pos / firstPos;
-    val lrate = opts.lrate * math.pow(nsteps, opts.texp).toFloat;
+    val gopts = opts.asInstanceOf[ADAGrad.Opts];
+    val lrate = gopts.lrate.dv.toFloat * math.pow(nsteps, - gopts.texp.dv).toFloat;
     val (words, lb, ub, trandwords, goodwords) = wordMats(mats, ipass, pos);
-  
-    Word2Vec.procPositives(opts.nskip, words, lb, ub, modelmats(0), modelmats(1), lrate);
-    Word2Vec.procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(0), modelmats(1), lrate); 
+    
+    val lrpos = lrate.dv.toFloat;
+//    val lrneg = lrpos/opts.nneg;  
+    val lrneg = lrpos;
+//    println("check %d %d" format (trandwords.length, goodwords.length))
+    procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos);
+    procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg); 
   }
   
   def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {
   	val (words, lb, ub, trandwords, goodwords) = wordMats(mats, ipass, pos);
-  	val epos = Word2Vec.evalPositives(opts.nskip, words, lb, ub, modelmats(0), modelmats(1));
-    val eneg = Word2Vec.evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(0), modelmats(1));
-  	val score = ((epos + eneg / opts.nneg) / words.ncols);
+  	val epos = evalPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0));
+    val eneg = evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0));
+//  	val score = ((epos + eneg / opts.nneg) /opts.nskip / words.ncols);
+  	val score = ((epos + eneg) /opts.nskip / words.ncols);
   	row(score)
   }
   
@@ -75,8 +89,10 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   
     val wordsens = mats(0);
     val words = wordsens(0,?);
+    val wgood = words < opts.vocabSize;
+    words ~ wgood + (wgood ∘ words - 1);                                       // Set OOV words to zero
     
-    rand(ubound);                                                              // get random upper and lower bounds
+    rand(ubound);                                                              // get random upper and lower bounds   
     val ubrand = int(ubound * opts.nskip);
     val lbrand = - ubrand;
     
@@ -89,66 +105,91 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val iwords = minusone \ words \ minusone;                                  // Build a convolution matrix.
     val cwords = iwords(wordtab);
     val pgoodwords = (wordmask >= lb) ∘ (wordmask <= ub) ∘ (cwords >= 0);      // Find words satisfying the bound
-    rand(randpermute);
-    randpermute ~ pgoodwords + (pgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1. 
+    val fgoodwords = float(pgoodwords);
+    
+    rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
+    randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1. 
     val (vv, ii) = sortdown2(randpermute(?));                                  // Permute the good words
     val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
     val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
     
     rand(randwords);                                                           // Compute some random negatives
-    val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));
-    
+    val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));    
     val trandwords = irandwords.view(opts.nneg, ngoodcols);                    // shrink the matrices to the available data
-    val goodwords = cwords(ii).view(opts.nreuse, ngoodcols);
+    val cwi = cwords(ii);
+    val goodwords = cwi.view(opts.nreuse, ngoodcols);
+    
+    test1 = words;
+    test2 = trandwords;
+    test3 = cwords;
     
     (words, lb, ub, trandwords, goodwords);
   }
-}
-
-object Word2Vec  {
-  trait Opts extends Model.Opts {
-    var aopts:ADAGrad.Opts = null;
-    var nskip = 5;
-    var lrate = 0.1f;
-    var texp = 0.5f;
-    var nneg = 5;
-    var nreuse = 5;    
-    var wexpt = 0.75f;
-  }
   
-  class Options extends Opts {}
-  
-  def procPositives(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, model1:Mat, model2:Mat, lrate:Float):Int = {
+  def procPositives(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, model1:Mat, model2:Mat, lrate:Float) = {
     val nrows = model1.nrows;
     val ncols = model1.ncols;
     val nwords = words.ncols;
+    Mat.nflops += 6L * nwords * nskip * nrows;
     (words, lbound, ubound, model1, model2) match {
       case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate);
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => if (Mat.useMKL) {
-        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, Mat.numThreads); 0;
+        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
       } else {
-        procPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, Mat.numThreads);
+        procPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
       }
     }
   }
   
-  def procNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat, lrate:Float):Int = {
+  def procNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat, lrate:Float) = {
     val nrows = modela.nrows;
     val ncols = modela.ncols;
     val nwords = wordsa.ncols;
+    Mat.nflops += 6L * nwords * nwa * nwb * nrows;
     (wordsa, wordsb, modela, modelb) match {
       case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate);
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => if (Mat.useMKL) {
-        CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads); 0;
+        CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
       } else {
-      	procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, Mat.numThreads);
+      	procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
+      }
+    }
+  }
+    
+  def evalPositives(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, model1:Mat, model2:Mat):Double = {
+    val nrows = model1.nrows;
+    val ncols = model1.ncols;
+    val nwords = words.ncols;
+    Mat.nflops += 2L * nwords * nskip * nrows;
+    (words, lbound, ubound, model1, model2) match {
+      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data);
+      case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => 
+      if (Mat.useMKL) {
+      	CPUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
+      } else {
+        evalPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
       }
     }
   }
   
+  def evalNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat):Double = {
+    val nrows = modela.nrows;
+    val ncols = modela.ncols;
+    val nwords = wordsa.ncols;
+    Mat.nflops += 2L * nwords * nwa * nwb * nrows;
+    (wordsa, wordsb, modela, modelb) match {
+      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data);
+      case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => 
+      if (Mat.useMKL) {
+      	CPUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads); 
+      } else {
+      	evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
+      }
+    }
+  }
 
   def procPosCPU(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
-      A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int):Int = {
+      A:Array[Float], B:Array[Float], lrate:Float, vexp:Float, nthreads:Int):Int = {
 
     (0 until nthreads).par.map((ithread:Int) => {
     	val istart = ((1L * ithread * ncols)/nthreads).toInt;
@@ -161,7 +202,9 @@ object Word2Vec  {
     	  var c = 0;
     	  var cv = 0f;
 
-    	  val ia = nrows * W(i);                                       // Get the current word (as a model matrix offset). 
+    	  val iac = W(i);
+    	  val ascale = math.pow(iac, vexp).toFloat;
+    	  val ia = nrows * iac;                                        // Get the current word (as a model matrix offset). 
     	  if (ia >= 0) {                                               // Check for OOV words
     	  	c = 0;
     	  	while (c < nrows) {                                        // Current word
@@ -172,7 +215,9 @@ object Word2Vec  {
     	  	while (j <= UB(i)) {                                       // Iterate over neighbors in the skip window
     	  		cv = 0f;
     	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
-    	  			val ib = nrows * W(i + j);                             // Get the context word and check it. 
+    	  		  val ibc = W(i + j);
+    	  		  val bscale = math.pow(ibc, vexp).toFloat;
+    	  			val ib = nrows * ibc;                                  // Get the context word and check it
     	  			if (ib >= 0) {
     	  				c = 0;
     	  				while (c < nrows) {                                  // Inner product between current and context words. 
@@ -192,8 +237,8 @@ object Word2Vec  {
 
     	  				c = 0;
     	  				while (c < nrows) {
-    	  					daa(c) += cv * B(c + ib);                          // Compute backward derivatives for A and B. 
-    	  					B(c + ib) += cv * A(c + ia);
+    	  					daa(c) += (1+ascale) * cv * B(c + ib);                    // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
+    	  					B(c + ib) += (1+bscale) * cv * A(c + ia);
     	  					c += 1;
     	  				}
     	  			}
@@ -213,7 +258,8 @@ object Word2Vec  {
   }
 
   
-  def procNegCPU(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], A:Array[Float], B:Array[Float], lrate:Float, nthreads:Int):Int = {
+  def procNegCPU(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], A:Array[Float], B:Array[Float], 
+      lrate:Float, vexp:Float, nthreads:Int):Int = {
 
   	(0 until nthreads).par.map((ithread:Int) => {
   		val istart = ((1L * nwords * ithread) / nthreads).toInt;
@@ -244,10 +290,14 @@ object Word2Vec  {
   			    bb(c) = 0;
   			    c += 1;
   			  }
-  				val ib = nrows * WB(k+i*nwb);                              // Get the B word as an array offset. 
+  			  val ibc = WB(k+i*nwb);
+  			  val bscale = math.pow(ibc, vexp).toFloat;
+  				val ib = nrows * ibc;                                      // Get the B word as an array offset. 
   				j = 0;
   				while (j < nwa) {                                          // Now iterate over A words. 
-  					val ia = nrows * WA(j+i*nwa); 		                       // Get an A word offset 
+  				  val iac = WA(j+i*nwa);
+  				  val ascale = math.pow(iac, vexp).toFloat;
+  					val ia = nrows * iac; 		                               // Get an A word offset 
   					
   					var cv = 0f;
   					c = 0;
@@ -269,8 +319,8 @@ object Word2Vec  {
   					val ja = j * nrows;
   					c = 0;
   					while (c < nrows) {                                      // Update the derivatives
-  						aa(c + ja) += cv * B(c + ib);
-  						bb(c) += cv * A(c + ia);
+  						aa(c + ja) += (1+ascale) * cv * B(c + ib);
+  						bb(c) +=  (1+bscale) * cv * A(c + ia);
   						c += 1;
   					}
   					j += 1;
@@ -297,36 +347,6 @@ object Word2Vec  {
   		}
   	});
   	0;
-  }
-  
-   def evalPositives(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, model1:Mat, model2:Mat):Double = {
-    val nrows = model1.nrows;
-    val ncols = model1.ncols;
-    val nwords = words.ncols;
-    (words, lbound, ubound, model1, model2) match {
-      case (w:GIMat, lb:GIMat, ub:GIMat, m1:GMat, m2:GMat) => CUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data);
-      case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => 
-        if (Mat.useMKL) {
-        CPUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads); 0;
-      } else {
-        evalPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
-      }
-    }
-  }
-  
-  def evalNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat):Double = {
-    val nrows = modela.nrows;
-    val ncols = modela.ncols;
-    val nwords = wordsa.ncols;
-    (wordsa, wordsb, modela, modelb) match {
-      case (wa:GIMat, wb:GIMat, ma:GMat, mb:GMat) => CUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data);
-      case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => 
-        if (Mat.useMKL) {
-        CPUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads); 0;
-      } else {
-      	evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
-      }
-    }
   }
   
 
@@ -372,7 +392,7 @@ object Word2Vec  {
     	  					cv = math.exp(cv).toFloat;
     	  					cv = cv / (1.0f + cv);
     	  				}
-    	  				sum += math.log(cv);                            
+    	  				sum += math.log(math.max(cv, 1e-20));                            
     	  			}
     	  		}
     	  		j += 1;
@@ -437,7 +457,7 @@ object Word2Vec  {
   						cv = math.exp(cv).toFloat;
   						cv = cv / (1.0f + cv);
   					}
-  					sum += math.log(1-cv);                                            
+  					sum += math.log(math.max(1-cv, 1e-20));                                            
   					j += 1;
   				}
   				k += 1;
@@ -446,6 +466,140 @@ object Word2Vec  {
   		}
   		sum;
   	}).reduce(_+_);
+  }
+}
+
+object Word2Vec  {
+  trait Opts extends Model.Opts {
+    var aopts:ADAGrad.Opts = null;
+    var nskip = 5;
+    var nneg = 5;
+    var nreuse = 5;  
+    var vocabSize = 100000;
+    var wexpt = 0.75f;
+  }
+  
+  class Options extends Opts {}
+  
+  
+  def mkModel(fopts:Model.Opts) = {
+    new Word2Vec(fopts.asInstanceOf[Word2Vec.Opts])
+  }
+  
+  def mkUpdater(nopts:Updater.Opts) = {
+    new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
+  } 
+  
+  def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
+  }
+    
+  class LearnOptions extends Learner.Options with Word2Vec.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+
+  def learner(mat0:Mat, targ:Mat) = {
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0, targ), opts), 
+  	    new Word2Vec(opts), 
+  	    Array(new L1Regularizer(opts)),
+  	    new Grad(opts), 
+  	    opts)
+    (nn, opts)
+  }
+  
+  def learnerX(mat0:Mat, targ:Mat) = {
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0, targ), opts), 
+  	    new Word2Vec(opts), 
+  	    null,
+  	    null, 
+  	    opts)
+    (nn, opts)
+  }
+  
+  class FDSopts extends Learner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
+  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
+  
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
+
+  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+    val opts = new FDSopts
+    opts.fnames = fnames
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+    implicit val threads = threadPool(4);
+    val ds = new FilesDS(opts)
+  	val nn = new Learner(
+  			ds, 
+  	    new Word2Vec(opts), 
+  	    Array(new L1Regularizer(opts)),
+  	    new Grad(opts), 
+  	    opts)
+    (nn, opts)
+  } 
+  
+  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0),
+  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
+  
+  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0)));
+  
+  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+    val opts = new FDSopts
+    opts.fnames = fnames;
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+    implicit val threads = threadPool(4);
+    val ds = new FilesDS(opts);
+  	val nn = new Learner(
+  			ds, 
+  	    new Word2Vec(opts), 
+  	    null,
+  	    null, 
+  	    opts)
+    (nn, opts)
+  }
+  
+  def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
+    val model = model0.asInstanceOf[DNN];
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
+    opts.addConstFeat = model.opts.asInstanceOf[DataSource.Opts].addConstFeat;
+    opts.putBack = 1;
+    
+    val newmod = new Word2Vec(opts);
+    newmod.refresh = false;
+    newmod.copyFrom(model)
+    val nn = new Learner(
+        new MatDS(Array(mat0, preds), opts), 
+        newmod, 
+        null,
+        null, 
+        opts);
+    (nn, opts)
+  }
+  
+  class LearnParOptions extends ParLearner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  
+  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)))}
+  
+  def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
+    val opts = new LearnParOptions;
+    opts.batchSize = 10000;
+    opts.lrate = 1f;
+    opts.fnames = fnames;
+    implicit val threads = threadPool(4)
+    val nn = new ParLearnerF(
+        new FilesDS(opts), 
+        opts, mkModel _,
+        opts, mkRegularizer _,
+        opts, mkUpdater _, 
+        opts)
+    (nn, opts)
   }
 }
 

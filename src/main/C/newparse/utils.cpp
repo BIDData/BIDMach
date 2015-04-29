@@ -533,3 +533,30 @@ int writeSBVecs(unhash & unh, string fname, int buffsize) {
   closeos(ofstr);
   return 0;
 }
+
+int writeCSVecs(unhash & unh, string fname, int buffsize) {
+  int i, s, fmt, nrows, ncols;
+  int64 nnz;
+  ostream *ofstr = open_out_buf(fname.c_str(), buffsize);
+  fmt = 302; // 3=sparse(no rows), 0=byte, 2=long
+  ncols = unh.size();
+  divector cols;
+  cols.push_back(0);
+  nnz = 0;
+  for (i=0, nrows=0; i<ncols; i++) {
+    s = strlen(unh[i]);
+    nrows = max(nrows, s);
+    nnz = nnz + s;
+    cols.push_back(nnz);
+  }
+  ofstr->write((const char *)&fmt, 4);
+  ofstr->write((const char *)&nrows, 4);
+  ofstr->write((const char *)&ncols, 4);
+  ofstr->write((const char *)&nnz, 4);
+  ofstr->write((const char *)&cols[0], 8 * (ncols+1));
+  for (i=0; i<ncols; i++) {
+    ofstr->write(unh[i], cols[i+1] - cols[i]);
+  }
+  closeos(ofstr);
+  return 0;
+}
