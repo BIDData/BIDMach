@@ -16,6 +16,7 @@ import scala.util.Random
 
 // Put general reminders here:
 // TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
+// TODO Investigate opts.nsampls. For now, have to do batchSize * opts.nsampls or something like that.
 class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
 
   var graph:Graph1 = null
@@ -94,34 +95,41 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
   }
 
-  // this method do the sampling it's equavelent the old method: "sample"
+  /**
+   * Performs parallel sampling over the color groups, for opts.uiter iterations.
+   * 
+   * @param sdata
+   * @param user
+   * @param ipass The current Gibbs sampling iteration index.
+   */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    if (putBack < 0 || ipass == 0) user.set(1f)     // I am not sure, what does this line mean...
-
+    if (putBack < 0 || ipass == 0) user.set(1f) // If no info on 'state' matrix, set all elements to be 1.
     for (k <- 0 until opts.uiter) {
-      
       for(c <- 0 until graph.ncolors){
-
-
         val idInColor = find(graph.colors == c)
         val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
         var stateSet = new Array[FMat](numState)
         var pSet = new Array[FMat](numState)
-        // here I change the dim of the pMatrix: I add the opts.nsampls
         var pMatrix = zeros(idInColor.length, sdata.ncols * opts.nsampls)
         for (i <- 0 until numState) {
           val saveID = find(statesPerNode(idInColor) > i)
           val ids = idInColor(saveID)
-          val pids = find(sum(pproject(ids, ?), 1))
+          val pids = find(FMat(sum(pproject(ids, ?), 1)))
           initStateColor(sdata, ids, i, stateSet, user)
           computeP(ids, pids, i, pSet, pMatrix, stateSet(i), saveID, idInColor.length)
         }
-        sampleColor(sdata, numState, idInColor, pSet, pMatrix)
-
+        sampleColor(sdata, numState, idInColor, pSet, pMatrix, user)
       } 
     } 
   }
   
+  /**
+   * I think this method is equivalent to our method: "updateCpt"
+   */
+  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+
+  }
+
   /**
    * Initializes the statei matrix for this particular color group and for this particular value.
    * It fills in the unknown values at the ids locations with i, then we can use it in computeP.
@@ -244,10 +252,6 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
     }
   }
 
-  // I think this method is equivalent to our method: "updateCpt"
-  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-
-  }
 
   /**
    * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
