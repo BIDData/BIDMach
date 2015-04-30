@@ -9,26 +9,28 @@ import java.io._
 import scala.util.Random
 
 /**
- * A Bayesian Network implementation with fast parallel Gibbs Sampling on a MOOC dataset.
+ * A Bayesian Network implementation with fast parallel Gibbs Sampling (e.g., for MOOC data).
  * 
  * Haoyu Chen and Daniel Seita are building off of Huasha Zhao's original code.
  */
 
-class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
-  var graph: Graph = null
+class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
+
+  var graph: Graph1 = null
   var mm:Mat = null       // the cpt in our code
   var iproject:Mat = null
   var pproject:Mat = null
-  var cptOffset:Mat = null
+  var cptOffset:IMat = null
+  var statesPerNode:IMat = IMat(states)
+  var normConstMatrix:SMat = null
 
 
   /* this is the init method; it does the same tasks in our setup method, but it will also init the state by randomly sample
    * some numbers. The filling unknown elements parts is the same as the "initState()" method in the old code.
-
   */
   def init() = {
     graph = dag match {
-      case dd:SMat => new Graph(dd, opts.dim, statesPerNode)
+      case dd:SMat => new Graph1(dd, opts.dim, statesPerNode)
       case _ => throw new RuntimeException("dag not SMat")
     }
     graph.color
@@ -39,27 +41,18 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
 
     // build the cpt as the modelmats
     // build the cptoffset
-    val numSlotsInCpt = if (opts.useGPU && Mat.hasCUDA > 0) GIMat(exp(GMat((pproject.t)) * ln(GMat(statesPerNode))) + 1e-3) else IMat(exp(DMat(full(pproject.t)) * ln(DMat(statesPerNode))) + 1e-3)     
+    val numSlotsInCpt = if (opts.useGPU && Mat.hasCUDA > 0) {
+      GIMat(exp(GMat((pproject.t)) * ln(GMat(statesPerNode))) + 1e-3) 
+    } else {
+      IMat(exp(DMat(full(pproject.t)) * ln(DMat(statesPerNode))) + 1e-3)     
+    }
     val lengthCPT = sum(numSlotsInCpt).v
     var cptOffset = izeros(graph.n, 1)
     var cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     var cpt = rand(lengthCPT,1)
+    normConstMatrix = getNormConstMatrix(cpt)
+    cpt = cpt / (normConstMatrix * cpt)
 
-    for (i <- 0 until graph.n-1) {
-      var offset = cptOffset(i)
-      val endOffset = cptOffset(i+1)
-      while (offset < endOffset) {
-        val normConst = sum( cpt(offset until offset+statesPerNode(i)) )
-        cpt(offset until offset+statesPerNode(i)) = cpt(offset until offset+statesPerNode(i)) / normConst
-        offset = offset + statesPerNode(i)
-      }
-    }
-    var lastOffset = cptOffset(graph.n-1)
-    while (lastOffset < cpt.length) {
-      val normConst = sum( cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) )
-      cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) = cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) / normConst
-      lastOffset = lastOffset + statesPerNode(graph.n-1)
-    }
     setmodelmats(new Array[Mat](1))
     modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(cpt) else cpt
         
@@ -74,6 +67,11 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
         val state = mats(1)
 
         state <-- rand(state.nrows, state.ncols * opts.nsampls)
+        /*
+        // New way of randomizing. Wrap a min() around it since rand can sometimes return 1.0.
+        state = rand(graph.n, batchSize)
+        state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
+        */
 
         for (row <- 0 until state.nrows) {
           state(row,?) = min(FMat(IMat(statesPerNode(row)*state(row,?))), statesPerNode(row)-1)
@@ -99,6 +97,33 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
   }
 
+  /**
+   * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a
+   * column vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized.
+   */
+  def getNormConstMatrix(cpt: Mat) : SMat = {
+    var ii = izeros(1,1)
+    var jj = izeros(1,1)
+    for (i <- 0 until graph.n-1) {
+      var offset = cptOffset(i)
+      val endOffset = cptOffset(i+1)
+      val ns = statesPerNode(i)
+      var indices = find2(ones(ns,ns))
+      while (offset < endOffset) {
+        ii = ii on (indices._1 + offset)
+        jj = jj on (indices._2 + offset)
+        offset = offset + ns
+      }
+    }
+    var offsetLast = cptOffset(graph.n-1)
+    var indices = find2(ones(statesPerNode(graph.n-1), statesPerNode(graph.n-1)))
+    while (offsetLast < cpt.length) {
+      ii = ii on (indices._1 + offsetLast)
+      jj = jj on (indices._2 + offsetLast)
+      offsetLast = offsetLast + statesPerNode(graph.n-1)
+    }
+    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cpt.length, cpt.length)
+  }
 
   /** Returns a conditional probability table specified by indices from the "index" matrix. */
   def getCpt(index: Mat) = {
@@ -169,7 +194,6 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
       statei.asInstanceOf[FMat](innz + i * fdata.ncols * graph.n) <--  fdata.asInstanceOf[SMat](innz)
     }
 
-
     if (!checkState(statei)) {
       println("problem with end of initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
     }
@@ -219,8 +243,6 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
    * @param pSet The array of matrices, each of which represents probabilities of nodes attaining i.
    * @param pMatrix The matrix that represents normalizing constants for probabilities.
    */
-
-
    // changes I made in this part: 1) delete the globalPMatrices parts; 2) use the user to replace the state matrix
    // 3) add the for loop for the nsampls; 4) fdata change type to be Mat
 
@@ -262,7 +284,7 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
     }
   }
 
-  // I think this method is equavelent to our method: "updateCpt"
+  // I think this method is equivalent to our method: "updateCpt"
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
 
   }
@@ -280,6 +302,61 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
 }
 
 
+
+// TODO Work in progress on the options, need to establish learners
+object BayesNetMooc3  {
+  trait Opts extends Model.Opts {
+    var nsampls = 1
+    var alpha = 0.01f
+    var uiter = 1
+    var eps = 1e-9
+  }
+  
+  class Options extends Opts {}
+  
+  /*
+  def mkBayesNetmodel(dag: Mat, fopts:Model.Opts) = {
+  	new BayesNet(dag, fopts.asInstanceOf[BayesNet.Opts])
+  }
+  
+  def mkUpdater(nopts:Updater.Opts) = {
+  	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
+  } 
+   
+  def learner(dag0:Mat, mat0:Mat) = {
+    class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts
+    val opts = new xopts
+    //opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = mat0.ncols
+    opts.dim = dag0.ncols
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new BayesNet(dag0, opts), 
+  	    null,
+  	    new IncNorm(opts), 
+  	    opts)
+    (nn, opts)
+  }
+  
+  def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {
+    val out = a match {
+      case aa:SMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "SMat.reuseuser".##)
+      case aa:FMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "FMat.reuseuser".##)
+      case aa:GSMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GSMat.reuseuser".##)
+      case aa:GMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GMat.reuseuser".##)
+    }
+    out.set(ival)
+    out
+  }
+  *
+  */
+     
+}
+
+
+
+
+
 /**
  * A graph structure for Bayesian Networks. Includes features for:
  * 
@@ -288,11 +365,13 @@ class BayesNetMooc3(val dag:Mat, val statesPerNode:Mat, val opts:BayesNetMooc3.O
  *
  * @param dag An adjacency matrix with a 1 at (i,j) if node i has an edge TOWARDS node j.
  * @param n The number of vertices in the graph. 
+ * @param statesPerNode A column vector where elements denote number of states for corresponding variables.
  */
 
- // the change I made here: 1) add one more input statesPerNode, 2) add two methods, return the pproject and iproject
-
-class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
+// TODO making this Graph1 instead of Graph so that we don't get conflicts
+// TODO investigate all non-Mat matrices (IMat, FMat, etc.) to see if these can be Mats to make them usable on GPUs
+// TODO Also see if connectParents, moralize, and color can be converted to GPU friendly code
+class Graph1(val dag: SMat, val n: Int, val statesPerNode: IMat) {
  
   var mrf: FMat = null
   var colors: IMat = null
@@ -303,8 +382,6 @@ class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
    * Connects the parents of a certain node, a single step in the process of moralizing the graph.
    * 
    * Iterates through the parent indices and insert 1s in the 'moral' matrix to indicate an edge.
-   * 
-   * TODO Is there a way to make this GPU-friendly?
    * 
    * @param moral A matrix that represents an adjacency matrix "in progress" in the sense that it
    *    is continually getting updated each iteration from the "moralize" method.
@@ -320,41 +397,28 @@ class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
       }
     moral
   } 
-  
-  /**
-   * TODO No idea what this is yet, and it isn't in the newgibbs branch. Only used here for BayesNet.
-   */
-  def iproject = {
-    pproj = pproject
-    var res = (pproj).t
-    for (i <- 0 until n) {
-      val parents = find(pproj(?, i))
-      var cumRes = 1
-      val partentsLen = parents.length
-      for (j <- 1 until partentsLen) {
-        cumRes = cumRes * statesPerNode(parents(partentsLen - j))
-        res(i, parents(partentsLen - j - 1)) = cumRes.toFloat
-      }
-    }
-    res
-    /**
-    var ip = dag.t       
-    for (i <- 0 until n) {
-      val ps = find(dag(?, i))
-      val np = ps.length    
-      for (j <-0 until np) {
-        ip(i, ps(j)) = math.pow(2, np-j).toFloat
-      }
-    }
-    ip + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
-    **/
+
+  /** Forms the pproject matrix (graph + identity) used for computing model parameters. */
+  def pproject = {
+    dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
   }
   
   /**
-   * TODO No idea what this is yet, and it isn't in the new gibbs branch. Only used here for BayesNet.
+   * Forms the iproject matrix, which is left-multiplied to send a Pr(X_i | parents) query to its
+   * appropriate spot in the cpt via LOCAL offsets for X_i.
    */
-  def pproject = {
-    dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
+  def iproject = {
+    var res = (pproject.copy).t
+    for (i <- 0 until n) {
+      val parents = find(pproject(?, i))
+      var cumRes = 1
+      val parentsLen = parents.length
+      for (j <- 1 until parentsLen) {
+        cumRes = cumRes * statesPerNode(parents(parentsLen - j))
+        res(i, parents(parentsLen - j - 1)) = cumRes.toFloat
+      }
+    }
+    res
   }
   
   /**
@@ -364,8 +428,6 @@ class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
    * the directed graph. First, copy the dag to the moral graph because all 1s in the dag matrix
    * are 1s in the moral matrix (these are adjacency matrices). For each node, find its parents,
    * connect them, and update the matrix. Then make it symmetric because the graph is undirected.
-   * 
-   * TODO Is there a way to make this GPU-friendly?
    */
   def moralize = {
     var moral = full(dag)
@@ -382,8 +444,6 @@ class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
    * Steps: first, moralize the graph. Then iterate through each node, find its neighbors, and apply a
    * "color mask" to ensure current node doesn't have any of those colors. Then find the legal color
    * with least count (a useful heuristic). If that's not possible, then increase "ncolor".
-   * 
-   * TODO Is there a way to make this GPU-friendly?
    */
   def color = {
     moralize
@@ -424,6 +484,4 @@ class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
   }
  
 }
-
-
 
