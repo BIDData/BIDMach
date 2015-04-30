@@ -14,48 +14,53 @@ import scala.util.Random
  * Haoyu Chen and Daniel Seita are building off of Huasha Zhao's original code.
  */
 
+// Put general reminders here:
+// TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
 class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
 
-  var graph: Graph1 = null
-  var mm:Mat = null       // the cpt in our code
+  var graph:Graph1 = null
+  var mm:Mat = null         // the cpt in our code
   var iproject:Mat = null
   var pproject:Mat = null
   var cptOffset:IMat = null
   var statesPerNode:IMat = IMat(states)
   var normConstMatrix:SMat = null
-
-
+  
   /* this is the init method; it does the same tasks in our setup method, but it will also init the state by randomly sample
    * some numbers. The filling unknown elements parts is the same as the "initState()" method in the old code.
   */
   def init() = {
+    
+    // build graph and the iproject/pproject matrices from it
     graph = dag match {
       case dd:SMat => new Graph1(dd, opts.dim, statesPerNode)
       case _ => throw new RuntimeException("dag not SMat")
     }
     graph.color
-
-    // build the iproj and pproj inside the graph
     iproject = if (opts.useGPU && Mat.hasCUDA > 0) GMat(graph.iproject) else graph.iproject
     pproject = if (opts.useGPU && Mat.hasCUDA > 0) GMat(graph.pproject) else graph.pproject
 
-    // build the cpt as the modelmats
-    // build the cptoffset
+    // build the cpt (which is the modelmats) and the cptoffset vectors
     val numSlotsInCpt = if (opts.useGPU && Mat.hasCUDA > 0) {
       GIMat(exp(GMat((pproject.t)) * ln(GMat(statesPerNode))) + 1e-3) 
     } else {
       IMat(exp(DMat(full(pproject.t)) * ln(DMat(statesPerNode))) + 1e-3)     
     }
-    val lengthCPT = sum(numSlotsInCpt).v
     var cptOffset = izeros(graph.n, 1)
-    var cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
+    if (opts.useGPU && Mat.hasCUDA > 0) {
+      cptOffset(1 until graph.n) = cumsum(GMat(numSlotsInCpt))(0 until graph.n-1)
+    } else {
+      cptOffset(1 until graph.n) = cumsum(IMat(numSlotsInCpt))(0 until graph.n-1)
+    }
+    val lengthCPT = sum(numSlotsInCpt).dv.toInt
     var cpt = rand(lengthCPT,1)
     normConstMatrix = getNormConstMatrix(cpt)
     cpt = cpt / (normConstMatrix * cpt)
-
     setmodelmats(new Array[Mat](1))
     modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(cpt) else cpt
         
+    // TODO Well, this is only for if we have a matrix of length > 1 ... but we are changing the size of 
+    // state, which is confusing because I assumed that the columns had to be consistent among the sources.
     // init the data here, i.e. revise the data into the our format, i.e. randomnize the unknown elements
     // I think it will read each matrix and init the state, and putback to the datarescource. 
     // it would be similar as what we wrote in initState()
@@ -64,74 +69,29 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
       while (datasource.hasNext) {
         mats = datasource.next
         val sdata = mats(0)
-        val state = mats(1)
-
-        state <-- rand(state.nrows, state.ncols * opts.nsampls)
-        /*
-        // New way of randomizing. Wrap a min() around it since rand can sometimes return 1.0.
-        state = rand(graph.n, batchSize)
-        state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
-        */
-
-        for (row <- 0 until state.nrows) {
-          state(row,?) = min(FMat(IMat(statesPerNode(row)*state(row,?))), statesPerNode(row)-1)
+        var state = mats(1)
+        state = rand(state.nrows, state.ncols * opts.nsampls)
+        if (opts.useGPU && Mat.hasCUDA > 0) {
+          state = min( GMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
+        } else {
+          state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
         }
-
         val innz = sdata match { 
           case ss: SMat => find(ss >= 0)
           case ss: GSMat => find(SMat(ss) >= 0)
           case _ => throw new RuntimeException("sdata not SMat/GSMat")
         }
-
         for(i <- 0 until opts.nsampls){
           state.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
           state(?, i*sdata.ncols until (i+1)*sdata.ncols) = state(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat](innz))
-
         }
         datasource.putBack(mats,1)
       }
     }
-    // I think here we do not need to store the "globalPMatrices", since the param of our model is just cpt and graph
+
     mm = modelmats(0)
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-  }
-
-  /**
-   * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a
-   * column vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized.
-   */
-  def getNormConstMatrix(cpt: Mat) : SMat = {
-    var ii = izeros(1,1)
-    var jj = izeros(1,1)
-    for (i <- 0 until graph.n-1) {
-      var offset = cptOffset(i)
-      val endOffset = cptOffset(i+1)
-      val ns = statesPerNode(i)
-      var indices = find2(ones(ns,ns))
-      while (offset < endOffset) {
-        ii = ii on (indices._1 + offset)
-        jj = jj on (indices._2 + offset)
-        offset = offset + ns
-      }
-    }
-    var offsetLast = cptOffset(graph.n-1)
-    var indices = find2(ones(statesPerNode(graph.n-1), statesPerNode(graph.n-1)))
-    while (offsetLast < cpt.length) {
-      ii = ii on (indices._1 + offsetLast)
-      jj = jj on (indices._2 + offsetLast)
-      offsetLast = offsetLast + statesPerNode(graph.n-1)
-    }
-    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cpt.length, cpt.length)
-  }
-
-  /** Returns a conditional probability table specified by indices from the "index" matrix. */
-  def getCpt(index: Mat) = {
-    var cptindex = mm.zeros(index.nrows, index.ncols)
-    for(i <-0 until index.ncols){
-      cptindex(?, i) = mm(IMat(index(?, i)))
-    }
-    cptindex
   }
 
   // this method do the sampling it's equavelent the old method: "sample"
@@ -289,6 +249,43 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
 
   }
 
+  /**
+   * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
+   * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. Use SMat to save
+   * on memory, I think.
+   */
+  def getNormConstMatrix(cpt: Mat) : SMat = {
+    var ii = izeros(1,1)
+    var jj = izeros(1,1)
+    for (i <- 0 until graph.n-1) {
+      var offset = cptOffset(i)
+      val endOffset = cptOffset(i+1)
+      val ns = statesPerNode(i)
+      var indices = find2(ones(ns,ns))
+      while (offset < endOffset) {
+        ii = ii on (indices._1 + offset)
+        jj = jj on (indices._2 + offset)
+        offset = offset + ns
+      }
+    }
+    var offsetLast = cptOffset(graph.n-1)
+    var indices = find2(ones(statesPerNode(graph.n-1), statesPerNode(graph.n-1)))
+    while (offsetLast < cpt.length) {
+      ii = ii on (indices._1 + offsetLast)
+      jj = jj on (indices._2 + offsetLast)
+      offsetLast = offsetLast + statesPerNode(graph.n-1)
+    }
+    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cpt.length, cpt.length)
+  }
+
+  /** Returns a conditional probability table specified by indices from the "index" matrix. */
+  def getCpt(index: Mat) = {
+    var cptindex = mm.zeros(index.nrows, index.ncols)
+    for(i <-0 until index.ncols){
+      cptindex(?, i) = mm(IMat(index(?, i)))
+    }
+    cptindex
+  }
 
   /** Returns FALSE if there's an element at least size 2, which is BAD. */
   def checkState(state: Mat) : Boolean = {
