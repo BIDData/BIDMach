@@ -397,7 +397,7 @@ extern "C" {
   */
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_word2vecPos
-  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint shift, jobject jW, jobject jLB, jobject jUB, jobject jA, jobject jB, jfloat lrate)
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint shift, jobject jW, jobject jLB, jobject jUB, jobject jA, jobject jB, jfloat lrate, jfloat vexp)
 
   {
     int *W = (int*)getPointer(env, jW);
@@ -406,18 +406,18 @@ extern "C" {
     float *A = (float*)getPointer(env, jA);
     float *B = (float*)getPointer(env, jB);
 
-    return word2vecPos(nrows, ncols, shift, W, LB, UB, A, B, lrate);
+    return word2vecPos(nrows, ncols, shift, W, LB, UB, A, B, lrate, vexp);
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_word2vecNeg
-  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint nwa, jint nwb, jobject jWA, jobject jWB, jobject jA, jobject jB, jfloat lrate)
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint nwa, jint nwb, jobject jWA, jobject jWB, jobject jA, jobject jB, jfloat lrate, jfloat vexp)
   {
     int *WA = (int*)getPointer(env, jWA);
     int *WB = (int*)getPointer(env, jWB);
     float *A = (float*)getPointer(env, jA);
     float *B = (float*)getPointer(env, jB);
 
-    return word2vecNeg(nrows, ncols, nwa, nwb, WA, WB, A, B, lrate);
+    return word2vecNeg(nrows, ncols, nwa, nwb, WA, WB, A, B, lrate, vexp);
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_word2vecEvalPos

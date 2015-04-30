@@ -17,7 +17,7 @@
  */
 
 template<int SKIP, int YDIM, int NREPS>
-  __global__ void __word2vecPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float lrate) {
+  __global__ void __word2vecPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float lrate, float vexp) {
   const int nwindow = 2*SKIP+1; 
   int awords[nwindow];
   float aa[NREPS];
@@ -27,13 +27,14 @@ template<int SKIP, int YDIM, int NREPS>
   __shared__ float CC[YDIM * nwindow];
 
   int i, j, k, tid, indx, icol, dxy, lb, ub;
-  float prod, v;
+  float prod, v, ascale, bscale;
   tid = threadIdx.x + blockDim.x * threadIdx.y;
   dxy = blockDim.x * blockDim.y;
   bool good;
 
   int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
   int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+  float inr = 1.0f / nrows;
 
 #pragma unroll
   for (i = 0; i < nwindow; i++) {                           // Prefill the word and aa window buffers
@@ -138,14 +139,16 @@ template<int SKIP, int YDIM, int NREPS>
     for (j = 0; j < NREPS; j++) {
       daa[j] = 0;
     }
+    ascale = pow(max(0, awords[SKIP])*inr + 1.0f, vexp);
 #pragma unroll                 
     for (i = 0; i < nwindow; i++) {                         // Iterate across the window for A cols
       if (i >= SKIP + lb && i <= SKIP + ub && i != SKIP) {
+        bscale = pow(max(0, awords[i])*inr + 1.0f, vexp);
         v = lrate * CC[i - SKIP - lb];
 #pragma unroll                 
         for (j = 0; j < NREPS; j++) {
-          daa[j] += v * bb[j][i];                           // Update the local B cache after each current word
-          dbb[j][i] += v * aa[j];                           // Compute the product with the current A, B cols
+          daa[j] += ascale * v * bb[j][i];                           // Update A's derivative
+          dbb[j][i] += bscale * v * aa[j];                           // Update B's derivative
         }
       }
     }
@@ -323,7 +326,7 @@ template<int SKIP, int YDIM, int NREPS>
  */
 
 template<int NWA, int NWB, int MAXD, int BYDIM>
-  __global__ void __word2vecNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {
+  __global__ void __word2vecNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
   const int NWAB = NWA*NWB;
   __shared__ float CC[NWA*NWB*BYDIM];
   float aa[NWA];
@@ -331,12 +334,14 @@ template<int NWA, int NWB, int MAXD, int BYDIM>
   float prods[NWA][NWB];
   int ia[NWA];
   int ib[NWB];
+  float bscale[NWB];
   int tid = threadIdx.x + blockDim.x * threadIdx.y;
   int dxy = blockDim.x * blockDim.y;
   int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
   int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
   int i, j, k, icol;
-  float dv, v;
+  float dv, v, ascale;
+  float inr = 1.0f / nrows;
 
   for (icol = istart; icol < iend; icol++) {                // Iterate over columns
 #pragma unroll
@@ -419,16 +424,18 @@ template<int NWA, int NWB, int MAXD, int BYDIM>
 #pragma unroll
       for (k = 0; k < NWB; k++) {                           // Load B data
         bb[k] = B[i + ib[k]];
+        bscale[k] = pow(max(0, ib[k])*inr + 1.0f, vexp);
         prods[0][k] = 0;
       }
 #pragma unroll
       for (j = 0; j < NWA; j++) {                           // Now do the products
+        ascale = pow(max(0, ia[j])*inr + 1.0f, vexp);
         dv = 0;
 #pragma unroll
         for (k = 0; k < NWB; k++) {                       
           v = CC[j + k * NWA];
-          dv += v * bb[k];
-          prods[0][k] += v * aa[j];
+          dv += ascale * v * bb[k];
+          prods[0][k] += bscale[k] * v * aa[j];
         }
         atomicAdd(&A[i + ia[j]], dv);                      // Update A
       }
@@ -983,10 +990,10 @@ template<int NWA, int NWB, int MAXDIM>
 #else
 
 template<int SKIP, int YDIM, int NREPS>
-  __global__ void __word2vecPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float lrate) {}
+  __global__ void __word2vecPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float lrate, float vexp) {}
 
 template<int NWA, int NWB, int MAXD, int BYDIM>
-  __global__ void __word2vecNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate) {}
+  __global__ void __word2vecNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {}
 
 template<int SKIP, int YDIM, int NREPS>
   __global__ void __word2vecEvalPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float *Retval) {}
@@ -1002,13 +1009,13 @@ template<int NWA, int NWB, int MAXDIM>
 
 #endif
 
-int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float *A, float *B, float lrate) {
+int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float *A, float *B, float lrate, float vexp) {
   dim3 threads(32, CDIM, 1);
   int nblocks = 1 + (nrows - 1)/threads.y;
   switch(skip) {
-  case 5 : __word2vecPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate); break;
-  case 3 : __word2vecPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate); break;
-  case 2 : __word2vecPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate); break;
+  case 5 : __word2vecPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+  case 3 : __word2vecPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+  case 2 : __word2vecPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
   default : printf("word2vecPos unsupport size %d\n", skip); return 1;
   }
   cudaDeviceSynchronize();
@@ -1017,15 +1024,15 @@ int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float 
 }
 
 
-int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate) {
+int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
   dim3 threads(32, BYDIMF, 1);
   int nblocks = min(2048, 2 + (ncols - 1));
   int which = nwa*10000 + nwb;
   switch (which) {
-  case 50001: __word2vecNeg<5,1,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
-  case 50005: __word2vecNeg<5,5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
-  case 100005: __word2vecNeg<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
-    //  case 100010: __word2vecNeg<10,10,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+  case  50001: __word2vecNeg<5,1,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+  case  50005: __word2vecNeg<5,5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+  case 100005: __word2vecNeg<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+  case  50010: __word2vecNeg<5,10,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
     //  case 150010: __word2vecNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
   default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
@@ -1057,7 +1064,7 @@ int word2vecEvalNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, fl
   case 50001: __word2vecEvalNeg<5,1,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
   case 50005: __word2vecEvalNeg<5,5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
   case 100005: __word2vecEvalNeg<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
-    //  case 100010: __word2vecEvalNeg<10,10,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+  case 50010: __word2vecEvalNeg<5,10,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
     //  case 150010: __word2vecEvalNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
   default : printf("word2vecEvalNeg unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
