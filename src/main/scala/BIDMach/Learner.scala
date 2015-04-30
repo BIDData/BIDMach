@@ -72,7 +72,7 @@ case class Learner(
       while (datasource.hasNext) {
         val mats = datasource.next   
         here += datasource.opts.batchSize
-        bytes += 12L*mats(0).nnz
+        bytes += mats.map(Learner.numBytes _).reduce(_+_);
         if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
           if (opts.updateAll) {
           	model.dobatchg(mats, ipass, here);
@@ -149,7 +149,7 @@ case class Learner(
     while (datasource.hasNext) {
       val mats = datasource.next    
       here += datasource.opts.batchSize
-      bytes += 12L*mats(0).nnz
+      bytes += mats.map(Learner.numBytes _).reduce(_+_);
       val scores = model.evalbatchg(mats, 0, here)
       reslist.append(scores.newcopy)
       samplist.append(here)
@@ -311,7 +311,7 @@ case class ParLearner(
     				if (ithread == 0) here += datasource.opts.batchSize
     				feats += mats(0).nnz
     				done(ithread) = 0;
-    				bytes += 12L*mats(0).nnz
+    				bytes += mats.map(Learner.numBytes _).reduce(_+_);
     			} 
     		}
       	while (mini(done).v == 0) Thread.sleep(1)
@@ -482,7 +482,7 @@ case class ParLearnerx(
 	  			while (datasources(ithread).hasNext) {
 	  				val mats = datasources(ithread).next
 	  				here += datasources(ithread).opts.batchSize
-	  				for (j <- 0 until mats.length) bytes += 12L * mats(j).nnz
+	  				bytes += mats.map(Learner.numBytes _).reduce(_+_);
 	  				models(0).synchronized {
 	  					istep += 1
 	  					istep0 += 1
@@ -716,6 +716,16 @@ object Learner {
   	var updateAll = false
   }
   
+  def numBytes(mat:Mat):Long = {
+    mat match {
+      case a:FMat => 4L * mat.length;
+      case a:IMat => 4L * mat.length;
+      case a:DMat => 8L * mat.length;
+      case a:LMat => 8L * mat.length;
+      case a:SMat => 8L * mat.nnz;
+      case a:SDMat => 12L * mat.nnz;
+    }
+  }
     
   def toCPU(mats:Array[Mat]) {
     for (i <- 0 until mats.length) {
