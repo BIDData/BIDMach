@@ -210,7 +210,6 @@ object BayesNetMooc2 {
       initState(fdata)
     }
     for (c <- 0 until graph.ncolors) {
-      // TODO Investigate the impact of stateSet and pSet on the matrix caching for GPUs.
       val idInColor = find(graph.colors == c)
       val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
       var stateSet = new Array[FMat](numState)

@@ -17,7 +17,9 @@ import scala.util.Random
 // Put general reminders here:
 // TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
 // TODO Investigate opts.nsampls. For now, have to do batchSize * opts.nsampls or something like that.
-class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
+class BayesNetMooc3(val dag:Mat, 
+                    val states:Mat, 
+                    override val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
 
   var graph:Graph1 = null
   var mm:Mat = null         // the cpt in our code
@@ -108,8 +110,8 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
       for(c <- 0 until graph.ncolors){
         val idInColor = find(graph.colors == c)
         val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
-        var stateSet = new Array[FMat](numState)
-        var pSet = new Array[FMat](numState)
+        var stateSet = new Array[Mat](numState)
+        var pSet = new Array[Mat](numState)
         var pMatrix = zeros(idInColor.length, sdata.ncols * opts.nsampls)
         for (i <- 0 until numState) {
           val saveID = find(statesPerNode(idInColor) > i)
@@ -127,7 +129,16 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
    * I think this method is equivalent to our method: "updateCpt"
    */
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+    println("Not yet implemented")
+  }
+  
+  def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+    println("Not yet implemented")
+  }
 
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+    println("Not yet implemented")
+    return null
   }
 
   /**
@@ -138,30 +149,29 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
    * @param ids Indices of nodes in this color group that can also attain value/state i.
    * @param i An integer representing a value/state (we use these terms interchangeably).
    * @param stateSet An array of statei matrices, each of which has "i" in the unknowns of "ids".
+   * @param user
    */
-
-   // the things I changed here is to 1) replace the state by user mat; and 2) update the compute of innz.
-   // 3) cast the statei mat to FMat and 4) add the nsamples
-  def initStateColor(fdata: Mat, ids: IMat, i: Int, stateSet: Array[FMat], user:Mat) = {
+  def initStateColor(fdata: Mat, ids: IMat, i: Int, stateSet: Array[Mat], user:Mat) = {
+    // TODO Why do we need to cast statei to FMats, and use that test for innz?
     var statei = user.copy
-    statei.asInstanceOf[FMat](ids,?) = i
-    if (!checkState(statei.asInstanceOf[FMat])) {
+    statei(ids,?) = i
+    if (!checkState(statei)) {
       println("problem with initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
     }
+    val innz = find(FMat(fdata) >= 0)
+    /*
     val innz = fdata match {
       case ss: SMat => find(fdata >= 0)
       case ss: GMat => find(SMat(fdata) >= 0)
     }
-    //val innz = find(fdata >= 0)
-    //statei.asInstanceOf[FMat](innz) = 0f
-    //statei(innz) <-- statei(innz) + fdata(innz)
-
-    val innz = find(fdata)
+    val innz = find(fdata >= 0)
+    statei.asInstanceOf[FMat](innz) = 0f
+    statei(innz) <-- statei(innz) + fdata(innz)
+     * 
+     */
     for (i <- 0 until opts.nsampls) {
-      //statei.asInstanceOf[FMat](innz + i * fdata.ncols * graph.n) = 0f
       statei.asInstanceOf[FMat](innz + i * fdata.ncols * graph.n) <--  fdata.asInstanceOf[SMat](innz)
     }
-
     if (!checkState(statei)) {
       println("problem with end of initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
     }
@@ -185,11 +195,11 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
    // the changes I made here are 1) use the opts.eps to replace the 1e-10, change the dim of the pSet,
    // i.e. the ncols of pSet is batchsize * nsampls
 
-  def computeP(ids: IMat, pids: IMat, i: Int, pSet: Array[FMat], pMatrix: FMat, statei: FMat, saveID: IMat, numPi: Int) = {
+  def computeP(ids: IMat, pids: IMat, i: Int, pSet: Array[Mat], pMatrix: Mat, statei: Mat, saveID: IMat, numPi: Int) = {
     val a = cptOffset(pids) + IMat(iproject(pids, ?) * statei)
     val b = maxi(maxi(a,1),2).dv
-    if (b >= cpt.length) {
-      println("ERROR! In computeP(), we have max index " + b + ", but cpt.length = " + cpt.length)
+    if (b >= mm.length) {
+      println("ERROR! In computeP(), we have max index " + b + ", but cpt.length = " + mm.length)
     }
     val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + opts.eps)
     var pii = zeros(numPi, statei.ncols)
@@ -210,29 +220,21 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
    * @param idInColor Indices of nodes in this color group.
    * @param pSet The array of matrices, each of which represents probabilities of nodes attaining i.
    * @param pMatrix The matrix that represents normalizing constants for probabilities.
+   * @param user
    */
    // changes I made in this part: 1) delete the globalPMatrices parts; 2) use the user to replace the state matrix
    // 3) add the for loop for the nsampls; 4) fdata change type to be Mat
 
-  def sampleColor(fdata: Mat, numState: Int, idInColor: IMat, pSet: Array[FMat], pMatrix: FMat, user: Mat) = {
-    
-    // Put inside globalPMatrices now because later we overwrite these pSet(i) matrices.
-    // For this particular sampling, we are only concerned with idInColor nodes.
-    //for (i <- 0 until numState) {
-    //  globalPMatrices(i)(idInColor,?) = pSet(i).copy
-    //}
-    
+  def sampleColor(fdata: Mat, numState: Int, idInColor: IMat, pSet: Array[Mat], pMatrix: Mat, user: Mat) = {
     val sampleMatrix = rand(idInColor.length, fdata.ncols * opts.nsampls)
     pSet(0) = pSet(0) / pMatrix
     user(idInColor,?) <-- 0 * user(idInColor,?)
     
     // Each time, we check to make sure it's <= pSet(i), but ALSO exceeds the previous \sum (pSet(j)).
-    
     for (i <- 1 until numState) {
       val saveID = find(statesPerNode(idInColor) > i)
-      //val saveID_before = find(statesPerNode(idInColor) > (i - 1))
       val ids = idInColor(saveID)
-      val pids = find(sum(pproject(ids, ?), 1))
+      val pids = find(FMat(sum(pproject(ids, ?), 1)))
       pSet(i) = (pSet(i) / pMatrix) + pSet(i-1) // Normalize and get the cumulative prob
       // Use Hadamard product to ensure that both requirements are held.
       user(ids, ?) = user(ids,?) + i * ((sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
@@ -242,11 +244,10 @@ class BayesNetMooc3(val dag:Mat, val states:Mat, val opts:BayesNetMooc3.Opts = n
     }
 
     // Finally, re-write the known state into the state matrix
-    val saveIndex = find(fdata >= 0)
+    val saveIndex = find(FMat(fdata) >= 0)
     for (j <- 0 until opts.nsampls) {
-      user.asInstanceOf[FMat](saveIndex + i * fdata.ncols * graph.n) <--  fdata.asInstanceOf[SMat](saveIndex)
+      user.asInstanceOf[FMat](saveIndex + j * fdata.ncols * graph.n) <--  fdata.asInstanceOf[SMat](saveIndex)
     }
-    
     if (!checkState(user)) {
       println("problem with end of sampleColor(), max elem is " + maxi(maxi(user,1),2).dv)
     }
