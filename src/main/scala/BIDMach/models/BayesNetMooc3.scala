@@ -17,6 +17,9 @@ import scala.util.Random
 // Put general reminders here:
 // TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
 // TODO Investigate opts.nsampls. For now, have to do batchSize * opts.nsampls or something like that.
+// TODO Check if the BayesNet should be re-using the user for now
+// To be honest, right now it's far easier to assume the datasource is providing us with a LENGTH ONE matrix each step
+// TODO Be sure to check if we should be using SMats, GMats, etc. ANYWHERE we use Mats.
 class BayesNetMooc3(val dag:Mat, 
                     val states:Mat, 
                     override val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
@@ -29,9 +32,11 @@ class BayesNetMooc3(val dag:Mat,
   var statesPerNode:IMat = IMat(states)
   var normConstMatrix:SMat = null
   
-  /* this is the init method; it does the same tasks in our setup method, but it will also init the state by randomly sample
-   * some numbers. The filling unknown elements parts is the same as the "initState()" method in the old code.
-  */
+  /**
+   * Performs a series of initialization steps, such as building the iproject/pproject matrices,
+   * setting up a randomized (but normalized) CPT, and randomly sampling users if our datasource
+   * provides us with an array of two or more matrices.
+   */
   def init() = {
     
     // build graph and the iproject/pproject matrices from it
@@ -103,7 +108,7 @@ class BayesNetMooc3(val dag:Mat,
    * 
    * @param sdata
    * @param user
-   * @param ipass
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     if (putBack < 0 || ipass == 0) user.set(1f) // If no info on 'state' matrix, set all elements to be 1.
@@ -124,6 +129,7 @@ class BayesNetMooc3(val dag:Mat,
         sampleColor(sdata, numState, idInColor, pSet, pMatrix, user)
       } 
     } 
+    // TODO I think we need to assign to "user" here in order to get evalfun() to work.
   }
   
   /**
@@ -132,7 +138,7 @@ class BayesNetMooc3(val dag:Mat,
    * 
    * @param sdata
    * @param user
-   * @param ipass
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
    */
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val numCols = size(user, 2)
@@ -145,26 +151,61 @@ class BayesNetMooc3(val dag:Mat,
     updatemats(0) <-- counts / (normConstMatrix * counts)
   }
   
-  /**
+  /** 
+   * Evaluates the log likelihood of this datasource segment (i.e., sdata). 
    * 
-   * @param mats
-   * @param ipass
-   * @param here
+   * The sdata matrix has instances as columns, so one column is an assignment to variables. If each column
+   * of sdata had a full assignment to all variables, then we easily compute log Pr(X1, ..., Xn) which is
+   * the sum of elements in the CPT (i.e., the mm), sum(Xi | parents(Xi)). For the log-l of the full segment,
+   * we need another addition around each column, so the full log-l is the sum of the log-l of each column.
+   * This works because we assume each column is iid so we split up their joint probabilities. Taking logs 
+   * then results in addition.
+   * 
+   * In reality, data is missing, and columns will not have a full assignment. That is where we incorporate
+   * the user matrix to fill in the missing details. The user matrix fills in the unknown assignment values.
+   * 
+   * @param sdata The data matrix, which may have missing assignments indicated by a -1.
+   * @param user A matrix with a full assignment to all variables from sampling or randomization.
+   * @return The log likelihood of the data.
+   */
+  def evalfun(sdata: Mat, user: Mat) : FMat = {
+    val a = cptOffset + IMat(iproject * user)
+    val b = maxi(maxi(a,1),2).dv
+    if (b >= mm.length) {
+      println("ERROR! In eval(), we have max index " + b + ", but cpt.length = " + mm.length)
+    }
+    val index = IMat(cptOffset + iproject * user)
+    val ll = sum(sum(ln(getCpt(index))))
+    return ll.dv
+  }
+  
+  /**
+   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala.
+   * 
+   * @param mats An array of matrices representing a segment of the original data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The total number of elements seen so far, including the ones in this current batch.
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-    println("Not yet implemented")
+    val sdata = mats(0)
+    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
+    uupdate(sdata, user, ipass)
+    mupdate(sdata, user, ipass)
   }
 
   /**
+   * Does a uupdate/evalfun on a datasource segment, called from evalbatchg() in Model.scala.
    * 
-   * @param mats
-   * @param ipass
-   * @param here
-   * @return 
+   * @param mats An array of matrices representing a segment of the original data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The total number of elements seen so far, including the ones in this current batch.
+   * @return The log likelihood of the data on this datasource segment (i.e., sdata).
    */
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-    println("Not yet implemented")
-    return null
+    val sdata = mats(0)
+    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
+    uupdate(sdata, user, ipass)
+    evalfun(sdata, user)
   }
 
   /**
@@ -279,7 +320,6 @@ class BayesNetMooc3(val dag:Mat,
     }
   }
 
-
   /**
    * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
    * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. Use SMat to save
@@ -332,6 +372,7 @@ class BayesNetMooc3(val dag:Mat,
 
 
 // TODO Work in progress on the options, need to establish learners
+// Also need to establish methods for input/output
 object BayesNetMooc3  {
   trait Opts extends Model.Opts {
     var nsampls = 1
@@ -365,7 +406,9 @@ object BayesNetMooc3  {
   	    opts)
     (nn, opts)
   }
+  */
   
+  // TODO Check if this is what we want/need
   def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {
     val out = a match {
       case aa:SMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "SMat.reuseuser".##)
@@ -376,12 +419,8 @@ object BayesNetMooc3  {
     out.set(ival)
     out
   }
-  *
-  */
-     
+
 }
-
-
 
 
 
