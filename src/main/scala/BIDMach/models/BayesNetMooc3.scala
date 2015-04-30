@@ -98,11 +98,12 @@ class BayesNetMooc3(val dag:Mat,
   }
 
   /**
-   * Performs parallel sampling over the color groups, for opts.uiter iterations.
+   * Performs parallel sampling over the color groups, for opts.uiter iterations (i.e., it does multiple
+   * Gibbs sampling iterations), over the current batch of data.
    * 
    * @param sdata
    * @param user
-   * @param ipass The current Gibbs sampling iteration index.
+   * @param ipass
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     if (putBack < 0 || ipass == 0) user.set(1f) // If no info on 'state' matrix, set all elements to be 1.
@@ -126,16 +127,41 @@ class BayesNetMooc3(val dag:Mat,
   }
   
   /**
-   * I think this method is equivalent to our method: "updateCpt"
+   * After one full round of Gibbs sampling iterations, update and normalize a new CPT that then gets
+   * passed in as an updater to update the true model matrix (i.e., the actual CPT we get as output).
+   * 
+   * @param sdata
+   * @param user
+   * @param ipass
    */
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("Not yet implemented")
+    val numCols = size(user, 2)
+    val index = IMat(cptOffset + iproject * user)
+    var counts = zeros(mm.length, 1)
+    for (i <- 0 until numCols) {
+      counts(index(?, i)) = counts(index(?, i)) + 1
+    }
+    counts = counts + opts.alpha
+    updatemats(0) <-- counts / (normConstMatrix * counts)
   }
   
+  /**
+   * 
+   * @param mats
+   * @param ipass
+   * @param here
+   */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
     println("Not yet implemented")
   }
 
+  /**
+   * 
+   * @param mats
+   * @param ipass
+   * @param here
+   * @return 
+   */
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     println("Not yet implemented")
     return null
@@ -309,7 +335,7 @@ class BayesNetMooc3(val dag:Mat,
 object BayesNetMooc3  {
   trait Opts extends Model.Opts {
     var nsampls = 1
-    var alpha = 0.01f
+    var alpha = 0.1f
     var uiter = 1
     var eps = 1e-9
   }
