@@ -5,6 +5,9 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Plotting._
+import BIDMach._
+import BIDMach.datasources._
+import BIDMach.updaters._
 import java.io._
 import scala.util.Random
 
@@ -163,6 +166,8 @@ class BayesNetMooc3(val dag:Mat,
    * 
    * In reality, data is missing, and columns will not have a full assignment. That is where we incorporate
    * the user matrix to fill in the missing details. The user matrix fills in the unknown assignment values.
+   * TODO Actually, since user contains all of sdata's known values, we DON'T NEED sdata, but we DO need to
+   * make sure that "user" is correctly initialized...
    * 
    * @param sdata The data matrix, which may have missing assignments indicated by a -1.
    * @param user A matrix with a full assignment to all variables from sampling or randomization.
@@ -371,44 +376,71 @@ class BayesNetMooc3(val dag:Mat,
 
 
 
-// TODO Work in progress on the options, need to establish learners
-// Also need to establish methods for input/output
+// TODO We need to describe how we want the data to be formatted
 object BayesNetMooc3  {
+
   trait Opts extends Model.Opts {
-    var nsampls = 1
+    var nsampls = 1 // Can we assume this is always 1 please?
     var alpha = 0.1f
     var uiter = 1
     var eps = 1e-9
   }
   
   class Options extends Opts {}
-  
-  /*
-  def mkBayesNetmodel(dag: Mat, fopts:Model.Opts) = {
-  	new BayesNet(dag, fopts.asInstanceOf[BayesNet.Opts])
-  }
-  
-  def mkUpdater(nopts:Updater.Opts) = {
-  	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
+
+  /** 
+   * A learner with file paths to a matrix data source file, a states per node file, and a dag file.
+   * This will need to form the actual data elements! This has not been tested yet. 
+   */
+  def learner(dataFile:String, statesPerNodeFile:String, dagFile:String) = {
+    var data: SMat = null
+    var statesPerNode: IMat = null  
+    var dag: SMat = null
+    // Then copy the code from the next learner, unless we can figure out a way to directly call it
   } 
-   
-  def learner(dag0:Mat, mat0:Mat) = {
-    class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts
+
+  /** 
+   * A learner with a matrix data source, with states per node, and with a dag prepared for us.
+   * This has not been tested yet.
+   */
+  def learner(data:Mat, statesPerNode:Mat, dag:Mat) = {
+    class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
-    //opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    opts.batchSize = mat0.ncols
-    opts.dim = dag0.ncols
-  	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
-  	    new BayesNet(dag0, opts), 
-  	    null,
-  	    new IncNorm(opts), 
-  	    opts)
+    opts.dim = dag.ncols
+    opts.batchSize = data.ncols // Easiest for debugging to start it as data.ncols
+    val nn = new Learner(
+        new MatDS(Array(data:Mat), opts),
+        new BayesNetMooc3(dag, statesPerNode, opts),
+        null,
+        new IncNorm(opts),
+        opts)
     (nn, opts)
   }
-  */
   
-  // TODO Check if this is what we want/need
+  /**
+   * A learner with a files data source, with states per node, and with a dag prepared for us.
+   * This has not been tested yet.
+   */
+  def learner(fnames:List[(Int)=>String], statesPerNode:Mat, dag:Mat) {
+    class xopts extends Learner.Options with BayesNetMooc3.Opts with FilesDS.Opts with IncNorm.Opts 
+    val opts = new xopts
+    opts.dim = dag.ncols
+    opts.batchSize = 10000 // Just a "random" number for now TODO change obviously!
+    opts.fnames = fnames
+    implicit val threads = threadPool(4)
+    val nn = new Learner(
+        new FilesDS(opts),
+        new BayesNetMooc3(dag, statesPerNode, opts),
+        null,
+        new IncNorm(opts),
+        opts)
+    (nn, opts)   
+  }
+  
+  // ---------------------------------------------------------------------- //
+  // Other non-learner methods, such as those that manage data input/output //
+  
+  // TODO Check if this is what we want/need. We may need something like this if we're sticking with 'user'.
   def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {
     val out = a match {
       case aa:SMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "SMat.reuseuser".##)
@@ -418,6 +450,204 @@ object BayesNetMooc3  {
     }
     out.set(ival)
     out
+  }
+  
+  /** 
+   * Loads the node file to create a node map. The node file has each line like:
+   *   question_or_concept_ID,integer_index
+   * Thus, we can form one entry of the map with one line in the file.
+   *
+   * We can assign the values directly here because the two data structures are global variables.
+   * The first is a map from strings (i.e., questions/concepts) to integers (0 to n-1), and the
+   * second is an IMat array with the # of states for each node.
+   *
+   * @param path The file path to the node file (e.g, node.txt).
+   */
+  def loadNodeMap(path: String) = {
+    /*
+    var tempNodeMap = new scala.collection.mutable.HashMap[String, Int]()
+    var lines = scala.io.Source.fromFile(path).getLines
+    for (l <- lines) {
+      var t = l.split(",")
+      tempNodeMap += (t(0) -> (t(1).toInt - 1))
+    }
+    nodeMap = tempNodeMap
+    */
+  }
+
+  /**
+   * Loads the size of state to create state size array: statesPerNode. In the input file, each
+   * line looks like N1, 3 (i.e. means there are 3 states for N1 node, which are 0, 1, 2) 
+   * 
+   * @param path The state size file
+   * @param n The number of the nodes
+   */
+  def loadStateSize(path: String, n: Int) = {
+    /*
+    statesPerNode = izeros(n, 1)
+    var lines = scala.io.Source.fromFile(path).getLines
+    for (l <- lines) {
+      var t = l.split(",")
+      statesPerNode(nodeMap(t(0))) = t(1).toInt
+    }
+    */
+  }
+
+  /** 
+   * Loads the dag file and converts it to an adjacency matrix so that we can create a graph object.
+   * Each line consists of two nodes represented by Strings, so use the previously-formed nodeMap to
+   * create the actual entries in the dag matrix. Column i is such that a 1 in a position somewhere
+   * indicates a parent of node i.
+   *
+   * @param path The path to the dag file (e.g., dag.txt).
+   * @return An adjacency matrix (of type SMat) for use to create a graph.
+   */
+  def loadDag(path: String, n: Int) = {
+    /*
+    var row = izeros(bufsize, 1)
+    var col = izeros(bufsize, 1)
+    var v = zeros(bufsize, 1)
+    var ptr = 0
+    var lines = scala.io.Source.fromFile(path).getLines
+    for (l <- lines) {
+      if (ptr % bufsize == 0 && ptr > 0) {
+        row = row on izeros(bufsize, 1)
+        col = col on izeros(bufsize, 1)
+        v = v on zeros(bufsize, 1)
+      }
+      var t = l.split(",")
+      row(ptr) = nodeMap(t(0))
+      col(ptr) = nodeMap(t(1))
+      v(ptr) = 1f
+      ptr = ptr + 1
+    }
+    sparse(row(0 until ptr), col(0 until ptr), v(0 until ptr), n, n)
+    */
+  }
+
+  /**
+   * Loads the data and stores the training samples in 'sdata'. 
+   *
+   * The path refers to a text file that consists of five columns: the first is the line's hash, the
+   * second is the student number, the third is the question number, the fourth is a 0 or a 1, and
+   * the fifth is the concept ID. We should be able to directly split the lines to put data in "row", 
+   * "col" and "v", which are then put into an (nq x ns) sparse matrix.
+   * 
+   * Note: with new data, the fourth column should probably be an arbitrary value in {0,1,...,k}. In
+   * general, check with the data rather than these comments.
+   * 
+   * Note: the data is still sparse, but later we do full(data)-1 to get -1 as unknowns.
+   * 
+   * @param path The path to the sdata_new.txt file, assuming that's what we're using.
+   * @param nq The number of nodes (e.g., 334 "concepts/questions" on the MOOC data)
+   * @param ns The number of columns (e.g., 4367 "students" on the MOOC data)
+   * @return An (nq x ns) sparse training data matrix, should have values in {0,1,...,k} where the 0
+   *    indicates an unknown value.
+   */
+  def loadSData(path: String, nq: Int, ns: Int) = {
+    /*
+    var lines = scala.io.Source.fromFile(path).getLines
+    var sMap = new scala.collection.mutable.HashMap[String, Int]()
+    var coordinatesMap = new scala.collection.mutable.HashMap[(Int,Int), Int]()
+    var row = izeros(bufsize, 1)
+    var col = izeros(bufsize, 1)
+    var v = zeros(bufsize, 1)
+    var ptr = 0
+    var sid = 0
+   
+    // Involves putting data in row, col, and v so that we can then create a sparse matrix, "sdata".
+    // Be aware of the maps we use: sMap and nodeMap.
+    for (l <- lines) {
+      if (ptr % bufsize == 0 && ptr > 0) {
+        row = row on izeros(bufsize, 1)
+        col = col on izeros(bufsize, 1)
+        v = v on zeros(bufsize, 1)
+      }
+      var t = l.split(",")
+      val shash = t(0)
+      // add this new line to hash table
+      if (!(sMap contains shash)) {
+        sMap += (shash -> sid)
+        sid = sid + 1
+      }
+      if (t(5) == "1") {
+        // NEW! Only add this if we have never seen the pair...
+        val a = sMap(shash)
+        val b = nodeMap("I"+t(2))
+        if (!(coordinatesMap contains (a,b))) {
+          coordinatesMap += ((a,b) -> 1)
+          row(ptr) = a
+          col(ptr) = b
+          // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
+          v(ptr) = t(3).toFloat+1
+          ptr = ptr + 1
+        }
+      }
+    }
+    var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
+
+    // Sanity check, to make sure that no element here exceeds max of all possible states
+    if (maxi(maxi(s,1),2).dv > maxi(maxi(statesPerNode,1),2).dv) {
+      println("ERROR, max value is " + maxi(maxi(s,1),2).dv)
+    }
+    s
+    */
+  }
+
+  /**
+   * Loads the data and stores the testing samples in 'tdata' in a similar manner as loadSData().
+   * 
+   * Note: the data is still sparse, but later we do full(data)-1 to get -1 as unknowns.
+   * 
+   * @param path The path to the sdata_new.txt file, assuming that's what we're using.
+   * @param nq The number of nodes (334 "concepts/questions" on the MOOC data)
+   * @param ns The number of columns (4367 "students" on the MOOC data)
+   * @return An (nq x ns) sparse training data matrix, should have values in {0,1,...,k} where the 0
+   *    indicates an unknown value.
+   */
+  def loadTData(path: String, nq: Int, ns: Int) = {
+    /*
+    var lines = scala.io.Source.fromFile(path).getLines
+    var sMap = new scala.collection.mutable.HashMap[String, Int]()
+    var coordinatesMap = new scala.collection.mutable.HashMap[(Int,Int), Int]()
+    var row = izeros(bufsize, 1)
+    var col = izeros(bufsize, 1)
+    var v = zeros(bufsize, 1)
+    var ptr = 0
+    var sid = 0
+    for (l <- lines) {
+      if (ptr % bufsize == 0 && ptr > 0) {
+        row = row on izeros(bufsize, 1)
+        col = col on izeros(bufsize, 1)
+        v = v on zeros(bufsize, 1)
+      }
+      var t = l.split(",")
+      val shash = t(0)
+      if (!(sMap contains shash)) {
+        sMap += (shash -> sid)
+        sid = sid + 1
+      }
+      if (t(5) == "0") {
+        val a = sMap(shash)
+        val b = nodeMap("I"+t(2))
+        if (!(coordinatesMap contains (a,b))) {
+          coordinatesMap += ((a,b) -> 1)
+          row(ptr) = a
+          col(ptr) = b
+          // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
+          v(ptr) = t(3).toFloat+1
+          ptr = ptr + 1
+        }
+      }
+    }
+
+    // Sanity check, to make sure that no element here exceeds max of all possible states
+    var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
+    if (maxi(maxi(s,1),2).dv > maxi(maxi(statesPerNode,1),2).dv) {
+      println("ERROR, max value is " + maxi(maxi(s,1),2).dv)
+    }
+    s
+    */
   }
 
 }
