@@ -260,18 +260,22 @@ template<int SKIP, int YDIM, int NREPS>
 
     __syncthreads();
 #pragma unroll                 
-    for (i = 0; i < nwindow; i++) {                         // Iterate across the window for B cols
-      prod = 0;
+    for (i = 0; i < nwindow; i++) {                           // Iterate across the window for B cols
       if (i >= SKIP + lb && i <= SKIP + ub) {
+        if (i == SKIP || awords[SKIP] < 0 || awords[i] < 0) { // Give this word a large score (gives zero contribution to loss)
+          prod = 20.0f;
+        } else {
+          prod = 0;
 #pragma unroll                 
-        for (j = 0; j < NREPS; j++) {                       // Iterate over blocks of elements
-          prod += bb[j][i] * aa[j];                         // Compute the product between current A, B cols
+          for (j = 0; j < NREPS; j++) {                       // Iterate over blocks of elements
+            prod += bb[j][i] * aa[j];                         // Compute the product between current A, B cols
+          }
+#pragma unroll                 
+          for (k = 1; k < 32; k = k + k) {
+            v = __shfl_down(prod, k);                         // Reduce within warp
+            prod += v;
+          }  
         }
-#pragma unroll                 
-        for (k = 1; k < 32; k = k + k) {
-          v = __shfl_down(prod, k);                         // Reduce within warp
-          prod += v;
-        }  
         if (threadIdx.x == 0) {
           CC[i - SKIP - lb + threadIdx.y * nwindow] = prod;  // Save to SHMEM
         }
@@ -297,11 +301,7 @@ template<int SKIP, int YDIM, int NREPS>
         v = exp(v);
         v = v / (1.0f + v);
       }
-      if (i == - lb) {
-        CC[i] = 0;                                          // Zero loss for the current word
-      } else {
-        CC[i] = log(max(v, 1.0e-20f));                      // Compute the loss
-      }
+      CC[i] = log(max(v, 1.0e-20f));                      // Compute the loss
     }
     __syncthreads();
     for (i = 1; i <= ub - lb; i = i + i) {
