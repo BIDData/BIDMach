@@ -26,6 +26,7 @@ object BayesNetMooc2 {
    * iproject, a matrix that provides LOCAL offsets in the CPT for Pr(X_i | parents_i).
    * pproject, a matrix that gets left multiplied to parameters to get Pr(X_i | all other nodes).
    * globalPMatrices, an array of matrices that contain all the probabilities we need for predictions.
+   * normConstMatrix, a sparse matrix to left-multiply to our un-normalized cpt to get the dividing factor.
    */
   var nodeMap: scala.collection.mutable.HashMap[String, Int] = null
   var graph: Graph = null
@@ -38,6 +39,7 @@ object BayesNetMooc2 {
   var iproject: SMat = null
   var pproject: SMat = null
   var globalPMatrices: Array[FMat] = null
+  var normConstMatrix: SMat = null
 
   /*
    * bufSize, the default size of matrices we create for data
@@ -114,22 +116,8 @@ object BayesNetMooc2 {
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cpt = rand(lengthCPT,1)
-
-    for (i <- 0 until graph.n-1) {
-      var offset = cptOffset(i)
-      val endOffset = cptOffset(i+1)
-      while (offset < endOffset) {
-        val normConst = sum( cpt(offset until offset+statesPerNode(i)) )
-        cpt(offset until offset+statesPerNode(i)) = cpt(offset until offset+statesPerNode(i)) / normConst
-        offset = offset + statesPerNode(i)
-      }
-    }
-    var lastOffset = cptOffset(graph.n-1)
-    while (lastOffset < cpt.length) {
-      val normConst = sum( cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) )
-      cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) = cpt(lastOffset until lastOffset+statesPerNode(graph.n-1)) / normConst
-      lastOffset = lastOffset + statesPerNode(graph.n-1)
-    }
+    normConstMatrix = getNormConstMatrix(cpt)
+    cpt = cpt / (normConstMatrix * cpt)
 
     // Compute iproject. Note that parents = indices of i's parents AND itself, and that we use cumulative sizes.
     iproject = (pproject.copy).t
@@ -149,6 +137,34 @@ object BayesNetMooc2 {
     for (i <- 0 until maxState) {
       globalPMatrices(i) = zeros(graph.n, batchSize)
     }
+  }
+
+  /**
+   * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a
+   * column vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized.
+   */
+  def getNormConstMatrix(cpt: Mat) : SMat = {
+    var ii = izeros(1,1)
+    var jj = izeros(1,1)
+    for (i <- 0 until graph.n-1) {
+      var offset = cptOffset(i)
+      val endOffset = cptOffset(i+1)
+      val ns = statesPerNode(i)
+      var indices = find2(ones(ns,ns))
+      while (offset < endOffset) {
+        ii = ii on (indices._1 + offset)
+        jj = jj on (indices._2 + offset)
+        offset = offset + ns
+      }
+    }
+    var offsetLast = cptOffset(graph.n-1)
+    var indices = find2(ones(statesPerNode(graph.n-1), statesPerNode(graph.n-1)))
+    while (offsetLast < cpt.length) {
+      ii = ii on (indices._1 + offsetLast)
+      jj = jj on (indices._2 + offsetLast)
+      offsetLast = offsetLast + statesPerNode(graph.n-1)
+    }
+    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cpt.length, cpt.length)
   }
 
   /** 
@@ -338,6 +354,7 @@ object BayesNetMooc2 {
   /** 
    * After doing sampling with all color groups, update the CPT according to the state matrix.
    * We use beta for a smoothing parameter and alpha in case we want to have a weighed average.
+   * Notice here that we are normalizing counts = counts / (normConstMatrix * counts).
    */
   def updateCpt = {
     val nstate = size(state, 2)
@@ -347,24 +364,7 @@ object BayesNetMooc2 {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
     counts = counts + beta
-
-    // Somewhat ugly normalizing, its the same as what we did at the start
-    for (i <- 0 until graph.n-1) {
-      var offset = cptOffset(i)
-      val endOffset = cptOffset(i+1)
-      while (offset < endOffset) {
-        val normConst = sum( counts(offset until offset+statesPerNode(i)) )
-        counts(offset until offset+statesPerNode(i)) = counts(offset until offset+statesPerNode(i)) / normConst
-        offset = offset + statesPerNode(i)
-      }
-    }
-    var lastOffset = cptOffset(graph.n-1)
-    while (lastOffset < counts.length) {
-      val normConst = sum( counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) )
-      counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) = counts(lastOffset until lastOffset+statesPerNode(graph.n-1)) / normConst
-      lastOffset = lastOffset + statesPerNode(graph.n-1)
-    }
-
+    counts = counts / (normConstMatrix * counts)
     cpt = (1 - alpha) * cpt + alpha * counts
   }
 
