@@ -263,7 +263,7 @@ case class ParLearner(
     val samplist = new ListBuffer[Float]
     for (i <- 0 until opts.nthreads) {
     	if (useGPU && i < Mat.hasCUDA) setGPU(i)
-    	updaters(i).clear
+    	if (updaters != null && updaters(i) != null) updaters(i).clear
     }
     setGPU(thisGPU)
     var istep = 0
@@ -283,7 +283,7 @@ case class ParLearner(
     				} else {
     					models(ithread).dobatchg(cmats(ithread), ipass, here)
     					if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here))
-    					updaters(ithread).update(ipass, here)
+    					if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here)
     				}
     			} catch {
     			case e:Exception => {
@@ -343,7 +343,7 @@ case class ParLearner(
       }
       for (i <- 0 until opts.nthreads) {
         if (useGPU && i < Mat.hasCUDA) setGPU(i); 
-        updaters(i).updateM(ipass)
+        if (updaters != null && updaters(i) != null) updaters(i).updateM(ipass)
       }
       setGPU(thisGPU)
       ParLearner.syncmodelsPass(models, mm, um, ipass)
