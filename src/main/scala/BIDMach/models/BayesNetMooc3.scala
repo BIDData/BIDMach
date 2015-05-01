@@ -35,6 +35,9 @@ class BayesNetMooc3(val dag:Mat,
   var statesPerNode:IMat = IMat(states)
   var normConstMatrix:SMat = null
   
+  
+
+
   /**
    * Performs a series of initialization steps, such as building the iproject/pproject matrices,
    * setting up a randomized (but normalized) CPT, and randomly sampling users if our datasource
@@ -76,6 +79,13 @@ class BayesNetMooc3(val dag:Mat,
     // I think it will read each matrix and init the state, and putback to the datarescource. 
     // it would be similar as what we wrote in initState()
     // here it has one more variable: opts.nsampls, it's like the number of traning samples
+
+    // I think for this part, the design should be: we don't put back the data. However, at each dobatch method 
+    // we read in a batch of sdata, then we init the state matrix there. Because, if we generate the big state 
+    // matrix at the learner part, and pass it into the model, it would occupy a lot of space. But, if we just 
+    // generate it at each iteration, the space cost would be small, with a slight effect on the speed. 
+    
+    /**
     if (mats.size > 1) {
       while (datasource.hasNext) {
         mats = datasource.next
@@ -99,7 +109,7 @@ class BayesNetMooc3(val dag:Mat,
         datasource.putBack(mats,1)
       }
     }
-
+    **/
     mm = modelmats(0)
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
@@ -193,9 +203,29 @@ class BayesNetMooc3(val dag:Mat,
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
     val sdata = mats(0)
-    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    mupdate(sdata, user, ipass)
+    //val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
+    // Since we don't do the putback at the init() method, we have to generate the state matrix at each time
+
+    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
+
+    if (opts.useGPU && Mat.hasCUDA > 0) {
+      state = min( GMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
+    } else {
+      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
+    }
+    val innz = sdata match { 
+      case ss: SMat => find(ss >= 0)
+      case ss: GSMat => find(SMat(ss) >= 0)
+      case _ => throw new RuntimeException("sdata not SMat/GSMat")
+    }
+    for(i <- 0 until opts.nsampls){
+      state.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
+      state(?, i*sdata.ncols until (i+1)*sdata.ncols) = state(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat](innz))
+    }
+    
+
+    uupdate(sdata, state, ipass)
+    mupdate(sdata, state, ipass)
   }
 
   /**
