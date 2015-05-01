@@ -221,7 +221,7 @@ case class ParLearner(
     	models(i).bind(datasource)
     	models(i).init
     	if (mixins != null) mixins(i) map (_ init(models(i)))
-    	updaters(i).init(models(i))
+    	if (updaters != null && updaters(i) != null) updaters(i).init(models(i))
     }
     if (useGPU) setGPU(thisGPU) 
     val mml = models(0).modelmats.length
