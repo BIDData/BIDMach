@@ -686,7 +686,7 @@ class ParLearnerF(
       if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
     	models(i) = mkmodel(mopts)
     	if (mkreg != null) mixins(i) = mkreg(ropts)
-    	updaters(i) = mkupdater(uopts)
+    	if (mkupdater != null) updaters(i) = mkupdater(uopts)
     }
     if (0 < Mat.hasCUDA) setGPU(thisGPU)
     learner = new ParLearner(ds, models, mixins, updaters, lopts)   

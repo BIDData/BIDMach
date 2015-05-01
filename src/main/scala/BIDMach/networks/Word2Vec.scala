@@ -569,9 +569,6 @@ object Word2Vec  {
   
   class FDSopts extends Learner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
-  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
-  
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
   
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
@@ -594,12 +591,17 @@ object Word2Vec  {
     val model = model0.asInstanceOf[DNN];
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.addConstFeat = model.opts.asInstanceOf[DataSource.Opts].addConstFeat;
-    opts.putBack = 1;
+    if (mat0.asInstanceOf[AnyRef] != null) opts.putBack = 1;
     
     val newmod = new Word2Vec(opts);
     newmod.refresh = false;
-    newmod.copyFrom(model)
+    newmod.copyFrom(model);
+    val mopts = model.opts.asInstanceOf[Word2Vec.Opts];
+    opts.dim = mopts.dim;
+    opts.vocabSize = mopts.vocabSize;
+    opts.nskip = mopts.nskip;
+    opts.nneg = mopts.nneg;
+    opts.nreuse = mopts.nreuse;
     val nn = new Learner(
         new MatDS(Array(mat0, preds), opts), 
         newmod, 
@@ -609,9 +611,11 @@ object Word2Vec  {
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  def predictor(model0:Model, mat0:Mat):(Learner, LearnOptions) = predictor(model0, mat0, null)
   
-  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)))}
+  class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts;
+  
+  def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0)))}
   
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
@@ -622,8 +626,8 @@ object Word2Vec  {
     val nn = new ParLearnerF(
         new FilesDS(opts), 
         opts, mkModel _,
-        opts, mkRegularizer _,
-        opts, mkUpdater _, 
+        null, null,
+        null, null, 
         opts)
     (nn, opts)
   }
