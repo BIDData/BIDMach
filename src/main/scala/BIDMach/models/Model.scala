@@ -41,7 +41,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   var refresh = true
   
-  def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat]) = {
+  def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat]):Unit = {
     val mlen = models(0).modelmats.length;
     val thisGPU = getGPU;
     for (j <- 0 until mlen) {
