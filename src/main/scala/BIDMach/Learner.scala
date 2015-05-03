@@ -16,6 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 /**
  *  Basic sequential Learner class with a single datasource 
  */
+
 case class Learner(
     val datasource:DataSource,
     val model:Model, 
@@ -290,8 +291,7 @@ case class ParLearner(
     				print("Caught exception in thread %d %s\n" format (ithread, e.toString));
     				val se = e.getStackTrace();
     				for (i <- 0 until 8) {
-//    					println("in %s, %s/%s at line %s\n" format (se(i).getFileName, se(i).getClassName, se(i).getMethodName, se(i).getLineNumber));  
-    					println("in %s" format se(i).toString)
+    					println("thread %d, %s" format (ithread, se(i).toString));
     				}
     				restart(ithread)
     				println("Restarted: Keep on truckin...")

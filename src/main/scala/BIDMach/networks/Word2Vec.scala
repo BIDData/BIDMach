@@ -12,6 +12,9 @@ import edu.berkeley.bid.CUMACH
 import edu.berkeley.bid.CPUMACH
 import jcuda.runtime.JCuda._
 import scala.util.hashing.MurmurHash3
+import scala.collection.mutable.ArrayBuffer
+import java.text.SimpleDateFormat
+import java.util.Calendar
 
 /**
  * 
@@ -39,6 +42,9 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var ntimes = 12;
   var times:FMat = null;
   var delays:FMat = null;
+  var log:ArrayBuffer[String] = null
+  val dateFormat = new SimpleDateFormat("mm")
+
   
   def addTime(itime:Int, lasti:Int = -1) = {
     val t = toc
@@ -46,6 +52,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     if (itime > 0) {
     	delays(itime) += times(itime) - times(itime + lasti);
     } 
+    val today = Calendar.getInstance().getTime()
+    log += "Log: %s, GPU %d, event %d" format (dateFormat.format(today), getGPU, itime);
   }
   
   var test1:Mat = null;
@@ -84,6 +92,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     }
     times = zeros(1, ntimes);
     delays = zeros(1, ntimes);
+    log = ArrayBuffer();
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
