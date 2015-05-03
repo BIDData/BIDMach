@@ -288,7 +288,7 @@ case class ParLearner(
     			} catch {
     			case e:Exception => {
     				print("Caught exception in thread %d %s" format (ithread, e.toString));
-    				val se = e.getStackTrace()(2);
+    				val se = e.getStackTrace()(1);
     				print(", in %s, %s at line %s\n" format (se.getFileName, se.getMethodName, se.getLineNumber));   				
     				restart(ithread)
     				println("Restarted: Keep on truckin...")
