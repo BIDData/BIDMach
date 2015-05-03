@@ -257,7 +257,6 @@ case class ParLearner(
     @volatile var done = iones(opts.nthreads, 1)
     var ipass = 0
     var here = 0L
-    var feats = 0L
     var lasti = 0
     var bytes = 0L
     val reslist = new ListBuffer[FMat]
@@ -314,7 +313,6 @@ case class ParLearner(
     				  cmats(ithread)(j) = safeCopy(mats(j), ithread) 
     				}
     				if (ithread == 0) here += datasource.opts.batchSize
-    				feats += mats(0).nnz
     				done(ithread) = 0;
     				bytes += mats.map(Learner.numBytes _).reduce(_+_);
     			} 
@@ -449,8 +447,8 @@ case class ParLearnerx(
     mm = new Array[Mat](mml)
     for (i <- 0 until mml) {
     	val mm0 = models(0).modelmats(i)
-    	mm(i) = mm0.zeros(mm0.nrows, mm0.ncols)
-    	um(i) = mm0.zeros(mm0.nrows, mm0.ncols)
+    	mm(i) = zeros(mm0.nrows, mm0.ncols)
+    	um(i) = zeros(mm0.nrows, mm0.ncols)
     }
   }
   
