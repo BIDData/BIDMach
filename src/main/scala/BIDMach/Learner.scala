@@ -287,9 +287,11 @@ case class ParLearner(
     				}
     			} catch {
     			case e:Exception => {
-    				print("Caught exception in thread %d %s\nTrying restart..." format (ithread, e.toString))
+    				print("Caught exception in thread %d %s" format (ithread, e.toString));
+    				val se = e.getStackTrace()(2);
+    				print(", in %s, %s at line %s\n" format (se.getFileName, se.getMethodName, se.getLineNumber));   				
     				restart(ithread)
-    				println("Keep on truckin...")
+    				println("Restarted: Keep on truckin...")
     			}
     			} 
     			done(ithread) = 1 
@@ -684,7 +686,7 @@ class ParLearnerF(
   def setup = {
     models = new Array[Model](lopts.nthreads)
     if (mkreg != null) mixins = new Array[Array[Mixin]](lopts.nthreads)
-    updaters = new Array[Updater](lopts.nthreads) 
+    if (mkupdater != null) updaters = new Array[Updater](lopts.nthreads) 
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
       if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
