@@ -43,9 +43,11 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat]) = {
     val mlen = models(0).modelmats.length;
+    val thisGPU = getGPU;
     for (j <- 0 until mlen) {
       mm(j).clear
       for (i <- 0 until models.length) {
+        if (useGPU && i < Mat.hasCUDA) setGPU(i);
       	um(j) <-- models(i).modelmats(j);
       	mm(j) ~ mm(j) + um(j);
       }
@@ -54,6 +56,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       	models(i).modelmats(j) <-- mm(j);
     	}
     }
+    setGPU(thisGPU);
   }
   
   def mergeModelPassFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) {}
