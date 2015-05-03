@@ -43,7 +43,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var times:FMat = null;
   var delays:FMat = null;
   var log:ArrayBuffer[String] = null
-  val dateFormat = new SimpleDateFormat("mm")
+  val dateFormat = new SimpleDateFormat("hh:mm:ss")
 
   
   def addTime(itime:Int, lasti:Int = -1) = {
