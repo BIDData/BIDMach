@@ -396,7 +396,7 @@ int parseFormat(string ffname, ivector & tvec, svector & dnames, svector & delim
     cerr << "couldnt open format file" << endl;
     throw;
   }
-  char *next, *third, *linebuf = new char[80];
+  char *next, *third, *newstr, *linebuf = new char[80];
   while (!ifstr.bad() && !ifstr.eof()) {
     ifstr.getline(linebuf, 80);
     if (strlen(linebuf) > 1) {
@@ -427,7 +427,9 @@ int parseFormat(string ffname, ivector & tvec, svector & dnames, svector & delim
       } else if (strncmp(linebuf, "string", 6) == 0) {
 	tvec.push_back(ftype_string);
 	ifstr.getline(linebuf, 80);
-	delims.push_back(linebuf);
+        newstr = new char[strlen(linebuf)+1];
+        strcpy(newstr, linebuf);
+	delims.push_back(newstr);
       } else if (strncmp(linebuf, "date", 4) == 0) {
 	tvec.push_back(ftype_date);
 	delims.push_back("");

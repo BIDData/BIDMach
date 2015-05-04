@@ -1,0 +1,29 @@
+import BIDMach.networks.Word2Vec
+
+val mdir = "/code/word2vec/data/";
+
+val (nn, opts) = Word2Vec.learnPar(mdir+"data%03d.imat.lz4");
+
+opts.nstart = 0;
+opts.nend = 7;
+opts.npasses = 1;
+opts.batchSize = 100000;
+opts.lrate = 1e-3f;
+opts.vexp = 0.5f
+opts.nreuse = 5
+opts.dim = 300
+opts.vocabSize = 400000
+
+opts.syncStep = 256
+
+//opts.useGPU = false;
+//opts.autoReset = false;
+//Mat.useMKL = false;
+
+nn.train
+
+val mod0 = nn.models(0).asInstanceOf[Word2Vec]
+
+//saveFMat(mdir+"model0.fmat.lz4", FMat(mod.modelmats(0)))
+
+//saveFMat(mdir+"model1.fmat.lz4", FMat(mod.modelmats(1)))

@@ -12,6 +12,9 @@ import edu.berkeley.bid.CUMACH
 import edu.berkeley.bid.CPUMACH
 import jcuda.runtime.JCuda._
 import scala.util.hashing.MurmurHash3
+import scala.collection.mutable.ArrayBuffer
+import java.text.SimpleDateFormat
+import java.util.Calendar
 
 /**
  * 
@@ -39,6 +42,9 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var ntimes = 12;
   var times:FMat = null;
   var delays:FMat = null;
+  var log:ArrayBuffer[String] = null
+  val dateFormat = new SimpleDateFormat("hh:mm:ss:SSS")
+
   
   def addTime(itime:Int, lasti:Int = -1) = {
     val t = toc
@@ -46,6 +52,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     if (itime > 0) {
     	delays(itime) += times(itime) - times(itime + lasti);
     } 
+    val today = Calendar.getInstance().getTime()
+    log += "Log: %s, GPU %d, event %d" format (dateFormat.format(today), getGPU, itime);
   }
   
   var test1:Mat = null;
@@ -84,6 +92,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     }
     times = zeros(1, ntimes);
     delays = zeros(1, ntimes);
+    log = ArrayBuffer();
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
@@ -152,8 +161,14 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     addTime(5);
     
     rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
-    randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1. 
-    val (vv, ii) = sortdown2(randpermute(?));                                  // Permute the good words
+    randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1.
+    var vv:Mat = null;
+    var ii:Mat = null;
+    opts.synchronized {
+    	val (vv0, ii0) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
+    	vv = vv0;
+    	ii = ii0;
+    }
     val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
     val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
     val cwi = cwords(ii);
@@ -569,9 +584,6 @@ object Word2Vec  {
   
   class FDSopts extends Learner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
-  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
-  
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
   
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
@@ -594,12 +606,17 @@ object Word2Vec  {
     val model = model0.asInstanceOf[DNN];
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.addConstFeat = model.opts.asInstanceOf[DataSource.Opts].addConstFeat;
-    opts.putBack = 1;
+    if (mat0.asInstanceOf[AnyRef] != null) opts.putBack = 1;
     
     val newmod = new Word2Vec(opts);
     newmod.refresh = false;
-    newmod.copyFrom(model)
+    newmod.copyFrom(model);
+    val mopts = model.opts.asInstanceOf[Word2Vec.Opts];
+    opts.dim = mopts.dim;
+    opts.vocabSize = mopts.vocabSize;
+    opts.nskip = mopts.nskip;
+    opts.nneg = mopts.nneg;
+    opts.nreuse = mopts.nreuse;
     val nn = new Learner(
         new MatDS(Array(mat0, preds), opts), 
         newmod, 
@@ -609,9 +626,11 @@ object Word2Vec  {
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with DNN.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  def predictor(model0:Model, mat0:Mat):(Learner, LearnOptions) = predictor(model0, mat0, null)
   
-  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)))}
+  class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts;
+  
+  def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0)))}
   
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
@@ -622,8 +641,8 @@ object Word2Vec  {
     val nn = new ParLearnerF(
         new FilesDS(opts), 
         opts, mkModel _,
-        opts, mkRegularizer _,
-        opts, mkUpdater _, 
+        null, null,
+        null, null, 
         opts)
     (nn, opts)
   }
