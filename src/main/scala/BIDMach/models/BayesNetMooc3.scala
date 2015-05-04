@@ -74,6 +74,9 @@ class BayesNetMooc3(val dag:Mat,
     mm = modelmats(0)
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
+    
+    println("Finished with init()")
+    sys.exit
   }
 
   /**
@@ -388,7 +391,7 @@ object BayesNetMooc3  {
 
   /** 
    * A learner with file paths to a matrix data source file, a states per node file, and a dag file.
-   * This will need to form the actual data elements. Note: the input up to class xopts should be OK.
+   * This will need to form the actual data elements.
    * 
    * @param statesPerNodeFile A file path to the states per node data, where each line is of the form
    *    node_index, num_states so we can also extract the full list of nodes.
@@ -401,6 +404,7 @@ object BayesNetMooc3  {
     val sdata:SMat = loadSData(dataFile, nodeMap, statesPerNode)
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
+    opts.useGPU = false // Temporary TODO
     opts.dim = dag.ncols
     opts.batchSize = sdata.ncols // Easiest for debugging to start it as data.ncols
     val nn = new Learner(
@@ -413,13 +417,16 @@ object BayesNetMooc3  {
   } 
 
   /** 
-   * A learner with a matrix data source, with states per node, and with a dag prepared for us.
-   * This has not been tested yet.
+   * A learner with a matrix data source, with states per node, and with a dag prepared. Call this with:
+   * 
+   * val (nn,opts) = BayesNetMooc3.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
+   * 
+   * though this obviously depends on differences in directory structure.
    */
-  /*
-  def learner(data:Mat, statesPerNode:Mat, dag:Mat) = {
+  def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
+    opts.useGPU = false // Temporary TODO
     opts.dim = dag.ncols
     opts.batchSize = data.ncols // Easiest for debugging to start it as data.ncols
     val nn = new Learner(
@@ -430,8 +437,6 @@ object BayesNetMooc3  {
         opts)
     (nn, opts)
   }
-  * 
-  */
   
   /**
    * A learner with a files data source, with states per node, and with a dag prepared for us.
