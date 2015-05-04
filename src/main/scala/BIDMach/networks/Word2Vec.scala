@@ -167,7 +167,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     opts.synchronized {
     	val (vv0, ii0) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
     	vv = vv0;
-    	vv = ii0;
+    	ii = ii0;
     }
     val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
     val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
