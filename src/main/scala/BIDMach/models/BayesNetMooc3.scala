@@ -42,7 +42,6 @@ class BayesNetMooc3(val dag:Mat,
    * provides us with an array of two or more matrices.
    */
   def init() = {
-    
     // build graph and the iproject/pproject matrices from it
     graph = dag match {
       case dd:SMat => new Graph1(dd, opts.dim, statesPerNode)
@@ -65,6 +64,7 @@ class BayesNetMooc3(val dag:Mat,
     } else {
       cptOffset(1 until graph.n) = cumsum(IMat(numSlotsInCpt))(0 until graph.n-1)
     }
+
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     var cpt = rand(lengthCPT,1)
     normConstMatrix = getNormConstMatrix(cpt)
@@ -74,50 +74,53 @@ class BayesNetMooc3(val dag:Mat,
     mm = modelmats(0)
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    
-    println("Finished with init()")
-    sys.exit
   }
 
   /**
-   * Performs parallel sampling over the color groups, for opts.uiter iterations (i.e., it does multiple
-   * Gibbs sampling iterations), over the current batch of data.
+   * Performs a complete, parallel Gibbs sampling over the color groups, for opts.uiter iterations over 
+   * the current batch of data. For a given color group, we need to know the maximum state number. The
+   * sampling process will assign new values to the "user" matrix.
    * 
-   * @param sdata
-   * @param user
-   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param kdata A data matrix of this batch where a -1 indicates an unknown value, and {0,1,...,k} are
+   *    the known values. Each row represents a random variable.
+   * @param user Another data matrix with the same number of rows as kdata, and whose columns represent
+   *    various iid assignments to all the variables. The known values of kdata are inserted in the same
+   *    spots in this matrix, but the unknown values are appropriately randomized to be in {0,1,...,k}.
+   * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
-  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    if (putBack < 0 || ipass == 0) user.set(1f) // If no info on 'state' matrix, set all elements to be 1.
+  def uupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
+    // if (putBack < 0 || ipass == 0) user.set(1f) // We already set user in dobatch() which calls this.
     for (k <- 0 until opts.uiter) {
       for(c <- 0 until graph.ncolors){
         val idInColor = find(graph.colors == c)
         val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
         var stateSet = new Array[Mat](numState)
         var pSet = new Array[Mat](numState)
-        var pMatrix = zeros(idInColor.length, sdata.ncols * opts.nsampls)
+        var pMatrix = zeros(idInColor.length, kdata.ncols * opts.nsampls)
         for (i <- 0 until numState) {
           val saveID = find(statesPerNode(idInColor) > i)
           val ids = idInColor(saveID)
           val pids = find(FMat(sum(pproject(ids, ?), 1)))
-          initStateColor(sdata, ids, i, stateSet, user)
+          initStateColor(kdata, ids, i, stateSet, user)
           computeP(ids, pids, i, pSet, pMatrix, stateSet(i), saveID, idInColor.length)
         }
-        sampleColor(sdata, numState, idInColor, pSet, pMatrix, user)
+        sampleColor(kdata, numState, idInColor, pSet, pMatrix, user)
       } 
     } 
-    // TODO I think we need to assign to "user" here in order to get evalfun() to work.
   }
   
   /**
    * After one full round of Gibbs sampling iterations, update and normalize a new CPT that then gets
    * passed in as an updater to update the true model matrix (i.e., the actual CPT we get as output).
    * 
-   * @param sdata
-   * @param user
-   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param kdata A data matrix of this batch where a -1 indicates an unknown value, and {0,1,...,k} are
+   *    the known values. Each row represents a random variable.
+   * @param user Another data matrix with the same number of rows as kdata, and whose columns represent
+   *    various iid assignments to all the variables. The known values of kdata are inserted in the same
+   *    spots in this matrix, but the unknown values are appropriately randomized to be in {0,1,...,k}.
+   * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
-  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+  def mupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
     val numCols = size(user, 2)
     val index = IMat(cptOffset + iproject * user)
     var counts = zeros(mm.length, 1)
@@ -159,7 +162,8 @@ class BayesNetMooc3(val dag:Mat,
   }
   
   /**
-   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala.
+   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
+   * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
    * 
    * @param mats An array of matrices representing a segment of the original data.
    * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
@@ -167,28 +171,24 @@ class BayesNetMooc3(val dag:Mat,
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
     val sdata = mats(0)
-    //val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
-    // Since we don't do the putback at the init() method, we have to generate the state matrix at each time
-
     var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
-
     if (opts.useGPU && Mat.hasCUDA > 0) {
       state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) // TODO Why is GMat not working?
     } else {
       state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
     }
-    val innz = sdata match { 
-      case ss: SMat => find(ss >= 0)
-      case ss: GSMat => find(SMat(ss) >= 0)
-      case _ => throw new RuntimeException("sdata not SMat/GSMat")
+    // Create and use kdata which is sdata-1, since we want -1 to represent an unknown value.
+    val kdata = if (opts.useGPU && Mat.hasCUDA > 0) {
+      GMat(sdata.copy - 1)
+    } else {
+      FMat(sdata.copy - 1)
     }
-    for(i <- 0 until opts.nsampls){
-      state.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
-      state(?, i*sdata.ncols until (i+1)*sdata.ncols) = state(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat](innz))
+    val nonNegativeIndices = find(FMat(kdata) >= 0)
+    for (i <- 0 until opts.nsampls) {
+      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) <-- kdata(nonNegativeIndices)
     }
-
-    uupdate(sdata, state, ipass)
-    mupdate(sdata, state, ipass)
+    uupdate(kdata, state, ipass)
+    mupdate(kdata, state, ipass)
   }
 
   /**
@@ -207,38 +207,24 @@ class BayesNetMooc3(val dag:Mat,
   }
 
   /**
-   * Initializes the statei matrix for this particular color group and for this particular value.
-   * It fills in the unknown values at the ids locations with i, then we can use it in computeP.
+   * Initializes the statei matrix for this particular color group and for this particular value. It
+   * fills in the unknown values at the ids locations with i, then we can use it in computeP. I.e.,
+   * the purpose of this is to make future probability computations/lookups efficient.
    * 
-   * @param fdata Training data matrix, with unknowns of -1 and known values in {0,1,...,k}.
+   * @param kdata Training data matrix, with unknowns of -1 and known values in {0,1,...,k}.
    * @param ids Indices of nodes in this color group that can also attain value/state i.
    * @param i An integer representing a value/state (we use these terms interchangeably).
    * @param stateSet An array of statei matrices, each of which has "i" in the unknowns of "ids".
-   * @param user
+   * @param user A data matrix with the same rows as kdata, and whose columns represent various iid
+   *    assignments to all the variables. The known values of kdata are inserted in the same spots in
+   *    this matrix, but the unknown values are appropriately randomized to be in {0,1,...,k}.
    */
-  def initStateColor(fdata: Mat, ids: IMat, i: Int, stateSet: Array[Mat], user:Mat) = {
-    // TODO Why do we need to cast statei to FMats, and use that test for innz?
+  def initStateColor(kdata: Mat, ids: IMat, i: Int, stateSet: Array[Mat], user:Mat) = {
     var statei = user.copy
     statei(ids,?) = i
-    if (!checkState(statei)) {
-      println("problem with initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
-    }
-    val innz = find(FMat(fdata) >= 0)
-    /*
-    val innz = fdata match {
-      case ss: SMat => find(fdata >= 0)
-      case ss: GMat => find(SMat(fdata) >= 0)
-    }
-    val innz = find(fdata >= 0)
-    statei.asInstanceOf[FMat](innz) = 0f
-    statei(innz) <-- statei(innz) + fdata(innz)
-     * 
-     */
+    val nonNegativeIndices = find(FMat(kdata) >= 0)
     for (i <- 0 until opts.nsampls) {
-      statei.asInstanceOf[FMat](innz + i * fdata.ncols * graph.n) <--  fdata.asInstanceOf[SMat](innz)
-    }
-    if (!checkState(statei)) {
-      println("problem with end of initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
+      statei(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) <-- kdata(nonNegativeIndices)
     }
     stateSet(i) = statei
   }
@@ -256,16 +242,7 @@ class BayesNetMooc3(val dag:Mat,
    * @param saveID Indices of nodes in this color group that can attain i. (TODO Is this needed?)
    * @param numPi The number of nodes in the color group of "ids", including those that can't get i.
    */
-
-   // the changes I made here are 1) use the opts.eps to replace the 1e-10, change the dim of the pSet,
-   // i.e. the ncols of pSet is batchsize * nsampls
-
   def computeP(ids: IMat, pids: IMat, i: Int, pSet: Array[Mat], pMatrix: Mat, statei: Mat, saveID: IMat, numPi: Int) = {
-    val a = cptOffset(pids) + IMat(iproject(pids, ?) * statei)
-    val b = maxi(maxi(a,1),2).dv
-    if (b >= mm.length) {
-      println("ERROR! In computeP(), we have max index " + b + ", but cpt.length = " + mm.length)
-    }
     val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + opts.eps)
     var pii = zeros(numPi, statei.ncols)
     pii(saveID, ?) = exp(pproject(ids, pids) * nodei)
@@ -278,20 +255,16 @@ class BayesNetMooc3(val dag:Mat,
    * 
    * To start, we use a matrix of random values. Then, we go through each of the possible states and
    * if random values fall in a certain range, we assign the range's corresponding integer {0,1,...,k}.
-   * Important! BEFORE changing pSet(i)'s, store them in the globalPMatrices to save for later.
    * 
    * @param fdata Training data matrix, with unknowns of -1 and known values in {0,1,...,k}.
    * @param numState The maximum number of state/values possible of any variable in this color group.
    * @param idInColor Indices of nodes in this color group.
    * @param pSet The array of matrices, each of which represents probabilities of nodes attaining i.
    * @param pMatrix The matrix that represents normalizing constants for probabilities.
-   * @param user
+   * @param user A matrix with a full assignment to all variables from sampling or randomization.
    */
-   // changes I made in this part: 1) delete the globalPMatrices parts; 2) use the user to replace the state matrix
-   // 3) add the for loop for the nsampls; 4) fdata change type to be Mat
-
-  def sampleColor(fdata: Mat, numState: Int, idInColor: IMat, pSet: Array[Mat], pMatrix: Mat, user: Mat) = {
-    val sampleMatrix = rand(idInColor.length, fdata.ncols * opts.nsampls)
+  def sampleColor(kdata: Mat, numState: Int, idInColor: IMat, pSet: Array[Mat], pMatrix: Mat, user: Mat) = {
+    val sampleMatrix = rand(idInColor.length, kdata.ncols * opts.nsampls)
     pSet(0) = pSet(0) / pMatrix
     user(idInColor,?) <-- 0 * user(idInColor,?)
     
@@ -303,18 +276,12 @@ class BayesNetMooc3(val dag:Mat,
       pSet(i) = (pSet(i) / pMatrix) + pSet(i-1) // Normalize and get the cumulative prob
       // Use Hadamard product to ensure that both requirements are held.
       user(ids, ?) = user(ids,?) + i * ((sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
-      if (!checkState(user)) {
-        println("problem with loop in sampleColor(), max elem is " + maxi(maxi(user,1),2).dv)
-      }
     }
 
     // Finally, re-write the known state into the state matrix
-    val saveIndex = find(FMat(fdata) >= 0)
+    val nonNegativeIndices = find(FMat(kdata) >= 0)
     for (j <- 0 until opts.nsampls) {
-      user.asInstanceOf[FMat](saveIndex + j * fdata.ncols * graph.n) <--  fdata.asInstanceOf[SMat](saveIndex)
-    }
-    if (!checkState(user)) {
-      println("problem with end of sampleColor(), max elem is " + maxi(maxi(user,1),2).dv)
+      user(nonNegativeIndices + j*(kdata.nrows*kdata.ncols)) <-- kdata(nonNegativeIndices)
     }
   }
 
