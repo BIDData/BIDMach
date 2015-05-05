@@ -135,7 +135,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     }
     if (ipass == 0) {
     	itemsum ~ itemsum + sum(sdata0, 2);
-    	itemcount ~ itemcount + sum(sdata0 != 0, 2);
+    	itemcount ~ itemcount + sum(sdata0 != 0f, 2);
     	avg = sum(itemsum) / sum(itemcount);
     	iavg ~ (itemsum + avg) / (itemcount + 1);
     }
