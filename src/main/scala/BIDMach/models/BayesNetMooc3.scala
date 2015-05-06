@@ -138,6 +138,77 @@ class BayesNetMooc3(val dag:Mat,
     updatemats(0) <-- counts / (normConstMatrix * counts)
   }
   
+
+
+  /*---------------------------------------------------------------------------------------------------*/
+  /*--------------------------------------Things I changed --------------------------------------------*/
+  /*---------------------------------------------------------------------------------------------------*/
+  /**
+   * method to update the cpt table (i.e. mm). This method is called after we finish one iteration of gibbs 
+   * sampling. And this method only update the local cpt table, it has nothing to with the leaner's updating
+   * parameters.
+   * @param user: the state matrix, updated after the sampling. 
+   */
+  def updateCPT(user: Mat): Unit = {
+    val numCols = size(user, 2)
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
+    var counts = zeros(mm.length, 1)
+    for (i <- 0 until numCols) {
+      counts(index(?, i)) = counts(index(?, i)) + 1
+    }
+    println("counts.t, before adding opts.alpha and normalizing, is\n" + counts.t)
+    counts = counts + opts.alpha  
+    mm =  (1 - opts.alpha) * mm + counts / (normConstMatrix * counts)
+  }
+
+
+  /** 
+   * The revised uupdate method, which gets a batch of input data and state, does  gibbs sampling for opts.uiter 
+   * iterations. For each iteration, it will update the CPT table (i.e. mm). The input parameters are the same as
+   * the old uupdate method. 
+   *
+   * QUESTION: Daniel, I am thinking of more parallel of the sampling, the for loop for each colors can be 
+   * done parallely, but I am not sure it is possible to do something like parallel for in the BIDMach framework.
+   */
+
+  def uupdate2(kdata:Mat, user:Mat, ipass:Int):Unit = {
+    println("At the start of uupdate. Our user matrix (i.e., \"state\") has size " + size(user) + " and contents:\n" + user)
+    for (k <- 0 until opts.uiter) {
+      println("Inside uupdate, Gibbs iteration number " + k)
+      for(c <- 0 until graph.ncolors){
+        val idInColor = find(graph.colors == c)
+        val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
+        var stateSet = new Array[Mat](numState)
+        var pSet = new Array[Mat](numState)
+        var pMatrix = zeros(idInColor.length, kdata.ncols * opts.nsampls)
+        for (i <- 0 until numState) {
+          val saveID = find(statesPerNode(idInColor) > i)
+          val ids = idInColor(saveID)
+          val pids = find(FMat(sum(pproject(ids, ?), 1)))
+          initStateColor(kdata, ids, i, stateSet, user)
+          computeP(ids, pids, i, pSet, pMatrix, stateSet(i), saveID, idInColor.length)
+        }
+        sampleColor(kdata, numState, idInColor, pSet, pMatrix, user)
+      }
+      updateCPT(user) 
+    } 
+  }
+  /**
+   * The revised mupdate2 method. I think for this method, it just need to pass the updated cpt table to the learner
+   * framwork. Thus, actually it won't change or update the cpt.
+   *
+   **/
+  def mupdate2(kdata:Mat, user:Mat, ipass:Int):Unit = {
+    println("Now inside mupdate")
+    
+    modelmats(0) <-- mm
+    updatemats(0) <-- mm
+  }
+
+  /*----------------------------------------------------------------------------------------------------*/
+  /*-----------------------------END OF MY CHANGES------------------------------------------------------*/
+  /*----------------------------------------------------------------------------------------------------*/
+  
   /** 
    * Evaluates the log likelihood of this datasource segment (i.e., sdata). 
    * 
