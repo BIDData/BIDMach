@@ -89,8 +89,9 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    // if (putBack < 0 || ipass == 0) user.set(1f) // We already set user in dobatch() which calls this.
+    println("At the start of uupdate. Our user matrix has size " + size(user) + " and contents:\n" + user)
     for (k <- 0 until opts.uiter) {
+      println("Inside uupdate, Gibbs iteration number " + k)
       for(c <- 0 until graph.ncolors){
         val idInColor = find(graph.colors == c)
         val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
@@ -112,6 +113,9 @@ class BayesNetMooc3(val dag:Mat,
   /**
    * After one full round of Gibbs sampling iterations, update and normalize a new CPT that then gets
    * passed in as an updater to update the true model matrix (i.e., the actual CPT we get as output).
+   * Note here that we don't (usually) insert the normalized counts into updatemats(0) directly, because
+   * of issues relating to the last batch of the data, which does not have as much information and
+   * should not be directly used as input to the moving average.
    * 
    * @param kdata A data matrix of this batch where a -1 indicates an unknown value, and {0,1,...,k} are
    *    the known values. Each row represents a random variable.
@@ -121,13 +125,16 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def mupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
+    println("Now inside mupdate")
     val numCols = size(user, 2)
-    val index = IMat(cptOffset + iproject * user)
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
     var counts = zeros(mm.length, 1)
     for (i <- 0 until numCols) {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
+    println("counts.t, before adding opts.alpha and normalizing, is\n" + counts.t)
     counts = counts + opts.alpha
+    modelmats(0) <-- mm
     updatemats(0) <-- counts / (normConstMatrix * counts)
   }
   
@@ -164,31 +171,51 @@ class BayesNetMooc3(val dag:Mat,
   /**
    * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
    * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
+   * The point of this method is to compute an update for the updater to improve the mm (the cpt here).
    * 
    * @param mats An array of matrices representing a segment of the original data.
    * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
    * @param here The total number of elements seen so far, including the ones in this current batch.
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+    println("Inside dobatch...")
     val sdata = mats(0)
     var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
+    if (!checkState(state)) {
+      println("problem with start of initState(), max elem is " + maxi(maxi(state,1),2).dv)
+    }
     if (opts.useGPU && Mat.hasCUDA > 0) {
       state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) // TODO Why is GMat not working?
     } else {
       state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
     }
+
     // Create and use kdata which is sdata-1, since we want -1 to represent an unknown value.
     val kdata = if (opts.useGPU && Mat.hasCUDA > 0) {
-      GMat(sdata.copy - 1)
+      GMat(sdata.copy) - 1
     } else {
-      FMat(sdata.copy - 1)
+      FMat(sdata.copy) - 1
     }
+    println("\nInside dobatch() which will create the state (well, user) matrix of random assignments to unknowns. First, our kdata matrix is\n" + kdata)
     val nonNegativeIndices = find(FMat(kdata) >= 0)
+    println("size(nonNegativeIndices) = " + size(nonNegativeIndices))
+    println("kdata(nonNegativeIndices).t =\n" + kdata(nonNegativeIndices).t)
+
+    //println("state(nonNegativeIndices).t =\n" +  state(nonNegativeIndices).t)
     for (i <- 0 until opts.nsampls) {
-      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) <-- kdata(nonNegativeIndices)
+      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) = 0
+      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
+    }
+    //println("state(nonNegativeIndices).t =\n" +  state(nonNegativeIndices).t)
+
+    if (!checkState(state)) {
+      println("problem with end of initState(), max elem is " + maxi(maxi(state,1),2).dv)
     }
     uupdate(kdata, state, ipass)
     mupdate(kdata, state, ipass)
+    
+    println("We just finished the first call to dobatch(), with uupdate() and mupdate() done.")
+    sys.exit
   }
 
   /**
@@ -222,9 +249,15 @@ class BayesNetMooc3(val dag:Mat,
   def initStateColor(kdata: Mat, ids: IMat, i: Int, stateSet: Array[Mat], user:Mat) = {
     var statei = user.copy
     statei(ids,?) = i
+    if (!checkState(statei)) {
+      println("problem with initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
+    }
     val nonNegativeIndices = find(FMat(kdata) >= 0)
     for (i <- 0 until opts.nsampls) {
       statei(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) <-- kdata(nonNegativeIndices)
+    }
+    if (!checkState(statei)) {
+      println("problem with end of initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
     }
     stateSet(i) = statei
   }
@@ -243,11 +276,20 @@ class BayesNetMooc3(val dag:Mat,
    * @param numPi The number of nodes in the color group of "ids", including those that can't get i.
    */
   def computeP(ids: IMat, pids: IMat, i: Int, pSet: Array[Mat], pMatrix: Mat, statei: Mat, saveID: IMat, numPi: Int) = {
-    val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + opts.eps)
+    //println("\n\n\nInside computeP now, concerning state = " + i)
+    //println("Our pids.t set is " + pids.t)
+    val nodei = ln(getCpt(cptOffset(pids) + IMat(SMat(iproject(pids, ?)) * FMat(statei))) + opts.eps)
+    //println("nodei=\n" + nodei)
+    //println("sum(sum(nodei)) = " + sum(sum(nodei)))
+    //println("pproject(ids,pids)=\n" + pproject(ids,pids))
     var pii = zeros(numPi, statei.ncols)
-    pii(saveID, ?) = exp(pproject(ids, pids) * nodei)
+    pii(saveID, ?) = exp(SMat(pproject(ids, pids)) * FMat(nodei))
+    //println("pii=\n" + pii)
+    //println("sum(sum(pii)) = " + sum(sum(pii)))
     pSet(i) = pii
     pMatrix(saveID, ?) = pMatrix(saveID, ?) + pii(saveID, ?)
+    //println("pMatrix=\n" + pMatrix)
+    //println("Finished with computeP about state = " + i + "\n\n\n")
   }
 
   /** 
@@ -264,24 +306,42 @@ class BayesNetMooc3(val dag:Mat,
    * @param user A matrix with a full assignment to all variables from sampling or randomization.
    */
   def sampleColor(kdata: Mat, numState: Int, idInColor: IMat, pSet: Array[Mat], pMatrix: Mat, user: Mat) = {
+    //println("Inside sampleColor with numState = " + numState + " and user =\n" + user)
     val sampleMatrix = rand(idInColor.length, kdata.ncols * opts.nsampls)
+    //println("Here's the sampleMatrix:\n" + sampleMatrix)
     pSet(0) = pSet(0) / pMatrix
-    user(idInColor,?) <-- 0 * user(idInColor,?)
+    //println("pSet(0) =\n" + pSet(0))
+    //println("user(idInColor,?)=\n" + user(idInColor,?))
+    //user(idInColor,?) <-- 0 * user(idInColor,?) // THIS IS NOT THE SAME!
+    user(idInColor,?) = 0 * user(idInColor,?)
+    //println("user(idInColor,?)=\n" + user(idInColor,?))
     
     // Each time, we check to make sure it's <= pSet(i), but ALSO exceeds the previous \sum (pSet(j)).
     for (i <- 1 until numState) {
+      //println("Inside i = " + i)
       val saveID = find(statesPerNode(idInColor) > i)
       val ids = idInColor(saveID)
       val pids = find(FMat(sum(pproject(ids, ?), 1)))
+      //println("ids.t = " + ids.t)
+      //println("pids.t = " + pids.t)
       pSet(i) = (pSet(i) / pMatrix) + pSet(i-1) // Normalize and get the cumulative prob
+      //println("pSet(i) =\n" + pSet(i))
       // Use Hadamard product to ensure that both requirements are held.
+      //println("That thing we add on\n" + (sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
       user(ids, ?) = user(ids,?) + i * ((sampleMatrix(saveID, ?) <= pSet(i)(saveID, ?)) *@ (sampleMatrix(saveID, ?) >= pSet(i - 1)(saveID, ?)))
+      //if (!checkState(user)) {
+      //println(user)
+      //println("problem with loop in sampleColor(), max elem is " + maxi(maxi(user,1),2).dv)
+      //}
     }
 
     // Finally, re-write the known state into the state matrix
     val nonNegativeIndices = find(FMat(kdata) >= 0)
     for (j <- 0 until opts.nsampls) {
       user(nonNegativeIndices + j*(kdata.nrows*kdata.ncols)) <-- kdata(nonNegativeIndices)
+    }
+    if (!checkState(user)) {
+      println("problem with end of sampleColor(), max elem is " + maxi(maxi(user,1),2).dv)
     }
   }
 
@@ -350,7 +410,7 @@ object BayesNetMooc3  {
   trait Opts extends Model.Opts {
     var nsampls = 1
     var alpha = 0.1f
-    var uiter = 100
+    var uiter = 25
     var eps = 1e-9
   }
   
@@ -371,14 +431,16 @@ object BayesNetMooc3  {
     val sdata:SMat = loadSData(dataFile, nodeMap, statesPerNode)
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
-    opts.useGPU = false // Temporary TODO
     opts.dim = dag.ncols
+    opts.useGPU = false // Temporary TODO test with GPUs
     opts.batchSize = sdata.ncols // Easiest for debugging to start it as data.ncols
+    opts.power = 1f // For the IncNorm, to get moving averages
+    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
     val nn = new Learner(
         new MatDS(Array(sdata:Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
         null,
-        new IncNorm(opts),
+        new IncNorm(),
         opts)
     (nn, opts)
   } 
@@ -396,6 +458,8 @@ object BayesNetMooc3  {
     opts.useGPU = false // Temporary TODO
     opts.dim = dag.ncols
     opts.batchSize = data.ncols // Easiest for debugging to start it as data.ncols
+    opts.power = 1f // For the IncNorm, to get moving averages
+    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
     val nn = new Learner(
         new MatDS(Array(data:Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
@@ -417,6 +481,8 @@ object BayesNetMooc3  {
     opts.batchSize = 10000 // Just a "random" number for now TODO change obviously!
     opts.fnames = fnames
     implicit val threads = threadPool(4)
+    opts.power = 1f // For the IncNorm, to get moving averages
+    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
     val nn = new Learner(
         new FilesDS(opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
