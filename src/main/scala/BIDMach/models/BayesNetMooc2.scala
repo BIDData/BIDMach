@@ -246,8 +246,7 @@ object BayesNetMooc2 {
     state = rand(graph.n, batchSize)
     state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
     val innz = find(fdata >= 0)
-    state(innz) = 0
-    state(innz) = state(innz) + fdata(innz)
+    state(innz) = fdata(innz)
     if (!checkState(state)) {
       println("problem with end of initState(), max elem is " + maxi(maxi(state,1),2).dv)
     }
@@ -269,8 +268,7 @@ object BayesNetMooc2 {
       println("problem with initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
     }
     val innz = find(fdata >= 0)
-    statei(innz) = 0
-    statei(innz) = statei(innz) + fdata(innz)
+    statei(innz) = fdata(innz)
     if (!checkState(statei)) {
       println("problem with end of initStateColor(), max elem is " + maxi(maxi(statei,1),2).dv)
     }
@@ -296,7 +294,7 @@ object BayesNetMooc2 {
     if (b >= cpt.length) {
       println("ERROR! In computeP(), we have max index " + b + ", but cpt.length = " + cpt.length)
     }
-    val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + 1e-10)
+    val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + 1e-9)
     var pii = zeros(numPi, batchSize)
     pii(saveID, ?) = exp(pproject(ids, pids) * nodei)
     pSet(i) = pii
@@ -317,13 +315,11 @@ object BayesNetMooc2 {
    * @param pMatrix The matrix that represents normalizing constants for probabilities.
    */
   def sampleColor(fdata: FMat, numState: Int, idInColor: IMat, pSet: Array[FMat], pMatrix: FMat) = {
-    
     // Put inside globalPMatrices now because later we overwrite these pSet(i) matrices.
     // For this particular sampling, we are only concerned with idInColor nodes.
     for (i <- 0 until numState) {
       globalPMatrices(i)(idInColor,?) = pSet(i).copy
     }
-    
     val sampleMatrix = rand(idInColor.length, batchSize)
     pSet(0) = pSet(0) / pMatrix
     state(idInColor,?) = 0 * state(idInColor,?)
@@ -362,6 +358,7 @@ object BayesNetMooc2 {
     for (i <- 0 until nstate) {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
+    //println("(Inside updateCpt()) counts.t, before adding opts.alpha and normalizing, is\n" + counts.t)
     counts = counts + beta
     counts = counts / (normConstMatrix * counts)
     cpt = (1 - alpha) * cpt + alpha * counts
@@ -374,6 +371,24 @@ object BayesNetMooc2 {
       cptindex(?, i) = cpt(index(?, i))
     }
     cptindex
+  }
+
+  /** A debugging method to show the CPT of a node (i.e., a question or concept in the MOOC data). */
+  def showCpt(node: String) {
+    val id = nodeMap(node)
+    val np = sum(graph.dag(?, id)).v
+    val offset = cptOffset(id)
+    for (i <- 0 until math.pow(2, np).toInt) {
+      if (np > 0)
+        print(String.format("\t%" + np.toInt + "s", i.toBinaryString).replace(" ", "0"))
+    }
+    print("\n0")
+    for (i <- 0 until math.pow(2, np).toInt)
+      print("\t%.2f" format cpt(offset + i * 2))
+    print("\n1")
+    for (i <- 0 until math.pow(2, np).toInt)
+      print("\t%.2f" format cpt(offset + i * 2 + 1))
+    print("\n")
   }
 
   /** Evaluates log likelihood based on the "state" matrix. */
