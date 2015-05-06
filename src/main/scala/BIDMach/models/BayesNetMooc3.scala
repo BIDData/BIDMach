@@ -125,17 +125,19 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def mupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("Now inside mupdate")
     val numCols = size(user, 2)
+    println("Now inside mupdate with numCols = " + numCols)
     val index = IMat(cptOffset + SMat(iproject) * FMat(user))
+    println("size(index) = " + size(index) + " and index =\n" + index)
     var counts = zeros(mm.length, 1)
     for (i <- 0 until numCols) {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
-    println("counts.t, before adding opts.alpha and normalizing, is\n" + counts.t)
+    println("counts.t, before adding opts.alpha and normalizing, is\n" + counts.t + "\nOur updatemats(0).t is:")
     counts = counts + opts.alpha
     modelmats(0) <-- mm
     updatemats(0) <-- counts / (normConstMatrix * counts)
+    println((counts / (normConstMatrix*counts)).t)
   }
   
   /** 
@@ -158,12 +160,12 @@ class BayesNetMooc3(val dag:Mat,
    * @return The log likelihood of the data.
    */
   def evalfun(sdata: Mat, user: Mat) : FMat = {
-    val a = cptOffset + IMat(iproject * user)
+    val a = cptOffset + IMat(SMat(iproject) * FMat(user))
     val b = maxi(maxi(a,1),2).dv
     if (b >= mm.length) {
       println("ERROR! In eval(), we have max index " + b + ", but cpt.length = " + mm.length)
     }
-    val index = IMat(cptOffset + iproject * user)
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
     val ll = sum(sum(ln(getCpt(index))))
     return ll.dv
   }
@@ -178,6 +180,7 @@ class BayesNetMooc3(val dag:Mat,
    * @param here The total number of elements seen so far, including the ones in this current batch.
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+    println("Inside dobatch() with ipass = " + ipass + " and our modelmats(0), i.e., the cpt, as (transposed):\n" + modelmats(0).t)
     val sdata = mats(0)
     var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
     if (!checkState(state)) {
@@ -204,9 +207,8 @@ class BayesNetMooc3(val dag:Mat,
     }
     uupdate(kdata, state, ipass)
     mupdate(kdata, state, ipass)
-    
-    println("We just finished the first call to dobatch(), with uupdate() and mupdate() done.")
-    sys.exit
+    println("We just finished a call to dobatch() (with uupdate() and mupdate() done).")
+    println("log likelihood is: " + evalfun(kdata, state))
   }
 
   /**
@@ -218,10 +220,16 @@ class BayesNetMooc3(val dag:Mat,
    * @return The log likelihood of the data on this datasource segment (i.e., sdata).
    */
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+    println("Inside evalbatch, right now nothing here because we're just debugging")
+    return 1f
+    /*
+    println("\n\nALERT ALERT ALERT WE ARE IN EVALBATCH WHICH WE SHOULD NOT BE IN (note: just a debugging warning)\n\n")
     val sdata = mats(0)
     val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
     uupdate(sdata, user, ipass)
     evalfun(sdata, user)
+    * *
+    */
   }
 
   /**
@@ -402,7 +410,7 @@ object BayesNetMooc3  {
         new MatDS(Array(sdata:Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
         null,
-        new IncNorm(),
+        new IncNorm(opts),
         opts)
     (nn, opts)
   } 
