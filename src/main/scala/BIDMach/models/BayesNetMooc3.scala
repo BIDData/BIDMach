@@ -397,6 +397,9 @@ object BayesNetMooc3  {
     val (statesPerNode, nodeMap) = loadStateSize(statesPerNodeFile)
     val dag:SMat = loadDag(dagFile, nodeMap, statesPerNode.length)
     val sdata:SMat = loadSData(dataFile, nodeMap, statesPerNode)
+    saveSMat("dag.lz4", dag)
+    saveSMat("sdata.lz4", sdata)
+    saveIMat("statesPerNode.lz4", statesPerNode)
 
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
@@ -519,15 +522,14 @@ object BayesNetMooc3  {
   /**
    * Loads the data and stores the training samples in 'sdata'. 
    *
-   * The path refers to a text file that consists of six columns: 
+   * The path refers to a text file that consists of five columns: 
    * 
    *  - Column 1 is the line's hash
-   *  - Column 2 is the student number
-   *  - Column 3 is the question number 
-   *  - Column 4 indicates the "value" of the student/question pair (0/1 in MOOC data, but in general,
+   *  - Column 2 is the question number 
+   *  - Column 3 indicates the "value" of the student/question pair (0/1 in MOOC data, but in general,
    *        should be {0,1,...,k})
-   *  - Column 5 is the concept ID
-   *  - Column 6 is a 0/1 to indicate testing/traiing, respectively.
+   *  - Column 4 is the concept ID
+   *  - Column 5 is a 0/1 to indicate testing/traiing, respectively.
    * 
    * In general, the data will still be sparse because a 0 indicates an unknown value, but later, we
    * do full(data)-1 to make -1 as the unkonwns. But here, have 0 as the unknown value.
@@ -563,16 +565,16 @@ object BayesNetMooc3  {
         sMap += (shash -> sid)
         sid = sid + 1
       }
-      if (t(5) == "1") {
+      if (t(4) == "1") {
         // only add this if we have never seen the pair
         val a = sMap(shash)
-        val b = nodeMap("I"+t(2))
+        val b = nodeMap("I"+t(1))
         if (!(coordinatesMap contains (a,b))) {
           coordinatesMap += ((a,b) -> 1)
           row(ptr) = a
           col(ptr) = b
-          // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
-          v(ptr) = t(3).toFloat+1
+          // Originally for binary data, this was: v(ptr) = (t(2).toFloat - 0.5) * 2
+          v(ptr) = t(2).toFloat+1
           ptr = ptr + 1
         }
       }
