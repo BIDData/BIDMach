@@ -251,7 +251,7 @@ case class ParLearner(
     val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
-	      if (i != thisGPU) connect(i)
+//	      if (i != thisGPU) connect(i)
 	    }
 	  }    
     @volatile var done = iones(opts.nthreads, 1)
@@ -361,7 +361,7 @@ case class ParLearner(
     Mat.useCache = cacheState
     if (useGPU) {
     	for (i <- 0 until opts.nthreads) {
-    		if (i != thisGPU) disconnect(i);
+ //   		if (i != thisGPU) disconnect(i);
     	}
     } 
     if (opts.autoReset) {
