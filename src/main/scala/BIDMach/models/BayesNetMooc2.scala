@@ -56,7 +56,7 @@ object BayesNetMooc2 {
   var llikelihood = 0f
   var alpha = 1f
   var beta = 0.1f
-  var verbose = false
+  var verbose = true
 
   /**
    * Set up paths and variables. Then sample. 
@@ -188,6 +188,8 @@ object BayesNetMooc2 {
       }
       llikelihood = 0f
     }
+    println("After our sampling, here is the cpt (in row-vector form):\n" + cpt.t)
+    saveFMat("cpt_BNM2_400iters.lz4", cpt)
   }
 
   /** 
@@ -358,7 +360,6 @@ object BayesNetMooc2 {
     for (i <- 0 until nstate) {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
-    //println("(Inside updateCpt()) counts.t, before adding opts.alpha and normalizing, is\n" + counts.t)
     counts = counts + beta
     counts = counts / (normConstMatrix * counts)
     cpt = (1 - alpha) * cpt + alpha * counts
