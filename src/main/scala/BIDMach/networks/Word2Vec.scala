@@ -131,7 +131,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   def wordMats(mats:Array[Mat], ipass:Int, pos:Long):(Mat, Mat, Mat, Mat, Mat) = {
   
     val wordsens = mats(0);
-    val words = wordsens(0,?);
+    val words = if (opts.iflip) wordsens(1,?) else wordsens(0,?);
     val wgood = words < opts.vocabSize;                                        // Find OOV words 
     addTime(1);
     
@@ -147,7 +147,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val lbrand = - ubrand;
     addTime(3);
     
-    val sentencenum = wordsens(1,?);                                           // Get the nearest sentence boundaries
+    val sentencenum = if (opts.iflip) wordsens(0,?) else wordsens(1,?);        // Get the nearest sentence boundaries
     val lbsentence = - cumsumByKey(allones, sentencenum) + 1;
     val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
     val lb = max(lbrand, lbsentence);                                          // Combine the bounds
@@ -259,6 +259,39 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
       }
     }
+  }
+  
+  def trailingZeros(a:Long):Int = {
+    var aa = a;
+    var nz = 0;
+    while ((aa & 1L) == 0) {
+      aa = aa >> 1;
+      nz += 1;
+    }
+    nz
+  }
+  
+  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long):Unit = {
+    val headlen = math.max(opts.headlen, opts.headlen << trailingZeros(istep));
+    val mlen = models(0).modelmats.length;
+    val thisGPU = getGPU;
+    val modj = new Array[Mat](models.length);
+    for (j <- 0 until mlen) {
+      val mmj = mm(j).view(mm(j).nrows, math.min(mm(j).ncols, headlen));
+      mmj.clear
+      for (i <- 0 until models.length) {
+        if (useGPU && i < Mat.hasCUDA) setGPU(i);
+        modj(i) = models(i).modelmats(j).view(models(i).modelmats(j).nrows, math.min(models(i).modelmats(j).ncols, headlen));
+        val umj = um(j).view(um(j).nrows, math.min(um(j).ncols, headlen));
+        umj <-- modj(i)
+        mmj ~ mmj + umj;
+      }
+      mmj ~ mmj * (1f/models.length);
+      for (i <- 0 until models.length) {
+        modj(i) <-- mmj;
+      }
+    }
+    setGPU(thisGPU);
   }
 
   def procPosCPU(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
@@ -551,6 +584,8 @@ object Word2Vec  {
     var vocabSize = 100000;
     var wexpt = 0.75f;
     var wsample = 1e-4f;
+    var headlen = 10000;
+    var iflip = false;
   }
   
   class Options extends Opts {}
