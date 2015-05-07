@@ -641,21 +641,59 @@ object BayesNetMooc2 {
    * know the training and testing split.
    * 
    * @param path The path to the sdata_new.txt file, assuming that's what we're using.
-   * @param ratio A number between 0 and 1 to indicate the train/testing split.
+   * @param ratio A number between 0 and 1 to indicate the testing/training split.
    * @param fileName The name to call the file that has extra 1s and 0s at the end.
    */
   def splitTrainTest(path: String, ratio: Double, fileName: String) = {
     var lines = scala.io.Source.fromFile(path).getLines
     val writer: PrintWriter = new PrintWriter(fileName)
-    for(l <- lines) {
+    for (l <- lines) {
       val r = math.random
-      if(r < ratio) {
+      if (r < ratio) {
         writer.println(l + ",1")}
       else {
         writer.println(l + ",0")
       }
     }
     writer.close
+  }
+
+  /**
+   * A new debug method to split the 'sdata' file into training and testing, but this time, we are
+   * splitting the data based on columns, which are students in the MOOC case. This way, it is like
+   * we are predicting on unknown STUDENTS, and not just unknown (student, question) pairs. Also,
+   * I'm doing a sys.exit after this because this should be like a one-time thing where we run it
+   * once to make the data, then never call it again (unless we want newly-generated data).
+   * 
+   * @param path The path to the sdata.txt file, assuming that's what we're using. For now, let's 
+   *    assume there is NO last column that is 0/1 to indicate a test/train.
+   * @param ratio A number between 0 and 1 to indicate the testing/training split. If it's 0.8, that
+   *    means 80% of the students will be assigned to the training set.
+   * @param fileName The name to call the file that has extra 1s and 0s at the end.
+   */ 
+  def splitDataStudent(path: String, ratio: Double, fileName: String) {
+    var lines = scala.io.Source.fromFile(path).getLines
+    val writer: PrintWriter = new PrintWriter(fileName)
+    // Map from student hash to 0 (=testing) or 1 (=training)
+    var sMap = new scala.collection.mutable.HashMap[String, Int]()
+    for (l <- lines) {
+      var t = l.split(",")
+      val shash = t(0)
+      if (!(sMap contains shash)) {
+        val r = math.random
+        if (r < ratio) {
+          sMap += (shash -> 1) // Training
+        } else {
+          sMap += (shash -> 0)
+        }
+      }
+      if (sMap(shash) == 0) {
+        writer.println(l + ",0") 
+      } else {
+        writer.println(l + ",1")  // Training 
+      }
+    }
+    writer.close   
   }
   
   /** A debugging method to print matrices, without being constrained by the command line's cropping. */
