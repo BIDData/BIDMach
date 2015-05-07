@@ -631,7 +631,7 @@ object Word2Vec  {
     (nn, opts)
   }
   
-    def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
+  def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
     val model = model0.asInstanceOf[Word2Vec];
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
@@ -655,7 +655,27 @@ object Word2Vec  {
     (nn, opts)
   }
   
-  def predictor(model0:Model, mat0:Mat):(Learner, LearnOptions) = predictor(model0, mat0, null)
+   def predictor(model0:Model, mat0:Mat):(Learner, LearnOptions) = {
+    val model = model0.asInstanceOf[Word2Vec];
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)    
+    val newmod = new Word2Vec(opts);
+    newmod.refresh = false;
+    newmod.copyFrom(model);
+    val mopts = model.opts.asInstanceOf[Word2Vec.Opts];
+    opts.dim = mopts.dim;
+    opts.vocabSize = mopts.vocabSize;
+    opts.nskip = mopts.nskip;
+    opts.nneg = mopts.nneg;
+    opts.nreuse = mopts.nreuse;
+    val nn = new Learner(
+        new MatDS(Array(mat0), opts), 
+        newmod, 
+        null,
+        null, 
+        opts);
+    (nn, opts)
+  }
   
   class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts;
   
