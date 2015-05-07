@@ -77,6 +77,61 @@ class BayesNetMooc3(val dag:Mat,
   }
 
   /**
+   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
+   * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
+   * The point of this method is to compute an update for the updater to improve the mm (the cpt here).
+   * Also note that we are randomizing the state/user matrix here, which is like initializing an assignment
+   * to the variables, which (ideally) should only be done if ipass = 0.
+   * 
+   * @param mats An array of matrices representing a segment of the original data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The total number of elements seen so far, including the ones in this current batch.
+   */
+  def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+    val sdata = mats(0)
+    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
+    if (opts.useGPU && Mat.hasCUDA > 0) {
+      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) // TODO Why is GMat not working?
+    } else {
+      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
+    }
+
+    // Create and use kdata which is sdata-1, since we want -1 to represent an unknown value.
+    val kdata = if (opts.useGPU && Mat.hasCUDA > 0) {
+      GMat(sdata.copy) - 1
+    } else {
+      FMat(sdata.copy) - 1
+    }
+    val nonNegativeIndices = find(FMat(kdata) >= 0)
+    for (i <- 0 until opts.nsampls) {
+      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
+    }
+
+    uupdate(kdata, state, ipass)
+    mupdate(kdata, state, ipass)
+  }
+
+  /**
+   * Does a uupdate/evalfun on a datasource segment, called from evalbatchg() in Model.scala.
+   * EDIT: do we even want a uupdate call? TODO Should finish this implementaiton.
+   * 
+   * @param mats An array of matrices representing a segment of the original data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The total number of elements seen so far, including the ones in this current batch.
+   * @return The log likelihood of the data on this datasource segment (i.e., sdata).
+   */
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+    println("Inside evalbatch, right now nothing here (debugging) but later we'll report a score.")
+    return 1f
+    /*
+    val sdata = mats(0)
+    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
+    uupdate(sdata, user, ipass)
+    evalfun(sdata, user)
+    */
+  }
+
+  /**
    * Performs a complete, parallel Gibbs sampling over the color groups, for opts.uiter iterations over 
    * the current batch of data. For a given color group, we need to know the maximum state number. The
    * sampling process will assign new values to the "user" matrix.
@@ -89,10 +144,13 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("At the start of uupdate. Our user matrix (i.e., \"state\") has size " + size(user) + " and contents:\n" + user)
-    for (k <- 0 until opts.uiter) {
-      println("Inside uupdate, Gibbs iteration number " + k)
-      for(c <- 0 until graph.ncolors){
+    var numGibbsIterations = opts.samplingRate
+    if (ipass == 0) {
+      numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
+    }
+    for (k <- 0 until numGibbsIterations) {
+      println("In uupdate, Gibbs iteration " + k)
+      for (c <- 0 until graph.ncolors) {
         val idInColor = find(graph.colors == c)
         val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
         var stateSet = new Array[Mat](numState)
@@ -107,15 +165,14 @@ class BayesNetMooc3(val dag:Mat,
         }
         sampleColor(kdata, numState, idInColor, pSet, pMatrix, user)
       } 
+      updateCPT(user)
     } 
   }
   
   /**
-   * After one full round of Gibbs sampling iterations, update and normalize a new CPT that then gets
-   * passed in as an updater to update the true model matrix (i.e., the actual CPT we get as output).
-   * Note here that we don't (usually) insert the normalized counts into updatemats(0) directly, because
-   * of issues relating to the last batch of the data, which does not have as much information and
-   * should not be directly used as input to the moving average.
+   * After one full round of Gibbs sampling iterations, we put in the local cpt, mm, into the updatemats(0)
+   * value so that it gets "averaged into" the global cpt, modelmats(0). The reason for doing this is that
+   * it is like thinning the samples so we pick every n-th one, where n is an opts parameter.
    * 
    * @param kdata A data matrix of this batch where a -1 indicates an unknown value, and {0,1,...,k} are
    *    the known values. Each row represents a random variable.
@@ -125,18 +182,9 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def mupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("Now inside mupdate")
-    val numCols = size(user, 2)
-    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
-    var counts = zeros(mm.length, 1)
-    for (i <- 0 until numCols) {
-      counts(index(?, i)) = counts(index(?, i)) + 1
-    }
-    println("counts.t, before adding opts.alpha and normalizing, is\n" + counts.t)
-    counts = counts + opts.alpha
-    modelmats(0) <-- mm
-    updatemats(0) <-- counts / (normConstMatrix * counts)
-  }
+    println("In mupdate, mm(0 until 100).t=\n" + mm(0 until 100))
+    updatemats(0) <-- mm
+  } 
   
   /** 
    * Evaluates the log likelihood of this datasource segment (i.e., sdata). 
@@ -158,70 +206,29 @@ class BayesNetMooc3(val dag:Mat,
    * @return The log likelihood of the data.
    */
   def evalfun(sdata: Mat, user: Mat) : FMat = {
-    val a = cptOffset + IMat(iproject * user)
+    val a = cptOffset + IMat(SMat(iproject) * FMat(user))
     val b = maxi(maxi(a,1),2).dv
-    if (b >= mm.length) {
-      println("ERROR! In eval(), we have max index " + b + ", but cpt.length = " + mm.length)
-    }
-    val index = IMat(cptOffset + iproject * user)
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
     val ll = sum(sum(ln(getCpt(index))))
     return ll.dv
   }
-  
-  /**
-   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
-   * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
-   * The point of this method is to compute an update for the updater to improve the mm (the cpt here).
-   * 
-   * @param mats An array of matrices representing a segment of the original data.
-   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
-   * @param here The total number of elements seen so far, including the ones in this current batch.
-   */
-  def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-    val sdata = mats(0)
-    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
-    if (!checkState(state)) {
-      println("problem with start of initState(), max elem is " + maxi(maxi(state,1),2).dv)
-    }
-    if (opts.useGPU && Mat.hasCUDA > 0) {
-      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) // TODO Why is GMat not working?
-    } else {
-      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
-    }
-
-    // Create and use kdata which is sdata-1, since we want -1 to represent an unknown value.
-    val kdata = if (opts.useGPU && Mat.hasCUDA > 0) {
-      GMat(sdata.copy) - 1
-    } else {
-      FMat(sdata.copy) - 1
-    }
-    val nonNegativeIndices = find(FMat(kdata) >= 0)
-    for (i <- 0 until opts.nsampls) {
-      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
-    }
-    if (!checkState(state)) {
-      println("problem with end of initState(), max elem is " + maxi(maxi(state,1),2).dv)
-    }
-    uupdate(kdata, state, ipass)
-    mupdate(kdata, state, ipass)
-    
-    println("We just finished the first call to dobatch(), with uupdate() and mupdate() done.")
-    sys.exit
-  }
 
   /**
-   * Does a uupdate/evalfun on a datasource segment, called from evalbatchg() in Model.scala.
+   * Method to update the cpt table (i.e. mm). This method is called after we finish one iteration of Gibbs 
+   * sampling. And this method only updates the local cpt table (mm), it has nothing to do with the learner's 
+   * cpt parameter (which is modelmats(0)).
    * 
-   * @param mats An array of matrices representing a segment of the original data.
-   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
-   * @param here The total number of elements seen so far, including the ones in this current batch.
-   * @return The log likelihood of the data on this datasource segment (i.e., sdata).
+   * @param user The state matrix, updated after the sampling.
    */
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-    val sdata = mats(0)
-    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    evalfun(sdata, user)
+  def updateCPT(user: Mat): Unit = {
+    val numCols = size(user, 2)
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
+    var counts = zeros(mm.length, 1)
+    for (i <- 0 until numCols) {
+      counts(index(?, i)) = counts(index(?, i)) + 1
+    }
+    counts = counts + opts.alpha  
+    mm = (1 - opts.alpha) * mm + counts / (normConstMatrix * counts)
   }
 
   /**
@@ -302,9 +309,6 @@ class BayesNetMooc3(val dag:Mat,
     for (j <- 0 until opts.nsampls) {
       user(nonNegativeIndices + j*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
     }
-    if (!checkState(user)) {
-      println("problem with end of sampleColor(), max elem is " + maxi(maxi(user,1),2).dv)
-    }
   }
 
   /**
@@ -371,9 +375,11 @@ object BayesNetMooc3  {
   
   trait Opts extends Model.Opts {
     var nsampls = 1
-    var alpha = 0.1f
-    var uiter = 25
+    var alpha = 1f
+    var beta = 0.1f
+    var samplingRate = 10
     var eps = 1e-9
+    var numSamplesBurn = 20
   }
   
   class Options extends Opts {}
@@ -391,18 +397,22 @@ object BayesNetMooc3  {
     val (statesPerNode, nodeMap) = loadStateSize(statesPerNodeFile)
     val dag:SMat = loadDag(dagFile, nodeMap, statesPerNode.length)
     val sdata:SMat = loadSData(dataFile, nodeMap, statesPerNode)
+
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
     opts.dim = dag.ncols
-    opts.useGPU = false // Temporary TODO test with GPUs
-    opts.batchSize = sdata.ncols // Easiest for debugging to start it as data.ncols
-    opts.power = 1f // For the IncNorm, to get moving averages
-    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
+    opts.useGPU = false     // Temporary TODO test with GPUs, delete this line later
+    opts.batchSize = 1000
+    opts.updateAll = true   // If not, then the averaging process in IncNorm isn't uniform
+    opts.power = 1f         // For the IncNorm, to get moving averages
+    opts.isprob = false     // Because our cpts should NOT be normalized across their one column (lol).
+    opts.putBack = 1        // Important! This will keep the various "user" matrices to carry their states over
+
     val nn = new Learner(
-        new MatDS(Array(sdata:Mat), opts),
+        new MatDS(Array(sdata:Mat, ones(sdata.nrows,sdata.ncols):Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
         null,
-        new IncNorm(),
+        new IncNorm(opts),
         opts)
     (nn, opts)
   } 
@@ -413,15 +423,12 @@ object BayesNetMooc3  {
    * val (nn,opts) = BayesNetMooc3.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
    * 
    * though this obviously depends on differences in directory structure.
+   * 
+   * Note: do not use this for now; use the learner with the files data sources.
    */
   def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
-    opts.useGPU = false // Temporary TODO
-    opts.dim = dag.ncols
-    opts.batchSize = data.ncols // Easiest for debugging to start it as data.ncols
-    opts.power = 1f // For the IncNorm, to get moving averages
-    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
     val nn = new Learner(
         new MatDS(Array(data:Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
@@ -430,35 +437,11 @@ object BayesNetMooc3  {
         opts)
     (nn, opts)
   }
-  
-  /**
-   * A learner with a files data source, with states per node, and with a dag prepared for us.
-   * This has not been tested yet.
-   */
-  /*
-  def learner(fnames:List[(Int)=>String], statesPerNode:Mat, dag:Mat) {
-    class xopts extends Learner.Options with BayesNetMooc3.Opts with FilesDS.Opts with IncNorm.Opts 
-    val opts = new xopts
-    opts.dim = dag.ncols
-    opts.batchSize = 10000 // Just a "random" number for now TODO change obviously!
-    opts.fnames = fnames
-    implicit val threads = threadPool(4)
-    opts.power = 1f // For the IncNorm, to get moving averages
-    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
-    val nn = new Learner(
-        new FilesDS(opts),
-        new BayesNetMooc3(dag, statesPerNode, opts),
-        null,
-        new IncNorm(opts),
-        opts)
-    (nn, opts)   
-  }
-  * 
-  */
-  
+ 
   // ---------------------------------------------------------------------- //
   // Other non-learner methods, such as those that manage data input/output //
   
+  /*
   // TODO Check if this is what we want/need. We may need something like this if we're sticking with 'user'.
   def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {
     val out = a match {
@@ -470,6 +453,7 @@ object BayesNetMooc3  {
     out.set(ival)
     out
   }
+  */
   
   /**
    * Loads the size of state to create state size array: statesPerNode. In the input file, each line
@@ -533,15 +517,14 @@ object BayesNetMooc3  {
   /**
    * Loads the data and stores the training samples in 'sdata'. 
    *
-   * The path refers to a text file that consists of six columns: 
+   * The path refers to a text file that consists of five columns: 
    * 
    *  - Column 1 is the line's hash
-   *  - Column 2 is the student number
-   *  - Column 3 is the question number 
-   *  - Column 4 indicates the "value" of the student/question pair (0/1 in MOOC data, but in general,
+   *  - Column 2 is the question number 
+   *  - Column 3 indicates the "value" of the student/question pair (0/1 in MOOC data, but in general,
    *        should be {0,1,...,k})
-   *  - Column 5 is the concept ID
-   *  - Column 6 is a 0/1 to indicate testing/traiing, respectively.
+   *  - Column 4 is the concept ID
+   *  - Column 5 is a 0/1 to indicate testing/traiing, respectively.
    * 
    * In general, the data will still be sparse because a 0 indicates an unknown value, but later, we
    * do full(data)-1 to make -1 as the unkonwns. But here, have 0 as the unknown value.
@@ -577,16 +560,16 @@ object BayesNetMooc3  {
         sMap += (shash -> sid)
         sid = sid + 1
       }
-      if (t(5) == "1") {
+      if (t(4) == "1") {
         // only add this if we have never seen the pair
         val a = sMap(shash)
-        val b = nodeMap("I"+t(2))
+        val b = nodeMap("I"+t(1))
         if (!(coordinatesMap contains (a,b))) {
           coordinatesMap += ((a,b) -> 1)
           row(ptr) = a
           col(ptr) = b
-          // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
-          v(ptr) = t(3).toFloat+1
+          // Originally for binary data, this was: v(ptr) = (t(2).toFloat - 0.5) * 2
+          v(ptr) = t(2).toFloat+1
           ptr = ptr + 1
         }
       }
