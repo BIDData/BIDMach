@@ -162,13 +162,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     
     rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
     randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1.
-    var vv:Mat = null;
-    var ii:Mat = null;
-    opts.synchronized {
-    	val (vv0, ii0) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
-    	vv = vv0;
-    	ii = ii0;
-    }
+    val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
     val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
     val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
     val cwi = cwords(ii);
@@ -637,8 +631,8 @@ object Word2Vec  {
     (nn, opts)
   }
   
-  def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
-    val model = model0.asInstanceOf[DNN];
+    def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
+    val model = model0.asInstanceOf[Word2Vec];
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mat0.asInstanceOf[AnyRef] != null) opts.putBack = 1;
