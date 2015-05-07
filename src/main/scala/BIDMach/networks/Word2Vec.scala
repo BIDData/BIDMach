@@ -272,17 +272,17 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   }
   
   override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long):Unit = {
-    val headlen = math.max(opts.headlen, opts.headlen << trailingZeros(istep));
+    val headlen = if (istep > 0) math.max(opts.headlen, opts.headlen << trailingZeros(istep)) else 0;
     val mlen = models(0).modelmats.length;
     val thisGPU = getGPU;
     val modj = new Array[Mat](models.length);
     for (j <- 0 until mlen) {
-      val mmj = mm(j).view(mm(j).nrows, math.min(mm(j).ncols, headlen));
+      val mmj = if (headlen > 0) mm(j).view(mm(j).nrows, math.min(mm(j).ncols, headlen)) else mm(j);
       mmj.clear
       for (i <- 0 until models.length) {
         if (useGPU && i < Mat.hasCUDA) setGPU(i);
-        modj(i) = models(i).modelmats(j).view(models(i).modelmats(j).nrows, math.min(models(i).modelmats(j).ncols, headlen));
-        val umj = um(j).view(um(j).nrows, math.min(um(j).ncols, headlen));
+        modj(i) = if (headlen > 0) models(i).modelmats(j).view(models(i).modelmats(j).nrows, math.min(models(i).modelmats(j).ncols, headlen)) else models(i).modelmats(j);
+        val umj = if (headlen > 0) um(j).view(um(j).nrows, math.min(um(j).ncols, headlen)) else um(j);
         umj <-- modj(i)
         mmj ~ mmj + umj;
       }

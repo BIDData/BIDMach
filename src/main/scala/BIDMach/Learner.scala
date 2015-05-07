@@ -233,6 +233,7 @@ case class ParLearner(
     	mm(i) = zeros(mm0.nrows, mm0.ncols)
     	um(i) = zeros(mm0.nrows, mm0.ncols)
     }
+    ParLearner.syncmodels(models, mm, um, 0, useGPU)
   }
   
   def train = {
