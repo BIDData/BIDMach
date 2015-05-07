@@ -80,7 +80,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     mmnorm ~ mm dotr mm;
   }
   
-  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat]) = {}
+  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long) = {}
   
   override def mergeModelPassFn(models:Array[Model], mmx:Array[Mat], umx:Array[Mat], ipass:Int) = {
     val nmodels = models.length;
