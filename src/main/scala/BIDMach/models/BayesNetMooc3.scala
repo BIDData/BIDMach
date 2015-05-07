@@ -80,14 +80,14 @@ class BayesNetMooc3(val dag:Mat,
    * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
    * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
    * The point of this method is to compute an update for the updater to improve the mm (the cpt here).
+   * Also note that we are randomizing the state/user matrix here, which is like initializing an assignment
+   * to the variables, which (ideally) should only be done if ipass = 0.
    * 
    * @param mats An array of matrices representing a segment of the original data.
    * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
    * @param here The total number of elements seen so far, including the ones in this current batch.
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-    println("\nInside dobatch() with ipass = " + ipass)
-    println("Our modelmats is...\n" + (modelmats(0)(0 until 100)))
     val sdata = mats(0)
     var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
     if (opts.useGPU && Mat.hasCUDA > 0) {
@@ -144,7 +144,11 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    for (k <- 0 until opts.samplingRate) {
+    var numGibbsIterations = opts.samplingRate
+    if (ipass == 0) {
+      numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
+    }
+    for (k <- 0 until numGibbsIterations) {
       println("In uupdate, Gibbs iteration " + k)
       for (c <- 0 until graph.ncolors) {
         val idInColor = find(graph.colors == c)
@@ -373,8 +377,9 @@ object BayesNetMooc3  {
     var nsampls = 1
     var alpha = 1f
     var beta = 0.1f
-    var samplingRate = 20
+    var samplingRate = 10
     var eps = 1e-9
+    var numSamplesBurn = 20
   }
   
   class Options extends Opts {}
@@ -392,14 +397,16 @@ object BayesNetMooc3  {
     val (statesPerNode, nodeMap) = loadStateSize(statesPerNodeFile)
     val dag:SMat = loadDag(dagFile, nodeMap, statesPerNode.length)
     val sdata:SMat = loadSData(dataFile, nodeMap, statesPerNode)
+
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
     opts.dim = dag.ncols
-    opts.useGPU = false // Temporary TODO test with GPUs
-    opts.batchSize = 800
-    opts.updateAll = true
-    opts.power = 1f // For the IncNorm, to get moving averages
-    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
+    opts.useGPU = false     // Temporary TODO test with GPUs, delete this line later
+    opts.batchSize = 1000
+    opts.updateAll = true   // If not, then the averaging process in IncNorm isn't uniform
+    opts.power = 1f         // For the IncNorm, to get moving averages
+    opts.isprob = false     // Because our cpts should NOT be normalized across their one column (lol).
+
     val nn = new Learner(
         new MatDS(Array(sdata:Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
