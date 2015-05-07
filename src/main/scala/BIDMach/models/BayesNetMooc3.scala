@@ -77,6 +77,61 @@ class BayesNetMooc3(val dag:Mat,
   }
 
   /**
+   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
+   * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
+   * The point of this method is to compute an update for the updater to improve the mm (the cpt here).
+   * 
+   * @param mats An array of matrices representing a segment of the original data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The total number of elements seen so far, including the ones in this current batch.
+   */
+  def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+    println("\nInside dobatch() with ipass = " + ipass)
+    println("Our modelmats is...\n" + (modelmats(0)(0 until 100)))
+    val sdata = mats(0)
+    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
+    if (opts.useGPU && Mat.hasCUDA > 0) {
+      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) // TODO Why is GMat not working?
+    } else {
+      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
+    }
+
+    // Create and use kdata which is sdata-1, since we want -1 to represent an unknown value.
+    val kdata = if (opts.useGPU && Mat.hasCUDA > 0) {
+      GMat(sdata.copy) - 1
+    } else {
+      FMat(sdata.copy) - 1
+    }
+    val nonNegativeIndices = find(FMat(kdata) >= 0)
+    for (i <- 0 until opts.nsampls) {
+      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
+    }
+
+    uupdate(kdata, state, ipass)
+    mupdate(kdata, state, ipass)
+  }
+
+  /**
+   * Does a uupdate/evalfun on a datasource segment, called from evalbatchg() in Model.scala.
+   * EDIT: do we even want a uupdate call? TODO Should finish this implementaiton.
+   * 
+   * @param mats An array of matrices representing a segment of the original data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The total number of elements seen so far, including the ones in this current batch.
+   * @return The log likelihood of the data on this datasource segment (i.e., sdata).
+   */
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+    println("Inside evalbatch, right now nothing here (debugging) but later we'll report a score.")
+    return 1f
+    /*
+    val sdata = mats(0)
+    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
+    uupdate(sdata, user, ipass)
+    evalfun(sdata, user)
+    */
+  }
+
+  /**
    * Performs a complete, parallel Gibbs sampling over the color groups, for opts.uiter iterations over 
    * the current batch of data. For a given color group, we need to know the maximum state number. The
    * sampling process will assign new values to the "user" matrix.
@@ -89,10 +144,9 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("At the start of uupdate. Our user matrix (i.e., \"state\") has size " + size(user) + " and contents:\n" + user)
-    for (k <- 0 until opts.uiter) {
-      println("Inside uupdate, Gibbs iteration number " + k)
-      for(c <- 0 until graph.ncolors){
+    for (k <- 0 until opts.samplingRate) {
+      println("In uupdate, Gibbs iteration " + k)
+      for (c <- 0 until graph.ncolors) {
         val idInColor = find(graph.colors == c)
         val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
         var stateSet = new Array[Mat](numState)
@@ -107,15 +161,14 @@ class BayesNetMooc3(val dag:Mat,
         }
         sampleColor(kdata, numState, idInColor, pSet, pMatrix, user)
       } 
+      updateCPT(user)
     } 
   }
   
   /**
-   * After one full round of Gibbs sampling iterations, update and normalize a new CPT that then gets
-   * passed in as an updater to update the true model matrix (i.e., the actual CPT we get as output).
-   * Note here that we don't (usually) insert the normalized counts into updatemats(0) directly, because
-   * of issues relating to the last batch of the data, which does not have as much information and
-   * should not be directly used as input to the moving average.
+   * After one full round of Gibbs sampling iterations, we put in the local cpt, mm, into the updatemats(0)
+   * value so that it gets "averaged into" the global cpt, modelmats(0). The reason for doing this is that
+   * it is like thinning the samples so we pick every n-th one, where n is an opts parameter.
    * 
    * @param kdata A data matrix of this batch where a -1 indicates an unknown value, and {0,1,...,k} are
    *    the known values. Each row represents a random variable.
@@ -125,91 +178,9 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def mupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    val numCols = size(user, 2)
-    println("Now inside mupdate with numCols = " + numCols)
-    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
-    println("size(index) = " + size(index) + " and index =\n" + index)
-    var counts = zeros(mm.length, 1)
-    for (i <- 0 until numCols) {
-      counts(index(?, i)) = counts(index(?, i)) + 1
-    }
-    println("counts.t, before adding opts.alpha and normalizing, is\n" + counts.t + "\nOur updatemats(0).t is:")
-    counts = counts + opts.alpha
-    modelmats(0) <-- mm
-    updatemats(0) <-- counts / (normConstMatrix * counts)
-    println((counts / (normConstMatrix*counts)).t)
-  }
-  
-
-
-  /*---------------------------------------------------------------------------------------------------*/
-  /*--------------------------------------Things I changed --------------------------------------------*/
-  /*---------------------------------------------------------------------------------------------------*/
-  /**
-   * method to update the cpt table (i.e. mm). This method is called after we finish one iteration of gibbs 
-   * sampling. And this method only update the local cpt table, it has nothing to with the leaner's updating
-   * parameters.
-   * @param user: the state matrix, updated after the sampling. 
-   */
-  def updateCPT(user: Mat): Unit = {
-    val numCols = size(user, 2)
-    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
-    var counts = zeros(mm.length, 1)
-    for (i <- 0 until numCols) {
-      counts(index(?, i)) = counts(index(?, i)) + 1
-    }
-    println("counts.t, before adding opts.alpha and normalizing, is\n" + counts.t)
-    counts = counts + opts.alpha  
-    mm =  (1 - opts.alpha) * mm + counts / (normConstMatrix * counts)
-  }
-
-
-  /** 
-   * The revised uupdate method, which gets a batch of input data and state, does  gibbs sampling for opts.uiter 
-   * iterations. For each iteration, it will update the CPT table (i.e. mm). The input parameters are the same as
-   * the old uupdate method. 
-   *
-   * QUESTION: Daniel, I am thinking of more parallel of the sampling, the for loop for each colors can be 
-   * done parallely, but I am not sure it is possible to do something like parallel for in the BIDMach framework.
-   */
-
-  def uupdate2(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("At the start of uupdate. Our user matrix (i.e., \"state\") has size " + size(user) + " and contents:\n" + user)
-    for (k <- 0 until opts.uiter) {
-      println("Inside uupdate, Gibbs iteration number " + k)
-      for(c <- 0 until graph.ncolors){
-        val idInColor = find(graph.colors == c)
-        val numState = IMat(maxi(maxi(statesPerNode(idInColor),1),2)).v
-        var stateSet = new Array[Mat](numState)
-        var pSet = new Array[Mat](numState)
-        var pMatrix = zeros(idInColor.length, kdata.ncols * opts.nsampls)
-        for (i <- 0 until numState) {
-          val saveID = find(statesPerNode(idInColor) > i)
-          val ids = idInColor(saveID)
-          val pids = find(FMat(sum(pproject(ids, ?), 1)))
-          initStateColor(kdata, ids, i, stateSet, user)
-          computeP(ids, pids, i, pSet, pMatrix, stateSet(i), saveID, idInColor.length)
-        }
-        sampleColor(kdata, numState, idInColor, pSet, pMatrix, user)
-      }
-      updateCPT(user) 
-    } 
-  }
-  /**
-   * The revised mupdate2 method. I think for this method, it just need to pass the updated cpt table to the learner
-   * framwork. Thus, actually it won't change or update the cpt.
-   *
-   **/
-  def mupdate2(kdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("Now inside mupdate")
-    
-    modelmats(0) <-- mm
+    println("In mupdate, mm(0 until 100).t=\n" + mm(0 until 100))
     updatemats(0) <-- mm
-  }
-
-  /*----------------------------------------------------------------------------------------------------*/
-  /*-----------------------------END OF MY CHANGES------------------------------------------------------*/
-  /*----------------------------------------------------------------------------------------------------*/
+  } 
   
   /** 
    * Evaluates the log likelihood of this datasource segment (i.e., sdata). 
@@ -233,74 +204,27 @@ class BayesNetMooc3(val dag:Mat,
   def evalfun(sdata: Mat, user: Mat) : FMat = {
     val a = cptOffset + IMat(SMat(iproject) * FMat(user))
     val b = maxi(maxi(a,1),2).dv
-    if (b >= mm.length) {
-      println("ERROR! In eval(), we have max index " + b + ", but cpt.length = " + mm.length)
-    }
     val index = IMat(cptOffset + SMat(iproject) * FMat(user))
     val ll = sum(sum(ln(getCpt(index))))
     return ll.dv
   }
-  
-  /**
-   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
-   * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
-   * The point of this method is to compute an update for the updater to improve the mm (the cpt here).
-   * 
-   * @param mats An array of matrices representing a segment of the original data.
-   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
-   * @param here The total number of elements seen so far, including the ones in this current batch.
-   */
-  def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-    println("Inside dobatch() with ipass = " + ipass + " and our modelmats(0), i.e., the cpt, as (transposed):\n" + modelmats(0).t)
-    val sdata = mats(0)
-    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
-    if (!checkState(state)) {
-      println("problem with start of initState(), max elem is " + maxi(maxi(state,1),2).dv)
-    }
-    if (opts.useGPU && Mat.hasCUDA > 0) {
-      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) // TODO Why is GMat not working?
-    } else {
-      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
-    }
-
-    // Create and use kdata which is sdata-1, since we want -1 to represent an unknown value.
-    val kdata = if (opts.useGPU && Mat.hasCUDA > 0) {
-      GMat(sdata.copy) - 1
-    } else {
-      FMat(sdata.copy) - 1
-    }
-    val nonNegativeIndices = find(FMat(kdata) >= 0)
-    for (i <- 0 until opts.nsampls) {
-      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
-    }
-    if (!checkState(state)) {
-      println("problem with end of initState(), max elem is " + maxi(maxi(state,1),2).dv)
-    }
-    uupdate(kdata, state, ipass)
-    mupdate(kdata, state, ipass)
-    println("We just finished a call to dobatch() (with uupdate() and mupdate() done).")
-    println("log likelihood is: " + evalfun(kdata, state))
-  }
 
   /**
-   * Does a uupdate/evalfun on a datasource segment, called from evalbatchg() in Model.scala.
+   * Method to update the cpt table (i.e. mm). This method is called after we finish one iteration of Gibbs 
+   * sampling. And this method only updates the local cpt table (mm), it has nothing to do with the learner's 
+   * cpt parameter (which is modelmats(0)).
    * 
-   * @param mats An array of matrices representing a segment of the original data.
-   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
-   * @param here The total number of elements seen so far, including the ones in this current batch.
-   * @return The log likelihood of the data on this datasource segment (i.e., sdata).
+   * @param user The state matrix, updated after the sampling.
    */
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-    println("Inside evalbatch, right now nothing here because we're just debugging")
-    return 1f
-    /*
-    println("\n\nALERT ALERT ALERT WE ARE IN EVALBATCH WHICH WE SHOULD NOT BE IN (note: just a debugging warning)\n\n")
-    val sdata = mats(0)
-    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    evalfun(sdata, user)
-    * *
-    */
+  def updateCPT(user: Mat): Unit = {
+    val numCols = size(user, 2)
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
+    var counts = zeros(mm.length, 1)
+    for (i <- 0 until numCols) {
+      counts(index(?, i)) = counts(index(?, i)) + 1
+    }
+    counts = counts + opts.alpha  
+    mm = (1 - opts.alpha) * mm + counts / (normConstMatrix * counts)
   }
 
   /**
@@ -381,9 +305,6 @@ class BayesNetMooc3(val dag:Mat,
     for (j <- 0 until opts.nsampls) {
       user(nonNegativeIndices + j*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
     }
-    if (!checkState(user)) {
-      println("problem with end of sampleColor(), max elem is " + maxi(maxi(user,1),2).dv)
-    }
   }
 
   /**
@@ -450,8 +371,9 @@ object BayesNetMooc3  {
   
   trait Opts extends Model.Opts {
     var nsampls = 1
-    var alpha = 0.1f
-    var uiter = 25
+    var alpha = 1f
+    var beta = 0.1f
+    var samplingRate = 20
     var eps = 1e-9
   }
   
@@ -474,7 +396,8 @@ object BayesNetMooc3  {
     val opts = new xopts
     opts.dim = dag.ncols
     opts.useGPU = false // Temporary TODO test with GPUs
-    opts.batchSize = sdata.ncols // Easiest for debugging to start it as data.ncols
+    opts.batchSize = 800
+    opts.updateAll = true
     opts.power = 1f // For the IncNorm, to get moving averages
     opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
     val nn = new Learner(
@@ -509,35 +432,11 @@ object BayesNetMooc3  {
         opts)
     (nn, opts)
   }
-  
-  /**
-   * A learner with a files data source, with states per node, and with a dag prepared for us.
-   * This has not been tested yet.
-   */
-  /*
-  def learner(fnames:List[(Int)=>String], statesPerNode:Mat, dag:Mat) {
-    class xopts extends Learner.Options with BayesNetMooc3.Opts with FilesDS.Opts with IncNorm.Opts 
-    val opts = new xopts
-    opts.dim = dag.ncols
-    opts.batchSize = 10000 // Just a "random" number for now TODO change obviously!
-    opts.fnames = fnames
-    implicit val threads = threadPool(4)
-    opts.power = 1f // For the IncNorm, to get moving averages
-    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
-    val nn = new Learner(
-        new FilesDS(opts),
-        new BayesNetMooc3(dag, statesPerNode, opts),
-        null,
-        new IncNorm(opts),
-        opts)
-    (nn, opts)   
-  }
-  * 
-  */
-  
+ 
   // ---------------------------------------------------------------------- //
   // Other non-learner methods, such as those that manage data input/output //
   
+  /*
   // TODO Check if this is what we want/need. We may need something like this if we're sticking with 'user'.
   def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {
     val out = a match {
@@ -549,6 +448,7 @@ object BayesNetMooc3  {
     out.set(ival)
     out
   }
+  */
   
   /**
    * Loads the size of state to create state size array: statesPerNode. In the input file, each line
