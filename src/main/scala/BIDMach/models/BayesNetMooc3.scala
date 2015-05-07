@@ -397,9 +397,6 @@ object BayesNetMooc3  {
     val (statesPerNode, nodeMap) = loadStateSize(statesPerNodeFile)
     val dag:SMat = loadDag(dagFile, nodeMap, statesPerNode.length)
     val sdata:SMat = loadSData(dataFile, nodeMap, statesPerNode)
-    saveSMat("dag.lz4", dag)
-    saveSMat("sdata.lz4", sdata)
-    saveIMat("statesPerNode.lz4", statesPerNode)
 
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
@@ -409,9 +406,10 @@ object BayesNetMooc3  {
     opts.updateAll = true   // If not, then the averaging process in IncNorm isn't uniform
     opts.power = 1f         // For the IncNorm, to get moving averages
     opts.isprob = false     // Because our cpts should NOT be normalized across their one column (lol).
+    opts.putBack = 1        // Important! This will keep the various "user" matrices to carry their states over
 
     val nn = new Learner(
-        new MatDS(Array(sdata:Mat), opts),
+        new MatDS(Array(sdata:Mat, ones(sdata.nrows,sdata.ncols):Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
         null,
         new IncNorm(opts),
@@ -425,15 +423,12 @@ object BayesNetMooc3  {
    * val (nn,opts) = BayesNetMooc3.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
    * 
    * though this obviously depends on differences in directory structure.
+   * 
+   * Note: do not use this for now; use the learner with the files data sources.
    */
   def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
-    opts.useGPU = false // Temporary TODO
-    opts.dim = dag.ncols
-    opts.batchSize = data.ncols // Easiest for debugging to start it as data.ncols
-    opts.power = 1f // For the IncNorm, to get moving averages
-    opts.isprob = false // Because our cpts should NOT be normalized across their one column (lol).
     val nn = new Learner(
         new MatDS(Array(data:Mat), opts),
         new BayesNetMooc3(dag, statesPerNode, opts),
