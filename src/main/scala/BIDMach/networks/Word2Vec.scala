@@ -68,9 +68,11 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
 	  datasource.reset;
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
-    	modelmats(0) = convertMat((rand(opts.dim, nfeats) - 0.5f)/opts.dim);              // syn0 - context model
-    	modelmats(1) = convertMat(zeros(opts.dim, nfeats));                               // syn1neg - target word model
+    	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;              // syn0 - context model
+    	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
     }
+    modelmats(0) = convertMat(modelmats(0));
+    modelmats(1) = convertMat(modelmats(1));
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
     val skipcol = icol((- nskip) to nskip);
