@@ -22,7 +22,7 @@ saveSMat(dir+"newtest.smat.lz4", ta)
 (a0, ta0)
 }
 
-val d = 128
+val d = 2048
 
 val fact = zeros(d, a.ncols);
 val (nn,opts) = SFA.learner(a,fact,d)
@@ -62,7 +62,7 @@ val preds = DDS(mm, fact, tanz) + iavg
 min(preds.contents, 5f, preds.contents)
 max(preds.contents, 1f, preds.contents)
 val diff = DMat(preds.contents - ta.contents)
-val rmse = sqrt((diff ^* diff) / diff.length).dv
+val rmse = sqrt((diff ^* diff) / diff.length.toFloat).dv
 
 println("rmse = %f" format rmse);
 :silent
