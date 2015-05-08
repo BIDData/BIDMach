@@ -66,7 +66,7 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
     nsamps = if (useGPU) GMat(opts.nsamps) else opts.nsamps
   }
   
-  def uupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
+  def uupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
     
      if (putBack < 0 || ipass == 0) user.set(1f)
     
@@ -93,13 +93,13 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
   
   }
   
-  def mupdate(sdata:Mat, user:Mat, ipass: Int):Unit = {
+  def mupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
 val um = updatemats(0)
 um ~ um + opts.beta
    sum(um, 2, updatemats(1))
   }
   
-  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {
+  def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
    val preds = DDS(mm, user, sdata)
    val dc = sdata.contents
    val pc = preds.contents

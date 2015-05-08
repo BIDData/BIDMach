@@ -72,7 +72,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
    *   multiplied by modelmats(0) to form sdata.
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
-  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+  def uupdate(sdata:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
     if (putBack < 0 || ipass == 0) user.set(1f)
     for (i <- 0 until opts.uiter) {
       val preds = DDS(mm, user, sdata)	
@@ -95,7 +95,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
    *   multiplied by modelmats(0) to form sdata.
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
-  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+  def mupdate(sdata:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
     val preds = DDS(mm, user, sdata)
     val dc = sdata.contents
     val pc = preds.contents
@@ -117,7 +117,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
    *   multiplied by modelmats(0) to form sdata.
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
-  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {  
+  def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {  
   	val preds = DDS(mm, user, sdata);
   	val dc = sdata.contents;
   	val pc = preds.contents;

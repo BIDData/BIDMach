@@ -62,6 +62,14 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   var nfeats:Int = 0;
   var totratings:Double = 0;
   var nratings:Double = 0;
+  // For integrated ADAGrad updater
+  var vexp:Mat = null;
+  var texp:Mat = null;
+  var lrate:Mat = null;
+  var sumsq:Mat = null;
+  var firststep = -1f;
+  var waitsteps = 0;
+  var epsilon = 0f;
 
   
   override def init() = {
@@ -92,14 +100,27 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     mzero = mm.zeros(1,1)
     setmodelmats(Array(mm, iavg));
     if (opts.doUsers) mm(0,?) = 1f
-    updatemats = new Array[Mat](2)
+    updatemats = new Array[Mat](2);
+    if (opts.aopts != null) initADAGrad(d, nfeats);
+  }
+  
+  def initADAGrad(d:Int, m:Int) = {
+    val aopts = opts.asInstanceOf[ADAGrad.Opts];
+    firststep = -1f;
+    lrate = convertMat(aopts.lrate);
+    texp = convertMat(aopts.texp);
+    vexp = convertMat(aopts.vexp);
+    sumsq = convertMat(zeros(d, m));
+    sumsq.set(aopts.initsumsq);
+    waitsteps = aopts.waitsteps;
+    epsilon = aopts.epsilon;
   }
   
   def setpm(pm0:Mat) = {
     pm = pm0
   }
  
-  def uupdate(sdata0:Mat, user:Mat, ipass:Int):Unit =  {
+  def uupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit =  {
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
     if (opts.doUsers) mm(0,?) = 1f; 
     val sdata = sdata0 - iavg;
@@ -122,24 +143,39 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  }
   }
   
-  def mupdate(sdata0:Mat, user:Mat, ipass:Int):Unit = {
+  def mupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
     val sdata = sdata0 - iavg;
     // values to be accumulated
     val ddsmu = DDS(mm, user, sdata);
-    if (opts.weightByUser) {
-      val iwt = 100f / max(sum(sdata != 0f), 100f); 
-      val suser = user ∘ iwt;
-      updatemats(0) = suser *^ sdata - ((mm ∘ slm) + suser *^ ddsmu);   // simple derivative for ADAGRAD
-    } else {
-    	updatemats(0) = user *^ sdata - ((mm ∘ slm) + user *^ ddsmu);     // simple derivative for ADAGRAD
-    }
+    ddsmu.contents ~ sdata.contents - ddsmu.contents;
     if (ipass == 0) {
     	itemsum ~ itemsum + sum(sdata0, 2);
     	itemcount ~ itemcount + sum(sdata0 != 0f, 2);
     	avg = sum(itemsum) / sum(itemcount);
     	iavg ~ (itemsum + avg) / (itemcount + 1);
     }
-    updatemats(1) = sum(sdata, 2) - sum(ddsmu, 2) - (iavg - avg)*mlm;   // per-item term estimator
+    updatemats(1) = sum(ddsmu, 2) - (iavg - avg)*mlm;   // per-item term estimator
+    if (opts.weightByUser) {
+      val iwt = 100f / max(sum(sdata != 0f), 100f); 
+      val suser = user ∘ iwt;
+      if (opts.aopts != null) {
+      	if (firststep <= 0) firststep = pos.toFloat;
+      	val step = (pos + firststep)/firststep;
+      	ADAGrad.multUpdate(suser, ddsmu, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
+      } else {
+      	updatemats(0) = suser *^ ddsmu - (mm ∘ slm);   // simple derivative for ADAGRAD
+      }
+    } else {
+    	if (opts.aopts != null) {
+      	if (firststep <= 0) firststep = pos.toFloat;
+      	val step = (pos + firststep)/firststep;
+      	ADAGrad.multUpdate(user, ddsmu, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
+    	} else {
+    		updatemats(0) = user *^ ddsmu - (mm ∘ slm);     // simple derivative for ADAGRAD
+    	}
+    }
+
+
   }
   
     
@@ -165,7 +201,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     Minv <-- inv(50f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
-  def evalfun(sdata:Mat, user:Mat, ipass:Int):FMat = {
+  def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
         val preds = DDS(mm, user, sdata) + iavg
   	val dc = sdata.contents
   	val pc = preds.contents
@@ -187,6 +223,7 @@ object SFA  {
   	var traceConverge = false
   	var doUsers = true
   	var weightByUser = false
+  	var aopts:ADAGrad.Opts = null;
   	
   }  
   class Options extends Opts {} 
@@ -207,6 +244,23 @@ object SFA  {
     (nn, opts)
   }
   
+  def learnerX(mat0:Mat, d:Int) = {
+    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = -1
+    opts.npasses = 4
+    opts.lrate = 0.1
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+    opts.aopts = opts;
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0:Mat), opts),
+  	    new SFA(opts), 
+  	    null,
+  	    null, opts);
+    (nn, opts)
+  }
+  
   def learner(mat0:Mat, user0:Mat, d:Int) = {
     class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
     val opts = new xopts
@@ -220,6 +274,23 @@ object SFA  {
         new SFA(opts), 
         null,
         new ADAGrad(opts), opts)
+    (nn, opts)
+  }
+  
+  def learnerX(mat0:Mat, user0:Mat, d:Int) = {
+    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = 1
+    opts.npasses = 4
+    opts.lrate = 0.1
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+    opts.aopts = opts;
+    val nn = new Learner(
+        new MatDS(Array(mat0, user0), opts),
+        new SFA(opts), 
+        null,
+        null, opts)
     (nn, opts)
   }
     // Preconditioned CG update
