@@ -1,4 +1,4 @@
-:silent
+//:silent
 val dir="../data/netflix/"
 
 //val a0=loadSMat(dir+"train.smat.lz4")
@@ -22,10 +22,10 @@ saveSMat(dir+"newtest.smat.lz4", ta)
 (a0, ta0)
 }
 
-val d = 2048
+val d = 512
 
 val fact = zeros(d, a.ncols);
-val (nn,opts) = SFA.learner(a,fact,d)
+val (nn,opts) = SFA.learnerX(a,fact,d)
 
 // good values for movielens 10m
 opts.lambdam = 5f
@@ -35,34 +35,52 @@ opts.npasses = 5
 opts.batchSize = 2000
 
 // good values for netflix
-opts.batchSize = 5000 
-opts.lambdau = 1f;
-opts.regumean = 0.1f;
-opts.lambdam = 0.025f;
-opts.regmmean = 0.000f;
-opts.uiter = 6
-opts.startup = 10
+opts.batchSize = 1000 
+opts.lambdau =0.5f;
+opts.regumean = 0.01f;
+opts.lambdam = 0.03f;
+opts.regmmean = 0.001f;
+
+val lambda = 15f
+opts.lambdau = lambda;
+opts.regumean = lambda;
+opts.lambdam = lambda / 500000;
+opts.regmmean = opts.lambdam
+opts.uiter = 4
+opts.startup = 1
 opts.npasses = 4
 opts.evalStep = 31
 opts.doUsers = true
-opts.lrate = 0.03
+opts.lrate = 0.003  // For ADAGRAD
+//opts.texp = null
 opts.uconvg = 1e-3f
 //opts.weightByUser = true
 //opts.traceConverge = true
-opts.autoReset = false
+//opts.autoReset = false
 //opts.useDouble = true
 
-
 nn.train
-val model = nn.model.asInstanceOf[SFA]
-val mm = FMat(nn.modelmat)
+
+val mmat = FMat(nn.modelmat)
 val iavg = FMat(nn.modelmats(1))
+val avg = FMat(nn.modelmats(2))
+
+val model = nn.model.asInstanceOf[SFA]
+val (mm, mopts) = SFA.predictor(model, a, fact);
+mopts.uiter = 7
+
+def testme = {
+mm.predict
+val mmod = mm.model.asInstanceOf[SFA];
 val tanz = ta > 0;
-val preds = DDS(mm, fact, tanz) + iavg
+val preds = DDS(FMat(nn.modelmats(0)), fact, tanz) + FMat(nn.modelmats(1) + nn.modelmats(2))
 min(preds.contents, 5f, preds.contents)
 max(preds.contents, 1f, preds.contents)
 val diff = DMat(preds.contents - ta.contents)
-val rmse = sqrt((diff ^* diff) / diff.length).dv
+val rmse = sqrt((diff ^* diff) / diff.length.toFloat).dv
+rmse
+}
+val rmse = testme
 
 println("rmse = %f" format rmse);
-:silent
+//:silent

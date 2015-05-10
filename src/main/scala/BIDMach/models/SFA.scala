@@ -78,29 +78,41 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  nfeats = mats(0).nrows;
 	  val batchSize = mats(0).ncols;
     val d = opts.dim;
-    mm = normrnd(0,0.01f,d,nfeats);
-    diagM = mkdiag(ones(d,1)) 
-    useGPU = opts.useGPU && Mat.hasCUDA > 0;
-    
+    if (refresh) {
+    	mm = normrnd(0,0.01f,d,nfeats);
+    	mm = convertMat(mm);
+    	avg = mm.zeros(1,1)
+    	iavg = mm.zeros(nfeats,1);
+    	itemsum = mm.zeros(nfeats, 1);
+    	itemcount = mm.zeros(nfeats, 1);
+    	diagM = mkdiag(ones(d,1));
+    	Minv = mm.zeros(d, d);
+    	Minv <-- diagM;
+    	setmodelmats(Array(mm, iavg, avg, Minv));
+    } 
+    useGPU = opts.useGPU && Mat.hasCUDA > 0;    
 	  if (useGPU || useDouble) {
 	    gmats = new Array[Mat](mats.length);
 	  } else {
 	    gmats = mats;
 	  }  
-	  mm = convertMat(mm)
-	  Minv = mm.zeros(d, d);
-	  Minv <-- diagM;
+	  
+	  modelmats(0) = convertMat(modelmats(0));
+	  modelmats(1) = convertMat(modelmats(1));
+	  modelmats(2) = convertMat(modelmats(2));
+	  modelmats(3) = convertMat(modelmats(3));
+	  mm = modelmats(0);
+    iavg = modelmats(1);
+    avg = modelmats(2);
+    Minv = modelmats(3);
     lamu = mm.ones(d, 1) ∘ opts.lambdau 
     if (opts.doUsers) lamu(0) = opts.regumean;
     slm = mm.ones(1,1) ∘ (opts.lambdam * batchSize);
     mlm = mm.ones(1,1) ∘ (opts.regmmean * batchSize);
-	  iavg = mm.zeros(nfeats,1);
-	  itemsum = mm.zeros(nfeats, 1);
-	  itemcount = mm.zeros(nfeats, 1);
     mzero = mm.zeros(1,1)
-    setmodelmats(Array(mm, iavg));
+
     if (opts.doUsers) mm(0,?) = 1f
-    updatemats = new Array[Mat](2);
+    updatemats = new Array[Mat](3);
     if (opts.aopts != null) initADAGrad(d, nfeats);
   }
   
@@ -108,7 +120,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     val aopts = opts.asInstanceOf[ADAGrad.Opts];
     firststep = -1f;
     lrate = convertMat(aopts.lrate);
-    texp = convertMat(aopts.texp);
+    texp = if (aopts.texp.asInstanceOf[AnyRef] != null) convertMat(aopts.texp) else null;
     vexp = convertMat(aopts.vexp);
     sumsq = convertMat(zeros(d, m));
     sumsq.set(aopts.initsumsq);
@@ -123,8 +135,9 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   def uupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit =  {
 // 	  val slu = sum((sdata>mzero), 1) * opts.lambdau
     if (opts.doUsers) mm(0,?) = 1f; 
-    val sdata = sdata0 - iavg;
-	  val b = mm * sdata
+    if (pos == 0) println("start "+user(?,0).t.toString)
+    val sdata = sdata0 - (iavg + avg);
+	  val b = mm * sdata;
 	  val r = if (ipass < opts.startup || putBack < 0) {
 	    // Setup CG on the first pass, or if no saved state
 	  	user.clear
@@ -141,20 +154,22 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  		println("i=%d, r=%f" format (i, norm(r)));
 	  	}
 	  }
+	  if (pos == 0) println("end "+user(?,0).t.toString)
   }
   
   def mupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
-    val sdata = sdata0 - iavg;
+    val sdata = sdata0 - (iavg + avg);
     // values to be accumulated
     val ddsmu = DDS(mm, user, sdata);
     ddsmu.contents ~ sdata.contents - ddsmu.contents;
-    if (ipass == 0) {
+    if (ipass < 1) {
     	itemsum ~ itemsum + sum(sdata0, 2);
     	itemcount ~ itemcount + sum(sdata0 != 0f, 2);
-    	avg = sum(itemsum) / sum(itemcount);
-    	iavg ~ (itemsum + avg) / (itemcount + 1);
+    	avg ~ sum(itemsum) / sum(itemcount);
+    	iavg ~ ((itemsum + avg) / (itemcount + 1)) - avg;
     }
-    updatemats(1) = sum(ddsmu, 2) - (iavg - avg)*mlm;   // per-item term estimator
+    updatemats(1) = (sum(ddsmu,2) - iavg*mlm) / (1 + sum(ddsmu>0f,2));   // per-item term estimator
+    updatemats(2) = sum(ddsmu.contents) / (1 + ddsmu.contents.length);
     if (opts.weightByUser) {
       val iwt = 100f / max(sum(sdata != 0f), 100f); 
       val suser = user ∘ iwt;
@@ -163,7 +178,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
       	val step = (pos + firststep)/firststep;
       	ADAGrad.multUpdate(suser, ddsmu, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
       } else {
-      	updatemats(0) = suser *^ ddsmu - (mm ∘ slm);   // simple derivative for ADAGRAD
+      	updatemats(0) = suser *^ ddsmu - (mm ∘ slm);   // simple derivative
       }
     } else {
     	if (opts.aopts != null) {
@@ -171,11 +186,9 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
       	val step = (pos + firststep)/firststep;
       	ADAGrad.multUpdate(user, ddsmu, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
     	} else {
-    		updatemats(0) = user *^ ddsmu - (mm ∘ slm);     // simple derivative for ADAGRAD
+    		updatemats(0) = user *^ ddsmu - (mm ∘ slm);     // simple derivative
     	}
     }
-
-
   }
   
     
@@ -202,7 +215,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   }
    
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
-        val preds = DDS(mm, user, sdata) + iavg
+    val preds = DDS(mm, user, sdata) + (iavg + avg);
   	val dc = sdata.contents
   	val pc = preds.contents
   	val vv = (dc - pc) ddot (dc - pc)
@@ -224,23 +237,26 @@ object SFA  {
   	var doUsers = true
   	var weightByUser = false
   	var aopts:ADAGrad.Opts = null;
+  	var minv = 1f;
+  	var maxv = 5f;
   	
   }  
   class Options extends Opts {} 
   
   def learner(mat0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
+    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = -1
     opts.npasses = 4
     opts.lrate = 0.1
+    opts.initUval = 0f;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts),
   	    new SFA(opts), 
   	    null,
-  	    new ADAGrad(opts), opts)
+  	    new Grad(opts), opts)
     (nn, opts)
   }
   
@@ -250,7 +266,8 @@ object SFA  {
     opts.dim = d
     opts.putBack = -1
     opts.npasses = 4
-    opts.lrate = 0.1
+    opts.lrate = 0.1;
+    opts.initUval = 0f;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
     opts.aopts = opts;
   	val nn = new Learner(
@@ -262,18 +279,19 @@ object SFA  {
   }
   
   def learner(mat0:Mat, user0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
+    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
     opts.npasses = 4
-    opts.lrate = 0.1
+    opts.lrate = 0.1;
+    opts.initUval = 0f;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
         new MatDS(Array(mat0, user0), opts),
         new SFA(opts), 
         null,
-        new ADAGrad(opts), opts)
+        new Grad(opts), opts)
     (nn, opts)
   }
   
@@ -283,7 +301,8 @@ object SFA  {
     opts.dim = d
     opts.putBack = 1
     opts.npasses = 4
-    opts.lrate = 0.1
+    opts.lrate = 0.1;
+    opts.initUval = 0f;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
     opts.aopts = opts;
     val nn = new Learner(
@@ -293,22 +312,51 @@ object SFA  {
         null, opts)
     (nn, opts)
   }
+  
+   def predictor(model0:Model, mat1:Mat, preds:Mat) = {
+  	class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with Grad.Opts
+    val model = model0.asInstanceOf[SFA]
+    val nopts = new xopts;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    nopts.putBack = 1
+    val newmod = new SFA(nopts);
+    newmod.refresh = false
+    newmod.copyFrom(model);
+    newmod.Minv = model.Minv;
+    val mopts = model.opts.asInstanceOf[SFA.Opts];
+    nopts.dim = mopts.dim;
+    nopts.uconvg = mopts.uconvg;
+    nopts.miter = mopts.miter;
+    nopts.lambdau = mopts.lambdau;
+    nopts.lambdam = mopts.lambdam;
+    nopts.regumean = mopts.regumean;
+    nopts.doUsers = mopts.doUsers;
+    nopts.weightByUser = mopts.weightByUser;
+    val nn = new Learner(
+        new MatDS(Array(mat1, preds), nopts), 
+        newmod, 
+        null,
+        null,
+        nopts)
+    (nn, nopts)
+  }
     // Preconditioned CG update
   def PreCGupdate(p:Mat, r:Mat, z:Mat, Ap:Mat, x:Mat, Minv:Mat, weps:Float, convgd:Float) = {
-  	val pAp = (p dot Ap)
-  	max(pAp, weps, pAp)
-  	val rsold = (r dot z) 
-  	val convec = rsold > convgd              // Check convergence
-  	val alpha = convec ∘ (rsold / pAp)       // Only process unconverged elements
-  	min(alpha, 10f, alpha)
-  	x ~ x + (p ∘ alpha)
-  	r ~ r - (Ap ∘ alpha)
-  	z ~ Minv * r
-  	val rsnew = (z dot r)                    // order is important to avoid aliasing
-  	max(rsold, weps, rsold)
-  	val beta = convec ∘ (rsnew / rsold)
-  	min(beta, 10f, beta)
-  	p ~ z + (p ∘ beta)
+    val safe = 300f;
+  	val pAp = (p dot Ap);
+  	max(pAp, weps, pAp);
+  	val rsold = (r dot z);
+  	val convec = rsold > convgd;             // Check convergence
+  	val alpha = convec ∘ (rsold / pAp);       // Only process unconverged elements
+  	min(alpha, safe, alpha);
+  	x ~ x + (p ∘ alpha);
+  	r ~ r - (Ap ∘ alpha);
+  	z ~ Minv * r;
+  	val rsnew = (z dot r);                    // order is important to avoid aliasing
+  	max(rsold, weps, rsold);
+  	val beta = convec ∘ (rsnew / rsold);
+  	min(beta, safe, beta);  	
+  	p ~ z + (p ∘ beta);
   }
 }
 
