@@ -156,27 +156,10 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
 	  	}
 
 	  	if (opts.traceConverge) {
-	  		println("step %d, loss %f" format (i, ((norm(sdata.contents - preds.contents) ^ 2f) + (sum(user dot user) ∘ lamu)).dv));
+	  		println("step %d, loss %f" format (i, ((norm(sdata.contents - preds.contents) ^ 2f) + (sum(user dot (user ∘ lamu)))).dv/sdata.nnz));
 	  	}
 	  }
 //	  println("GPUmemu3 "+GPUmem._1);
-  }
-  
-  def accept(sdata:Mat, mmod:Mat, du:Mat, preds:Mat, dpreds:Mat, uscale:Mat, lambda:Mat, flip:Boolean) = {
-    	val diff1 = preds + 0f;
-	  	diff1.contents ~ sdata.contents - preds.contents;
-//	  	println("sdata "+FMat(sdata.contents).t(0,0->5).toString);
-	  	val diff2 = diff1 + 0f;
-	  	diff2.contents ~ diff1.contents - dpreds.contents;
-	  	diff1.contents ~ diff1.contents ∘ diff1.contents;
-	  	diff2.contents ~ diff2.contents ∘ diff2.contents;
-	  	val rmmod = mmod + 1f;
-	  	normrnd(0, opts.lsgd, rmmod);
-	  	val mmod2 = mmod + du + rmmod ∘ uscale;
-	  	val loss1 = (if (flip) sum(diff1,2).t else sum(diff1)) + (mmod dot (mmod ∘ lambda));
-	  	val loss2 = (if (flip) sum(diff2,2).t else sum(diff2)) + (mmod2 dot (mmod2 ∘ lambda));
-	  	val selector = loss2 < loss1;	  	
-	  	mmod ~ (mmod2 ∘ selector) + (mmod ∘ (1f - selector));
   }
   
   def mupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
@@ -184,7 +167,8 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     val sdata = sdata0 - (iavg + avg);
     // values to be accumulated
     val ddsmu = DDS(mm, user, sdata);
-    ddsmu.contents ~ sdata.contents - ddsmu.contents;
+    val diffs = sdata + 2f;
+    diffs.contents ~ sdata.contents - ddsmu.contents;
     if (ipass < 1) {
     	itemsum ~ itemsum + sum(sdata0, 2);
     	itemcount ~ itemcount + sum(sdata0 != 0f, 2);
@@ -202,24 +186,51 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
       user;
     }
     if (firststep <= 0) firststep = pos.toFloat;
-    if (opts.aopts != null) {
-    	if (texp.asInstanceOf[AnyRef] != null) {
-    		val step = (pos + firststep)/firststep;
-    		ADAGrad.multUpdate(wuser, ddsmu, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
-    	} else {
-    		ADAGrad.multUpdate(wuser, ddsmu, modelmats(0), sumsq, null, lrate, pexp, vexp, epsilon, ipass + 1, waitsteps);
-    	}
-    } else {
-    	updatemats(0) = (wuser *^ ddsmu - (mm ∘ slm)) / ((icount + 1).t ^ vexp);   // simple derivative  
+    if (opts.lsgd >= 0 || opts.aopts == null) {
+    	updatemats(0) = (wuser *^ ddsmu - (mm ∘ slm)) / ((icount + 1).t ^ vexp);   // simple derivative
     	if (opts.lsgd >= 0) {
     		val step = (pos + firststep)/firststep;
-    		uscale.set(lrate.dv * math.pow(step, - texp.dv).toFloat)
-    	  val dpreds = DDS(updatemats(0), user, sdata);
-    	  accept(sdata, mm, updatemats(0), ddsmu, dpreds, uscale, slm, true)
+    		uscale.set((lrate.dv * math.pow(step, - texp.dv)).toFloat);
+    		val dm = updatemats(0) ∘ uscale;
+    	  val dpreds = DDS(dm, user, sdata);
+    	  accept(sdata, mm, dm, ddsmu, dpreds, uscale, slm, true);
+    	}
+    } else {
+    	if (texp.asInstanceOf[AnyRef] != null) {
+    		val step = (pos + firststep)/firststep;
+    		ADAGrad.multUpdate(wuser, diffs, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
+    	} else {
+    		ADAGrad.multUpdate(wuser, diffs, modelmats(0), sumsq, null, lrate, pexp, vexp, epsilon, ipass + 1, waitsteps);
     	}
     }
 //    println("GPUmem5 "+GPUmem._1);
  //   println("GUIDS %d %d %d " format (updatemats(0).GUID, updatemats(1).GUID, updatemats(2).GUID));
+  }
+  
+   def accept(sdata:Mat, mmod:Mat, du:Mat, preds:Mat, dpreds:Mat, scale:Mat, lambda:Mat, flip:Boolean) = {
+//  	println("sdata " + FMat(sdata.contents)(0->5,0).t)
+    	val diff1 = preds + 0f;
+	  	diff1.contents ~ sdata.contents - preds.contents;
+//	  	println("sdata %d %s" format (if (flip) 1 else 0, FMat(sdata.contents)(0->5,0).t.toString));
+//	  	println("preds %d %s" format (if (flip) 1 else 0, FMat(preds.contents)(0->5,0).t.toString));
+//	  	println("diff %d %s" format (if (flip) 1 else 0, FMat(diff1.contents)(0->5,0).t.toString));
+//	  	println("sdata "+FMat(sdata.contents)(0->5,t).t.toString);
+	  	val diff2 = diff1 + 0f;
+	  	diff2.contents ~ diff1.contents - dpreds.contents;
+	  	diff1.contents ~ diff1.contents ∘ diff1.contents;
+	  	diff2.contents ~ diff2.contents ∘ diff2.contents;
+	  	val rmmod = mmod + 1f;
+	  	normrnd(0, opts.lsgd, rmmod);
+	  	val mmod2 = mmod + du + rmmod ∘ scale;
+//	  	println("diff %d %s" format (if (flip) 1 else 0, FMat(diff1.contents)(0->5,0).t.toString));
+	  	val loss1 = (if (flip) sum(diff1,2).t else sum(diff1)) + (mmod dot (mmod ∘ lambda));
+	  	val loss2 = (if (flip) sum(diff2,2).t else sum(diff2)) + (mmod2 dot (mmod2 ∘ lambda));
+//	  	println("loss %d %s" format (if (flip) 1 else 0, FMat(loss1)(0,0->5).toString));
+	  	val selector = loss2 < loss1;	  	
+	  	mmod ~ (mmod2 ∘ selector) + (mmod ∘ (1f - selector));
+	  	if (opts.traceConverge) {
+	  	  println("accepted %d %f %f %f" format (if (flip) 1 else 0, mean(selector).dv, mean(loss1).dv, mean(loss2).dv));
+	  	}
   }
   
   def evalfun(sdata0:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
