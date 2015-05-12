@@ -1,0 +1,90 @@
+import BIDMach.models.SMF
+//:silent
+val dir="../data/netflix/"
+
+//val a0=loadSMat(dir+"train.smat.lz4")
+//val ta0=loadSMat(dir+"test.smat.lz4")
+val a0=loadSMat(dir+"newtrain.smat.lz4")
+val ta0=loadSMat(dir+"newtest.smat.lz4")
+
+val rebuild = false
+
+val (a, ta) = if (rebuild) {
+val (ii, jj, vv) = find3(a0+ta0);
+val ir = rand(ii.length, 1) < 0.1f;
+val itrain = find(ir == 0);
+val itest = find(ir);
+val a = sparse(ii(itrain),jj(itrain),vv(itrain),a0.nrows,a0.ncols);
+val ta = sparse(ii(itest),jj(itest),vv(itest),a0.nrows,a0.ncols);
+saveSMat(dir+"newtrain.smat.lz4", a)
+saveSMat(dir+"newtest.smat.lz4", ta)
+(a, ta)
+} else {
+(a0, ta0)
+}
+
+val d = 512
+
+val fact = zeros(d, a.ncols);
+val (nn,opts) = SMF.learnerX(a,fact,d)
+
+// good values for movielens 10m
+opts.lambdam = 5f
+opts.lambdau = 5f
+opts.uiter = 8
+opts.npasses = 5
+opts.batchSize = 2000
+
+// good values for netflix
+opts.batchSize = 1000
+opts.uiter = 2
+// for acceptance = 1
+opts.urate = 0.01f
+opts.lrate = 0.01f  
+// for computed acceptance
+opts.urate = 0.1f
+opts.lrate = 0.1  
+opts.npasses = 5
+
+//opts.texp = null
+//opts.aopts = null
+val lambda = 4f
+opts.lambdau = lambda;
+opts.regumean = lambda;
+opts.lambdam = lambda / 500000 * 20;
+opts.regmmean = opts.lambdam
+opts.evalStep = 31
+opts.doUsers = false
+opts.lsgd = 0.010f
+//opts.weightByUser = true
+//opts.traceConverge = true
+//opts.autoReset = false
+//opts.useDouble = true
+
+nn.train
+
+val mmat = FMat(nn.modelmat)
+val iavg = FMat(nn.modelmats(1))
+val avg = FMat(nn.modelmats(2))
+
+val model = nn.model.asInstanceOf[SMF]
+val (mm, mopts) = SMF.predictor(model, a, fact);
+mopts.uiter = 6
+mopts.urate = opts.urate
+mopts.lsgd = 0.0f
+
+def testme = {
+mm.predict
+val mmod = mm.model.asInstanceOf[SMF];
+val tanz = ta > 0;
+val preds = DDS(FMat(nn.modelmats(0)), fact, tanz) + FMat(nn.modelmats(1) + nn.modelmats(2))
+min(preds.contents, 5f, preds.contents)
+max(preds.contents, 1f, preds.contents)
+val diff = DMat(preds.contents - ta.contents)
+val rmse = sqrt((diff ^* diff) / diff.length.toFloat).dv
+rmse
+}
+val rmse = testme
+
+println("rmse = %f" format rmse);
+//:silent
