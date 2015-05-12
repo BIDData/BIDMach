@@ -161,32 +161,33 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     val sdata = sdata0 - (iavg + avg);
     // values to be accumulated
     val ddsmu = DDS(mm, user, sdata);
-    ddsmu.contents ~ sdata.contents - ddsmu.contents;
+    val diffs = sdata + 1f;
+    diffs.contents ~ sdata.contents - ddsmu.contents;
     if (ipass < 1) {
     	itemsum ~ itemsum + sum(sdata0, 2);
     	itemcount ~ itemcount + sum(sdata0 != 0f, 2);
     	avg ~ sum(itemsum) / sum(itemcount);
     	iavg ~ ((itemsum + avg) / (itemcount + 1)) - avg;
     }
-    updatemats(1) = (sum(ddsmu,2) - iavg*mlm) / (1 + sum(ddsmu>0f,2));   // per-item term estimator
-    updatemats(2) = sum(ddsmu.contents) / (1 + ddsmu.contents.length);
+    updatemats(1) = (sum(diffs,2) - iavg*mlm) / (1 + sum(diffs>0f,2));   // per-item term estimator
+    updatemats(2) = sum(diffs.contents) / (1 + diffs.contents.length);
     if (opts.weightByUser) {
       val iwt = 100f / max(sum(sdata != 0f), 100f); 
       val suser = user ∘ iwt;
       if (opts.aopts != null) {
       	if (firststep <= 0) firststep = pos.toFloat;
       	val step = (pos + firststep)/firststep;
-      	ADAGrad.multUpdate(suser, ddsmu, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
+      	ADAGrad.multUpdate(suser, diffs, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
       } else {
-      	updatemats(0) = suser *^ ddsmu - (mm ∘ slm);   // simple derivative
+      	updatemats(0) = suser *^ diffs - (mm ∘ slm);   // simple derivative
       }
     } else {
     	if (opts.aopts != null) {
       	if (firststep <= 0) firststep = pos.toFloat;
       	val step = (pos + firststep)/firststep;
-      	ADAGrad.multUpdate(user, ddsmu, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
+      	ADAGrad.multUpdate(user, diffs, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
     	} else {
-    		updatemats(0) = user *^ ddsmu - (mm ∘ slm);     // simple derivative
+    		updatemats(0) = user *^ diffs - (mm ∘ slm);     // simple derivative
     	}
     }
   }

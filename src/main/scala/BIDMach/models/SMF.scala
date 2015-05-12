@@ -62,6 +62,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   var vexp:Mat = null;
   var texp:Mat = null;
   var pexp:Mat = null;
+  var cscale:Mat = null;
   var lrate:Mat = null;
   var uscale:Mat = null;
   var sumsq:Mat = null;
@@ -105,7 +106,8 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     mlm = mm.ones(1,1) ∘ (opts.regmmean * batchSize);
     mzero = mm.zeros(1,1);
     uscale = mm.zeros(1,1);
-
+    cscale = mm.ones(d, 1);
+    cscale(0,0) = 0.0001f;
     if (opts.doUsers) mm(0,?) = 1f
     updatemats = new Array[Mat](3);
     updatemats(2) = mm.zeros(1,1);
@@ -126,8 +128,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     epsilon = aopts.epsilon;
   }
  
-  def uupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit =  {
-//  	println("GPUmemu1 "+GPUmem._1);
+  def uupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit =  { 
   	if (firststep <= 0) firststep = pos.toFloat;
   	val step = (pos + firststep)/firststep;
   	val texp = if (opts.asInstanceOf[Grad.Opts].texp.asInstanceOf[AnyRef] != null) {
@@ -135,8 +136,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   	} else {
   	  opts.asInstanceOf[Grad.Opts].pexp.dv
   	}
-  	uscale.set(opts.urate * math.pow(ipass+1, - texp).toFloat)
-    if (opts.doUsers) mm(0,?) = 1f; 
+  	uscale.set(opts.urate * math.pow(ipass+1, - texp).toFloat) 
     val sdata = sdata0 - (iavg + avg);
 	  if (putBack < 0) {
 	  	user.clear
@@ -159,16 +159,14 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
 	  		println("step %d, loss %f" format (i, ((norm(sdata.contents - preds.contents) ^ 2f) + (sum(user dot (user ∘ lamu)))).dv/sdata.nnz));
 	  	}
 	  }
-//	  println("GPUmemu3 "+GPUmem._1);
   }
   
   def mupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
-//  	println("GPUmem1 "+GPUmem._1);
     val sdata = sdata0 - (iavg + avg);
     // values to be accumulated
-    val ddsmu = DDS(mm, user, sdata);
+    val preds = DDS(mm, user, sdata);
     val diffs = sdata + 2f;
-    diffs.contents ~ sdata.contents - ddsmu.contents;
+    diffs.contents ~ sdata.contents - preds.contents;
     if (ipass < 1) {
     	itemsum ~ itemsum + sum(sdata0, 2);
     	itemcount ~ itemcount + sum(sdata0 != 0f, 2);
@@ -177,8 +175,8 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     } 
     val icomp = sdata0 != 0f
     val icount = sum(sdata0 != 0f, 2);
-    updatemats(1) = (sum(ddsmu,2) - iavg*mlm) / (icount + 1f);   // per-item term estimator
-    updatemats(2) ~ sum(ddsmu.contents) / (ddsmu.contents.length + 1f);
+    updatemats(1) = (sum(diffs,2) - iavg*mlm) / (icount + 1f);   // per-item term estimator
+    updatemats(2) ~ sum(diffs.contents) / (diffs.contents.length + 1f);
     val wuser = if (opts.weightByUser) {
     	val iwt = 100f / max(sum(sdata != 0f), 100f); 
       user ∘ iwt;
@@ -187,13 +185,13 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     }
     if (firststep <= 0) firststep = pos.toFloat;
     if (opts.lsgd >= 0 || opts.aopts == null) {
-    	updatemats(0) = (wuser *^ ddsmu - (mm ∘ slm)) / ((icount + 1).t ^ vexp);   // simple derivative
+    	updatemats(0) = (wuser *^ diffs - (mm ∘ slm)) / ((icount + 1).t ^ vexp);   // simple derivative
     	if (opts.lsgd >= 0) {
     		val step = (pos + firststep)/firststep;
     		uscale.set((lrate.dv * math.pow(step, - texp.dv)).toFloat);
-    		val dm = updatemats(0) ∘ uscale;
+    		val dm = updatemats(0) ∘ uscale ∘ cscale;
     	  val dpreds = DDS(dm, user, sdata);
-    	  accept(sdata, mm, dm, ddsmu, dpreds, uscale, slm, true);
+    	  accept(sdata, mm, dm, preds, dpreds, uscale, slm, true);
     	}
     } else {
     	if (texp.asInstanceOf[AnyRef] != null) {
@@ -203,18 +201,17 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     		ADAGrad.multUpdate(wuser, diffs, modelmats(0), sumsq, null, lrate, pexp, vexp, epsilon, ipass + 1, waitsteps);
     	}
     }
-//    println("GPUmem5 "+GPUmem._1);
- //   println("GUIDS %d %d %d " format (updatemats(0).GUID, updatemats(1).GUID, updatemats(2).GUID));
+    if (opts.doUsers) mm(0,?) = 1f;
   }
   
    def accept(sdata:Mat, mmod:Mat, du:Mat, preds:Mat, dpreds:Mat, scale:Mat, lambda:Mat, flip:Boolean) = {
-//  	println("sdata " + FMat(sdata.contents)(0->5,0).t)
+ // 	println("sdata " + FMat(sdata.contents)(0->5,0).t)
     	val diff1 = preds + 0f;
 	  	diff1.contents ~ sdata.contents - preds.contents;
 //	  	println("sdata %d %s" format (if (flip) 1 else 0, FMat(sdata.contents)(0->5,0).t.toString));
 //	  	println("preds %d %s" format (if (flip) 1 else 0, FMat(preds.contents)(0->5,0).t.toString));
 //	  	println("diff %d %s" format (if (flip) 1 else 0, FMat(diff1.contents)(0->5,0).t.toString));
-//	  	println("sdata "+FMat(sdata.contents)(0->5,t).t.toString);
+//	  	println("sdata "+FMat(sdata.contents)(0->5,0).t.toString);
 	  	val diff2 = diff1 + 0f;
 	  	diff2.contents ~ diff1.contents - dpreds.contents;
 	  	diff1.contents ~ diff1.contents ∘ diff1.contents;
@@ -222,11 +219,13 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
 	  	val rmmod = mmod + 1f;
 	  	normrnd(0, opts.lsgd, rmmod);
 	  	val mmod2 = mmod + du + rmmod ∘ scale;
-//	  	println("diff %d %s" format (if (flip) 1 else 0, FMat(diff1.contents)(0->5,0).t.toString));
 	  	val loss1 = (if (flip) sum(diff1,2).t else sum(diff1)) + (mmod dot (mmod ∘ lambda));
 	  	val loss2 = (if (flip) sum(diff2,2).t else sum(diff2)) + (mmod2 dot (mmod2 ∘ lambda));
-//	  	println("loss %d %s" format (if (flip) 1 else 0, FMat(loss1)(0,0->5).toString));
-	  	val selector = loss2 < loss1;	  	
+	  	
+	  	val accprob = erfc((loss2 - loss1) /scale);	  	
+	  	val rsel = accprob + 0f;
+	  	rand(rsel);
+	  	val selector = rsel < accprob;
 	  	mmod ~ (mmod2 ∘ selector) + (mmod ∘ (1f - selector));
 	  	if (opts.traceConverge) {
 	  	  println("accepted %d %f %f %f" format (if (flip) 1 else 0, mean(selector).dv, mean(loss1).dv, mean(loss2).dv));
@@ -239,7 +238,6 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   	val dc = sdata.contents
   	val pc = preds.contents
   	val diff = dc - pc;
-//  	println(FMat(sdata.contents).t(0,0->5).toString);
   	val vv = diff ddot diff;
   	-sqrt(row(vv/sdata.nnz))
   }
