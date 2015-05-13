@@ -170,6 +170,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
       	val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
       	val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
+      	println("ngroups %d" format ngoodcols);
       	val cwi = cwords(ii);
       	addTime(6);
 
@@ -181,14 +182,14 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	(trandwords0, contextwords0)
       }
       case (iwords:IMat, ilb:IMat, iub:IMat) => {
-        wordblocks(iwords, ilb, iub, Mat.numThreads);
+        getnegs(iwords, ilb, iub, Mat.numThreads);
       }
     }
     
     (words, lb, ub, trandwords, contextwords);
   }
   
-  def wordblocks(words:IMat, lb:IMat, ub:IMat, nthreads:Int):(IMat, IMat) = {
+  def getnegs(words:IMat, lb:IMat, ub:IMat, nthreads:Int):(IMat, IMat) = {
     val ncols = words.ncols;
     val cwcounts = irow((0 until nthreads).par.map((ithread:Int) => {
       val istart = ((1L * ncols * ithread)/nthreads).toInt;
@@ -212,6 +213,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     }).toArray)
     val ccc = cumsum(cwcounts);
     val ngroups = ccc(ccc.length - 1) / opts.nreuse;
+    println("ngroups %d" format ngroups);
     val contextwords0 = izeros(opts.nreuse, ngroups);
     val trandwords0 = izeros(opts.nneg, ngroups);
     
@@ -240,7 +242,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     
     addTime(5);
     
-    val prand = rand(opts.nreuse, ngroups);                             // Rands for permutation
+    val prand = drand(opts.nreuse, ngroups);                             // Rands for permutation
     
     var i = 0;
     val n = prand.length;
