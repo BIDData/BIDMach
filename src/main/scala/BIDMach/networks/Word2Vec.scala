@@ -59,6 +59,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var test1:Mat = null;
   var test2:Mat = null;
   var test3:Mat = null;
+  var test4:Mat = null;
   
 
   override def init() = {
@@ -75,11 +76,11 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     modelmats(1) = convertMat(modelmats(1));
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
-    val skipcol = icol((- nskip) to nskip);
+    val skipcol = icol((-nskip) to -1) on icol(1 to nskip)
     expt = 1f / (1f - opts.wexpt);
-    wordtab = convertMat(max(0, min(ncols+1, iones(nwindow, 1) * irow(1 -> (ncols+1)) + skipcol)));  // Indices for convolution matrix
+    wordtab = convertMat(max(0, min(ncols+1, iones(nwindow-1, 1) * irow(1 -> (ncols+1)) + skipcol)));  // Indices for convolution matrix
     wordmask = convertMat(skipcol * iones(1, ncols));                                   // columns = distances from center word
-    randpermute = convertMat(zeros(nwindow, ncols));                                    // holds random values for permuting negative context words
+    randpermute = convertMat(zeros(nwindow-1, ncols));                                    // holds random values for permuting negative context words
     ubound = convertMat(zeros(1, ncols));                                               // upper bound random matrix
     minusone = convertMat(irow(-1));
     allones = convertMat(iones(1, ncols));
@@ -145,7 +146,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     addTime(2);
         
     rand(ubound);                                                              // get random upper and lower bounds   
-    val ubrand = int(ubound * opts.nskip);
+    val ubrand = min(opts.nskip, int(ubound * opts.nskip) + 1);
+//    println(ubrand.toString)
     val lbrand = - ubrand;
     addTime(3);
     
@@ -154,6 +156,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
     val lb = max(lbrand, lbsentence);                                          // Combine the bounds
     val ub = min(ubrand, ubsentence);
+    test3 = lb
+    test4 = ub
     addTime(4);
     
     val (trandwords, contextwords) = (words, lb, ub) match {
@@ -161,22 +165,26 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
 
       	val iwords = minusone \ words \ minusone;                                  // Build a convolution matrix.
       	val cwords = iwords(wordtab);
-      	val pgoodwords = (wordmask >= lb) ∘ (wordmask <= ub) ∘ (cwords >= 0);      // Find words satisfying the bound
+      	val pgoodwords = (wordmask >= lb) ∘ (wordmask <= ub) ∘ (cwords >= 0) ∘ (words >= 0);  // Find context words satisfying the bound
+      	                                                                           // and check that context and center word are good.
       	val fgoodwords = float(pgoodwords);
       	addTime(5);
+      	
+      	test1 = cwords;
 
       	rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
       	randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1.
       	val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
-      	val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
+      	val ngood = sum(vv >= 0f).dv.toInt;                                        // Count of the good words
       	val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
-      	println("ngroups %d" format ngoodcols);
       	val cwi = cwords(ii);
+      	
+      	test2 = cwi
       	addTime(6);
 
       	rand(randwords);                                                           // Compute some random negatives
       	val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));    
-      	val trandwords0 = irandwords.view(opts.nneg, ngoodcols);                    // shrink the matrices to the available data
+      	val trandwords0 = irandwords.view(opts.nneg, ngoodcols);                   // shrink the matrices to the available data
       	val contextwords0 = cwi.view(opts.nreuse, ngoodcols);
       	addTime(7);
       	(trandwords0, contextwords0)
@@ -213,7 +221,6 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     }).toArray)
     val ccc = cumsum(cwcounts);
     val ngroups = ccc(ccc.length - 1) / opts.nreuse;
-    println("ngroups %d" format ngroups);
     val contextwords0 = izeros(opts.nreuse, ngroups);
     val trandwords0 = izeros(opts.nneg, ngroups);
     
