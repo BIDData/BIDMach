@@ -53,7 +53,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	delays(itime) += times(itime) - times(itime + lasti);
     } 
     val today = Calendar.getInstance().getTime()
-    log += "Log: %s, GPU %d, event %d" format (dateFormat.format(today), getGPU, itime);
+    log += "Log: %s, GPU %d, event %d" format (dateFormat.format(today), if (useGPU) getGPU else 0, itime);
   }
   
   var test1:Mat = null;
