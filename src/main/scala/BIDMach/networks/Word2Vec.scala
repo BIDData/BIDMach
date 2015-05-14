@@ -110,9 +110,9 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	val lrpos = lrate.dv.toFloat;
     	//    val lrneg = lrpos/opts.nneg;  
     	val lrneg = lrpos;
-    	procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos);
+    	procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
     	addTime(8);
-    	procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg); 
+    	procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp); 
     	addTime(9);
     }
   }
@@ -142,7 +142,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val wrat = float(words+1) * salpha;
     wrat ~ sqrt(wrat) + wrat;
     wgood ~ wgood ∘ int(randsamp < wrat);
-    words ~ wgood + (wgood ∘ words - 1);                                       // Set OOV or skipped samples to -1
+    words ~ (wgood ∘ (words + 1)) - 1;                                        // Set OOV or skipped samples to -1
     addTime(2);
         
     rand(ubound);                                                              // get random upper and lower bounds   
@@ -173,7 +173,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	test1 = cwords;
 
       	rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
-      	randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1.
+      	randpermute ~ (fgoodwords ∘ (randpermute + 1f)) - 1f;                      // set the values for bad words to -1.
       	val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
       	val ngood = sum(vv >= 0f).dv.toInt;                                        // Count of the good words
       	val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
@@ -199,17 +199,18 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   
   def getnegs(words:IMat, lb:IMat, ub:IMat, nthreads:Int):(IMat, IMat) = {
     val ncols = words.ncols;
-    val cwcounts = irow((0 until nthreads).par.map((ithread:Int) => {
+                                                                               // First count the good context words
+    val cwcounts = irow((0 until nthreads).par.map((ithread:Int) => {          // work on blocks
       val istart = ((1L * ncols * ithread)/nthreads).toInt;
       val iend = ((1L * ncols * (ithread + 1))/nthreads).toInt;
       var i = istart;
       var icount = 0;
-      while (i < iend) {
-        if (words.data(i) >= 0) {
-        	var j = lb.data(i);
+      while (i < iend) {                                                       // iterate over center words
+        if (words.data(i) >= 0) {                                              // check center word is good
+        	var j = lb.data(i);                                                  // get lower and upper bounds
         	var jend = ub.data(i);
         	while (j <= jend) {
-        		if (j != 0 && words.data(i + j) >= 0) {
+        		if (j != 0 && words.data(i + j) >= 0) {                            // if not center word and context word is good, count it. 
         		  icount += 1;        		  
         		}
         		j += 1;
@@ -219,12 +220,13 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       }
       icount
     }).toArray)
-    val ccc = cumsum(cwcounts);
+                                                                               // Now we know how many good words in each block
+    val ccc = cumsum(cwcounts);                                                // so size the context word and neg word matrices
     val ngroups = ccc(ccc.length - 1) / opts.nreuse;
     val contextwords0 = izeros(opts.nreuse, ngroups);
     val trandwords0 = izeros(opts.nneg, ngroups);
     
-    (0 until nthreads).par.map((ithread:Int) => {
+    (0 until nthreads).par.map((ithread:Int) => {                              // Copy the good words into a dense matrix (contextwords0)
       val istart = ((1L * ncols * ithread)/nthreads).toInt;
       val iend = ((1L * ncols * (ithread + 1))/nthreads).toInt;
       var i = istart;
@@ -251,7 +253,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     
     val prand = drand(opts.nreuse, ngroups);                             // Rands for permutation
     
-    var i = 0;
+    var i = 0;                                                           // Permute the good context words randomly
     val n = prand.length;
     while (i < n) {
       val indx = math.min(n-1, i + math.floor(prand.data(i) * (n - i)).toInt);
@@ -266,7 +268,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     
     val randneg = rand(opts.nneg, ngroups);                                // Compute some random negatives
 
-    (0 until nthreads).par.map((ithread:Int) => {
+    (0 until nthreads).par.map((ithread:Int) => {                          // Work in blocks over the negs
       val istart = ((1L * ngroups * opts.nneg * ithread)/nthreads).toInt;
       val iend = ((1L * ngroups * opts.nneg * (ithread + 1))/nthreads).toInt;
       var i = istart;
@@ -280,7 +282,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     (trandwords0, contextwords0)    
   }
   
-  def procPositives(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, model1:Mat, model2:Mat, lrate:Float) = {
+  def procPositives(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, model1:Mat, model2:Mat, lrate:Float, vexp:Float) = {
     val nrows = model1.nrows;
     val ncols = model1.ncols;
     val nwords = words.ncols;
@@ -298,7 +300,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     }
   }
   
-  def procNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat, lrate:Float) = {
+  def procNegatives(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modela:Mat, modelb:Mat, lrate:Float, vexp:Float) = {
     val nrows = modela.nrows;
     val ncols = modela.ncols;
     val nwords = wordsa.ncols;
