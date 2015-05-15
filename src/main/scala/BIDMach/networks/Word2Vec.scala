@@ -293,9 +293,18 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
         if (err != 0)  throw new RuntimeException("CUMACH.word2vecPos error " + cudaGetErrorString(err));
       }
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => if (Mat.useMKL) {
-        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
+        val gw = GIMat(w);
+        val glb = GIMat(lb);
+        val gub = GIMat(ub);
+        val gm1 = GMat(m1);
+        val gm2 = GMat(m2);
+        val err = CUMACH.word2vecPos(nrows, nwords, nskip, gw.data, glb.data, gub.data, gm1.data, gm2.data, lrate, vexp);
+        m1 <-- gm1
+        m2 <-- gm2
+        if (err != 0) throw new RuntimeException("CUMACH.word2vecEvalPos error " + cudaGetErrorString(err));
+//        CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
       } else {
-        procPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
+        Word2Vec.procPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
       }
     }
   }
@@ -313,7 +322,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       case (wa:IMat, wb:IMat, ma:FMat, mb:FMat) => if (Mat.useMKL) {
         CPUMACH.word2vecNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
       } else {
-      	procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
+      	Word2Vec.procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
       }
     }
   }
@@ -334,7 +343,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       if (Mat.useMKL) {
       	CPUMACH.word2vecEvalPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
       } else {
-        evalPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
+        Word2Vec.evalPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
       }
     }
   }
@@ -355,7 +364,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       if (Mat.useMKL) {
       	CPUMACH.word2vecEvalNeg(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads); 
       } else {
-      	evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
+      	Word2Vec.evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
       }
     }
   }
@@ -393,6 +402,24 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     setGPU(thisGPU);
   }
 
+}
+
+object Word2Vec  {
+  trait Opts extends Model.Opts {
+    var aopts:ADAGrad.Opts = null;
+    var nskip = 5;
+    var nneg = 5;
+    var nreuse = 5;  
+    var vocabSize = 100000;
+    var wexpt = 0.75f;
+    var wsample = 1e-4f;
+    var headlen = 10000;
+    var iflip = false;
+  }
+  
+  class Options extends Opts {}
+  
+  
   def procPosCPU(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
       A:Array[Float], B:Array[Float], lrate:Float, vexp:Float, nthreads:Int):Int = {
 
@@ -418,13 +445,13 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	  	}
     	  	j = LB(i);
     	  	while (j <= UB(i)) {                                       // Iterate over neighbors in the skip window
-    	  		cv = 0f;
     	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
     	  		  val ibc = W(i + j);
     	  		  val bscale = math.pow(ibc, vexp).toFloat;
     	  			val ib = nrows * ibc;                                  // Get the context word and check it
     	  			if (ib >= 0) {
     	  				c = 0;
+    	  				cv = 0f;
     	  				while (c < nrows) {                                  // Inner product between current and context words. 
     	  					cv += A(c + ia) * B(c + ib);
     	  					c += 1;
@@ -579,11 +606,11 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	  	}
     	  	j = LB(i);
     	  	while (j <= UB(i)) {                                       // Iterate over neighbors in the skip window
-    	  		cv = 0f;
     	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
     	  			val ib = nrows * W(i + j);                             // Get the context word and check it. 
     	  			if (ib >= 0) {
     	  				c = 0;
+    	  				cv = 0f;
     	  				while (c < nrows) {                                  // Inner product between current and context words. 
     	  					cv += A(c + ia) * B(c + ib);
     	  					c += 1;
@@ -672,22 +699,6 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   		sum;
   	}).reduce(_+_);
   }
-}
-
-object Word2Vec  {
-  trait Opts extends Model.Opts {
-    var aopts:ADAGrad.Opts = null;
-    var nskip = 5;
-    var nneg = 5;
-    var nreuse = 5;  
-    var vocabSize = 100000;
-    var wexpt = 0.75f;
-    var wsample = 1e-4f;
-    var headlen = 10000;
-    var iflip = false;
-  }
-  
-  class Options extends Opts {}
   
   
   def mkModel(fopts:Model.Opts) = {

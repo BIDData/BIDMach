@@ -1222,7 +1222,7 @@ template<int NWA, int NWB, int MAXDIM>
 
 int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float *A, float *B, float lrate, float vexp) {
   dim3 threads(32, CDIM, 1);
-  int nblocks = 1 + (nrows - 1)/threads.y;
+  int nblocks = min(64, ncols);
   switch(skip) {
   case 5 : __word2vecPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
   case 3 : __word2vecPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
@@ -1254,7 +1254,7 @@ int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
 
 int word2vecEvalPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float *A, float *B, float *Retval) {
   dim3 threads(32, CDIM, 1);
-  int nblocks = 1 + (nrows - 1)/threads.y;
+  int nblocks = min(64, ncols);
   switch(skip) {
   case 5 : __word2vecEvalPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
   case 3 : __word2vecEvalPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;

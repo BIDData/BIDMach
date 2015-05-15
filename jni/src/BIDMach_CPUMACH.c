@@ -31,12 +31,12 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
           daa[c] = 0;
         }
         for (j = LB[i]; j <= UB[i]; j++) {
-          cv = 0;
           if (j != 0 && i + j >= 0 && i + j < ncols) {
             itmp = W[i + j];
             ib = nrows * itmp;
             if (ib >= 0) {
               bscale = pow(1+itmp, vexp);
+              cv = 0;
               for (c = 0; c < nrows; c++) {
                 cv += A[c + ia] * B[c + ib];
               }
@@ -178,14 +178,13 @@ JNIEXPORT jdouble JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecEvalPos
       ia = nrows * W[i];
       if (ia >= 0) {
         for (j = LB[i]; j <= UB[i]; j++) {
-          cv = 0;
           if (j != 0 && i + j >= 0 && i + j < ncols) {
             ib = nrows * W[i + j];
             if (ib >= 0) {
+              cv = 0;
               for (c = 0; c < nrows; c++) {
                 cv += A[c + ia] * B[c + ib];
               }
-
               if (cv > 16.0f) {
                 cv = 1.0f;
               } else if (cv < -16.0f) {
