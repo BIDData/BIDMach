@@ -435,7 +435,7 @@ object Word2Vec  {
     	  var cv = 0f;
 
     	  val iac = W(i);
-    	  val ascale = math.pow(iac, vexp).toFloat;
+    	  val ascale = math.pow(1+iac, vexp).toFloat;
     	  val ia = nrows * iac;                                        // Get the current word (as a model matrix offset). 
     	  if (ia >= 0) {                                               // Check for OOV words
     	  	c = 0;
@@ -447,7 +447,7 @@ object Word2Vec  {
     	  	while (j <= UB(i)) {                                       // Iterate over neighbors in the skip window
     	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
     	  		  val ibc = W(i + j);
-    	  		  val bscale = math.pow(ibc, vexp).toFloat;
+    	  		  val bscale = math.pow(1+ibc, vexp).toFloat;
     	  			val ib = nrows * ibc;                                  // Get the context word and check it
     	  			if (ib >= 0) {
     	  				c = 0;
@@ -469,8 +469,8 @@ object Word2Vec  {
 
     	  				c = 0;
     	  				while (c < nrows) {
-    	  					daa(c) += (1+ascale) * cv * B(c + ib);                    // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
-    	  					B(c + ib) += (1+bscale) * cv * A(c + ia);
+    	  					daa(c) += ascale * cv * B(c + ib);                    // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
+    	  					B(c + ib) += bscale * cv * A(c + ia);
     	  					c += 1;
     	  				}
     	  			}
@@ -523,12 +523,12 @@ object Word2Vec  {
   			    c += 1;
   			  }
   			  val ibc = WB(k+i*nwb);
-  			  val bscale = math.pow(ibc, vexp).toFloat;
+  			  val bscale = math.pow(1+ibc, vexp).toFloat;
   				val ib = nrows * ibc;                                      // Get the B word as an array offset. 
   				j = 0;
   				while (j < nwa) {                                          // Now iterate over A words. 
   				  val iac = WA(j+i*nwa);
-  				  val ascale = math.pow(iac, vexp).toFloat;
+  				  val ascale = math.pow(1+iac, vexp).toFloat;
   					val ia = nrows * iac; 		                               // Get an A word offset 
   					
   					var cv = 0f;
@@ -551,8 +551,8 @@ object Word2Vec  {
   					val ja = j * nrows;
   					c = 0;
   					while (c < nrows) {                                      // Update the derivatives
-  						aa(c + ja) += (1+ascale) * cv * B(c + ib);
-  						bb(c) +=  (1+bscale) * cv * A(c + ia);
+  						aa(c + ja) += ascale * cv * B(c + ib);
+  						bb(c) +=  bscale * cv * A(c + ia);
   						c += 1;
   					}
   					j += 1;
