@@ -108,8 +108,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	val (words, lb, ub, trandwords, goodwords) = wordMats(gmats, ipass, pos);
 
     	val lrpos = lrate.dv.toFloat;
-    	//    val lrneg = lrpos/opts.nneg;  
-    	val lrneg = lrpos;
+    	val lrneg = lrpos/opts.nneg;  
+//    	val lrneg = lrpos;
     	procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
     	addTime(8);
     	procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp); 
@@ -126,7 +126,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val eneg = evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0));
     addTime(11)
 //  	val score = ((epos + eneg / opts.nneg) /opts.nskip / words.ncols);
-  	val score = ((epos + eneg) / goodwords.length);
+  	val score = ((epos + eneg / opts.nneg) / goodwords.length);
   	row(score)
   	} else row(0);
   }
