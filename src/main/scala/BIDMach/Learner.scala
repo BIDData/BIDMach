@@ -114,7 +114,7 @@ case class Learner(
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
-    if (opts.autoReset) {
+    if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
       resetGPUs
     }
@@ -176,7 +176,7 @@ case class Learner(
     val gf = gflop
     Mat.useCache = cacheState
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
-    if (opts.autoReset) {
+    if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
       resetGPUs
     }
@@ -365,7 +365,7 @@ case class ParLearner(
  //   		if (i != thisGPU) disconnect(i);
     	}
     } 
-    if (opts.autoReset) {
+    if (opts.autoReset && useGPU) {
       Learner.toCPU(models(0).modelmats)
       resetGPUs
     }
@@ -571,7 +571,7 @@ case class ParLearnerx(
 	  val gf = gflop
 	  Mat.useCache = cacheState
 	  println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
-	  if (opts.autoReset) {
+	  if (opts.autoReset && useGPU) {
 	    Learner.toCPU(modelmats)
 	    resetGPUs
 	  }

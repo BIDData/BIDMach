@@ -38,26 +38,26 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
   } 
   
   
-  def uupdate(data:Mat, user:Mat, ipass:Int)
+  def uupdate(data:Mat, user:Mat, ipass:Int, pos:Long)
   
-  def mupdate(data:Mat, user:Mat, ipass:Int)
+  def mupdate(data:Mat, user:Mat, ipass:Int, pos:Long)
   
   def mupdate2(data:Mat, user:Mat, ipass:Int) = {}
   
-  def evalfun(data:Mat, user:Mat, ipass:Int):FMat
+  def evalfun(data:Mat, user:Mat, ipass:Int, pos:Long):FMat
   
   def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
     val sdata = gmats(0)
-    val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    mupdate(sdata, user, ipass)
+    val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval)
+    uupdate(sdata, user, ipass, i)
+    mupdate(sdata, user, ipass, i)
   }
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val sdata = gmats(0)
-    val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    evalfun(sdata, user, ipass)
+    val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval)
+    uupdate(sdata, user, ipass, here)
+    evalfun(sdata, user, ipass, here)
   } 
 }
 
@@ -66,6 +66,7 @@ object FactorModel {
     var uiter = 5
     var weps = 1e-10f
     var minuser = 1e-8f
+    var initUval = 1f
   }
   
   def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {

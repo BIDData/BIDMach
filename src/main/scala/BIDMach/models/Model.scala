@@ -186,6 +186,19 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       		FMat(g);
       	}
       }
+      case g:GDMat => if (useGPU) {
+      	if (opts.useDouble) {
+      		g;
+      	} else {
+      	  GMat(g)
+      	} 
+      } else {
+      	if (opts.useDouble) {
+      	  DMat(g);
+      	} else {
+      		FMat(g);
+      	}
+      }
     }
   }
   

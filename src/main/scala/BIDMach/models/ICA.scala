@@ -101,7 +101,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param user An intermediate matrix that stores (w_j^T^) * (x^i^) values.
    * @param ipass The current pass through the data.
    */
-  def uupdate(data : Mat, user : Mat, ipass : Int) {
+  def uupdate(data : Mat, user : Mat, ipass : Int, pos:Long) {
     if (ipass == 0) {
       batchIteration = batchIteration + 1.0f
       modelmats(1) <-- (modelmats(1)*(batchIteration-1) + mean(data,2)) / batchIteration 
@@ -129,7 +129,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param user An intermediate matrix that stores (w_j^T^) * (x^i^) values.
    * @param ipass The current pass through the data.
    */
-  def mupdate(data : Mat, user : Mat, ipass : Int) {
+  def mupdate(data : Mat, user : Mat, ipass : Int, pos:Long) {
     val gwtx = g_fun(user)
     val g_wtx = g_d_fun(user)
     val termBeta = mkdiag( -mean(user *@ gwtx, 2) )
@@ -160,7 +160,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
    * @param user An intermediate matrix that stores (w_j^T^) * (x^i^) values.
    * @param ipass The current pass through the data.
    */
-  def evalfun(data : Mat, user : Mat, ipass : Int) : FMat = {
+  def evalfun(data : Mat, user : Mat, ipass : Int, pos:Long) : FMat = {
     val big_gwtx = G_fun(user)
     val rowMean = FMat(mean(big_gwtx,2)) - stdNorm
     return sum(rowMean *@ rowMean)

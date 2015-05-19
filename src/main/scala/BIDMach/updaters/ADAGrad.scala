@@ -17,6 +17,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   var stepn:Mat = null
   var mask:Mat = null
   var ve:Mat = null
+  var pe:Mat = null
   var te:Mat = null
   var lrate:Mat = null
   var one:Mat = null
@@ -35,7 +36,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     stepn = mm.zeros(1,1);
     one = mm.ones(1,1);
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols);
-    te = mm.zeros(opts.texp.nrows, opts.texp.ncols);
+    if (opts.texp.asInstanceOf[AnyRef] != null) te = mm.zeros(opts.texp.nrows, opts.texp.ncols);
+    if (opts.pexp.asInstanceOf[AnyRef] != null) pe = mm.zeros(opts.pexp.nrows, opts.pexp.ncols);
     lrate = mm.zeros(opts.lrate.nrows, 1);
     ve <-- opts.vexp;
     te <-- opts.texp;
@@ -93,7 +95,13 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
       	step / firstStep;
       }
     }
-    stepn.set(nsteps+1);
+    val tscale = if (opts.texp.asInstanceOf[AnyRef] != 0) {
+      stepn.set(nsteps+1);
+      stepn ^ te;
+    } else {
+      stepn.set(ipass+1);
+      stepn ^ pe;
+    }
     val nw = one / stepn;
     val nmats = math.min(modelmats.length, updatemats.length)
 //    println("u sumsq %g" format mini(sumSq(0)).dv)
@@ -114,7 +122,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     		if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADA 0 "+i);
     		val tmp = ss ^ ve;
     		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 1 "+i);
-    		tmp ~ tmp *@ (stepn ^ te);
+    		tmp ~ tmp *@ tscale;
     		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 2 "+i);
     		tmp ~ tmp + opts.epsilon;
     		tmp ~ um / tmp;
