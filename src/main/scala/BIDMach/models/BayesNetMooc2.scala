@@ -12,6 +12,9 @@ import scala.util.Random
  * A Bayesian Network implementation with fast parallel Gibbs Sampling on a MOOC dataset.
  * 
  * Haoyu Chen and Daniel Seita are building off of Huasha Zhao's original code.
+ *
+ * Note: do not use this code for important things since it's still in development and we are
+ * transitioning over to a learner framework.
  */
 object BayesNetMooc2 {
 
@@ -72,6 +75,12 @@ object BayesNetMooc2 {
     batchSize = numStudents
     niter = args(5).toInt
     val stateSizePath = args(6)
+
+    // Include these if you want to just do a split or something like that
+    //splitDataStudent(datapath, 0.8, "sdata_student_split.txt")
+    // or do: splitTrainTest(path: String, ratio: Double, fileName: String)
+    //sys.exit
+
     init(nodepath, dagpath, stateSizePath)
     loadData(datapath, numQuestions, numStudents)   
     setup
@@ -188,8 +197,16 @@ object BayesNetMooc2 {
       }
       llikelihood = 0f
     }
-    println("After our sampling, here is the cpt (in row-vector form):\n" + cpt.t)
-    saveFMat("cpt_BNM2_400iters.lz4", cpt)
+    val showThisData = true
+    if (showThisData) {
+      println("After our sampling, here is the cpt (in row-vector form):\n" + cpt.t)
+      println("\nNow let's go through each node and print out its cpt:\n")
+      for ((node,index) <- nodeMap) {
+        println("\nCPT for node " + node + " at index " + index + ".")
+        showCpt(node)
+      }
+      saveFMat("cpt_BNM2_100iters.lz4", cpt)
+    }
   }
 
   /** 
@@ -517,11 +534,11 @@ object BayesNetMooc2 {
    * Loads the data and stores the training samples in 'sdata'. 
    *
    * The path refers to a text file that consists of five columns: the first is the line's hash, the
-   * second is the student number, the third is the question number, the fourth is a 0 or a 1, and
-   * the fifth is the concept ID. We should be able to directly split the lines to put data in "row", 
-   * "col" and "v", which are then put into an (nq x ns) sparse matrix.
+   * the second is the question number, the third is a 0 or a 1, the fourth is the concept ID, and
+   * the fifth indicates a test/train. We should be able to directly split the lines to put data in
+   * "row", "col" and "v", which are then put into an (nq x ns) sparse matrix.
    * 
-   * Note: with new data, the fourth column should probably be an arbitrary value in {0,1,...,k}. In
+   * Note: with new data, the third column should probably be an arbitrary value in {0,1,...,k}. In
    * general, check with the data rather than these comments.
    * 
    * Note: the data is still sparse, but later we do full(data)-1 to get -1 as unknowns.
@@ -557,16 +574,16 @@ object BayesNetMooc2 {
         sMap += (shash -> sid)
         sid = sid + 1
       }
-      if (t(5) == "1") {
+      if (t(4) == "1") {
         // NEW! Only add this if we have never seen the pair...
         val a = sMap(shash)
-        val b = nodeMap("I"+t(2))
+        val b = nodeMap("I"+t(1))
         if (!(coordinatesMap contains (a,b))) {
           coordinatesMap += ((a,b) -> 1)
           row(ptr) = a
           col(ptr) = b
           // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
-          v(ptr) = t(3).toFloat+1
+          v(ptr) = t(2).toFloat+1
           ptr = ptr + 1
         }
       }
@@ -612,15 +629,15 @@ object BayesNetMooc2 {
         sMap += (shash -> sid)
         sid = sid + 1
       }
-      if (t(5) == "0") {
+      if (t(4) == "0") {
         val a = sMap(shash)
-        val b = nodeMap("I"+t(2))
+        val b = nodeMap("I"+t(1))
         if (!(coordinatesMap contains (a,b))) {
           coordinatesMap += ((a,b) -> 1)
           row(ptr) = a
           col(ptr) = b
           // Originally for binary data, this was: v(ptr) = (t(3).toFloat - 0.5) * 2
-          v(ptr) = t(3).toFloat+1
+          v(ptr) = t(2).toFloat+1
           ptr = ptr + 1
         }
       }
@@ -661,9 +678,7 @@ object BayesNetMooc2 {
   /**
    * A new debug method to split the 'sdata' file into training and testing, but this time, we are
    * splitting the data based on columns, which are students in the MOOC case. This way, it is like
-   * we are predicting on unknown STUDENTS, and not just unknown (student, question) pairs. Also,
-   * I'm doing a sys.exit after this because this should be like a one-time thing where we run it
-   * once to make the data, then never call it again (unless we want newly-generated data).
+   * we are predicting on unknown STUDENTS, and not just unknown (student, question) pairs.
    * 
    * @param path The path to the sdata.txt file, assuming that's what we're using. For now, let's 
    *    assume there is NO last column that is 0/1 to indicate a test/train.

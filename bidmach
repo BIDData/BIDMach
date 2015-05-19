@@ -27,7 +27,7 @@ fi
 if [ `uname` = "Darwin" ]; then
     export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${DYLD_LIBRARY_PATH}"
 else
-    export LD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
+    export LD_LIBRARY_PATH="${LIBDIR}:${LIBDIR}/cuda:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
 fi
 export JAVA_NATIVE=${JAVA_NATIVE}:${LD_LIBRARY_PATH}:${DYLD_LIBRARY_PATH}:
 popd > /dev/null

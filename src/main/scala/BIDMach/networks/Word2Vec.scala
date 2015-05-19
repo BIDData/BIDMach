@@ -68,9 +68,11 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
 	  datasource.reset;
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
-    	modelmats(0) = convertMat((rand(opts.dim, nfeats) - 0.5f)/opts.dim);              // syn0 - context model
-    	modelmats(1) = convertMat(zeros(opts.dim, nfeats));                               // syn1neg - target word model
+    	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;              // syn0 - context model
+    	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
     }
+    modelmats(0) = convertMat(modelmats(0));
+    modelmats(1) = convertMat(modelmats(1));
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
     val skipcol = icol((- nskip) to nskip);
@@ -131,7 +133,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   def wordMats(mats:Array[Mat], ipass:Int, pos:Long):(Mat, Mat, Mat, Mat, Mat) = {
   
     val wordsens = mats(0);
-    val words = wordsens(0,?);
+    val words = if (opts.iflip) wordsens(1,?) else wordsens(0,?);
     val wgood = words < opts.vocabSize;                                        // Find OOV words 
     addTime(1);
     
@@ -147,7 +149,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val lbrand = - ubrand;
     addTime(3);
     
-    val sentencenum = wordsens(1,?);                                           // Get the nearest sentence boundaries
+    val sentencenum = if (opts.iflip) wordsens(0,?) else wordsens(1,?);        // Get the nearest sentence boundaries
     val lbsentence = - cumsumByKey(allones, sentencenum) + 1;
     val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
     val lb = max(lbrand, lbsentence);                                          // Combine the bounds
@@ -162,13 +164,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     
     rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
     randpermute ~ fgoodwords + (fgoodwords ∘ randpermute - 1);                 // set the values for bad words to -1.
-    var vv:Mat = null;
-    var ii:Mat = null;
-    opts.synchronized {
-    	val (vv0, ii0) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
-    	vv = vv0;
-    	ii = ii0;
-    }
+    val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
     val ngood = sum(vv > 0f).dv.toInt;                                         // Count of the good words
     val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
     val cwi = cwords(ii);
@@ -259,6 +255,39 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
       }
     }
+  }
+  
+  def trailingZeros(a:Long):Int = {
+    var aa = a;
+    var nz = 0;
+    while ((aa & 1L) == 0) {
+      aa = aa >> 1;
+      nz += 1;
+    }
+    nz
+  }
+  
+  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long):Unit = {
+    val headlen = if (istep > 0) math.max(opts.headlen, opts.headlen << trailingZeros(istep)) else 0;
+    val mlen = models(0).modelmats.length;
+    val thisGPU = getGPU;
+    val modj = new Array[Mat](models.length);
+    for (j <- 0 until mlen) {
+      val mmj = if (headlen > 0) mm(j).view(mm(j).nrows, math.min(mm(j).ncols, headlen)) else mm(j);
+      mmj.clear
+      for (i <- 0 until models.length) {
+        if (useGPU && i < Mat.hasCUDA) setGPU(i);
+        modj(i) = if (headlen > 0) models(i).modelmats(j).view(models(i).modelmats(j).nrows, math.min(models(i).modelmats(j).ncols, headlen)) else models(i).modelmats(j);
+        val umj = if (headlen > 0) um(j).view(um(j).nrows, math.min(um(j).ncols, headlen)) else um(j);
+        umj <-- modj(i)
+        mmj ~ mmj + umj;
+      }
+      mmj ~ mmj * (1f/models.length);
+      for (i <- 0 until models.length) {
+        modj(i) <-- mmj;
+      }
+    }
+    setGPU(thisGPU);
   }
 
   def procPosCPU(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
@@ -551,6 +580,8 @@ object Word2Vec  {
     var vocabSize = 100000;
     var wexpt = 0.75f;
     var wsample = 1e-4f;
+    var headlen = 10000;
+    var iflip = false;
   }
   
   class Options extends Opts {}
@@ -603,7 +634,7 @@ object Word2Vec  {
   }
   
   def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
-    val model = model0.asInstanceOf[DNN];
+    val model = model0.asInstanceOf[Word2Vec];
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mat0.asInstanceOf[AnyRef] != null) opts.putBack = 1;
@@ -626,7 +657,27 @@ object Word2Vec  {
     (nn, opts)
   }
   
-  def predictor(model0:Model, mat0:Mat):(Learner, LearnOptions) = predictor(model0, mat0, null)
+   def predictor(model0:Model, mat0:Mat):(Learner, LearnOptions) = {
+    val model = model0.asInstanceOf[Word2Vec];
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)    
+    val newmod = new Word2Vec(opts);
+    newmod.refresh = false;
+    newmod.copyFrom(model);
+    val mopts = model.opts.asInstanceOf[Word2Vec.Opts];
+    opts.dim = mopts.dim;
+    opts.vocabSize = mopts.vocabSize;
+    opts.nskip = mopts.nskip;
+    opts.nneg = mopts.nneg;
+    opts.nreuse = mopts.nreuse;
+    val nn = new Learner(
+        new MatDS(Array(mat0), opts), 
+        newmod, 
+        null,
+        null, 
+        opts);
+    (nn, opts)
+  }
   
   class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts;
   

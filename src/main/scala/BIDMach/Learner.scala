@@ -233,6 +233,7 @@ case class ParLearner(
     	mm(i) = zeros(mm0.nrows, mm0.ncols)
     	um(i) = zeros(mm0.nrows, mm0.ncols)
     }
+    ParLearner.syncmodels(models, mm, um, 0, useGPU)
   }
   
   def train = {
@@ -251,7 +252,7 @@ case class ParLearner(
     val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
-	      if (i != thisGPU) connect(i)
+//	      if (i != thisGPU) connect(i)
 	    }
 	  }    
     @volatile var done = iones(opts.nthreads, 1)
@@ -320,7 +321,7 @@ case class ParLearner(
       	while (mini(done).v == 0) Thread.sleep(1)
       	Thread.sleep(opts.coolit)
       	istep += opts.nthreads
-      	if (istep % opts.syncStep == 0) ParLearner.syncmodels(models, mm, um, useGPU)
+      	if (istep % opts.syncStep == 0) ParLearner.syncmodels(models, mm, um, istep/opts.syncStep, useGPU)
       	if (datasource.progress > lastp + opts.pstep) {
       		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
       		val gf = gflop
@@ -361,7 +362,7 @@ case class ParLearner(
     Mat.useCache = cacheState
     if (useGPU) {
     	for (i <- 0 until opts.nthreads) {
-    		if (i != thisGPU) disconnect(i);
+ //   		if (i != thisGPU) disconnect(i);
     	}
     } 
     if (opts.autoReset) {
@@ -527,7 +528,7 @@ case class ParLearnerx(
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		if (istep0 >= ilast0 + opts.syncStep) {
-	  			ParLearner.syncmodels(models, mm, um, useGPU)
+	  			ParLearner.syncmodels(models, mm, um, istep0/opts.syncStep, useGPU)
 	  			ilast0 += opts.syncStep
 	  		}
 	  		if (dsProgress > lastp + opts.pstep) {
@@ -795,8 +796,8 @@ object ParLearner {
     models(0).mergeModelPassFn(models, mm, um, ipass);
   }
   
-  def syncmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], useGPU:Boolean) = {
-    models(0).mergeModelFn(models, mm, um);
+  def syncmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, useGPU:Boolean) = {
+    models(0).mergeModelFn(models, mm, um, istep);
   }
   
 }
