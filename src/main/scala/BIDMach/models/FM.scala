@@ -61,7 +61,7 @@ import BIDMach._
  * 
  */
 
-class FM(opts:FM.Opts) extends RegressionModel(opts) {
+class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opts) {
   
   var mylinks:Mat = null;
   var iweight:Mat = null;
@@ -319,12 +319,13 @@ object FM {
   }
   
   // This function constructs a predictor from an existing model 
-  def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions) = {
+  def predictor(model:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
+    val mod = model.asInstanceOf[FM];
+    val mopts = mod.opts;
     val nopts = new LearnOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
-    nopts.links.set(d)
-    nopts.putBack = 1
+    nopts.links = mopts.links.copy;
+    nopts.putBack = 1;
     val newmod = new FM(nopts);
     newmod.refresh = false
     model.copyTo(newmod)

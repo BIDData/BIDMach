@@ -20,7 +20,7 @@ libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
   deps :+ ("org.scala-lang" % "scala-compiler" % sv)
 }
 
-libraryDependencies += "org.scala-lang" % "jline" % "2.10.3"
+libraryDependencies += "jline" % "jline" % "2.11"
 
 libraryDependencies += "org.apache.commons" % "commons-math3" % "3.2"
 

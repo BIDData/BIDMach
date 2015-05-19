@@ -46,6 +46,8 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
   
   def evalfun(data:Mat, user:Mat, ipass:Int, pos:Long):FMat
   
+  def evalfun(data:Mat, user:Mat, preds:Mat, ipass:Int, pos:Long):FMat = {zeros(0,0)}
+  
   def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval)
@@ -55,9 +57,13 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val sdata = gmats(0)
-    val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval)
-    uupdate(sdata, user, ipass, here)
-    evalfun(sdata, user, ipass, here)
+    val user = if (gmats.length > 1) gmats(1) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval);
+    uupdate(sdata, user, ipass, here);
+    if (gmats.length > 2) {
+    	evalfun(sdata, user, gmats(2), ipass, here);
+    } else {
+    	evalfun(sdata, user, ipass, here);
+    }
   } 
 }
 

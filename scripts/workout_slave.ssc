@@ -5,13 +5,15 @@ val ta = loadSMat(dir+"/data/rcv1/testdocs.smat.lz4")
 val tc = loadFMat(dir+"/data/rcv1/testcats.fmat.lz4")
 
 println("\n<<<<<<< Testing GLM on RCV1 (2 passes) >>>>>>>")
-val pc = zeros(tc.nrows, tc.ncols);
-val (mm1,opts1,nn1,nopts1) = GLM.learner(a,c,ta,pc,1)
+val (mm1,opts1) = GLM.learner(a,c,1)
 opts1.useGPU=useGPU
-nopts1.useGPU=useGPU
-opts1.autoReset=false
 mm1.train
+
+val pc = zeros(tc.nrows, tc.ncols);
+val (nn1,nopts1) = GLM.predictor(mm1.model,ta,pc)
+nopts1.useGPU=useGPU
 nn1.predict
+
 val rc = roc2(pc, tc, 1-tc, 1000)
 val mr = mean(rc)(0, 0->100)
 val nt = sum(c,2)(0->100, 0)
@@ -22,28 +24,26 @@ println("\n<<<<<<< Testing FM on RCV1 (2 passes) >>>>>>>")
 //min(a,1f,a)
 //min(ta,1f,ta)
 val c6 = c(6,?)
-val p6 = zeros(1,ta.ncols)
-val tc6 = tc(6,?)
-val (mm2,opts2,nn2,nopts2) = FM.learner(a,c6,ta,p6,1)
-
+val (mm2,opts2) = FM.learner(a,c6,1)
 opts2.useGPU=useGPU
-nopts2.useGPU=useGPU
 opts2.lrate = 0.03f*row(1,0,0) + 0.003f*row(0,1,1)
 opts2.reg1weight = 0.001*row(1,0,0) + 0.1*row(0,1,1)
 opts2.batchSize=2000
-nopts2.batchSize=10000
 opts2.addConstFeat = true
-nopts2.addConstFeat = true
 opts2.dim1 = 32
 opts2.dim2 = 32
 //opts2.strictFM = true
-
 mm2.train
+
+val p6 = zeros(1,ta.ncols)
+val tc6 = tc(6,?)
+val (nn2,nopts2) = FM.predictor(mm2.model,ta,p6)
+nopts2.useGPU=useGPU
+nopts2.batchSize=10000
+nopts2.addConstFeat = true
 nn2.predict
 val rr2 = roc(p6,tc6,1-tc6,100)
 println("ROC AUC cat6 %5.4f" format mean(rr2).dv)
-
-if (useGPU) resetGPU
 
 val a = loadSMat(dir+"/data/uci/nytimes.smat.lz4")
 
@@ -81,10 +81,11 @@ opts5.npasses=5
 opts5.batchSize = 1000
 
 mm5.train
-val mod5 = FMat(mm5.modelmat)
-val iavg = FMat(mm5.modelmats(1))
-val preds = DDS(mod5, fact5, ta5) + iavg
-val diff = preds.contents - ta5.contents
+
+val pa5 = (ta5 != 0);
+val (nn5,nopts5) = SFA.predictor(mm5.model,a5,fact5,pa5)
+
+val diff = ta5.contents - pa5.contents
 val rmse = sqrt((diff ^* diff) / diff.length)
 println("RMSE = %f" format rmse.v);
 

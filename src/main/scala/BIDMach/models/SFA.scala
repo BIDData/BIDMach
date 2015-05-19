@@ -217,9 +217,19 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
    
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
     val preds = DDS(mm, user, sdata) + (iavg + avg);
-  	val dc = sdata.contents
-  	val pc = preds.contents
-  	val vv = (dc - pc) ddot (dc - pc)
+  	val dc = sdata.contents;
+  	val pc = preds.contents;
+  	val vv = (dc - pc) ddot (dc - pc);
+  	-sqrt(row(vv/sdata.nnz))
+  }
+  
+  override def evalfun(sdata:Mat, user:Mat, preds:Mat, ipass:Int, pos:Long):FMat = {
+    val spreds = DDS(mm, user, sdata) + (iavg + avg);
+  	val dc = sdata.contents;
+  	val pc = spreds.contents;
+  	val vv = (dc - pc) ddot (dc - pc);
+  	val xpreds = DDS(mm, user, preds) + (iavg + avg);
+  	preds.contents <-- xpreds.contents;
   	-sqrt(row(vv/sdata.nnz))
   }
 }
@@ -335,6 +345,34 @@ object SFA  {
     nopts.weightByUser = mopts.weightByUser;
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
+        newmod, 
+        null,
+        null,
+        nopts)
+    (nn, nopts)
+  }
+   
+  def predictor(model0:Model, mat1:Mat, user:Mat, preds:Mat) = {
+  	class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with Grad.Opts
+    val model = model0.asInstanceOf[SFA]
+    val nopts = new xopts;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    nopts.putBack = 2
+    val newmod = new SFA(nopts);
+    newmod.refresh = false
+    newmod.copyFrom(model);
+    newmod.Minv = model.Minv;
+    val mopts = model.opts.asInstanceOf[SFA.Opts];
+    nopts.dim = mopts.dim;
+    nopts.uconvg = mopts.uconvg;
+    nopts.miter = mopts.miter;
+    nopts.lambdau = mopts.lambdau;
+    nopts.lambdam = mopts.lambdam;
+    nopts.regumean = mopts.regumean;
+    nopts.doUsers = mopts.doUsers;
+    nopts.weightByUser = mopts.weightByUser;
+    val nn = new Learner(
+        new MatDS(Array(mat1, user, preds), nopts), 
         newmod, 
         null,
         null,
