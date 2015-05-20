@@ -29,7 +29,8 @@ import scala.collection.mutable._
 // To be honest, right now it's far easier to assume the datasource is providing us with a LENGTH ONE matrix each step
 // TODO Be sure to check if we should be using SMats, GMats, etc. ANYWHERE we use Mats.
 // TODO Worry about putback and multiple iterations LATER
-class BayesNetMooc3(val dag:Mat, 
+// TODO Only concerning ourselves with SMats here, right?
+class BayesNetMooc3(val dag:SMat, 
                     val states:Mat, 
                     override val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
 
@@ -42,83 +43,86 @@ class BayesNetMooc3(val dag:Mat,
   var normConstMatrix:SMat = null
   
   /**
-   * Performs a series of initialization steps, such as building the iproject/pproject matrices,
-   * setting up a randomized (but normalized) CPT, and randomly sampling users if our datasource
-   * provides us with an array of two or more matrices.
+   * Performs a series of initialization steps.
+   * 
+   * - Builds iproject/pproject for local offsets and computing probabilities, respectively.
+   * - Build the CPT and its normalizing constant matrix (though we might not use the latter)
+   *   - Note that the CPT itself is a cpt of counts, which I initialize to 1 for now
    */
   def init() = {
-    // build graph and the iproject/pproject matrices from it
-    graph = dag match {
-      case dd:SMat => new Graph1(dd, opts.dim, statesPerNode)
-      case _ => throw new RuntimeException("dag not SMat")
-    }
+    val useGPU = opts.useGPU && (Mat.hasCUDA > 0)
+    graph = new Graph1(dag, opts.dim, statesPerNode)
     graph.color
-    // TODO Problem is that GSMat has no transpose method! Use CPU Matrices for now!
-    iproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.iproject) else graph.iproject
-    pproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.pproject) else graph.pproject
 
-    // build the cpt (which is the modelmats) and the cptoffset vectors
-    val numSlotsInCpt = if (opts.useGPU && Mat.hasCUDA > 0) {
+    // TODO Problem is that GSMat has no transpose method! Use CPU Matrices for now!
+    iproject = if (useGPU) GSMat(graph.iproject) else graph.iproject
+    pproject = if (useGPU) GSMat(graph.pproject) else graph.pproject
+   
+    // Now start building the CPT by computing offset vector.
+    val numSlotsInCpt = if (useGPU) {
       GIMat(exp(GMat((pproject.t)) * ln(GMat(statesPerNode))) + 1e-3) 
     } else {
       IMat(exp(DMat(full(pproject.t)) * ln(DMat(statesPerNode))) + 1e-3)     
     }
     cptOffset = izeros(graph.n, 1)
-    if (opts.useGPU && Mat.hasCUDA > 0) {
+    if (useGPU) {
       cptOffset(1 until graph.n) = cumsum(GMat(numSlotsInCpt))(0 until graph.n-1)
     } else {
       cptOffset(1 until graph.n) = cumsum(IMat(numSlotsInCpt))(0 until graph.n-1)
     }
 
+    // Build the CPT. For now, it stores counts. To avoid div by 0, initialize w/ones.
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     var cpt = rand(lengthCPT,1)
-    normConstMatrix = getNormConstMatrix(cpt)
+    //val cpt = ones(lengthCPT, 1)
+    normConstMatrix = getNormConstMatrix(lengthCPT)
     cpt = cpt / (normConstMatrix * cpt)
+    println("Our cpt.t =\n" + cpt.t)
     setmodelmats(new Array[Mat](1))
-    modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(cpt) else cpt
+    modelmats(0) = if (useGPU) GMat(cpt) else cpt
     mm = modelmats(0)
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
   }
 
   /**
-   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. Note that the
-   * data we get in mats(0) will be such that 0s represent unknowns, but we later want -1 to mean that.
-   * The point of this method is to compute an update for the updater to improve the mm (the cpt here).
-   * Also note that we are randomizing the state/user matrix here, which is like initializing an assignment
-   * to the variables, which (ideally) should only be done if ipass = 0.
+   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. 
+   * 
+   * The data we get in mats(0) is such that 0s mean unknowns, and the knowns are {1, 2, ...}. The
+   * purpose here is to run Gibbs sampling and use the resulting samples to "improve" the mm (i.e.,
+   * the CPT). We randomize the state/user matrix here because we need to randomize the assignment
+   * to all variables. TODO Should this only happen if ipass=0 and we have datasources put back?
    * 
    * @param mats An array of matrices representing a segment of the original data.
    * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
    * @param here The total number of elements seen so far, including the ones in this current batch.
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+    val useGPU = opts.useGPU && (Mat.hasCUDA > 0)
     val sdata = mats(0)
-    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls)
-    if (opts.useGPU && Mat.hasCUDA > 0) {
-      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) // TODO Why is GMat not working?
-    } else {
+    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls) + 1 // Because 0 = unknown
+    if (useGPU) {
+      // TODO GMat not working? Also if we want 1, we increment the FMat() and remove the last -1 part
       state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
-    }
-
-    // Create and use kdata which is sdata-1, since we want -1 to represent an unknown value.
-    val kdata = if (opts.useGPU && Mat.hasCUDA > 0) {
-      GMat(sdata.copy) - 1
     } else {
-      FMat(sdata.copy) - 1
+      state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) 
     }
-    val nonNegativeIndices = find(FMat(kdata) >= 0)
+    val kdata = if (useGPU) { GMat(sdata)-1 } else { FMat(sdata)-1 }
+    val positiveIndices = find(FMat(kdata) >= 0)
     for (i <- 0 until opts.nsampls) {
-      state(nonNegativeIndices + i*(kdata.nrows*kdata.ncols)) = kdata(nonNegativeIndices)
+      state(positiveIndices + i*(kdata.nrows*kdata.ncols)) = kdata(positiveIndices)
     }
-
     uupdate(kdata, state, ipass)
     mupdate(kdata, state, ipass)
   }
 
   /**
-   * Does a uupdate/evalfun on a datasource segment, called from evalbatchg() in Model.scala.
-   * EDIT: do we even want a uupdate call? TODO Should finish this implementaiton.
+   * Evaluates the current datasource; called from evalbatchg() in Model.scala.
+   * 
+   * TODO For now it seems like we may not even need a uupdate call. What often happens here is that
+   * we do uupdate then evaluate, but if we have opts.updateAll then we will already have done a full
+   * uupdate/mupdate call. And we are just evaluating the log likelihood of the cpt here, right? That
+   * involves summing up the log of its normalized elements (use the normConstMatrix).
    * 
    * @param mats An array of matrices representing a segment of the original data.
    * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
@@ -128,12 +132,6 @@ class BayesNetMooc3(val dag:Mat,
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     println("Inside evalbatch, right now nothing here (debugging) but later we'll report a score.")
     return 1f
-    /*
-    val sdata = mats(0)
-    val user = if (mats.length > 1) mats(1) else BayesNetMooc3.reuseuser(mats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    evalfun(sdata, user)
-    */
   }
 
   /**
@@ -149,10 +147,67 @@ class BayesNetMooc3(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(kdata:Mat, user:Mat, ipass:Int):Unit = {
+    println("Inside uupdate with user = ")
+    printMatrix(FMat(user))
     var numGibbsIterations = opts.samplingRate
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
     }
+    for (k <- 0 until numGibbsIterations) {
+      println("In uupdate(), Gibbs iteration " + k + " of " + numGibbsIterations)
+      for (n <- 0 until graph.n) {
+        
+        println("\nCURRENTLY ON NODE " + n)
+        // firstIndices gives [i1 i2 ... ik ]^T which gives contiguous block of Pr(Xn = ? | parents).
+        val assignment = user(?,0)
+        assignment(n) = 0
+        val numStates = statesPerNode(n)
+
+        val globalOffset = cptOffset(n)
+        val localOffset = SMat(iproject(n,?)) * FMat(assignment)
+        val firstIndices = globalOffset + localOffset + icol(0 until numStates)
+        println("globalOffset = " + globalOffset)
+        println(firstIndices)
+        
+        // Some book-keeping
+        val childrenIDs = find(graph.dag(n,?)) 
+        val predIndices = zeros(numStates, childrenIDs.length+1)
+        predIndices(?,0) = firstIndices
+
+        // Next, for EACH of its children, we have to compute appropriate vectors to add
+        for (i <- 0 until childrenIDs.length) {
+          val child = childrenIDs(i)
+          val globalOffset2 = cptOffset(child)
+          val localOffset2 = SMat(iproject(child,?)) * FMat(assignment)
+          val stride = SMat(iproject)(child, n) // Crucial
+          val indices = globalOffset2 + localOffset2 + (stride * icol(0 until numStates))
+          println("For child = " + child + ", goffset = " + globalOffset2 + ", loffset = " + localOffset2 + " stride = " + stride)
+          println(indices)
+          predIndices(?,i+1) = indices
+        }
+        
+        // Combine all previously computed vectors, transpose it, then do matrix multiplication to compute probabilities
+        println("After all has been concluded, predIndices and predIndices.t =")
+        printMatrix(FMat(predIndices))
+        printMatrix(FMat(predIndices.t))
+
+        //val nodei = ln(getCpt(cptOffset(pids) + IMat(SMat(iproject(pids, ?)) * FMat(statei))) + opts.eps)
+        val logProbs = ln(getCpt( predIndices.t )) // + opts.eps) 
+        println("Log probs matrix =")
+        printMatrix(FMat(logProbs))
+        val result = exp( ones(1,childrenIDs.length+1) * logProbs )
+        println("result matrix =")
+        printMatrix(FMat(result))
+
+        // results = a vector with length statesPerNode(n), which references all necessary probabilities, so now sample
+        // TODO (though not difficult once we know what row we have I hope)
+      }
+      sys.exit
+      // Once we've sampled everything, accumulate counts in a CPT (but don't normalize).
+      updateCPT(user)
+    }
+    
+    /*
     for (k <- 0 until numGibbsIterations) {
       println("In uupdate, Gibbs iteration " + k)
       for (c <- 0 until graph.ncolors) {
@@ -171,13 +226,15 @@ class BayesNetMooc3(val dag:Mat,
         sampleColor(kdata, numState, idInColor, pSet, pMatrix, user)
       } 
       updateCPT(user)
-    } 
+    }
+    */
   }
   
   /**
    * After one full round of Gibbs sampling iterations, we put in the local cpt, mm, into the updatemats(0)
    * value so that it gets "averaged into" the global cpt, modelmats(0). The reason for doing this is that
-   * it is like thinning the samples so we pick every n-th one, where n is an opts parameter.
+   * it is like "thinning" the samples so we pick every n-th one, where n is an opts parameter. This also
+   * works if we assume that modelmats(0) stores counts instead of normalized probabilities.
    * 
    * @param kdata A data matrix of this batch where a -1 indicates an unknown value, and {0,1,...,k} are
    *    the known values. Each row represents a random variable.
@@ -233,7 +290,8 @@ class BayesNetMooc3(val dag:Mat,
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
     counts = counts + opts.alpha  
-    mm = (1 - opts.alpha) * mm + counts / (normConstMatrix * counts)
+    //mm = (1 - opts.alpha) * mm + counts / (normConstMatrix * counts)
+    mm = counts // For now, in case we just want raw counts
   }
 
   /**
@@ -321,7 +379,7 @@ class BayesNetMooc3(val dag:Mat,
    * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. Use SMat to save
    * on memory, I think.
    */
-  def getNormConstMatrix(cpt: Mat) : SMat = {
+  def getNormConstMatrix(cptLength : Int) : SMat = {
     var ii = izeros(1,1)
     var jj = izeros(1,1)
     for (i <- 0 until graph.n-1) {
@@ -337,12 +395,12 @@ class BayesNetMooc3(val dag:Mat,
     }
     var offsetLast = cptOffset(graph.n-1)
     var indices = find2(ones(statesPerNode(graph.n-1), statesPerNode(graph.n-1)))
-    while (offsetLast < cpt.length) {
+    while (offsetLast < cptLength) {
       ii = ii on (indices._1 + offsetLast)
       jj = jj on (indices._2 + offsetLast)
       offsetLast = offsetLast + statesPerNode(graph.n-1)
     }
-    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cpt.length, cpt.length)
+    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cptLength, cptLength)
   }
 
   /** Returns a conditional probability table specified by indices from the "index" matrix. */
@@ -363,6 +421,16 @@ class BayesNetMooc3(val dag:Mat,
     return true
   }
 
+  /** A debugging method to print matrices, without being constrained by the command line's cropping. */
+  def printMatrix(mat: FMat) = {
+    for(i <- 0 until mat.nrows) {
+      for (j <- 0 until mat.ncols) {
+        print(mat(i,j) + " ")
+      }
+      println()
+    }
+  }
+  
 }
 
 
@@ -382,9 +450,9 @@ object BayesNetMooc3  {
     var nsampls = 1
     var alpha = 1f
     var beta = 0.1f
-    var samplingRate = 10
+    var samplingRate = 1
     var eps = 1e-9
-    var numSamplesBurn = 20
+    var numSamplesBurn = 100
   }
   
   class Options extends Opts {}
@@ -400,17 +468,17 @@ object BayesNetMooc3  {
     class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
     opts.dim = dag.ncols
-    opts.batchSize = 1000
+    opts.batchSize = 4367
+    opts.isprob = false     // Because our cpts should NOT be normalized across their one column (lol).
     opts.useGPU = false     // Temporary TODO test with GPUs, delete this line later
     opts.updateAll = true   // Temporary TODO (this means that we do the same IncNorm update even with "evalfun"
     //opts.power = 1f         // TODO John suggested that we do not need 1f here
-    opts.isprob = false     // Because our cpts should NOT be normalized across their one column (lol).
     opts.putBack = 1        // Temporary TODO because we will assume we have npasses = 1 for now
     opts.npasses = 1        // Temporary TODO because I would like to get one pass working correctly.
 
     val nn = new Learner(
         new MatDS(Array(data:Mat), opts),
-        new BayesNetMooc3(dag, statesPerNode, opts),
+        new BayesNetMooc3(SMat(dag), statesPerNode, opts),
         null,
         new IncNorm(opts),
         opts)
