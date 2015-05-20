@@ -107,7 +107,7 @@ elif [ "$OS" = "linux" ] ; then
     JAVA_HOME="/usr/java/default"
     fi
     CUDA_HOME="/usr/local/cuda"
-    CUB_HOME=../../../cub
+    CUB_ROOT=../../../cub
     CC="icc"
     GCC="g++"
     NVCC="nvcc"
