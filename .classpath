@@ -7,7 +7,7 @@
 	</classpathentry>
 	<classpathentry kind="src" path="src/main/java">
 		<attributes>
-			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="c:/code/CUDA5.5/SDK/bin"/>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="c:/code/CUDA7/bin"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
@@ -25,5 +25,6 @@
 	<classpathentry kind="lib" path="lib/jcurand-0.7.0a.jar"/>
 	<classpathentry kind="lib" path="lib/jcusolver-0.7.0a.jar"/>
 	<classpathentry kind="lib" path="lib/jcusparse-0.7.0a.jar"/>
+	<classpathentry kind="lib" path="lib/scala-compiler-2.11.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
