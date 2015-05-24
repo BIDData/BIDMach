@@ -398,14 +398,14 @@ object BayesNetMooc2 {
     val offset = cptOffset(id)
     for (i <- 0 until math.pow(2, np).toInt) {
       if (np > 0)
-        print(String.format("\t%" + np.toInt + "s", i.toBinaryString).replace(" ", "0"))
+        print(String.format("\t\t%" + np.toInt + "s", i.toBinaryString).replace(" ", "0"))
     }
     print("\n0")
     for (i <- 0 until math.pow(2, np).toInt)
-      print("\t%.2f" format cpt(offset + i * 2))
+      print("\t%.3f" format cpt(offset + i * 2))
     print("\n1")
     for (i <- 0 until math.pow(2, np).toInt)
-      print("\t%.2f" format cpt(offset + i * 2 + 1))
+      print("\t%.3f" format cpt(offset + i * 2 + 1))
     print("\n")
   }
 
