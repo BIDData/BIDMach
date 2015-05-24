@@ -10,8 +10,7 @@ import BIDMach._
 /**
  * WIP: Bayes network using cooled Gibbs parameter estimation
  */
-
-class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
+class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
   var mm:Mat = null
   var offset:Mat = null
@@ -20,21 +19,16 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
   var pproject:Mat = null
   
   def init() = {
-       
-    graph = dag match {
-      case dd:SMat => new Graph(dd, opts.dim)
-      case _ => throw new RuntimeException("dag not SMat")
-    }
+    graph = new Graph(dag, opts.dim)
     graph.color
-    
-    iproject = if (opts.useGPU && Mat.hasCUDA > 0) GMat(graph.iproject) else graph.iproject
-    pproject = if (opts.useGPU && Mat.hasCUDA > 0) GMat(graph.pproject) else graph.pproject
+    iproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.iproject) else graph.iproject
+    pproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.pproject) else graph.pproject
     
     // prepare cpt 
     val np = sum(dag)
     val ns = IMat(pow(2*ones(1, graph.n), np+1))
     val l = sum(ns).v
-    val modelmat = rand(1, l)
+    val modelmat = rand(l, 1)
     modelmat(1 until l by 2) = 1 - modelmat(0 until l-1 by 2)
     setmodelmats(new Array[Mat](1))
     modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat
@@ -48,16 +42,13 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
         mats = datasource.next
         val sdata = mats(0)
         val state = mats(1)
-
         state <-- rand(state.nrows, state.ncols * opts.nsampls)
         state <-- (state >= 0.5)
-
         val innz = sdata match { 
           case ss: SMat => find(ss)
           case ss: GSMat => find(SMat(ss))
           case _ => throw new RuntimeException("sdata not SMat/GSMat")
         }
-
         for(i <- 0 until opts.nsampls){
         	state.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
         	state(?, i*sdata.ncols until (i+1)*sdata.ncols) = state(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
@@ -67,10 +58,8 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
     }
     
     mm = modelmats(0)
- 
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-    
   }
   
   def getCpt(index: Mat) = {
@@ -83,63 +72,70 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
   
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     if (putBack < 0 || ipass == 0) user.set(1f)
+    println("Inside uupdate with user:\n" + user)
 
     for (k <- 0 until opts.uiter) {
-      
-      for(c <- 0 until graph.ncolors){
-    	  val ids = find(graph.colors == c)
-    	  val innz = sdata match {
-    	    case ss: SMat => find(ss)
-    	    case ss: GSMat => find(SMat(ss))
-    	  }
-    	  
-    	  val user0 = user.copy
-    	  
-    	  user0.asInstanceOf[FMat](ids, ?) = 0f
-    	  for(i <- 0 until opts.nsampls){
-    		user0.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
-    		user0(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
-    	  }
-    	  val nodep0 = ln(getCpt(offset + iproject*user0) + opts.eps)        
-    	  val p0 = exp(pproject(ids, ?) * nodep0)
-    	  
-    	  val user1 = user.copy
-    	  user1.asInstanceOf[FMat](ids, ?) = 1f
-    	  for(i <- 0 until opts.nsampls){
-    		user1.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
-    		user1(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
-    	  }
-    	  val nodep1 = ln(getCpt(offset + iproject*user1) + opts.eps)        
-    	  val p1 = exp(pproject(ids, ?) * nodep1)
-    	  
-    	  val p = p1/(p0+p1)
-    	  val sample = rand(ids.length, sdata.ncols)
-    	  sample <-- (sample <= p)
-
-    	  user(ids, ?) <-- sample
-    	  for(i <- 0 until opts.nsampls){
-    		user.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
-    		user(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
-    	  }
-
+      for (c <- 0 until graph.ncolors) {
+    	val ids = find(graph.colors == c)
+    	val innz = sdata match {
+    	  case ss: SMat => find(ss)
+    	  case ss: GSMat => find(SMat(ss)) // This makes no sense
+    	}
+    	
+    	// Get probabilities for getting 0
+    	val user0 = user.copy
+    	user0.asInstanceOf[FMat](ids, ?) = 0f
+    	for (i <- 0 until opts.nsampls) {
+    	  user0.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
+    	  //user0(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	  user0(?, i*sdata.ncols until (i+1)*sdata.ncols) = user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	}
+    	val nodep0 = ln(getCpt(offset + SMat(iproject) * FMat(user0)) + opts.eps)        
+    	val p0 = exp(SMat(pproject(ids, ?)) * FMat(nodep0))
+    	
+    	// Get probabilities for getting 1
+    	val user1 = user.copy
+    	user1.asInstanceOf[FMat](ids, ?) = 1f
+    	for (i <- 0 until opts.nsampls) {
+    	  user1.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
+    	  //user1(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	  user1(?, i*sdata.ncols until (i+1)*sdata.ncols) = user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	}
+    	val nodep1 = ln(getCpt(offset + SMat(iproject) * FMat(user1)) + opts.eps)        
+    	val p1 = exp(SMat(pproject(ids, ?)) * FMat(nodep1))
+    	
+    	// Now sample
+    	val p = p1/(p0+p1)
+    	val sample = rand(ids.length, sdata.ncols)
+    	sample <-- (sample <= p) // This works because it's a full size matrix
+    	println("For color group " + c + ", with sample matrix size " + size(sample) + ", and ids.t = " + ids.t + ", we just finished sampling:\n" + sample)
+    	//user(ids, ?) <-- sample
+    	user(ids,?) = sample
+    	for (i <- 0 until opts.nsampls) {
+    	  user.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
+    	  //user(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	  user(?, i*sdata.ncols until (i+1)*sdata.ncols) = user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	}
       } 
     }	
+    println("Done with uupdate, user:\n" + user)
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+    println("inside mupdate with user:\n" + user)
   	val um = updatemats(0) 
   	um.set(0)
-	val index = offset + iproject*(user>0)
-	for(i <- 0 until user.ncols){
-	  um(index(?, i)) = um(index(?, i)) + 1
+	val index = IMat(offset + SMat(iproject) * FMat(user > 0))
+	for (i <- 0 until user.ncols) {
+	  um(index(?, i)) = um(index(?, i)) + 1f
 	}
     um <-- um + opts.alpha
     	
 	// normalize count matrix
 	val norm = um.zeros(um.nrows, um.ncols)
-	val l = um.ncols
-    norm(0, 0 until l-1 by 2) = um(0, 1 until l by 2) 
-    norm(0, 1 until l by 2) = um(0, 0 until l-1 by 2) 
+	val l = um.length
+    norm(0 until l-1 by 2) = um(1 until l by 2) 
+    norm(1 until l by 2) = um(0 until l-1 by 2) 
     norm <-- norm + um
     um <-- um / norm
   }
@@ -148,7 +144,9 @@ class BayesNet(val dag:Mat, override val opts:BayesNet.Opts = new BayesNet.Optio
   	row(0f, 0f)
   }
   
-  def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
+  def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
+    println("\n\n\nInside dobatch with here = " + here)
+    println("also, our modelmats(0).t is:\n" + modelmats(0).t)
     val sdata = gmats(0)
     val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
     uupdate(sdata, user, ipass)
@@ -173,7 +171,7 @@ object BayesNet  {
   
   class Options extends Opts {}
   
-  def mkBayesNetmodel(dag: Mat, fopts:Model.Opts) = {
+  def mkBayesNetmodel(dag: SMat, fopts:Model.Opts) = {
   	new BayesNet(dag, fopts.asInstanceOf[BayesNet.Opts])
   }
   
@@ -181,12 +179,13 @@ object BayesNet  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
    
-  def learner(dag0:Mat, mat0:Mat) = {
+  def learner(dag0:SMat, mat0:Mat) = {
     class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
     //opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     opts.batchSize = mat0.ncols
     opts.dim = dag0.ncols
+    opts.isprob = false // Important! Otherwise it normalizes across columns!
   	val nn = new Learner(
   	    new MatDS(Array(mat0:Mat), opts), 
   	    new BayesNet(dag0, opts), 
@@ -230,8 +229,6 @@ class Graph(val dag: SMat, val n: Int) {
    * 
    * Iterates through the parent indices and insert 1s in the 'moral' matrix to indicate an edge.
    * 
-   * TODO Is there a way to make this GPU-friendly?
-   * 
    * @param moral A matrix that represents an adjacency matrix "in progress" in the sense that it
    *    is continually getting updated each iteration from the "moralize" method.
    * @param parents An array representing the parent indices of the node of interest.
@@ -248,7 +245,7 @@ class Graph(val dag: SMat, val n: Int) {
   } 
   
   /**
-   * TODO No idea what this is yet, and it isn't in the newgibbs branch. Only used here for BayesNet.
+   * Computes the local offset matrix.
    */
   def iproject = {
     var ip = dag.t       
@@ -263,7 +260,7 @@ class Graph(val dag: SMat, val n: Int) {
   }
   
   /**
-   * TODO No idea what this is yet, and it isn't in the new gibbs branch. Only used here for BayesNet.
+   * Computes the dag + identity matrix.
    */
   def pproject = {
     dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
@@ -276,8 +273,6 @@ class Graph(val dag: SMat, val n: Int) {
    * the directed graph. First, copy the dag to the moral graph because all 1s in the dag matrix
    * are 1s in the moral matrix (these are adjacency matrices). For each node, find its parents,
    * connect them, and update the matrix. Then make it symmetric because the graph is undirected.
-   * 
-   * TODO Is there a way to make this GPU-friendly?
    */
   def moralize = {
     var moral = full(dag)
@@ -294,8 +289,6 @@ class Graph(val dag: SMat, val n: Int) {
    * Steps: first, moralize the graph. Then iterate through each node, find its neighbors, and apply a
    * "color mask" to ensure current node doesn't have any of those colors. Then find the legal color
    * with least count (a useful heuristic). If that's not possible, then increase "ncolor".
-   * 
-   * TODO Is there a way to make this GPU-friendly?
    */
   def color = {
     moralize

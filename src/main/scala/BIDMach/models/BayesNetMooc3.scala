@@ -100,9 +100,9 @@ class BayesNetMooc3(val dag:SMat,
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
     val useGPU = opts.useGPU && (Mat.hasCUDA > 0)
     val sdata = mats(0)
-    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls) + 1 // Because 0 = unknown
+    var state = rand(sdata.nrows, sdata.ncols * opts.nsampls) // Because 0 = unknown
     if (useGPU) {
-      // TODO GMat not working? Also if we want 1, we increment the FMat() and remove the last -1 part
+      // TODO GMat not working?
       state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
     } else {
       state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) 
@@ -158,23 +158,34 @@ class BayesNetMooc3(val dag:SMat,
       for (n <- 0 until graph.n) {
         
         println("\nCURRENTLY ON NODE " + n)
-        // firstIndices gives [i1 i2 ... ik ]^T which gives contiguous block of Pr(Xn = ? | parents).
-        val assignment = user(?,0)
-        assignment(n) = 0
+        // firstIndices gives indices to the contiguous block of Pr(Xn = ? | parents).
+        val assignment = user.copy
+        assignment(n,?) = 0
         val numStates = statesPerNode(n)
-
         val globalOffset = cptOffset(n)
         val localOffset = SMat(iproject(n,?)) * FMat(assignment)
-        val firstIndices = globalOffset + localOffset + icol(0 until numStates)
+        val firstIndices = globalOffset + localOffset + (icol(0 until numStates) + zeros(numStates, localOffset.length))
         println("globalOffset = " + globalOffset)
+        println("localOffset = " + localOffset)
         println(firstIndices)
-        
+
         // Some book-keeping
         val childrenIDs = find(graph.dag(n,?)) 
-        val predIndices = zeros(numStates, childrenIDs.length+1)
-        predIndices(?,0) = firstIndices
+        val predIndices = zeros(numStates, user.ncols * (childrenIDs.length+1))
+        predIndices(?, (0 until user.ncols) ) = firstIndices
+        println("predIndices = ") 
+        printMatrix(FMat(predIndices))
 
-        // Next, for EACH of its children, we have to compute appropriate vectors to add
+        // Next, for EACH of its children, we have to compute appropriate vectors to add. Avoid looping over children.
+        val globalOffsets = cptOffset(childrenIDs)
+        val localOffsets = SMat(iproject)(childrenIDs,?) * FMat(assignment)
+        val strides = SMat(iproject)(childrenIDs,n)
+
+        println("localoffsets followed by strides:")
+        printMatrix(localOffsets)
+        printMatrix(FMat(strides))
+        sys.exit
+        
         for (i <- 0 until childrenIDs.length) {
           val child = childrenIDs(i)
           val globalOffset2 = cptOffset(child)
@@ -200,7 +211,11 @@ class BayesNetMooc3(val dag:SMat,
         printMatrix(FMat(result))
 
         // results = a vector with length statesPerNode(n), which references all necessary probabilities, so now sample
-        // TODO (though not difficult once we know what row we have I hope)
+        val resultNormalized = result / sum(result,2)
+        // For each row, pick a number in [0,1], then check which range it goes in, and that is the value we sample for that row.
+        // Result, btw, is a ROW vector, representing one row and the different values that row can take on!
+        // TODO (though not difficult once we know what row we have I hope) If one row, can normalize across rows,
+        // Of course, at the end, we have to override everything with the values we know!
       }
       sys.exit
       // Once we've sampled everything, accumulate counts in a CPT (but don't normalize).

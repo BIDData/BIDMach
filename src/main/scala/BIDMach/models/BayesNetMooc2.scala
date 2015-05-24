@@ -199,13 +199,13 @@ object BayesNetMooc2 {
     }
     val showThisData = true
     if (showThisData) {
-      println("After our sampling, here is the cpt (in row-vector form):\n" + cpt.t)
-      println("\nNow let's go through each node and print out its cpt:\n")
-      for ((node,index) <- nodeMap) {
-        println("\nCPT for node " + node + " at index " + index + ".")
+      println("After our sampling, here is the cpt in row-vector form:\n" + cpt.t)
+      println("\nNow let's go through each node --- in order by index --- and print out its cpt:\n")
+      for ((node,index) <- nodeMap.toSeq.sortBy(_._2)) {
+        println("\nAt index " + index + ", CPT for node " + node + " is ...")
         showCpt(node)
       }
-      saveFMat("cpt_BNM2_100iters.lz4", cpt)
+      saveFMat("cpt_BNM2_" + niter + "iters.lz4", cpt)
     }
   }
 
