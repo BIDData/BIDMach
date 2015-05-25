@@ -7,6 +7,8 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
 
+import java.text.NumberFormat
+
 /**
  * WIP: Bayes network using cooled Gibbs parameter estimation
  */
@@ -15,14 +17,66 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
   var mm:Mat = null
   var offset:Mat = null
   var graph:Graph = null
-  var iproject:Mat = null
+  var iproject:SMat = null
   var pproject:Mat = null
   
+  // Trying to stop matrix caching problems!
+  var nodep0:Mat = null
+  var nodep1:Mat = null
+  var p0:Mat = null
+  var p1:Mat = null
+  var p:Mat = null
+  var sample:Mat = null
+  var cptindex:Mat = null
+  var user:Mat = null
+  var user0:FMat = null
+  var user1:FMat = null
+  var index:Mat = null
+  var zeromatrix:Mat = null
+  
   def init() = {
+    
+    /*
+    val a = rand(10000,10000)
+    val b = rand(10000,10000)
+    val c = rand(10000,10000)
+    println("Memory stats after creating a, b, and c:")
+    computeMemory()
+    for (i <- 0 until 100) {
+      a <-- (b / (b+c))
+      println("On iteration i = " + i + ", after doing a <-- (b / (b+c)), memory stats are:")
+      computeMemory()
+    }
+    val a = rand(334,4367)
+    for (i <- 0 until 100) {
+      a <-- zeros(334,4367)
+      println("On iteration i = " + i + ", we have memory as:")
+      computeMemory()
+    }
+    sys.exit
+    * 
+    */
+    
+    // Back to normal...
     graph = new Graph(dag, opts.dim)
     graph.color
-    iproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.iproject) else graph.iproject
-    pproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.pproject) else graph.pproject
+    //iproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.iproject) else SMat(graph.iproject)
+    iproject = SMat(graph.iproject)
+    pproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.pproject) else SMat(graph.pproject)
+    
+    // New stuff
+    nodep0 = zeros(334,4367)
+    nodep1 = zeros(334,4367)
+    cptindex = zeros(334,4367)
+    index = zeros(334,4367)
+    p0 = zeros(67,4367)
+    p1 = zeros(67,4367)
+    p = zeros(67,4367)
+    sample = zeros(67,4367)
+    user = ones(334,4367)
+    user0 = ones(334,4367)
+    user1 = ones(334,4367)
+    zeromatrix = zeros(334,4367)
     
     // prepare cpt 
     val np = sum(dag)
@@ -63,66 +117,85 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
   }
   
   def getCpt(index: Mat) = {
-    var cptindex = mm.zeros(index.nrows, index.ncols)
-    for(i <-0 until index.ncols){
+    println("Inside getCpt")
+    computeMemory()
+    cptindex <-- zeromatrix
+    for(i <- 0 until index.ncols){
       cptindex(?, i) = mm(IMat(index(?, i)))
     }
+    println("Just before getCPT finishes, returning the cptindex")
+    computeMemory()
     cptindex
   }
   
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     if (putBack < 0 || ipass == 0) user.set(1f)
-    println("Inside uupdate with user:\n" + user)
 
     for (k <- 0 until opts.uiter) {
+      println("Before iterating through color groups, we have memory as:")
+      computeMemory()
       for (c <- 0 until graph.ncolors) {
+        if (c == 0) {
+
     	val ids = find(graph.colors == c)
     	val innz = sdata match {
     	  case ss: SMat => find(ss)
     	  case ss: GSMat => find(SMat(ss)) // This makes no sense
     	}
     	
-    	// Get probabilities for getting 0
-    	val user0 = user.copy
+    	// Compute probabilities for getting 0
+    	user0 <-- FMat(user)
     	user0.asInstanceOf[FMat](ids, ?) = 0f
     	for (i <- 0 until opts.nsampls) {
     	  user0.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
-    	  //user0(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
-    	  user0(?, i*sdata.ncols until (i+1)*sdata.ncols) = user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	  user0(?, i*sdata.ncols until (i+1)*sdata.ncols) = user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0) // The <-- doesn't work
     	}
-    	val nodep0 = ln(getCpt(offset + SMat(iproject) * FMat(user0)) + opts.eps)        
-    	val p0 = exp(SMat(pproject(ids, ?)) * FMat(nodep0))
+    	println("before node0,p0")
+    	computeMemory()
+    	index <-- (offset + iproject * user0)
+    	nodep0 <-- ln(getCpt(index) + opts.eps)        
+    	println("after node0, before p0")
+    	computeMemory()
+    	p0 <-- exp(SMat(pproject(ids, ?)) * FMat(nodep0))
+    	println("after node0,p0, note: size of node0 and p0 are " + size(nodep0) + " and " + size(p0))
+    	computeMemory()
     	
-    	// Get probabilities for getting 1
-    	val user1 = user.copy
+    	// Compute probabilities for getting 1
+    	user1 <-- FMat(user)
     	user1.asInstanceOf[FMat](ids, ?) = 1f
     	for (i <- 0 until opts.nsampls) {
     	  user1.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
-    	  //user1(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
-    	  user1(?, i*sdata.ncols until (i+1)*sdata.ncols) = user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	  user1(?, i*sdata.ncols until (i+1)*sdata.ncols) = user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0) // The <-- doesn't work
     	}
-    	val nodep1 = ln(getCpt(offset + SMat(iproject) * FMat(user1)) + opts.eps)        
-    	val p1 = exp(SMat(pproject(ids, ?)) * FMat(nodep1))
+    	println("before node1,p1:")
+    	computeMemory()
+    	index <-- (offset + iproject * user1)
+    	nodep1 <-- ln(getCpt(index) + opts.eps)        
+    	println("after node1, before p1")
+    	computeMemory()
+    	p1 <-- exp(SMat(pproject(ids, ?)) * FMat(nodep1))
+    	println("after node1,p1:")
+    	computeMemory()
     	
-    	// Now sample
-    	val p = p1/(p0+p1)
-    	val sample = rand(ids.length, sdata.ncols)
+    	// Now sample. I this section should be OK with regards to memory allocation.
+    	p <-- p1/(p0+p1)
+    	sample <-- rand(ids.length, sdata.ncols)
     	sample <-- (sample <= p) // This works because it's a full size matrix
-    	println("For color group " + c + ", with sample matrix size " + size(sample) + ", and ids.t = " + ids.t + ", we just finished sampling:\n" + sample)
-    	//user(ids, ?) <-- sample
-    	user(ids,?) = sample
+    	user(ids, ?) = sample // The <-- doesn't work
     	for (i <- 0 until opts.nsampls) {
     	  user.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
-    	  //user(?, i*sdata.ncols until (i+1)*sdata.ncols) <-- user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
-    	  user(?, i*sdata.ncols until (i+1)*sdata.ncols) = user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
+    	  user(?, i*sdata.ncols until (i+1)*sdata.ncols) = user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0) // The <-- doesn't work
     	}
+        println("...")
+        
+        }
       } 
+      println("After iterating through color groups, memory is:")
+      computeMemory()
     }	
-    println("Done with uupdate, user:\n" + user)
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("inside mupdate with user:\n" + user)
   	val um = updatemats(0) 
   	um.set(0)
 	val index = IMat(offset + SMat(iproject) * FMat(user > 0))
@@ -145,26 +218,38 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    println("\n\n\nInside dobatch with here = " + here)
-    println("also, our modelmats(0).t is:\n" + modelmats(0).t)
-    val sdata = gmats(0)
-    val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    mupdate(sdata, user, ipass)
+    println("\nAt the start of doBatch(), our memory is:")
+    computeMemory() // to see if memory is causing issues
+    //val sdata = gmats(0)
+    //val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
+    uupdate(gmats(0), user, ipass)
+    mupdate(gmats(0), user, ipass)
   }
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-    val sdata = gmats(0)
-    val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
-    uupdate(sdata, user, ipass)
-    evalfun(sdata, user)
+    //val sdata = gmats(0)
+    //val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
+    uupdate(gmats(0), user, ipass)
+    evalfun(gmats(0), user)
   } 
+  
+  def computeMemory() = {
+    val runtime = Runtime.getRuntime();
+    val format = NumberFormat.getInstance(); 
+    val sb = new StringBuilder();
+    val allocatedMemory = runtime.totalMemory();
+    val freeMemory = runtime.freeMemory();
+    sb.append("free memory: " + format.format(freeMemory / (1024*1024)) + "M   ");
+    sb.append("allocated/total memory: " + format.format(allocatedMemory / (1024*1024)) + "M\n");
+    print(sb.toString())
+  }
+  
 }
 
 object BayesNet  {
   trait Opts extends Model.Opts {
     var nsampls = 1
-    var alpha = 0.01f
+    var alpha = 0.1f
     var uiter = 1
     var eps = 1e-9
   }
