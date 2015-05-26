@@ -55,17 +55,19 @@ case class Learner(
    
   def retrain() = {
     flip 
-    var cacheState = Mat.useCache
-    Mat.useCache = opts.useCache
-    var done = false
-    var ipass = 0
-    var here = 0L
-    var lasti = 0
-    var bytes = 0L
-    if (updater != null) updater.clear
-    val reslist = new ListBuffer[FMat]
-    val samplist = new ListBuffer[Float]
+    var cacheState = Mat.useCache;
+    Mat.useCache = opts.useCache;
+    val debugMemState = Mat.debugMem;
+    var done = false;
+    var ipass = 0;
+    var here = 0L;
+    var lasti = 0;
+    var bytes = 0L;
+    if (updater != null) updater.clear;
+    val reslist = new ListBuffer[FMat];
+    val samplist = new ListBuffer[Float];
     while (ipass < opts.npasses && ! done) {
+      if (opts.debugMem && ipass > 0) Mat.debugMem = true;
     	var lastp = 0f
       datasource.reset
       var istep = 0
@@ -111,8 +113,9 @@ case class Learner(
       if (updater != null) updater.updateM(ipass)
       ipass += 1
     }
-    val gf = gflop
-    Mat.useCache = cacheState
+    val gf = gflop;
+    Mat.useCache = cacheState;
+    Mat.debugMem = debugMemState;
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
@@ -722,6 +725,7 @@ object Learner {
   	var autoReset = true
   	var useCache = true
   	var updateAll = false
+  	var debugMem = false
   }
   
   def numBytes(mat:Mat):Long = {
