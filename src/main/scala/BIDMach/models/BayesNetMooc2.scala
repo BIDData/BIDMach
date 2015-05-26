@@ -402,10 +402,10 @@ object BayesNetMooc2 {
     }
     print("\n0")
     for (i <- 0 until math.pow(2, np).toInt)
-      print("\t%.3f" format cpt(offset + i * 2))
+      print("\t%.4f" format cpt(offset + i * 2))
     print("\n1")
     for (i <- 0 until math.pow(2, np).toInt)
-      print("\t%.3f" format cpt(offset + i * 2 + 1))
+      print("\t%.4f" format cpt(offset + i * 2 + 1))
     print("\n")
   }
 

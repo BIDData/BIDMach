@@ -1,5 +1,5 @@
 //:silent
-val dir="../data/netflix/"
+val dir="data/netflix/"
 
 //val a0=loadSMat(dir+"train.smat.lz4")
 //val ta0=loadSMat(dir+"test.smat.lz4")

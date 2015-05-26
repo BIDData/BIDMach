@@ -17,80 +17,63 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
   var mm:Mat = null
   var offset:Mat = null
   var graph:Graph = null
-  var iproject:SMat = null
+  var iproject:Mat = null
   var pproject:Mat = null
   
   // Trying to stop matrix caching problems!
   var nodep0:Mat = null
   var nodep1:Mat = null
-  var p0:Mat = null
-  var p1:Mat = null
-  var p:Mat = null
-  var sample:Mat = null
   var cptindex:Mat = null
   var user:Mat = null
-  var user0:FMat = null
-  var user1:FMat = null
+  var user0:Mat = null
+  var user1:Mat = null
   var index:Mat = null
-  var zeromatrix:Mat = null
   
   def init() = {
-    
-    /*
-    val a = rand(10000,10000)
-    val b = rand(10000,10000)
-    val c = rand(10000,10000)
-    println("Memory stats after creating a, b, and c:")
-    computeMemory()
-    for (i <- 0 until 100) {
-      a <-- (b / (b+c))
-      println("On iteration i = " + i + ", after doing a <-- (b / (b+c)), memory stats are:")
-      computeMemory()
-    }
-    val a = rand(334,4367)
-    for (i <- 0 until 100) {
-      a <-- zeros(334,4367)
-      println("On iteration i = " + i + ", we have memory as:")
-      computeMemory()
-    }
-    sys.exit
-    * 
-    */
-    
-    // Back to normal...
     graph = new Graph(dag, opts.dim)
     graph.color
-    //iproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.iproject) else SMat(graph.iproject)
-    iproject = SMat(graph.iproject)
-    pproject = if (opts.useGPU && Mat.hasCUDA > 0) GSMat(graph.pproject) else SMat(graph.pproject)
     
-    // New stuff
-    nodep0 = zeros(334,4367)
-    nodep1 = zeros(334,4367)
-    cptindex = zeros(334,4367)
-    index = zeros(334,4367)
-    p0 = zeros(67,4367)
-    p1 = zeros(67,4367)
-    p = zeros(67,4367)
-    sample = zeros(67,4367)
-    user = ones(334,4367)
-    user0 = ones(334,4367)
-    user1 = ones(334,4367)
-    zeromatrix = zeros(334,4367)
+    // Please bear with me on this for now...
+    val useGPUnow = opts.useGPU && Mat.hasCUDA > 0
+    val numVars = dag.ncols
+    if (useGPUnow) {
+      iproject  = GSMat(graph.iproject)
+      pproject  = GSMat(graph.pproject)
+      nodep0    = gzeros(numVars,4367)
+      nodep1    = gzeros(numVars,4367)
+      cptindex  = gzeros(numVars,4367)
+      index     = gzeros(numVars,4367)
+      user      = gones(numVars,4367) // TODO maybe this shouldn't be here for now?
+      user0     = gones(numVars,4367)
+      user1     = gones(numVars,4367)
+    } else {
+      iproject  = SMat(graph.iproject)
+      pproject  = SMat(graph.pproject)
+      nodep0    = zeros(numVars,4367)
+      nodep1    = zeros(numVars,4367)
+      cptindex  = zeros(numVars,4367)
+      index     = zeros(numVars,4367)
+      user      = ones(numVars,4367) // Same over here...
+      user0     = ones(numVars,4367)
+      user1     = ones(numVars,4367)     
+    }
     
-    // prepare cpt 
+    // Prepare the CPT, which is stored in modelmats(0), and its offset.
     val np = sum(dag)
     val ns = IMat(pow(2*ones(1, graph.n), np+1))
     val l = sum(ns).v
     val modelmat = rand(l, 1)
     modelmat(1 until l by 2) = 1 - modelmat(0 until l-1 by 2)
+    println("Here is the modelmat.t after initializing it and normalizing:\n" + modelmat.t)
     setmodelmats(new Array[Mat](1))
-    modelmats(0) = if (opts.useGPU && Mat.hasCUDA > 0) GMat(modelmat) else modelmat
-    
-    // prepare cpt offset 
-    offset = izeros(graph.n, 1)
+    modelmats(0) = if (useGPUnow) GMat(modelmat) else modelmat
+    offset = izeros(graph.n,1)
     offset(1 until graph.n) = cumsum(ns)(0 until graph.n-1)
+    if (useGPUnow) {
+      offset = GIMat(offset)
+    }
     
+    /*
     if (mats.size > 1) {
       while (datasource.hasNext) {
         mats = datasource.next
@@ -110,6 +93,7 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
         datasource.putBack(mats,1)
       }
     }
+    */
     
     mm = modelmats(0)
     updatemats = new Array[Mat](1)
@@ -117,90 +101,85 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
   }
   
   def getCpt(index: Mat) = {
-    println("Inside getCpt")
-    computeMemory()
-    cptindex <-- zeromatrix
-    for(i <- 0 until index.ncols){
-      cptindex(?, i) = mm(IMat(index(?, i)))
+    if (opts.useGPU && Mat.hasCUDA > 0) {
+      cptindex <-- mm(GIMat(index)) 
+    } else {
+      cptindex <-- mm(IMat(index)) 
     }
-    println("Just before getCPT finishes, returning the cptindex")
-    computeMemory()
     cptindex
   }
   
+  // Note: sdata is a sparse matrix of 1s and 2s, right? The "user" matrix will shift everything
+  // over to be {0,1} in which case we only want to add the sdata stuff that exceeds ONE. The
+  // user matrix is what we put our sampled values in, so it will "look random" to us.
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    if (putBack < 0 || ipass == 0) user.set(1f)
+    val useGPUnow:Boolean = opts.useGPU && Mat.hasCUDA > 0
+    if (putBack < 0 || ipass == 0) {
+      if (useGPUnow) {
+        user <-- (grand(user.nrows, user.ncols) > 0.5)
+      } else {
+        user <-- (rand(user.nrows, user.ncols) > 0.5)
+      }
+    }
 
     for (k <- 0 until opts.uiter) {
-      println("Before iterating through color groups, we have memory as:")
-      computeMemory()
       for (c <- 0 until graph.ncolors) {
-        if (c == 0) {
-
     	val ids = find(graph.colors == c)
-    	val innz = sdata match {
-    	  case ss: SMat => find(ss)
-    	  case ss: GSMat => find(SMat(ss)) // This makes no sense
-    	}
+    	val nonzeroIndices = find(SMat(sdata))
     	
     	// Compute probabilities for getting 0
-    	user0 <-- FMat(user)
-    	user0.asInstanceOf[FMat](ids, ?) = 0f
-    	for (i <- 0 until opts.nsampls) {
-    	  user0.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
-    	  user0(?, i*sdata.ncols until (i+1)*sdata.ncols) = user0(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0) // The <-- doesn't work
+    	user0 <-- user
+    	user0(ids, ?) = 0f
+    	user0(nonzeroIndices) = 0f
+    	user0 ~ user0 + (sdata >= 2)
+    	if (useGPUnow) {
+     	  index <-- (offset + GSMat(SMat(iproject)) * GMat(user0))
+    	} else {
+     	  index <-- (offset + SMat(iproject) * FMat(user0))
     	}
-    	println("before node0,p0")
-    	computeMemory()
-    	index <-- (offset + iproject * user0)
     	nodep0 <-- ln(getCpt(index) + opts.eps)        
-    	println("after node0, before p0")
-    	computeMemory()
-    	p0 <-- exp(SMat(pproject(ids, ?)) * FMat(nodep0))
-    	println("after node0,p0, note: size of node0 and p0 are " + size(nodep0) + " and " + size(p0))
-    	computeMemory()
+    	val p0 = if (useGPUnow) {
+    	  exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep0))
+    	} else {
+    	  exp(SMat(pproject(ids, ?)) * FMat(nodep0))   	  
+    	}
     	
     	// Compute probabilities for getting 1
-    	user1 <-- FMat(user)
-    	user1.asInstanceOf[FMat](ids, ?) = 1f
-    	for (i <- 0 until opts.nsampls) {
-    	  user1.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
-    	  user1(?, i*sdata.ncols until (i+1)*sdata.ncols) = user1(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0) // The <-- doesn't work
+    	user1 <-- user
+    	user1(ids, ?) = 1f
+    	user1(nonzeroIndices) = 0f
+    	user1 ~ user1 + (sdata >= 2)
+    	if (useGPUnow) {
+    	  index <-- (offset + GSMat(SMat(iproject)) * GMat(user1))
+    	} else {
+     	  index <-- (offset + SMat(iproject) * FMat(user1))
     	}
-    	println("before node1,p1:")
-    	computeMemory()
-    	index <-- (offset + iproject * user1)
     	nodep1 <-- ln(getCpt(index) + opts.eps)        
-    	println("after node1, before p1")
-    	computeMemory()
-    	p1 <-- exp(SMat(pproject(ids, ?)) * FMat(nodep1))
-    	println("after node1,p1:")
-    	computeMemory()
-    	
-    	// Now sample. I this section should be OK with regards to memory allocation.
-    	p <-- p1/(p0+p1)
-    	sample <-- rand(ids.length, sdata.ncols)
-    	sample <-- (sample <= p) // This works because it's a full size matrix
-    	user(ids, ?) = sample // The <-- doesn't work
-    	for (i <- 0 until opts.nsampls) {
-    	  user.asInstanceOf[FMat](innz + i * sdata.ncols * graph.n) = 0f
-    	  user(?, i*sdata.ncols until (i+1)*sdata.ncols) = user(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0) // The <-- doesn't work
+    	val p1 = if (useGPUnow) {
+    	  exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep1))
+    	} else {
+    	  exp(SMat(pproject(ids, ?)) * FMat(nodep1))   	  
     	}
-        println("...")
-        
-        }
+
+    	// Now sample using the p0 and p1 matrices we just computed.
+    	val p = p1/(p0+p1)
+    	val sample = if (useGPU) grand(ids.length, sdata.ncols) else rand(ids.length, sdata.ncols)
+    	sample <-- (sample <= p)       // This works because it's a full size matrix
+    	user(ids, ?) = sample          // The <-- doesn't work
+    	user(nonzeroIndices) = 0f
+    	user ~ user + (sdata >= 2)
       } 
-      println("After iterating through color groups, memory is:")
-      computeMemory()
     }	
   }
   
+  // Update the CPT. The "user" matrix is carried over from the previous step and should be binary.
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
   	val um = updatemats(0) 
   	um.set(0)
-	val index = IMat(offset + SMat(iproject) * FMat(user > 0))
+	val indices = IMat(offset + SMat(iproject) * FMat(user))
+	// um(indices) = um(indices) + 1f // No because this will ignore duplicates
 	for (i <- 0 until user.ncols) {
-	  um(index(?, i)) = um(index(?, i)) + 1f
+	  um(indices(?, i)) = um(indices(?, i)) + 1f
 	}
     um <-- um + opts.alpha
     	
@@ -218,8 +197,12 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
   }
   
   def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    println("\nAt the start of doBatch(), our memory is:")
-    computeMemory() // to see if memory is causing issues
+    println("Yes, I know not to put too much stock into this, but here is memory anyway:")
+    computeMemory()
+    if ((ipass+1) % 25 == 0) {
+      println("Also, with ipass = " + ipass + ", here is our modelmats(0).t:")
+      println(modelmats(0).t)
+    }
     //val sdata = gmats(0)
     //val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
     uupdate(gmats(0), user, ipass)
