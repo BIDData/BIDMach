@@ -181,7 +181,7 @@ elif [ "$OS" = "windows" ] ; then
     if [ "$PARLIB" = "sequential" ] ; then
 	    MKL_LIBS=""
     else
-	    MKL_LIBS="libiomp5md.lib" 
+	    MKL_LIBS="libiomp5md.lib"
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="cudart.lib"

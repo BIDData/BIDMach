@@ -8,7 +8,8 @@ import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
-import scala.util.hashing.MurmurHash3
+import scala.util.hashing.MurmurHash3;
+import scala.collection.mutable.HashMap;
 
 /**
  * Basic DNN class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 15 layer types:
@@ -45,7 +46,9 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
   var targmap:Mat = null;
   var mask:Mat = null;
   var bufmat:Mat = null;
+  var modelMap:HashMap[String,Int] = null;
   var batchSize = -1;
+  var imodel = 0;
 
   override def init() = {
 	  mats = datasource.next;
@@ -54,79 +57,19 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  layers = new Array[Layer](opts.layers.length);
-	  var imodel = 0;
+	  modelMap = HashMap();
+	  imodel = 0;
 	  if (refresh) {
-	    if (opts.nmodelmats < 0) {
-	    	val nmodelmats = opts.layers.count(_ match {case x:DNN.ModelLayerSpec => true; case _ => false});
-	    	setmodelmats(new Array[Mat](nmodelmats));
-	    } else {
-	      setmodelmats(new Array[Mat](opts.nmodelmats));
-	    }
+	    val nm = opts.nmodelmats + opts.layers.map(_ match {case x:DNN.ModelLayerSpec => x.nmodels; case _ => 0}).reduce(_+_);
+	    setmodelmats(new Array[Mat](nm));
 	  }
 	  for (i <- 0 until opts.layers.length) {
-	  	opts.layers(i) match {
-
-	  	case lspec:DNN.FC => {
-	  	  val thismodel = if (opts.nmodelmats > 0) lspec.imodel else imodel;
-	  	  val fclayer = new FCLayer(thismodel, lspec.constFeat, lspec.aopts);
-	  		layers(i) = fclayer;
-	  		if (refresh) modelmats(thismodel) = convertMat(normrnd(0, 1, lspec.outsize, nfeats + (if (lspec.constFeat) 1 else 0)));
-	  		nfeats = lspec.outsize;
-	  		if (lspec.aopts != null) fclayer.initADAGrad
-	  		imodel += 1;
-	  	}
-	  	case lspec:DNN.ReLU => {
-	  		layers(i) = new ReLULayer;
-	  	}
-	  	case lspec:DNN.Input => {
-	  		layers(i) = new InputLayer;
-	  	}
-	  	case lspec:DNN.GLM => {
-	  		layers(i) = new GLMLayer(lspec.links);
-	  	}
-	  	case lspec:DNN.Norm => {
-	  		layers(i) = new NormLayer(lspec.targetNorm, lspec.weight);
-	  	}
-	  	case lspec:DNN.Dropout => {
-	  		layers(i) = new DropoutLayer(lspec.frac);
-	  	}
-	  	case lspec:DNN.Add => {
-	  		layers(i) = new AddLayer;
-	  	}
-	  	case lspec:DNN.Mul => {
-	  		layers(i) = new MulLayer;
-	  	}
-	  	case lspec:DNN.Softmax => {
-	  		layers(i) = new SoftmaxLayer;
-	  	}
-	  	case lspec:DNN.Tanh => {
-	  		layers(i) = new TanhLayer;
-	  	}
-	  	case lspec:DNN.Sigmoid => {
-	  		layers(i) = new SigmoidLayer;
-	  	}
-	  	case lspec:DNN.Softplus => {
-	  		layers(i) = new SoftplusLayer;
-	  	}
-	  	case lspec:DNN.Ln => {
-	  		layers(i) = new LnLayer;
-	  	}
-	  	case lspec:DNN.Exp => {
-	  		layers(i) = new ExpLayer;
-	  	}
-	  	case lspec:DNN.Sum => {
-	  		layers(i) = new SumLayer;
-	  	}
-	  	case lspec:DNN.Lag => {
-	  		layers(i) = new LagLayer(lspec.siz);
-	  	}
-	  	}
+	  	layers(i) = opts.layers(i).factory(this);
 	  	opts.layers(i).myLayer = layers(i);
 	  }
 	  updatemats = new Array[Mat](modelmats.length);
 	  for (i <- 0 until modelmats.length) {
-	    modelmats(i) = convertMat(modelmats(i));
-	    updatemats(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
+	    if (modelmats(i).asInstanceOf[AnyRef] != null) modelmats(i) = convertMat(modelmats(i));
 	  } 		
 	  for (i <- 0 until opts.layers.length) {
 	  	if (opts.layers(i).input.asInstanceOf[AnyRef] != null) layers(i).input = opts.layers(i).input.myLayer.asInstanceOf[DNN.this.Layer];
@@ -249,7 +192,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
    * Includes a model matrix that contains the linear map. 
    */
   
-  class FCLayer(val imodel:Int, val constFeat:Boolean, val aopts:ADAGrad.Opts) extends Layer {
+  class FCLayer(val imodel:Int, val constFeat:Boolean, val aopts:ADAGrad.Opts, val outdim:Int) extends Layer {
   	var vexp:Mat = null;
     var texp:Mat = null;
     var lrate:Mat = null;
@@ -259,12 +202,17 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     var epsilon = 0f;
     
     override def forward = {
+      if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+        modelmats(imodel) = convertMat(normrnd(0, 1, outdim, input.data.nrows + (if (constFeat) 1 else 0)));
+        updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
+        if (aopts != null) initADAGrad;  
+      }
     	val mm = if (constFeat) {
     		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
     	} else {
     		modelmats(imodel);
     	}
-    	createData(mm.nrows, input.data.ncols)
+    	createData(mm.nrows, input.data.ncols);
     	data ~ mm * input.data;
     	if (constFeat) data ~ data + modelmats(imodel).colslice(0, 1);
     	clearDeriv;
@@ -286,6 +234,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       	updatemats(imodel) ~ updatemats(imodel) + (if (constFeat) (sum(deriv,2) \ dprod) else dprod);
       }
     }
+
     
     def initADAGrad {
       val mm = modelmats(imodel); 
@@ -664,48 +613,98 @@ object DNN  {
     var dmask:Mat = null;
     var constFeat:Boolean = false;
     var aopts:ADAGrad.Opts = null;
-    var nmodelmats = -1;
+    var nmodelmats = 0;
   }
   
   class Options extends Opts {}
   
-  class LayerSpec(val input:LayerSpec, val inputs:Array[LayerSpec]) {
+  abstract class LayerSpec(var input:LayerSpec, val inputs:Array[LayerSpec]) {
     var myLayer:DNN#Layer = null;
+    def factory(net:DNN):net.Layer
   }
   
-  class ModelLayerSpec(input:LayerSpec) extends LayerSpec(input, null){}
+  abstract class ModelLayerSpec(input:LayerSpec, val modelName:String, val imodel:Int, val nmodels:Int) extends LayerSpec(input, null) {}
   
-  class FC(input:LayerSpec, val outsize:Int, val constFeat:Boolean, val aopts:ADAGrad.Opts, val imodel:Int = 0) extends ModelLayerSpec(input) {}
+  class FC(input:LayerSpec, val outsize:Int, override val modelName:String, val constFeat:Boolean = false, val aopts:ADAGrad.Opts = null, override val imodel:Int = 0) extends ModelLayerSpec(input, modelName, imodel, 1) {
+  	override def factory(net:DNN) = {
+  		val thismodel = if (net.opts.nmodelmats > 0) {   // If explicit model numbers are given, use them. 
+  			imodel 
+  		} else if (modelName.length > 0) {               // If this is a named layer, look it up. 
+  			if (net.modelMap.contains(modelName)) {
+  				net.modelMap(modelName);
+  			} else {
+  				val len = net.modelMap(modelName).length;
+  				net.modelMap(modelName) = len + net.opts.nmodelmats; 	
+  				len;
+  			}
+  		} else {                                         // Otherwise return the next available int
+  		  net.imodel += 1;
+  		  net.imodel - 1;
+  		}
+  		val fclayer = new net.FCLayer(thismodel, constFeat, aopts, outsize);
+  		fclayer;
+  	}
+  }
   
-  class ReLU(input:LayerSpec) extends LayerSpec(input, null) {}
+  class ReLU(input:LayerSpec) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.ReLULayer;
+  }
   
-  class Input extends LayerSpec(null, null) {}
+  class Input extends LayerSpec(null, null) {
+    override def factory(net:DNN) = new net.InputLayer;
+  }
   
-  class GLM(input:LayerSpec, val links:IMat) extends LayerSpec(input, null) {}
+  class GLM(input:LayerSpec, val links:IMat) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.GLMLayer(links);
+  }
   
-  class Norm(input:LayerSpec, val targetNorm:Float, val weight:Float) extends LayerSpec(input, null) {}
+  class Norm(input:LayerSpec, val targetNorm:Float, val weight:Float) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.NormLayer(targetNorm, weight);
+  }
   
-  class Dropout(input:LayerSpec, val frac:Float) extends LayerSpec(input, null) {}
+  class Dropout(input:LayerSpec, val frac:Float) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.DropoutLayer(frac);
+  }
   
-  class Add(inputs:Array[LayerSpec]) extends LayerSpec(null, inputs) {}
+  class Add(inputs:Array[LayerSpec]) extends LayerSpec(null, inputs) {
+    override def factory(net:DNN) = new net.AddLayer;
+  }
   
-  class Mul(inputs:Array[LayerSpec]) extends LayerSpec(null, inputs) {}
+  class Mul(inputs:Array[LayerSpec]) extends LayerSpec(null, inputs) {
+    override def factory(net:DNN) = new net.MulLayer;
+  }
   
-  class Softmax(input:LayerSpec) extends LayerSpec(input, null) {}
+  class Softmax(input:LayerSpec) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.SoftmaxLayer;
+  }
   
-  class Tanh(input:LayerSpec) extends LayerSpec(input, null) {}
+  class Tanh(input:LayerSpec) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.TanhLayer;
+  }
   
-  class Sigmoid(input:LayerSpec) extends LayerSpec(input, null) {}
+  class Sigmoid(input:LayerSpec) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.SigmoidLayer;
+  }
   
-  class Softplus(input:LayerSpec) extends LayerSpec(input, null) {}
+  class Softplus(input:LayerSpec) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.SoftplusLayer;
+  }
   
-  class Ln(input:LayerSpec) extends LayerSpec(input, null) {}
+  class Ln(input:LayerSpec) extends LayerSpec(input, null) {
+  	override def factory(net:DNN) = new net.LnLayer;
+  }
   
-  class Exp(input:LayerSpec) extends LayerSpec(input, null) {}
+  class Exp(input:LayerSpec) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.ExpLayer;
+  }
   
-  class Sum(input:LayerSpec) extends LayerSpec(input, null) {}
+  class Sum(input:LayerSpec) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.SumLayer;
+  }
   
-  class Lag(input:LayerSpec, val siz:Int) extends LayerSpec(input, null) {}
+  class Lag(input:LayerSpec, val siz:Int) extends LayerSpec(input, null) {
+    override def factory(net:DNN) = new net.LagLayer(siz);
+  }
   
   /**
    * Build a stack of layer specs. layer(0) is an input layer, layer(n-1) is a GLM layer. 
@@ -720,7 +719,7 @@ object DNN  {
     layers(0) = new Input;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new FC(layers(i-1), w, opts.constFeat, opts.aopts);
+    		layers(i) = new FC(layers(i-1), w, "", opts.constFeat, opts.aopts);
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
@@ -731,7 +730,7 @@ object DNN  {
     	  }
     	}
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat, opts.aopts);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, "", opts.constFeat, opts.aopts);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -750,7 +749,7 @@ object DNN  {
     layers(0) = new Input;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new FC(layers(i-1), w, opts.constFeat, opts.aopts);
+    		layers(i) = new FC(layers(i-1), w, "", opts.constFeat, opts.aopts);
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
@@ -763,7 +762,7 @@ object DNN  {
     	  layers(i) = new Norm(layers(i-1), opts.targetNorm, opts.nweight);
     	}
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat, opts.aopts);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, "", opts.constFeat, opts.aopts);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -783,7 +782,7 @@ object DNN  {
     for (i <- 1 until depth - 2) {
       (i % 4) match {
         case 1 => {
-        	layers(i) = new FC(layers(i-1), w, opts.constFeat, opts.aopts);
+        	layers(i) = new FC(layers(i-1), w, "", opts.constFeat, opts.aopts);
         	w = (taper*w).toInt;
         }
         case 2 => {
@@ -802,7 +801,7 @@ object DNN  {
         }
       }
     }
-    layers(depth-2) = new FC(layers(depth-3), ntargs, opts.constFeat, opts.aopts);
+    layers(depth-2) = new FC(layers(depth-3), ntargs, "", opts.constFeat, opts.aopts);
     layers(depth-1) = new GLM(layers(depth-2), opts.links);
     opts.layers = layers
     layers
@@ -965,5 +964,3 @@ object DNN  {
     (nn, opts)
   }
 }
-
-
