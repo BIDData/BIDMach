@@ -964,5 +964,3 @@ object DNN  {
     (nn, opts)
   }
 }
-
-
