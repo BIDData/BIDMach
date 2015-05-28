@@ -60,11 +60,10 @@ if [ "$OS" = "apple" ] ; then
 	JAVA_HOME=`/usr/libexec/java_home`
     fi
     CUDA_HOME="/usr/local/cuda"
-    CUB_ROOT=../../../cub
     CC="icc"
     GCC="g++"
     NVCC="nvcc"
-    NVCCFLAGS="-c -ccbin=clang -use_fast_math  -I$BIDMACH_ROOT/jni/include -I${CUB_ROOT} \
+    NVCCFLAGS="-c -ccbin=clang -use_fast_math  -I$BIDMACH_ROOT/jni/include \
           -gencode arch=compute_20,code=sm_20 \
           -gencode arch=compute_30,code=sm_30 \
           -gencode arch=compute_35,code=sm_35 \
@@ -107,11 +106,10 @@ elif [ "$OS" = "linux" ] ; then
     JAVA_HOME="/usr/java/default"
     fi
     CUDA_HOME="/usr/local/cuda"
-    CUB_ROOT=../../../cub
     CC="icc"
     GCC="g++"
     NVCC="nvcc"
-    NVCCFLAGS="-c -use_fast_math -I$BIDMACH_ROOT/jni/include -I${CUB_ROOT}\
+    NVCCFLAGS="-c -use_fast_math -I$BIDMACH_ROOT/jni/include \
           -gencode arch=compute_20,code=sm_20 \
           -gencode arch=compute_30,code=sm_30 \
           -gencode arch=compute_35,code=sm_35 \
