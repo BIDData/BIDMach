@@ -41,21 +41,21 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
       pproject  = GSMat(graph.pproject)
       nodep0    = gzeros(numVars,4367)
       nodep1    = gzeros(numVars,4367)
-      cptindex  = gzeros(numVars,4367)
-      index     = gzeros(numVars,4367)
-      user      = gones(numVars,4367) // TODO maybe this shouldn't be here for now?
-      user0     = gones(numVars,4367)
-      user1     = gones(numVars,4367)
+      cptindex  = gizeros(numVars,4367)
+      index     = gizeros(numVars,4367)
+      user      = giones(numVars,4367) // TODO maybe this shouldn't be here for now?
+      user0     = giones(numVars,4367)
+      user1     = giones(numVars,4367)
     } else {
       iproject  = SMat(graph.iproject)
       pproject  = SMat(graph.pproject)
       nodep0    = zeros(numVars,4367)
       nodep1    = zeros(numVars,4367)
-      cptindex  = zeros(numVars,4367)
-      index     = zeros(numVars,4367)
-      user      = ones(numVars,4367) // Same over here...
-      user0     = ones(numVars,4367)
-      user1     = ones(numVars,4367)     
+      cptindex  = izeros(numVars,4367)
+      index     = izeros(numVars,4367)
+      user      = iones(numVars,4367) // Same over here...
+      user0     = iones(numVars,4367)
+      user1     = iones(numVars,4367)     
     }
     
     // Prepare the CPT, which is stored in modelmats(0), and its offset.
@@ -125,49 +125,71 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
     for (k <- 0 until opts.uiter) {
       for (c <- 0 until graph.ncolors) {
     	val ids = find(graph.colors == c)
-    	val nonzeroIndices = find(SMat(sdata))
+    	val innz = find(SMat(sdata))
     	
-    	// Compute probabilities for getting 0
+    	// Compute probabilities for getting 0 (for GPUs, block indexing is not as straightforward)
     	user0 <-- user
-    	user0(ids, ?) = 0f
-    	user0(nonzeroIndices) = 0f
-    	user0 ~ user0 + (sdata >= 2)
     	if (useGPUnow) {
-     	  index <-- (offset + GSMat(SMat(iproject)) * GMat(user0))
+    	  user0(ids, ?) = gizeros(ids.length, user0.ncols)
+    	  user0(GIMat(innz)) = gizeros(innz.length, 1)
+    	  user0 ~ user0 + GIMat(full(sdata >= 2f)) // TODO Is there a kernel for this?
+     	  //index <-- (offset + GSMat(SMat(iproject)) * GIMat(user0))
+     	  index <-- (offset + (GIMat(user0).t * GSMat(SMat(iproject)).t).t )
     	} else {
+    	  user0(ids, ?) = 0f
+    	  user0(innz) = 0f
+    	  user0 ~ user0 + (sdata >= 2f)
      	  index <-- (offset + SMat(iproject) * FMat(user0))
     	}
+    	println("just before nodep0")
     	nodep0 <-- ln(getCpt(index) + opts.eps)        
     	val p0 = if (useGPUnow) {
-    	  exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep0))
+    	  //exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep1))
+    	  exp( (GMat(nodep0).t *^ pproject(ids,?) ).t )
     	} else {
     	  exp(SMat(pproject(ids, ?)) * FMat(nodep0))   	  
     	}
+    	println("Finished with computing probabilities for 0")
     	
     	// Compute probabilities for getting 1
     	user1 <-- user
-    	user1(ids, ?) = 1f
-    	user1(nonzeroIndices) = 0f
-    	user1 ~ user1 + (sdata >= 2)
     	if (useGPUnow) {
-    	  index <-- (offset + GSMat(SMat(iproject)) * GMat(user1))
+    	  user1(ids, ?) = giones(ids.length, user1.ncols)
+    	  user1(GIMat(innz)) = gizeros(innz.length, 1)
+    	  user1 ~ user1 + GIMat(full(sdata >= 2f)) // TODO Is there a kernel for this?
+    	  //index <-- (offset + GSMat(SMat(iproject)) * GMat(user1))
+    	  index <-- (offset + (GMat(user1).t *^ iproject).t )
     	} else {
+    	  user1(ids, ?) = 1f
+    	  user1(innz) = 0f
+    	  user1 ~ user1 + (sdata >= 2f)
      	  index <-- (offset + SMat(iproject) * FMat(user1))
     	}
+    	println("just before nodep1")
     	nodep1 <-- ln(getCpt(index) + opts.eps)        
     	val p1 = if (useGPUnow) {
-    	  exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep1))
+    	  //exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep1))
+    	  exp( (GMat(nodep1).t *^ pproject(ids,?) ).t ) 
     	} else {
     	  exp(SMat(pproject(ids, ?)) * FMat(nodep1))   	  
     	}
+    	println("Finished with computing probabiliites for 1")
 
     	// Now sample using the p0 and p1 matrices we just computed.
     	val p = p1/(p0+p1)
     	val sample = if (useGPU) grand(ids.length, sdata.ncols) else rand(ids.length, sdata.ncols)
     	sample <-- (sample <= p)       // This works because it's a full size matrix
     	user(ids, ?) = sample          // The <-- doesn't work
-    	user(nonzeroIndices) = 0f
-    	user ~ user + (sdata >= 2)
+    	println("now about to assign to user again")
+    	if (useGPU) {
+    	  user(innz) = gizeros(innz.length,1)
+    	  user ~ user + GIMat(full(sdata >= 2f))
+    	} else {
+    	  user(innz) = 0f
+    	  user ~ user + (sdata >= 2f)
+    	}
+
+    	println("Finished sampling!")
       } 
     }	
   }
