@@ -81,6 +81,7 @@ object Layer {
     val inputs:Array[Spec] = Array(null);
     var myLayer:Layer = null;
     var myGhost:Spec = null;
+    var parent:Spec = null;
     
     def copyTo(spec:Spec):Spec = {
       spec.inputs(0) = inputs(0);
@@ -276,13 +277,10 @@ class InputLayer(override val net:Net, override val spec:InputLayer.Spec = new I
 
 object InputLayer {  
   class Spec extends Layer.Spec {
-  	override def clone:Spec = {
-    	copyTo(new Spec).asInstanceOf[Spec];
-    }
+    
+  	override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
   	
-  	override def create(net:Net):InputLayer = {
-      apply(net, this);
-    }
+  	override def create(net:Net):InputLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new InputLayer(net, new Spec);
@@ -331,13 +329,9 @@ object GLMLayer {
   		spec;
     }
     
-    override def clone:Spec = {
-  	  copyTo(new Spec);
-    }
+    override def clone:Spec = {copyTo(new Spec);}   
     
-    override def create(net:Net):GLMLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):GLMLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new GLMLayer(net, new Spec);
@@ -382,13 +376,9 @@ object NormLayer {
   		spec;
     }
     
-    override def clone:Spec = {
-  	  copyTo(new Spec);
-    }
+    override def clone:Spec = {copyTo(new Spec);}
     
-    override def create(net:Net):NormLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):NormLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new NormLayer(net, new Spec);
@@ -436,13 +426,9 @@ object DropoutLayer {
   		spec;
     }
     
-    override def clone:Spec = {
-  	  copyTo(new Spec);
-    }
+    override def clone:Spec = {copyTo(new Spec);}
     
-    override def create(net:Net):DropoutLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):DropoutLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new DropoutLayer(net, new Spec);
@@ -482,13 +468,9 @@ object AddLayer {
   		spec;
     }
     
-    override def clone:Spec = {
-  	  copyTo(new Spec);
-    }
+    override def clone:Spec = {copyTo(new Spec);}
     
-    override def create(net:Net):AddLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):AddLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new AddLayer(net, new Spec);
@@ -529,13 +511,9 @@ object MulLayer {
   		spec;
     }
     
-    override def clone:Spec = {
-  	  copyTo(new Spec);
-    }
+    override def clone:Spec = {copyTo(new Spec);}
     
-    override def create(net:Net):MulLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):MulLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new MulLayer(net, new Spec);
@@ -568,13 +546,9 @@ class SoftmaxLayer(override val net:Net, override val spec:SoftmaxLayer.Spec = n
 object SoftmaxLayer {  
   class Spec extends Layer.Spec {
    
-    override def clone:Spec = {
-  	  copyTo(new Spec).asInstanceOf[Spec];
-    }
+    override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
     
-    override def create(net:Net):SoftmaxLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):SoftmaxLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new SoftmaxLayer(net, new Spec);
@@ -602,13 +576,9 @@ class TanhLayer(override val net:Net, override val spec:TanhLayer.Spec = new Tan
 object TanhLayer {  
   class Spec extends Layer.Spec {
     
-    override def clone:Spec = {
-  	  copyTo(new Spec).asInstanceOf[Spec];
-    }
+    override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
     
-    override def create(net:Net):TanhLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):TanhLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new TanhLayer(net, new Spec);
@@ -645,13 +615,9 @@ class SigmoidLayer(override val net:Net, override val spec:SigmoidLayer.Spec = n
 object SigmoidLayer {  
   class Spec extends Layer.Spec {
     
-    override def clone:Spec = {
-  	  copyTo(new Spec).asInstanceOf[Spec];
-    }
+    override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
     
-    override def create(net:Net):SigmoidLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):SigmoidLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new SigmoidLayer(net, new Spec);
@@ -690,13 +656,9 @@ class SoftplusLayer(override val net:Net, override val spec:SoftplusLayer.Spec =
 object SoftplusLayer {  
   class Spec extends Layer.Spec {
     
-    override def clone:Spec = {
-  	  copyTo(new Spec).asInstanceOf[Spec];
-    }
+    override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
     
-    override def create(net:Net):SoftplusLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):SoftplusLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new SoftplusLayer(net, new Spec);
@@ -723,13 +685,9 @@ class LnLayer(override val net:Net, override val spec:LnLayer.Spec = new LnLayer
 object LnLayer {  
   class Spec extends Layer.Spec {
     
-  	override def clone:Spec = {
-  	  copyTo(new Spec).asInstanceOf[Spec];
-    }
+  	override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
   	
-  	override def create(net:Net):LnLayer = {
-      apply(net, this);
-    }
+  	override def create(net:Net):LnLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new LnLayer(net, new Spec);
@@ -757,13 +715,9 @@ class ExpLayer(override val net:Net, override val spec:ExpLayer.Spec = new ExpLa
 object ExpLayer {  
   class Spec extends Layer.Spec {
     
-  	override def clone:Spec = {
-  	  copyTo(new Spec).asInstanceOf[Spec];
-    }
+  	override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
   	
-    override def create(net:Net):ExpLayer = {
-      apply(net, this);
-    }
+    override def create(net:Net):ExpLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new ExpLayer(net, new Spec);
@@ -793,18 +747,43 @@ class SumLayer(override val net:Net, override val spec:SumLayer.Spec = new SumLa
 object SumLayer {  
   class Spec extends Layer.Spec {
     
-  	override def clone:Spec = {
-  	  copyTo(new Spec).asInstanceOf[Spec];
-    }
+  	override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
   	
-  	override def create(net:Net):SumLayer = {
-      apply(net, this);
-    }
+  	override def create(net:Net):SumLayer = {apply(net, this);}
   }
   
   def apply(net:Net) = new SumLayer(net, new Spec);
   
   def apply(net:Net, spec:Spec) = new SumLayer(net, spec);
+
+}
+
+class OutputLayer(override val net:Net, override val spec:OutputLayer.Spec = new OutputLayer.Spec) extends Layer(net, spec) {
+
+  override def forward = {
+		createoutput;
+		output <-- input.outputs(spec.inputnum);
+		clearDeriv;
+  }
+
+  override def backward = {
+    if (input.derivs(spec.inputnum).asInstanceOf[AnyRef] != null) input.derivs(spec.inputnum) ~ input.derivs(spec.inputnum) + deriv    
+  }
+}
+
+object OutputLayer {  
+  class Spec extends Layer.Spec {
+    
+    var inputnum = 0;
+    
+  	override def clone:Spec = {copyTo(new Spec).asInstanceOf[Spec];}
+  	
+  	override def create(net:Net):OutputLayer = {apply(net, this);}
+  }
+  
+  def apply(net:Net) = new OutputLayer(net, new Spec);
+  
+  def apply(net:Net, spec:Spec) = new OutputLayer(net, spec);
 
 }
 
@@ -815,6 +794,21 @@ class LayerSpec(val nlayers:Int) {
   def apply(i:Int):Layer.Spec = layerSpecs(i);
   
   def update(i:Int, lspec:Layer.Spec) = {layerSpecs(i) = lspec; this}
+  
+  override def clone = copyTo(new LayerSpec(nlayers));
+  
+  def copyTo(lspec:LayerSpec):LayerSpec = {
+    for (i <- 0 until nlayers) {
+      lspec.layerSpecs(i) = layerSpecs(i).clone;
+      layerSpecs(i).myGhost = lspec.layerSpecs(i);
+    }
+    for (i <- 0 until nlayers) {
+      for (j <- 0 until layerSpecs(i).inputs.length) {
+      	if (layerSpecs(i).inputs(j) != null) lspec.layerSpecs(i).inputs(j) = layerSpecs(i).inputs(j).myGhost;
+      }
+    }
+    lspec;
+  }
 }
  
 
