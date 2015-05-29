@@ -43,7 +43,7 @@ import scala.collection.mutable.HashMap;
 
 
   
-class Layer(val net:Net, val opts:Layer.Opts = new Layer.Options) {
+class Layer(val net:Net, val spec:Layer.Spec = new Layer.Spec) {
   val inputs = new Array[Layer](1);
   val outputs = new Array[Mat](1);
   val derivs = new Array[Mat](1);
@@ -55,14 +55,14 @@ class Layer(val net:Net, val opts:Layer.Opts = new Layer.Options) {
   def backward:Unit = {};
   def backward(ipass:Int, pos:Long):Unit = backward;
   def score:FMat = zeros(1,1);
-  def modelmats = net.modelmats;
-  def updatemats = net.updatemats;
-  def convertMat(mat:Mat) = net.convertMat(mat);
-  def useGPU = net.useGPU;
-  def nopts = net.opts;
+  lazy val modelmats = net.modelmats;
+  lazy val updatemats = net.updatemats;
+  lazy val useGPU = net.useGPU;
+  lazy val nopts = net.opts;
+  def convertMat(mat:Mat) = {net.convertMat(mat);}
 
   def createoutput = {
-  		if (output.asInstanceOf[AnyRef] == null) outputs(0) = input.output.zeros(input.output.nrows, input.output.ncols);
+  	if (output.asInstanceOf[AnyRef] == null) outputs(0) = input.output.zeros(input.output.nrows, input.output.ncols);
   }
 
   def createoutput(nrows:Int, ncols:Int) = {
@@ -77,12 +77,26 @@ class Layer(val net:Net, val opts:Layer.Opts = new Layer.Options) {
 
 
 object Layer {  
-  trait Opts{
+  class Spec{
+    val inputs:Array[Spec] = Array(null);
+    var myLayer:Layer = null;
+    var myGhost:Spec = null;
+    
+    def copyTo(spec:Spec):Spec = {
+      spec.inputs(0) = inputs(0);
+      myGhost = spec;
+      spec;
+    }
+    
+    override def clone:Spec = {
+      copyTo(new Spec);
+    }
+    
+    def create(net:Net):Layer = {null}
   }
-  class Options extends Opts {}
 }
 
-class ModelLayer(override val net:Net, override val opts:ModelLayer.Opts = new ModelLayer.Options) extends Layer(net, opts) {
+class ModelLayer(override val net:Net, override val spec:ModelLayer.Spec = new ModelLayer.Spec) extends Layer(net, spec) {
 	var modelName = "";
 	var imodel = 0;
   
@@ -105,18 +119,28 @@ class ModelLayer(override val net:Net, override val opts:ModelLayer.Opts = new M
 }
 
 object ModelLayer {  
-  trait Opts extends Layer.Opts{
+  class Spec extends Layer.Spec {
   	var modelName = "";
     var imodel = 0;
+    
+    def copyTo(spec:Spec):Spec = {
+      super.copyTo(spec);
+      spec.modelName = modelName;
+      spec.imodel = imodel;
+      spec;
+    }
+    
+    override def clone:Spec = {
+      copyTo(new Spec);
+    }
   }
-  class Options extends Opts {}
 }
 /**
  * Linear layer. 
  * Includes a model matrix that contains the linear map. 
  */
 
-class LinLayer(override val net:Net, override val opts:LinLayer.Opts = new LinLayer.Options) extends ModelLayer(net, opts) {
+class LinLayer(override val net:Net, override val spec:LinLayer.Spec = new LinLayer.Spec) extends ModelLayer(net, spec) {
 	var vexp:Mat = null;
   var texp:Mat = null;
   var lrate:Mat = null;
@@ -127,42 +151,44 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Opts = new LinLa
   var epsilon = 0f;
 
   override def forward = {
+  	println("x0 %s" format (if (net.modelmats(0).asInstanceOf[AnyRef] != null) net.modelmats(0).mytype else "none"));
   	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-  		modelmats(imodel) = convertMat(normrnd(0, 1, opts.outdim, input.output.nrows + (if (opts.constFeat) 1 else 0)));
+  		modelmats(imodel) = convertMat(normrnd(0, 1, spec.outdim, input.output.nrows + (if (spec.constFeat) 1 else 0)));
   		updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
-  		if (opts.aopts != null) initADAGrad;  
+  		if (spec.aopts != null) initADAGrad;  
   	}
-  	val mm = if (opts.constFeat) {
+  	println("xx %d %s %s" format (imodel, modelmats(imodel).mytype, net.modelmats(0).mytype))
+  	val mm = if (spec.constFeat) {
   		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
   	} else {
   		modelmats(imodel);
   	}
   	createoutput(mm.nrows, input.output.ncols);
   	output ~ mm * input.output;
-  	if (opts.constFeat) output ~ output + modelmats(imodel).colslice(0, 1);
+  	if (spec.constFeat) output ~ output + modelmats(imodel).colslice(0, 1);
   	clearDeriv;
   }
 
   override def backward(ipass:Int, pos:Long) = {
-  	val mm = if (opts.constFeat && imodel > 0) {
+  	val mm = if (spec.constFeat && imodel > 0) {
   		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
   	} else {
   		modelmats(imodel);
   	}
   	if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (mm ^* deriv);
-  	if (opts.aopts != null) {
+  	if (spec.aopts != null) {
   		if (firststep <= 0) firststep = pos.toFloat;
   		val istep = (pos + firststep)/firststep;
   		ADAGrad.multUpdate(deriv, input.output, modelmats(imodel), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
   	} else {
   		val dprod = deriv *^ input.output;
-  		updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (sum(deriv,2) \ dprod) else dprod);
+  		updatemats(imodel) ~ updatemats(imodel) + (if (spec.constFeat) (sum(deriv,2) \ dprod) else dprod);
   	}
   }
 
 
   def initADAGrad {
-  	val aopts = opts.aopts;
+  	val aopts = spec.aopts;
   	val mm = modelmats(imodel); 
   	val d = mm.nrows;
   	val m = mm.ncols;
@@ -179,31 +205,49 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Opts = new LinLa
 }
 
 object LinLayer {  
-  trait Opts extends ModelLayer.Opts {
+  class Spec extends ModelLayer.Spec {
     var constFeat:Boolean = false;
     var aopts:ADAGrad.Opts = null;
     var outdim = 0;
+    
+    def copyTo(spec:Spec):Spec = {
+    	super.copyTo(spec);
+    	spec.constFeat = constFeat;
+    	spec.aopts = aopts;
+    	spec.outdim = outdim;
+    	spec;
+    }
+    
+    override def clone:Spec = {
+    	copyTo(new Spec);
+    }
+    
+    override def create(net:Net):LinLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new LinLayer(net, new Options);
+  def apply(net:Net) = new LinLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new LinLayer(net, opts);
+  def apply(net:Net, spec:Spec):LinLayer = {
+    val x = new LinLayer(net, spec); 
+    x.modelName = spec.modelName;
+    x.imodel = x.getModelMat(net, spec.modelName, spec.imodel)  
+    x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {
-    val x = new LinLayer(net, opts); 
-    x.inputs(0) = in; 
-    x.modelName = opts.modelName;
-    x.imodel = x.getModelMat(net, opts.modelName, opts.imodel)
+  def apply(in:Layer, net:Net, spec:Spec):LinLayer = {
+    val x = apply(net, spec);
+    x.inputs(0) = in;
     x;}
   
   def apply(in:Layer, net:Net, modelName:String, imodel:Int, outdim:Int, constFeat:Boolean, aopts:ADAGrad.Opts) = {
-    val x = new LinLayer(net, new Options);
-    x.opts.modelName = modelName;
-    x.opts.imodel = imodel;
-    x.opts.constFeat = constFeat;
-    x.opts.aopts = aopts;
-    x.opts.outdim = outdim;
+  	val x = new LinLayer(net, new Spec);   
+  	x.inputs(0) = in;
+    x.spec.modelName = modelName;
+    x.spec.imodel = imodel;
+    x.spec.constFeat = constFeat;
+    x.spec.aopts = aopts;
+    x.spec.outdim = outdim;
     x.modelName = modelName;
     x.imodel = x.getModelMat(net, modelName, imodel)
     x;
@@ -214,7 +258,7 @@ object LinLayer {
  * Rectifying Linear Unit layer.
  */
 
-class ReLULayer(override val net:Net, override val opts:ReLULayer.Opts = new ReLULayer.Options) extends Layer(net, opts) {
+class ReLULayer(override val net:Net, override val spec:ReLULayer.Spec = new ReLULayer.Spec) extends Layer(net, spec) {
 	override def forward = {
 			createoutput;
 			output <-- max(input.output, 0f);
@@ -227,38 +271,50 @@ class ReLULayer(override val net:Net, override val opts:ReLULayer.Opts = new ReL
 }
 
 object ReLULayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+  	override def clone:Spec = {
+    	copyTo(new Spec).asInstanceOf[Spec];
+    }
+  	
+  	override def create(net:Net):ReLULayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new ReLULayer(net, new Options);
+  def apply(net:Net) = new ReLULayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new ReLULayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new ReLULayer(net, spec); x;}
   
-  def apply(in:Layer, net:Net) = {val x = new ReLULayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new ReLULayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new ReLULayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new ReLULayer(net, spec); x.inputs(0) = in; x;}
 }
 
 /**
  * Input layer is currently just a placeholder.
  */
 
-class InputLayer(override val net:Net, override val opts:InputLayer.Opts = new InputLayer.Options) extends Layer(net, opts) {
+class InputLayer(override val net:Net, override val spec:InputLayer.Spec = new InputLayer.Spec) extends Layer(net, spec) {
 }
 
 object InputLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+  	override def clone:Spec = {
+    	copyTo(new Spec).asInstanceOf[Spec];
+    }
+  	
+  	override def create(net:Net):InputLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new InputLayer(net, new Options);
+  def apply(net:Net) = new InputLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new InputLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new InputLayer(net, new Spec); x;}
   
-  def apply(in:Layer, net:Net) = {val x = new InputLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new InputLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new InputLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new InputLayer(net, spec); x.inputs(0) = in; x;}
 }
 
 /**
@@ -266,16 +322,16 @@ object InputLayer {
  * Commonly used as an output layer so includes a score method.
  */
 
-class GLMLayer(override val net:Net, override val opts:GLMLayer.Opts = new GLMLayer.Options) extends Layer(net, opts) {
+class GLMLayer(override val net:Net, override val spec:GLMLayer.Spec = new GLMLayer.Spec) extends Layer(net, spec) {
 	var ilinks:Mat = null;
 	var totflops = 0L;
 
 	override def forward = {
 			createoutput;
 			if (ilinks.asInstanceOf[AnyRef] == null) {
-			  ilinks = convertMat(opts.links);
-			  for (i <- 0 until opts.links.length) {
-			  	totflops += GLM.linkArray(opts.links(i)).fnflops
+			  ilinks = convertMat(spec.links);
+			  for (i <- 0 until spec.links.length) {
+			  	totflops += GLM.linkArray(spec.links(i)).fnflops
 			  }
 			}
 			output <-- GLM.preds(input.output, ilinks, totflops);
@@ -293,21 +349,34 @@ class GLMLayer(override val net:Net, override val opts:GLMLayer.Opts = new GLMLa
 }
 
 object GLMLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
     var links:IMat = null;
+    
+    def copyTo(spec:Spec):Spec = {
+  		super.copyTo(spec);
+  		spec.links = links;
+  		spec;
+    }
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec);
+    }
+    
+    override def create(net:Net):GLMLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new GLMLayer(net, new Options);
+  def apply(net:Net) = new GLMLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new GLMLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new GLMLayer(net, spec); x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new GLMLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new GLMLayer(net, spec); x.inputs(0) = in; x;}
   
   def apply(in:Layer, net:Net, links:IMat) = {
-    val x = new GLMLayer(net, new Options); 
+    val x = new GLMLayer(net, new Spec); 
     x.inputs(0) = in; 
-    x.opts.links = links;
+    x.spec.links = links;
     x;
     }
 }
@@ -317,7 +386,7 @@ object GLMLayer {
  * is different from the specified value (targetNorm).
  */
 
-class NormLayer(override val net:Net, override val opts:NormLayer.Opts = new NormLayer.Options) extends Layer(net, opts) {
+class NormLayer(override val net:Net, override val spec:NormLayer.Spec = new NormLayer.Spec) extends Layer(net, spec) {
 	var sconst:Mat = null;
 
   override def forward = {
@@ -329,7 +398,7 @@ class NormLayer(override val net:Net, override val opts:NormLayer.Opts = new Nor
   override def backward = {
     if (input.deriv.asInstanceOf[AnyRef] != null) {
     	if (sconst.asInstanceOf[AnyRef] == null) sconst = output.zeros(1,1);
-    	sconst.set(math.min(0.1f, math.max(-0.1f, (opts.targetNorm - norm(output)/output.length).toFloat * opts.weight)));
+    	sconst.set(math.min(0.1f, math.max(-0.1f, (spec.targetNorm - norm(output)/output.length).toFloat * spec.weight)));
     	input.derivs(0) = output ∘ sconst;
     	input.deriv ~ input.deriv + deriv;
     }
@@ -337,24 +406,38 @@ class NormLayer(override val net:Net, override val opts:NormLayer.Opts = new Nor
 }
 
 object NormLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
     var targetNorm = 1f;
     var weight = 1f;
+    
+    def copyTo(spec:Spec):Spec = {
+  		super.copyTo(spec);
+  		spec.targetNorm = targetNorm;
+  		spec.weight = weight;
+  		spec;
+    }
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec);
+    }
+    
+    override def create(net:Net):NormLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new NormLayer(net, new Options);
+  def apply(net:Net) = new NormLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new NormLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new NormLayer(net, spec); x;}
   
-  def apply(in:Layer, net:Net) = {val x = new NormLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new NormLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new NormLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new NormLayer(net, spec); x.inputs(0) = in; x;}
   
   def apply(in:Layer, net:Net, targetNorm:Float, weight:Float) = {
-    val x = new NormLayer(net, new Options);
-    x.opts.targetNorm = targetNorm;
-    x.opts.weight = weight;
+    val x = new NormLayer(net, new Spec);
+    x.spec.targetNorm = targetNorm;
+    x.spec.weight = weight;
     x.inputs(0) = in; 
     x;
     }
@@ -365,21 +448,21 @@ object NormLayer {
  * Assumes that "randmat" is not changed between forward and backward passes. 
  */
 
-class DropoutLayer(override val net:Net, override val opts:DropoutLayer.Opts = new DropoutLayer.Options) extends Layer(net, opts) {  
+class DropoutLayer(override val net:Net, override val spec:DropoutLayer.Spec = new DropoutLayer.Spec) extends Layer(net, spec) {  
 	var randmat:Mat = null;
 
   override def forward = {
 		createoutput;
 		randmat = input.output + 20f;   // Hack to make a cached container to hold the random output
 		if (nopts.predict) {
-			output ~ input.output * opts.frac;
+			output ~ input.output * spec.frac;
 		} else {
 			if (useGPU) {
 				grand(randmat.asInstanceOf[GMat]); 
 			} else {
 				rand(randmat.asInstanceOf[FMat]);
 			}
-			randmat ~ (randmat < opts.frac)
+			randmat ~ (randmat < spec.frac)
 			output ~ input.output ∘ randmat;
 		}
 		clearDeriv;
@@ -391,22 +474,35 @@ class DropoutLayer(override val net:Net, override val opts:DropoutLayer.Opts = n
 }
 
 object DropoutLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
     var frac = 1f;
+    
+    def copyTo(spec:Spec):Spec = {
+  		super.copyTo(spec);
+  		spec.frac = frac;
+  		spec;
+    }
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec);
+    }
+    
+    override def create(net:Net):DropoutLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new DropoutLayer(net, new Options);
+  def apply(net:Net) = new DropoutLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new DropoutLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new DropoutLayer(net, spec); x;}
   
-  def apply(in:Layer, net:Net) = {val x = new DropoutLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new DropoutLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new DropoutLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new DropoutLayer(net, spec); x.inputs(0) = in; x;}
   
   def apply(in:Layer, net:Net, frac:Float) = {
-    val x = new DropoutLayer(net, new Options); 
-    x.opts.frac = frac;
+    val x = new DropoutLayer(net, new Spec); 
+    x.spec.frac = frac;
     x.inputs(0) = in; 
     x;
   }
@@ -416,9 +512,9 @@ object DropoutLayer {
  * Computes the sum of input layers. 
  */
 
-class AddLayer(override val net:Net, override val opts:AddLayer.Opts = new AddLayer.Options) extends Layer(net, opts) { 
+class AddLayer(override val net:Net, override val spec:AddLayer.Spec = new AddLayer.Spec) extends Layer(net, spec) { 
   
-  override val inputs = new Array[Layer](opts.ninputs);
+  override val inputs = new Array[Layer](spec.ninputs);
 
 	override def forward = {
 			createoutput(inputs(0).output.nrows, inputs(0).output.ncols);
@@ -435,27 +531,40 @@ class AddLayer(override val net:Net, override val opts:AddLayer.Opts = new AddLa
 }
 
 object AddLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
     var ninputs = 1;
+    
+    def copyTo(spec:Spec):Spec = {
+  		super.copyTo(spec);
+  		spec.ninputs = ninputs;
+  		spec;
+    }
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec);
+    }
+    
+    override def create(net:Net):AddLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new AddLayer(net, new Options);
+  def apply(net:Net) = new AddLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new AddLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new AddLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new AddLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new AddLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new AddLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new AddLayer(net, spec); x.inputs(0) = in; x;}
 }
 
 /**
  * Computes the product of its input layers. 
  */
 
-class MulLayer(override val net:Net, override val opts:MulLayer.Opts = new MulLayer.Options) extends Layer(net, opts) {  
+class MulLayer(override val net:Net, override val spec:MulLayer.Spec = new MulLayer.Spec) extends Layer(net, spec) {  
   
-	override val inputs = new Array[Layer](opts.ninputs);
+	override val inputs = new Array[Layer](spec.ninputs);
 
 	override def forward = {
 			createoutput(inputs(0).output.nrows, inputs(0).output.ncols);
@@ -473,25 +582,38 @@ class MulLayer(override val net:Net, override val opts:MulLayer.Opts = new MulLa
 }
 
 object MulLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
     var ninputs = 1;
+    
+    def copyTo(spec:Spec):Spec = {
+  		super.copyTo(spec);
+  		spec.ninputs = ninputs;
+  		spec;
+    }
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec);
+    }
+    
+    override def create(net:Net):MulLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new MulLayer(net, new Options);
+  def apply(net:Net) = new MulLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new MulLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new MulLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new MulLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new MulLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new MulLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new MulLayer(net, spec); x.inputs(0) = in; x;}
 }
 
 /**
  * Softmax layer. Output = exp(input) / sum(exp(input))
  */
 
-class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Opts = new SoftmaxLayer.Options) extends Layer(net, opts) {    
+class SoftmaxLayer(override val net:Net, override val spec:SoftmaxLayer.Spec = new SoftmaxLayer.Spec) extends Layer(net, spec) {    
 
 	override def forward = {
 			createoutput;
@@ -510,21 +632,28 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Opts = n
 }
 
 object SoftmaxLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+   
+    override def clone:Spec = {
+  	  copyTo(new Spec).asInstanceOf[Spec];
+    }
+    
+    override def create(net:Net):SoftmaxLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new SoftmaxLayer(net, new Options);
+  def apply(net:Net) = new SoftmaxLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new SoftmaxLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new SoftmaxLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new SoftmaxLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SoftmaxLayer(net, spec); x.inputs(0) = in; x;}
 }
 /**
  * Tanh layer. 
  */
 
-class TanhLayer(override val net:Net, override val opts:TanhLayer.Opts = new TanhLayer.Options) extends Layer(net, opts) {    
+class TanhLayer(override val net:Net, override val spec:TanhLayer.Spec = new TanhLayer.Spec) extends Layer(net, spec) {    
 
 	override def forward = {
 			createoutput;
@@ -539,24 +668,31 @@ class TanhLayer(override val net:Net, override val opts:TanhLayer.Opts = new Tan
 }
 
 object TanhLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec).asInstanceOf[Spec];
+    }
+    
+    override def create(net:Net):TanhLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new TanhLayer(net, new Options);
+  def apply(net:Net) = new TanhLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new TanhLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new TanhLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new TanhLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new TanhLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new TanhLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new TanhLayer(net, spec); x.inputs(0) = in; x;}
 }
 
 /**
  * Sigmoid layer. Uses GLM implementations of logistic functions for performance. 
  */
 
-class SigmoidLayer(override val net:Net, override val opts:SigmoidLayer.Opts = new SigmoidLayer.Options) extends Layer(net, opts) {
+class SigmoidLayer(override val net:Net, override val spec:SigmoidLayer.Spec = new SigmoidLayer.Spec) extends Layer(net, spec) {
 	var ilinks:Mat = null;
   var totflops = 0L;
 
@@ -579,23 +715,30 @@ class SigmoidLayer(override val net:Net, override val opts:SigmoidLayer.Opts = n
 }
 
 object SigmoidLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec).asInstanceOf[Spec];
+    }
+    
+    override def create(net:Net):SigmoidLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new SigmoidLayer(net, new Options);
+  def apply(net:Net) = new SigmoidLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new SigmoidLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new SigmoidLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new SigmoidLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new SigmoidLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new SigmoidLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SigmoidLayer(net, spec); x.inputs(0) = in; x;}
 }
 /**
  * Softplus layer.  
  */
 
-class SoftplusLayer(override val net:Net, override val opts:SoftplusLayer.Opts = new SoftplusLayer.Options) extends Layer(net, opts) {
+class SoftplusLayer(override val net:Net, override val spec:SoftplusLayer.Spec = new SoftplusLayer.Spec) extends Layer(net, spec) {
 	var ilinks:Mat = null;
   var totflops = 0L;
 
@@ -621,23 +764,30 @@ class SoftplusLayer(override val net:Net, override val opts:SoftplusLayer.Opts =
 }
 
 object SoftplusLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+    
+    override def clone:Spec = {
+  	  copyTo(new Spec).asInstanceOf[Spec];
+    }
+    
+    override def create(net:Net):SoftplusLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new SoftplusLayer(net, new Options);
+  def apply(net:Net) = new SoftplusLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new SoftplusLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new SoftplusLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new SoftplusLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new SoftplusLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new SoftplusLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SoftplusLayer(net, spec); x.inputs(0) = in; x;}
 }
 /**
  * Natural Log layer. 
  */
 
-class LnLayer(override val net:Net, override val opts:LnLayer.Opts = new LnLayer.Options) extends Layer(net, opts) {
+class LnLayer(override val net:Net, override val spec:LnLayer.Spec = new LnLayer.Spec) extends Layer(net, spec) {
 
 	override def forward = {
 			createoutput;
@@ -651,24 +801,31 @@ class LnLayer(override val net:Net, override val opts:LnLayer.Opts = new LnLayer
 }
 
 object LnLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+    
+  	override def clone:Spec = {
+  	  copyTo(new Spec).asInstanceOf[Spec];
+    }
+  	
+  	override def create(net:Net):LnLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new LnLayer(net, new Options);
+  def apply(net:Net) = new LnLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new LnLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new LnLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new LnLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new LnLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new LnLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new LnLayer(net, spec); x.inputs(0) = in; x;}
 }
 
 /**
  * Exponential layer. 
  */
 
-class ExpLayer(override val net:Net, override val opts:ExpLayer.Opts = new ExpLayer.Options) extends Layer(net, opts) {
+class ExpLayer(override val net:Net, override val spec:ExpLayer.Spec = new ExpLayer.Spec) extends Layer(net, spec) {
 
 	override def forward = {
 			createoutput;
@@ -682,23 +839,30 @@ class ExpLayer(override val net:Net, override val opts:ExpLayer.Opts = new ExpLa
 }
 
 object ExpLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+    
+  	override def clone:Spec = {
+  	  copyTo(new Spec).asInstanceOf[Spec];
+    }
+  	
+    override def create(net:Net):ExpLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new ExpLayer(net, new Options);
+  def apply(net:Net) = new ExpLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new ExpLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new ExpLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new ExpLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new ExpLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new ExpLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new ExpLayer(net, spec); x.inputs(0) = in; x;}
 }
 /**
  * Sum layer. 
  */
 
-class SumLayer(override val net:Net, override val opts:SumLayer.Opts = new SumLayer.Options) extends Layer(net, opts) {
+class SumLayer(override val net:Net, override val spec:SumLayer.Spec = new SumLayer.Spec) extends Layer(net, spec) {
 	var vmap:Mat = null;
 
   override def forward = {
@@ -714,17 +878,32 @@ class SumLayer(override val net:Net, override val opts:SumLayer.Opts = new SumLa
 }
 
 object SumLayer {  
-  trait Opts extends Layer.Opts {
+  class Spec extends Layer.Spec {
+    
+  	override def clone:Spec = {
+  	  copyTo(new Spec).asInstanceOf[Spec];
+    }
+  	
+  	override def create(net:Net):SumLayer = {
+      apply(net, this);
+    }
   }
-  class Options extends Opts {}
   
-  def apply(net:Net) = new SumLayer(net, new Options);
+  def apply(net:Net) = new SumLayer(net, new Spec);
   
-  def apply(net:Net, opts:Opts) = new SumLayer(net, opts);
+  def apply(net:Net, spec:Spec) = {val x = new SumLayer(net, spec);  x;}
   
-  def apply(in:Layer, net:Net) = {val x = new SumLayer(net, new Options); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net) = {val x = new SumLayer(net, new Spec); x.inputs(0) = in; x;}
   
-  def apply(in:Layer, net:Net, opts:Opts) = {val x = new SumLayer(net, opts); x.inputs(0) = in; x;}
+  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SumLayer(net, spec); x.inputs(0) = in; x;}
+}
+
+class LayerSpec(val nlayers:Int) {
+  val layerSpecs = new Array[Layer.Spec](nlayers);
+  
+  def apply(i:Int):Layer.Spec = layerSpecs(i);
+  
+  def update(i:Int, lspec:Layer.Spec) = {layerSpecs(i) = lspec; this}
 }
  
 
