@@ -826,12 +826,13 @@ object DNN  {
     if (opts.links == null) opts.links = izeros(1,targ.nrows)
     opts.links.set(1)
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.aopts = opts
     dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   	    new MatDS(Array(mat0, targ), opts), 
   	    new DNN(opts), 
   	    Array(new L1Regularizer(opts)),
-  	    new ADAGrad(opts), 
+  	    null, 
   	    opts)
     (nn, opts)
   }
@@ -863,6 +864,7 @@ object DNN  {
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
+    opts.aopts = opts
     implicit val threads = threadPool(4);
     val ds = new FilesDS(opts)
 //    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
@@ -870,7 +872,7 @@ object DNN  {
   			ds, 
   	    new DNN(opts), 
   	    Array(new L1Regularizer(opts)),
-  	    new ADAGrad(opts), 
+  	    null, 
   	    opts)
     (nn, opts)
   } 
@@ -903,6 +905,7 @@ object DNN  {
     mopts.lrate = 1f
     mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     mopts.autoReset = false
+    mopts.aopts = mopts
     if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
     nopts.links = mopts.links
     nopts.batchSize = mopts.batchSize
@@ -913,7 +916,7 @@ object DNN  {
         new MatDS(Array(mat0, targ), mopts), 
         model, 
         Array(new L1Regularizer(mopts)),
-        new ADAGrad(mopts), mopts)
+        null, mopts)
     val nn = new Learner(
         new MatDS(Array(mat1, preds), nopts), 
         model, 
