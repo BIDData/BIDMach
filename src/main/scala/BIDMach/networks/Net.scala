@@ -12,30 +12,11 @@ import scala.util.hashing.MurmurHash3;
 import scala.collection.mutable.HashMap;
 
 /**
- * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 15 layer types:
- - InputLayer: just a placeholder for the first layer which is loaded with input data blocks. No learnable params. 
- - FCLayer: Fully-Connected Linear layer. Has a matrix of learnable params which is the input-output map. 
- - RectLayer: Rectifying one-to-one layer. No params.
- - GLMLayer: a one-to-one layer with GLM mappings (linear, logistic, abs-logistic and SVM). No learnable params. 
- - NormLayer: normalizing layer that adds a derivative term based on the difference between current layer norm and a target norm. 
-   No learnable params. The target norm and weight of this derivative term can be specified. 
- - DropoutLayer: A layer that implements random dropout. No learnable params, but dropout fraction can be specified. 
- - AddLayer: adds input layers element-wise.
- - MulLayer: multiplies input layers element-wise. Will also perform edge operations (one input can be a scalar). 
- - Softmax: a softmax (normalized exponential) layer.
- - Tanh: Hyperbolic tangent non-linearity.
- - Sigmoid: Logistic function non-linearity.
- - Softplus: smooth ReLU unit. 
- - Ln: natural logarithm
- - Exp: exponential
- - Sum: column-wise sum
+ * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. 
  *
- * The network topology is specified by opts.layers which is a sequence of "LayerSpec" objects. There is a LayerSpec
- * Class for each Layer class, which holds the params for defining that layer. Currently only four LayerSpec types need params:
- - FC: "outside" holds the output dimensions of the FClayer (input dimension set by previous layer). 
- - GLM: "links" holds the links matrix (integer specs for loss types, see GLM), for the output of that layer. Its size should match the number of targets.
- - Norm: "targetNorm" holds a target per-element norm, and "weight" is the weight for this term in the derivative calculation.
- - Dropout: "frac" holds the fraction of neurons to retain.
+ * The network topology is specified by opts.layers which is a sequence of "LayerOptions" objects. There is a LayerOptions
+ * Class for each Layer class, which holds the params for defining that layer. There is also an inputs parameter which points
+ * to the set of Layer.Options instances that mirror the final network structure. 
  *
  */
 
@@ -55,13 +36,12 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
-	  if (refresh) {
+	  if (modelMap == null) {
 	  	modelMap = HashMap();
 	  	imodel = 0;
-	  	layers.map({
-	  	    case mlayer:ModelLayer => mlayer.imodel = mlayer.getModelMat(this, mlayer.spec.modelName, mlayer.spec.imodel);
-	  	    case _ => {}
-	  	});
+	  	layers.map(_.getModelMats(this));
+	  }
+	  if (refresh) {
 	  	setmodelmats(new Array[Mat](imodel));
 	  }
 	  if (updatemats == null) updatemats = new Array[Mat](modelmats.length);
@@ -72,15 +52,15 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
   
   def createLayers = {
-    val layerSpecs = opts.layers.layerSpecs;
+    val layerOptionss = opts.layers.layerOptionss;
     layers = new Array[Layer](opts.layers.nlayers);
     for (i <- 0 until opts.layers.nlayers) {
-      layers(i) = layerSpecs(i).create(this);
-      layerSpecs(i).myLayer = layers(i);
+      layers(i) = layerOptionss(i).create(this);
+      layerOptionss(i).myLayer = layers(i);
     }
     for (i <- 0 until opts.layers.nlayers) {
-    	for (j <- 0 until layerSpecs(i).inputs.length) {
-    		if (layerSpecs(i).inputs(j) != null) layers(i).inputs(j) = layerSpecs(i).inputs(j).myLayer;
+    	for (j <- 0 until layerOptionss(i).inputs.length) {
+    		if (layerOptionss(i).inputs(j) != null) layers(i).setinput(j, layerOptionss(i).inputs(j).myLayer);
     	}
     }
   }
@@ -89,7 +69,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
-    	layers(0).outputs(0) = gmats(0);
+    	layers(0).output = gmats(0);
     	if (targmap.asInstanceOf[AnyRef] != null) {
     		layers(layers.length-1).target = targmap * gmats(0);
     	} else {
@@ -117,7 +97,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
   	if (batchSize < 0) batchSize = gmats(0).ncols;
-    layers(0).outputs(0) = extendData(gmats(0), batchSize);
+    layers(0).output = extendData(gmats(0), batchSize);
     val targ = extendData(if (targmap.asInstanceOf[AnyRef] != null && putBack < 0) {
     	targmap * gmats(0);
     } else {
@@ -180,7 +160,7 @@ object Net  {
     var constFeat:Boolean = false;
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
-    var layers:LayerSpec = null;
+    var layers:LayerOptions = null;
   }
   
   class Options extends Opts {}
@@ -192,26 +172,26 @@ object Net  {
    * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerSpec = {
+  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
-    val layers = new LayerSpec(depth);
+    val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Spec;
+    layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new LinLayer.Spec{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
+    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhLayer.Spec{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidLayer.Spec{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new ReLULayer.Spec{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusLayer.Spec{inputs(0) = layers(i-1)};
+    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Spec{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
@@ -221,28 +201,28 @@ object Net  {
    * First FC layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerSpec = {
+  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
     val depth = (depth0/3)*3;              // Round up to an odd number of layers 
-    val layers = new LayerSpec(depth);
+    val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Spec;
+    layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new LinLayer.Spec{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
+    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhLayer.Spec{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidLayer.Spec{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new ReLULayer.Spec{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusLayer.Spec{inputs(0) = layers(i-1)};
+    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
     	  }
     	} else {
-    		layers(i) = new NormLayer.Spec{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    		layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat = opts.constFeat; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Spec{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat = opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
@@ -252,35 +232,35 @@ object Net  {
    * First FC layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerSpec = {
+  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
     val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of layers 
-    val layers = new LayerSpec(depth);
+    val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Spec;
+    layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	(i % 4) match {
     	  case 1 => {
-    	  	layers(i) = new LinLayer.Spec{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
+    	  	layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     	  	w = (taper*w).toInt;
     	  }
     	  case 2 => {
     	  	nonlin match {
-    	  	case 1 => layers(i) = new TanhLayer.Spec{inputs(0) = layers(i-1)};
-    	  	case 2 => layers(i) = new SigmoidLayer.Spec{inputs(0) = layers(i-1)};
-    	  	case 3 => layers(i) = new ReLULayer.Spec{inputs(0) = layers(i-1)};
-    	  	case 4 => layers(i) = new SoftplusLayer.Spec{inputs(0) = layers(i-1)};
+    	  	case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
     	  	}
     	  }
     	  case 3 => {
-    	  	layers(i) = new NormLayer.Spec{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    	  	layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
       }
     	  case _ => {
-    	  	layers(i) = new DropoutLayer.Spec{inputs(0) = layers(i-1); frac = opts.dropout};
+    	  	layers(i) = new DropoutLayer.Options{inputs(0) = layers(i-1); frac = opts.dropout};
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Spec{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
