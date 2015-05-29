@@ -235,23 +235,6 @@ object LinLayer {
     x.imodel = x.getModelMat(net, spec.modelName, spec.imodel)  
     x;}
   
-  def apply(in:Layer, net:Net, spec:Spec):LinLayer = {
-    val x = apply(net, spec);
-    x.inputs(0) = in;
-    x;}
-  
-  def apply(in:Layer, net:Net, modelName:String, imodel:Int, outdim:Int, constFeat:Boolean, aopts:ADAGrad.Opts) = {
-  	val x = new LinLayer(net, new Spec);   
-  	x.inputs(0) = in;
-    x.spec.modelName = modelName;
-    x.spec.imodel = imodel;
-    x.spec.constFeat = constFeat;
-    x.spec.aopts = aopts;
-    x.spec.outdim = outdim;
-    x.modelName = modelName;
-    x.imodel = x.getModelMat(net, modelName, imodel)
-    x;
-  }
 }
 
 /**
@@ -284,10 +267,6 @@ object ReLULayer {
   def apply(net:Net) = new ReLULayer(net, new Spec);
   
   def apply(net:Net, spec:Spec) = {val x = new ReLULayer(net, spec); x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new ReLULayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new ReLULayer(net, spec); x.inputs(0) = in; x;}
 }
 
 /**
@@ -899,6 +878,7 @@ object SumLayer {
 }
 
 class LayerSpec(val nlayers:Int) {
+  
   val layerSpecs = new Array[Layer.Spec](nlayers);
   
   def apply(i:Int):Layer.Spec = layerSpecs(i);

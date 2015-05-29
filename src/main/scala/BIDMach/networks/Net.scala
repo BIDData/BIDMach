@@ -193,29 +193,27 @@ object Net  {
    * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Net = {
-    val net = new Net(opts);
+  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerSpec = {
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
-    val layers = new Array[Layer](depth);
-    net.layers = layers;
+    val layers = new LayerSpec(depth);
     var w = width;
-    layers(0) = InputLayer(net);
+    layers(0) = new InputLayer.Spec;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = LinLayer(layers(i-1), net, "", 0, w, opts.constFeat, opts.aopts);
+    		layers(i) = new LinLayer.Spec{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
-    	    case 1 => layers(i) = TanhLayer(layers(i-1), net);
-    	    case 2 => layers(i) = SigmoidLayer(layers(i-1), net);
-    	    case 3 => layers(i) = ReLULayer(layers(i-1), net);
-    	    case 4 => layers(i) = SoftplusLayer(layers(i-1), net);
+    	    case 1 => layers(i) = new TanhLayer.Spec{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidLayer.Spec{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new ReLULayer.Spec{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusLayer.Spec{inputs(0) = layers(i-1)};
     	  }
     	}
     }
-    layers(depth-2) = LinLayer(layers(depth-3), net, "", 0, ntargs, opts.constFeat, opts.aopts);
-    layers(depth-1) = GLMLayer(layers(depth-2), net, opts.links);
-    net
+    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Spec{inputs(0) = layers(depth-2); links = opts.links};
+    layers;
   }
   
   /**
@@ -224,31 +222,29 @@ object Net  {
    * First FC layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Net = {
-    val net = new Net(opts);
+  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerSpec = {
     val depth = (depth0/3)*3;              // Round up to an odd number of layers 
-    val layers = new Array[Layer](depth);
-    net.layers = layers;
+    val layers = new LayerSpec(depth);
     var w = width;
-    layers(0) = InputLayer(net);
+    layers(0) = new InputLayer.Spec;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = LinLayer(layers(i-1), net, "", 0, w, opts.constFeat, opts.aopts);
+    		layers(i) = new LinLayer.Spec{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
-    	    case 1 => layers(i) = TanhLayer(layers(i-1), net);
-    	    case 2 => layers(i) = SigmoidLayer(layers(i-1), net);
-    	    case 3 => layers(i) = ReLULayer(layers(i-1), net);
-    	    case 4 => layers(i) = SoftplusLayer(layers(i-1), net);
+    	    case 1 => layers(i) = new TanhLayer.Spec{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidLayer.Spec{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new ReLULayer.Spec{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusLayer.Spec{inputs(0) = layers(i-1)};
     	  }
     	} else {
-    		layers(i) = NormLayer(layers(i-1), net, opts.targetNorm, opts.nweight);
+    		layers(i) = new NormLayer.Spec{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = LinLayer(layers(depth-3), net, "", 0, ntargs, opts.constFeat, opts.aopts);
-    layers(depth-1) = GLMLayer(layers(depth-2), net, opts.links);
-    net
+    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Spec{inputs(0) = layers(depth-2); links = opts.links};
+    layers;
   }
   
   /**
@@ -257,38 +253,36 @@ object Net  {
    * First FC layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Net = {
-    val net = new Net(opts);
+  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerSpec = {
     val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of layers 
-    val layers = new Array[Layer](depth);
-    net.layers = layers;
+    val layers = new LayerSpec(depth);
     var w = width;
-    layers(0) = InputLayer(net);
+    layers(0) = new InputLayer.Spec;
     for (i <- 1 until depth - 2) {
     	(i % 4) match {
     	  case 1 => {
-    	  	layers(i) = LinLayer(layers(i-1), net, "", 0, w, opts.constFeat, opts.aopts);
+    	  	layers(i) = new LinLayer.Spec{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     	  	w = (taper*w).toInt;
     	  }
     	  case 2 => {
     	  	nonlin match {
-    	  	case 1 => layers(i) = TanhLayer(layers(i-1), net);
-    	  	case 2 => layers(i) = SigmoidLayer(layers(i-1), net);
-    	  	case 3 => layers(i) = ReLULayer(layers(i-1), net);
-    	  	case 4 => layers(i) = SoftplusLayer(layers(i-1), net);
+    	  	case 1 => layers(i) = new TanhLayer.Spec{inputs(0) = layers(i-1)};
+    	  	case 2 => layers(i) = new SigmoidLayer.Spec{inputs(0) = layers(i-1)};
+    	  	case 3 => layers(i) = new ReLULayer.Spec{inputs(0) = layers(i-1)};
+    	  	case 4 => layers(i) = new SoftplusLayer.Spec{inputs(0) = layers(i-1)};
     	  	}
     	  }
     	  case 3 => {
-    	  	layers(i) = NormLayer(layers(i-1), net, opts.targetNorm, opts.nweight);
-    	  }
+    	  	layers(i) = new NormLayer.Spec{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+      }
     	  case _ => {
-    	  	layers(i) = DropoutLayer(layers(i-1), net, opts.dropout);
+    	  	layers(i) = new DropoutLayer.Spec{inputs(0) = layers(i-1); frac = opts.dropout};
     	  }
     	}
     }
-    layers(depth-2) = LinLayer(layers(depth-3), net, "", 0, ntargs, opts.constFeat, opts.aopts);
-    layers(depth-1) = GLMLayer(layers(depth-2), net, opts.links);
-    net
+    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Spec{inputs(0) = layers(depth-2); links = opts.links};
+    layers;
   }
   
   def mkNetModel(fopts:Model.Opts) = {
@@ -305,9 +299,8 @@ object Net  {
     
   class LearnOptions extends Learner.Options with Net.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
-  def learner(net0:Net, mat0:Mat, targ:Mat) = {
-    val net = if (net0 == null) dlayers(3, 0, 1f, targ.nrows, new LearnOptions) else net0;     // default to a 3-layer network
-    val opts = net.opts.asInstanceOf[LearnOptions];
+  def learner(mat0:Mat, targ:Mat) = {
+    val opts = new LearnOptions;
     if (opts.links == null) {
       opts.links = izeros(1,targ.nrows);
       opts.links.set(1);
@@ -315,24 +308,21 @@ object Net  {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
   	    new MatDS(Array(mat0, targ), opts), 
-  	    net, 
+  	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
     (nn, opts)
   }
   
-  def learnerX(net0:Net, mat0:Mat, targ:Mat) = {
-    val net = if (net0 == null) dlayers(3, 0, 1f, targ.nrows, new LearnOptions) else net0;      // default to a 3-layer network
-    val opts = net.opts.asInstanceOf[LearnOptions];
-    if (opts.links == null) {
-      opts.links = izeros(1,targ.nrows);
-      opts.links.set(1);
-    }
+  def learnerX(mat0:Mat, targ:Mat) = {
+    val opts = new LearnOptions;
+    opts.links = izeros(1,targ.nrows);
+    opts.links.set(1);
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatDS(Array(mat0, targ), opts), 
-  	    net, 
+  	    new Net(opts), 
   	    null,
   	    null, 
   	    opts)
@@ -341,17 +331,13 @@ object Net  {
   
   class FDSopts extends Learner.Options with Net.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(net:Net, fn1:String, fn2:String):(Learner, FDSopts) = learner(net, List(FilesDS.simpleEnum(fn1,1,0),
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
   		                                                                  FilesDS.simpleEnum(fn2,1,0)));
   
-  def learner(net:Net, fn1:String):(Learner, FDSopts) = learner(net, List(FilesDS.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
 
-  def learner(net:Net, fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
-    val opts = net.opts.asInstanceOf[FDSopts];
-    if (opts.links == null) {
-      opts.links = izeros(1,net.opts.targmap.nrows);
-      opts.links.set(1);
-    }
+  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+    val opts = new FDSopts;
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
@@ -359,7 +345,7 @@ object Net  {
     val ds = new FilesDS(opts)
   	val nn = new Learner(
   			ds, 
-  	    net, 
+  	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
@@ -381,7 +367,7 @@ object Net  {
     val net = dlayers(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
-  	    net, 
+  	    new Net(opts), 
   	    null,
   	    null, 
   	    opts)
