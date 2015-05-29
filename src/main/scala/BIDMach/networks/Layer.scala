@@ -151,13 +151,11 @@ class LinLayer(override val net:Net, override val spec:LinLayer.Spec = new LinLa
   var epsilon = 0f;
 
   override def forward = {
-  	println("x0 %s" format (if (net.modelmats(0).asInstanceOf[AnyRef] != null) net.modelmats(0).mytype else "none"));
   	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
   		modelmats(imodel) = convertMat(normrnd(0, 1, spec.outdim, input.output.nrows + (if (spec.constFeat) 1 else 0)));
   		updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
   		if (spec.aopts != null) initADAGrad;  
   	}
-  	println("xx %d %s %s" format (imodel, modelmats(imodel).mytype, net.modelmats(0).mytype))
   	val mm = if (spec.constFeat) {
   		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
   	} else {
@@ -266,7 +264,7 @@ object ReLULayer {
   
   def apply(net:Net) = new ReLULayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new ReLULayer(net, spec); x;}
+  def apply(net:Net, spec:Spec) = new ReLULayer(net, spec);
 }
 
 /**
@@ -289,11 +287,7 @@ object InputLayer {
   
   def apply(net:Net) = new InputLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new InputLayer(net, new Spec); x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new InputLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new InputLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new InputLayer(net, spec);
 }
 
 /**
@@ -348,16 +342,8 @@ object GLMLayer {
   
   def apply(net:Net) = new GLMLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new GLMLayer(net, spec); x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new GLMLayer(net, spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, links:IMat) = {
-    val x = new GLMLayer(net, new Spec); 
-    x.inputs(0) = in; 
-    x.spec.links = links;
-    x;
-    }
+  def apply(net:Net, spec:Spec) = new GLMLayer(net, spec); 
+
 }
 
 /**
@@ -407,19 +393,7 @@ object NormLayer {
   
   def apply(net:Net) = new NormLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new NormLayer(net, spec); x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new NormLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new NormLayer(net, spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, targetNorm:Float, weight:Float) = {
-    val x = new NormLayer(net, new Spec);
-    x.spec.targetNorm = targetNorm;
-    x.spec.weight = weight;
-    x.inputs(0) = in; 
-    x;
-    }
+  def apply(net:Net, spec:Spec) = new NormLayer(net, spec);  
 }
 
 /**
@@ -473,18 +447,7 @@ object DropoutLayer {
   
   def apply(net:Net) = new DropoutLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new DropoutLayer(net, spec); x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new DropoutLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new DropoutLayer(net, spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, frac:Float) = {
-    val x = new DropoutLayer(net, new Spec); 
-    x.spec.frac = frac;
-    x.inputs(0) = in; 
-    x;
-  }
+  def apply(net:Net, spec:Spec) = new DropoutLayer(net, spec);
 }
 
 /**
@@ -530,11 +493,7 @@ object AddLayer {
   
   def apply(net:Net) = new AddLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new AddLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new AddLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new AddLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new AddLayer(net, spec); 
 }
 
 /**
@@ -581,11 +540,7 @@ object MulLayer {
   
   def apply(net:Net) = new MulLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new MulLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new MulLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new MulLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new MulLayer(net, spec); 
 }
 
 /**
@@ -624,9 +579,7 @@ object SoftmaxLayer {
   
   def apply(net:Net) = new SoftmaxLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new SoftmaxLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SoftmaxLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new SoftmaxLayer(net, spec);
 }
 /**
  * Tanh layer. 
@@ -660,11 +613,7 @@ object TanhLayer {
   
   def apply(net:Net) = new TanhLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new TanhLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new TanhLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new TanhLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new TanhLayer(net, spec);
 }
 
 /**
@@ -707,11 +656,7 @@ object SigmoidLayer {
   
   def apply(net:Net) = new SigmoidLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new SigmoidLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new SigmoidLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SigmoidLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new SigmoidLayer(net, spec); 
 }
 /**
  * Softplus layer.  
@@ -756,11 +701,7 @@ object SoftplusLayer {
   
   def apply(net:Net) = new SoftplusLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new SoftplusLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new SoftplusLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SoftplusLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new SoftplusLayer(net, spec); 
 }
 /**
  * Natural Log layer. 
@@ -793,11 +734,7 @@ object LnLayer {
   
   def apply(net:Net) = new LnLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new LnLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new LnLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new LnLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new LnLayer(net, spec);
 }
 
 /**
@@ -831,11 +768,8 @@ object ExpLayer {
   
   def apply(net:Net) = new ExpLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new ExpLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new ExpLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new ExpLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new ExpLayer(net, spec);
+
 }
 /**
  * Sum layer. 
@@ -870,11 +804,8 @@ object SumLayer {
   
   def apply(net:Net) = new SumLayer(net, new Spec);
   
-  def apply(net:Net, spec:Spec) = {val x = new SumLayer(net, spec);  x;}
-  
-  def apply(in:Layer, net:Net) = {val x = new SumLayer(net, new Spec); x.inputs(0) = in; x;}
-  
-  def apply(in:Layer, net:Net, spec:Spec) = {val x = new SumLayer(net, spec); x.inputs(0) = in; x;}
+  def apply(net:Net, spec:Spec) = new SumLayer(net, spec);
+
 }
 
 class LayerSpec(val nlayers:Int) {

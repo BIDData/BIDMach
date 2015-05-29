@@ -54,8 +54,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  datasource.reset;
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
+	  createLayers;
 	  if (refresh) {
-	    createLayers
 	  	modelMap = HashMap();
 	  	imodel = 0;
 	  	layers.map({
@@ -69,19 +69,18 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  	if (modelmats(i).asInstanceOf[AnyRef] != null) modelmats(i) = convertMat(modelmats(i));
 	  	if (updatemats(i).asInstanceOf[AnyRef] != null) updatemats(i) = convertMat(updatemats(i));
 	  };
-	  println("mm %s" format (if (modelmats(0).asInstanceOf[AnyRef] != null) modelmats(0).mytype else "nope"))
   }
   
   def createLayers = {
-    val layerSpecs = opts.spec.layerSpecs;
-    layers = new Array[Layer](opts.spec.nlayers);
-    for (i <- 0 until opts.spec.nlayers) {
+    val layerSpecs = opts.layers.layerSpecs;
+    layers = new Array[Layer](opts.layers.nlayers);
+    for (i <- 0 until opts.layers.nlayers) {
       layers(i) = layerSpecs(i).create(this);
       layerSpecs(i).myLayer = layers(i);
     }
-    for (i <- 0 until opts.spec.nlayers) {
+    for (i <- 0 until opts.layers.nlayers) {
     	for (j <- 0 until layerSpecs(i).inputs.length) {
-    		layers(i).inputs(j) = layerSpecs(i).inputs(j).myLayer;
+    		if (layerSpecs(i).inputs(j) != null) layers(i).inputs(j) = layerSpecs(i).inputs(j).myLayer;
     	}
     }
   }
@@ -171,7 +170,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 
 object Net  {
   trait Opts extends Model.Opts {
-    var spec:LayerSpec = null;
     var links:IMat = null;
     var nweight:Float = 0.1f;
     var dropout:Float = 0.5f;
@@ -182,6 +180,7 @@ object Net  {
     var constFeat:Boolean = false;
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
+    var layers:LayerSpec = null;
   }
   
   class Options extends Opts {}
@@ -242,7 +241,7 @@ object Net  {
     		layers(i) = new NormLayer.Spec{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-2) = new LinLayer.Spec{inputs(0) = layers(depth-3); outdim = ntargs; constFeat = opts.constFeat; aopts = opts.aopts};
     layers(depth-1) = new GLMLayer.Spec{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
@@ -376,16 +375,16 @@ object Net  {
   
   def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
     val model = model0.asInstanceOf[Net];
+    val mopts = model.opts;
     val opts = new LearnOptions;
-    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.links = model.opts.links;
-    opts.addConstFeat = model.opts.asInstanceOf[DataSource.Opts].addConstFeat;
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1);
+    opts.links = mopts.links;
+    opts.layers = mopts.layers;
+    opts.addConstFeat = mopts.asInstanceOf[DataSource.Opts].addConstFeat;
     opts.putBack = 1;
     opts.dropout = 1f;
-    opts.predict = true;
     
     val newmod = new Net(opts);
-    newmod.layers = model.layers;
     newmod.refresh = false;
     newmod.copyFrom(model)
     val nn = new Learner(
