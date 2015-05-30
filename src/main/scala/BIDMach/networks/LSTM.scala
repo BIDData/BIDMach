@@ -87,17 +87,19 @@ object LSTMLayer {
     x;
   }
   
-  def simpleArray(height:Int, width:Int) = {
+  def simpleArray(height:Int, width:Int, dim:Int, nvocab:Int) = {
     val nopts = new Net.Options;
     val net = new Net(nopts);
-    net.layers = new Array[Layer]((height+2)*width);
+    net.layers = new Array[Layer]((height+4)*width);
     val opts = new LSTMLayer.Options;
-    val lopts = new LinLayer.Options;
+    val lopts = new LinLayer.Options{modelName = "inWordMap"; outdim = dim};
+    val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = nvocab};
     val sopts = new SoftmaxLayer.Options;
     for (j <- 0 until width) {
-    	net.layers(j) = LinLayer(net, lopts);
+    	net.layers(j) = InputLayer(net);
+    	net.layers(j + width) = LinLayer(net, lopts);
     }
-    for (i <- 1 until height + 1) {
+    for (i <- 2 until height + 2) {
       for (j <- 0 until width) {
         val layer = LSTMLayer(net, opts);
         layer.setinput(2, net.layers(j + (i - 1) * width));
@@ -111,9 +113,13 @@ object LSTMLayer {
       net.layers(i * width).setinout(1, net.layers(i * width + width - 1), 1);
     }
     for (j <- 0 until width) {
-    	val layer = SoftmaxLayer(net, sopts);
-    	layer.setinput(0, net.layers(j + height * width));
-    	net.layers(j + (height + 1) * width) = layer;
+    	val linlayer = LinLayer(net, lopts2); 
+    	linlayer.setinput(0, net.layers(j + (height + 1) * width));
+    	net.layers(j + (height + 2) * width) = linlayer;
+    	
+    	val smlayer = SoftmaxLayer(net, sopts);
+    	smlayer.setinput(0, linlayer);
+    	net.layers(j + (height + 3) * width) = smlayer;
     }
   }
 }

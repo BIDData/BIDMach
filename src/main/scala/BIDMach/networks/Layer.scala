@@ -553,13 +553,13 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Options 
 
 	override def forward = {
 			createoutput;
-			val exps = exp(inputOut);
+			val exps = exp(inputOut - maxi(inputOut));  // ensures sum(exps) is between 1 and nfeats
 			output ~ exps / sum(exps);
 			clearDeriv;
 	}
 
 	override def backward = {
-			val exps = exp(inputOut);
+			val exps = exp(inputOut - maxi(inputOut));
 			val sumexps = sum(exps);
 			val isum = 1f / (sumexps ∘ sumexps);
 			if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~
