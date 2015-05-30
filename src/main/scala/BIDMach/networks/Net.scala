@@ -168,7 +168,7 @@ object Net  {
   
   /**
    * Build a net with a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are FC alternating with ReLU, starting and ending with FC. 
+   * Intermediate layers are Linear alternating with Rect, starting and ending with Linear. 
    * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
@@ -197,8 +197,8 @@ object Net  {
   
   /**
    * Build a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are FC, ReLU, Norm, starting and ending with FC. 
-   * First FC layer width is given as an argument, then it tapers off by taper.
+   * Intermediate layers are linear, Rect, Norm, starting and ending with Linear. 
+   * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
   def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
@@ -228,8 +228,8 @@ object Net  {
   
   /**
    * Build a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are FC, ReLU, Norm, Dropout, starting and ending with FC. 
-   * First FC layer width is given as an argument, then it tapers off by taper.
+   * Intermediate layers are Linear, Rect, Norm, Dropout, starting and ending with Linear. 
+   * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
   def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {

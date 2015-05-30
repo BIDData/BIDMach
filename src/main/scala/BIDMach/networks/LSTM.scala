@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -17,6 +17,7 @@ import scala.collection.mutable.HashMap;
 
 class LSTMLayer(override val net:Net, override val opts:LSTMLayer.Options = new LSTMLayer.Options) extends CompoundLayer(net, opts) {
 	override val _inputs = new Array[Layer](3);
+	override val _inputNums = Array(0,0,0);
 	override val _outputs = new Array[Mat](2);
 	override val _derivs = new Array[Mat](2);
 }
@@ -56,7 +57,7 @@ object LSTMLayer {
 	  	val next_tanh = new TanhLayer.Options{inputs(0) = next_c;};
 	  	val next_h = new MulLayer.Options{inputs(0) = out_gate;    inputs(1) = next_tanh};
 	  	
-	  	lopts = Array(prev_c, prev_h, i,                                         // First 3 layers should be inputs
+	  	lopts = Array(prev_h, prev_c, i,                                         // First 3 layers should be inputs
 	  	              il1, ph1, sum1, in_gate,                                   // Otherwise the ordering should support forward-backward inference
 	  	              il2, ph2, sum2, out_gate, 
 	  	              il3, ph3, sum3, forget_gate, 
@@ -65,7 +66,7 @@ object LSTMLayer {
 	  			          next_tanh, next_h);
 	  	
 	  	lopts.map(_.parent = this);
-	  	outputNumbers = Array(lopts.length-3, lopts.length-1);                   // Specifies the output layer numbers (next_c and next_h)
+	  	outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
 	  }
 	  
 
@@ -84,6 +85,36 @@ object LSTMLayer {
     val x = new LSTMLayer(net, opts);
     x.construct;
     x;
+  }
+  
+  def simpleArray(height:Int, width:Int) = {
+    val nopts = new Net.Options;
+    val net = new Net(nopts);
+    net.layers = new Array[Layer]((height+2)*width);
+    val opts = new LSTMLayer.Options;
+    val lopts = new LinLayer.Options;
+    val sopts = new SoftmaxLayer.Options;
+    for (j <- 0 until width) {
+    	net.layers(j) = LinLayer(net, lopts);
+    }
+    for (i <- 1 until height + 1) {
+      for (j <- 0 until width) {
+        val layer = LSTMLayer(net, opts);
+        layer.setinput(2, net.layers(j + (i - 1) * width));
+        if (j > 0) {
+          layer.setinput(0, net.layers(j - 1 + i * width));
+          layer.setinout(1, net.layers(j - 1 + i * width), 1);
+        }
+        net.layers(j + i * width) = layer;
+      }
+      net.layers(i * width).setinput(0, net.layers(i * width + width - 1));
+      net.layers(i * width).setinout(1, net.layers(i * width + width - 1), 1);
+    }
+    for (j <- 0 until width) {
+    	val layer = SoftmaxLayer(net, sopts);
+    	layer.setinput(0, net.layers(j + height * width));
+    	net.layers(j + (height + 1) * width) = layer;
+    }
   }
 }
 
