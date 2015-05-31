@@ -85,13 +85,23 @@ class BayesNetMooc3(val dag:SMat,
    * @param here The number of samples (columns) seen so far, including the ones in this batch.
    */
   def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-    val sdata = mats(0)
-    val nonzeroIndices = find(SMat(sdata) > 0)
-    var state = rand(sdata.nrows, sdata.ncols)
-    state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) 
-    state(nonzeroIndices) = (FMat(sdata)(nonzeroIndices)-1) // Because now it's {0, 1, ..., k-1}, and because SMats don't have linear array access.
-    uupdate(sdata, state, ipass)
-    mupdate(sdata, state, ipass)
+    println("Inside dobatch, ipass = " + ipass)
+    val user:Mat = mats(1)
+    println("Before the ipass == 0 part, mats(1) was...")
+    printMatrix(FMat(mats(1)))
+    if (ipass == 0) {
+      user <-- getRandomInitialStates(mats(0))
+    }
+
+    println("mats(0):")
+    printMatrix(full(SMat(mats(0))))
+    println("mats(1):")
+    printMatrix(FMat(mats(1)))
+    println("Here is the user:")
+    printMatrix(FMat(user))
+
+    uupdate(mats(0), user, ipass)
+    mupdate(mats(0), user, ipass)
   }
 
   /**
@@ -113,18 +123,20 @@ class BayesNetMooc3(val dag:SMat,
   }
 
   /**
-   * Performs a complete, parallel Gibbs sampling over the color groups, which may involve more than one
-   * iteration if we are at the first pass or if we want to thin. For now, we sample one node at a time.
+   * Performs a complete, parallel Gibbs sampling, which may involve more than one iteration if we are
+   * in the first pass or if we want to thin. For now, we sample one node at a time (so no color groups).
    * 
-   * @param sdata The original sparse data matrix with data {1, 2, ...}. We do not use this at all!
+   * @param sdata The original sparse data matrix with data {1, 2, ...}. We only use this for overriding
+   *    information if we know certain states.
    * @param user Another data matrix with the same number of rows as sdata, and whose columns represent
    *    various iid assignments to all the variables. The known values of sdata are inserted in the same
    *    spots in this matrix, but the unknown values are appropriately randomized to be in {0,1,...,k}.
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    println("In uupdate, with user =\n")
-    printMatrix(FMat(user))
+    //println("In uupdate, with user =\n")
+    //printMatrix(FMat(user))
+    val nonzeroIndices = find(SMat(sdata) > 0)
     var numGibbsIterations = opts.samplingRate
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
@@ -134,19 +146,14 @@ class BayesNetMooc3(val dag:SMat,
     for (k <- 0 until numGibbsIterations) {
       println("In uupdate(), Gibbs iteration " + (k+1) + " of " + numGibbsIterations)
       for (n <- 0 until graph.n) {
-        println("\nCURRENTLY ON NODE " + n)
 
-        // First, find probabilities for the contiguous block of Pr(Xn = ? | parents). Store and update results in pMatrix.
+        // First, find probabilities for the contiguous block of Pr(Xn = ? | parents). Store/update results in pMatrix.
         val assignment = user.copy
         assignment(n,?) = 0
         val numStates = statesPerNode(n)
         val globalOffset = cptOffset(n)
         val localOffset = SMat(iproject(n,?)) * FMat(assignment)
         val pMatrix = globalOffset + localOffset + (icol(0 until numStates) * ones(1, batchSize))
-        println("pMatrix=")
-        printMatrix(FMat(pMatrix))
-        println("pMatrix after getting it from the cpt:")
-        printMatrix(FMat(getCpt(pMatrix)))
         pMatrix <-- getCpt(pMatrix)
         pMatrix <-- (pMatrix / sum(pMatrix,1))
 
@@ -156,33 +163,31 @@ class BayesNetMooc3(val dag:SMat,
           val globalOffsets = cptOffset(childrenIDs)
           val localOffsets = SMat(iproject)(childrenIDs,?) * FMat(assignment)
           val strides = full(SMat(iproject)(childrenIDs,n))
-          println("localoffsets followed by strides:")
-          printMatrix(localOffsets)
-          printMatrix(FMat(strides))
           for (i <- 0 until childrenIDs.length) {
-            val child = childrenIDs(i)
             val tmp = globalOffsets(i) + localOffsets(i,?) + ((icol(0 until numStates) * strides(i).toInt) * ones(1, batchSize))
-            println("Our tmp matrix for i = " + i + " is ...")
-            printMatrix(FMat(tmp))
             tmp <-- getCpt(tmp)
-            println("Now getCpt(tmp) is")
-            printMatrix(FMat(tmp))
             tmp <-- (tmp / sum(tmp,1))
             pMatrix ~ pMatrix + tmp
           }
         }
         
-        // Now pMatrix is a (numState x batchSize)-dim matrix, and row k refers to all the un-normalized
+        // Now pMatrix is a (numState x batchSize)-dim matrix, and row k refers to the un-normalized
         // probabilities that X_i (the variable we are sampling) is equal to k, for each column.
-        // TODO Sample for that variable! and save the result in user.
-        println("Our final pMatrix for this variable:")
+        pMatrix <-- (pMatrix / sum(pMatrix,1))
+        println("normalized matrix:")
         printMatrix(pMatrix)
-        println("")
-        // user <-- ???
-        // Now override the sampled values with any known values
+        sys.exit
+        // user <-- SAMPLE
+        //println("what we sampled:")
+        // ...
+        //println("user, after overriding with known values:")
+        //user(nonzeroIndices) = (FMat(sdata)(nonzeroIndices)-1)
+        //printMatrix(FMat(user))
+        //sys.exit
       }
       // Once we've sampled everything, accumulate counts in a CPT (but don't normalize).
       updateCPT(user)
+      sys.exit
     }
   }
   
@@ -228,6 +233,18 @@ class BayesNetMooc3(val dag:SMat,
     val ll = sum(sum(ln(getCpt(index))))
     return ll.dv
   }
+  
+  // -------------------------------------------------------------------------- //
+  // Methods that are specific to BayesNets and not part of the Model interface
+  
+  /** Help obtain starting 'user'; at end, subtract one because it's {0, 1, ..., k-1}. */
+  def getRandomInitialStates(sdata:Mat) : Mat = {
+    val nonzeroIndices = find(SMat(sdata) > 0)
+    var state = rand(sdata.nrows, sdata.ncols)
+    state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) 
+    state(nonzeroIndices) = (FMat(sdata)(nonzeroIndices)-1) 
+    return state
+  }
 
   /**
    * Method to update the cpt table (i.e. mm). This method is called after we finish one iteration of Gibbs 
@@ -236,7 +253,7 @@ class BayesNetMooc3(val dag:SMat,
    * 
    * @param user The state matrix, updated after the sampling.
    */
-  def updateCPT(user: Mat): Unit = {
+  def updateCPT(user: Mat) : Unit = {
     val numCols = size(user, 2)
     val index = IMat(cptOffset + SMat(iproject) * FMat(user))
     var counts = mm.zeros(mm.length, 1)
@@ -253,7 +270,7 @@ class BayesNetMooc3(val dag:SMat,
   def getCpt(index: Mat) : Mat = {
     return mm(IMat(index))
   }
-
+  
   /**
    * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
    * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. Use SMat to save
@@ -318,11 +335,8 @@ class BayesNetMooc3(val dag:SMat,
 object BayesNetMooc3  {
   
   trait Opts extends Model.Opts {
-    var nsampls = 1
     var alpha = 1f
-    var beta = 0.1f
     var samplingRate = 1
-    var eps = 1e-9
     var numSamplesBurn = 100
   }
   
@@ -340,15 +354,16 @@ object BayesNetMooc3  {
     val opts = new xopts
     opts.dim = dag.ncols
     opts.batchSize = 4367
-    opts.isprob = false     // Because our cpts should NOT be normalized across their one column (lol).
+    opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
+    opts.putBack = 1        // For now...
+    val secondMatrix = data.zeros(data.nrows,data.ncols)
     //opts.useGPU = false     // Temporary TODO test with GPUs, delete this line later
     //opts.updateAll = true   // TODO not necessary for testing purposes now
     //opts.power = 1f         // TODO John suggested that we do not need 1f here
-    //opts.putBack = 1        // Temporary TODO because we will assume we have npasses = 1 for now
     //opts.npasses = 1        // Temporary TODO because I would like to get one pass working correctly.
 
     val nn = new Learner(
-        new MatDS(Array(data:Mat), opts),
+        new MatDS(Array(data:Mat, secondMatrix), opts),
         new BayesNetMooc3(SMat(dag), statesPerNode, opts),
         null,
         new IncNorm(opts),
