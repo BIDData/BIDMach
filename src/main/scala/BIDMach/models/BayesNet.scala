@@ -8,236 +8,312 @@ import BIDMach.updaters._
 import BIDMach._
 
 import java.text.NumberFormat
+import edu.berkeley.bid.CUMACH._
 
 /**
- * WIP: Bayes network using cooled Gibbs parameter estimation
+ * A Bayesian Network implementation with fast parallel Gibbs Sampling (e.g., for MOOC data).
+ * 
+ * Haoyu Chen and Daniel Seita are building off of Huasha Zhao's original code.
+ * 
+ * The input needs to be (1) a graph, (2) a sparse data matrix, and (3) a states-per-node file
+ * 
+ * This is still a WIP.
  */
-class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
+
+// Put general reminders here:
+// TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
+// TODO Investigate opts.nsampls. For now, have to do batchSize * opts.nsampls or something like that.
+// TODO Check if the BayesNet should be re-using the user for now
+// To be honest, right now it's far easier to assume the datasource is providing us with a LENGTH ONE matrix each step
+// TODO Be sure to check if we should be using SMats, GMats, etc. ANYWHERE we use Mats.
+class BayesNet(val dag:SMat, 
+               val states:Mat, 
+               override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
   var mm:Mat = null
-  var offset:Mat = null
+  var cptOffset:Mat = null
   var graph:Graph = null
-  var iproject:Mat = null
-  var pproject:Mat = null
-  
-  // Trying to stop matrix caching problems!
-  var nodep0:Mat = null
-  var nodep1:Mat = null
-  var cptindex:Mat = null
-  var user:Mat = null
-  var user0:Mat = null
-  var user1:Mat = null
-  var index:Mat = null
-  
+  var iproject:Mat = null           // Local CPT offset matrix
+  var pproject:Mat = null           // Parent tracking matrix
+  var statesPerNode:IMat = null
+  var useGPUnow:Boolean = false
+  var replicationMatrices:Array[Mat] = null
+  var strideVectors:Array[Mat] = null
+  var combinationMatrices:Array[Mat] = null
+ 
+  /**
+   * Performs a series of initialization steps.
+   * 
+   * - Builds iproject/pproject for local offsets and computing probabilities, respectively.
+   * - Build the CPT, which is actually counts, not probabilities. I initialize it to be ones.
+   * - Randomize the input data, which is stored in the second matrix
+   */
   def init() = {
-    graph = new Graph(dag, opts.dim)
+
+    // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
+    useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
+    statesPerNode = IMat(states)
+    graph = new Graph(dag, opts.dim, statesPerNode)
     graph.color
+    iproject = (graph.iproject).t
+    pproject = (graph.pproject)
     
-    // Please bear with me on this for now...
-    val useGPUnow = opts.useGPU && Mat.hasCUDA > 0
-    val numVars = dag.ncols
-    if (useGPUnow) {
-      iproject  = GSMat(graph.iproject)
-      pproject  = GSMat(graph.pproject)
-      nodep0    = gzeros(numVars,4367)
-      nodep1    = gzeros(numVars,4367)
-      cptindex  = gizeros(numVars,4367)
-      index     = gizeros(numVars,4367)
-      user      = giones(numVars,4367) // TODO maybe this shouldn't be here for now?
-      user0     = giones(numVars,4367)
-      user1     = giones(numVars,4367)
-    } else {
-      iproject  = SMat(graph.iproject)
-      pproject  = SMat(graph.pproject)
-      nodep0    = zeros(numVars,4367)
-      nodep1    = zeros(numVars,4367)
-      cptindex  = izeros(numVars,4367)
-      index     = izeros(numVars,4367)
-      user      = iones(numVars,4367) // Same over here...
-      user0     = iones(numVars,4367)
-      user1     = iones(numVars,4367)     
+    // Form the replication matrices, stride vectors, and combination matrices, for update() later.
+    formReplicationAndStrides
+    formCombinationMatrices
+    println("Finished with the replication and stride matrices!")
+    for (c <- 0 until graph.ncolors) {
+      println("Color group with elements\n" + find(graph.colors == c).t)
+      printMatrix(FMat(replicationMatrices(c)))
+      println("The stride:")
+      printMatrix(FMat(strideVectors(c)))
+      println()
     }
+    println("Finished with the combination matrices!")
+    for (c <- 0 until graph.ncolors) {
+      println("Color group with elements\n" + find(graph.colors == c))
+      printMatrix(FMat(combinationMatrices(c)))
+      println()
+    }
+    sys.exit
     
-    // Prepare the CPT, which is stored in modelmats(0), and its offset.
-    val np = sum(dag)
-    val ns = IMat(pow(2*ones(1, graph.n), np+1))
-    val l = sum(ns).v
-    val modelmat = rand(l, 1)
-    modelmat(1 until l by 2) = 1 - modelmat(0 until l-1 by 2)
-    println("Here is the modelmat.t after initializing it and normalizing:\n" + modelmat.t)
+    // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize w/ones.
+    val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode.t)) * pproject) + 1e-4)
+    cptOffset = izeros(graph.n, 1)
+    cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
+    val lengthCPT = sum(numSlotsInCpt).dv.toInt
+    val cpt = if(useGPUnow) gones(lengthCPT, 1) else ones(lengthCPT, 1)
     setmodelmats(new Array[Mat](1))
-    modelmats(0) = if (useGPUnow) GMat(modelmat) else modelmat
-    offset = izeros(graph.n,1)
-    offset(1 until graph.n) = cumsum(ns)(0 until graph.n-1)
-    if (useGPUnow) {
-      offset = GIMat(offset)
-    }
-    
-    /*
-    if (mats.size > 1) {
-      while (datasource.hasNext) {
-        mats = datasource.next
-        val sdata = mats(0)
-        val state = mats(1)
-        state <-- rand(state.nrows, state.ncols * opts.nsampls)
-        state <-- (state >= 0.5)
-        val innz = sdata match { 
-          case ss: SMat => find(ss)
-          case ss: GSMat => find(SMat(ss))
-          case _ => throw new RuntimeException("sdata not SMat/GSMat")
-        }
-        for(i <- 0 until opts.nsampls){
-        	state.asInstanceOf[FMat](innz + i * sdata.ncols *  graph.n) = 0f
-        	state(?, i*sdata.ncols until (i+1)*sdata.ncols) = state(?, i*sdata.ncols until (i+1)*sdata.ncols) + (sdata.asInstanceOf[SMat] > 0)
-        }
-        datasource.putBack(mats,1)
-      }
-    }
-    */
-    
+    modelmats(0) = cpt
     mm = modelmats(0)
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
-  }
-  
-  def getCpt(index: Mat) = {
-    if (opts.useGPU && Mat.hasCUDA > 0) {
-      cptindex <-- mm(GIMat(index)) 
-    } else {
-      cptindex <-- mm(IMat(index)) 
+    
+    // Randomize the initial starting states, and store the data in the second matrix source
+    if (this.mats.size < 2) {
+      throw new RuntimeException("We need at least two matrices in the datasource.")
     }
-    cptindex
-  }
-  
-  // Note: sdata is a sparse matrix of 1s and 2s, right? The "user" matrix will shift everything
-  // over to be {0,1} in which case we only want to add the sdata stuff that exceeds ONE. The
-  // user matrix is what we put our sampled values in, so it will "look random" to us.
-  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    val useGPUnow:Boolean = opts.useGPU && Mat.hasCUDA > 0
-    if (putBack < 0 || ipass == 0) {
-      if (useGPUnow) {
-        user <-- (grand(user.nrows, user.ncols) > 0.5)
-      } else {
-        user <-- (rand(user.nrows, user.ncols) > 0.5)
+    while (datasource.hasNext) {
+      mats = datasource.next
+      val sdata = mats(0)
+      val state = mats(1)
+      if (sdata.nrows != state.nrows || sdata.ncols != state.ncols) {
+        throw new RuntimeException("size(sdata), size(state) do not match: " +size(sdata)+ " and " +size(state))
       }
+      state <-- rand(sdata.nrows, sdata.ncols)
+      state <-- min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
+      val nonzeroIndices = find(SMat(sdata))
+      state(nonzeroIndices) = 0f
+      state(nonzeroIndices) = (full(sdata)(nonzeroIndices) - 1)
+      datasource.putBack(mats,1)
     }
-
-    for (k <- 0 until opts.uiter) {
-      for (c <- 0 until graph.ncolors) {
-    	val ids = find(graph.colors == c)
-    	val innz = find(SMat(sdata))
-    	
-    	// Compute probabilities for getting 0 (for GPUs, block indexing is not as straightforward)
-    	user0 <-- user
-    	if (useGPUnow) {
-    	  user0(ids, ?) = gizeros(ids.length, user0.ncols)
-    	  user0(GIMat(innz)) = gizeros(innz.length, 1)
-    	  user0 ~ user0 + GIMat(full(sdata >= 2f)) // TODO Is there a kernel for this?
-     	  //index <-- (offset + GSMat(SMat(iproject)) * GIMat(user0))
-     	  index <-- (offset + (GIMat(user0).t * GSMat(SMat(iproject)).t).t )
-    	} else {
-    	  user0(ids, ?) = 0f
-    	  user0(innz) = 0f
-    	  user0 ~ user0 + (sdata >= 2f)
-     	  index <-- (offset + SMat(iproject) * FMat(user0))
-    	}
-    	println("just before nodep0")
-    	nodep0 <-- ln(getCpt(index) + opts.eps)        
-    	val p0 = if (useGPUnow) {
-    	  //exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep1))
-    	  exp( (GMat(nodep0).t *^ pproject(ids,?) ).t )
-    	} else {
-    	  exp(SMat(pproject(ids, ?)) * FMat(nodep0))   	  
-    	}
-    	println("Finished with computing probabilities for 0")
-    	
-    	// Compute probabilities for getting 1
-    	user1 <-- user
-    	if (useGPUnow) {
-    	  user1(ids, ?) = giones(ids.length, user1.ncols)
-    	  user1(GIMat(innz)) = gizeros(innz.length, 1)
-    	  user1 ~ user1 + GIMat(full(sdata >= 2f)) // TODO Is there a kernel for this?
-    	  //index <-- (offset + GSMat(SMat(iproject)) * GMat(user1))
-    	  index <-- (offset + (GMat(user1).t *^ iproject).t )
-    	} else {
-    	  user1(ids, ?) = 1f
-    	  user1(innz) = 0f
-    	  user1 ~ user1 + (sdata >= 2f)
-     	  index <-- (offset + SMat(iproject) * FMat(user1))
-    	}
-    	println("just before nodep1")
-    	nodep1 <-- ln(getCpt(index) + opts.eps)        
-    	val p1 = if (useGPUnow) {
-    	  //exp(GSMat(SMat(pproject(ids, ?))) * GMat(nodep1))
-    	  exp( (GMat(nodep1).t *^ pproject(ids,?) ).t ) 
-    	} else {
-    	  exp(SMat(pproject(ids, ?)) * FMat(nodep1))   	  
-    	}
-    	println("Finished with computing probabiliites for 1")
-
-    	// Now sample using the p0 and p1 matrices we just computed.
-    	val p = p1/(p0+p1)
-    	val sample = if (useGPU) grand(ids.length, sdata.ncols) else rand(ids.length, sdata.ncols)
-    	sample <-- (sample <= p)       // This works because it's a full size matrix
-    	user(ids, ?) = sample          // The <-- doesn't work
-    	println("now about to assign to user again")
-    	if (useGPU) {
-    	  user(innz) = gizeros(innz.length,1)
-    	  user ~ user + GIMat(full(sdata >= 2f))
-    	} else {
-    	  user(innz) = 0f
-    	  user ~ user + (sdata >= 2f)
-    	}
-
-    	println("Finished sampling!")
-      } 
-    }	
-  }
-  
-  // Update the CPT. The "user" matrix is carried over from the previous step and should be binary.
-  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-  	val um = updatemats(0) 
-  	um.set(0)
-	val indices = IMat(offset + SMat(iproject) * FMat(user))
-	// um(indices) = um(indices) + 1f // No because this will ignore duplicates
-	for (i <- 0 until user.ncols) {
-	  um(indices(?, i)) = um(indices(?, i)) + 1f
-	}
-    um <-- um + opts.alpha
-    	
-	// normalize count matrix
-	val norm = um.zeros(um.nrows, um.ncols)
-	val l = um.length
-    norm(0 until l-1 by 2) = um(1 until l by 2) 
-    norm(1 until l by 2) = um(0 until l-1 by 2) 
-    norm <-- norm + um
-    um <-- um / norm
-  }
-  
-  def evalfun(sdata:Mat, user:Mat):FMat = {  
-  	row(0f, 0f)
-  }
-  
+    
+    println("Whew! All done! And hopefully after the expensive init step, we will be fine.")
+    sys.exit
+  } 
+   
+  // TODO
   def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
+    /*
     println("Yes, I know not to put too much stock into this, but here is memory anyway:")
     computeMemory()
     if ((ipass+1) % 25 == 0) {
       println("Also, with ipass = " + ipass + ", here is our modelmats(0).t:")
       println(modelmats(0).t)
-    }
-    //val sdata = gmats(0)
-    //val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
-    uupdate(gmats(0), user, ipass)
-    mupdate(gmats(0), user, ipass)
+    } 
+    */
+    println("Inside dobatch with ipass = " + ipass + ", user =\n")
+    printMatrix(FMat(gmats(1)))
+    uupdate(gmats(0), gmats(1), ipass)
+    mupdate(gmats(0), gmats(1), ipass)
   }
   
+  // TODO
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-    //val sdata = gmats(0)
-    //val user = if (gmats.length > 1) gmats(1) else BayesNet.reuseuser(gmats(0), opts.dim, 1f)
-    uupdate(gmats(0), user, ipass)
-    evalfun(gmats(0), user)
+    uupdate(gmats(0), gmats(1), ipass)
+    evalfun(gmats(0), gmats(1))
+  }  
+ 
+  // Note: sdata is a sparse matrix that has 1s, 2s, ..., ks. The user matrix shifts those over by -1.
+  // Thus, when updating stuff, we only want to add the stuff in sdata that exceeds one, and shift that.
+  // Of course, for what we use in our code, called input, we need user.t, not user.
+  /**
+   * TODO
+   */
+  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+    val usertrans = user.t
+    var numGibbsIterations = opts.samplingRate
+    if (ipass == 0) {
+      numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
+    }
+    val batchSize = user.ncols 
+    
+    for (k <- 0 until numGibbsIterations) {
+      println("In uupdate(), Gibbs iteration " + (k+1) + " of " + numGibbsIterations)
+      for (c <- 0 until graph.ncolors) {
+
+        // Several steps. First, establish local offset matrix for the START of cpt blocks
+        val idsInColor = find(graph.colors == c)
+        val numInColor = idsInColor.length
+        val assignment = usertrans.copy
+        assignment(?,idsInColor) = zeros(usertrans.nrows, numInColor)
+        val offsetMatrix = assignment * iproject(?,idsInColor) // NO NO NO I need the children as well!
+        val globalOffsetVector = cptOffset(idsInColor).t
+        offsetMatrix <-- (offsetMatrix + globalOffsetVector)
+
+        // Then expand our matrix to find indices for each possible state within the cpt blocks
+        val replicatedOffsetMatrix = offsetMatrix * replicationMatrices(c)
+        replicatedOffsetMatrix <-- (replicatedOffsetMatrix + strideVectors(c))
+
+        /*
+        val combinationMatrix = sparse(iii,jjj,vvv,numRows,numCols)
+        val probabilities = ln(mm(IMat(replicatedOffsetMatrix)))
+        val combinedProbabilities = exp(probabilities * combinationMatrix)
+        for (i <- 0 until numInColor) {
+          var endIndex = 0
+          if (i == numInColor-1) {
+            endIndex = sum(numStates).dv.toInt
+          } else {
+            endIndex = startingIndices(i+1)
+          }
+          
+          // TODO I will have to do some case matching to match FMat, GMat, so as to get 'data' working.
+          val probs = combinedProbabilities(?,startingIndices(i) until endIndex).t
+          val samples = probs.izeros(probs.nrows, probs.ncols)
+          //multinomial(probs.nrows, probs.ncols, probs.data, samples.data, sum(probs,1).data, 1)
+          val (maxVals, indices) = maxi2(samples);  // maxVals = (1, 1, ..., 1)
+          usertrans(?, idsInColor(i)) = indices.t
+        }
+        */
+
+      }
+    }
+    
+    user ~ usertrans.t
+  }
+
+  /**
+   * After one round of Gibbs sampling iterations, we put the local cpt (mm) into the updatemats(0)
+   * value so that it gets "averaged into" the global cpt, modelmats(0). The reason is that it is like
+   * "thinning" the samples so we pick every n-th one, where n is an opts parameter.
+   * 
+   * @param sdata The sparse data matrix for this batch (0s = unknowns), which we do not use here.
+   * @param user A data matrix with the same dimensions as sdata, and whose columns represent various
+   *    iid assignments to all the variables. The known values of sdata are inserted in the same spots
+   *    in this matrix, but the unknown values are randomized to be in {0,1,...,k}.
+   * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
+   */
+  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+    updatemats(0) <-- mm
+  }   
+ 
+  // TODO This is not finished...
+  def evalfun(sdata:Mat, user:Mat):FMat = {  
+  	row(0f, 0f)
   } 
   
+  // -----------------------------------
+  // Various debugging or helper methods
+  // -----------------------------------
+
+  /**
+   * 
+   */
+  def formReplicationAndStrides = {
+    replicationMatrices = new Array[Mat](graph.ncolors)
+    strideVectors = new Array[Mat](graph.ncolors)
+    for (c <- 0 until graph.ncolors) {
+      val idsInColor = find(graph.colors == c)
+      val chIdsInColor = find(FMat( sum(pproject(idsInColor,?),1) ))
+      var ncols = 0
+      val numOnes = izeros(1, chIdsInColor.length) // So we can iterate through and determine how many 1s to have
+      val strideFactors = izeros(1, chIdsInColor.length) // So we can get stride factors for our strideVectors
+
+      for (i <- 0 until chIdsInColor.length) {
+        var nodeIndex = chIdsInColor(i)
+        if (idsInColor.data.contains(nodeIndex)) {
+          numOnes(i) = statesPerNode(nodeIndex)
+          ncols = ncols + statesPerNode(nodeIndex)
+          strideFactors(i) = 1
+        } else {
+          // Have to find the ONE parent of this node that IS in the color group
+          val parentIndices = find(FMat( sum(pproject(?,nodeIndex),2) ))
+          var parentIndex = -1
+          var k = 0
+          while (parentIndex == -1 && k < parentIndices.length) {
+            if (idsInColor.data.contains(parentIndices(k))) {
+              parentIndex = parentIndices(k)
+            }
+            k = k + 1
+          }
+          if (parentIndex == -1) {
+            throw new RuntimeException("For node at index " + nodeIndex + ", it seems to be missing a parent in this color group.")
+          }
+          numOnes(i) = statesPerNode(parentIndex)
+          ncols = ncols + statesPerNode(parentIndex)
+          strideFactors(i) = full(iproject(parentIndex,IMat(nodeIndex))).dv.toInt
+        }
+      }
+
+      var col = 0
+      val strideVector = izeros(1, ncols)
+      val ii = izeros(ncols, 1)
+      for (i <- 0 until chIdsInColor.length) {
+        val num = numOnes(i)
+        ii(col until col+num) = i
+        strideVector(col until col+num) = (0 until num)*strideFactors(i)
+        col = col + num
+      }
+      val jj = icol(0 until ncols)
+      val vv = ones(ncols, 1)
+      val replicationMatrix = sparse(ii, jj, vv) // dims are (#-of-ch_id-variables x ncols)
+      replicationMatrices(c) = replicationMatrix
+      strideVectors(c) = strideVector
+    }
+  }
+  
+  def formCombinationMatrices = {
+    combinationMatrices = new Array[Mat](graph.ncolors)
+    /*
+    for (c <- 0 until graph.ncolors) {
+      val idsInColor = find(graph.colors == c)
+      val chIdsInColor = find(SMat( sum(pproject(idsInColor,?),1) ))
+      val numStatesIds = statesPerNode(idsInColor)
+      val numStatesChIds = statesPerNode(chIdsInColor)
+      val ncols = sum(numStatesIds).dv.toInt
+      val nrows = sum(numStatesChIds).dv.toInt
+      val indicesColumns = izeros(1, idsInColor.length)
+      val indicesRows = izeros(1, chIdsInColor.length)
+      indicesColumns(1 until idsInColor.length) = cumsum(numStatesIds)(0 until idsInColor.length-1)
+      indicesRows(1 until chIdsInColor.length) = cumsum(numStatesChIds)(0 until chIdsInColor.length-1)
+      val ii = izeros(nrows,1)
+      val jj = izeros(nrows,1)
+      
+      for (n <- 0 until chIdsInColor.length) {  // n indexes in stuff using the subset of chIdsInColor
+        val node = chIdsInColor(n)              // This indexes in stuff using the FULL variable set
+      }
+      
+      for (n <- 0 until idsInColor.length) { // Don't get confused between "n" and "node."
+        val node = idsInColor(n)
+        val startCol = indicesColumns(n)
+        val stateSize = numStatesIds(n)
+        val nodeAndItsChildren = find(SMat( sum(pproject(node,?),1) ))
+        for (n1 <- 0 until nodeAndItsChildren.length) {
+          val index = chIdsInColor.index(nodeAndItsChildren(n1))
+          val startRow = indicesRows(n1)
+          ii(startRow until startRow+stateSize) = startRow until startRow+stateSize
+          jj(startRow until startRow+stateSize) = startCol until startCol+stateSize
+        }
+      }
+      val vv = ones(nrows,1)
+      val combinationMatrix = sparse(ii,jj,vv,nrows,ncols)
+      combinationMatrices(c) = combinationMatrix
+    }
+    * 
+    */
+  }
+ 
+  /** For computing Java runtime memory, can be reasonably reliable. */
   def computeMemory() = {
     val runtime = Runtime.getRuntime();
     val format = NumberFormat.getInstance(); 
@@ -248,55 +324,68 @@ class BayesNet(val dag:SMat, override val opts:BayesNet.Opts = new BayesNet.Opti
     sb.append("allocated/total memory: " + format.format(allocatedMemory / (1024*1024)) + "M\n");
     print(sb.toString())
   }
+
+  /** A debugging method to print matrices, without being constrained by the command line's cropping. */
+  def printMatrix(mat: FMat) = {
+    for(i <- 0 until mat.nrows) {
+      for (j <- 0 until mat.ncols) {
+        print(mat(i,j) + " ")
+      }
+      println()
+    }
+  } 
   
 }
 
+
+/**
+ * There are three things the BayesNet needs as input:
+ * 
+ *  - A states per node array. Each value needs to be an integer that is at least two.
+ *  - A DAG array, in which column i represents node i and its parents.
+ *  - A sparse data matrix, where 0 indicates an unknown element, and rows are variables.
+ * 
+ * That's it. Other settings, such as the number of Gibbs iterations, are set in "opts".
+ */
 object BayesNet  {
+  
   trait Opts extends Model.Opts {
-    var nsampls = 1
-    var alpha = 0.1f
-    var uiter = 1
-    var eps = 1e-9
+    var alpha = 1f
+    var samplingRate = 1
+    var numSamplesBurn = 100
   }
   
   class Options extends Opts {}
-  
-  def mkBayesNetmodel(dag: SMat, fopts:Model.Opts) = {
-  	new BayesNet(dag, fopts.asInstanceOf[BayesNet.Opts])
-  }
-  
-  def mkUpdater(nopts:Updater.Opts) = {
-  	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
-  } 
-   
-  def learner(dag0:SMat, mat0:Mat) = {
-    class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts
+
+  /** 
+   * A learner with a matrix data source, with states per node, and with a dag prepared. Call this
+   * using (assuming proper names):
+   * 
+   * val (nn,opts) = BayesNet.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
+   */
+  def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
+
+    class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
-    //opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    opts.batchSize = mat0.ncols
-    opts.dim = dag0.ncols
-    opts.isprob = false // Important! Otherwise it normalizes across columns!
-  	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
-  	    new BayesNet(dag0, opts), 
-  	    null,
-  	    new IncNorm(opts), 
-  	    opts)
+    opts.dim = dag.ncols
+    opts.batchSize = math.min(100000, data.ncols/30 + 1)
+    opts.useGPU = false
+    opts.npasses = 2 
+    opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
+    opts.putBack = 1        // Because this stores samples across ipasses, as required by Gibbs sampling
+    val secondMatrix = data.zeros(data.nrows,data.ncols)
+
+    val nn = new Learner(
+        new MatDS(Array(data:Mat, secondMatrix), opts),
+        new BayesNet(SMat(dag), statesPerNode, opts),
+        null,
+        new IncNorm(opts),
+        opts)
     (nn, opts)
   }
-  
-  def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {
-    val out = a match {
-      case aa:SMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "SMat.reuseuser".##)
-      case aa:FMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "FMat.reuseuser".##)
-      case aa:GSMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GSMat.reuseuser".##)
-      case aa:GMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GMat.reuseuser".##)
-    }
-    out.set(ival)
-    out
-  }
-     
 }
+
+
 
 /**
  * A graph structure for Bayesian Networks. Includes features for:
@@ -306,8 +395,11 @@ object BayesNet  {
  *
  * @param dag An adjacency matrix with a 1 at (i,j) if node i has an edge TOWARDS node j.
  * @param n The number of vertices in the graph. 
+ * @param statesPerNode A column vector where elements denote number of states for corresponding variables.
  */
-class Graph(val dag: SMat, val n: Int) {
+// TODO investigate all non-Mat matrices (IMat, FMat, etc.) to see if these can be Mats to make them usable on GPUs
+// TODO Also see if connectParents, moralize, and color can be converted to GPU friendly code
+class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
  
   var mrf: FMat = null
   var colors: IMat = null
@@ -333,27 +425,28 @@ class Graph(val dag: SMat, val n: Int) {
       }
     moral
   } 
-  
-  /**
-   * Computes the local offset matrix.
-   */
-  def iproject = {
-    var ip = dag.t       
-    for (i <- 0 until n) {
-      val ps = find(dag(?, i))
-      val np = ps.length    
-      for (j <-0 until np) {
-        ip(i, ps(j)) = math.pow(2, np-j).toFloat
-      }
-    }
-    ip + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
+
+  /** Forms the pproject matrix (dag + identity) used for computing model parameters. */
+  def pproject = {
+    dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
   }
   
   /**
-   * Computes the dag + identity matrix.
+   * Forms the iproject matrix, which is left-multiplied to send a Pr(X_i | parents) query to its
+   * appropriate spot in the cpt via LOCAL offsets for X_i.
    */
-  def pproject = {
-    dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
+  def iproject = {
+    var res = (pproject.copy).t
+    for (i <- 0 until n) {
+      val parents = find(pproject(?, i))
+      var cumRes = 1
+      val parentsLen = parents.length
+      for (j <- 1 until parentsLen) {
+        cumRes = cumRes * statesPerNode(parents(parentsLen - j))
+        res(i, parents(parentsLen - j - 1)) = cumRes.toFloat
+      }
+    }
+    res
   }
   
   /**
@@ -409,8 +502,8 @@ class Graph(val dag: SMat, val n: Int) {
         }
       }
       if (c == -1) {
-     	 c = ncolors
-     	 ncolors = ncolors + 1
+       c = ncolors
+       ncolors = ncolors + 1
       }
       colors(node) = c
       colorCount(c) += 1
@@ -419,3 +512,4 @@ class Graph(val dag: SMat, val n: Int) {
   }
  
 }
+
