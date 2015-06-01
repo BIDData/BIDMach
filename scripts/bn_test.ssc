@@ -1,0 +1,22 @@
+// Script to test out BayesNet.scala for the general case.
+
+// BayesNet.scala, now assuming general case.
+// For the debug data, add "Debug" to the three file names:
+
+val dag = loadSMat("data/dag.lz4");
+val data = loadSMat("data/sdata.lz4")
+val states = loadIMat("data/states.lz4")
+//val dag = loadSMat("data/dagDebug.lz4");
+//val data = loadSMat("data/sdataDebug.lz4")
+//val states = loadIMat("data/statesDebug.lz4")
+
+val (nn, opts) = BIDMach.models.BayesNet.learner(states, dag, data)
+opts.batchSize = data.ncols
+opts.debugMem = true
+opts.npasses = 10
+opts.samplingRate = 1
+opts.numSamplesBurn = 10
+opts.useGPU = true
+opts.what
+nn.train
+
