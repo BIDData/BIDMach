@@ -59,23 +59,8 @@ class BayesNet(val dag:SMat,
     pproject = (graph.pproject)
     
     // Form the replication matrices, stride vectors, and combination matrices, for update() later.
-    formReplicationAndStrides
-    formCombinationMatrices
-    println("Finished with the replication and stride matrices!")
-    for (c <- 0 until graph.ncolors) {
-      println("Color group with elements\n" + find(graph.colors == c).t)
-      printMatrix(FMat(replicationMatrices(c)))
-      println("The stride:")
-      printMatrix(FMat(strideVectors(c)))
-      println()
-    }
-    println("Finished with the combination matrices!")
-    for (c <- 0 until graph.ncolors) {
-      println("Color group with elements\n" + find(graph.colors == c))
-      printMatrix(FMat(combinationMatrices(c)))
-      println()
-    }
-    sys.exit
+    createColorGroupMatrices
+    //debugColorGroupMatrices
     
     // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize w/ones.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode.t)) * pproject) + 1e-4)
@@ -217,17 +202,22 @@ class BayesNet(val dag:SMat,
   // -----------------------------------
 
   /**
-   * 
+   * A little expensive, especially the process of looking up parents, but right now I just want it to work.
    */
-  def formReplicationAndStrides = {
+  def createColorGroupMatrices = {
     replicationMatrices = new Array[Mat](graph.ncolors)
     strideVectors = new Array[Mat](graph.ncolors)
+    combinationMatrices = new Array[Mat](graph.ncolors)
+
+    // Iterate through each color group and add one matrix to each of the three arrays we created
+    // Be careful of global indices (e.g., idsInColor, statesPerNode) and local indices (e.g., numOnes, parentOf)
     for (c <- 0 until graph.ncolors) {
       val idsInColor = find(graph.colors == c)
       val chIdsInColor = find(FMat( sum(pproject(idsInColor,?),1) ))
       var ncols = 0
       val numOnes = izeros(1, chIdsInColor.length) // So we can iterate through and determine how many 1s to have
       val strideFactors = izeros(1, chIdsInColor.length) // So we can get stride factors for our strideVectors
+      val parentOf = izeros(1, chIdsInColor.length) // So for each variable, we can extract index into chIdsInColor
 
       for (i <- 0 until chIdsInColor.length) {
         var nodeIndex = chIdsInColor(i)
@@ -235,6 +225,7 @@ class BayesNet(val dag:SMat,
           numOnes(i) = statesPerNode(nodeIndex)
           ncols = ncols + statesPerNode(nodeIndex)
           strideFactors(i) = 1
+          parentOf(i) = idsInColor.data.indexOf(nodeIndex)
         } else {
           // Have to find the ONE parent of this node that IS in the color group
           val parentIndices = find(FMat( sum(pproject(?,nodeIndex),2) ))
@@ -243,6 +234,7 @@ class BayesNet(val dag:SMat,
           while (parentIndex == -1 && k < parentIndices.length) {
             if (idsInColor.data.contains(parentIndices(k))) {
               parentIndex = parentIndices(k)
+              parentOf(i) = idsInColor.data.indexOf(parentIndices(k))
             }
             k = k + 1
           }
@@ -255,6 +247,7 @@ class BayesNet(val dag:SMat,
         }
       }
 
+      // Form the replication and stride matrices
       var col = 0
       val strideVector = izeros(1, ncols)
       val ii = izeros(ncols, 1)
@@ -269,52 +262,48 @@ class BayesNet(val dag:SMat,
       val replicationMatrix = sparse(ii, jj, vv) // dims are (#-of-ch_id-variables x ncols)
       replicationMatrices(c) = replicationMatrix
       strideVectors(c) = strideVector
+      
+      // Form the combination matrix
+      val numStatesIds = statesPerNode(idsInColor)
+      val ncolsCombo = sum(numStatesIds).dv.toInt
+      val indicesColumns = izeros(1, idsInColor.length)
+      indicesColumns(1 until idsInColor.length) = cumsum(numStatesIds)(0 until idsInColor.length-1)
+      val nrowsCombo = ncols
+      val indicesRows = izeros(1,chIdsInColor.length)
+      indicesRows(1 until chIdsInColor.length) = cumsum(numOnes)(0 until numOnes.length-1)
+      val iii = izeros(nrowsCombo,1)
+      val jjj = izeros(nrowsCombo,1)
+      val vvv = ones(nrowsCombo,1)
+      for (i <- 0 until chIdsInColor.length) {
+        val p = parentOf(i) // Index into the PARENT of this node, usually different from i, and NOT global system
+        iii(indicesRows(i) until indicesRows(i)+numOnes(i)) = indicesRows(i) until indicesRows(i)+numOnes(i)
+        jjj(indicesRows(i) until indicesRows(i)+numOnes(i)) = indicesColumns(p) until indicesColumns(p)+numOnes(i)
+      }
+      val combinationMatrix = sparse(iii,jjj,vvv,nrowsCombo,ncolsCombo) // # rows is # columns of replicationMatrix
+      combinationMatrices(c) = combinationMatrix
     }
   }
   
-  def formCombinationMatrices = {
-    combinationMatrices = new Array[Mat](graph.ncolors)
-    /*
+  /** For debugging the various color group matrices. */
+  def debugColorGroupMatrices = {
+    println("Finished with the replication and stride matrices!")
     for (c <- 0 until graph.ncolors) {
-      val idsInColor = find(graph.colors == c)
-      val chIdsInColor = find(SMat( sum(pproject(idsInColor,?),1) ))
-      val numStatesIds = statesPerNode(idsInColor)
-      val numStatesChIds = statesPerNode(chIdsInColor)
-      val ncols = sum(numStatesIds).dv.toInt
-      val nrows = sum(numStatesChIds).dv.toInt
-      val indicesColumns = izeros(1, idsInColor.length)
-      val indicesRows = izeros(1, chIdsInColor.length)
-      indicesColumns(1 until idsInColor.length) = cumsum(numStatesIds)(0 until idsInColor.length-1)
-      indicesRows(1 until chIdsInColor.length) = cumsum(numStatesChIds)(0 until chIdsInColor.length-1)
-      val ii = izeros(nrows,1)
-      val jj = izeros(nrows,1)
-      
-      for (n <- 0 until chIdsInColor.length) {  // n indexes in stuff using the subset of chIdsInColor
-        val node = chIdsInColor(n)              // This indexes in stuff using the FULL variable set
-      }
-      
-      for (n <- 0 until idsInColor.length) { // Don't get confused between "n" and "node."
-        val node = idsInColor(n)
-        val startCol = indicesColumns(n)
-        val stateSize = numStatesIds(n)
-        val nodeAndItsChildren = find(SMat( sum(pproject(node,?),1) ))
-        for (n1 <- 0 until nodeAndItsChildren.length) {
-          val index = chIdsInColor.index(nodeAndItsChildren(n1))
-          val startRow = indicesRows(n1)
-          ii(startRow until startRow+stateSize) = startRow until startRow+stateSize
-          jj(startRow until startRow+stateSize) = startCol until startCol+stateSize
-        }
-      }
-      val vv = ones(nrows,1)
-      val combinationMatrix = sparse(ii,jj,vv,nrows,ncols)
-      combinationMatrices(c) = combinationMatrix
+      println("Color group with elements\n" + find(graph.colors == c).t)
+      printMatrix(FMat(replicationMatrices(c)))
+      println("The stride:")
+      printMatrix(FMat(strideVectors(c)))
+      println()
     }
-    * 
-    */
+    println("Finished with the combination matrices!")
+    for (c <- 0 until graph.ncolors) {
+      println("Color group with elements\n" + find(graph.colors == c).t)
+      printMatrix(FMat(combinationMatrices(c)))
+      println()
+    }
   }
- 
+  
   /** For computing Java runtime memory, can be reasonably reliable. */
-  def computeMemory() = {
+  def computeMemory = {
     val runtime = Runtime.getRuntime();
     val format = NumberFormat.getInstance(); 
     val sb = new StringBuilder();
