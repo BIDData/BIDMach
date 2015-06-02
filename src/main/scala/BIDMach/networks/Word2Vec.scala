@@ -17,7 +17,19 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 
 /**
- * 
+ * Fast Word2Vec implementation for CPU and GPU. 
+ * The input is an IMat with 2 rows. Each column holds a word ID (top row) and the corresponding sentence ID (second row). 
+ * Options are:
+ - nskip(5) the size of the skip-gram window.
+ - nneg(5) the number of negative samples. 
+ - nreuse(5) the number of times to re-use negative samples.  
+ - vocabSize(100000) the vocabulary size. The input matrix can contain larger word IDs, in which case those IDs are marked as OOV. 
+ - wexpt(0.75f) the exponent for negative sample weighting.
+ - wsample(1e-4f) frequent word sample factor.
+ - headlen(10000) size of the smallest block of words for distributed model synchronization. 
+ - iflip(false) true if word and sentence IDs flipped (sentence ID in first row, word ID in second). 
+ - eqPosNeg(false) normalize positive and negative word weights in the likelihood. 
+ - aopts:ADAGrad.Opts(null) set this to an ADAGRAD.Opts object to use integrated adagrad updates. 
  */
 
 class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends Model(opts) {

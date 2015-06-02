@@ -25,7 +25,7 @@ class LSTMLayer(override val net:Net, override val opts:LSTMLayer.Options = new 
 object LSTMLayer {
 	class Options extends CompoundLayer.Options {	
 	  	  
-	  def constructOptions = {
+	  def constructNet = {
 	    val prev_c = new CopyLayer.Options;
 	    val prev_h = new CopyLayer.Options;
 	    val i = new CopyLayer.Options;
@@ -92,6 +92,7 @@ object LSTMLayer {
     val net = new Net(nopts);
     net.layers = new Array[Layer]((height+4)*width);
     val opts = new LSTMLayer.Options;
+    opts.constructNet;
     val lopts = new LinLayer.Options{modelName = "inWordMap"; outdim = dim};
     val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = nvocab};
     val sopts = new SoftmaxLayer.Options;

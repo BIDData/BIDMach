@@ -32,7 +32,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   override def init() = {
 	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
-	  datasource.reset;
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
@@ -49,6 +48,12 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  	if (modelmats(i).asInstanceOf[AnyRef] != null) modelmats(i) = convertMat(modelmats(i));
 	  	if (updatemats(i).asInstanceOf[AnyRef] != null) updatemats(i) = convertMat(updatemats(i));
 	  };
+	  if (useGPU) copyMats(mats, gmats);
+	  val pb = putBack;
+	  putBack = -1;
+    evalbatch(gmats, 0, 0);
+    putBack = pb;
+	  datasource.reset;
   }
   
   def createLayers = {

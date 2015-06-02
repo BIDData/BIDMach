@@ -77,6 +77,12 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  	  (0 until opts.layers(i).inputs.length).map((j:Int) => layers(i).inputs(j) = opts.layers(i).inputs(j).myLayer.asInstanceOf[DNN.this.Layer]);
 	  	} 
 	  }
+	  if (useGPU) copyMats(mats, gmats);
+	  val pb = putBack;
+	  putBack = -1;
+    evalbatch(gmats, 0, 0);
+    putBack = pb;
+	  datasource.reset;
   }
   
   
