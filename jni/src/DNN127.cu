@@ -1229,7 +1229,7 @@ int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float 
   case 2 : __word2vecPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
   default : printf("word2vecPos unsupport size %d\n", skip); return 1;
   }
-  cudaDeviceSynchronize();
+//  cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
 }
@@ -1247,7 +1247,7 @@ int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
     //  case 150010: __word2vecNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
   default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
-  cudaDeviceSynchronize();
+//  cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
 }
