@@ -54,6 +54,7 @@ class BayesNet(val dag:SMat,
   def init() = {
     println("At the start of init(), here's the memory:")
     computeMemory
+    println("And the GPU memory: " + GPUmem)
 
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
     useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
@@ -124,6 +125,10 @@ class BayesNet(val dag:SMat,
     
     // For debugging. I can remove this without affecting the rest of the code.
     normConstMatrix = if (useGPUnow) GSMat(getNormConstMatrix(lengthCPT)) else getNormConstMatrix(lengthCPT)
+    
+    println("At the end of init, Java memory and GPU memory are:")
+    computeMemory
+    println(GPUmem)
   } 
    
   /** TODO describe */
@@ -134,6 +139,8 @@ class BayesNet(val dag:SMat,
       println("Also, with ipass = " + ipass + ", here is our modelmats(0).t:")
       println(modelmats(0).t)
     } 
+    println("In dobatch(), our GPU mem: " + GPUmem)
+    if (ipass == 3) sys.exit
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
@@ -159,7 +166,7 @@ class BayesNet(val dag:SMat,
     }
     
     for (k <- 0 until numGibbsIterations) {
-      println("In uupdate(), Gibbs iteration " + (k+1) + " of " + numGibbsIterations)
+      //println("In uupdate(), Gibbs iteration " + (k+1) + " of " + numGibbsIterations)
       for (c <- 0 until graph.ncolors) {
 
         // Several steps. First, establish local offset matrix for the START of cpt blocks
@@ -167,10 +174,8 @@ class BayesNet(val dag:SMat,
         val chIdsInColor = find( FMat( sum(SMat(pproject)(idsInColor,?),1) ) ) // Can't do find with GSMats
         usertrans ~ user.t // Temp fix because user gets updated w/known indices, but usertrans doesn't
         val assignment = usertrans.copy
-
         //assignment(?,idsInColor) = mm.zeros(usertrans.nrows, idsInColor.length) // This did not get cached.
         assignment(?,idsInColor) = zeroMap(usertrans.nrows,idsInColor.length)
-
         val offsetMatrix = if (useGPUnow) {
           assignment * GSMat(SMat(iproject)(?,chIdsInColor))
         } else {
@@ -194,13 +199,15 @@ class BayesNet(val dag:SMat,
         startingIndices(1 until idsInColor.length) = cumsum(IMat(statesPerNode(idsInColor)))(0 until idsInColor.length-1)
         if (useGPUnow) startingIndices <-- GIMat(startingIndices)
         for (i <- 0 until idsInColor.length) {
-          if (useGPUnow) {
+          //println("At the start of node index i = " + i)
+          if (useGPUnow) { // Odd, the "probs = GMat(...)" line IS getting cached.
             val start = startingIndices(i).dv.toInt
             val probs = GMat(combinedProbabilities(?, start until start+statesPerNode(idsInColor(i)).dv.toInt).t)
             val samples = probs.izeros(probs.nrows, probs.ncols)
             multinomial(probs.nrows, probs.ncols, probs.data, samples.data, sum(probs,1).data, 1)
-            val (maxVals, indices) = maxi2(GMat( samples ));  // maxVals = (1, 1, ..., 1)
-            usertrans(?, idsInColor(i)) = GMat(indices.t)
+            //val (maxVals, indices) = maxi2(GMat( samples ));  // maxVals = (1, 1, ..., 1)
+            val indices = GMat( (maxi2( GMat(samples) )._2).t ) // This line allocates some long vectors
+            usertrans(?, idsInColor(i)) = indices
           } else {
             // val start = startingIndices(i).dv.toInt
             // val probs = combinedProbabilities(?, start until start+statesPerNode(idsInColor(i))).t
@@ -209,18 +216,18 @@ class BayesNet(val dag:SMat,
             usertrans(?, idsInColor(i)) = FMat(indices)
           }
         }
+        //println("Finished with one color group")
+        //if (ipass > 0) sys.exit
 
         // After we finish with this color group, we should override the known values because that affects other parts.
         user ~ usertrans.t
         val nonzeroIndices = convertMat(find(SMat(sdata) > 0))
         user(nonzeroIndices) = (full(sdata)(nonzeroIndices)-1)
-        if (ipass > 0) {
-          sys.exit
-        }
       }     
     }
     
     // After a complete Gibbs iteration (or more, depending on burn-in or thinning), update the CPT.
+    println("GPUmemory just before updateCPT(): " + GPUmem)
     updateCPT(user)
   }
 
@@ -335,7 +342,8 @@ class BayesNet(val dag:SMat,
    * Method to update the local cpt table (i.e. mm), called after one or more iterations of Gibbs sampling.
    * This does not update the Learner's cpt, which is modelmats(0).
    * 
-   * @param user The state matrix, with all variables updated after sampling. Columns correspond to batches.
+   * @param user The state matrix, with all variables updated after sampling. Columns are the batches, and
+   *    rows are the variables.
    */
   def updateCPT(user: Mat) : Unit = {
     val index = if (useGPUnow) {
@@ -343,10 +351,9 @@ class BayesNet(val dag:SMat,
     } else {
       IMat(cptOffset + (user.t * iproject).t)
     }
-    //val index = IMat(cptOffset + SMat(iproject) * FMat(user)) // Old way with different iproject transposed
-    var counts = mm.zeros(mm.length, 1)
+    var counts = mm.izeros(mm.length, 1)
     for (i <- 0 until user.ncols) {
-      counts(index(?, i)) = counts(index(?, i)) + 1
+      counts(index(?, i)) = counts(index(?, i)) + 1 
     }
     mm <-- (counts + opts.alpha)
   } 
