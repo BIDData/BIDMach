@@ -24,23 +24,22 @@ import edu.berkeley.bid.CUMACH._
 // TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
 // TODO Investigate opts.nsampls. For now, have to do batchSize * opts.nsampls or something like that.
 // TODO Check if the BayesNet should be re-using the user for now
-// To be honest, right now it's far easier to assume the datasource is providing us with a LENGTH ONE matrix each step
 // TODO Be sure to check if we should be using SMats, GMats, etc. ANYWHERE we use Mats.
 class BayesNet(val dag:SMat, 
                val states:Mat, 
                override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
-  var mm:Mat = null                 // Local copy of the cpt
-  var cptOffset:Mat = null
-  var graph:Graph = null
-  var iproject:Mat = null           // Local CPT offset matrix
-  var pproject:Mat = null           // Parent tracking matrix
-  var statesPerNode:IMat = null
-  var useGPUnow:Boolean = false
+  var mm:Mat = null                         // Local copy of the cpt
+  var cptOffset:Mat = null                  // For global variable offsets
+  var graph:Graph = null                    // Data structure representing the DAG
+  var iproject:Mat = null                   // Local CPT offset matrix
+  var pproject:Mat = null                   // Parent tracking matrix
+  var statesPerNode:Mat = null              // Variables can have an arbitrary number of states
   var replicationMatrices:Array[Mat] = null
   var strideVectors:Array[Mat] = null
   var combinationMatrices:Array[Mat] = null
-  var normConstMatrix:Mat = null    // For debugging if needed. I don't use this.
+  var useGPUnow:Boolean = false
+  var normConstMatrix:Mat = null            // For debugging if needed.
  
   /**
    * Performs a series of initialization steps.
@@ -50,7 +49,7 @@ class BayesNet(val dag:SMat,
    * - Randomize the input data, which is stored in the second matrix
    */
   def init() = {
-    println("At init, here's the memory:")
+    println("At the start of init(), here's the memory:")
     computeMemory
 
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
@@ -63,13 +62,14 @@ class BayesNet(val dag:SMat,
     
     // Form the replication matrices, stride vectors, and combination matrices, for update() later.
     createColorGroupMatrices
-    println("Finished creating replication, stride, and combination matrices.")
+    println("Finished creating the replication, stride, and combination matrices.")
     //debugColorGroupMatrices
     
     // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize w/ones.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode.t)) * SMat(pproject)) + 1e-4)
-    cptOffset = numSlotsInCpt.izeros(graph.n, 1)
+    cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
+    if (useGPUnow) cptOffset <-- GIMat(cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     val cpt = if(useGPUnow) gones(lengthCPT, 1) else ones(lengthCPT, 1)
     setmodelmats(new Array[Mat](1))
@@ -87,7 +87,7 @@ class BayesNet(val dag:SMat,
       val sdata = mats(0)
       val state = mats(1)
       if (sdata.nrows != state.nrows || sdata.ncols != state.ncols) {
-        throw new RuntimeException("size(sdata), size(state) do not match: " +size(sdata)+ " and " +size(state))
+        throw new RuntimeException("size of sdata and state differ: " +size(sdata)+ " and " +size(state))
       }
       state <-- rand(sdata.nrows, sdata.ncols)
       state <-- min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1)
@@ -102,8 +102,8 @@ class BayesNet(val dag:SMat,
    
   /** TODO describe */
   def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    println("At ipass = " + ipass + ", here is Java memory (don't put too much stock in this) and part of the modelmats:")
-    computeMemory
+    //println("At ipass = " + ipass + ", here is Java memory (don't put too much stock in this):")
+    //computeMemory
     if ((ipass+1) % 20 == 0) {
       println("Also, with ipass = " + ipass + ", here is our modelmats(0).t:")
       println(modelmats(0).t)
@@ -138,15 +138,10 @@ class BayesNet(val dag:SMat,
 
         // Several steps. First, establish local offset matrix for the START of cpt blocks
         val idsInColor = find(graph.colors == c)
-        val chIdsInColor = find( FMat( sum(SMat(pproject)(idsInColor,?),1) ) ) // find is expensive, not usable for GMats
-        val numStates = statesPerNode(idsInColor)
-        usertrans ~ user.t // TODO temporary fix because user gets updated with the known indices, but usertrans doesn't
+        val chIdsInColor = find( FMat( sum(SMat(pproject)(idsInColor,?),1) ) ) // Can't do find with GSMats
+        usertrans ~ user.t // Temp fix because user gets updated w/known indices, but usertrans doesn't
         val assignment = usertrans.copy
-        assignment(?,idsInColor) = if (useGPUnow) {
-          gzeros(usertrans.nrows, idsInColor.length)
-        } else {
-          zeros(usertrans.nrows, idsInColor.length)
-        }
+        assignment(?,idsInColor) = mm.zeros(usertrans.nrows, idsInColor.length)
         val offsetMatrix = if (useGPUnow) {
           assignment * GSMat(SMat(iproject)(?,chIdsInColor))
         } else {
@@ -165,13 +160,14 @@ class BayesNet(val dag:SMat,
         val probabilities = ln(mm(replicatedOffsetMatrix))
         val combinedProbabilities = exp(probabilities * combinationMatrices(c))
 
-        // Now we can actually sample for each color in this color group
+        // Now we can sample for each color in this color group. Note: cumsum doesn't work with GIMats.
         val startingIndices = izeros(idsInColor.length,1)
-        startingIndices(1 until idsInColor.length) = cumsum(numStates)(0 until idsInColor.length-1)
+        startingIndices(1 until idsInColor.length) = cumsum(IMat(statesPerNode(idsInColor)))(0 until idsInColor.length-1)
+        if (useGPUnow) startingIndices <-- GIMat(startingIndices)
         for (i <- 0 until idsInColor.length) {
           if (useGPUnow) {
             val start = startingIndices(i).dv.toInt
-            val probs = GMat(combinedProbabilities(?, start until start+statesPerNode(idsInColor(i))).t)
+            val probs = GMat(combinedProbabilities(?, start until start+statesPerNode(idsInColor(i)).dv.toInt).t)
             val samples = probs.izeros(probs.nrows, probs.ncols)
             multinomial(probs.nrows, probs.ncols, probs.data, samples.data, sum(probs,1).data, 1)
             val (maxVals, indices) = maxi2(GMat( samples ));  // maxVals = (1, 1, ..., 1)
@@ -187,7 +183,7 @@ class BayesNet(val dag:SMat,
 
         // After we finish with this color group, we should override the known values because that affects other parts.
         user ~ usertrans.t
-        val nonzeroIndices = if (useGPU) GIMat(find(SMat(sdata) > 0)) else find(SMat(sdata) > 0)
+        val nonzeroIndices = convertMat(find(SMat(sdata) > 0))
         user(nonzeroIndices) = (full(sdata)(nonzeroIndices)-1)
       }     
     }
@@ -227,7 +223,7 @@ class BayesNet(val dag:SMat,
     replicationMatrices = new Array[Mat](graph.ncolors)
     strideVectors = new Array[Mat](graph.ncolors)
     combinationMatrices = new Array[Mat](graph.ncolors)
-
+    
     // Iterate through each color group and add one matrix to each of the three arrays we created
     // Be careful of global indices (e.g., idsInColor, statesPerNode) and local indices (e.g., numOnes, parentOf)
     for (c <- 0 until graph.ncolors) {
@@ -242,7 +238,7 @@ class BayesNet(val dag:SMat,
         var nodeIndex = chIdsInColor(i)
         if (idsInColor.data.contains(nodeIndex)) {
           numOnes(i) = statesPerNode(nodeIndex)
-          ncols = ncols + statesPerNode(nodeIndex)
+          ncols = ncols + statesPerNode(nodeIndex).dv.toInt
           strideFactors(i) = 1
           parentOf(i) = idsInColor.data.indexOf(nodeIndex)
         } else {
@@ -261,7 +257,7 @@ class BayesNet(val dag:SMat,
             throw new RuntimeException("For node at index " + nodeIndex + ", it seems to be missing a parent in this color group.")
           }
           numOnes(i) = statesPerNode(parentIndex)
-          ncols = ncols + statesPerNode(parentIndex)
+          ncols = ncols + statesPerNode(parentIndex).dv.toInt
           strideFactors(i) = full(SMat(iproject)(parentIndex,IMat(nodeIndex))).dv.toInt // This is really ugly
         }
       }
@@ -286,7 +282,7 @@ class BayesNet(val dag:SMat,
       val numStatesIds = statesPerNode(idsInColor)
       val ncolsCombo = sum(numStatesIds).dv.toInt
       val indicesColumns = izeros(1, idsInColor.length)
-      indicesColumns(1 until idsInColor.length) = cumsum(numStatesIds)(0 until idsInColor.length-1)
+      indicesColumns(1 until idsInColor.length) = cumsum(numStatesIds.asInstanceOf[IMat])(0 until idsInColor.length-1)
       val nrowsCombo = ncols
       val indicesRows = izeros(1,chIdsInColor.length)
       indicesRows(1 until chIdsInColor.length) = cumsum(numOnes)(0 until numOnes.length-1)
@@ -352,7 +348,7 @@ class BayesNet(val dag:SMat,
     for (i <- 0 until graph.n-1) {
       var offset = IMat(cptOffset)(i)
       val endOffset = IMat(cptOffset)(i+1)
-      val ns = statesPerNode(i)
+      val ns = statesPerNode(i).dv.toInt
       var indices = find2(ones(ns,ns))
       while (offset < endOffset) {
         ii = ii on (indices._1 + offset)
@@ -361,11 +357,11 @@ class BayesNet(val dag:SMat,
       }
     }
     var offsetLast = IMat(cptOffset)(graph.n-1)
-    var indices = find2(ones(statesPerNode(graph.n-1), statesPerNode(graph.n-1)))
+    var indices = find2(ones(statesPerNode.asInstanceOf[IMat](graph.n-1), statesPerNode.asInstanceOf[IMat](graph.n-1)))
     while (offsetLast < cptLength) {
       ii = ii on (indices._1 + offsetLast)
       jj = jj on (indices._2 + offsetLast)
-      offsetLast = offsetLast + statesPerNode(graph.n-1)
+      offsetLast = offsetLast + statesPerNode.asInstanceOf[IMat](graph.n-1)
     }
     return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cptLength, cptLength)
   }
@@ -456,7 +452,7 @@ object BayesNet  {
  */
 // TODO investigate all non-Mat matrices (IMat, FMat, etc.) to see if these can be Mats to make them usable on GPUs
 // TODO Also see if connectParents, moralize, and color can be converted to GPU friendly code
-class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
+class Graph(val dag: SMat, val n: Int, val statesPerNode: Mat) {
  
   var mrf: FMat = null
   var colors: IMat = null
@@ -499,7 +495,7 @@ class Graph(val dag: SMat, val n: Int, val statesPerNode: IMat) {
       var cumRes = 1
       val parentsLen = parents.length
       for (j <- 1 until parentsLen) {
-        cumRes = cumRes * statesPerNode(parents(parentsLen - j))
+        cumRes = cumRes * IMat(statesPerNode)(parents(parentsLen - j))
         res(i, parents(parentsLen - j - 1)) = cumRes.toFloat
       }
     }

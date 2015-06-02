@@ -12,13 +12,15 @@ val states = loadIMat("data/states.lz4")
 
 val (nn, opts) = BIDMach.models.BayesNet.learner(states, dag, data)
 opts.batchSize = data.ncols
-opts.debugMem = true
 opts.npasses = 50
 opts.samplingRate = 1
-opts.numSamplesBurn = 10
+opts.numSamplesBurn = 0
 opts.useGPU = true
+// Mat.debugMemThreshold = 4367*434+1
+opts.debugMem = true
 opts.what
 nn.train
 
 // Also consider:
-Mat.debugMemThreshold = 4367*434+1
+// Mat.debugMemThreshold = 4367*434+1
+// opts.debugMem = true
