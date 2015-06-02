@@ -9,6 +9,7 @@ import BIDMach._
 
 import java.text.NumberFormat
 import edu.berkeley.bid.CUMACH._
+import scala.collection.mutable._
 
 /**
  * A Bayesian Network implementation with fast parallel Gibbs Sampling (e.g., for MOOC data).
@@ -38,7 +39,9 @@ class BayesNet(val dag:SMat,
   var replicationMatrices:Array[Mat] = null
   var strideVectors:Array[Mat] = null
   var combinationMatrices:Array[Mat] = null
+
   var useGPUnow:Boolean = false
+  var zeroMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a zero matrix (to avoid allocation)
   var normConstMatrix:Mat = null            // For debugging if needed.
  
   /**
@@ -79,6 +82,9 @@ class BayesNet(val dag:SMat,
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     
     // Randomize the initial starting states, and store the data in the second matrix source
+    var batchSize = -1
+    var lastBatchSize = -1
+    var first:Boolean = true
     if (this.mats.size < 2) {
       throw new RuntimeException("We need at least two matrices in the datasource.")
     }
@@ -86,6 +92,18 @@ class BayesNet(val dag:SMat,
       mats = datasource.next
       val sdata = mats(0)
       val state = mats(1)
+
+      // Find the # of columns in the normal batches (batchSize) and (if different) the last batch.
+      if (first) {
+        batchSize = sdata.ncols
+        lastBatchSize = sdata.ncols
+        first = false
+      } else {
+        if (sdata.ncols != batchSize) {
+          lastBatchSize = sdata.ncols
+        }
+      }
+
       if (sdata.nrows != state.nrows || sdata.ncols != state.ncols) {
         throw new RuntimeException("size of sdata and state differ: " +size(sdata)+ " and " +size(state))
       }
@@ -94,6 +112,14 @@ class BayesNet(val dag:SMat,
       val nonzeroIndices = find(SMat(sdata))
       state(nonzeroIndices) = (full(sdata)(nonzeroIndices) - 1)
       datasource.putBack(mats,1)
+    }
+    
+    // Adding in a bunch of zero matrices that we will need later for zeroing-out values
+    zeroMap = new HashMap[(Int,Int),Mat]()
+    for (c <- 0 until graph.ncolors) {
+      val ncols = find(graph.colors == c).length
+      zeroMap += ((batchSize,ncols) -> mm.zeros(batchSize,ncols))
+      zeroMap += ((lastBatchSize,ncols) -> mm.zeros(lastBatchSize,ncols))
     }
     
     // For debugging. I can remove this without affecting the rest of the code.
@@ -141,7 +167,10 @@ class BayesNet(val dag:SMat,
         val chIdsInColor = find( FMat( sum(SMat(pproject)(idsInColor,?),1) ) ) // Can't do find with GSMats
         usertrans ~ user.t // Temp fix because user gets updated w/known indices, but usertrans doesn't
         val assignment = usertrans.copy
-        assignment(?,idsInColor) = mm.zeros(usertrans.nrows, idsInColor.length)
+
+        //assignment(?,idsInColor) = mm.zeros(usertrans.nrows, idsInColor.length) // This did not get cached.
+        assignment(?,idsInColor) = zeroMap(usertrans.nrows,idsInColor.length)
+
         val offsetMatrix = if (useGPUnow) {
           assignment * GSMat(SMat(iproject)(?,chIdsInColor))
         } else {
@@ -185,6 +214,9 @@ class BayesNet(val dag:SMat,
         user ~ usertrans.t
         val nonzeroIndices = convertMat(find(SMat(sdata) > 0))
         user(nonzeroIndices) = (full(sdata)(nonzeroIndices)-1)
+        if (ipass > 0) {
+          sys.exit
+        }
       }     
     }
     
@@ -470,12 +502,13 @@ class Graph(val dag: SMat, val n: Int, val statesPerNode: Mat) {
    */
   def connectParents(moral: FMat, parents: IMat) = {
     val l = parents.length
-    for(i <- 0 until l)
-      for(j <- 0 until l){
-        if(parents(i) != parents(j)){
+    for(i <- 0 until l) {
+      for(j <- 0 until l) {
+        if(parents(i) != parents(j)) {
           moral(parents(i), parents(j)) = 1f
         }
       }
+    }
     moral
   } 
 
