@@ -18,6 +18,7 @@ import java.util.Calendar
 
 /**
  * Fast Word2Vec implementation for CPU and GPU. 
+ * 
  * The input is an IMat with 2 rows. Each column holds a word ID (top row) and the corresponding sentence ID (second row). 
  * Options are:
  - nskip(5) the size of the skip-gram window.
@@ -120,11 +121,17 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	val (words, lb, ub, trandwords, goodwords) = wordMats(gmats, ipass, pos);
 
     	val lrpos = lrate.dv.toFloat;
-    	val lrneg = if (opts.eqPosNeg) lrpos else lrpos/opts.nneg;  
-    	procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
-    	addTime(8);
-    	procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp); 
-    	addTime(9);
+    	val lrneg = if (opts.eqPosNeg) lrpos else lrpos/opts.nneg; 
+    	(0 until 2).par.map((i:Int) => i match {
+    	  case 0 => {
+    	    procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
+    	    addTime(8);
+    	  }
+    	  case 1 => {
+    	  	procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp); 
+    	  	addTime(9,-2);
+    	  }
+    	});
     }
   }
   
