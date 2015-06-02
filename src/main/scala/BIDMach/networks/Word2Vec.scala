@@ -19,11 +19,13 @@ import java.util.Calendar
 import java.io.DataOutputStream
 import java.io.DataInputStream
 import java.io.BufferedReader
+import java.io.BufferedWriter
 import java.io.InputStreamReader
+import java.io.PrintWriter
 import java.util.Scanner
 
 /**
- * Fast Word2Vec implementation for CPU and GPU. 
+ * Fast Word2Vec implementation for CPU and GPU. Currently support skip-gram models with negative sampling. 
  * 
  * The input is an IMat with 2 rows. Each column holds a word ID (top row) and the corresponding sentence ID (second row). 
  * Options are:
@@ -162,7 +164,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val wrat = float(words+1) * salpha;
     wrat ~ sqrt(wrat) + wrat;
     wgood ~ wgood ∘ int(randsamp < wrat);
-    words ~ (wgood ∘ (words + 1)) - 1;                                        // Set OOV or skipped samples to -1
+    words ~ (wgood ∘ (words + 1)) - 1;                                         // Set OOV or skipped samples to -1
     addTime(2);
         
     rand(ubound);                                                              // get random upper and lower bounds   
@@ -829,7 +831,7 @@ object Word2Vec  {
     val ins = HMat.getInputStream(fname, 0);
     val din = new DataInputStream(ins);
     val sin = new Scanner(din);
-    val header = din.readLine
+    val header = sin.nextLine
     val dims = header.split(" ");
     val nr = dims(0).toInt;
     val dim = dims(1).toInt;
@@ -839,19 +841,20 @@ object Word2Vec  {
     while (i < nr) {
     	val word = sin.next;
     	val icol = dict(word);
-    	if (icol >= 0 && icol < n) {
-    		var j = 0;
-    		while (j < dim) {
-    		  if (binary) {
-    		    model(j, icol) = din.readFloat;
-    		  } else {
-    		  	model(j, icol) = sin.nextFloat;
-    		  }
-    			j += 1;
+    	val saveIt = (icol >= 0 && icol < n);
+    	var j = 0;
+    	while (j < dim) {
+    		val v = if (binary) {
+    			din.readFloat;
+    		} else {
+    			sin.nextFloat;
     		}
-    		sin.nextLine;
+    		if (saveIt) model(j, icol) = v;
+    		j += 1;
     	}
+    	sin.nextLine;
     	i += 1;
+    	if (i % 1000 == 0) println("i=%d %s" format (i, word))
     }
     model;
   }
@@ -860,19 +863,22 @@ object Word2Vec  {
   
   def saveGoogleW2V(dict:CSMat, mod:FMat, fname:String, binary:Boolean = false) = {
   	val outs = HMat.getOutputStream(fname, 0);
-  	val dout = new DataOutputStream(outs);  
+  	val dout = new DataOutputStream(outs);
+  	val fout = new PrintWriter(dout);
   	val cr = String.format("\n");
-  	dout.writeBytes(mod.ncols.toString + " " + mod.nrows.toString + cr);
+  	fout.print(mod.ncols.toString + " " + mod.nrows.toString + cr);
+  	fout.flush;
   	var i = 0;
   	while (i < mod.ncols) {
-  		dout.writeBytes(dict(i)+ " ");
+  		fout.print(dict(i)+ " ");
+  		fout.flush;
   		var nwritten = 0;
   		var j = 0;
   		while (j < mod.nrows) {
   			if (binary) {
   			  dout.writeFloat(mod(j,i));
   			} else {
-  			  dout.writeBytes("%f " format mod(j,i));
+  			  dout.writeBytes("%g " format mod(j,i));
   			}
   			j += 1;
   		}
