@@ -139,8 +139,6 @@ class BayesNet(val dag:SMat,
       println("Also, with ipass = " + ipass + ", here is our modelmats(0).t:")
       println(modelmats(0).t)
     } 
-    println("In dobatch(), our GPU mem: " + GPUmem)
-    if (ipass == 3) sys.exit
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
@@ -204,9 +202,11 @@ class BayesNet(val dag:SMat,
             val start = startingIndices(i).dv.toInt
             val probs = GMat(combinedProbabilities(?, start until start+statesPerNode(idsInColor(i)).dv.toInt).t)
             val samples = probs.izeros(probs.nrows, probs.ncols)
+            println("After samples, GPU mem: " + GPUmem)
             multinomial(probs.nrows, probs.ncols, probs.data, samples.data, sum(probs,1).data, 1)
             //val (maxVals, indices) = maxi2(GMat( samples ));  // maxVals = (1, 1, ..., 1)
             val indices = GMat( (maxi2( GMat(samples) )._2).t ) // This line allocates some long vectors
+            println("After indices, GPU mem: " + GPUmem)
             usertrans(?, idsInColor(i)) = indices
           } else {
             // val start = startingIndices(i).dv.toInt
@@ -353,7 +353,8 @@ class BayesNet(val dag:SMat,
     }
     var counts = mm.izeros(mm.length, 1)
     for (i <- 0 until user.ncols) {
-      counts(index(?, i)) = counts(index(?, i)) + 1 
+      println("in loop, gpu mem " + GPUmem)
+      counts(index(?, i)) = counts(index(?, i)) + 1
     }
     mm <-- (counts + opts.alpha)
   } 
