@@ -346,16 +346,24 @@ class BayesNet(val dag:SMat,
    *    rows are the variables.
    */
   def updateCPT(user: Mat) : Unit = {
+    println("at start of cpt, gpu mem is " + GPUmem)
     val index = if (useGPUnow) {
       GIMat(cptOffset + (user.t * iproject).t)
     } else {
       IMat(cptOffset + (user.t * iproject).t)
     }
     var counts = mm.izeros(mm.length, 1)
+    var tmp = mm.izeros(index(?,0).length,1)
+    var ones = mm.iones(index(?,0).length,1)
+    println("before loop, GPU mem is " + GPUmem)
     for (i <- 0 until user.ncols) {
-      println("in loop, gpu mem " + GPUmem)
-      counts(index(?, i)) = counts(index(?, i)) + 1
+      tmp <-- index(?,i)
+      tmp <-- counts(tmp)
+      tmp ~ tmp + ones
+      counts(index(?,i)) = tmp
+      // counts(index(?, i)) = counts(index(?, i)) + 1 // The old way
     }
+    println("after loop, GPU mem is " + GPUmem)
     mm <-- (counts + opts.alpha)
   } 
   
