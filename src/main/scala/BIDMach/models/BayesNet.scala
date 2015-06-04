@@ -63,15 +63,8 @@ class BayesNet(val dag:Mat,
     iproject = (graph.iproject).t
     pproject = graph.pproject
     
-    // For each color group, pre-compute all relevant matrices we need later (this does a lot!)
-    colorInfo = new Array[ColorGroup](graph.ncolors)
-    for (c <- 0 until graph.ncolors) {
-      colorInfo(c) = computeAllColorGroupInfo(c)
-    }
-    zeroMap = new HashMap[(Int,Int),Mat]()
-    
     // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize w/ones.
-    val numSlotsInCpt = IMat(exp(ln(statesPerNode.t) * pproject) + 1e-4)
+    val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * pproject) + 1e-4)
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cptOffset <-- convertMat(cptOffset)
@@ -83,8 +76,15 @@ class BayesNet(val dag:Mat,
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
 
+    // For each color group, pre-compute all relevant matrices we need later (this does a lot!)
+    colorInfo = new Array[ColorGroup](graph.ncolors)
+    for (c <- 0 until graph.ncolors) {
+      colorInfo(c) = computeAllColorGroupInfo(c)
+    }
+    zeroMap = new HashMap[(Int,Int),Mat]()
+
     // To wrap it up, convert a few matrices and add some debugging info
-    normConstMatrix = convertMat(getNormConstMatrix(lengthCPT))
+    normConstMatrix = getNormConstMatrix(lengthCPT)
     statesPerNode <-- convertMat(statesPerNode) 
     println("At the end of init, GPU memory is " + GPUmem)
   } 
@@ -140,7 +140,8 @@ class BayesNet(val dag:Mat,
       for (c <- 0 until graph.ncolors) {
 
         // Prepare our data by establishing the appropriate offset matrices for the entire cpt blocks
-        usertrans <-- user.t // TODO Temp fix because user gets updated w/known indices, but usertrans doesn't. I think there's a better way to do this.
+        // I think there's a better way to do this.
+        usertrans <-- user.t // TODO Temp fix because user gets updated w/known indices, but usertrans doesn't.
         val assignment = usertrans.copy
         assignment(?, colorInfo(c).idsInColor) = zeroMap(usertrans.nrows, colorInfo(c).numNodes)
         val offsetMatrix = assignment * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
@@ -192,7 +193,7 @@ class BayesNet(val dag:Mat,
     updatemats(0) <-- mm
   }   
  
-  /** TODO This is not finished... but its probably a simple sum over all the cpts? Maybe I do need to normalize? */
+  /** TODO This is not finished... but its probably a simple sum over all the cpts? */
   def evalfun(sdata:Mat, user:Mat):FMat = {  
   	row(0f, 0f)
   } 
@@ -202,18 +203,18 @@ class BayesNet(val dag:Mat,
   // -----------------------------------
   
   /** 
-   * Needs to determine the color group info for color c.
+   * Needs to determine the color group info for color c. This is a huge method.
    */
   def computeAllColorGroupInfo(c:Int) : ColorGroup = {
     val cg = new ColorGroup 
     cg.idsInColor = find(IMat(graph.colors) == c)
     cg.numNodes = cg.idsInColor.length
-    cg.chIdsInColor = find( FMat( sum(pproject(cg.idsInColor,?),1) ) ) // For some reason I need FMat(...)
+    cg.chIdsInColor = find(FMat(sum(pproject(cg.idsInColor,?),1)))
     cg.numNodesCh = cg.chIdsInColor.length
     cg.iprojectSliced = iproject(?,cg.chIdsInColor)
     cg.globalOffsetVector = cptOffset(cg.chIdsInColor)
     val startingIndices = izeros(cg.numNodes,1)
-    startingIndices(1 until cg.numNodes) = cumsum(IMat(statesPerNode(cg.idsInColor)))(0 until cg.numNodes)
+    startingIndices(1 until cg.numNodes) = cumsum(IMat(statesPerNode(cg.idsInColor)))(0 until cg.numNodes-1)
     cg.startingIndices = convertMat(startingIndices)
 
     // Gather useful information for determining the replication, stride, and combination matrices
@@ -221,8 +222,9 @@ class BayesNet(val dag:Mat,
     val numOnes = izeros(1,cg.numNodesCh)       // Determine how many 1s to have
     val strideFactors = izeros(1,cg.numNodesCh) // Get stride factors for the stride vector
     val parentOf = izeros(1,cg.numNodesCh)      // Get index of parent (or itself) in idsInColor
+    val fullIproject = full(iproject)
     for (i <- 0 until cg.numNodesCh) {
-      var nodeIndex = cg.chIdsInColor(i)
+      var nodeIndex = cg.chIdsInColor(i).dv.toInt
       if (IMat(cg.idsInColor).data.contains(nodeIndex)) { // This node is in the color group
         numOnes(i) = statesPerNode(nodeIndex)
         ncols = ncols + statesPerNode(nodeIndex).dv.toInt
@@ -240,11 +242,11 @@ class BayesNet(val dag:Mat,
           k = k + 1
         }
         if (parentIndex == -1) {
-          throw new RuntimeException("For node at index " + nodeIndex + ", it seems to be missing a parent in this color group.")
+          throw new RuntimeException("Node at index " +nodeIndex+ " is missing a parent in its color group.")
         }
         numOnes(i) = statesPerNode(parentIndex)
         ncols = ncols + statesPerNode(parentIndex).dv.toInt
-        strideFactors(i) = iproject(parentIndex,nodeIndex).dv.toInt
+        strideFactors(i) = fullIproject(parentIndex,IMat(nodeIndex)).dv.toInt
       }
     }
     
@@ -267,7 +269,7 @@ class BayesNet(val dag:Mat,
     val numStatesIds = statesPerNode(cg.idsInColor)
     val ncolsCombo = sum(numStatesIds).dv.toInt
     val indicesColumns = izeros(1,cg.numNodes)
-    indicesColumns(1 until cg.numNodes) = cumsum(numStatesIds.asInstanceOf[IMat])(0 until cg.numNodes)
+    indicesColumns(1 until cg.numNodes) = cumsum(numStatesIds.asInstanceOf[IMat])(0 until cg.numNodes-1)
     val nrowsCombo = ncols
     val indicesRows = izeros(1,cg.numNodesCh)
     indicesRows(1 until cg.numNodesCh) = cumsum(numOnes)(0 until numOnes.length-1)
@@ -285,6 +287,8 @@ class BayesNet(val dag:Mat,
       sparse(iii,jjj,vvv,nrowsCombo,ncolsCombo)
     }
     
+    cg.idsInColor <-- convertMat(cg.idsInColor)
+    cg.chIdsInColor <-- convertMat(cg.chIdsInColor)
     return cg
   } 
  
@@ -318,34 +322,14 @@ class BayesNet(val dag:Mat,
     }
     println("after loop, GPU mem is " + GPUmem)
     mm <-- (counts + opts.alpha)
-  } 
-  
-  /** For debugging the various color group matrices. */
-  /*
-  def debugColorGroupMatrices = {
-    println("Finished with the replication and stride matrices!")
-    for (c <- 0 until graph.ncolors) {
-      println("Color group with elements\n" + find(graph.colors == c).t)
-      printMatrix(FMat(replicationMatrices(c)))
-      println("The stride:")
-      printMatrix(FMat(strideVectors(c)))
-      println()
-    }
-    println("Finished with the combination matrices!")
-    for (c <- 0 until graph.ncolors) {
-      println("Color group with elements\n" + find(graph.colors == c).t)
-      printMatrix(FMat(combinationMatrices(c)))
-      println()
-    }
   }
-  */
   
   /**
    * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
    * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. I don't actually
    * use this, but it's nice to have it to find the probabilities later for debugging/infomative purposes.
    */
-  def getNormConstMatrix(cptLength : Int) : SMat = {
+  def getNormConstMatrix(cptLength : Int) : Mat = {
     var ii = izeros(1,1)
     var jj = izeros(1,1)
     for (i <- 0 until graph.n-1) {
@@ -366,7 +350,12 @@ class BayesNet(val dag:Mat,
       jj = jj on (indices._2 + offsetLast)
       offsetLast = offsetLast + statesPerNode.asInstanceOf[IMat](graph.n-1)
     }
-    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cptLength, cptLength)
+    val res = sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1,1), cptLength, cptLength)
+    if (useGPUnow) {
+      return GSMat(res) 
+    } else {
+      return res
+    }
   }
   
   /** For computing Java runtime memory, can be reasonably reliable. */
@@ -475,9 +464,9 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
    */
   def connectParents(moral: FMat, parents: IMat) = {
     val l = parents.length
-    for(i <- 0 until l) {
-      for(j <- 0 until l) {
-        if(parents(i) != parents(j)) {
+    for (i <- 0 until l) {
+      for (j <- 0 until l) {
+        if (parents(i) != parents(j)) {
           moral(parents(i), parents(j)) = 1f
         }
       }
@@ -498,11 +487,11 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
     var res = (pproject.copy).t
     for (i <- 0 until n) {
       val parents = find(SMat(pproject(?, i)))
-      var cumRes = 1
+      var cumRes = 1f
       val parentsLen = parents.length
       for (j <- 1 until parentsLen) {
         cumRes = cumRes * IMat(statesPerNode)(parents(parentsLen - j))
-        res(i, parents(parentsLen - j - 1)) = cumRes.toFloat
+        res.asInstanceOf[SMat](i, parents(parentsLen - j - 1)) = cumRes
       }
     }
     res
@@ -575,15 +564,15 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
  * This will store a set of pre-computed variables (usually matrices) for each color group.
  */
 class ColorGroup {
-  var numNodes:Int
-  var numNodesCh:Int
-  var idsInColor:Mat
-  var chIdsInColor:Mat
-  var globalOffsetVector:Mat
-  var iprojectSliced:Mat
-  var startingIndices:Mat
-  var replicationMatrix:Mat
-  var strideVector:Mat
-  var combinationMatrix:Mat
+  var numNodes:Int = -1
+  var numNodesCh:Int = -1
+  var idsInColor:Mat = null
+  var chIdsInColor:Mat = null
+  var globalOffsetVector:Mat = null
+  var iprojectSliced:Mat = null
+  var startingIndices:Mat = null
+  var replicationMatrix:Mat = null
+  var strideVector:Mat = null
+  var combinationMatrix:Mat = null
 }
 
