@@ -60,16 +60,16 @@ class BayesNet(val dag:Mat,
     statesPerNode = IMat(states)
     graph = new Graph(dag, opts.dim, statesPerNode)
     graph.color
-    iproject = (graph.iproject).t
-    pproject = graph.pproject
+    iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
+    pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
     
     // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize w/ones.
-    val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * pproject) + 1e-4)
+    val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
-    cptOffset <-- convertMat(cptOffset)
+    cptOffset = convertMat(cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
-    val cpt = cptOffset.ones(lengthCPT,1)
+    val cpt = convertMat(ones(lengthCPT,1))
     setmodelmats(new Array[Mat](1))
     modelmats(0) = cpt
     mm = modelmats(0)
@@ -85,7 +85,7 @@ class BayesNet(val dag:Mat,
 
     // To wrap it up, convert a few matrices and add some debugging info
     normConstMatrix = getNormConstMatrix(lengthCPT)
-    statesPerNode <-- convertMat(statesPerNode) 
+    statesPerNode = convertMat(statesPerNode) 
     println("At the end of init, GPU memory is " + GPUmem)
   } 
    
@@ -93,16 +93,19 @@ class BayesNet(val dag:Mat,
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
     val ncols = gmats(0).ncols
     if (ipass == 0) {
-      val first = (here == ncols.toLong)    // We are on the first mini-batch of the first pass
-      val last = (ncols != batchSize)       // We are on the last mini-batch of the first pass
-      if (first || last) {
-        if (first) { 
-          batchSize = ncols
-        }
+      val first = (here == ncols.toLong) 
+      val last = (ncols != batchSize) 
+      if (first) { // We are on the first mini-batch of the first pass
+        batchSize = ncols
         lastBatchSize = ncols
         for (c <- 0 until graph.ncolors) {
           val ncols = colorInfo(c).numNodes
           zeroMap += ((batchSize,ncols) -> mm.zeros(batchSize,ncols))
+        }
+      } else if (last) { // We are on the last mini-batch of the first pass
+        lastBatchSize = ncols
+        for (c <- 0 until graph.ncolors) {
+          val ncols = colorInfo(c).numNodes
           zeroMap += ((lastBatchSize,ncols) -> mm.zeros(lastBatchSize,ncols))
         }
       }
@@ -119,6 +122,7 @@ class BayesNet(val dag:Mat,
  
   /**
    * TODO describe
+   * Note: if the pass is 0, then the "user" matrix is all zeros (as of now). It makes more sense to 
    * 
    * @param sdata The sparse data matrix for this batch (0s = unknowns), which the user matrix shifts by -1.
    * @param user
@@ -129,23 +133,20 @@ class BayesNet(val dag:Mat,
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
       val state = convertMat(rand(sdata.nrows, sdata.ncols))
-      state <-- min( trunc(statesPerNode *@ state), statesPerNode-1 )
+      state <-- min( int(statesPerNode ∘ state), statesPerNode-1 )
       val data = full(sdata)
-      val select = sdata > 0
-      user ~ (select *@ (data-1)) + ((1-select) *@ state)
+      val select = data > 0
+      user ~ (select ∘ (data-1)) + ((1-select) ∘ state)
     }
     val usertrans = user.t
 
     for (k <- 0 until numGibbsIterations) {
       for (c <- 0 until graph.ncolors) {
 
-        // Prepare our data by establishing the appropriate offset matrices for the entire cpt blocks
-        // I think there's a better way to do this.
-        usertrans <-- user.t // TODO Temp fix because user gets updated w/known indices, but usertrans doesn't.
-        val assignment = usertrans.copy
-        assignment(?, colorInfo(c).idsInColor) = zeroMap(usertrans.nrows, colorInfo(c).numNodes)
-        val offsetMatrix = assignment * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
-        val replicatedOffsetMatrix = offsetMatrix * colorInfo(c).replicationMatrix + colorInfo(c).strideVector
+        // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
+        usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
+        val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
+        val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
         val probabilities = ln(mm(replicatedOffsetMatrix))
         val combinedProbabilities = exp(probabilities * colorInfo(c).combinationMatrix)
 
@@ -157,8 +158,8 @@ class BayesNet(val dag:Mat,
             val probs = GMat(combinedProbabilities(?, start until start+numStates).t)
             val samples = probs.izeros(probs.nrows, probs.ncols)
             multinomial(probs.nrows, probs.ncols, probs.data, samples.data, sum(probs,1).data, 1)
-            val (maxVals, indices) = maxi2( samples ) 
-            usertrans(?, colorInfo(c).idsInColor(i)) = indices.t
+            val (maxVals, indices) = maxi2( float(samples) ) 
+            usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
           } else {
             // TODO for now I'll randomly put samples here because otherwise I'd have to write one
             val indices = IMat(rand(usertrans.nrows,1) * statesPerNode(i) * 0.9999999)
@@ -166,11 +167,12 @@ class BayesNet(val dag:Mat,
           }
         }
 
-        // After we finish with this color group, we should override the known values because that affects other parts.
+        // After we finish sampling with this color group, we override the known values.
         user ~ usertrans.t
         val data = full(sdata)
-        val select = sdata > 0
+        val select = data > 0
         user ~ (select *@ (data-1)) + ((1-select) *@ user)
+        usertrans <-- user.t
       }     
     }
     
@@ -209,10 +211,10 @@ class BayesNet(val dag:Mat,
     val cg = new ColorGroup 
     cg.idsInColor = find(IMat(graph.colors) == c)
     cg.numNodes = cg.idsInColor.length
-    cg.chIdsInColor = find(FMat(sum(pproject(cg.idsInColor,?),1)))
+    cg.chIdsInColor = find(FMat(sum(SMat(pproject)(cg.idsInColor,?),1)))
     cg.numNodesCh = cg.chIdsInColor.length
-    cg.iprojectSliced = iproject(?,cg.chIdsInColor)
-    cg.globalOffsetVector = cptOffset(cg.chIdsInColor)
+    cg.iprojectSliced = SMat(iproject)(?,cg.chIdsInColor)
+    cg.globalOffsetVector = convertMat(FMat(cptOffset(cg.chIdsInColor))) // Need FMat to avoid GMat+GIMat
     val startingIndices = izeros(cg.numNodes,1)
     startingIndices(1 until cg.numNodes) = cumsum(IMat(statesPerNode(cg.idsInColor)))(0 until cg.numNodes-1)
     cg.startingIndices = convertMat(startingIndices)
@@ -231,7 +233,7 @@ class BayesNet(val dag:Mat,
         strideFactors(i) = 1
         parentOf(i) = IMat(cg.idsInColor).data.indexOf(nodeIndex)
       } else { // This node is a child of a node in the color group
-        val parentIndices = find( FMat( sum(pproject(?,nodeIndex),2) ) )
+        val parentIndices = find( FMat( sum(SMat(pproject)(?,nodeIndex),2) ) )
         var parentIndex = -1
         var k = 0
         while (parentIndex == -1 && k < parentIndices.length) {
@@ -287,8 +289,11 @@ class BayesNet(val dag:Mat,
       sparse(iii,jjj,vvv,nrowsCombo,ncolsCombo)
     }
     
-    cg.idsInColor <-- convertMat(cg.idsInColor)
-    cg.chIdsInColor <-- convertMat(cg.chIdsInColor)
+    cg.idsInColor = convertMat(cg.idsInColor)
+    cg.chIdsInColor = convertMat(cg.chIdsInColor)
+    if (useGPUnow) {
+      cg.iprojectSliced = GSMat(cg.iprojectSliced.asInstanceOf[SMat])
+    }
     return cg
   } 
  
@@ -300,7 +305,7 @@ class BayesNet(val dag:Mat,
    *    rows are the variables.
    */
   def updateCPT(user: Mat) : Unit = {
-    println("at start of cpt, gpu mem is " + GPUmem)
+    println("At start of updateCPT() call, GPUmem: " + GPUmem)
     /*
     val index = if (useGPUnow) {
       GIMat(cptOffset + (user.t * iproject).t)
@@ -308,11 +313,11 @@ class BayesNet(val dag:Mat,
       IMat(cptOffset + (user.t * iproject).t)
     }
     */
-    val index = cptOffset + (user.t * iproject).t
+    val index = int(cptOffset + (user.t * iproject).t)
     var counts = mm.izeros(mm.length, 1)
     var tmp = mm.izeros(index(?,0).length,1)
     var ones = mm.iones(index(?,0).length,1)
-    println("before loop, GPU mem is " + GPUmem)
+    println("In updateCPT(), before loop, GPU mem is " + GPUmem)
     for (i <- 0 until user.ncols) {
       tmp <-- index(?,i)
       tmp <-- counts(tmp)
@@ -320,7 +325,7 @@ class BayesNet(val dag:Mat,
       counts(index(?,i)) = tmp
       // counts(index(?, i)) = counts(index(?, i)) + 1 // The old way
     }
-    println("after loop, GPU mem is " + GPUmem)
+    println("In updateCPT(), after loop, GPU mem is " + GPUmem)
     mm <-- (counts + opts.alpha)
   }
   
@@ -475,15 +480,15 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
   } 
 
   /** Forms the pproject matrix (dag + identity) used for computing model parameters. */
-  def pproject = {
-    dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
+  def pproject : SMat = {
+    return SMat(dag) + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
   }
   
   /**
    * Forms the iproject matrix, which is left-multiplied to send a Pr(X_i | parents) query to its
    * appropriate spot in the cpt via LOCAL offsets for X_i.
    */
-  def iproject = {
+  def iproject : SMat = {
     var res = (pproject.copy).t
     for (i <- 0 until n) {
       val parents = find(SMat(pproject(?, i)))
@@ -494,7 +499,7 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
         res.asInstanceOf[SMat](i, parents(parentsLen - j - 1)) = cumRes
       }
     }
-    res
+    return SMat(res)
   }
   
   /**
