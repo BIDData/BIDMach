@@ -112,7 +112,7 @@ class BayesNet(val dag:Mat,
     var numGibbsIterations = opts.samplingRate
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
-      establishBatchSizes(sdata.ncols)
+      establishZeroMatrices(sdata.ncols)
       val state = convertMat(rand(sdata.nrows, sdata.ncols))
       state <-- min( int(statesPerNode ∘ state), statesPerNode-1 )
       val data = full(sdata)
@@ -136,13 +136,12 @@ class BayesNet(val dag:Mat,
           if (useGPUnow) {
             val start = colorInfo(c).startingIndices(i).dv.toInt
             val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
-            //println("before probs")
-            val probs = GMat(combinedProbabilities(?, start until start+numStates).t)
-            val samples = probs.izeros(probs.nrows, probs.ncols)
-            multinomial(probs.nrows, probs.ncols, probs.data, samples.data, sum(probs,1).data, 1)
-            val (maxVals, indices) = maxi2( GMat(samples) ) 
-            usertrans(?, colorInfo(c).idsInColor(i)) = GMat(indices.t)
-            //println("after float(indices.t)")
+            val probs = float(combinedProbabilities(?, start until start+numStates).t)
+            val samples = zeroMap( (probs.nrows, probs.ncols) )
+            multinomial(probs.nrows, probs.ncols, probs.asInstanceOf[GMat].data, 
+                        samples.asInstanceOf[GIMat].data, sum(probs,1).asInstanceOf[GMat].data, 1)
+            val (maxVals, indices) = maxi2( float(samples) ) 
+            usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
           } else {
             // TODO for now I'll randomly put samples here because we don't have a CPU multinomial sampler
             val indices = IMat(rand(usertrans.nrows,1) * statesPerNode(i) * 0.9999999)
@@ -283,27 +282,36 @@ class BayesNet(val dag:Mat,
   }
 
   /**
-   * Creates zero matrices to be put in the zero map based on the size of the data and the number of
-   * variables in each color group. The zero matrices "zero-out" the user-transpose matrix columns
-   * that correspond to variables in a color group being sampled. The zeros mean that the indexing
-   * starts at the beginning of CPT blocks of those variables. This is only called if ipass == 0.
+   * Creates zero matrices to be put in the zero map based on the size of the data, the number of
+   * variables in each color group, and the number of states of those variables. One class of zero
+   * matrices "zero-out"s the user-transpose matrix columns when we sample from the color group,
+   * which means indexing starts at the beginning of CPT blocks of those variables. The second set
+   * of zero matrices is to create an empty "samples" matrix when doing multinomial sampling.
    * 
    * @param ncols The number of columns of sdata, (i.e. the batchSize), which might be different for
    *    the last mini-batch.
    */
-  def establishBatchSizes(ncols:Int) = {
+  def establishZeroMatrices(ncols:Int) = {
     if (batchSize == -1) { // We are on the first mini-batch of the first pass
       batchSize = ncols
       lastBatchSize = ncols
       for (c <- 0 until graph.ncolors) {
-        val ncols = colorInfo(c).numNodes
-        zeroMap += ((batchSize,ncols) -> mm.zeros(batchSize,ncols))
+        val numVars = colorInfo(c).numNodes
+        zeroMap += ((batchSize,numVars) -> mm.zeros(batchSize,numVars))
+        for (i <- 0 until colorInfo(c).numNodes) {
+          val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
+          zeroMap += ((numStates,batchSize) -> mm.izeros(numStates,batchSize))
+        }
       }
     } else if (ncols != batchSize) { // We are on the last mini-batch of the first pass
       lastBatchSize = ncols
       for (c <- 0 until graph.ncolors) {
-        val ncols = colorInfo(c).numNodes
-        zeroMap += ((lastBatchSize,ncols) -> mm.zeros(lastBatchSize,ncols))
+        val numVars = colorInfo(c).numNodes
+        zeroMap += ((lastBatchSize,numVars) -> mm.zeros(lastBatchSize,numVars))
+        for (i <- 0 until colorInfo(c).numNodes) {
+          val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
+          zeroMap += ((numStates,lastBatchSize) -> mm.izeros(numStates,lastBatchSize))         
+        }
       }
     }
   }
