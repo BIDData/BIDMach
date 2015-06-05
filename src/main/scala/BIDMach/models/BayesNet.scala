@@ -92,7 +92,7 @@ class BayesNet(val dag:Mat,
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
     if (ipass % 5 == 0) {
-      val a = mm / (normConstMatrix * mm)
+      val a = mm / (mm.t * normConstMatrix).t
       println("\nDebugging notice: here is the normalized model matrix:")
       println( a )
     }
@@ -198,7 +198,7 @@ class BayesNet(val dag:Mat,
    */
   def evalfun(sdata:Mat, user:Mat):FMat = {  
     val index = int(cptOffset + (user.t * iproject).t)
-    val cptNormalized = mm / (normConstMatrix * mm)
+    val cptNormalized = mm / (mm.t * normConstMatrix).t
     return FMat( sum(sum(ln(cptNormalized(index)),1),2) )
   }
   
@@ -357,9 +357,14 @@ class BayesNet(val dag:Mat,
   }
   
   /**
-   * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
-   * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. I don't actually
-   * use this, but it's nice to have it to find the probabilities later for debugging/informative purposes.
+   * Creates normalizing matrix N that we can then multiply with the CPT to get a column vector
+   * of the same length as the CPT but such that it has normalized probabilties, not counts.
+   * 
+   * Specific usage: our CPT is a column vector of counts. To normalize and get probabilities, use
+   *   CPT / (CPT.t * N).t
+   *   
+   * Alternatively, one could avoid those two transposes by making CPT a row vector, but since the
+   * code assumes it's a column vector, it makes sense to maintain that convention.
    */
   def getNormConstMatrix(cptLength : Int) : Mat = {
     var ii = izeros(1,1)
@@ -383,10 +388,10 @@ class BayesNet(val dag:Mat,
       offsetLast = offsetLast + statesPerNode.asInstanceOf[IMat](graph.n-1)
     }
     val res = sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1,1), cptLength, cptLength)
-    if (useGPUnow) {
-      return GSMat(res) 
+    if (useGPUnow) { // Note that here we have to transpose!
+      return GSMat(res.t) 
     } else {
-      return res
+      return res.t
     }
   }
   
