@@ -160,11 +160,18 @@ template<int SKIP, int YDIM, int NREPS>
       for (j = 0; j < NREPS; j++) { 
         if (tid + j * dxy < nrows) {                        // Save the A column
           atomicAdd(&A[tid + j * dxy + iwords[SKIP]], daa[j]);
-          atomicAdd(&B[tid + j * dxy + iwords[0]], dbb[j][0]);
         }
       } 
+      if (iwords[0] >= 0) {
+#pragma unroll                 
+        for (j = 0; j < NREPS; j++) { 
+          if (tid + j * dxy < nrows) {                        // Save the B column
+            atomicAdd(&B[tid + j * dxy + iwords[0]], dbb[j][0]);
+          }
+        }
+      }
+      __syncthreads();  
     }
-    __syncthreads();  
   }
 
 #pragma unroll      
