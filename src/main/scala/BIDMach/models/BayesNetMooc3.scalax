@@ -1,0 +1,503 @@
+package BIDMach.models
+
+import BIDMat.{ CMat, CSMat, DMat, Dict, IDict, FMat, GMat, GIMat, GSMat, HMat, IMat, Mat, SMat, SBMat, SDMat }
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMat.Solvers._
+import BIDMat.Plotting._
+import BIDMach._
+import BIDMach.datasources._
+import BIDMach.updaters._
+import java.io._
+import scala.util.Random
+import scala.collection.mutable._
+
+/**
+ * A Bayesian Network implementation with fast parallel Gibbs Sampling (e.g., for MOOC data).
+ * 
+ * Haoyu Chen and Daniel Seita are building off of Huasha Zhao's original code.
+ * 
+ * The input needs to be (1) a graph, (2) a sparse data matrix, and (3) a states-per-node file
+ * 
+ * This is still a WIP.
+ */
+
+// Put general reminders here:
+// TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
+// TODO Investigate opts.nsampls. For now, have to do batchSize * opts.nsampls or something like that.
+// TODO Check if the BayesNet should be re-using the user for now
+// To be honest, right now it's far easier to assume the datasource is providing us with a LENGTH ONE matrix each step
+// TODO Be sure to check if we should be using SMats, GMats, etc. ANYWHERE we use Mats.
+// TODO Worry about putback and multiple iterations LATER
+// TODO Only concerning ourselves with SMats here, right?
+class BayesNetMooc3(val dag:SMat, 
+                    val states:Mat, 
+                    override val opts:BayesNetMooc3.Opts = new BayesNetMooc3.Options) extends Model(opts) {
+
+  var graph:Graph1 = null
+  var mm:Mat = null
+  var iproject:Mat = null
+  var pproject:Mat = null
+  var cptOffset:IMat = null
+  var statesPerNode:IMat = IMat(states)
+  //var normConstMatrix:SMat = null
+  var useGPUnow:Boolean = false
+  
+  /**
+   * Performs a series of initialization steps.
+   * 
+   * - Builds iproject/pproject for local offsets and computing probabilities, respectively.
+   * - Build the CPT and its normalizing constant matrix (though we might not use the latter)
+   *   - Note that the CPT itself is a cpt of counts, which I initialize to 1 for now
+   */
+  def init() = {
+    useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
+    graph = new Graph1(dag, opts.dim, statesPerNode)
+    graph.color
+    iproject = graph.iproject
+    pproject = graph.pproject
+
+    // Now start building the CPT by computing offset vector.
+    val numSlotsInCpt = IMat(exp(full(pproject.t) * ln(FMat(statesPerNode))) + 1e-3)     
+    cptOffset = izeros(graph.n, 1)
+    cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
+
+    // Build the CPT. For now, it stores counts. To avoid div by 0, initialize w/ones.
+    val lengthCPT = sum(numSlotsInCpt).dv.toInt
+    val cpt = ones(lengthCPT, 1)
+    setmodelmats(new Array[Mat](1))
+    modelmats(0) = if (useGPUnow) GMat(cpt) else cpt
+    mm = modelmats(0)
+    updatemats = new Array[Mat](1)
+    updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
+  }
+
+  /**
+   * Does a uupdate/mupdate on a datasource segment, called from dobatchg() in Model.scala. 
+   * 
+   * The data we get in mats(0) is such that 0s mean unknowns, and the knowns are {1, 2, ...}. The
+   * purpose here is to run Gibbs sampling and use the resulting samples to "improve" the mm (i.e.,
+   * the CPT). We randomize the state/user matrix here because we need to randomize the assignment
+   * to all variables. TODO Should this only happen if ipass=0 and we have datasources put back?
+   * 
+   * @param mats An array of matrices representing part of the original data, with mats(0) the data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The number of samples (columns) seen so far, including the ones in this batch.
+   */
+  def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+    println("Inside dobatch, ipass = " + ipass)
+    val user:Mat = mats(1)
+    println("Before the ipass == 0 part, mats(1) was...")
+    printMatrix(FMat(mats(1)))
+    if (ipass == 0) {
+      user <-- getRandomInitialStates(mats(0))
+    }
+
+    println("mats(0):")
+    printMatrix(full(SMat(mats(0))))
+    println("mats(1):")
+    printMatrix(FMat(mats(1)))
+    println("Here is the user:")
+    printMatrix(FMat(user))
+
+    uupdate(mats(0), user, ipass)
+    mupdate(mats(0), user, ipass)
+  }
+
+  /**
+   * Evaluates the current datasource; called from evalbatchg() in Model.scala.
+   * 
+   * TODO For now it seems like we may not even need a uupdate call. What often happens here is that
+   * we do uupdate then evaluate, but if we have opts.updateAll then we will already have done a full
+   * uupdate/mupdate call. And we are just evaluating the log likelihood of the cpt here, right? That
+   * involves summing up the log of its normalized elements (use the normConstMatrix).
+   * 
+   * @param mats An array of matrices representing a segment of the original data.
+   * @param ipass The current pass over the data source (not the Gibbs sampling iteration number).
+   * @param here The total number of elements seen so far, including the ones in this current batch.
+   * @return The log likelihood of the data on this datasource segment (i.e., sdata).
+   */
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+    println("Inside evalbatch, right now nothing here (debugging) but later we'll report a score.")
+    return 1f
+  }
+
+  /**
+   * Performs a complete, parallel Gibbs sampling, which may involve more than one iteration if we are
+   * in the first pass or if we want to thin. For now, we sample one node at a time (so no color groups).
+   * 
+   * @param sdata The original sparse data matrix with data {1, 2, ...}. We only use this for overriding
+   *    information if we know certain states.
+   * @param user Another data matrix with the same number of rows as sdata, and whose columns represent
+   *    various iid assignments to all the variables. The known values of sdata are inserted in the same
+   *    spots in this matrix, but the unknown values are appropriately randomized to be in {0,1,...,k}.
+   * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
+   */
+  def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+    //println("In uupdate, with user =\n")
+    //printMatrix(FMat(user))
+    val nonzeroIndices = find(SMat(sdata) > 0)
+    var numGibbsIterations = opts.samplingRate
+    if (ipass == 0) {
+      numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
+    }
+    val batchSize = user.ncols
+
+    for (k <- 0 until numGibbsIterations) {
+      println("In uupdate(), Gibbs iteration " + (k+1) + " of " + numGibbsIterations)
+      for (n <- 0 until graph.n) {
+
+        // First, find probabilities for the contiguous block of Pr(Xn = ? | parents). Store/update results in pMatrix.
+        val assignment = user.copy
+        assignment(n,?) = 0
+        val numStates = statesPerNode(n)
+        val globalOffset = cptOffset(n)
+        val localOffset = SMat(iproject(n,?)) * FMat(assignment)
+        val pMatrix = globalOffset + localOffset + (icol(0 until numStates) * ones(1, batchSize))
+        pMatrix <-- getCpt(pMatrix)
+        pMatrix <-- (pMatrix / sum(pMatrix,1))
+
+        // For EACH of its children, we have to compute appropriate matrices; localOffsets has as many rows as children
+        val childrenIDs = find(graph.dag(n,?)) 
+        if (childrenIDs.length > 0) {
+          val globalOffsets = cptOffset(childrenIDs)
+          val localOffsets = SMat(iproject)(childrenIDs,?) * FMat(assignment)
+          val strides = full(SMat(iproject)(childrenIDs,n))
+          for (i <- 0 until childrenIDs.length) {
+            val tmp = globalOffsets(i) + localOffsets(i,?) + ((icol(0 until numStates) * strides(i).toInt) * ones(1, batchSize))
+            tmp <-- getCpt(tmp)
+            tmp <-- (tmp / sum(tmp,1))
+            pMatrix ~ pMatrix + tmp
+          }
+        }
+        
+        // Now pMatrix is a (numState x batchSize)-dim matrix, and row k refers to the un-normalized
+        // probabilities that X_i (the variable we are sampling) is equal to k, for each column.
+        pMatrix <-- (pMatrix / sum(pMatrix,1))
+        println("normalized matrix:")
+        printMatrix(pMatrix)
+        sys.exit
+        // user <-- SAMPLE
+        //println("what we sampled:")
+        // ...
+        //println("user, after overriding with known values:")
+        //user(nonzeroIndices) = (FMat(sdata)(nonzeroIndices)-1)
+        //printMatrix(FMat(user))
+        //sys.exit
+      }
+      // Once we've sampled everything, accumulate counts in a CPT (but don't normalize).
+      updateCPT(user)
+      sys.exit
+    }
+  }
+  
+  /**
+   * After one full round of Gibbs sampling iterations, we put in the local cpt, mm, into the updatemats(0)
+   * value so that it gets "averaged into" the global cpt, modelmats(0). The reason for doing this is that
+   * it is like "thinning" the samples so we pick every n-th one, where n is an opts parameter. This also
+   * works if we assume that modelmats(0) stores counts instead of normalized probabilities.
+   * 
+   * @param sdata A sparse data matrix for this batch, which we do not use.
+   * @param user Another data matrix with the same number of rows as sdata, and whose columns represent
+   *    various iid assignments to all the variables. The known values of sdata are inserted in the same
+   *    spots in this matrix, but the unknown values are appropriately randomized to be in {0,1,...,k}.
+   * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
+   */
+  def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+    updatemats(0) <-- mm
+  } 
+  
+  /** 
+   * Evaluates the log likelihood of this datasource segment (i.e., sdata). 
+   * 
+   * The sdata matrix has instances as columns, so one column is an assignment to variables. If each column
+   * of sdata had a full assignment to all variables, then we easily compute log Pr(X1, ..., Xn) which is
+   * the sum of elements in the CPT (i.e., the mm), sum(Xi | parents(Xi)). For the log-l of the full segment,
+   * we need another addition around each column, so the full log-l is the sum of the log-l of each column.
+   * This works because we assume each column is iid so we split up their joint probabilities. Taking logs 
+   * then results in addition.
+   * 
+   * In reality, data is missing, and columns will not have a full assignment. That is where we incorporate
+   * the user matrix to fill in the missing details. The user matrix fills in the unknown assignment values.
+   * TODO Actually, since user contains all of sdata's known values, we DON'T NEED sdata, but we DO need to
+   * make sure that "user" is correctly initialized...
+   * 
+   * @param sdata The data matrix, which may have missing assignments indicated by a -1.
+   * @param user A matrix with a full assignment to all variables from sampling or randomization.
+   * @return The log likelihood of the data.
+   */
+  def evalfun(sdata: Mat, user: Mat) : FMat = {
+    val a = cptOffset + IMat(SMat(iproject) * FMat(user))
+    val b = maxi(maxi(a,1),2).dv
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
+    val ll = sum(sum(ln(getCpt(index))))
+    return ll.dv
+  }
+  
+  // -------------------------------------------------------------------------- //
+  // Methods that are specific to BayesNets and not part of the Model interface
+  
+  /** Help obtain starting 'user'; at end, subtract one because it's {0, 1, ..., k-1}. */
+  def getRandomInitialStates(sdata:Mat) : Mat = {
+    val nonzeroIndices = find(SMat(sdata) > 0)
+    var state = rand(sdata.nrows, sdata.ncols)
+    state = min( FMat(trunc(statesPerNode *@ state)) , statesPerNode-1) 
+    state(nonzeroIndices) = (FMat(sdata)(nonzeroIndices)-1) 
+    return state
+  }
+
+  /**
+   * Method to update the cpt table (i.e. mm). This method is called after we finish one iteration of Gibbs 
+   * sampling. And this method only updates the local cpt table (mm), it has nothing to do with the learner's 
+   * cpt parameter (which is modelmats(0)).
+   * 
+   * @param user The state matrix, updated after the sampling.
+   */
+  def updateCPT(user: Mat) : Unit = {
+    val numCols = size(user, 2)
+    val index = IMat(cptOffset + SMat(iproject) * FMat(user))
+    var counts = mm.zeros(mm.length, 1)
+    for (i <- 0 until numCols) {
+      counts(index(?, i)) = counts(index(?, i)) + 1
+    }
+    counts = counts + opts.alpha  
+    //mm = (1 - opts.alpha) * mm + counts / (normConstMatrix * counts)
+    mm = counts // For now, in case we just want raw counts
+    println("After a call to updateCPT(), our counts vector is:\n" + mm.t)
+  }
+
+  /** Returns a conditional probability table specified by indices from the "index" matrix. */
+  def getCpt(index: Mat) : Mat = {
+    return mm(IMat(index))
+  }
+  
+  /**
+   * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
+   * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. Use SMat to save
+   * on memory, I think.
+   */
+  def getNormConstMatrix(cptLength : Int) : SMat = {
+    var ii = izeros(1,1)
+    var jj = izeros(1,1)
+    for (i <- 0 until graph.n-1) {
+      var offset = cptOffset(i)
+      val endOffset = cptOffset(i+1)
+      val ns = statesPerNode(i)
+      var indices = find2(ones(ns,ns))
+      while (offset < endOffset) {
+        ii = ii on (indices._1 + offset)
+        jj = jj on (indices._2 + offset)
+        offset = offset + ns
+      }
+    }
+    var offsetLast = cptOffset(graph.n-1)
+    var indices = find2(ones(statesPerNode(graph.n-1), statesPerNode(graph.n-1)))
+    while (offsetLast < cptLength) {
+      ii = ii on (indices._1 + offsetLast)
+      jj = jj on (indices._2 + offsetLast)
+      offsetLast = offsetLast + statesPerNode(graph.n-1)
+    }
+    return sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1, 1), cptLength, cptLength)
+  }
+
+  /** Returns FALSE if there's an element at least size 2, which is BAD (well, only for binary data...). */
+  def checkState(state: Mat) : Boolean = {
+    val a = maxi(maxi(state,2),1).dv
+    if (a >= 2) {
+      return false
+    }
+    return true
+  }
+
+  /** A debugging method to print matrices, without being constrained by the command line's cropping. */
+  def printMatrix(mat: FMat) = {
+    for(i <- 0 until mat.nrows) {
+      for (j <- 0 until mat.ncols) {
+        print(mat(i,j) + " ")
+      }
+      println()
+    }
+  }
+  
+}
+
+
+
+/**
+ * There are three things the BayesNet needs as input:
+ * 
+ *  - A states per node array. Each value needs to be an integer that is at least two.
+ *  - A DAG array, in which column i represents node i and its parents.
+ *  - A sparse data matrix, where 0 indicates an unknown element, and rows are variables.
+ * 
+ * We don't need anything else for now, except for the number of gibbs iterations as input.
+ */
+object BayesNetMooc3  {
+  
+  trait Opts extends Model.Opts {
+    var alpha = 1f
+    var samplingRate = 1
+    var numSamplesBurn = 100
+  }
+  
+  class Options extends Opts {}
+
+  /** 
+   * A learner with a matrix data source, with states per node, and with a dag prepared. Call this
+   * using (assuming proper names):
+   * 
+   * val (nn,opts) = BayesNetMooc3.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
+   */
+  def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
+
+    class xopts extends Learner.Options with BayesNetMooc3.Opts with MatDS.Opts with IncNorm.Opts 
+    val opts = new xopts
+    opts.dim = dag.ncols
+    opts.batchSize = data.ncols
+    opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
+    opts.putBack = 1        // For now...
+    val secondMatrix = data.zeros(data.nrows,data.ncols)
+    //opts.useGPU = false     // Temporary TODO test with GPUs, delete this line later
+    //opts.updateAll = true   // TODO not necessary for testing purposes now
+    //opts.power = 1f         // TODO John suggested that we do not need 1f here
+    //opts.npasses = 1        // Temporary TODO because I would like to get one pass working correctly.
+
+    val nn = new Learner(
+        new MatDS(Array(data:Mat, secondMatrix), opts),
+        new BayesNetMooc3(SMat(dag), statesPerNode, opts),
+        null,
+        new IncNorm(opts),
+        opts)
+    (nn, opts)
+  }
+}
+
+
+
+/**
+ * A graph structure for Bayesian Networks. Includes features for:
+ * 
+ *   (1) moralizing graphs, 'moral' matrix must be (i,j) = 1 means node i is connected to node j
+ *   (2) coloring moralized graphs, not sure why there is a maxColor here, though...
+ *
+ * @param dag An adjacency matrix with a 1 at (i,j) if node i has an edge TOWARDS node j.
+ * @param n The number of vertices in the graph. 
+ * @param statesPerNode A column vector where elements denote number of states for corresponding variables.
+ */
+// TODO making this Graph1 instead of Graph so that we don't get conflicts
+// TODO investigate all non-Mat matrices (IMat, FMat, etc.) to see if these can be Mats to make them usable on GPUs
+// TODO Also see if connectParents, moralize, and color can be converted to GPU friendly code
+class Graph1(val dag: SMat, val n: Int, val statesPerNode: IMat) {
+ 
+  var mrf: FMat = null
+  var colors: IMat = null
+  var ncolors = 0
+  val maxColor = 100
+   
+  /**
+   * Connects the parents of a certain node, a single step in the process of moralizing the graph.
+   * 
+   * Iterates through the parent indices and insert 1s in the 'moral' matrix to indicate an edge.
+   * 
+   * @param moral A matrix that represents an adjacency matrix "in progress" in the sense that it
+   *    is continually getting updated each iteration from the "moralize" method.
+   * @param parents An array representing the parent indices of the node of interest.
+   */
+  def connectParents(moral: FMat, parents: IMat) = {
+    val l = parents.length
+    for(i <- 0 until l)
+      for(j <- 0 until l){
+        if(parents(i) != parents(j)){
+          moral(parents(i), parents(j)) = 1f
+        }
+      }
+    moral
+  } 
+
+  /** Forms the pproject matrix (graph + identity) used for computing model parameters. */
+  def pproject = {
+    dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
+  }
+  
+  /**
+   * Forms the iproject matrix, which is left-multiplied to send a Pr(X_i | parents) query to its
+   * appropriate spot in the cpt via LOCAL offsets for X_i.
+   */
+  def iproject = {
+    var res = (pproject.copy).t
+    for (i <- 0 until n) {
+      val parents = find(pproject(?, i))
+      var cumRes = 1
+      val parentsLen = parents.length
+      for (j <- 1 until parentsLen) {
+        cumRes = cumRes * statesPerNode(parents(parentsLen - j))
+        res(i, parents(parentsLen - j - 1)) = cumRes.toFloat
+      }
+    }
+    res
+  }
+  
+  /**
+   * Moralize the graph.
+   * 
+   * This means we convert the graph from directed to undirected and connect parents of nodes in 
+   * the directed graph. First, copy the dag to the moral graph because all 1s in the dag matrix
+   * are 1s in the moral matrix (these are adjacency matrices). For each node, find its parents,
+   * connect them, and update the matrix. Then make it symmetric because the graph is undirected.
+   */
+  def moralize = {
+    var moral = full(dag)
+    for (i <- 0 until n) {
+      var parents = find(dag(?, i))
+      moral = connectParents(moral, parents)
+    }
+    mrf = ((moral + moral.t) > 0)
+  }
+  
+  /**
+   * Sequentially colors the moralized graph of the dag so that one can run parallel Gibbs sampling.
+   * 
+   * Steps: first, moralize the graph. Then iterate through each node, find its neighbors, and apply a
+   * "color mask" to ensure current node doesn't have any of those colors. Then find the legal color
+   * with least count (a useful heuristic). If that's not possible, then increase "ncolor".
+   */
+  def color = {
+    moralize
+    var colorCount = izeros(maxColor, 1)
+    colors = -1 * iones(n, 1)
+    ncolors = 0
+   
+    // Access nodes sequentially. Find the color map of its neighbors, then find the legal color w/least count
+    val seq = IMat(0 until n)
+    // Can also access nodes randomly
+    // val r = rand(n, 1); val (v, seq) = sort2(r)
+
+    for (i <- 0 until n) {
+      var node = seq(i)
+      var nbs = find(mrf(?, node))
+      var colorMap = iones(ncolors, 1)
+      for (j <- 0 until nbs.length) {
+        if (colors(nbs(j)) > -1) {
+          colorMap(colors(nbs(j))) = 0
+        }
+      }
+      var c = -1
+      var minc = 999999
+      for (k <- 0 until ncolors) {
+        if ((colorMap(k) > 0) && (colorCount(k) < minc)) {
+          c = k
+          minc = colorCount(k)
+        }
+      }
+      if (c == -1) {
+       c = ncolors
+       ncolors = ncolors + 1
+      }
+      colors(node) = c
+      colorCount(c) += 1
+    }
+    colors
+  }
+ 
+}
+
