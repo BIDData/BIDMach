@@ -18,14 +18,8 @@ import scala.collection.mutable._
  * 
  * The input needs to be (1) a graph, (2) a sparse data matrix, and (3) a states-per-node file
  * 
- * This is still a WIP.
+ * This is still a WIP. Once we get it working, we need to check for opts.nsamples to cool.
  */
-
-// Put general reminders here:
-// TODO Check if all these (opts.useGPU && Mat.hasCUDA > 0) tests are necessary.
-// TODO Investigate opts.nsampls. For now, have to do batchSize * opts.nsampls or something like that.
-// TODO Check if the BayesNet should be re-using the user for now
-// TODO Be sure to check if we should be using SMats, GMats, etc. ANYWHERE we use Mats.
 class BayesNet(val dag:Mat, 
                val states:Mat, 
                override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
@@ -42,6 +36,8 @@ class BayesNet(val dag:Mat,
   var useGPUnow:Boolean = false             // NOTE: Ideally, we will NOT need to use this at all!
   var batchSize:Int = -1
   var lastBatchSize:Int = -1
+  var zeroVector:Mat = null
+  var counts:Mat = null
 
   /**
    * Performs a series of initialization steps.
@@ -83,46 +79,30 @@ class BayesNet(val dag:Mat,
     }
     zeroMap = new HashMap[(Int,Int),Mat]()
 
-    // To wrap it up, convert a few matrices and add some debugging info
+    // To wrap it up, create/convert a few matrices, reset some variables, and add some debugging info
+    zeroVector = mm.izeros(mm.length, 1)
+    counts = mm.izeros(mm.length, 1)
     normConstMatrix = getNormConstMatrix(lengthCPT)
     statesPerNode = convertMat(statesPerNode) 
+    batchSize = -1
+    lastBatchSize = -1
     println("At the end of init, GPU memory is " + GPUmem)
   } 
    
-  /** Calls a uupdate/mupdate sequence. If ipass == 0, we pre-compute zero matrices for later. */
+  /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    val ncols = gmats(0).ncols
-    if (ipass == 0) {
-      val first = (here == ncols.toLong) 
-      val last = (ncols != batchSize) 
-      if (first) { // We are on the first mini-batch of the first pass
-        batchSize = ncols
-        lastBatchSize = ncols
-        for (c <- 0 until graph.ncolors) {
-          val ncols = colorInfo(c).numNodes
-          zeroMap += ((batchSize,ncols) -> mm.zeros(batchSize,ncols))
-        }
-      } else if (last) { // We are on the last mini-batch of the first pass
-        lastBatchSize = ncols
-        for (c <- 0 until graph.ncolors) {
-          val ncols = colorInfo(c).numNodes
-          zeroMap += ((lastBatchSize,ncols) -> mm.zeros(lastBatchSize,ncols))
-        }
-      }
-    }
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
   
-  /** Calls a uupdate/evalfun sequence. */
+  /** Calls a uupdate/evalfunsequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     uupdate(gmats(0), gmats(1), ipass)
     evalfun(gmats(0), gmats(1))
-  }  
+  }
  
   /**
    * TODO describe
-   * Note: if the pass is 0, then the "user" matrix is all zeros (as of now). It makes more sense to 
    * 
    * @param sdata The sparse data matrix for this batch (0s = unknowns), which the user matrix shifts by -1.
    * @param user
@@ -132,6 +112,7 @@ class BayesNet(val dag:Mat,
     var numGibbsIterations = opts.samplingRate
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
+      establishBatchSizes(sdata.ncols)
       val state = convertMat(rand(sdata.nrows, sdata.ncols))
       state <-- min( int(statesPerNode ∘ state), statesPerNode-1 )
       val data = full(sdata)
@@ -155,13 +136,15 @@ class BayesNet(val dag:Mat,
           if (useGPUnow) {
             val start = colorInfo(c).startingIndices(i).dv.toInt
             val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
+            //println("before probs")
             val probs = GMat(combinedProbabilities(?, start until start+numStates).t)
             val samples = probs.izeros(probs.nrows, probs.ncols)
             multinomial(probs.nrows, probs.ncols, probs.data, samples.data, sum(probs,1).data, 1)
-            val (maxVals, indices) = maxi2( float(samples) ) 
-            usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
+            val (maxVals, indices) = maxi2( GMat(samples) ) 
+            usertrans(?, colorInfo(c).idsInColor(i)) = GMat(indices.t)
+            //println("after float(indices.t)")
           } else {
-            // TODO for now I'll randomly put samples here because otherwise I'd have to write one
+            // TODO for now I'll randomly put samples here because we don't have a CPU multinomial sampler
             val indices = IMat(rand(usertrans.nrows,1) * statesPerNode(i) * 0.9999999)
             usertrans(?, colorInfo(c).idsInColor(i)) = FMat(indices)
           }
@@ -206,6 +189,8 @@ class BayesNet(val dag:Mat,
   
   /** 
    * Needs to determine the color group info for color c. This is a huge method.
+   * 
+   * TODO describe in more detail what it does
    */
   def computeAllColorGroupInfo(c:Int) : ColorGroup = {
     val cg = new ColorGroup 
@@ -279,7 +264,7 @@ class BayesNet(val dag:Mat,
     val jjj = izeros(nrowsCombo,1)
     val vvv = ones(nrowsCombo,1)
     for (i <- 0 until cg.numNodesCh) {
-      val p = parentOf(i) // Index into the PARENT of this node, usually different from i, and NOT global system
+      val p = parentOf(i) // Index into the node itself or its parent if it isn't in the color group
       iii(indicesRows(i) until indicesRows(i)+numOnes(i)) = indicesRows(i) until indicesRows(i)+numOnes(i)
       jjj(indicesRows(i) until indicesRows(i)+numOnes(i)) = indicesColumns(p) until indicesColumns(p)+numOnes(i)
     }
@@ -295,37 +280,58 @@ class BayesNet(val dag:Mat,
       cg.iprojectSliced = GSMat(cg.iprojectSliced.asInstanceOf[SMat])
     }
     return cg
-  } 
+  }
+
+  /**
+   * Creates zero matrices to be put in the zero map based on the size of the data and the number of
+   * variables in each color group. The zero matrices "zero-out" the user-transpose matrix columns
+   * that correspond to variables in a color group being sampled. The zeros mean that the indexing
+   * starts at the beginning of CPT blocks of those variables. This is only called if ipass == 0.
+   * 
+   * @param ncols The number of columns of sdata, (i.e. the batchSize), which might be different for
+   *    the last mini-batch.
+   */
+  def establishBatchSizes(ncols:Int) = {
+    if (batchSize == -1) { // We are on the first mini-batch of the first pass
+      batchSize = ncols
+      lastBatchSize = ncols
+      for (c <- 0 until graph.ncolors) {
+        val ncols = colorInfo(c).numNodes
+        zeroMap += ((batchSize,ncols) -> mm.zeros(batchSize,ncols))
+      }
+    } else if (ncols != batchSize) { // We are on the last mini-batch of the first pass
+      lastBatchSize = ncols
+      for (c <- 0 until graph.ncolors) {
+        val ncols = colorInfo(c).numNodes
+        zeroMap += ((lastBatchSize,ncols) -> mm.zeros(lastBatchSize,ncols))
+      }
+    }
+  }
  
   /**
-   * Method to update the local cpt table (i.e. mm), called after one or more iterations of Gibbs sampling.
-   * This does not update the Learner's cpt, which is modelmats(0).
+   * Update the local CPT table (i.e. mm), called after one or more iterations of Gibbs sampling. This
+   * does not update the Learner's cpt, which is modelmats(0). Note that "tmp" and "ones" are not cached,
+   * but we only create two length-K vectors, where K is the number of variables. The counts and 
+   * zeroVector are to avoid allocating space for another CPT.
    * 
    * @param user The state matrix, with all variables updated after sampling. Columns are the batches, and
    *    rows are the variables.
    */
   def updateCPT(user: Mat) : Unit = {
-    println("At start of updateCPT() call, GPUmem: " + GPUmem)
-    /*
-    val index = if (useGPUnow) {
-      GIMat(cptOffset + (user.t * iproject).t)
-    } else {
-      IMat(cptOffset + (user.t * iproject).t)
-    }
-    */
+    //println("At start of updateCPT() call, GPUmem: " + GPUmem)
     val index = int(cptOffset + (user.t * iproject).t)
-    var counts = mm.izeros(mm.length, 1)
+    counts <-- zeroVector
     var tmp = mm.izeros(index(?,0).length,1)
     var ones = mm.iones(index(?,0).length,1)
-    println("In updateCPT(), before loop, GPU mem is " + GPUmem)
-    for (i <- 0 until user.ncols) {
+    //println("In updateCPT(), before loop, GPU mem is " + GPUmem)
+    for (i <- 0 until (user.ncols-1)) {
       tmp <-- index(?,i)
       tmp <-- counts(tmp)
       tmp ~ tmp + ones
       counts(index(?,i)) = tmp
       // counts(index(?, i)) = counts(index(?, i)) + 1 // The old way
     }
-    println("In updateCPT(), after loop, GPU mem is " + GPUmem)
+    //println("In updateCPT(), after loop, GPU mem is " + GPUmem)
     mm <-- (counts + opts.alpha)
   }
   
@@ -449,7 +455,7 @@ object BayesNet  {
  * @param n The number of vertices in the graph. 
  * @param statesPerNode A column vector where elements denote number of states for corresponding variables.
  */
-// TODO investigate all non-Mat matrices (IMat, FMat, etc.) to see if these can be Mats to make them usable on GPUs
+// TODO investigate all non-Mat matrices (IMat, FMat, etc.) to see if these can be Mats
 // TODO Also see if connectParents, moralize, and color can be converted to GPU friendly code
 class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
  
@@ -567,6 +573,13 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
 
 /**
  * This will store a set of pre-computed variables (usually matrices) for each color group.
+ * 
+ * Some important ones are:
+ *  - replicationMatrix is a sparse matrix of rows of ones, used to replicate columns
+ *  - strideVector is a vector where groups are (0 until k)*stride(x) where k is determined
+ *    by the node or its parent, and stride(x) is 1 if the node is in the color group.
+ *  - combinationMatrix is a sparse identity matrix that combines parents with children for
+ *    probability computations
  */
 class ColorGroup {
   var numNodes:Int = -1
