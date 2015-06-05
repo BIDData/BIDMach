@@ -309,29 +309,20 @@ class BayesNet(val dag:Mat,
   }
  
   /**
-   * Update the local CPT table (i.e. mm), called after one or more iterations of Gibbs sampling. This
-   * does not update the Learner's cpt, which is modelmats(0). Note that "tmp" and "ones" are not cached,
-   * but we only create two length-K vectors, where K is the number of variables. The counts and 
-   * zeroVector are to avoid allocating space for another CPT.
+   * Update the local CPT table (i.e. mm), called after one or more iterations of Gibbs sampling.
+   * This does not update the Learner's cpt, which is modelmats(0). The counts and zeroVector are
+   * here to avoid allocating space for another CPT each time this gets called. Currently, this
+   * method (correctly) does not allocate any new memory after the first ipass.
    * 
-   * @param user The state matrix, with all variables updated after sampling. Columns are the batches, and
-   *    rows are the variables.
+   * @param user The state matrix, with all variables updated after sampling. Columns represent
+   *    samples and rows represent variables.
    */
   def updateCPT(user: Mat) : Unit = {
-    //println("At start of updateCPT() call, GPUmem: " + GPUmem)
     val index = int(cptOffset + (user.t * iproject).t)
     counts <-- zeroVector
-    var tmp = mm.izeros(index(?,0).length,1)
-    var ones = mm.iones(index(?,0).length,1)
-    //println("In updateCPT(), before loop, GPU mem is " + GPUmem)
     for (i <- 0 until (user.ncols-1)) {
-      tmp <-- index(?,i)
-      tmp <-- counts(tmp)
-      tmp ~ tmp + ones
-      counts(index(?,i)) = tmp
-      // counts(index(?, i)) = counts(index(?, i)) + 1 // The old way
+      counts(index(?, i)) = counts(index(?, i)) + 1
     }
-    //println("In updateCPT(), after loop, GPU mem is " + GPUmem)
     mm <-- (counts + opts.alpha)
   }
   
