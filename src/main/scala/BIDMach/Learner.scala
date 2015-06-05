@@ -104,7 +104,7 @@ case class Learner(
         			bytes*1e-9,
         			bytes/gf._2*1e-6))  
         			if (useGPU) {
-        				print(", GPUmem=%3.2f" format GPUmem._1) 
+        				print(", GPUmem=%3.6f" format GPUmem._1) 
         			}
         	println
         	lasti = reslist.length

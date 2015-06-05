@@ -91,6 +91,11 @@ class BayesNet(val dag:Mat,
    
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
+    if (ipass % 5 == 0) {
+      val a = mm / (normConstMatrix * mm)
+      println("\nDebugging notice: here is the normalized model matrix:")
+      println( a )
+    }
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
@@ -102,11 +107,18 @@ class BayesNet(val dag:Mat,
   }
  
   /**
-   * TODO describe
+   * Computes an update for the conditional probability table by sampling each variable once (for now).
+   * 
+   * On the first ipass, it randomizes the user matrix except for those values that are already known from
+   * sdata. This method also establishes zero matrices of varying sizes to be put in zeroMap for caching
+   * purposes. Then, for any pass over the data, this iterates through each color group, iterates through
+   * each of its nodes, and samples using the multinomial function.
    * 
    * @param sdata The sparse data matrix for this batch (0s = unknowns), which the user matrix shifts by -1.
-   * @param user
-   * @param ipass
+   * @param user A data matrix with the same dimensions as sdata, and whose columns represent various iid
+   *    assignments to all the variables. The known values of sdata are inserted in the same spots in this
+   *    matrix, but the unknown values are randomized to be in {0,1,...,k}.
+   * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     var numGibbsIterations = opts.samplingRate
@@ -163,9 +175,10 @@ class BayesNet(val dag:Mat,
   }
 
   /**
-   * After one round of Gibbs sampling iterations, we put the local cpt (mm) into the updatemats(0)
-   * value so that it gets "averaged into" the global cpt, modelmats(0). The reason is that it is like
-   * "thinning" the samples so we pick every n-th one, where n is an opts parameter.
+   * After one set of Gibbs sampling iterations, we put the local cpt (mm) into the updatemats(0)
+   * value so that it gets "averaged into" the global cpt, modelmats(0), from the IncNorm updater.
+   * Also, if the uupdate call involved more than one Gibbs sampling iterations, then the mupdate 
+   * effectively "thins" the sampler by only taking results from every n^th^ sample.
    * 
    * @param sdata The sparse data matrix for this batch (0s = unknowns), which we do not use here.
    * @param user A data matrix with the same dimensions as sdata, and whose columns represent various
@@ -177,19 +190,28 @@ class BayesNet(val dag:Mat,
     updatemats(0) <-- mm
   }   
  
-  /** TODO This is not finished... but its probably a simple sum over all the cpts? */
+  /**
+   * Evaluates the log-likelihood of the data. First, we get the index matrix, which indexes into
+   * the CPT for each column's variable assignment. Then, using the normalized CPT, we find the log
+   * probabilities of the user matrix, and sum vertically (i.e., each variable, valid due to derived
+   * rules) and then horizontally (i.e., each sample, which can do since we assume i.i.d.). 
+   */
   def evalfun(sdata:Mat, user:Mat):FMat = {  
-  	row(0f, 0f)
-  } 
+    val index = int(cptOffset + (user.t * iproject).t)
+    val cptNormalized = mm / (normConstMatrix * mm)
+    return FMat( sum(sum(ln(cptNormalized(index)),1),2) )
+  }
   
   // -----------------------------------
   // Various debugging or helper methods
   // -----------------------------------
   
   /** 
-   * Needs to determine the color group info for color c. This is a huge method.
+   * Determines a variety of information for this color group, and stores it in a ColorGroup object. 
+   * First, it establishes some basic information from each color group. Then it computes the more
+   * complicated replication matrices, stride vectors, and combination matrices.
    * 
-   * TODO describe in more detail what it does
+   * @param c The integer index of the given color group.
    */
   def computeAllColorGroupInfo(c:Int) : ColorGroup = {
     val cg = new ColorGroup 
@@ -337,7 +359,7 @@ class BayesNet(val dag:Mat,
   /**
    * Creates normalizing matrix N that we can then multiply with the cpt, i.e., N * cpt, to get a column
    * vector of the same length as the cpt, but such that cpt / (N * cpt) is normalized. I don't actually
-   * use this, but it's nice to have it to find the probabilities later for debugging/infomative purposes.
+   * use this, but it's nice to have it to find the probabilities later for debugging/informative purposes.
    */
   def getNormConstMatrix(cptLength : Int) : Mat = {
     var ii = izeros(1,1)
@@ -389,7 +411,7 @@ class BayesNet(val dag:Mat,
       println()
     }
   } 
-  
+ 
 }
 
 
@@ -418,7 +440,7 @@ object BayesNet  {
    * 
    * val (nn,opts) = BayesNet.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
    * 
-   * One issue with this, I guess, is that it assumes the data fits in memory. TODO anything I should change?
+   * I believe this requires the data to fit in memory.
    */
   def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
 
@@ -441,7 +463,6 @@ object BayesNet  {
     (nn, opts)
   }
 }
-
 
 
 /**
