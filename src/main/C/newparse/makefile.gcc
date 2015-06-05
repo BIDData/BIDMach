@@ -2,7 +2,7 @@
 .SUFFIXES: 
 .SUFFIXES: .c .cpp .o .exe .lxc .flex
 
-EXES=xmltweet.exe xmlwiki.exe trec.exe tparse.exe parsevw.exe
+EXES=xmltweet.exe xmlwiki.exe trec.exe tparse.exe parsevw.exe tparse2.exe
 OBJS=newparse.o utils.o gzstream.o
 
 .SECONDARY: xmltweet.lxc xmlwiki.lxc trec.lxc
@@ -14,6 +14,9 @@ all: $(EXES)
 
 tparse.exe: gzstream.o utils.o tparse.o utils.h
 	$(LD) -o tparse.exe tparse.o utils.o gzstream.o $(LINK_OPTS)
+
+tparse2.exe: gzstream.o utils.o tparse2.o utils.h
+	$(LD) -o tparse2.exe tparse2.o utils.o gzstream.o $(LINK_OPTS)
 
 parsevw.exe: gzstream.o utils.o parsevw.o utils.h
 	$(LD) -o parsevw.exe parsevw.o utils.o gzstream.o $(LINK_OPTS)
