@@ -1,0 +1,11 @@
+
+val dir = "../../data/rcv1/"
+
+val a = loadSMat(dir+"docs.smat.lz4");
+val c = sparse(loadFMat(dir+"cats.fmat.lz4"));
+
+val ta = loadSMat(dir+"testdocs.smat.lz4");
+val tc = sparse(loadFMat(dir+"testcats.fmat.lz4"));
+
+saveVW(dir+"train.vw", a, c);
+saveVW(dir+"test.vw", ta, tc);

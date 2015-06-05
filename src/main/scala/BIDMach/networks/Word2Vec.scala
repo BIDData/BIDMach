@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,Dict,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -13,11 +13,39 @@ import edu.berkeley.bid.CPUMACH
 import jcuda.runtime.JCuda._
 import scala.util.hashing.MurmurHash3
 import scala.collection.mutable.ArrayBuffer
+import scala.io.Source
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.io.DataOutputStream
+import java.io.DataInputStream
+import java.io.BufferedReader
+import java.io.BufferedWriter
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.util.Scanner
 
 /**
+ * Fast Word2Vec implementation for CPU and GPU. Currently support skip-gram models with negative sampling. 
  * 
+ * The input is an IMat with 2 rows. Each column holds a word ID (top row) and the corresponding sentence ID (second row). 
+ * Options are:
+ - nskip(5) the size of the skip-gram window.
+ - nneg(5) the number of negative samples. 
+ - nreuse(5) the number of times to re-use negative samples.  
+ - vocabSize(100000) the vocabulary size. The input matrix can contain larger word IDs, in which case those IDs are marked as OOV. 
+ - wexpt(0.75f) the exponent for negative sample weighting.
+ - wsample(1e-4f) frequent word sample factor.
+ - headlen(10000) size of the smallest block of words for distributed model synchronization. 
+ - iflip(false) true if word and sentence IDs flipped (sentence ID in first row, word ID in second). 
+ - eqPosNeg(false) normalize positive and negative word weights in the likelihood. 
+ - aopts:ADAGrad.Opts(null) set this to an ADAGRAD.Opts object to use integrated adagrad updates. 
+ *
+ * The code has the ability to build models larger than a single Java array, and bigger than a single node can store. 
+ * These options control performance in the case of models that must be distributed across multiple arrays and/or multiple machines
+ - maxArraySize(1024^3) the maximum size in words of a model array.
+ - nHeadTerms(0) the size of the head of the model - these terms are not changed.
+ - nSlices(1) Process (num) slices of the model on (num) nodes.
+ - iSlice(0) which model slice are we processing on this node?
  */
 
 class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends Model(opts) {
@@ -38,6 +66,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var expt = 0f;
   var vexp = 0f;
   var salpha = 0f;
+  var maxCols = 0;
   
   var ntimes = 12;
   var times:FMat = null;
@@ -66,26 +95,39 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val mats = datasource.next;
 	  nfeats = opts.vocabSize;
 	  ncols = mats(0).ncols;
+	  maxCols = opts.maxArraySize / opts.dim;
 	  datasource.reset;
     if (refresh) {
-    	setmodelmats(new Array[Mat](2));
-    	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;              // syn0 - context model
-    	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
+      if (nfeats <= maxCols) {
+      	setmodelmats(new Array[Mat](2));
+      	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;              // syn0 - context model
+      	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
+      } else {
+        val actualFeats = opts.nHeadTerms + 1 + (nfeats - opts.nHeadTerms - 1) / opts.nSlices;   // Number of features on this node. 
+        val nmmats = 1 + (actualFeats - 1)/maxCols;                           // number of model mats needed
+        setmodelmats(new Array[Mat](2 * nmmats));
+        for (i <- 0 until nmmats) {
+          val xfeats = if (i < nmmats - 1) maxCols else nfeats - (nmmats - 1) * maxCols;
+        	modelmats(2 * i) = (rand(opts.dim, xfeats) - 0.5f)/opts.dim;              
+        	modelmats(2 * i + 1) = zeros(opts.dim, xfeats);
+        }
+      }
     }
-    modelmats(0) = convertMat(modelmats(0));
-    modelmats(1) = convertMat(modelmats(1));
+    for (i <- 0 until modelmats.length) {
+      modelmats(i) = convertMat(modelmats(i)); 
+    }
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
     val skipcol = icol((-nskip) to -1) on icol(1 to nskip)
     expt = 1f / (1f - opts.wexpt);
     wordtab = convertMat(max(0, min(ncols+1, iones(nwindow-1, 1) * irow(1 -> (ncols+1)) + skipcol)));  // Indices for convolution matrix
-    wordmask = convertMat(skipcol * iones(1, ncols));                                   // columns = distances from center word
-    randpermute = convertMat(zeros(nwindow-1, ncols));                                    // holds random values for permuting negative context words
-    ubound = convertMat(zeros(1, ncols));                                               // upper bound random matrix
+    wordmask = convertMat(skipcol * iones(1, ncols));                          // columns = distances from center word
+    randpermute = convertMat(zeros(nwindow-1, ncols));                         // holds random values for permuting negative context words
+    ubound = convertMat(zeros(1, ncols));                                      // upper bound random matrix
     minusone = convertMat(irow(-1));
     allones = convertMat(iones(1, ncols));
     randwords = convertMat(zeros(1, (1.01 * opts.nneg * nskip * ncols / opts.nreuse).toInt)); // generates random negative words
-    randsamp = convertMat(zeros(1, ncols));                                             // For sub-sampling frequent words
+    randsamp = convertMat(zeros(1, ncols));                                    // For sub-sampling frequent words
     val gopts = opts.asInstanceOf[ADAGrad.Opts];
     vexp = gopts.vexp.v;
     salpha = opts.wsample * math.log(nfeats).toFloat;
@@ -108,11 +150,18 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	val (words, lb, ub, trandwords, goodwords) = wordMats(gmats, ipass, pos);
 
     	val lrpos = lrate.dv.toFloat;
-    	val lrneg = if (opts.eqPosNeg) lrpos else lrpos/opts.nneg;  
-    	procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
-    	addTime(8);
-    	procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp); 
-    	addTime(9);
+    	val lrneg = if (opts.eqPosNeg) lrpos else lrpos/opts.nneg; 
+    	if (opts.nSlices == 1) {
+    		procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
+    		addTime(8);   	
+    		procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp);    	  	
+    		addTime(9);
+    	} else {
+    		procPositivesSlice(opts.nskip, words, lb, ub, modelmats, lrpos, vexp, opts.iSlice);
+    		addTime(8);   	
+    		procNegativesSlice(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats, lrneg, vexp, opts.iSlice);    	  	
+    		addTime(9);
+    	}
     }
   }
   
@@ -124,7 +173,6 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   	addTime(10,-3);
     val eneg = evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0));
     addTime(11)
-//  	val score = ((epos + eneg / opts.nneg) /opts.nskip / words.ncols);
   	val score = ((epos + eneg / (if (opts.eqPosNeg) 1 else opts.nneg)) / goodwords.length);
   	row(score)
   	} else row(0);
@@ -141,12 +189,11 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val wrat = float(words+1) * salpha;
     wrat ~ sqrt(wrat) + wrat;
     wgood ~ wgood ∘ int(randsamp < wrat);
-    words ~ (wgood ∘ (words + 1)) - 1;                                        // Set OOV or skipped samples to -1
+    words ~ (wgood ∘ (words + 1)) - 1;                                         // Set OOV or skipped samples to -1
     addTime(2);
         
     rand(ubound);                                                              // get random upper and lower bounds   
     val ubrand = min(opts.nskip, int(ubound * opts.nskip) + 1);
-//    println(ubrand.toString)
     val lbrand = - ubrand;
     addTime(3);
     
@@ -162,7 +209,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val (trandwords, contextwords) = (words, lb, ub) match {
       case (giwords:GIMat, gilb:GIMat, giub:GIMat) => {
 
-      	val iwords = minusone \ words \ minusone;                                  // Build a convolution matrix.
+      	val iwords = minusone \ words \ minusone;                              // Build a convolution matrix.
       	val cwords = iwords(wordtab);
       	val pgoodwords = (wordmask >= lb) ∘ (wordmask <= ub) ∘ (cwords >= 0) ∘ (words >= 0);  // Find context words satisfying the bound
       	                                                                           // and check that context and center word are good.
@@ -171,19 +218,19 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	
       	test1 = cwords;
 
-      	rand(randpermute);                                                         // Prepare a random permutation of context words for negative sampling
-      	randpermute ~ (fgoodwords ∘ (randpermute + 1f)) - 1f;                      // set the values for bad words to -1.
-      	val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));         // Permute the good words
-      	val ngood = sum(vv >= 0f).dv.toInt;                                        // Count of the good words
-      	val ngoodcols = ngood / opts.nreuse;                                       // Number of good columns
+      	rand(randpermute);                                                      // Prepare a random permutation of context words for negative sampling
+      	randpermute ~ (fgoodwords ∘ (randpermute + 1f)) - 1f;                   // set the values for bad words to -1.
+      	val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));      // Permute the good words
+      	val ngood = sum(vv >= 0f).dv.toInt;                                     // Count of the good words
+      	val ngoodcols = ngood / opts.nreuse;                                    // Number of good columns
       	val cwi = cwords(ii);
       	
       	test2 = cwi
       	addTime(6);
 
-      	rand(randwords);                                                           // Compute some random negatives
+      	rand(randwords);                                                        // Compute some random negatives
       	val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));    
-      	val trandwords0 = irandwords.view(opts.nneg, ngoodcols);                   // shrink the matrices to the available data
+      	val trandwords0 = irandwords.view(opts.nneg, ngoodcols);                // shrink the matrices to the available data
       	val contextwords0 = cwi.view(opts.nreuse, ngoodcols);
       	addTime(7);
       	(trandwords0, contextwords0)
@@ -250,9 +297,9 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     
     addTime(5);
     
-    val prand = drand(opts.nreuse, ngroups);                             // Rands for permutation
+    val prand = drand(opts.nreuse, ngroups);                                   // Rands for permutation
     
-    var i = 0;                                                           // Permute the good context words randomly
+    var i = 0;                                                                 // Permute the good context words randomly
     val n = prand.length;
     while (i < n) {
       val indx = math.min(n-1, i + math.floor(prand.data(i) * (n - i)).toInt);
@@ -265,9 +312,9 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     }
     addTime(6);
     
-    val randneg = rand(opts.nneg, ngroups);                                // Compute some random negatives
+    val randneg = rand(opts.nneg, ngroups);                                    // Compute some random negatives
 
-    (0 until nthreads).par.map((ithread:Int) => {                          // Work in blocks over the negs
+    (0 until nthreads).par.map((ithread:Int) => {                              // Work in blocks over the negs
       val istart = ((1L * ngroups * opts.nneg * ithread)/nthreads).toInt;
       val iend = ((1L * ngroups * opts.nneg * (ithread + 1))/nthreads).toInt;
       var i = istart;
@@ -292,15 +339,6 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
         if (err != 0)  throw new RuntimeException("CUMACH.word2vecPos error " + cudaGetErrorString(err));
       }
       case (w:IMat, lb:IMat, ub:IMat, m1:FMat, m2:FMat) => if (Mat.useMKL) {
-/*        val gw = GIMat(w);
-        val glb = GIMat(lb);
-        val gub = GIMat(ub);
-        val gm1 = GMat(m1);
-        val gm2 = GMat(m2);
-        val err = CUMACH.word2vecPos(nrows, nwords, nskip, gw.data, glb.data, gub.data, gm1.data, gm2.data, lrate, vexp);
-        m1 <-- gm1
-        m2 <-- gm2
-        if (err != 0) throw new RuntimeException("CUMACH.word2vecEvalPos error " + cudaGetErrorString(err));*/
         CPUMACH.word2vecPos(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
       } else {
         Word2Vec.procPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
@@ -323,6 +361,27 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       } else {
       	Word2Vec.procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
       }
+    }
+  }
+  
+  def procPositivesSlice(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, modelmats:Array[Mat], lrate:Float, vexp:Float, islice:Int) = {
+    val nrows = modelmats(0).nrows;
+    val nwords = words.ncols;
+    Mat.nflops += 6L * nwords * nskip * nrows;
+    (words, lbound, ubound) match {
+      case (w:IMat, lb:IMat, ub:IMat) => 
+      Word2Vec.procPosCPUSlice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, lrate, vexp, Mat.numThreads, 
+          islice, opts.nSlices, maxCols, opts.nHeadTerms);
+    }
+  }
+  
+  def procNegativesSlice(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modelmats:Array[Mat], lrate:Float, vexp:Float, islice:Int) = {
+    val nrows = modelmats(0).nrows;
+    val nwords = wordsa.ncols;
+    Mat.nflops += 6L * nwords * nwa * nwb * nrows;
+    (wordsa, wordsb) match {
+      case (wa:IMat, wb:IMat) => 
+//      Word2Vec.procNegCPUSlice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, lrate, vexp, Mat.numThreads, islice, opts.nSlices, maxCols);
     }
   }
     
@@ -415,6 +474,10 @@ object Word2Vec  {
     var headlen = 10000;
     var iflip = false;
     var eqPosNeg = false;
+    var maxArraySize = 1024*1024*1024;
+    var nHeadTerms = 0; 
+    var nSlices = 1;
+    var iSlice = 0;
   }
   
   class Options extends Opts {}
@@ -469,7 +532,7 @@ object Word2Vec  {
 
     	  				c = 0;
     	  				while (c < nrows) {
-    	  					daa(c) += ascale * cv * B(c + ib);                    // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
+    	  					daa(c) += ascale * cv * B(c + ib);                 // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
     	  					B(c + ib) += bscale * cv * A(c + ia);
     	  					c += 1;
     	  				}
@@ -481,6 +544,92 @@ object Word2Vec  {
     	  	while (c < nrows) {                                        // Add derivative for A to A. 
     	  		A(c + ia) += daa(c);
     	  		c += 1;
+    	  	}
+    	  }
+    	  i += 1;
+    	}
+    });
+    0;
+  }
+  
+  def mapIndx(indx:Int, islice:Int, nslices:Int, nHead:Int, maxCols:Int, nrows:Int):(Int, Int, Boolean, Boolean) = {
+  	val newi = (indx - nHead) / nslices + nHead;                     // new column index
+  	val m = newi / maxCols;                                          // which matrix are we in? 
+  	val ismine = (indx >= nHead) && (indx % nslices == islice);
+  	val ishead = (indx < nHead);
+  	val i = nrows * (newi - m * maxCols);
+  	(m, i, ismine, ishead)
+  }
+
+   def procPosCPUSlice(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
+      modelmats:Array[Mat], lrate:Float, vexp:Float, nthreads:Int, islice:Int, nslices:Int, maxCols:Int, nHead:Int):Int = {
+
+    (0 until nthreads).par.map((ithread:Int) => {
+    	val istart = ((1L * ithread * ncols)/nthreads).toInt;
+    	val iend = ((1L * (ithread+1) * ncols)/nthreads).toInt;
+    	val daa = new Array[Float](nrows);
+    	var i = istart;
+    	while (i < iend) {
+    	  var j = 0;
+    	  var k = 0;
+    	  var c = 0;
+    	  var cv = 0f;
+
+    	  val iac = W(i);
+    	  val ascale = math.pow(1+iac, vexp).toFloat; 
+    	  if (iac >= 0) {                                              // Check for OOV words
+    	    val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
+    	    val A = modelmats(2*ma+1).asInstanceOf[FMat].data;
+    	  	c = 0;
+    	  	while (c < nrows) {                                        // Current word
+    	  		daa(c) = 0;                                              // delta for the A matrix (maps current and negative words). 
+    	  		c += 1;
+    	  	}
+    	  	j = LB(i);
+    	  	var touched = false;
+    	  	while (j <= UB(i)) {                                       // Iterate over neighbors in the skip window
+    	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
+    	  		  val ibc = W(i + j);                                    // Get the context word 
+    	  		  val bscale = math.pow(1+ibc, vexp).toFloat;  
+    	  			if (ibc >= 0) {                                        // check if context word is OOV
+    	  			  val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows);
+    	  				val B = modelmats(2*mb).asInstanceOf[FMat].data;
+    	  				if ((aismine && bishead) || (bismine && aishead)) {
+    	  				  touched = true;
+    	  					c = 0;
+    	  					cv = 0f;
+    	  					while (c < nrows) {                                // Inner product between current and context words. 
+    	  						cv += A(c + ia) * B(c + ib);
+    	  						c += 1;
+    	  					}
+
+    	  					if (cv > 16.0f) {                                  // Apply logistic function with guards
+    	  						cv = 1.0f;
+    	  					} else if (cv < -16.0f) {
+    	  						cv = 0.0f;
+    	  					} else {
+    	  						cv = math.exp(cv).toFloat;
+    	  						cv = cv / (1.0f + cv);
+    	  					}
+    	  					cv = lrate * (1.0f - cv);                          // Subtract prediction from target (1.0), and scale by learning rate. 
+
+    	  					c = 0;
+    	  					while (c < nrows) {
+    	  						daa(c) += ascale * cv * B(c + ib);               // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
+    	  						B(c + ib) += bscale * cv * A(c + ia);
+    	  						c += 1;
+    	  					}
+    	  				}
+    	  			}
+    	  		}
+    	  		j += 1;
+    	  	}
+    	  	if (touched) {
+    	  		c = 0;
+    	  		while (c < nrows) {                                        // Add derivative for A to A. 
+    	  			A(c + ia) += daa(c);
+    	  			c += 1;
+    	  		}
     	  	}
     	  }
     	  i += 1;
@@ -811,6 +960,70 @@ object Word2Vec  {
         opts)
     (nn, opts)
   }
+  
+  // Read a Google Word2Vec model file in binary or text format. 
+  
+  def readGoogleW2V(fname:String, dict:Dict, n:Int, binary:Boolean = false):FMat = {
+    val ins = HMat.getInputStream(fname, 0);
+    val din = new DataInputStream(ins);
+    val sin = new Scanner(din);
+    val header = sin.nextLine
+    val dims = header.split(" ");
+    val nr = dims(0).toInt;
+    val dim = dims(1).toInt;
+    val model = FMat(dim, n);
+
+    var i = 0;
+    while (i < nr) {
+    	val word = sin.next;
+    	val icol = dict(word);
+    	val saveIt = (icol >= 0 && icol < n);
+    	var j = 0;
+    	while (j < dim) {
+    		val v = if (binary) {
+    			din.readFloat;
+    		} else {
+    			sin.nextFloat;
+    		}
+    		if (saveIt) model(j, icol) = v;
+    		j += 1;
+    	}
+    	sin.nextLine;
+    	i += 1;
+    	if (i % 1000 == 0) println("i=%d %s" format (i, word))
+    }
+    model;
+  }
+  
+  // Write a Google Word2Vec model file in binary or text format. 
+  
+  def saveGoogleW2V(dict:CSMat, mod:FMat, fname:String, binary:Boolean = false) = {
+  	val outs = HMat.getOutputStream(fname, 0);
+  	val dout = new DataOutputStream(outs);
+  	val fout = new PrintWriter(dout);
+  	val cr = String.format("\n");
+  	fout.print(mod.ncols.toString + " " + mod.nrows.toString + cr);
+  	fout.flush;
+  	var i = 0;
+  	while (i < mod.ncols) {
+  		fout.print(dict(i)+ " ");
+  		fout.flush;
+  		var nwritten = 0;
+  		var j = 0;
+  		while (j < mod.nrows) {
+  			if (binary) {
+  			  dout.writeFloat(mod(j,i));
+  			} else {
+  			  dout.writeBytes("%g " format mod(j,i));
+  			}
+  			j += 1;
+  		}
+  		i += 1;
+  		dout.writeBytes(cr);
+  	}
+  	dout.close;
+};
+
 }
 
 

@@ -12,30 +12,11 @@ import scala.util.hashing.MurmurHash3;
 import scala.collection.mutable.HashMap;
 
 /**
- * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. There are currently 15 layer types:
- - InputLayer: just a placeholder for the first layer which is loaded with input data blocks. No learnable params. 
- - FCLayer: Fully-Connected Linear layer. Has a matrix of learnable params which is the input-output map. 
- - RectLayer: Rectifying one-to-one layer. No params.
- - GLMLayer: a one-to-one layer with GLM mappings (linear, logistic, abs-logistic and SVM). No learnable params. 
- - NormLayer: normalizing layer that adds a derivative term based on the difference between current layer norm and a target norm. 
-   No learnable params. The target norm and weight of this derivative term can be specified. 
- - DropoutLayer: A layer that implements random dropout. No learnable params, but dropout fraction can be specified. 
- - AddLayer: adds input layers element-wise.
- - MulLayer: multiplies input layers element-wise. Will also perform edge operations (one input can be a scalar). 
- - Softmax: a softmax (normalized exponential) layer.
- - Tanh: Hyperbolic tangent non-linearity.
- - Sigmoid: Logistic function non-linearity.
- - Softplus: smooth ReLU unit. 
- - Ln: natural logarithm
- - Exp: exponential
- - Sum: column-wise sum
+ * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. 
  *
- * The network topology is specified by opts.layers which is a sequence of "LayerSpec" objects. There is a LayerSpec
- * Class for each Layer class, which holds the params for defining that layer. Currently only four LayerSpec types need params:
- - FC: "outside" holds the output dimensions of the FClayer (input dimension set by previous layer). 
- - GLM: "links" holds the links matrix (integer specs for loss types, see GLM), for the output of that layer. Its size should match the number of targets.
- - Norm: "targetNorm" holds a target per-element norm, and "weight" is the weight for this term in the derivative calculation.
- - Dropout: "frac" holds the fraction of neurons to retain.
+ * The network topology is specified by opts.layers which is a sequence of "LayerOptions" objects. There is a LayerOptions
+ * Class for each Layer class, which holds the params for defining that layer. There is also an inputs parameter which points
+ * to the set of Layer.Options instances that mirror the final network structure. 
  *
  */
 
@@ -51,26 +32,49 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   override def init() = {
 	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
-	  datasource.reset;
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
-	  if (refresh) {
+	  createLayers;
+	  if (modelMap == null) {
 	  	modelMap = HashMap();
 	  	imodel = 0;
-	  	layers.map({
-	  	    case mlayer:ModelLayer => mlayer.imodel = mlayer.getModelMat(this, mlayer.opts.modelName, mlayer.opts.imodel);
-	  	    case _ => {}
-	  	});
-	  	setmodelmats(new Array[Mat](imodel));
-	  	updatemats = new Array[Mat](modelmats.length);
+	  	layers.map(_.getModelMats(this));
 	  }
+	  if (refresh) {
+	  	setmodelmats(new Array[Mat](imodel));
+	  }
+	  if (updatemats == null) updatemats = new Array[Mat](modelmats.length);
+	  for (i <- 0 until modelmats.length) {
+	  	if (modelmats(i).asInstanceOf[AnyRef] != null) modelmats(i) = convertMat(modelmats(i));
+	  	if (updatemats(i).asInstanceOf[AnyRef] != null) updatemats(i) = convertMat(updatemats(i));
+	  };
+	  if (useGPU) copyMats(mats, gmats);
+	  val pb = putBack;
+	  putBack = -1;
+    evalbatch(gmats, 0, 0);
+    putBack = pb;
+	  datasource.reset;
+  }
+  
+  def createLayers = {
+    val layerOptionss = opts.layers.layerOptionss;
+    layers = new Array[Layer](opts.layers.nlayers);
+    for (i <- 0 until opts.layers.nlayers) {
+      layers(i) = layerOptionss(i).create(this);
+      layerOptionss(i).myLayer = layers(i);
+    }
+    for (i <- 0 until opts.layers.nlayers) {
+    	for (j <- 0 until layerOptionss(i).inputs.length) {
+    		if (layerOptionss(i).inputs(j) != null) layers(i).setinput(j, layerOptionss(i).inputs(j).myLayer);
+    	}
+    }
   }
   
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
-    	layers(0).outputs(0) = gmats(0);
+    	layers(0).output = gmats(0);
     	if (targmap.asInstanceOf[AnyRef] != null) {
     		layers(layers.length-1).target = targmap * gmats(0);
     	} else {
@@ -98,7 +102,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
   	if (batchSize < 0) batchSize = gmats(0).ncols;
-    layers(0).outputs(0) = extendData(gmats(0), batchSize);
+    layers(0).output = extendData(gmats(0), batchSize);
     val targ = extendData(if (targmap.asInstanceOf[AnyRef] != null && putBack < 0) {
     	targmap * gmats(0);
     } else {
@@ -161,6 +165,7 @@ object Net  {
     var constFeat:Boolean = false;
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
+    var layers:LayerOptions = null;
   }
   
   class Options extends Opts {}
@@ -168,106 +173,100 @@ object Net  {
   
   /**
    * Build a net with a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are FC alternating with ReLU, starting and ending with FC. 
+   * Intermediate layers are Linear alternating with Rect, starting and ending with Linear. 
    * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Net = {
-    val net = new Net;
+  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
-    val layers = new Array[Layer](depth);
-    net.layers = layers;
+    val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = InputLayer(net);
+    layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = LinLayer(layers(i-1), net, "", 0, w, opts.constFeat, opts.aopts);
+    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
-    	    case 1 => layers(i) = TanhLayer(layers(i-1), net);
-    	    case 2 => layers(i) = SigmoidLayer(layers(i-1), net);
-    	    case 3 => layers(i) = ReLULayer(layers(i-1), net);
-    	    case 4 => layers(i) = SoftplusLayer(layers(i-1), net);
+    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
     	  }
     	}
     }
-    layers(depth-2) = LinLayer(layers(depth-3), net, "", 0, ntargs, opts.constFeat, opts.aopts);
-    layers(depth-1) = GLMLayer(layers(depth-2), net, opts.links);
-    net
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers;
   }
   
   /**
    * Build a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are FC, ReLU, Norm, starting and ending with FC. 
-   * First FC layer width is given as an argument, then it tapers off by taper.
+   * Intermediate layers are linear, Rect, Norm, starting and ending with Linear. 
+   * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Net = {
-    val net = new Net;
+  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
     val depth = (depth0/3)*3;              // Round up to an odd number of layers 
-    val layers = new Array[Layer](depth);
-    net.layers = layers;
+    val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = InputLayer(net);
+    layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = LinLayer(layers(i-1), net, "", 0, w, opts.constFeat, opts.aopts);
+    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
-    	    case 1 => layers(i) = TanhLayer(layers(i-1), net);
-    	    case 2 => layers(i) = SigmoidLayer(layers(i-1), net);
-    	    case 3 => layers(i) = ReLULayer(layers(i-1), net);
-    	    case 4 => layers(i) = SoftplusLayer(layers(i-1), net);
+    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
     	  }
     	} else {
-    		layers(i) = NormLayer(layers(i-1), net, opts.targetNorm, opts.nweight);
+    		layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = LinLayer(layers(depth-3), net, "", 0, ntargs, opts.constFeat, opts.aopts);
-    layers(depth-1) = GLMLayer(layers(depth-2), net, opts.links);
-    net
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat = opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers;
   }
   
   /**
    * Build a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are FC, ReLU, Norm, Dropout, starting and ending with FC. 
-   * First FC layer width is given as an argument, then it tapers off by taper.
+   * Intermediate layers are Linear, Rect, Norm, Dropout, starting and ending with Linear. 
+   * First Linear layer width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):Net = {
-    val net = new Net;
-    val depth = (depth0/4)*4 - 1;              // Round up to an odd number of layers 
-    val layers = new Array[Layer](depth);
-    net.layers = layers;
+  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
+    val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of layers 
+    val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = InputLayer(net);
+    layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	(i % 4) match {
     	  case 1 => {
-    	  	layers(i) = LinLayer(layers(i-1), net, "", 0, w, opts.constFeat, opts.aopts);
+    	  	layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
     	  	w = (taper*w).toInt;
     	  }
     	  case 2 => {
     	  	nonlin match {
-    	  	case 1 => layers(i) = TanhLayer(layers(i-1), net);
-    	  	case 2 => layers(i) = SigmoidLayer(layers(i-1), net);
-    	  	case 3 => layers(i) = ReLULayer(layers(i-1), net);
-    	  	case 4 => layers(i) = SoftplusLayer(layers(i-1), net);
+    	  	case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
     	  	}
     	  }
     	  case 3 => {
-    	  	layers(i) = NormLayer(layers(i-1), net, opts.targetNorm, opts.nweight);
-    	  }
+    	  	layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+      }
     	  case _ => {
-    	  	layers(i) = DropoutLayer(layers(i-1), net, opts.dropout);
+    	  	layers(i) = new DropoutLayer.Options{inputs(0) = layers(i-1); frac = opts.dropout};
     	  }
     	}
     }
-    layers(depth-2) = LinLayer(layers(depth-3), net, "", 0, ntargs, opts.constFeat, opts.aopts);
-    layers(depth-1) = GLMLayer(layers(depth-2), net, opts.links);
-    net
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers;
   }
   
   def mkNetModel(fopts:Model.Opts) = {
@@ -285,14 +284,15 @@ object Net  {
   class LearnOptions extends Learner.Options with Net.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, targ:Mat) = {
-    val opts = new LearnOptions
-    if (opts.links == null) opts.links = izeros(1,targ.nrows)
-    opts.links.set(1)
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    val net = dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
+    val opts = new LearnOptions;
+    if (opts.links == null) {
+      opts.links = izeros(1,targ.nrows);
+      opts.links.set(1);
+    }
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
   	    new MatDS(Array(mat0, targ), opts), 
-  	    net, 
+  	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
@@ -300,14 +300,13 @@ object Net  {
   }
   
   def learnerX(mat0:Mat, targ:Mat) = {
-    val opts = new LearnOptions
-    if (opts.links == null) opts.links = izeros(1,targ.nrows)
-    opts.links.set(1)
+    val opts = new LearnOptions;
+    opts.links = izeros(1,targ.nrows);
+    opts.links.set(1);
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    val net = dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   	    new MatDS(Array(mat0, targ), opts), 
-  	    net, 
+  	    new Net(opts), 
   	    null,
   	    null, 
   	    opts)
@@ -322,16 +321,15 @@ object Net  {
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
 
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
-    val opts = new FDSopts
+    val opts = new FDSopts;
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
     val ds = new FilesDS(opts)
-    val net = dlayers(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
-  	    net, 
+  	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
@@ -353,7 +351,7 @@ object Net  {
     val net = dlayers(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
-  	    net, 
+  	    new Net(opts), 
   	    null,
   	    null, 
   	    opts)
@@ -362,15 +360,16 @@ object Net  {
   
   def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
     val model = model0.asInstanceOf[Net];
+    val mopts = model.opts;
     val opts = new LearnOptions;
-    opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.links = model.opts.links;
-    opts.addConstFeat = model.opts.asInstanceOf[DataSource.Opts].addConstFeat;
+    opts.batchSize = math.min(10000, mat0.ncols/30 + 1);
+    opts.links = mopts.links;
+    opts.layers = mopts.layers;
+    opts.addConstFeat = mopts.asInstanceOf[DataSource.Opts].addConstFeat;
     opts.putBack = 1;
     opts.dropout = 1f;
     
     val newmod = new Net(opts);
-    newmod.layers = model.layers;
     newmod.refresh = false;
     newmod.copyFrom(model)
     val nn = new Learner(

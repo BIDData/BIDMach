@@ -77,6 +77,12 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
 	  	  (0 until opts.layers(i).inputs.length).map((j:Int) => layers(i).inputs(j) = opts.layers(i).inputs(j).myLayer.asInstanceOf[DNN.this.Layer]);
 	  	} 
 	  }
+	  if (useGPU) copyMats(mats, gmats);
+	  val pb = putBack;
+	  putBack = -1;
+    evalbatch(gmats, 0, 0);
+    putBack = pb;
+	  datasource.reset;
   }
   
   
@@ -925,17 +931,18 @@ object DNN  {
   
   def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
     val model = model0.asInstanceOf[DNN];
+    val mopts = model.opts;
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    opts.links = model.opts.links;
-    opts.layers = model.opts.layers;
+    opts.links = mopts.links;
+    opts.layers = mopts.layers;
     opts.addConstFeat = model.opts.asInstanceOf[DataSource.Opts].addConstFeat;
     opts.putBack = 1;
     opts.dropout = 1f;
     
     val newmod = new DNN(opts);
     newmod.refresh = false;
-    newmod.copyFrom(model)
+    newmod.copyFrom(model);
     val nn = new Learner(
         new MatDS(Array(mat0, preds), opts), 
         newmod, 

@@ -7,12 +7,12 @@ val (nn, opts) = Word2Vec.learner(mdir+"data%03d.imat.lz4");
 opts.nstart = 0;
 opts.nend = 7;
 opts.npasses = 3;
-opts.batchSize = 1000000;
+opts.batchSize = 100000;
 opts.lrate = 1e-3f
 opts.vexp = 0.5f
 opts.nreuse = 5
 opts.dim = 300
-opts.vocabSize = 1000000
+opts.vocabSize = 200000
 
 //opts.useGPU = false;
 opts.autoReset = false;
