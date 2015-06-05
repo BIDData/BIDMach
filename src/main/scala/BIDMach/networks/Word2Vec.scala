@@ -39,6 +39,13 @@ import java.util.Scanner
  - iflip(false) true if word and sentence IDs flipped (sentence ID in first row, word ID in second). 
  - eqPosNeg(false) normalize positive and negative word weights in the likelihood. 
  - aopts:ADAGrad.Opts(null) set this to an ADAGRAD.Opts object to use integrated adagrad updates. 
+ *
+ * The code has the ability to build models larger than a single Java array, and bigger than a single node can store. 
+ * These options control performance in the case of models that must be distributed across multiple arrays and/or multiple machines
+ - maxArraySize(1024^3) the maximum size in words of a model array.
+ - nHeadTerms(0) the size of the head of the model - these terms are not changed.
+ - nSlices(1) Process (num) slices of the model on (num) nodes.
+ - iSlice(0) which model slice are we processing on this node?
  */
 
 class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends Model(opts) {
@@ -59,6 +66,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var expt = 0f;
   var vexp = 0f;
   var salpha = 0f;
+  var maxCols = 0;
   
   var ntimes = 12;
   var times:FMat = null;
@@ -87,26 +95,39 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val mats = datasource.next;
 	  nfeats = opts.vocabSize;
 	  ncols = mats(0).ncols;
+	  maxCols = opts.maxArraySize / opts.dim;
 	  datasource.reset;
     if (refresh) {
-    	setmodelmats(new Array[Mat](2));
-    	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;              // syn0 - context model
-    	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
+      if (nfeats <= maxCols) {
+      	setmodelmats(new Array[Mat](2));
+      	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;              // syn0 - context model
+      	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
+      } else {
+        val actualFeats = opts.nHeadTerms + 1 + (nfeats - opts.nHeadTerms - 1) / opts.nSlices;   // Number of features on this node. 
+        val nmmats = 1 + (actualFeats - 1)/maxCols;                           // number of model mats needed
+        setmodelmats(new Array[Mat](2 * nmmats));
+        for (i <- 0 until nmmats) {
+          val xfeats = if (i < nmmats - 1) maxCols else nfeats - (nmmats - 1) * maxCols;
+        	modelmats(2 * i) = (rand(opts.dim, xfeats) - 0.5f)/opts.dim;              
+        	modelmats(2 * i + 1) = zeros(opts.dim, xfeats);
+        }
+      }
     }
-    modelmats(0) = convertMat(modelmats(0));
-    modelmats(1) = convertMat(modelmats(1));
+    for (i <- 0 until modelmats.length) {
+      modelmats(i) = convertMat(modelmats(i)); 
+    }
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
     val skipcol = icol((-nskip) to -1) on icol(1 to nskip)
     expt = 1f / (1f - opts.wexpt);
     wordtab = convertMat(max(0, min(ncols+1, iones(nwindow-1, 1) * irow(1 -> (ncols+1)) + skipcol)));  // Indices for convolution matrix
-    wordmask = convertMat(skipcol * iones(1, ncols));                                   // columns = distances from center word
-    randpermute = convertMat(zeros(nwindow-1, ncols));                                    // holds random values for permuting negative context words
-    ubound = convertMat(zeros(1, ncols));                                               // upper bound random matrix
+    wordmask = convertMat(skipcol * iones(1, ncols));                          // columns = distances from center word
+    randpermute = convertMat(zeros(nwindow-1, ncols));                         // holds random values for permuting negative context words
+    ubound = convertMat(zeros(1, ncols));                                      // upper bound random matrix
     minusone = convertMat(irow(-1));
     allones = convertMat(iones(1, ncols));
     randwords = convertMat(zeros(1, (1.01 * opts.nneg * nskip * ncols / opts.nreuse).toInt)); // generates random negative words
-    randsamp = convertMat(zeros(1, ncols));                                             // For sub-sampling frequent words
+    randsamp = convertMat(zeros(1, ncols));                                    // For sub-sampling frequent words
     val gopts = opts.asInstanceOf[ADAGrad.Opts];
     vexp = gopts.vexp.v;
     salpha = opts.wsample * math.log(nfeats).toFloat;
@@ -130,13 +151,17 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
 
     	val lrpos = lrate.dv.toFloat;
     	val lrneg = if (opts.eqPosNeg) lrpos else lrpos/opts.nneg; 
-    	procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
-    	cudaDeviceSynchronize();
-    	addTime(8);   	
-    	procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp); 
-    	cudaDeviceSynchronize();   	  	
-    	addTime(9);
-
+    	if (opts.nSlices == 1) {
+    		procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
+    		addTime(8);   	
+    		procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp);    	  	
+    		addTime(9);
+    	} else {
+    		procPositivesSlice(opts.nskip, words, lb, ub, modelmats, lrpos, vexp, opts.iSlice);
+    		addTime(8);   	
+    		procNegativesSlice(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats, lrneg, vexp, opts.iSlice);    	  	
+    		addTime(9);
+    	}
     }
   }
   
@@ -338,6 +363,27 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       }
     }
   }
+  
+  def procPositivesSlice(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, modelmats:Array[Mat], lrate:Float, vexp:Float, islice:Int) = {
+    val nrows = modelmats(0).nrows;
+    val nwords = words.ncols;
+    Mat.nflops += 6L * nwords * nskip * nrows;
+    (words, lbound, ubound) match {
+      case (w:IMat, lb:IMat, ub:IMat) => 
+      Word2Vec.procPosCPUSlice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, lrate, vexp, Mat.numThreads, 
+          islice, opts.nSlices, maxCols, opts.nHeadTerms);
+    }
+  }
+  
+  def procNegativesSlice(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modelmats:Array[Mat], lrate:Float, vexp:Float, islice:Int) = {
+    val nrows = modelmats(0).nrows;
+    val nwords = wordsa.ncols;
+    Mat.nflops += 6L * nwords * nwa * nwb * nrows;
+    (wordsa, wordsb) match {
+      case (wa:IMat, wb:IMat) => 
+//      Word2Vec.procNegCPUSlice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, lrate, vexp, Mat.numThreads, islice, opts.nSlices, maxCols);
+    }
+  }
     
   def evalPositives(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, model1:Mat, model2:Mat):Double = {
     val nrows = model1.nrows;
@@ -428,6 +474,10 @@ object Word2Vec  {
     var headlen = 10000;
     var iflip = false;
     var eqPosNeg = false;
+    var maxArraySize = 1024*1024*1024;
+    var nHeadTerms = 0; 
+    var nSlices = 1;
+    var iSlice = 0;
   }
   
   class Options extends Opts {}
@@ -494,6 +544,92 @@ object Word2Vec  {
     	  	while (c < nrows) {                                        // Add derivative for A to A. 
     	  		A(c + ia) += daa(c);
     	  		c += 1;
+    	  	}
+    	  }
+    	  i += 1;
+    	}
+    });
+    0;
+  }
+  
+  def mapIndx(indx:Int, islice:Int, nslices:Int, nHead:Int, maxCols:Int, nrows:Int):(Int, Int, Boolean, Boolean) = {
+  	val newi = (indx - nHead) / nslices + nHead;                     // new column index
+  	val m = newi / maxCols;                                          // which matrix are we in? 
+  	val ismine = (indx >= nHead) && (indx % nslices == islice);
+  	val ishead = (indx < nHead);
+  	val i = nrows * (newi - m * maxCols);
+  	(m, i, ismine, ishead)
+  }
+
+   def procPosCPUSlice(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
+      modelmats:Array[Mat], lrate:Float, vexp:Float, nthreads:Int, islice:Int, nslices:Int, maxCols:Int, nHead:Int):Int = {
+
+    (0 until nthreads).par.map((ithread:Int) => {
+    	val istart = ((1L * ithread * ncols)/nthreads).toInt;
+    	val iend = ((1L * (ithread+1) * ncols)/nthreads).toInt;
+    	val daa = new Array[Float](nrows);
+    	var i = istart;
+    	while (i < iend) {
+    	  var j = 0;
+    	  var k = 0;
+    	  var c = 0;
+    	  var cv = 0f;
+
+    	  val iac = W(i);
+    	  val ascale = math.pow(1+iac, vexp).toFloat; 
+    	  if (iac >= 0) {                                              // Check for OOV words
+    	    val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
+    	    val A = modelmats(2*ma+1).asInstanceOf[FMat].data;
+    	  	c = 0;
+    	  	while (c < nrows) {                                        // Current word
+    	  		daa(c) = 0;                                              // delta for the A matrix (maps current and negative words). 
+    	  		c += 1;
+    	  	}
+    	  	j = LB(i);
+    	  	var touched = false;
+    	  	while (j <= UB(i)) {                                       // Iterate over neighbors in the skip window
+    	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
+    	  		  val ibc = W(i + j);                                    // Get the context word 
+    	  		  val bscale = math.pow(1+ibc, vexp).toFloat;  
+    	  			if (ibc >= 0) {                                        // check if context word is OOV
+    	  			  val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows);
+    	  				val B = modelmats(2*mb).asInstanceOf[FMat].data;
+    	  				if ((aismine && bishead) || (bismine && aishead)) {
+    	  				  touched = true;
+    	  					c = 0;
+    	  					cv = 0f;
+    	  					while (c < nrows) {                                // Inner product between current and context words. 
+    	  						cv += A(c + ia) * B(c + ib);
+    	  						c += 1;
+    	  					}
+
+    	  					if (cv > 16.0f) {                                  // Apply logistic function with guards
+    	  						cv = 1.0f;
+    	  					} else if (cv < -16.0f) {
+    	  						cv = 0.0f;
+    	  					} else {
+    	  						cv = math.exp(cv).toFloat;
+    	  						cv = cv / (1.0f + cv);
+    	  					}
+    	  					cv = lrate * (1.0f - cv);                          // Subtract prediction from target (1.0), and scale by learning rate. 
+
+    	  					c = 0;
+    	  					while (c < nrows) {
+    	  						daa(c) += ascale * cv * B(c + ib);               // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
+    	  						B(c + ib) += bscale * cv * A(c + ia);
+    	  						c += 1;
+    	  					}
+    	  				}
+    	  			}
+    	  		}
+    	  		j += 1;
+    	  	}
+    	  	if (touched) {
+    	  		c = 0;
+    	  		while (c < nrows) {                                        // Add derivative for A to A. 
+    	  			A(c + ia) += daa(c);
+    	  			c += 1;
+    	  		}
     	  	}
     	  }
     	  i += 1;
