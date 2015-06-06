@@ -203,7 +203,7 @@ class BayesNet(val dag:Mat,
   def evalfun(sdata:Mat, user:Mat):FMat = {  
     val index = int(cptOffset + (user.t * iproject).t)
     val cptNormalized = mm / (mm.t * normConstMatrix).t
-    return FMat( sum(sum(ln(cptNormalized(index)),1),2) )
+    return FMat( sum(sum(ln(cptNormalized(index)),1),2) ) / sdata.ncols
   }
   
   // -----------------------------------
