@@ -19,10 +19,13 @@ import scala.collection.mutable._
  * The input needs to be (1) a graph, (2) a sparse data matrix, and (3) a states-per-node file
  * 
  * This is still a WIP. Once we get it working, we need to check for opts.nsamples to cool.
+ * 
+ * Update: the tdata is the testing set.
  */
 class BayesNet(val dag:Mat, 
                val states:Mat, 
-               override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
+               override val opts:BayesNet.Opts = new BayesNet.Options,
+               val tdata:Mat) extends Model(opts) {
 
   var mm:Mat = null                         // Local copy of the cpt
   var cptOffset:Mat = null                  // For global variable offsets
@@ -94,10 +97,11 @@ class BayesNet(val dag:Mat,
     if (ipass % 5 == 0) {
       val a = mm / (mm.t * normConstMatrix).t
       println("\nDebugging notice: here is the normalized model matrix:")
-      println( a )
+      println(a.t)
     }
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
+    predict(gmats(0),ipass) // Remove this if we don't want to predict
   }
   
   /** Calls a uupdate/evalfunsequence. Known data is in gmats(0), sampled data is in gmats(1). */
@@ -205,6 +209,108 @@ class BayesNet(val dag:Mat,
   // -----------------------------------
   // Various debugging or helper methods
   // -----------------------------------
+  
+  /**
+   * Predict on the testing data and reports the percentage correct. This gets called in dobatch(),
+   * after the uupdate/mupdate step, but for pass k over the data, it relies on the computed model
+   * matrix from the first k-1 passes. (The first batch uses the uniform cpt.) Thus, the cptNormalized
+   * matrix is basically what the current sampling information is going to use.
+   * 
+   * But how do we actually decide what state to assign for a given variable-column combination? We
+   * need to take our training data, sdata, and do one round of sampling. This sampling will be based
+   * on the current model mat CPT, so that will "improve" the sampling somewhat. But the only reason
+   * to do this is because we need to have ALL variables assigned in any column to safely perform
+   * inference. We create a predictedStates matrix that contains, for each column, the most likely
+   * variable assignments based on the original sampling procedure. That is compared with the tdata.
+   * 
+   * This is a temporary fix, because it is probably better to use the Learner's predict method. It
+   * also does not cache (well).
+   */
+  def predict(sdata:Mat, k:Int) = {
+    val cptNormalized = modelmats(0) / (modelmats(0).t * normConstMatrix).t
+    val predictedStates = sampleForTesting(sdata)
+    val (r,c,v) = find3(tdata.asInstanceOf[SMat])
+    var correct = 0f
+    var total = 0f
+    for (i <- 0 until tdata.nnz) {
+      val ri = r(i).toInt
+      val ci = c(i).toInt
+      val predictedState = predictedStates(IMat(ri),ci).dv.toInt
+      val actualState = v(i)-1 // Remember, have to do -1
+      if (predictedState == actualState.toInt) {
+        correct = correct + 1
+      }
+      total = total + 1
+    }
+    println("Before pass " + k + ", test-set prediction accuracy is " + correct/total)
+  }
+  
+  /**
+   * Fills in the test data, similar to the normal uupdate. Uses the same pre-computed matrices.
+   */
+  def sampleForTesting(sdata:Mat) : Mat = {
+    val state = convertMat(rand(sdata.nrows, sdata.ncols))
+    state <-- min( int(statesPerNode ∘ state), statesPerNode-1 )
+    val data = full(sdata)
+    val select = data > 0
+    val user = (select ∘ (data-1)) + ((1-select) ∘ state)
+    val usertrans = user.t
+
+    for (c <- 0 until graph.ncolors) {
+      // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
+      usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
+      val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
+      val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
+      val probabilities = ln(mm(replicatedOffsetMatrix))
+      val combinedProbabilities = exp(probabilities * colorInfo(c).combinationMatrix)
+
+      // Now we can sample for each color in this color group.
+      for (i <- 0 until colorInfo(c).numNodes) {
+        if (useGPUnow) {
+          val start = colorInfo(c).startingIndices(i).dv.toInt
+          val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
+          val probs = float(combinedProbabilities(?, start until start+numStates).t)
+          val samples = zeroMap( (probs.nrows, probs.ncols) )
+          multinomial(probs.nrows, probs.ncols, probs.asInstanceOf[GMat].data, 
+                      samples.asInstanceOf[GIMat].data, sum(probs,1).asInstanceOf[GMat].data, 1)
+          val (maxVals, indices) = maxi2( float(samples) ) 
+          usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
+        } else {
+          // TODO for now I'll randomly put samples here because we don't have a CPU multinomial sampler
+          val indices = IMat(rand(usertrans.nrows,1) * statesPerNode(i) * 0.9999999)
+          usertrans(?, colorInfo(c).idsInColor(i)) = FMat(indices)
+        }
+      }
+
+      // After we finish sampling with this color group, we override the known values.
+      user ~ usertrans.t
+      user ~ (select *@ (data-1)) + ((1-select) *@ user)
+      usertrans <-- user.t
+    }     
+    
+    // "user" is now a full (variable x sample) matrix with a valid variable assignment. For each
+    // row/column combination, we must pick the single most likely number probabilistically.
+    val result = user.copy
+    for (c <- 0 until graph.ncolors) {
+      usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
+      val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
+      val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
+      val probabilities = ln(mm(replicatedOffsetMatrix))
+      val combinedProbabilities = exp(probabilities * colorInfo(c).combinationMatrix)
+      for (i <- 0 until colorInfo(c).numNodes) {
+        val start = colorInfo(c).startingIndices(i).dv.toInt
+        val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
+        val probs = float(combinedProbabilities(?, start until start+numStates)) // Note: no transpose
+        val (v,indices) = maxi2(probs,2) // DIFFERENCE HERE, we can just take the max probability
+        usertrans(?, colorInfo(c).idsInColor(i)) = float(indices)
+      }
+      user ~ usertrans.t
+      user ~ (select *@ (data-1)) + ((1-select) *@ user)
+      usertrans <-- user.t
+    }
+    return result
+  }
+  
   
   /** 
    * Determines a variety of information for this color group, and stores it in a ColorGroup object. 
@@ -446,8 +552,10 @@ object BayesNet  {
    * val (nn,opts) = BayesNet.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
    * 
    * I believe this requires the data to fit in memory.
+   * 
+   * UPDATE: As a temporary work-around, let us put in the tdata matrix.
    */
-  def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
+  def learner(statesPerNode:Mat, dag:Mat, data:Mat, tdata:Mat) = {
 
     class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
@@ -461,7 +569,7 @@ object BayesNet  {
 
     val nn = new Learner(
         new MatDS(Array(data:Mat, secondMatrix), opts),
-        new BayesNet(SMat(dag), statesPerNode, opts),
+        new BayesNet(SMat(dag), statesPerNode, opts, tdata),
         null,
         new IncNorm(opts),
         opts)
