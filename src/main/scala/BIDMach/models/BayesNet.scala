@@ -35,7 +35,7 @@ class BayesNet(val dag:Mat,
   var statesPerNode:Mat = null              // Variables can have an arbitrary number of states
   var colorInfo:Array[ColorGroup] = null    // Gives us, for each color, a colorStuff class (of arrays)
   var zeroMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a zero matrix (to avoid allocation)
-  var normConstMatrix:Mat = null            // For debugging if needed. Do cpt / (nConstMat * cpt).
+  var normConstMatrix:Mat = null            // Normalizes the cpt. Do cpt / (cpt.t * nConstMat).t
   var useGPUnow:Boolean = false             // NOTE: Ideally, we will NOT need to use this at all!
   var batchSize:Int = -1
   var lastBatchSize:Int = -1
@@ -62,13 +62,20 @@ class BayesNet(val dag:Mat,
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
     
-    // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize w/ones.
+    // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cptOffset = convertMat(cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
-    val cpt = convertMat(ones(lengthCPT,1))
+    val cpt = convertMat(rand(lengthCPT,1))
+    
+    // To finish building CPT, we normalize it based on the batch size and normalizing constant matrix.
+    normConstMatrix = getNormConstMatrix(lengthCPT)
+    cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
+    val mats = datasource.next
+    cpt <-- (cpt * mats(0).ncols)
+    datasource.reset
     setmodelmats(new Array[Mat](1))
     modelmats(0) = cpt
     mm = modelmats(0)
@@ -85,7 +92,6 @@ class BayesNet(val dag:Mat,
     // To wrap it up, create/convert a few matrices, reset some variables, and add some debugging info
     zeroVector = mm.izeros(mm.length, 1)
     counts = mm.izeros(mm.length, 1)
-    normConstMatrix = getNormConstMatrix(lengthCPT)
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
     lastBatchSize = -1
@@ -94,14 +100,16 @@ class BayesNet(val dag:Mat,
    
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    if (ipass % 5 == 0) {
-      val a = mm / (mm.t * normConstMatrix).t
-      println("\nDebugging notice: here is the normalized model matrix:")
-      println(a.t)
-    }
+    //if (ipass % 5 == 0) {
+    val a = mm / (mm.t * normConstMatrix).t
+    println("\n\n\n\n\nDebugging notice: here is the normalized model matrix:\n" + a.t)
+    println("Here is the un-normalized model matrix:\n" + mm.t)
+    println("Note that size(mm) = " + size(mm))
+    println("Also GPUmem: " + GPUmem)
+    //}
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
-    predict(gmats(0),ipass) // Remove this if we don't want to predict
+    // predict(gmats(0),ipass) // Remove this if we don't want to predict
   }
   
   /** Calls a uupdate/evalfunsequence. Known data is in gmats(0), sampled data is in gmats(1). */
@@ -134,6 +142,7 @@ class BayesNet(val dag:Mat,
       val data = full(sdata)
       val select = data > 0
       user ~ (select ∘ (data-1)) + ((1-select) ∘ state)
+      println("Here is the user matrix after initializing it in the first pass:\n" + user)
     }
     val usertrans = user.t
 
@@ -141,23 +150,53 @@ class BayesNet(val dag:Mat,
       for (c <- 0 until graph.ncolors) {
 
         // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
+        //println("In this color group, variables are: " + colorInfo(c).idsInColor.t)
+        //println("In this color group, variables + children are: " + colorInfo(c).chIdsInColor.t)
         usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
+        //println("Here's an intermediate one, offset matrix WITHOUT global offsets")
+        //println(usertrans * colorInfo(c).iprojectSliced)
         val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
+        //println("size(offsetMatrix) = " + size(offsetMatrix))
+        //println("offsetMatrix:\n" + offsetMatrix)
         val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
-        val probabilities = ln(mm(replicatedOffsetMatrix))
-        val combinedProbabilities = exp(probabilities * colorInfo(c).combinationMatrix)
+        //println("size(replicatedOffsetMatrix) = " + size(replicatedOffsetMatrix))
+        //println("replicatedOffsetMatrix:\n" + replicatedOffsetMatrix)
+        println("mm.t = " + mm.t)
+        val mmNorm = mm / (mm.t * normConstMatrix).t
+        println("mmNorm.t = " + mmNorm.t)
+        val logProbs = ln(mmNorm(replicatedOffsetMatrix))
+        //val probabilities = ln(mm(replicatedOffsetMatrix))
+        //val logProbs = ln(probabilities)
+        println("size(logProbs) = " + size(logProbs))
+        println("logProbs:\n" + logProbs)
+        //val a = probabilities * colorInfo(c).combinationMatrix
+        //println("size(a) = " + size(a))
+        //println("a:\n" + a)
+        //val combinedProbabilities = exp(a)
+        //val combinedProbabilities = exp(probabilities * colorInfo(c).combinationMatrix)
+        println(logProbs * colorInfo(c).combinationMatrix)
+        val combinedProbabilities = exp(logProbs * colorInfo(c).combinationMatrix)
+        //println("size(combinedProbabilities) = " + size(combinedProbabilities))
+        //println("combinedProbabilities:\n" + combinedProbabilities)
 
         // Now we can sample for each color in this color group.
         for (i <- 0 until colorInfo(c).numNodes) {
           if (useGPUnow) {
             val start = colorInfo(c).startingIndices(i).dv.toInt
             val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
-            val probs = float(combinedProbabilities(?, start until start+numStates).t)
+            val probs = max( float(combinedProbabilities(?, start until start+numStates).t), 1e-35) // TODO temp workaround
             val samples = zeroMap( (probs.nrows, probs.ncols) )
             multinomial(probs.nrows, probs.ncols, probs.asInstanceOf[GMat].data, 
                         samples.asInstanceOf[GIMat].data, sum(probs,1).asInstanceOf[GMat].data, 1)
             val (maxVals, indices) = maxi2( float(samples) ) 
             usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
+
+            println("We are sampling node " + colorInfo(c).startingIndices(i))
+            println("(un-normalized) probs =\n" + probs) 
+            println("samples =\n" + samples)
+            println("indices =\n" + indices)
+            if (i == 5) sys.exit
+
           } else {
             // TODO for now I'll randomly put samples here because we don't have a CPU multinomial sampler
             val indices = IMat(rand(usertrans.nrows,1) * statesPerNode(i) * 0.9999999)
@@ -166,7 +205,7 @@ class BayesNet(val dag:Mat,
         }
 
         // After we finish sampling with this color group, we override the known values.
-        user ~ usertrans.t
+        user <-- usertrans.t
         val data = full(sdata)
         val select = data > 0
         user ~ (select *@ (data-1)) + ((1-select) *@ user)
@@ -283,7 +322,7 @@ class BayesNet(val dag:Mat,
       }
 
       // After we finish sampling with this color group, we override the known values.
-      user ~ usertrans.t
+      user <-- usertrans.t
       user ~ (select *@ (data-1)) + ((1-select) *@ user)
       usertrans <-- user.t
     }     
@@ -304,7 +343,7 @@ class BayesNet(val dag:Mat,
         val (v,indices) = maxi2(probs,2) // DIFFERENCE HERE, we can just take the max probability
         usertrans(?, colorInfo(c).idsInColor(i)) = float(indices)
       }
-      user ~ usertrans.t
+      user <-- usertrans.t
       user ~ (select *@ (data-1)) + ((1-select) *@ user)
       usertrans <-- user.t
     }
@@ -454,12 +493,18 @@ class BayesNet(val dag:Mat,
    *    samples and rows represent variables.
    */
   def updateCPT(user: Mat) : Unit = {
+    println("Inside updateCPT, with user =\n" + user)
+    println("sum(user,1) = " + sum(user,1))
+    println("sum(user,2).t = " + sum(user,2).t)
     val index = int(cptOffset + (user.t * iproject).t)
+    println("index =\n" + index)
     counts <-- zeroVector
-    for (i <- 0 until (user.ncols-1)) {
+    println("size(counts) = " + size(counts) + " and counts.t = " + counts.t)
+    for (i <- 0 until user.ncols) {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
     mm <-- (counts + opts.alpha)
+    println("At the end of updateCPT, with mm.t =\n" + mm.t)
   }
   
   /**
@@ -541,6 +586,7 @@ object BayesNet  {
     var alpha = 1f
     var samplingRate = 1
     var numSamplesBurn = 0
+    var firstBatchSize = 0
   }
   
   class Options extends Opts {}
@@ -561,6 +607,7 @@ object BayesNet  {
     val opts = new xopts
     opts.dim = dag.ncols
     opts.batchSize = math.min(100000, data.ncols/30 + 1)
+    opts.firstBatchSize = opts.batchSize
     opts.useGPU = false
     opts.npasses = 2 
     opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
