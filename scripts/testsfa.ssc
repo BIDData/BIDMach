@@ -31,7 +31,7 @@ val (nn,opts) = SFA.learnerX(a,fact,d)
 opts.lambdam = 5f
 opts.lambdau = 5f
 opts.uiter = 8
-opts.npasses = 5
+opts.npasses = 2
 opts.batchSize = 2000
 
 // good values for netflix
@@ -65,22 +65,22 @@ val mmat = FMat(nn.modelmat)
 val iavg = FMat(nn.modelmats(1))
 val avg = FMat(nn.modelmats(2))
 
-val model = nn.model.asInstanceOf[SFA]
-val (mm, mopts) = SFA.predictor(model, a, fact);
-mopts.uiter = 7
-
-def testme = {
-mm.predict
-val mmod = mm.model.asInstanceOf[SFA];
-val tanz = ta > 0;
-val preds = DDS(FMat(nn.modelmats(0)), fact, tanz) + FMat(nn.modelmats(1) + nn.modelmats(2))
-min(preds.contents, 5f, preds.contents)
-max(preds.contents, 1f, preds.contents)
-val diff = DMat(preds.contents - ta.contents)
-val rmse = sqrt((diff ^* diff) / diff.length.toFloat).dv
-rmse
-}
-val rmse = testme
-
-println("rmse = %f" format rmse);
+//val model = nn.model.asInstanceOf[SFA]
+//val (mm, mopts) = SFA.predictor(model, a, fact);
+//mopts.uiter = 7
+//
+//def testme = {
+//mm.predict
+//val mmod = mm.model.asInstanceOf[SFA];
+//val tanz = ta > 0;
+//val preds = DDS(FMat(nn.modelmats(0)), fact, tanz) + FMat(nn.modelmats(1) + nn.modelmats(2))
+//min(preds.contents, 5f, preds.contents)
+//max(preds.contents, 1f, preds.contents)
+//val diff = DMat(preds.contents - ta.contents)
+//val rmse = sqrt((diff ^* diff) / diff.length.toFloat).dv
+//rmse
+//}
+//val rmse = testme
+//
+//println("rmse = %f" format rmse);
 //:silent
