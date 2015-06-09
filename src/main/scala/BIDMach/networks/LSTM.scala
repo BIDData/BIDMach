@@ -81,7 +81,7 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
 }
 
 object LSTMnextWord {
-  class Opts extends Net.Opts {
+  trait Opts extends Net.Opts {
     var width = 1;
     var height = 1;
     var nvocab = 100000;
@@ -89,6 +89,64 @@ object LSTMnextWord {
   }
   
   class Options extends Opts {}
+  
+   def mkNetModel(fopts:Model.Opts) = {
+    new LSTMnextWord(fopts.asInstanceOf[LSTMnextWord.Opts])
+  }
+  
+  def mkUpdater(nopts:Updater.Opts) = {
+    new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
+  } 
+  
+  def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
+    Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
+  }
+    
+  class LearnOptions extends Learner.Options with LSTMnextWord.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+
+  def learner(mat0:Mat) = {
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0), opts), 
+  	    new LSTMnextWord(opts), 
+  	    Array(new L1Regularizer(opts)),
+  	    new ADAGrad(opts), 
+  	    opts)
+    (nn, opts)
+  }
+  
+  def learnerX(mat0:Mat) = {
+    val opts = new LearnOptions;
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+  	val nn = new Learner(
+  	    new MatDS(Array(mat0), opts), 
+  	    new LSTMnextWord(opts), 
+  	    null,
+  	    null, 
+  	    opts)
+    (nn, opts)
+  }
+  
+  class FDSopts extends Learner.Options with LSTMnextWord.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+   
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
+
+  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+    val opts = new FDSopts;
+    opts.fnames = fnames
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+    implicit val threads = threadPool(4);
+    val ds = new FilesDS(opts)
+  	val nn = new Learner(
+  			ds, 
+  	    new LSTMnextWord(opts), 
+  	    Array(new L1Regularizer(opts)),
+  	    new ADAGrad(opts), 
+  	    opts)
+    (nn, opts)
+  } 
 }
 /**
  * LSTM unit 
