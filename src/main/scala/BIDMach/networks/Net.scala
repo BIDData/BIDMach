@@ -32,6 +32,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   override def init() = {
 	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
+	  batchSize = mats(0).ncols
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
@@ -70,16 +71,24 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
   }
   
+  def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
+  	layers(0).output = gmats(0);
+  }
+  
+  def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
+  	if (targmap.asInstanceOf[AnyRef] != null) {
+  		layers(layers.length-1).target = targmap * gmats(0);
+  	} else {
+  		layers(layers.length-1).target = gmats(1);
+  	}
+  }
+  
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
-    	layers(0).output = gmats(0);
-    	if (targmap.asInstanceOf[AnyRef] != null) {
-    		layers(layers.length-1).target = targmap * gmats(0);
-    	} else {
-    		layers(layers.length-1).target = gmats(1);
-    	}
+    	assignInputs(gmats, ipass, pos);
+    	assignTargets(gmats, ipass, pos);
     	if (mask.asInstanceOf[AnyRef] != null) {
     		modelmats(0) ~ modelmats(0) ∘ mask;
     	}

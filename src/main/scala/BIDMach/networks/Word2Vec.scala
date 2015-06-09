@@ -67,6 +67,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   var vexp = 0f;
   var salpha = 0f;
   var maxCols = 0;
+  var nmmats = 1;
   
   var ntimes = 12;
   var times:FMat = null;
@@ -104,7 +105,8 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
       } else {
         val actualFeats = opts.nHeadTerms + 1 + (nfeats - opts.nHeadTerms - 1) / opts.nSlices;   // Number of features on this node. 
-        val nmmats = 1 + (actualFeats - 1)/maxCols;                           // number of model mats needed
+        nmmats = 1 + (actualFeats - 1)/maxCols;                               // number of model mats needed
+        println("nmmats = %d" format nmmats)
         setmodelmats(new Array[Mat](2 * nmmats));
         for (i <- 0 until nmmats) {
           val xfeats = if (i < nmmats - 1) maxCols else nfeats - (nmmats - 1) * maxCols;
@@ -151,7 +153,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
 
     	val lrpos = lrate.dv.toFloat;
     	val lrneg = if (opts.eqPosNeg) lrpos else lrpos/opts.nneg; 
-    	if (opts.nSlices == 1) {
+    	if (opts.nSlices == 1 && nmmats == 1) {
     		procPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0), lrpos, vexp);
     		addTime(8);   	
     		procNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0), lrneg, vexp);    	  	
@@ -169,7 +171,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   	addTime(0);
   	if (gmats(0).ncols == ncols) {
   	val (words, lb, ub, trandwords, goodwords) = wordMats(gmats, ipass, pos);
-  	val (epos, eneg) = if (opts.nSlices == 1) {
+  	val (epos, eneg) = if (opts.nSlices == 1 && nmmats == 1) {
   		val epos0 = evalPositives(opts.nskip, words, lb, ub, modelmats(1), modelmats(0));
   		addTime(10,-3);
   		val eneg0 = evalNegatives(opts.nneg, opts.nreuse, trandwords, goodwords, modelmats(1), modelmats(0));
@@ -626,7 +628,7 @@ object Word2Vec  {
     	  			if (ibc >= 0) {                                        // check if context word is OOV
     	  			  val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows);
     	  				val B = modelmats(2*mb).asInstanceOf[FMat].data;
-    	  				if ((aismine && bishead) || (bismine && aishead)) {
+    	  				if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
     	  				  touched = true;
     	  					c = 0;
     	  					cv = 0f;
@@ -806,7 +808,7 @@ object Word2Vec  {
   				  val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
   				  val A = modelmats(2*ma+1).asInstanceOf[FMat].data;	
   					var cv = 0f;
-  					if ((aismine && bishead) || (bismine && aishead)) {
+  					if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
   						c = 0;
   						while (c < nrows) {                                      // Inner product between A and B columns
   							cv += A(c + ia) * B(c + ib);

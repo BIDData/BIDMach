@@ -13,10 +13,11 @@ opts.vexp = 0.5f
 opts.nreuse = 5
 opts.dim = 300
 opts.vocabSize = 1000000
+//opts.maxArraySize = 100000000
 
-//opts.useGPU = false;
+opts.useGPU = false;
 //opts.autoReset = false;
-//Mat.useMKL = false;
+Mat.useMKL = false;
 
 nn.train
 
