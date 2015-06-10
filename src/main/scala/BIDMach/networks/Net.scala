@@ -42,7 +42,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  	layers.map(_.getModelMats(this));
 	  }
 	  if (refresh) {
-	  	setmodelmats(new Array[Mat](imodel));
+	  	setmodelmats(new Array[Mat](imodel + modelMap.size));
 	  }
 	  if (updatemats == null) updatemats = new Array[Mat](modelmats.length);
 	  for (i <- 0 until modelmats.length) {
@@ -92,8 +92,11 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	if (mask.asInstanceOf[AnyRef] != null) {
     		modelmats(0) ~ modelmats(0) ∘ mask;
     	}
-    	var i = 1;
+    	var i = 0;
     	while (i < layers.length) {
+    		if (opts.debug > 0) {
+  		    println("dobatch forward %d %s" format (i, layers(i).getClass))
+  		  }
     		layers(i).forward;
     		i += 1;
     	}
@@ -101,6 +104,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	for (j <- 0 until updatemats.length) updatemats(j).clear;
     	while (i > 1) {
     		i -= 1;
+    		if (opts.debug > 0) {
+  		    println("dobatch backward %d %s" format (i, layers(i).getClass))
+  		  }
     		layers(i).backward(ipass, pos);
     	}
     	if (mask.asInstanceOf[AnyRef] != null) {
@@ -109,27 +115,29 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
   }
   
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {  
+  def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
   	if (batchSize < 0) batchSize = gmats(0).ncols;
-    layers(0).output = extendData(gmats(0), batchSize);
-    val targ = extendData(if (targmap.asInstanceOf[AnyRef] != null && putBack < 0) {
-    	targmap * gmats(0);
-    } else {
-    	gmats(1);
-    }, batchSize);
-    layers(layers.length-1).target = targ;
-    if (mask.asInstanceOf[AnyRef] != null) {
-    	modelmats(0) ~ modelmats(0) ∘ mask;
-    }
-    var i = 1;
-    while (i < layers.length) {
-    	layers(i).forward;
-    	i += 1;
-    }
-    if (putBack >= 0) {
-    	layers(layers.length-1).output.colslice(0, gmats(0).ncols, gmats(1));
-    }
-    layers(layers.length-1).score
+  	if (batchSize == gmats(0).ncols) { 
+  		assignInputs(gmats, ipass, pos);
+  		assignTargets(gmats, ipass, pos);
+  		if (mask.asInstanceOf[AnyRef] != null) {
+  			modelmats(0) ~ modelmats(0) ∘ mask;
+  		}
+  		var i = 0;
+  		while (i < layers.length) {
+  		  if (opts.debug > 0) {
+  		    println("evalbatch forward %d %s" format (i, layers(i).getClass))
+  		  }
+  			layers(i).forward;
+  			i += 1;
+  		}
+  		if (putBack >= 0) {
+  			layers(layers.length-1).output.colslice(0, gmats(0).ncols, gmats(1));
+  		}
+  		layers(layers.length-1).score;
+  	} else {
+  	  zeros(1,1)
+  	}
   }
   
   /* 

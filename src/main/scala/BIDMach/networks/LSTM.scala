@@ -17,53 +17,58 @@ import scala.collection.mutable.HashMap;
 class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Options) extends Net(opts) {
   
   var dummyword:Mat = null;
+  var leftedge:Layer = null;
 	
 	override def createLayers = {
-	  val net = new LSTMnextWord(opts);
 	  val lopts = opts.lopts;
 	  val height = opts.height;
 	  val width = opts.width;
 	  
-    net.layers = new Array[Layer]((height+4)*width);
+    layers = new Array[Layer]((height+4)*width);
     lopts.constructNet;
     val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim};
     val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab};
     val sopts = new SoftmaxLayer.Options;
+    leftedge = InputLayer(this);
     for (j <- 0 until width) {
-    	net.layers(j) = InputLayer(net);
-    	net.layers(j + width) = LinLayer(net, lopts1);
+      layers(j) = InputLayer(this);
+    	layers(j + width) = LinLayer(this, lopts1);
+    	layers(j + width).setinput(0, layers(j));
     }
     for (i <- 2 until height + 2) {
       for (j <- 0 until width) {
-        val layer = LSTMLayer(net, lopts);
-        layer.setinput(2, net.layers(j + (i - 1) * width));
+        val layer = LSTMLayer(this, lopts);
+        layer.setinput(2, layers(j + (i - 1) * width));
         if (j > 0) {
-          layer.setinput(0, net.layers(j - 1 + i * width));
-          layer.setinout(1, net.layers(j - 1 + i * width), 1);
+          layer.setinput(0, layers(j - 1 + i * width));
+          layer.setinout(1, layers(j - 1 + i * width), 1);
         }
-        net.layers(j + i * width) = layer;
+        layers(j + i * width) = layer;
       }
-      net.layers(i * width).setinput(0, net.layers(i * width + width - 1));
-      net.layers(i * width).setinout(1, net.layers(i * width + width - 1), 1);
+      layers(i * width).setinput(0, leftedge);
+      layers(i * width).setinput(1, leftedge);
     }
     for (j <- 0 until width) {
-    	val linlayer = LinLayer(net, lopts2); 
-    	linlayer.setinput(0, net.layers(j + (height + 1) * width));
-    	net.layers(j + (height + 2) * width) = linlayer;
+    	val linlayer = LinLayer(this, lopts2); 
+    	linlayer.setinput(0, layers(j + (height + 1) * width));
+    	layers(j + (height + 2) * width) = linlayer;
     	
-    	val smlayer = SoftmaxLayer(net, sopts);
+    	val smlayer = SoftmaxLayer(this, sopts);
     	smlayer.setinput(0, linlayer);
-    	net.layers(j + (height + 3) * width) = smlayer;
+    	layers(j + (height + 3) * width) = smlayer;
     }
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
-    if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width")
+    if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width %d %d" format (batchSize, opts.width))
     val nr = batchSize / opts.width;
     val in = gmats(0).view(nr, opts.width).t;
     for (i <- 0 until opts.width) {
       layers(i).output = in.colslice(i,i+1);
     }	
+    if (leftedge.output.asInstanceOf[AnyRef] == null) {
+      leftedge.output = in.zeros(opts.dim, batchSize);
+    }
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
@@ -107,6 +112,7 @@ object LSTMnextWord {
   def learner(mat0:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+    opts.lopts = new LSTMLayer.Options;
   	val nn = new Learner(
   	    new MatDS(Array(mat0), opts), 
   	    new LSTMnextWord(opts), 
@@ -118,7 +124,8 @@ object LSTMnextWord {
   
   def learnerX(mat0:Mat) = {
     val opts = new LearnOptions;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+    opts.lopts = new LSTMLayer.Options;
   	val nn = new Learner(
   	    new MatDS(Array(mat0), opts), 
   	    new LSTMnextWord(opts), 
@@ -137,6 +144,7 @@ object LSTMnextWord {
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
+    opts.lopts = new LSTMLayer.Options;
     implicit val threads = threadPool(4);
     val ds = new FilesDS(opts)
   	val nn = new Learner(

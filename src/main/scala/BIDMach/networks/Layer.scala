@@ -135,7 +135,7 @@ class ModelLayer(override val net:Net, override val opts:ModelLayer.Options = ne
 			if (net.modelMap.contains(opts.modelName)) {
 				net.modelMap(opts.modelName);
 			} else {
-				val len = net.modelMap(opts.modelName).length;
+				val len = net.modelMap.size;
 				net.modelMap(opts.modelName) = len + net.opts.nmodelmats; 	
 				len;
 			}
@@ -484,7 +484,8 @@ class AddLayer(override val net:Net, override val opts:AddLayer.Options = new Ad
 
 object AddLayer {  
   class Options extends Layer.Options {
-    var ninputs = 1;
+    var ninputs = 2;
+    override val inputs:Array[Layer.Options] = new Array[Layer.Options](ninputs);
     
     def copyTo(opts:Options):Options = {
   		super.copyTo(opts);
@@ -527,7 +528,8 @@ class MulLayer(override val net:Net, override val opts:MulLayer.Options = new Mu
 
 object MulLayer {  
   class Options extends Layer.Options {
-    var ninputs = 1;
+    var ninputs = 2;
+    override val inputs:Array[Layer.Options] = new Array[Layer.Options](ninputs);
     
     def copyTo(opts:Options):Options = {
   		super.copyTo(opts);
@@ -821,10 +823,22 @@ class CompoundLayer(override val net:Net, override val opts:CompoundLayer.Option
 	  internal_layers(i).setinput(0, v);
 	}
 	
+  override def setinout(i:Int, v:Layer, j:Int) = {               // Assumes the inputs are the first k layers in internal_layers
+	  _inputs(i) = v;
+	  internal_layers(i).setinout(0, v, j);
+	}
+	
 	var internal_layers:Array[Layer] = null;
 	
 	override def forward = {
-	  internal_layers.map(_.forward);
+	  if (net.opts.debug == 0) {
+	    internal_layers.map(_.forward);
+	  } else {
+	    for (i <- 0 until internal_layers.length) {
+	      if (net.opts.debug > 0) println("  compound layer forward %d %s" format (i, internal_layers(i).getClass));
+	      internal_layers(i).forward;
+	    }
+	  }
 	  for (i <- 0 until opts.outputNumbers.length) {
 	    _outputs(i) = internal_layers(opts.outputNumbers(i)).output
 	    if (_derivs(i).asInstanceOf[AnyRef] == null){
@@ -834,7 +848,14 @@ class CompoundLayer(override val net:Net, override val opts:CompoundLayer.Option
 	}
 	
 	override def backward(ipass:Int, pos:Long) = {
+		if (net.opts.debug == 0) {
 	  internal_layers.reverse.map(_.backward(ipass, pos));
+		} else {
+	    for (i <- internal_layers.length until 1 by -1) {
+	      if (net.opts.debug > 0) println("  compound layer backward %d" format (i-1, internal_layers(i-1).getClass));
+	      internal_layers(i-1).backward(ipass, pos);
+	    }
+	  }
 	}
 		
 	override def getModelMats(net:Net) = {

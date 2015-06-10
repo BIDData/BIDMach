@@ -1,0 +1,30 @@
+:silent
+import BIDMach.networks.LSTMnextWord
+
+val dir="../data/rcv1/"
+
+val a = loadSMat(dir + "docs.smat.lz4")(0->10000,?)
+
+val ta = loadSMat(dir + "testdocs.smat.lz4")(0->10000,?)
+
+val (nn,opts) = LSTMnextWord.learner(a)
+
+opts.aopts = opts
+
+opts.batchSize=10000
+opts.width=10;
+opts.height=3;
+opts.dim=256;
+opts.nvocab = 10000;
+//opts.debug =1;
+
+opts.reg1weight = 0.0001
+opts.npasses = 5
+
+nn.train
+
+val dnn = nn.model.asInstanceOf[LSTMnextWord]
+
+:silent
+
+
