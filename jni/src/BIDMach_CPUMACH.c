@@ -73,6 +73,112 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
   (*env)->ReleasePrimitiveArrayCritical(env, jW, W, 0);
 }
 
+void mapIndx(int *mm, int *ii, int *ismine, int *ishead, int indx, int islice, int nslices, int nhead, int maxcols, int nrows, int offset)
+{
+  int newi = indx;
+  if (indx >= nhead) newi = ((indx - nhead) / nslices + nhead);                     // new column index
+  *mm = newi / maxcols + offset;                                 // which matrix are we in? 
+  *ismine = (indx >= nhead) && (indx % nslices == islice);
+  *ishead = (indx < nhead);
+  *ii = nrows * (newi - (*mm) * maxcols);
+}
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPosSlice
+(JNIEnv *env, jobject obj, jint nrows, jint ncols, jint skip, jintArray jW, jintArray jLB, jintArray jUB,
+ jobjectArray jMM, jfloat lrate, jfloat vexp, jint nthreads,
+ jint islice, jint nslices, jint maxCols, jint nHead, jint dualMode, jint doHead)
+{
+  int ix, ithread;
+  int offset = 0;
+  int * W = (jint *)((*env)->GetPrimitiveArrayCritical(env, jW, JNI_FALSE));
+  int * LB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jLB, JNI_FALSE));
+  int * UB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jUB, JNI_FALSE));
+  int nelems = (*env)->GetArrayLength(env, jMM);
+  jfloatArray *X = malloc(nelems * sizeof(jfloatArray));
+  float **Y = malloc(nelems * sizeof(float *));
+  float *A, *B;
+  if (dualMode) offset = 1;
+  for (ix = 0; ix < nelems; ix++) {
+     X[ix] = (jfloatArray)((*env)->GetObjectArrayElement(env, jMM, ix));
+     Y[ix] = (float *)((*env)->GetPrimitiveArrayCritical(env, X[ix], JNI_FALSE));
+  }
+
+#pragma omp parallel for
+  for (ithread = 0; ithread < nthreads; ithread++) {
+    int istart = (1L * ithread * ncols)/nthreads;
+    int iend = (1L * (ithread+1) * ncols)/nthreads;
+    int i, j, k, c, ia, ib, iac, ibc, coff;
+    int aismine, bismine, aishead, bishead, ma, mb;
+    float cv, ascale, bscale;
+    int touched; 
+    float * daa = (float *)malloc(nrows*sizeof(float));  
+
+    for (i = istart; i < iend; i++) {
+      iac = W[i];
+      if (iac >= 0) {
+        mapIndx(&ma, &ia, &aismine, &aishead, iac, islice, nslices, nHead, maxCols, nrows, offset);
+        A = Y[2*ma+1];
+        ascale = pow(1+iac, vexp);
+        for (c = 0; c < nrows; c++) {
+          daa[c] = 0;
+        }
+        touched = 0;
+        for (j = LB[i]; j <= UB[i]; j++) {
+          if (j != 0 && i + j >= 0 && i + j < ncols) {
+            ibc = W[i + j];
+            if (ibc >= 0) {
+              mapIndx(&mb, &ib, &bismine, &bishead, ibc, islice, nslices, nHead, maxCols, nrows, offset);
+              B = Y[2*mb];
+              bscale = pow(1+ibc, vexp);
+              if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
+                touched = 1;
+                cv = 0;
+                for (c = 0; c < nrows; c++) {
+                  cv += A[c + ia] * B[c + ib];
+                }
+
+                if (cv > 16.0f) {
+                  cv = 1.0f;
+                } else if (cv < -16.0f) {
+                  cv = 0.0f;
+                } else {
+                  cv = exp(cv);
+                  cv = cv / (1.0f + cv);
+                }
+
+                cv = lrate * (1.0f - cv);
+                for (c = 0; c < nrows; c++) {
+                  daa[c] += ascale * cv * B[c + ib];
+                }
+                if (bismine || (bishead && doHead)) {
+                  for (c = 0; c < nrows; c++) {
+                    B[c + ib] += bscale * cv * A[c + ia];
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (touched && (aismine || (aishead && doHead))) {
+          for (c = 0; c < nrows; c++) {
+            A[c + ia] += daa[c];
+          }
+        }
+      }
+    }
+    free(daa);
+  }
+
+  for (ix = nelems-1; ix >= 0; ix--) {
+    (*env)->ReleasePrimitiveArrayCritical(env, X[ix], Y[ix], 0);
+  }
+  (*env)->ReleasePrimitiveArrayCritical(env, jUB, UB, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jLB, LB, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jW, W, 0);
+  free(Y);
+  free(X);
+}
+
 JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint nwa, jint nwb, jintArray jWA, jintArray jWB, 
  jfloatArray jA, jfloatArray jB, jfloat lrate, jfloat vexp, jint nthreads)
@@ -151,6 +257,108 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNeg
   (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
   (*env)->ReleasePrimitiveArrayCritical(env, jWB, WB, 0);
   (*env)->ReleasePrimitiveArrayCritical(env, jWA, WA, 0);
+}
+
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNegSlice
+(JNIEnv *env, jobject obj, jint nrows, jint ncols, jint nwa, jint nwb, jintArray jWA, jintArray jWB, 
+ jfloatArray jMM, jfloat lrate, jfloat vexp, jint nthreads,
+ jint islice, jint nslices, jint maxCols, jint nHead, jint dualMode, jint doHead)
+{
+  int ix, ithread, offset = 0;
+  int * WA = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWA, JNI_FALSE));
+  int * WB = (jint *)((*env)->GetPrimitiveArrayCritical(env, jWB, JNI_FALSE));
+  float *A, *B;
+  int nelems = (*env)->GetArrayLength(env, jMM);
+  jfloatArray *X = malloc(nelems * sizeof(jfloatArray));
+  float **Y = malloc(nelems * sizeof(float *));
+  if (dualMode) offset = 1;
+  for (ix = 0; ix < nelems; ix++) {
+     X[ix] = (jfloatArray)((*env)->GetObjectArrayElement(env, jMM, ix));
+     Y[ix] = (float *)((*env)->GetPrimitiveArrayCritical(env, X[ix], JNI_FALSE));
+  }
+
+#pragma omp parallel for
+  for (ithread = 0; ithread < nthreads; ithread++) {
+    int i, j, k, c, ia, ib, iac, ibc, ja;
+    float cv, ascale, bscale;
+    int aismine, bismine, aishead, bishead, ma, mb;
+    int istart = (1L * ithread * ncols)/nthreads;
+    int iend = (1L * (ithread+1) * ncols)/nthreads;
+    float * daa = (float *)malloc(nwa*nrows*sizeof(float));  
+    float * dbb = (float *)malloc(nrows*sizeof(float));  
+
+    for (i = istart; i < iend; i++) {
+      for (j = 0; j < nwa; j++) {
+        ja = j * nrows;
+        for (c = 0; c < nrows; c++) {
+          daa[c + ja] = 0;
+        }
+      }
+      for (k = 0; k < nwb; k++) {
+        ibc = WB[k+i*nwb];
+        mapIndx(&mb, &ib, &bismine, &bishead, ibc, islice, nslices, nHead, maxCols, nrows, offset);
+        B = Y[2*mb];
+        bscale = pow(1+ibc, vexp);
+        for (c = 0; c < nrows; c++) {
+          dbb[c] = 0;
+        }
+        for (j = 0; j < nwa; j++) {
+          iac = WA[j+i*nwa];
+          mapIndx(&ma, &ia, &aismine, &aishead, iac, islice, nslices, nHead, maxCols, nrows, offset);
+          A = Y[2*ma+1];
+          ascale = pow(1+iac, vexp);
+          if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
+            cv = 0;
+            for (c = 0; c < nrows; c++) {
+              cv += A[c + ia] * B[c + ib];
+            }
+
+            if (cv > 16.0f) {
+              cv = 1.0f;
+            } else if (cv < -16.0f) {
+              cv = 0.0f;
+            } else {
+              cv = exp(cv);
+              cv = cv / (1.0f + cv);
+            } 
+
+            cv = - lrate * cv;
+            ja = j * nrows;
+            for (c = 0; c < nrows; c++) {
+              dbb[c] += bscale * cv * A[c + ia];
+              daa[c + ja] += ascale * cv * B[c + ib];
+            }
+          }
+        }
+        if (bismine || (bishead && doHead)) {
+          for (c = 0; c < nrows; c++) {
+            B[c + ib] += dbb[c];
+          }
+        }
+      }
+      for (j = 0; j < nwa; j++) {
+        ja = j * nrows;
+        iac = WA[j+i*nwa];
+        mapIndx(&ma, &ia, &aismine, &aishead, iac, islice, nslices, nHead, maxCols, nrows, offset);
+        A = Y[2*ma+1];
+        if (aismine || (aishead && doHead)) {
+          for (c = 0; c < nrows; c++) {
+            A[c + ia] += daa[c + ja];
+          }
+        }
+      }
+    }
+    free(dbb);
+    free(daa);
+  }
+  for (ix = nelems-1; ix >= 0; ix--) {
+    (*env)->ReleasePrimitiveArrayCritical(env, X[ix], Y[ix], 0);
+  }
+  (*env)->ReleasePrimitiveArrayCritical(env, jWB, WB, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jWA, WA, 0);
+  free(Y);
+  free(X);
 }
 
 JNIEXPORT jdouble JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecEvalPos
