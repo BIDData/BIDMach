@@ -355,3 +355,23 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecBwd
   (*env)->ReleasePrimitiveArrayCritical(env, jWB, WB, 0);
   (*env)->ReleasePrimitiveArrayCritical(env, jWA, WA, 0);
 }
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_testarrays
+(JNIEnv *env, jobject obj, jobjectArray arr) 
+{
+  int i;
+  int nelems = (*env)->GetArrayLength(env, arr);
+  jfloatArray *X = malloc(nelems * sizeof(jfloatArray));
+  jfloat **Y = malloc(nelems * sizeof(jfloat *));
+  for (i = 0; i < nelems; i++) {
+     X[i] = (jfloatArray)((*env)->GetObjectArrayElement(env, arr, i));
+     Y[i] = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, X[i], JNI_FALSE));
+  }
+  printf("n=%d, v=%f, u=%f\n", nelems, Y[0][0], Y[1][0]);
+  fflush(stdout);
+  for (i = 0; i < nelems; i++) {
+    (*env)->ReleasePrimitiveArrayCritical(env, X[i], Y[i], 0);
+  }
+  free(X);
+  free(Y);
+}

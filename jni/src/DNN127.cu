@@ -667,6 +667,162 @@ template<int NWA, int NWB, int MAXD, int BYDIM>
 }
 
 
+template<int NWA, int NWB, int MAXD, int BYDIM>
+  __global__ void __word2vecNegFilt(int nrows, int ncols, int nwords, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
+  const int NWAB = NWA*NWB;
+  __shared__ float CC[NWA*NWB*BYDIM];
+  float aa[NWA];
+  float bb[NWB];
+  float prods[NWA][NWB];
+  int ia[NWA];
+  int ib[NWB];
+  float bscale[NWB];
+  int tid = threadIdx.x + blockDim.x * threadIdx.y;
+  int dxy = blockDim.x * blockDim.y;
+  int istart = (int)((1L * blockIdx.x * ncols) / gridDim.x);
+  int iend = (int)((1L * (blockIdx.x+1) * ncols) / gridDim.x);
+  int i, j, k, icol, tmpi;
+  float dv, v, ascale;
+  float inr = 1.0f / nrows;
+
+  for (icol = istart; icol < iend; icol++) {                // Iterate over columns
+#pragma unroll
+    for (i = 0; i < NWA; i++) {
+      tmpi = WA[i + icol * NWA];                            // Fill the A word matrix
+      if (tmpi < nwords) {
+        tmpi = nrows * tmpi;
+      } else {
+        tmpi = -1;
+      }
+      ia[i] = tmpi;
+#pragma unroll
+      for (j = 0; j < NWB; j++) {                           // clear the products matrix
+        prods[i][j] = 0;
+      }
+    }
+#pragma unroll
+    for (i = 0; i < NWB; i++) {
+      tmpi = WB[i + icol * NWB];                            // Fill the B word matrix
+      if (tmpi < nwords) {
+        tmpi = nrows * tmpi;
+      } else {
+        tmpi = -1;
+      }
+      ib[i] = tmpi;
+    }
+
+    for (i = tid; i < nrows; i += dxy) {                    // Now iterate over the rows of this block
+#pragma unroll
+      for (j = 0; j < NWB ; j++) {                          // Read B
+        if (ib[j] >= 0) {
+          bb[j] = B[i + ib[j]];
+        } else {
+          bb[j] = 0;
+        }
+      }
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                           // Compute the products of these elements
+        if (ia[j] >= 0) {
+          v = A[i + ia[j]];
+        } else {
+          v = 0;
+        }
+#pragma unroll
+        for (k = 0; k < NWB; k++) {
+          prods[j][k] += v * bb[k];
+        }
+      }
+    }                                                       // Finished the entire block
+
+#pragma unroll
+    for (i = 0; i < NWA; i++) {                             // Reduce the products within each warp
+#pragma unroll
+      for (j = 0; j < NWB; j++) {
+#pragma unroll
+        for (k = 1; k < 32; k = k+k) {
+          float tmp = __shfl_down(prods[i][j], k);
+          prods[i][j] += tmp;
+        }
+      }
+    }
+    __syncthreads();
+    if (threadIdx.x == 0) {                                 // Save the products to SHMEM (one copy per warp)
+#pragma unroll
+      for (i = 0; i < NWA; i++) {
+#pragma unroll
+        for (j = 0; j < NWB; j++) {
+          CC[i + NWA * (j + NWB * threadIdx.y)] = prods[i][j];
+        }
+      }
+    }
+    __syncthreads();
+    for (i = 1; i < blockDim.y; i++) {
+      __syncthreads();
+      for (j = tid; j < NWAB; j += dxy) {                   // Reduce the products across warps
+        CC[j] += CC[j + i * NWAB];
+      } 
+    } 
+    __syncthreads();
+
+    for (i = tid; i < NWA*NWB; i+= dxy) {                   // Compute logistic function on all products
+      v = CC[i];
+      if (v > 16.0f) {
+        v = 1.0f;
+      } else if (v < -16.0f) {
+        v = 0.0f;
+      } else {
+        v = exp(v);
+        v = v / (1.0f + v);
+      }
+      CC[i] = - lrate * v;                                  // All these pairs have label 0
+    }
+
+    __syncthreads();
+    for (i = tid; i < nrows; i += dxy) {
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                           // Load A data
+        if (ia[j] >= 0) {
+          aa[j] = A[i + ia[j]];
+        } else {
+          aa[j] = 0;
+        }
+      }
+#pragma unroll
+      for (k = 0; k < NWB; k++) {                           // Load B data
+        if (ib[k] >= 0) {
+          bb[k] = B[i + ib[k]];
+        } else {
+          bb[k] = 0;
+        }
+        bscale[k] = pow(max(0, ib[k])*inr + 1.0f, vexp);
+        prods[0][k] = 0;
+      }
+#pragma unroll
+      for (j = 0; j < NWA; j++) {                           // Now do the products
+        ascale = pow(max(0, ia[j])*inr + 1.0f, vexp);
+        dv = 0;
+#pragma unroll
+        for (k = 0; k < NWB; k++) {                       
+          v = CC[j + k * NWA];
+          dv += ascale * v * bb[k];
+          prods[0][k] += bscale[k] * v * aa[j];
+        }
+        if (ia[j] >= 0) {
+          atomicAdd(&A[i + ia[j]], dv);                      // Update A
+        }
+      }
+#pragma unroll
+      for (k = 0; k < NWB; k++) {                       
+        if (ib[k] >= 0) {
+          atomicAdd(&B[i + ib[k]], prods[0][k]);             // Update B
+        }
+      }
+    } 
+    __syncthreads();
+  }
+}
+
+
 /*
  * Combined forward-backward word2vec kernel
  */
@@ -1213,6 +1369,9 @@ template<int SKIP, int BYDIM, int NREPS>
 template<int NWA, int NWB, int MAXD, int BYDIM>
   __global__ void __word2vecNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {}
 
+template<int NWA, int NWB, int MAXD, int BYDIM>
+  __global__ void __word2vecNegFilt(int nrows, int ncols, int nwords, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {}
+
 template<int SKIP, int BYDIM, int NREPS>
   __global__ void __word2vecEvalPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float *Retval) {}
 
@@ -1252,6 +1411,23 @@ int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
   case 100005: __word2vecNeg<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
   case  50010: __word2vecNeg<5,10,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
     //  case 150010: __word2vecNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+  default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+  }
+  cudaDeviceSynchronize();
+  int err = cudaGetLastError();
+  return err;
+}
+
+int word2vecNegFilt(int nrows, int ncols, int nwords, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
+  dim3 threads(32, BYDIMF, 1);
+  int nblocks = min(2048, 2 + (ncols - 1));
+  int which = nwa*10000 + nwb;
+  switch (which) {
+  case  50001: __word2vecNegFilt<5,1,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+  case  50005: __word2vecNegFilt<5,5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+  case 100005: __word2vecNegFilt<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+  case  50010: __word2vecNegFilt<5,10,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+    //  case 150010: __word2vecNegFilt<15,10,15><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
   default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
   cudaDeviceSynchronize();

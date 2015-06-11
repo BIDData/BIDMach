@@ -21,5 +21,6 @@ public final class CPUMACH {
   
   public static native double word2vecEvalPos(int nrows, int ncols, int shift, int [] W, int [] LB, int [] UB, float [] A, float [] B, int nthreads);
 
+  public static native void testarrays(float [] [] a);
 }
 

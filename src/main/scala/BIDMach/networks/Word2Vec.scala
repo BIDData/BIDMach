@@ -23,9 +23,12 @@ import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.util.Scanner
+import scala.concurrent.Future
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 /**
- * Fast Word2Vec implementation for CPU and GPU. Currently support skip-gram models with negative sampling. 
+ * Fast Word2Vec implementation for CPU and GPU. Currently supports skip-gram models with negative sampling. 
  * 
  * The input is an IMat with 2 rows. Each column holds a word ID (top row) and the corresponding sentence ID (second row). 
  * Options are:
@@ -101,23 +104,27 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     if (refresh) {
       if (nfeats <= maxCols) {
       	setmodelmats(new Array[Mat](2));
-      	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;              // syn0 - context model
-      	modelmats(1) = zeros(opts.dim, nfeats);                               // syn1neg - target word model
+      	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;               // syn0 - context model
+      	modelmats(1) = zeros(opts.dim, nfeats);                                // syn1neg - target word model
       } else {
         val actualFeats = opts.nHeadTerms + 1 + (nfeats - opts.nHeadTerms - 1) / opts.nSlices;   // Number of features on this node. 
-        nmmats = 1 + (actualFeats - 1)/maxCols;                               // number of model mats needed
-        println("nmmats = %d" format nmmats)
-        setmodelmats(new Array[Mat](2 * nmmats));
+        nmmats = 1 + (actualFeats - 1)/maxCols;                                // number of model mats needed
+        println("nmmats = %d" format nmmats);
+        val offset = if (opts.dualMode) 1 else 0;
+        setmodelmats(new Array[Mat](2 * (nmmats + offset)));
         for (i <- 0 until nmmats) {
           val xfeats = if (i < nmmats - 1) maxCols else nfeats - (nmmats - 1) * maxCols;
-        	modelmats(2 * i) = (rand(opts.dim, xfeats) - 0.5f)/opts.dim;              
-        	modelmats(2 * i + 1) = zeros(opts.dim, xfeats);
+        	modelmats(2 * (i + offset)) = (rand(opts.dim, xfeats) - 0.5f)/opts.dim;              
+        	modelmats(2 * (i + offset) + 1) = zeros(opts.dim, xfeats);
+        }
+        if (opts.dualMode) {
+          modelmats(0) <-- modelmats(2).copy;
+          modelmats(1) <-- modelmats(3).copy;
         }
       }
     }
-    for (i <- 0 until modelmats.length) {
-      modelmats(i) = convertMat(modelmats(i)); 
-    }
+    modelmats(0) = convertMat(modelmats(0));                                   // At most the first two will be GPU-based
+    modelmats(1) = convertMat(modelmats(1)); 
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
     val skipcol = icol((-nskip) to -1) on icol(1 to nskip)
@@ -240,7 +247,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	addTime(6);
 
       	rand(randwords);                                                        // Compute some random negatives
-      	val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));    
+      	val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt))); 
       	val trandwords0 = irandwords.view(opts.nneg, ngoodcols);                // shrink the matrices to the available data
       	val contextwords0 = cwi.view(opts.nreuse, ngoodcols);
       	addTime(7);
@@ -334,6 +341,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
         i += 1;
       }
     })
+//    println("mean=%f" format mean(FMat(trandwords0(?) < opts.nHeadTerms)).v);
     addTime(7);
     
     (trandwords0, contextwords0)    
@@ -376,24 +384,58 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
   }
   
   def procPositivesSlice(nskip:Int, words:Mat, lbound:Mat, ubound:Mat, modelmats:Array[Mat], lrate:Float, vexp:Float, islice:Int) = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     val nrows = modelmats(0).nrows;
     val nwords = words.ncols;
     Mat.nflops += 6L * nwords * nskip * nrows;
     (words, lbound, ubound) match {
       case (w:IMat, lb:IMat, ub:IMat) => 
       Word2Vec.procPosCPUslice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, lrate, vexp, Mat.numThreads, 
-          islice, opts.nSlices, maxCols, opts.nHeadTerms);
+          islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
+      case (w:GIMat, lb:GIMat, ub:GIMat) => if (opts.dualMode) {
+      	val m0 = modelmats(0).asInstanceOf[GMat];
+      	val m1 = modelmats(1).asInstanceOf[GMat];
+      	m0 <-- modelmats(2);
+      	m1 <-- modelmats(3);
+//      	val err = CUMACH.word2vecPos(nrows, m0.ncols, nskip, w.data, lb.data, ub.data, m0.data, m1.data, lrate, vexp);
+//      	if (err != 0)  throw new RuntimeException("CUMACH.word2vecPos error " + cudaGetErrorString(err));   
+      	modelmats(2) <-- m0;
+      	modelmats(3) <-- m1;
+      	Word2Vec.procPosCPUslice(nrows, nwords, nskip, IMat(w).data, IMat(lb).data, IMat(ub).data, modelmats, lrate, vexp, Mat.numThreads, 
+      			islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
+      } else {
+        throw new RuntimeException("Use dualMode to use the GPU with multi-part models")
+      }        
     }
   }
   
   def procNegativesSlice(nwa:Int, nwb:Int, wordsa:Mat, wordsb:Mat, modelmats:Array[Mat], lrate:Float, vexp:Float, islice:Int) = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     val nrows = modelmats(0).nrows;
+    val nvocab = modelmats(0).ncols;
     val nwords = wordsa.ncols;
     Mat.nflops += 6L * nwords * nwa * nwb * nrows;
     (wordsa, wordsb) match {
-      case (wa:IMat, wb:IMat) => 
-      Word2Vec.procNegCPUslice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, lrate, vexp, Mat.numThreads, 
-          islice, opts.nSlices, maxCols, opts.nHeadTerms);
+    case (wa:IMat, wb:IMat) => {
+    	Word2Vec.procNegCPUslice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, lrate, vexp, Mat.numThreads, 
+    			islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
+    }
+    case (wa:GIMat, wb:GIMat) => {
+    	if (opts.dualMode) {
+    		val m0 = modelmats(0).asInstanceOf[GMat];
+    		val m1 = modelmats(1).asInstanceOf[GMat];
+    		m0 <-- modelmats(2);
+    		m1 <-- modelmats(3);
+    		val err = CUMACH.word2vecNegFilt(nrows, nwords, nvocab, nwa, nwb, wa.data, wb.data, m0.data, m1.data, lrate, vexp);
+    		if (err != 0)  throw new RuntimeException("CUMACH.word2vecNegFilt error " + cudaGetErrorString(err));    
+    		modelmats(2) <-- m0;
+    		modelmats(3) <-- m1;
+    		Word2Vec.procNegCPUslice(nrows, nwords, nwa, nwb, IMat(wa).data, IMat(wb).data, modelmats, lrate, vexp, Mat.numThreads, 
+    				islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
+    	} else {
+    		throw new RuntimeException("Use dualMode to use the GPU with multi-part models")
+    	}
+    }
     }
   }
     
@@ -425,7 +467,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     (words, lbound, ubound) match {
       case (w:IMat, lb:IMat, ub:IMat) => 
         Word2Vec.evalPosCPUslice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, Mat.numThreads,
-        		islice, opts.nSlices, maxCols, opts.nHeadTerms);
+        		islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode);
     }
   }
   
@@ -457,7 +499,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     (wordsa, wordsb) match {
       case (wa:IMat, wb:IMat) => 
       	Word2Vec.evalNegCPUslice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, Mat.numThreads,
-      	    islice, opts.nSlices, maxCols, opts.nHeadTerms);
+      	    islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode);
     }
   }
   
@@ -512,6 +554,8 @@ object Word2Vec  {
     var nHeadTerms = 0; 
     var nSlices = 1;
     var iSlice = 0;
+    var dualMode = false;
+    var doHead = true;
   }
   
   class Options extends Opts {}
@@ -586,18 +630,20 @@ object Word2Vec  {
     0;
   }
   
-  def mapIndx(indx:Int, islice:Int, nslices:Int, nHead:Int, maxCols:Int, nrows:Int):(Int, Int, Boolean, Boolean) = {
-  	val newi = (indx - nHead) / nslices + nHead;                     // new column index
-  	val m = newi / maxCols;                                          // which matrix are we in? 
+  def mapIndx(indx:Int, islice:Int, nslices:Int, nHead:Int, maxCols:Int, nrows:Int, offset:Int):(Int, Int, Boolean, Boolean) = {
+  	val newi = if (indx >= nHead) ((indx - nHead) / nslices + nHead) else indx;                     // new column index
+  	val m = newi / maxCols + offset;                                 // which matrix are we in? 
   	val ismine = (indx >= nHead) && (indx % nslices == islice);
   	val ishead = (indx < nHead);
   	val i = nrows * (newi - m * maxCols);
   	(m, i, ismine, ishead)
   }
 
-   def procPosCPUslice(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
-      modelmats:Array[Mat], lrate:Float, vexp:Float, nthreads:Int, islice:Int, nslices:Int, maxCols:Int, nHead:Int):Int = {
+  def procPosCPUslice(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
+     modelmats:Array[Mat], lrate:Float, vexp:Float, nthreads:Int, 
+     islice:Int, nslices:Int, maxCols:Int, nHead:Int, dualMode:Boolean, doHead:Boolean):Int = {
 
+    val arrayOffset = if (dualMode) 1 else 0;
     (0 until nthreads).par.map((ithread:Int) => {
     	val istart = ((1L * ithread * ncols)/nthreads).toInt;
     	val iend = ((1L * (ithread+1) * ncols)/nthreads).toInt;
@@ -612,7 +658,7 @@ object Word2Vec  {
     	  val iac = W(i);
     	  val ascale = math.pow(1+iac, vexp).toFloat; 
     	  if (iac >= 0) {                                              // Check for OOV words
-    	    val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
+    	    val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows, arrayOffset);
     	    val A = modelmats(2*ma+1).asInstanceOf[FMat].data;
     	  	c = 0;
     	  	while (c < nrows) {                                        // Current word
@@ -626,7 +672,7 @@ object Word2Vec  {
     	  		  val ibc = W(i + j);                                    // Get the context word 
     	  		  val bscale = math.pow(1+ibc, vexp).toFloat;  
     	  			if (ibc >= 0) {                                        // check if context word is OOV
-    	  			  val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows);
+    	  			  val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows, arrayOffset);
     	  				val B = modelmats(2*mb).asInstanceOf[FMat].data;
     	  				if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
     	  				  touched = true;
@@ -650,15 +696,21 @@ object Word2Vec  {
     	  					c = 0;
     	  					while (c < nrows) {
     	  						daa(c) += ascale * cv * B(c + ib);               // Compute backward derivatives for A and B with pseudo-ADAGrad scaling
-    	  						B(c + ib) += bscale * cv * A(c + ia);
     	  						c += 1;
+    	  					}
+    	  					if (bismine || (bishead && doHead)) {
+    	  						c = 0;
+    	  						while (c < nrows) {
+    	  							B(c + ib) += bscale * cv * A(c + ia);
+    	  							c += 1;
+    	  						}
     	  					}
     	  				}
     	  			}
     	  		}
     	  		j += 1;
     	  	}
-    	  	if (touched) {
+    	  	if (touched && (aismine || (aishead && doHead))) {
     	  		c = 0;
     	  		while (c < nrows) {                                        // Add derivative for A to A. 
     	  			A(c + ia) += daa(c);
@@ -766,9 +818,10 @@ object Word2Vec  {
   
     
   def procNegCPUslice(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], modelmats:Array[Mat], 
-      lrate:Float, vexp:Float, nthreads:Int, islice:Int, nslices:Int, maxCols:Int, nHead:Int):Int = {
+      lrate:Float, vexp:Float, nthreads:Int, islice:Int, nslices:Int, maxCols:Int, nHead:Int, dualMode:Boolean, doHead:Boolean):Int = {
 
-  	(0 until nthreads).par.map((ithread:Int) => {
+  	val arrayOffset = if (dualMode) 1 else 0;
+    (0 until nthreads).par.map((ithread:Int) => {
   		val istart = ((1L * nwords * ithread) / nthreads).toInt;
   		val iend = ((1L * nwords * (ithread+1)) / nthreads).toInt;
   		val aa = new Array[Float](nwa * nrows);
@@ -799,13 +852,13 @@ object Word2Vec  {
   			  }
   			  val ibc = WB(k+i*nwb);
   			  val bscale = math.pow(1+ibc, vexp).toFloat;
-  			  val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows);
+  			  val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows, arrayOffset);
   			  val B = modelmats(2*mb).asInstanceOf[FMat].data;
   				j = 0;
   				while (j < nwa) {                                          // Now iterate over A words. 
   				  val iac = WA(j+i*nwa);
   				  val ascale = math.pow(1+iac, vexp).toFloat;
-  				  val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
+  				  val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows, arrayOffset);
   				  val A = modelmats(2*ma+1).asInstanceOf[FMat].data;	
   					var cv = 0f;
   					if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
@@ -835,10 +888,12 @@ object Word2Vec  {
   					}
   					j += 1;
   				}
-  				c = 0;
-  				while (c < nrows) {                                        // Add B's derivative to B
-  					B(c + ib) += bb(c);
-  					c += 1;
+  				if (bismine || (bishead && doHead)) {
+  					c = 0;
+  					while (c < nrows) {                                        // Add B's derivative to B
+  						B(c + ib) += bb(c);
+  						c += 1;
+  					}
   				}
   				k += 1;
   			}
@@ -846,12 +901,14 @@ object Word2Vec  {
   			while (j < nwa) {                                            // Add A's derivatives to A
   			  val ja = j * nrows;
   			  val iac = WA(j+i*nwa);
-  			  val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
+  			  val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows, arrayOffset);
   			  val A = modelmats(2*ma+1).asInstanceOf[FMat].data;
-  			  c = 0;
-  			  while (c < nrows) {
-  			    A(c + ia) += aa(c + ja);
-  			    c += 1;
+  			  if (aismine || (aishead && doHead)) {
+  			  	c = 0;
+  			  	while (c < nrows) {
+  			  		A(c + ia) += aa(c + ja);
+  			  		c += 1;
+  			  	}
   			  }
   			  j += 1;
   			}
@@ -915,9 +972,10 @@ object Word2Vec  {
     }).reduce(_+_);
   }
   
-   def evalPosCPUslice(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
-      modelmats:Array[Mat], nthreads:Int, islice:Int, nslices:Int, maxCols:Int, nHead:Int):Double = {
+  def evalPosCPUslice(nrows:Int, ncols:Int, skip:Int, W:Array[Int], LB:Array[Int], UB:Array[Int],
+     modelmats:Array[Mat], nthreads:Int, islice:Int, nslices:Int, maxCols:Int, nHead:Int, dualMode:Boolean):Double = {
 
+    val arrayOffset = if (dualMode) 1 else 0;
     (0 until nthreads).par.map((ithread:Int) => {
     	val istart = ((1L * ithread * ncols)/nthreads).toInt;
     	val iend = ((1L * (ithread+1) * ncols)/nthreads).toInt;
@@ -932,7 +990,7 @@ object Word2Vec  {
 
     	  val iac =  W(i);                                       // Get the current word (as a model matrix offset). 
     	  if (iac >= 0) {  
-    	  	val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
+    	  	val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows, arrayOffset);
     	  	val A = modelmats(2*ma+1).asInstanceOf[FMat].data;
     	  	c = 0;
     	  	while (c < nrows) {                                        // Current word
@@ -944,7 +1002,7 @@ object Word2Vec  {
     	  		if (j != 0 && i + j >= 0 && i + j < ncols) {             // context word index is in range (and not current word).
     	  			val ibc = W(i + j);                             // Get the context word and check it. 
     	  			if (ibc >= 0) {
-    	  				val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows);
+    	  				val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows, arrayOffset);
     	  				val B = modelmats(2*mb).asInstanceOf[FMat].data;
     	  				c = 0;
     	  				cv = 0f;
@@ -1037,9 +1095,10 @@ object Word2Vec  {
   	}).reduce(_+_);
   }
   
-   def evalNegCPUslice(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], modelmats:Array[Mat], nthreads:Int,
-      islice:Int, nslices:Int, maxCols:Int, nHead:Int):Double = {
+  def evalNegCPUslice(nrows:Int, nwords:Int, nwa:Int, nwb:Int, WA:Array[Int], WB:Array[Int], modelmats:Array[Mat], nthreads:Int,
+     islice:Int, nslices:Int, maxCols:Int, nHead:Int, dualMode:Boolean):Double = {
 
+    val arrayOffset = if (dualMode) 1 else 0;
   	(0 until nthreads).par.map((ithread:Int) => {
   		val istart = ((1L * nwords * ithread) / nthreads).toInt;
   		val iend = ((1L * nwords * (ithread+1)) / nthreads).toInt;
@@ -1071,12 +1130,12 @@ object Word2Vec  {
   			    c += 1;
   			  }
   				val ibc = WB(k+i*nwb);                              // Get the B word as an array offset. 
-  				val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows);
+  				val (mb, ib, bismine, bishead) = mapIndx(ibc, islice, nslices, nHead, maxCols, nrows, arrayOffset);
     	  	val B = modelmats(2*mb).asInstanceOf[FMat].data;
   				j = 0;
   				while (j < nwa) {                                          // Now iterate over A words. 
   					val iac = WA(j+i*nwa); 		                       // Get an A word offset 
-  					val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows);
+  					val (ma, ia, aismine, aishead) = mapIndx(iac, islice, nslices, nHead, maxCols, nrows, arrayOffset);
   					val A = modelmats(2*ma+1).asInstanceOf[FMat].data;
   					var cv = 0f;
   					c = 0;

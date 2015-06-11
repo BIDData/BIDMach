@@ -66,6 +66,8 @@ int word2vecPos(int nrows, int ncols, int shift, int *W, int *LB, int *UB, float
 
 int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate, float vexp);
 
+int word2vecNegFilt(int nrows, int ncols, int nwords, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate, float vexp);
+
 int word2vecEvalPos(int nrows, int ncols, int shift, int *W, int *LB, int *UB, float *A, float *B, float *Retval);
 
 int word2vecEvalNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *Retval);
