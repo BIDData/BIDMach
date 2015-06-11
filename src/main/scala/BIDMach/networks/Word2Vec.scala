@@ -553,7 +553,7 @@ object Word2Vec  {
     var headlen = 10000;
     var iflip = false;
     var eqPosNeg = false;
-    var maxArraySize = 1024*1024*1024;
+    var maxArraySize = 2047*1024*1024;
     var nHeadTerms = 0; 
     var nSlices = 1;
     var iSlice = 0;
