@@ -104,7 +104,10 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     if (refresh) {
       if (nfeats <= maxCols) {
       	setmodelmats(new Array[Mat](2));
-      	modelmats(0) = (rand(opts.dim, nfeats) - 0.5f)/opts.dim;               // syn0 - context model
+      	val mm0 = rand(opts.dim, nfeats);
+      	mm0 ~ mm0 - 0.5f;
+      	mm0 ~ mm0 / opts.dim;
+      	modelmats(0) = mm0;                                                    // syn0 - context model
       	modelmats(1) = zeros(opts.dim, nfeats);                                // syn1neg - target word model
       } else {
         val actualFeats = opts.nHeadTerms + 1 + (nfeats - opts.nHeadTerms - 1) / opts.nSlices;   // Number of features on this node. 
