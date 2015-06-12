@@ -101,19 +101,28 @@ class BayesNet(val dag:Mat,
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
     val a = mm / (mm.t * normConstMatrix).t
-    println("\nDebugging notice: here is the normalized model matrix:")
-    printMatrix( FMat(a.t) )
-    //println("Here is the un-normalized model matrix:")
-    //printMatrix(FMat(mm.t))
-    println("Note that size(mm) = " + size(mm))
-    println("Also GPUmem: " + GPUmem)
+    if (ipass % 5 == 0) {
+      println("\nDebugging notice with ipass = " + ipass + " and here = " + here + "; the following is the normalized model matrix:")
+      printMatrix( FMat(a.t) )
+      println("Here is the un-normalized model matrix:")
+      printMatrix(FMat(mm.t))
+      println("Note that size(mm) = " + size(mm))
+      println("Also GPUmem: " + GPUmem)
+    }
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
-    if (ipass % 10 == 0) predict(gmats(0),ipass) // Do not do this until it's clear that the mm is forming properly
+    //if (ipass % 10 == 0) predict(gmats(0),ipass) // Do not do this until it's clear that the mm is forming properly
   }
   
   /** Calls a uupdate/evalfunsequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+    //val a = mm / (mm.t * normConstMatrix).t
+    //println("\nDebugging notice with ipass = " + ipass + " and here = " + here + "; the following is the normalized model matrix:")
+    //printMatrix( FMat(a.t) )
+    //println("Here is the un-normalized model matrix:")
+    //printMatrix(FMat(mm.t))
+    //println("Note that size(mm) = " + size(mm))
+    //println("Also GPUmem: " + GPUmem)
     uupdate(gmats(0), gmats(1), ipass)
     evalfun(gmats(0), gmats(1))
   }
@@ -148,15 +157,29 @@ class BayesNet(val dag:Mat,
     for (k <- 0 until numGibbsIterations) {
       for (c <- 0 until graph.ncolors) {
 
+        //println("\nNow on color c = " + c + " with nodes " + colorInfo(c).idsInColor.t)
         // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
         usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
+        //println("The usertrans matrix after zeroing-out relevant components")
+        //printMatrix(FMat(usertrans))
         val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
+        //println("The offset matrix:")
+        //printMatrix(FMat(offsetMatrix))
         val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
+        //println("The replicated offset matrix:")
+        //printMatrix(FMat(replicatedOffsetMatrix))
+        //println("Here is the mm(replicatedOffsetMatrix):")
+        //printMatrix(FMat(mm(replicatedOffsetMatrix)))
         val logProbs = ln(mm(replicatedOffsetMatrix))
+        //println("The log probs matrix:")
+        //printMatrix(FMat(logProbs))
         val nonExponentiatedProbs = logProbs * colorInfo(c).combinationMatrix
+        //println("The non exonentiated probaiblities:")
+        //printMatrix(FMat(nonExponentiatedProbs))
 
         // Now we can sample for each color in this color group.
         for (i <- 0 until colorInfo(c).numNodes) {
+          //println("Currently sampling node " + colorInfo(c).idsInColor(i))
           if (useGPUnow) {
             val start = colorInfo(c).startingIndices(i).dv.toInt
             val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
@@ -164,6 +187,10 @@ class BayesNet(val dag:Mat,
             val maxProb = maxi(maxi(probsBeforeScaling,2),1)
             val minProb = mini(mini(probsBeforeScaling,2),1)
             val probs = if (maxProb.dv > 80) exp( probsBeforeScaling - (maxProb - 80) ) else exp(probsBeforeScaling)
+            //println("probsBeforeScaling:")
+            //printMatrix(FMat(probsBeforeScaling))
+            //println("probs")
+            //printMatrix(FMat(probs))
             val samples = zeroMap( (probs.nrows, probs.ncols) )
             multinomial(probs.nrows, probs.ncols, probs.asInstanceOf[GMat].data, 
                         samples.asInstanceOf[GIMat].data, sum(probs,1).asInstanceOf[GMat].data, 1)
@@ -175,6 +202,8 @@ class BayesNet(val dag:Mat,
             usertrans(?, colorInfo(c).idsInColor(i)) = FMat(indices)
           }
         }
+        //println("After sampling all colors, we have our usertrans:")
+        //printMatrix(FMat(usertrans))
 
         // After we finish sampling with this color group, we override the known values.
         val data = full(sdata)
@@ -205,7 +234,7 @@ class BayesNet(val dag:Mat,
   }   
  
   /**
-   * Evaluates the log-likelihood of the data. First, we get the index matrix, which indexes into
+   * Evaluates the log-likelihood of the data (per element). First, we get the index matrix, which indexes into
    * the CPT for each column's variable assignment. Then, using the normalized CPT, we find the log
    * probabilities of the user matrix, and sum vertically (i.e., each variable, valid due to derived
    * rules) and then horizontally (i.e., each sample, which can do since we assume i.i.d.). 
@@ -213,7 +242,7 @@ class BayesNet(val dag:Mat,
   def evalfun(sdata:Mat, user:Mat):FMat = {  
     val index = int(cptOffset + (user.t * iproject).t)
     val cptNormalized = mm / (mm.t * normConstMatrix).t
-    return FMat( sum(sum(ln(cptNormalized(index)),1),2) ) / sdata.ncols
+    return FMat( sum(sum(ln(cptNormalized(index)),1),2) ) / ( user.ncols * user.nrows)
   }
   
   // -----------------------------------
