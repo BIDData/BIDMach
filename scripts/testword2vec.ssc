@@ -12,13 +12,17 @@ opts.lrate = 1e-3f
 opts.vexp = 0.5f
 opts.nreuse = 5
 opts.dim = 300
-opts.vocabSize = 900000
-opts.maxArraySize = 100000000
-//opts.nHeadTerms = opts.maxArraySize / opts.dim
+opts.vocabSize = 1700000
+opts.nHeadTerms = 100000
+opts.maxArraySize = opts.nHeadTerms * opts.dim
+//opts.nHeadTerms = 0
+opts.nSlices=4
+opts.iSlice=0
+opts.doHead = 0
 
 opts.useGPU = false;
 //opts.autoReset = false;
-Mat.useMKL = false;
+//Mat.useMKL = false;
 
 nn.train
 
@@ -32,6 +36,7 @@ val test = loadIMat(mdir+"test00000.imat.lz4");
 
 val (mm,mopts) = Word2Vec.predictor(mod, test);
 
+mopts.useGPU = opts.useGPU
 mm.predict
 
 val score = mean(mm.results(0,0->(mm.results.ncols-2)))

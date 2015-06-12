@@ -130,7 +130,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPosSlice
               mapIndx(&mb, &ib, &bismine, &bishead, ibc, islice, nslices, nHead, maxCols, nrows, offset);
               B = Y[2*mb];
               bscale = pow(1+ibc, vexp);
-              if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
+              if ((doHead > 1 && aishead && bishead) || (aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
                 touched = 1;
                 cv = 0;
                 for (c = 0; c < nrows; c++) {
@@ -308,7 +308,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecNegSlice
           mapIndx(&ma, &ia, &aismine, &aishead, iac, islice, nslices, nHead, maxCols, nrows, offset);
           A = Y[2*ma+1];
           ascale = pow(1+iac, vexp);
-          if ((aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
+          if ((doHead > 1 && aishead && bishead) || (aismine && bishead) || (bismine && aishead) || (aismine && bismine)) {
             cv = 0;
             for (c = 0; c < nrows; c++) {
               cv += A[c + ia] * B[c + ib];
