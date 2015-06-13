@@ -56,11 +56,15 @@ class BayesNet(val dag:Mat,
 
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
     useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
-    statesPerNode = IMat(states)
-    graph = new Graph(dag, opts.dim, statesPerNode)
+    graph = new Graph(dag, opts.dim, IMat(states))
+    graph.topologicallySort
+    statesPerNode = graph.sortedStatesPerNode
     graph.color
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
+    println("Done with creating the graph. Here is the iproject matrix:")
+    printMatrix(full(SMat(iproject))(0 until 50, 0 until 50))
+    sys.exit
     
     // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
@@ -632,10 +636,64 @@ object BayesNet  {
 // TODO Also see if connectParents, moralize, and color can be converted to GPU friendly code
 class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
  
+  val sortedDag: Mat = null             // This one is topologically sorted
+  val sortedStatesPerNode: Mat = null   // This one is topologically sorted
   var mrf: Mat = null
   var colors: Mat = null
   var ncolors = 0
   val maxColor = 100
+  
+  /**
+   * Topologically sort the nodes, which will prevent some confusing bugs. Trust me! We will have
+   * to change the dag (make it sortedDag) and make a new statesPerNode array. Remember that in
+   * the original dag, if we look at column j, i.e., column for variable X_j, then any "1" there
+   * indicates a PARENT, so (i,j)=1 means X_i --> X_j so i has to come before j. It logically
+   * follows that the dag must be upper triangular (and the same holds for iproject and pproject).
+   */
+  def topologicallySort = {
+    val fullDag = full(dag)
+    val alreadySeen = scala.collection.mutable.Set.empty[Float]
+    val sorted = ones(1, n) * -1
+    for (oldIndex <- 0 until n) {
+      var done = false
+      var newIndex = 0
+      while (!done) {
+        if (alreadySeen.contains(newIndex.toFloat)) {
+          newIndex = newIndex + 1
+        } else {
+          val column = fullDag(?,newIndex)
+          val numExistingParents = sum(column) 
+          if (numExistingParents.dv.toInt == 0) {
+            sorted(oldIndex) = newIndex
+            fullDag(newIndex,?) = 0
+            alreadySeen += newIndex
+            done = true
+          }
+          newIndex = newIndex + 1
+        }
+      }
+    }
+    if (sorted.length != n) println("Something went wrong with comparing the lengths")
+    println(sorted.t)
+    val newDag = zeros(n, n)
+    for (i <- 0 until n) {
+      newDag(?,i) = full(dag(?,i))
+    }
+    println("Here's our newDag:")
+    printMatrix2(full(newDag)(0 until 50, 0 until 40))
+    println("By the way, the old dag from the graph:")
+    printMatrix2(full(SMat(dag))(0 until 50, 0 until 40))
+  }
+
+  /** A debugging method to print matrices, without being constrained by the command line's cropping. */
+  def printMatrix2(mat: FMat) = {
+    for(i <- 0 until mat.nrows) {
+      for (j <- 0 until mat.ncols) {
+        print(mat(i,j) + " ")
+      }
+      println()
+    }
+  } 
    
   /**
    * Connects the parents of a certain node, a single step in the process of moralizing the graph.
