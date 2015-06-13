@@ -59,7 +59,7 @@ object BayesNetMooc2 {
   var llikelihood = 0f
   var alpha = 1f
   var beta = 0.1f
-  var verbose = true
+  var verbose = false
 
   /**
    * Set up paths and variables. Then sample. 
@@ -85,16 +85,16 @@ object BayesNetMooc2 {
     loadData(datapath, numQuestions, numStudents)   
     setup
 
-    println("After main(), our randomly initialized CPT is:")
-    printMatrix(cpt.t)
-    println("Our sdata matrix is:")
-    printMatrix(full(sdata)(0 until 76, 0 until 96))
-    println("Now here is information about color groups:")
-    for (c <- 0 until graph.ncolors) {
-      val ids = find(graph.colors == c)
-      println("For color c = " + c + ", the actual nodes here are:")
-      println(ids.t)
-    }
+    //println("After main(), our randomly initialized CPT is:")
+    //printMatrix(cpt.t)
+    //println("Our sdata matrix is:")
+    //printMatrix(full(sdata)(0 until 76, 0 until 96))
+    //println("Now here is information about color groups:")
+    //for (c <- 0 until graph.ncolors) {
+    //  val ids = find(graph.colors == c)
+    //  println("For color c = " + c + ", the actual nodes here are:")
+    //  println(ids.t)
+    //}
 
     sampleAll
   }
@@ -152,10 +152,11 @@ object BayesNetMooc2 {
       }
     }
     
-    println("here is iproject:")
-    printMatrix((full(iproject))(0 until 50, 0 until 50))
-    println("transposed, which si what we do in the BayesNet versino")
-    printMatrix((full(iproject.t))(0 until 50, 0 until 50))
+    //println("here is iproject:")
+    //printMatrix((full(iproject))(0 until 50, 0 until 50))
+    //println("transposed, which si what we do in the BayesNet versino")
+    //printMatrix((full(iproject.t))(0 until 50, 0 until 50))
+    //sys.exit
 
     // Initializing everything to 0 because later we assign to it, so if we never assign to it, it's still 0.
     val maxState = maxi(maxi(statesPerNode,1),2).v
@@ -213,10 +214,10 @@ object BayesNetMooc2 {
         println("ll: %f" format llikelihood)
       }
       llikelihood = 0f
-      if (k % 5 == 0) {
-        println("Our cpt:")
-        printMatrix(FMat(cpt.t))
-      }
+      //if (k % 10 == 0) {
+      //  println("Our cpt:")
+      //  printMatrix(FMat(cpt.t))
+      //}
     }
     val showThisData = true
     if (showThisData) {
@@ -264,22 +265,21 @@ object BayesNetMooc2 {
         computeP(ids, pids, i, pSet, pMatrix, stateSet(i), saveID, idInColor.length)
       }
 
-      println("Our state0 matrix is")
-      printMatrix(stateSet(0)(0 until 76, 0 until 96))
-      println("Our state1 matrix is")
-      printMatrix(stateSet(1)(0 until 76, 0 until 96))
-      println("Our un-normalized p0 matrix is")
-      printMatrix(pSet(0)(?, 0 until 20))
-      println("Our un-normalized p1 matrix is")
-      printMatrix(pSet(1)(?, 0 until 20))
-      sys.exit
+      //println("Our state0 matrix is")
+      //printMatrix(stateSet(0)(0 until 76, 0 until 96))
+      //println("Our state1 matrix is")
+      //printMatrix(stateSet(1)(0 until 76, 0 until 96))
+      //println("Our un-normalized p0 matrix is")
+      //printMatrix(pSet(0)(?, 0 until 20))
+      //println("Our un-normalized p1 matrix is")
+      //printMatrix(pSet(1)(?, 0 until 20))
+      //sys.exit
 
       sampleColor(fdata, numState, idInColor, pSet, pMatrix)
     }
 
-    println("We have done a complete gibbs iteration. Here is the state matrix")
-    printMatrix(state(0 until 76, 0 until 96))
-    sys.exit
+    //println("We have done a complete gibbs iteration. Here is the state matrix")
+    //printMatrix(state(0 until 76, 0 until 96))
   }
 
   /**
@@ -346,11 +346,10 @@ object BayesNetMooc2 {
    */
   def computeP(ids: IMat, pids: IMat, i: Int, pSet: Array[FMat], pMatrix: FMat, statei: FMat, saveID: IMat, numPi: Int) = {
     val nodei = ln(getCpt(cptOffset(pids) + IMat(iproject(pids, ?) * statei)) + 1e-9)
-    println("For color group with nodes " + ids.t + ", our indices we use to access the cpt are:")
-    printMatrix((IMat(iproject(pids,?) * statei))(0 until 50, 0 until 50))
-    println("With global offsets:")
-    printMatrix((cptOffset(pids) + IMat(iproject(pids,?) * statei))(0 until 50, 0 until 50))
-    sys.exit
+    //println("For color group with nodes " + ids.t + ", our indices we use to access the cpt are:")
+    //printMatrix((IMat(iproject(pids,?) * statei))(0 until 50, 0 until 50))
+    //println("With global offsets:")
+    //printMatrix((cptOffset(pids) + IMat(iproject(pids,?) * statei))(0 until 50, 0 until 50))
 
     var pii = zeros(numPi, batchSize)
     pii(saveID, ?) = exp(pproject(ids, pids) * nodei)
@@ -381,13 +380,13 @@ object BayesNetMooc2 {
     pSet(0) = pSet(0) / pMatrix
     state(idInColor,?) = 0 * state(idInColor,?)
 
-    println("\nRemember that we are sampling nodes " + idInColor.t)
-    println("state matrix before sampling is:")
-    printMatrix(state(0 until 76, 0 until 96))
-    println("pSet(0), NORMALIZED, matrix before sampling is:")
-    printMatrix(pSet(0)(?, 0 until 20))
-    println("pSet(1), NORMALIZED, matrix before sampling is:")
-    printMatrix((pSet(1) / pMatrix)(?, 0 until 20))
+    //println("\nRemember that we are sampling nodes " + idInColor.t)
+    //println("state matrix before sampling is:")
+    //printMatrix(state(0 until 76, 0 until 96))
+    //println("pSet(0), NORMALIZED, matrix before sampling is:")
+    //printMatrix(pSet(0)(?, 0 until 20))
+    //println("pSet(1), NORMALIZED, matrix before sampling is:")
+    //printMatrix((pSet(1) / pMatrix)(?, 0 until 20))
 
     // Each time, we check to make sure it's <= pSet(i), but ALSO exceeds the previous \sum (pSet(j)).
     for (i <- 1 until numState) {
@@ -403,8 +402,8 @@ object BayesNetMooc2 {
       }
     }
 
-    println("state matrix after sampling is (but before overriding)")
-    printMatrix(state(0 until 76, 0 until 96))
+    //println("state matrix after sampling is (but before overriding)")
+    //printMatrix(state(0 until 76, 0 until 96))
 
     // Finally, re-write the known state into the state matrix
     val saveIndex = find(fdata >= 0)
@@ -413,8 +412,8 @@ object BayesNetMooc2 {
       println("problem with end of sampleColor(), max elem is " + maxi(maxi(state,1),2).dv)
     }
 
-    println("state matrix after sampling is (and before overriding)")
-    printMatrix(state(0 until 76, 0 until 96))
+    //println("state matrix after sampling is (and before overriding)")
+    //printMatrix(state(0 until 76, 0 until 96))
   }
 
   /** 
@@ -430,10 +429,10 @@ object BayesNetMooc2 {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
     counts = counts + beta
-    if (k % 5 == 0) {
-      println("Here is our counts matrix")
-      printMatrix(counts.t)
-    }
+    //if (k % 5 == 0) {
+    //  println("Here is our counts matrix")
+    //  printMatrix(counts.t)
+    //}
     counts = counts / (normConstMatrix * counts)
     cpt = (1 - alpha) * cpt + alpha * counts
   }
