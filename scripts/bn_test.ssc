@@ -22,7 +22,7 @@ opts.npasses = 2
 opts.samplingRate = 1
 opts.numSamplesBurn = 0
 opts.useGPU = false
-opts.power = 0.3f
+opts.power = 0.0f
 //Mat.debugMemThreshold = 4367*2+1
 //opts.debugMem = true
 opts.what

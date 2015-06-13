@@ -26,7 +26,7 @@ object BayesNetMooc {
    * state0 and state1 are similar to state, but with extra 0s and 1s in the current rows we're sampling
    */
   var nodeMap: scala.collection.mutable.HashMap[String, Int] = null
-  var graph: Graph = null
+  var graph: Graph1 = null
   var sdata: SMat = null
   var tdata: SMat = null
   var cpt: FMat = null
@@ -58,6 +58,13 @@ object BayesNetMooc {
     init(nodepath, dagpath)
     setup
     loadData(datapath, nq, ns)   
+
+    println("Our cpt.t is:")
+    println(cpt.t)
+    println("Our sdata matrix is:")
+    println(full(sdata))
+    sys.exit
+
     sampleAll
   }
 
@@ -66,7 +73,7 @@ object BayesNetMooc {
     nodeMap = loadNodeMap(nodepath)
     val n = nodeMap.size
     val dag = loadDag(dagpath, n)
-    graph = new Graph(dag, n)
+    graph = new Graph1(dag, n)
   }
 
   /**
@@ -471,10 +478,10 @@ object BayesNetMooc {
         sMap += (shash -> sid)
         sid = sid + 1
       }
-      if (t(5) == "1") {
+      if (t(4) == "1") {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = (t(3).toFloat - 0.5) * 2
+        v(ptr) = (t(2).toFloat - 0.5) * 2
         ptr = ptr + 1
       }
     }
@@ -513,14 +520,147 @@ object BayesNetMooc {
         sMap += (shash -> sid)
         sid = sid + 1
       }
-      if (t(5) == "0") {
+      if (t(4) == "0") {
         row(ptr) = sMap(shash)
         col(ptr) = nodeMap("I" + t(2))
-        v(ptr) = (t(3).toFloat - 0.5) * 2
+        v(ptr) = (t(2).toFloat - 0.5) * 2
         ptr = ptr + 1
       }
     }
     var s = sparse(col(0 until ptr), row(0 until ptr), v(0 until ptr), nq, ns)
     (s > 0) - (s < 0)
   }
+}
+
+
+
+
+
+
+
+
+
+/**
+* A graph structure for Bayesian Networks. Includes features for:
+*
+* (1) moralizing graphs, 'moral' matrix must be (i,j) = 1 means node i is connected to node j
+* (2) coloring moralized graphs, not sure why there is a maxColor here, though...
+*
+* @param dag An adjacency matrix with a 1 at (i,j) if node i has an edge TOWARDS node j.
+* @param n The number of vertices in the graph.
+*/
+class Graph1(val dag: SMat, val n: Int) {
+    var mrf: FMat = null
+    var colors: IMat = null
+    var ncolors = 0
+    val maxColor = 100
+   /**
+    * Connects the parents of a certain node, a single step in the process of moralizing the graph.
+    *
+    * Iterates through the parent indices and insert 1s in the 'moral' matrix to indicate an edge.
+    *
+    * TODO Is there a way to make this GPU-friendly?
+    *
+    * @param moral A matrix that represents an adjacency matrix "in progress" in the sense that it
+    * is continually getting updated each iteration from the "moralize" method.
+    * @param parents An array representing the parent indices of the node of interest.
+    */
+    def connectParents(moral: FMat, parents: IMat) = {
+        val l = parents.length
+        for(i <- 0 until l)
+            for(j <- 0 until l){
+                if(parents(i) != parents(j)){
+                    moral(parents(i), parents(j)) = 1f
+                }
+            }
+            moral
+    }
+    /**
+    * TODO No idea what this is yet, and it isn't in the newgibbs branch. Only used here for
+    * BayesNet.
+    */
+    def iproject = {
+        var ip = dag.t
+        for (i <- 0 until n) {
+            val ps = find(dag(?, i))
+            val np = ps.length
+            for (j <-0 until np) {
+                ip(i, ps(j)) = math.pow(2, np-j).toFloat
+            }
+        }
+        ip + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
+    }
+    /**
+    * TODO No idea what this is yet, and it isn't in the new gibbs branch. Only used here for
+    * BayesNet.
+    */
+    def pproject = {
+        dag + sparse(IMat(0 until n), IMat(0 until n), ones(1, n))
+    }
+    /**
+    * Moralize the graph.
+    *
+    * This means we convert the graph from directed to undirected and connect parents of nodes in
+    * the directed graph. First, copy the dag to the moral graph because all 1s in the dag matrix
+    * are 1s in the moral matrix (these are adjacency matrices). For each node, find its parents,
+    * connect them, and update the matrix. Then make it symmetric because the graph is undirected.
+    *
+    * TODO Is there a way to make this GPU-friendly?
+    */
+    def moralize = {
+        var moral = full(dag)
+        for (i <- 0 until n) {
+            var parents = find(dag(?, i))
+            moral = connectParents(moral, parents)
+        }
+        mrf = ((moral + moral.t) > 0)
+    }
+    /**
+    * Sequentially colors the moralized graph of the dag so that one can run parallel Gibbs
+    * sampling.
+    *
+    * Steps: first, moralize the graph. Then iterate through each node, find its neighbors, and
+    * apply a
+    * "color mask" to ensure current node doesn't have any of those colors. Then find the legal
+    * color
+    * with least count (a useful heuristic). If that's not possible, then increase "ncolor".
+    *
+    * TODO Is there a way to make this GPU-friendly?
+    */
+    def color = {
+        moralize
+        var colorCount = izeros(maxColor, 1)
+        colors = -1 * iones(n, 1)
+        ncolors = 0
+        // Access nodes sequentially. Find the color map of its neighbors, then find the legal color
+        // w/least count
+        val seq = IMat(0 until n)
+        // Can also access nodes randomly
+        // val r = rand(n, 1); val (v, seq) = sort2(r)
+        for (i <- 0 until n) {
+            var node = seq(i)
+            var nbs = find(mrf(?, node))
+            var colorMap = iones(ncolors, 1)
+            for (j <- 0 until nbs.length) {
+                if (colors(nbs(j)) > -1) {
+                    colorMap(colors(nbs(j))) = 0
+                }
+            }
+            var c = -1
+            var minc = 999999
+            for (k <- 0 until ncolors) {
+                if ((colorMap(k) > 0) && (colorCount(k) < minc)) {
+                    c = k
+                    minc = colorCount(k)
+                }
+            }
+            if (c == -1) {
+                c = ncolors
+                ncolors = ncolors + 1
+            }
+            colors(node) = c
+            colorCount(c) += 1
+        }
+        colors
+    }
 }
