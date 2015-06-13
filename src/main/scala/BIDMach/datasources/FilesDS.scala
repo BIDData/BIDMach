@@ -291,6 +291,8 @@ object FilesDS {
   
   def apply(fname:String, opts:FilesDS.Opts):FilesDS = apply(fname, opts, 4);
   
+  def apply(fname:String):FilesDS = apply(fname, new FilesDS.Options, 4);
+  
   def apply(fn1:String, fn2:String, opts:FilesDS.Opts, nthreads:Int) = {
     opts.fnames = List(simpleEnum(fn1, 1, 0), simpleEnum(fn2, 1, 0));
     implicit val ec = threadPool(nthreads);

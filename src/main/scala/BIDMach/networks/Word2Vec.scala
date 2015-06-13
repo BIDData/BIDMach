@@ -118,7 +118,10 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
         setmodelmats(new Array[Mat](2 * (nmmats + offset)));
         for (i <- 0 until nmmats) {
           val xfeats = if (i < nmmats - 1) maxCols else actualFeats - (nmmats - 1) * maxCols;
-        	modelmats(2 * (i + offset)) = (rand(opts.dim, xfeats) - 0.5f)/opts.dim;              
+          val tmp = rand(opts.dim, xfeats);
+          tmp ~ tmp - 0.5f;
+          tmp ~ tmp / opts.dim;
+        	modelmats(2 * (i + offset)) = tmp;             
         	modelmats(2 * (i + offset) + 1) = zeros(opts.dim, xfeats);
         }
         if (opts.dualMode) {
