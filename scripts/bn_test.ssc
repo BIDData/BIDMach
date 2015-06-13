@@ -2,27 +2,27 @@
 
 // BayesNet.scala now assuming general case.
 
-//val test = loadSMat("data/tdata_normal.lz4")
-//val dag = loadSMat("data/dag.lz4");
-//val data = loadSMat("data/sdata_normal.lz4")
-//val states = loadIMat("data/states.lz4")
+val tdata = loadSMat("data/tdata_normal.lz4")
+val dag = loadSMat("data/dag.lz4");
+val data = loadSMat("data/sdata_normal.lz4")
+val states = loadIMat("data/states.lz4")
 //val dag = loadSMat("data/dagDebug.lz4");
 //val data = loadSMat("data/sdataDebug.lz4")
 //val states = loadIMat("data/statesDebug.lz4")
 
-val tdata = loadSMat("data/bayesnet_student_data/dataStudentTest100k.lz4")
-val data = loadSMat("data/bayesnet_student_data/dataStudentTrain100k.lz4")
+//val tdata = loadSMat("data/bayesnet_student_data/dataStudentTest100k.lz4")
+//val data = loadSMat("data/bayesnet_student_data/dataStudentTrain100k.lz4")
 //val data = loadSMat("data/bayesnet_student_data/dataStudentTrainDense50k.lz4")
-val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
-val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
+//val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
+//val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
 
 val (nn, opts) = BIDMach.models.BayesNet.learner(states, dag, data, tdata)
-opts.batchSize = 2500
+opts.batchSize = 4367
 opts.npasses = 100
 opts.samplingRate = 1
 opts.numSamplesBurn = 0
-opts.useGPU = true
-opts.power = 0.3
+opts.useGPU = false
+opts.power = 0.0f
 //Mat.debugMemThreshold = 4367*2+1
 //opts.debugMem = true
 opts.what

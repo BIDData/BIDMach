@@ -61,6 +61,10 @@ class BayesNet(val dag:Mat,
     graph.color
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
+
+    println("Here is the iproject")
+    printMatrix((full(iproject))(0 until 50, 0 until 50))
+    //sys.exit
     
     // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
@@ -106,23 +110,17 @@ class BayesNet(val dag:Mat,
       printMatrix( FMat(a.t) )
       println("Here is the un-normalized model matrix:")
       printMatrix(FMat(mm.t))
-      println("Note that size(mm) = " + size(mm))
-      println("Also GPUmem: " + GPUmem)
+      //println("Note that size(mm) = " + size(mm))
+      //println("Also GPUmem: " + GPUmem)
     }
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
+    println( "pass " + ipass + ", ll is " + evalfun(gmats(0), gmats(1)) )
     //if (ipass % 10 == 0) predict(gmats(0),ipass) // Do not do this until it's clear that the mm is forming properly
   }
   
   /** Calls a uupdate/evalfunsequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-    //val a = mm / (mm.t * normConstMatrix).t
-    //println("\nDebugging notice with ipass = " + ipass + " and here = " + here + "; the following is the normalized model matrix:")
-    //printMatrix( FMat(a.t) )
-    //println("Here is the un-normalized model matrix:")
-    //printMatrix(FMat(mm.t))
-    //println("Note that size(mm) = " + size(mm))
-    //println("Also GPUmem: " + GPUmem)
     uupdate(gmats(0), gmats(1), ipass)
     evalfun(gmats(0), gmats(1))
   }
@@ -147,70 +145,90 @@ class BayesNet(val dag:Mat,
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
       establishZeroMatrices(sdata.ncols)
       val state = convertMat(rand(sdata.nrows, sdata.ncols))
-      state <-- min( int(statesPerNode ∘ state), statesPerNode-1 )
+      state <-- float( min( int(statesPerNode ∘ state), statesPerNode-1 ) ) // Need an extra float() outside
       val data = full(sdata)
       val select = data > 0
       user ~ (select ∘ (data-1)) + ((1-select) ∘ state)
+      println("\nInside uupdate, ipass = 0, we have our random state matrix as:")
+      printMatrix(state(0 until 76, 0 until 96))
+      println("And here is the user matrix:")
+      printMatrix(user(0 until 76, 0 until 96))
     }
     val usertrans = user.t
     
     for (k <- 0 until numGibbsIterations) {
       for (c <- 0 until graph.ncolors) {
+        println("currently sampling color c = " + c + " with nodes " + colorInfo(c).idsInColor.t)
+        println("and parent set " + colorInfo(c).chIdsInColor.t)
 
-        //println("\nNow on color c = " + c + " with nodes " + colorInfo(c).idsInColor.t)
         // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
         usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
-        //println("The usertrans matrix after zeroing-out relevant components")
-        //printMatrix(FMat(usertrans))
+
+        println("Here is the iproject sliced matrix:")
+        printMatrix(full(colorInfo(c).iprojectSliced)(0 until 50, 0 until 50))
+        println("Here is the usertrans * iprojectsliced matrix:")
+        printMatrix((usertrans * colorInfo(c).iprojectSliced)(0 until 50, 0 until 50))
+        println("Finally, here is the offset matrix:")
+
         val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
-        //println("The offset matrix:")
-        //printMatrix(FMat(offsetMatrix))
+        printMatrix(offsetMatrix(0 until 50, 0 until 50))
+        sys.exit
         val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
-        //println("The replicated offset matrix:")
-        //printMatrix(FMat(replicatedOffsetMatrix))
-        //println("Here is the mm(replicatedOffsetMatrix):")
-        //printMatrix(FMat(mm(replicatedOffsetMatrix)))
         val logProbs = ln(mm(replicatedOffsetMatrix))
-        //println("The log probs matrix:")
-        //printMatrix(FMat(logProbs))
         val nonExponentiatedProbs = logProbs * colorInfo(c).combinationMatrix
-        //println("The non exonentiated probaiblities:")
-        //printMatrix(FMat(nonExponentiatedProbs))
 
         // Now we can sample for each color in this color group.
-        for (i <- 0 until colorInfo(c).numNodes) {
-          //println("Currently sampling node " + colorInfo(c).idsInColor(i))
-          if (useGPUnow) {
+        if (useGPUnow) {
+          for (i <- 0 until colorInfo(c).numNodes) {
             val start = colorInfo(c).startingIndices(i).dv.toInt
             val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
             val probsBeforeScaling = float(nonExponentiatedProbs(?, start until start+numStates).t)
             val maxProb = maxi(maxi(probsBeforeScaling,2),1)
-            val minProb = mini(mini(probsBeforeScaling,2),1)
             val probs = if (maxProb.dv > 80) exp( probsBeforeScaling - (maxProb - 80) ) else exp(probsBeforeScaling)
-            //println("probsBeforeScaling:")
-            //printMatrix(FMat(probsBeforeScaling))
-            //println("probs")
-            //printMatrix(FMat(probs))
             val samples = zeroMap( (probs.nrows, probs.ncols) )
             multinomial(probs.nrows, probs.ncols, probs.asInstanceOf[GMat].data, 
                         samples.asInstanceOf[GIMat].data, sum(probs,1).asInstanceOf[GMat].data, 1)
             val (maxVals, indices) = maxi2( float(samples) ) 
             usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
-          } else {
-            // TODO for now I'll randomly put samples here because we don't have a CPU multinomial sampler
-            val indices = IMat(rand(usertrans.nrows,1) * statesPerNode(i) * 0.9999999)
-            usertrans(?, colorInfo(c).idsInColor(i)) = FMat(indices)
           }
+        } else {
+          // TODO for now I'll randomly put samples here because we don't have a CPU multinomial sampler
+          // Or we could assume binary stuff for now :)
+          val normMatrix = mm / (mm.t * normConstMatrix).t
+          val realLogProbs = ln(normMatrix(replicatedOffsetMatrix))
+          println("realLogProbs.t:")
+          printMatrix((realLogProbs.t)(0 until 20 ,0 until 20))
+          println("replicatedOffsetMatrix(even rows).t:")
+          printMatrix((replicatedOffsetMatrix.t)(0 until 100 by 2, 0 until 50))
+          println("replicatedOffsetMatrix(odd rows).t:")
+          printMatrix((replicatedOffsetMatrix.t)(1 until 100 by 2, 0 until 50))
+          val probs = exp(realLogProbs * colorInfo(c).combinationMatrix).t
+          val p0 = probs(0 until probs.nrows by 2, ?)
+          val p1 = probs(1 until probs.nrows by 2, ?)
+          val p = p1 / (p1 + p0)
+          println("For this group, the un-normalized p0 matrix is")
+          printMatrix(p0(?, 0 until 20))
+          println("For this group, the un-normalized p1 matrix is")
+          printMatrix(p1(?, 0 until 20))
+          println("For this group, our p1 / (p1+p0) matrix is")
+          printMatrix(p(?, 0 until 20))
+          var samples:Mat = rand(p.nrows, p.ncols)
+          samples = (samples <= p)
+          usertrans(?, colorInfo(c).idsInColor) = samples.t
         }
-        //println("After sampling all colors, we have our usertrans:")
-        //printMatrix(FMat(usertrans))
 
         // After we finish sampling with this color group, we override the known values.
         val data = full(sdata)
         val select = data > 0
         usertrans ~ (select *@ (data-1)).t + ((1-select) *@ usertrans.t).t
+        println("Now usertrans.t after overwriting is:")
+        printMatrix((usertrans.t)(0 until 76, 0 until 96))
       }     
     }
+
+    println("We have done a complete Gibbs iteration. Here is our usertrans.t matrix (so rows = variables):")
+    printMatrix((usertrans.t)(0 until 76, 0 until 96))
+    sys.exit
     
     // After a complete Gibbs iteration (or more, depending on burn-in or thinning), update the CPT.
     user <-- usertrans.t
@@ -499,7 +517,7 @@ class BayesNet(val dag:Mat,
     for (i <- 0 until user.ncols) {
       counts(index(?, i)) = counts(index(?, i)) + 1
     }
-    mm <-- (counts + opts.alpha)
+    mm <-- (float(counts) + opts.alpha)
   }
   
   /**
@@ -554,10 +572,10 @@ class BayesNet(val dag:Mat,
   }
 
   /** A debugging method to print matrices, without being constrained by the command line's cropping. */
-  def printMatrix(mat: FMat) = {
+  def printMatrix(mat: Mat) = {
     for(i <- 0 until mat.nrows) {
       for (j <- 0 until mat.ncols) {
-        print(mat(i,j) + " ")
+        print(mat(IMat(i),j) + " ")
       }
       println()
     }
@@ -578,7 +596,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var alpha = 1f
+    var alpha = 0.1f
     var samplingRate = 1
     var numSamplesBurn = 0
   }
