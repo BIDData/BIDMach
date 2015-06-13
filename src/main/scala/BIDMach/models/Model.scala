@@ -213,6 +213,7 @@ object Model {
 	  var useDouble = false
 	  var doubleScore = false
 	  var dim = 256
+	  var debug = 0;
   }
 	
 	class Options extends Opts {}

@@ -17,11 +17,12 @@ val (nn,opts)=GLM.learnerX(a,c,1)
 
 opts.batchSize=5000
 opts.lrate = 0.1f
-opts.npasses = 3
+opts.npasses = 100
 opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
 opts.aopts = opts;
+opts.useGPU = false
 
 //val dd = mkdiag(ones(100,1));
 //val tmap = dd on dd on dd on dd

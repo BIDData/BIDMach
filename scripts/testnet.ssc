@@ -1,0 +1,49 @@
+:silent
+import BIDMach.networks.Net
+
+val dir="c:/code/BIDMach/data/rcv1/"
+
+val a0 = loadSMat(dir + "docs.smat.lz4")(0->100000,?)
+val c0 = loadFMat(dir + "cats.fmat.lz4")(0->100,?)
+val rr = rand(c0.ncols,1);
+val (ss, ii) = sort2(rr);
+val a = a0(?,ii);
+val c = c0(?,ii);
+
+val ta = loadSMat(dir + "testdocs.smat.lz4")(0->100000,?)
+val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,?)
+
+val pc = zeros(tc.nrows, tc.ncols)
+
+val opts = new Net.LearnOptions
+
+opts.aopts = opts
+opts.batchSize=2000
+opts.reg1weight = 0.0001
+opts.npasses = 1
+opts.addConstFeat=false;
+opts.links = iones(100,1);
+opts.lrate = 0.4f // best for 6-layer
+opts.lrate = 0.2f 
+opts.texp = 0.4f
+opts.nweight = 1e-4f
+
+val net = Net.dlayers4(7,500,0.5f,100,opts,2);
+
+val (nn,opts0) = Net.learnerX(net,a,c);
+
+nn.train
+
+val dnn = nn.model.asInstanceOf[Net]
+
+val (mm,mopts) = Net.predictor(dnn, ta, pc);
+mopts.batchSize=1000
+
+
+mm.predict
+
+val rc = roc2(pc, tc, 1-tc, 1000)
+val counts = sum(tc,2);
+:silent
+println("auc6 = %5.4f, auc weighted mean = %5.4f" format (mean(rc)(6), (mean(rc) * counts / sum(counts)).dv));
+

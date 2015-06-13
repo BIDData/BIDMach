@@ -1,0 +1,77 @@
+:silent
+// Repartition and remap the data files to fixed size for a FileDS
+
+val size = 10000000; // target size in words
+
+var read = 0L;                    // words read
+var written = 0L;                 // words written
+
+def repartition(infilepat:String, outfilepat:String, map:IMat, ifile:Int, nfiles:Int, size:Int) {
+    var i = ifile;
+    var j = 0;
+    var todo = 0;
+
+    val container = izeros(2, size);  // Output container
+    var filled = 0;                   // how many cols filled in the container
+    var ioff = 0;                     // offset to give a unique sentence id. 
+
+    while (i <= nfiles) {
+        val indat = loadIMat(infilepat format i);
+        read += indat.nrows;
+        var indone = 0;
+        var todo = indat.nrows - indone;
+        while (todo > 0) {
+            val tocopy = math.min(todo, size - filled);
+            val inds = indat(indone -> (indone + tocopy), 1).t - 1;      // convert 1 -> zero-based
+            val ii = find(inds < map.length);                            // make sure we're in the map
+            container(0, filled -> (filled + tocopy)) = -1;              // set everything to OOV
+            container(0, filled + ii) = map(inds(0,ii));                 // then set mappable indices
+            container(1, filled -> (filled + tocopy)) = indat(indone -> (indone + tocopy), 0).t + ioff;   // add offset for unique sentence IDs
+            filled += tocopy;
+            indone += tocopy;
+            todo -= tocopy;
+            if (filled == size) {
+                saveIMat(outfilepat format j, container); 
+                filled = 0;
+                written += size;
+                j += 1;
+            }
+        }
+        ioff += indat(indat.nrows - 1, 0) + 1;
+        i += 1;
+        print(".");
+    }    
+    println;
+    if (filled > 0) {
+        saveIMat(outfilepat format j, container(?, 0->filled)); 
+        written += filled;
+    }
+}
+
+val dir = "../data/word2vec/tokenized/";
+val words0 = CSMat(loadSBMat(dir + "sentence.sbmat.gz"));
+val cnt0 = loadIMat(dir + "sentence.cnt.imat.gz");
+val (vv, ii) = sortdown2(cnt0);
+val words = words0(ii);
+saveCSMat("../data/word2vec/data/dict.csmat.lz4", words);
+saveDMat("../data/word2vec/data/dict.dmat.lz4", DMat(vv));
+val map0 = invperm(ii);
+
+
+val dir2 = "../data/word2vec/tokenized2/";
+val dict2 = Dict(loadSBMat(dir2 + "sentence.sbmat.gz"));
+val map1 = dict2 --> Dict(words);
+
+repartition(dir+ "news.en-%05d-of-00100_sentence.imat.gz",
+            "../data/word2vec/data/train%05d.imat.lz4",
+            map0,
+            0, 99, size);
+
+
+repartition(dir2 +"news.en.heldout-%05d-of-00050_sentence.imat.gz",
+            "../data/word2vec/data/test%05d.imat.lz4",
+            map1,
+            0, 49, size);
+
+:silent
+sys.exit
