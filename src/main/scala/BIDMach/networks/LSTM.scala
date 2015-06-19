@@ -73,7 +73,7 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	val nr = batchSize / opts.width;
-  	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = gmats(0).zeros(1,1);
+  	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = gmats(0).izeros(1,1);
   	val in0 = gmats(0);
   	val inshift = in0(0,1->(in0.ncols)) \ dummyword;
     val in = inshift.view(nr, opts.width).t;
