@@ -67,7 +67,7 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
       layers(i).output = in.colslice(i,i+1);
     }	
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
-      leftedge.output = in.zeros(opts.dim, batchSize);
+      leftedge.output = in.izeros(opts.dim, batchSize);
     }
   }
   
