@@ -6,13 +6,17 @@
 //val data = loadSMat("data/sdata_normal.lz4")
 //val states = loadIMat("data/states.lz4")
 
+// Other data sets (I prefer just using 10 percent of the data)
 //val data = loadSMat("data/bayesnet_student_data/dataStudentTrainDense50k.lz4")
-val data = loadSMat("data/bayesnet_student_data/dataStudentTrain100k.lz4")
+//val data = loadSMat("data/bayesnet_student_data/dataStudentTrain100k.lz4")
+
+val data = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
 val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
 val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
 
 val (nn, opts) = BIDMach.models.BayesNet.learner(states, dag, data)
-opts.npasses = 20
+opts.npasses = 3
+opts.batchSize = 100
 opts.samplingRate = 1
 opts.numSamplesBurn = 0
 opts.useGPU = true
