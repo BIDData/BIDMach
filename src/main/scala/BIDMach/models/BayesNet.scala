@@ -63,8 +63,7 @@ class BayesNet(val dag:Mat,
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cptOffset = convertMat(cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
-    //val cpt = convertMat(rand(lengthCPT,1))
-    val cpt = convertMat(.5 on .5 on .5 on .5 on .5 on .5 on .5 on .5 on .33 on .34 on .33 on .33 on .34 on .33 on .33 on .34 on .33 on .33 on .34 on .33 on .5 on .5 on .5 on .5 on .5 on .5)
+    val cpt = convertMat(rand(lengthCPT,1))
     
     // To finish building CPT, we normalize it based on the batch size and normalizing constant matrix.
     normConstMatrix = getNormConstMatrix(lengthCPT)
