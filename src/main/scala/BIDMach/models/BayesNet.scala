@@ -35,7 +35,6 @@ class BayesNet(val dag:Mat,
   var useGPUnow:Boolean = false             // NOTE: Ideally, we will NOT need to use this at all!
   var batchSize:Int = -1
   var lastBatchSize:Int = -1
-  var zeroVector:Mat = null
   var counts:Mat = null
 
   /**
@@ -64,6 +63,7 @@ class BayesNet(val dag:Mat,
     cptOffset = convertMat(cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     val cpt = convertMat(rand(lengthCPT,1))
+    println("starting cpt: " + cpt.t)
     
     // To finish building CPT, we normalize it based on the batch size and normalizing constant matrix.
     normConstMatrix = getNormConstMatrix(lengthCPT)
@@ -85,7 +85,6 @@ class BayesNet(val dag:Mat,
     zeroMap = new HashMap[(Int,Int),Mat]()
 
     // To wrap it up, create/convert a few matrices, reset some variables, and add some debugging info
-    zeroVector = mm.izeros(mm.length, 1)
     counts = mm.izeros(mm.length, 1)
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
@@ -211,10 +210,9 @@ class BayesNet(val dag:Mat,
    */
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val index = int(cptOffset + (user.t * iproject).t)
-    counts <-- zeroVector
-    for (i <- 0 until user.ncols) {
-      counts(index(?, i)) = counts(index(?, i)) + 1
-    }
+    val linearIndices = index(?)
+    counts.clear
+    counts <-- accum(linearIndices, 1, counts.length, 1)
     updatemats(0) <-- (float(counts) + opts.alpha)
   }
  
