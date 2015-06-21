@@ -2,24 +2,38 @@
 
 // BayesNet.scala now assuming general case.
 
+// This is Huasha's data
 //val dag = loadSMat("data/sortedDag.lz4");
 //val data = loadSMat("data/sdata_normal.lz4")
 //val states = loadIMat("data/states.lz4")
 
-// Other data sets (I prefer just using 10 percent of the data)
-//val data = loadSMat("data/bayesnet_student_data/dataStudentTrainDense50k.lz4")
-//val data = loadSMat("data/bayesnet_student_data/dataStudentTrain100k.lz4")
+// This is the data I'm using, following Daphne's example DAG
+// Just for comparison, the real model matrix is realCPT:
+val realCPT = .7 on .3 on .6 on .4 on .95 on .05 on .2 on .8 on .3 on .4 on .3 on .05 on .25 on .7 on .9 on .08 on .02 on .5 on .3 on .2 on .1 on .9 on .4 on .6 on .99 on .01
+val data1 = loadSMat("data/bayesnet_student_data/dataStudentTrainDense50k.lz4")
+val data2 = loadSMat("data/bayesnet_student_data/dataStudentTrain100k.lz4")
+val data3 = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
+val data4 = loadFMat("data/bayesnet_student_data/dataStudent_1000000.txt")
 
-val data = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
+val somedata = data3(?, 0 until 50000)
+val realdata = data4(?, 0 until 50000)
+realdata <-- (realdata + 1)
+val (ii,jj,kk) = find3(realdata)
+val alldata = sparse(ii,jj,kk,5,50000)
+
 val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
 val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
 
-val (nn, opts) = BIDMach.models.BayesNet.learner(states, dag, data)
-opts.npasses = 3
-opts.batchSize = 100
-opts.samplingRate = 1
-opts.numSamplesBurn = 0
-opts.useGPU = true
-opts.what
-nn.train
+val (nn0 , opts0) = BIDMach.models.BayesNet.learner(states , dag , somedata)
+val (nn1 , opts1) = BIDMach.models.BayesNet.learner(states , dag , realdata)
 
+opts0.npasses = 3
+opts0.useGPU = true
+opts0.what
+
+opts1.npasses = 3
+opts1.useGPU = true
+opts1.what
+
+nn0.train
+nn1.train
