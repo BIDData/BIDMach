@@ -99,7 +99,7 @@ class BayesNet(val dag:Mat,
   }
   
   /** Calls a uupdate/evalfunsequence. Known data is in gmats(0), sampled data is in gmats(1). */
-  override def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+  override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
     uupdate(gmats(0), gmats(1), ipass)
     evalfun(gmats(0), gmats(1))
   }
