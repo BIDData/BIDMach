@@ -42,6 +42,8 @@ import scala.concurrent.ExecutionContextExecutor
  * For floating point data, the leading nbits are used. So e.g. 16 float bits gives sign, 8 bits of exponent, 
  * and 7 bits of mantissa with a leading 1. 
  * 
+ * The category labels in the cats matrix should be contiguous, non-negative integer labels starting with zero. 
+ * 
  * For regression, discrete (integer) target values should be used in the training data. The output will be continuous
  * values interpolated from them.
  * 
@@ -260,7 +262,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   } 
 
   def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
-    val data = gmats(0);
+    val data = full(gmats(0));
     val cats = gmats(1);
     val t0 = toc;
 //    var blockv0:SVec = null;
@@ -320,7 +322,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val depth = if (opts.training) ipass else opts.depth
-    val data = gmats(0);
+    val data = full(gmats(0));
     val cats = gmats(1);
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
     val fnodes:FMat = zeros(ntrees, data.ncols);
