@@ -1350,9 +1350,9 @@ object RandomForest {
   
   class RFSopts extends RFopts with MatDS.Opts;
   
-  def learner(data:FMat, labels:IMat) = {
+  def learner(data:Mat, labels:IMat) = {
     val opts = new RFSopts;
-    opts.nbits = countbits(maxi(maxi(data)).dv.toInt);
+    opts.nbits = 16;
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
     val nn = new Learner(
         new MatDS(Array(data, labels), opts), 
