@@ -252,7 +252,8 @@ object ADAGrad {
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
     val nc = b.ncols;
-    Mat.nflops += 2L * nr * b.nnz;
+    val npc = b.nnz / b.ncols;
+    Mat.nflops += 2L * nr * b.nnz * npc;
     (a, b, mm, sumSq, lrate, texp, vexp) match {
       case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
         val fmask = mask.asInstanceOf[FMat];

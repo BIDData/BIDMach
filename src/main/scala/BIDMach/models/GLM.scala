@@ -506,6 +506,8 @@ object GLM {
   def hashMult(a:GMat, b:GSMat, bound1:Int, bound2:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashMult".##);
     c.clear;
+    val npercol = b.nnz / b.ncols;
+    Mat.nflops += 1L * a.nrows * npercol * b.nnz;
     CUMACH.hashMult(a.nrows, a.ncols, b.ncols, bound1, bound2, a.data, b.data, b.ir, b.jc, c.data, 0);
     c
   }
@@ -520,6 +522,8 @@ object GLM {
   def hashMultT(a:GMat, b:GSMat, nfeats:Int, bound1:Int, bound2:Int):GMat = {
     val c = GMat.newOrCheckGMat(a.nrows, nfeats, null, a.GUID, b.GUID, nfeats, "hashMultT".##);
     c.clear;
+    val npercol = b.nnz / b.ncols;
+    Mat.nflops += 1L * a.nrows * npercol * b.nnz;
     CUMACH.hashMult(a.nrows, nfeats, b.ncols, bound1, bound2, a.data, b.data, b.ir, b.jc, c.data, 1);
     c
   }
@@ -532,6 +536,8 @@ object GLM {
 
   def hashCross(a:GMat, b:GSMat, c:GSMat):GMat = {
     val d = GMat.newOrCheckGMat(a.nrows, b.ncols, null, a.GUID, b.GUID, "hashCross".##);
+    val npercol = b.nnz / b.ncols;
+    Mat.nflops += 1L * a.nrows * npercol * b.nnz;
     d.clear;
     CUMACH.hashCross(a.nrows, a.ncols, b.ncols, a.data, b.data, b.ir, b.jc, c.data, c.ir, c.jc, d.data, 0);
     d
@@ -545,6 +551,8 @@ object GLM {
   
   def hashCrossT(a:GMat, b:GSMat, c:GSMat, nfeats:Int):GMat = {
     val d = GMat.newOrCheckGMat(a.nrows, nfeats, null, a.GUID, b.GUID, "hashCrossT".##);
+    val npercol = b.nnz / b.ncols;
+    Mat.nflops += 1L * a.nrows * npercol * b.nnz;
     d.clear;
     CUMACH.hashCross(a.nrows, nfeats, b.ncols, a.data, b.data, b.ir, b.jc, c.data, c.ir, c.jc, d.data, 1);
     d
