@@ -151,7 +151,7 @@ class BayesNet(val dag:Mat,
           val keys = samples + 0
           val cumsumMatrix = samples + 0
           val normalizedProbs = probs / sum(probs, 1)
-          BIDMat.SciFunctions.multinomial(normalizedProbs, keys, cumsumMatrix, samples, 1)
+//          BIDMat.SciFunctions.multinomial(normalizedProbs, keys, cumsumMatrix, samples, 1)
           val (maxVals, indices) = maxi2( samples )
           usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
           zeroMap( (probs.nrows, probs.ncols) ).clear
