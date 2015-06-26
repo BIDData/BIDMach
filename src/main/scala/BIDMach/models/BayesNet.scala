@@ -134,12 +134,35 @@ class BayesNet(val dag:Mat,
       for (c <- 0 until graph.ncolors) {
 
         // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
-        usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
+        
+        //usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
+        
+        // Daniel you dont need the above construction, you can just do:
+        usertrans(?, colorInfo(c).idsInColor) = 0
         val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
         val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
         val logProbs = ln(mm(replicatedOffsetMatrix))
         val nonExponentiatedProbs = logProbs * colorInfo(c).combinationMatrix
-
+        
+        // Daniel: Lets simplify and parallelize from here:
+        // Since the states per node are fixed lets put them in a matrix colorInfo(c).keys = 0,0,0,1,1,1,2,2,2,2 
+        // where the length of each group is the number of states and the number is the node id. 
+        // you can define also a scattering matrix ikeys = 2,5,9 which contains the index of the last element in the group,
+        // and then bkeys = ikeys(keys) = 2,2,2,5,5,5,9,9,9,9.
+        // Finally construct a samplemat of dimension 1 x nnodes for each color group to hold random values. 
+        // 
+        /*
+         * val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys)
+         * val probs = exp(nonExponentiatedProbs - maxInGroup)               // avoid overflow and exp
+         * val cumprobs = cumsumByKey(probs, keys);                          // their cumulative sum in groups
+         * val normedProbs = cumprobs / cumprobs(bkeys);                     // normalize
+         * val greater = normedProbs > rand(colorInfo(c).samplemat)(keys);   // find cumsum vals that are bigger than the sample
+         * val sampleids = cumsumByKey(greater)(ikeys)                        // already has the right dimensions
+        */
+        
+        // dont need the loop over nodes any more...
+        
+        
         // Now we can sample for each color in this color group.
         for (i <- 0 until colorInfo(c).numNodes) {
           val start = colorInfo(c).startingIndices(i).dv.toInt
