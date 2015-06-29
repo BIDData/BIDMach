@@ -1350,7 +1350,7 @@ object RandomForest {
   
   class RFSopts extends RFopts with MatDS.Opts;
   
-  def learner(data:Mat, labels:IMat) = {
+  def learner(data:Mat, labels:Mat) = {
     val opts = new RFSopts;
     opts.nbits = 16;
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
@@ -1375,9 +1375,20 @@ object RandomForest {
     (nn, opts)
   }
   
-  def predictor(model:RandomForest, ds:DataSource, opts:RFopts):(Learner, RFopts) = {
+  def predictor(model:Model, ds:DataSource, opts:RFopts):(Learner, RFopts) = {
     val nn = new Learner(
         ds, 
+        model,
+        null, 
+        new Batch(opts),
+        opts)
+    (nn, opts)
+  }
+  
+  def predictor(model:Model, data:Mat, preds:Mat):(Learner, RFopts) = {
+    val opts = model.opts.asInstanceOf[RFSopts];
+    val nn = new Learner(
+        new MatDS(Array(data, preds), opts),
         model,
         null, 
         new Batch(opts),

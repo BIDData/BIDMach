@@ -15,14 +15,14 @@ val pc = zeros(tc.nrows, tc.ncols)
 
 val (nn,opts)=GLM.learnerX(a,c,1)
 
-opts.batchSize=5000
+opts.batchSize=10000
 opts.lrate = 0.1f
-opts.npasses = 100
+opts.npasses = 4
 opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
 opts.aopts = opts;
-opts.useGPU = false
+//opts.useGPU = false
 
 //val dd = mkdiag(ones(100,1));
 //val tmap = dd on dd on dd on dd
