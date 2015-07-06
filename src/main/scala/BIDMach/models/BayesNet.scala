@@ -40,6 +40,7 @@ class BayesNet(val dag:Mat,
   var onesVectorLast:Mat = null
   var untilVector:Mat = null
   var untilVectorLast:Mat = null
+  var didWeAddMoreMatrices:Boolean = false
 
   /**
    * Performs a series of initialization steps.
@@ -51,9 +52,10 @@ class BayesNet(val dag:Mat,
    * Note that the randomization of the input data to be put back in the data is done in uupdate.
    */
   override def init() = {
+    useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
+    didWeAddMoreMatrices = false
 
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
-    useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
     statesPerNode = IMat(states)
     graph = new Graph(dag, opts.dim, statesPerNode)
     graph.color
@@ -113,7 +115,7 @@ class BayesNet(val dag:Mat,
    * On the first ipass, it randomizes the user matrix except for those values that are already known from
    * sdata. This method also establishes zero matrices of varying sizes to be put in zeroMap for caching
    * purposes. Then, for any pass over the data, this iterates through each color group, iterates through
-   * each of its nodes, and samples using the multinomial function.
+   * each of its nodes, and samples using the multinomial function. EDIT: No, now there's a better way! :)
    * 
    * @param sdata The sparse data matrix for this batch (0s = unknowns), which the user matrix shifts by -1.
    * @param user A data matrix with the same dimensions as sdata, and whose columns represent various iid
@@ -123,9 +125,12 @@ class BayesNet(val dag:Mat,
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     var numGibbsIterations = opts.samplingRate
+    
+    // For the first pass, there are a lot of matrices we create in establishZeroMatrices/establishRemaining...
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
       establishZeroMatrices(sdata.ncols)
+      establishRemainingColorGroupMatrices(sdata.ncols)
       val state = convertMat(rand(sdata.nrows, sdata.ncols))
       state <-- float( min( int(statesPerNode ∘ state), statesPerNode-1 ) ) // Need an extra float() outside
       val data = full(sdata)
@@ -133,7 +138,7 @@ class BayesNet(val dag:Mat,
       user ~ (select ∘ (data-1)) + ((1-select) ∘ state)
     }
     val usertrans = user.t
-    
+
     for (k <- 0 until numGibbsIterations) {
       for (c <- 0 until graph.ncolors) {
 
@@ -144,26 +149,25 @@ class BayesNet(val dag:Mat,
         val logProbs = ln(mm(replicatedOffsetMatrix))
         val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrix).t
         
-        // Set up two vectors that we'll use for replication and scaling purposes.
-        val onesVec = if (batchSize == user.ncols) onesVector else onesVectorLast
-        val untilVec = if (batchSize == user.ncols) untilVector else untilVectorLast
-
-        // Parallel multinomial sampling. Note: colorInfo(c).{keys,scaledKeys,ikeys,bkeys} are all ROW vectors.
-        val keysMatrix = (colorInfo(c).keys).t * onesVec                        // Replicate keys across columns
-        val bkeysOffsets = int(untilVec * (colorInfo(c).keys).ncols)           // Add to bkeysMatrix to get correct column indices
-        val bkeysMatrix = int(colorInfo(c).bkeys.t * onesVec) + bkeysOffsets    // Again, replicate keys across columns
-        val maxInGroup = cummaxByKey(nonExponentiatedProbs, keysMatrix)(bkeysMatrix)
+        // Establish matrices needed for the multinomial sampling
+        val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
+        val bkeys = if (user.ncols == batchSize) colorInfo(c).bkeysMatrix else colorInfo(c).bkeysMatrixLast
+        val bkeysOff = if (user.ncols == batchSize) colorInfo(c).bkeysOffsets else colorInfo(c).bkeysOffsetsLast
+        val randIndices = if (user.ncols == batchSize) colorInfo(c).randMatrixIndices else colorInfo(c).randMatrixIndicesLast
+        val sampleIndices = if (user.ncols == batchSize) colorInfo(c).sampleIDindices else colorInfo(c).sampleIDindicesLast
+        
+        // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
+        val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys)
         val probs = exp(nonExponentiatedProbs - maxInGroup)
-        val cumprobs = cumsumByKey(probs, keysMatrix)
-        val normedProbs = cumprobs / cumprobs(bkeysMatrix)
+        val cumprobs = cumsumByKey(probs, keys)
+        val normedProbs = cumprobs / cumprobs(bkeys)
         
         // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
         val randMatrix = zeroMap( (colorInfo(c).numNodes, usertrans.nrows) )
         randMatrix <-- convertMat(rand(randMatrix.nrows, randMatrix.ncols) * 0.99999f)
-        val randOffsets = int(untilVec * colorInfo(c).numNodes)
-        val lessThan = normedProbs < randMatrix(int((colorInfo(c).scaledKeys).t * onesVec) + randOffsets)
+        val lessThan = normedProbs < randMatrix(randIndices)
         randMatrix.clear
-        val sampleIDs = cumsumByKey(lessThan, keysMatrix)(int((colorInfo(c).ikeys).t * onesVec) + bkeysOffsets)
+        val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
         usertrans(?, colorInfo(c).idsInColor) = sampleIDs.t
         
         // After we finish sampling with this color group, we override the known values.
@@ -328,6 +332,32 @@ class BayesNet(val dag:Mat,
       cg.iprojectSliced = GSMat(cg.iprojectSliced.asInstanceOf[SMat])
     }
     return cg
+  }
+  
+  /** All right, I lied, we really should do a little more for each color group. */
+  def establishRemainingColorGroupMatrices(ncols:Int) = {
+    if (!didWeAddMoreMatrices || ncols != batchSize) {
+      if (!didWeAddMoreMatrices) {
+        for (c <- 0 until graph.ncolors) {
+          colorInfo(c).keysMatrix = (colorInfo(c).keys).t * onesVector
+          colorInfo(c).bkeysOffsets = int(untilVector * colorInfo(c).keys.ncols)
+          colorInfo(c).bkeysMatrix = int(colorInfo(c).bkeys.t * onesVector) + colorInfo(c).bkeysOffsets
+          val randOffsets = int(untilVector * colorInfo(c).numNodes)
+          colorInfo(c).randMatrixIndices = int((colorInfo(c).scaledKeys).t * onesVector) + randOffsets
+          colorInfo(c).sampleIDindices = int((colorInfo(c).ikeys).t * onesVector) + colorInfo(c).bkeysOffsets
+        } 
+        didWeAddMoreMatrices = true
+      } else if (ncols != batchSize) {
+        for (c <- 0 until graph.ncolors) {
+          colorInfo(c).keysMatrixLast = (colorInfo(c).keys).t * onesVectorLast
+          colorInfo(c).bkeysOffsetsLast = int(untilVectorLast * colorInfo(c).keys.ncols)
+          colorInfo(c).bkeysMatrixLast = int(colorInfo(c).bkeys.t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
+          val randOffsets = int(untilVectorLast * colorInfo(c).numNodes)
+          colorInfo(c).randMatrixIndicesLast = int((colorInfo(c).scaledKeys).t * onesVectorLast) + randOffsets
+          colorInfo(c).sampleIDindicesLast = int((colorInfo(c).ikeys).t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
+        }
+      }
+    }
   }
 
   /**
@@ -614,4 +644,14 @@ class ColorGroup {
   var ikeys:Mat = null
   var bkeys:Mat = null
   var samplemat:Mat = null
+  var keysMatrix:Mat = null
+  var keysMatrixLast:Mat = null
+  var bkeysMatrix:Mat = null
+  var bkeysMatrixLast:Mat = null
+  var bkeysOffsets:Mat = null
+  var bkeysOffsetsLast:Mat = null
+  var sampleIDindices:Mat = null
+  var sampleIDindicesLast:Mat = null
+  var randMatrixIndices:Mat = null
+  var randMatrixIndicesLast:Mat = null
 }
