@@ -9,3 +9,6 @@ Documentation is <b><a href="https://github.com/BIDData/BIDMach/wiki">here in th
 BIDMach is a sister project of BIDMat, a matrix library, which is 
 <b><a href="https://github.com/BIDData/BIDMat">also on github</a></b>
 
+
+
+[![Join the chat at https://gitter.im/BIDData/BIDMach](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/BIDData/BIDMach?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
