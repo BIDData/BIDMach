@@ -12,7 +12,7 @@ import scala.util.hashing.MurmurHash3;
 import scala.collection.mutable.HashMap;
 
 /**
- * Basic Net Layer class. There are currently 16 layer types:
+ * Basic Net Layer class. There are currently 17 layer types:
  - InputLayer: just a placeholder for the first layer which is loaded with input output blocks. No learnable params. 
  - LinLayer: Linear layer. Has a matrix of learnable params which is the input-output map. 
  - RectLayer: Rectifying one-to-one layer. No params.
@@ -30,6 +30,9 @@ import scala.collection.mutable.HashMap;
  - ExpLayer: exponential
  - SumLayer: column-wise sum
  - CopyLayer: copies its input to its output. 
+ - OnehotLayer: Converts an integer array of feature values to a sparse matrix whose columns are the instances with one non-zero in the feature position. 
+ *
+ *
  *
  * Currently only four Layer types need params:
  - LinLayer: "outside" holds the output dimensions of the FClayer (input dimension set by previous layer). 
@@ -48,24 +51,44 @@ import scala.collection.mutable.HashMap;
  * You can also create the Layer graph directly using the "setinput()" method in each layer. 
  */
 
+// Notes: 
+// Layer Nodes can have multiple inputs and multiple outputs. 
+// Each layer contains an array of inputs, an array of outputs, and an array of derivatives. 
+// The output and derivatives are "owned" by the node and are simple arrays of Mat. 
+//
+// The inputs comprise a reference to another layer and an integer which is the number of output of that layer to use. 
+// _inputs(i): refers to input layer i, and _inputNums(i): the number of the output of layer i we are using. 
+//
+// To simplify references to input matrices, convenience functions are provided:
+//   inputData: refers to this layers first input matrix. 
+//   inputDeriv: refers to the derivative matrix for the first input. 
+//   inputDatas(i): refers to the i^th input matrix of this layer.
+//   inputDerivs(i); refers to the derivative of the i^th input layer. 
+//
+// its also possible to assign to inputDeriv for backward processing. 
+//
+// To set layer A's i^th input to layer B's default (0th) output, do A.setinput(i, B)
+// To set layer A's i^th input to layer B's j^th output, do A.setinout(i, B, j)
 
   
 class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
+  // Internal data arrays
   val _inputs = new Array[Layer](1);
   val _inputNums = Array(0);
   val _outputs = new Array[Mat](1);
   val _derivs = new Array[Mat](1);
   def inputlength = _inputs.length
   
+  // Setters and getters for general elements of those arrays
   def inputs(i:Int) = _inputs(i);
   def outputs(i:Int) = _outputs(i);
-  def derivs(i:Int) = _derivs(i);
-  
-  def setinput(i:Int, v:Layer) = {_inputs(i) = v;}
+  def derivs(i:Int) = _derivs(i);  
   def setoutput(i:Int, v:Mat) = {_outputs(i) = v;}
   def setderiv(i:Int, v:Mat) = {_derivs(i) = v;}
+  def setinput(i:Int, v:Layer) = {_inputs(i) = v; _inputNums(i) = 0;}
   def setinout(i:Int, v:Layer, j:Int) = {_inputs(i) = v; _inputNums(i) = j;}
   
+  // Setters and getters for the first input or output
   def input = _inputs(0);
   def output = _outputs(0);
   def deriv = _derivs(0);
@@ -73,7 +96,12 @@ class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
   def output_= (v:Mat):Unit = {_outputs(0) = v};
   def deriv_=(v:Mat):Unit = {_derivs(0) = v};
   
-  def inputOut = input.outputs(_inputNums(0));
+  // Input getters (and one setter) which get the appropriate output from each input layer
+  def inputData = _inputs(0)._outputs(_inputNums(0));
+  def inputDeriv = _inputs(0)._derivs(_inputNums(0));
+  def inputDeriv_=(v:Mat):Unit = {_inputs(0)._derivs(_inputNums(0)) = v}; 
+  def inputDatas(i:Int) = _inputs(i)._outputs(_inputNums(i));
+  def inputDerivs(i:Int) = _inputs(i)._derivs(_inputNums(i));
   
   var target:Mat = null;
   def forward = {};
@@ -88,11 +116,11 @@ class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
   def convertMat(mat:Mat) = {net.convertMat(mat);}
 
   def createoutput = {
-  	if (output.asInstanceOf[AnyRef] == null) output = inputOut.zeros(inputOut.nrows, inputOut.ncols);
+  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(inputData.nrows, inputData.ncols);
   }
 
   def createoutput(nrows:Int, ncols:Int) = {
-  	if (output.asInstanceOf[AnyRef] == null) output = inputOut.zeros(nrows, ncols);
+  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(nrows, ncols);
   }
 
   def clearDeriv = {
@@ -163,13 +191,14 @@ object ModelLayer {
     }
   }
 }
+
 /**
  * Linear layer. 
  * Includes a model matrix that contains the linear map. 
  */
 
 class LinLayer(override val net:Net, override val opts:LinLayer.Options = new LinLayer.Options) extends ModelLayer(net, opts) {
-	var vexp:Mat = null;
+  var vexp:Mat = null;
   var texp:Mat = null;
   var lrate:Mat = null;
   var sumsq:Mat = null;
@@ -179,55 +208,55 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   var epsilon = 0f;
 
   override def forward = {
-  	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-  	  val outdim = if (opts.outdim == 0) (inputOut.nrows + (if (opts.constFeat) 1 else 0)) else opts.outdim;
-  		modelmats(imodel) = convertMat(normrnd(0, 1, outdim, inputOut.nrows + (if (opts.constFeat) 1 else 0)));
-  		updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
-  		if (opts.aopts != null) initADAGrad;  
-  	}
-  	val mm = if (opts.constFeat) {
-  		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
-  	} else {
-  		modelmats(imodel);
-  	}
-  	createoutput(mm.nrows, inputOut.ncols);
-  	output ~ mm * inputOut;
-  	if (opts.constFeat) output ~ output + modelmats(imodel).colslice(0, 1);
-  	clearDeriv;
+    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+      val outdim = if (opts.outdim == 0) (inputData.nrows + (if (opts.constFeat) 1 else 0)) else opts.outdim;
+      modelmats(imodel) = convertMat(normrnd(0, 1, outdim, inputData.nrows + (if (opts.constFeat) 1 else 0)));
+      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
+      if (opts.aopts != null) initADAGrad;  
+    }
+    val mm = if (opts.constFeat) {
+      modelmats(imodel).colslice(1, modelmats(imodel).ncols);
+    } else {
+      modelmats(imodel);
+    }
+    createoutput(mm.nrows, inputData.ncols);
+    output ~ mm * inputData;
+    if (opts.constFeat) output ~ output + modelmats(imodel).colslice(0, 1);
+    clearDeriv;
   }
 
   override def backward(ipass:Int, pos:Long) = {
-  	val mm = if (opts.constFeat && imodel > 0) {
-  		modelmats(imodel).colslice(1, modelmats(imodel).ncols);
-  	} else {
-  		modelmats(imodel);
-  	}
-  	if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (mm ^* deriv);
-  	if (opts.aopts != null) {
-  		if (firststep <= 0) firststep = pos.toFloat;
-  		val istep = (pos + firststep)/firststep;
-  		ADAGrad.multUpdate(deriv, inputOut, modelmats(imodel), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
-  	} else {
-  		val dprod = deriv *^ inputOut;
-  		updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (sum(deriv,2) \ dprod) else dprod);
-  	}
+    val mm = if (opts.constFeat && imodel > 0) {
+      modelmats(imodel).colslice(1, modelmats(imodel).ncols);
+    } else {
+      modelmats(imodel);
+    }
+    if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (mm ^* deriv);
+    if (opts.aopts != null) {
+      if (firststep <= 0) firststep = pos.toFloat;
+      val istep = (pos + firststep)/firststep;
+      ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
+    } else {
+      val dprod = deriv *^ inputData;
+      updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (sum(deriv,2) \ dprod) else dprod);
+    }
   }
 
 
   def initADAGrad {
-  	val aopts = opts.aopts;
-  	val mm = modelmats(imodel); 
-  	val d = mm.nrows;
-  	val m = mm.ncols;
-  	firststep = -1f;
-  	lrate = convertMat(aopts.lrate);
-  	texp = convertMat(aopts.texp);
-  	vexp = convertMat(aopts.vexp);
-  	sumsq = convertMat(zeros(d, m));
-  	sumsq.set(aopts.initsumsq);
-  	waitsteps = aopts.waitsteps;
-  	epsilon = aopts.epsilon;
-  	mask = aopts.mask;
+    val aopts = opts.aopts;
+    val mm = modelmats(imodel); 
+    val d = mm.nrows;
+    val m = mm.ncols;
+    firststep = -1f;
+    lrate = convertMat(aopts.lrate);
+    texp = convertMat(aopts.texp);
+    vexp = convertMat(aopts.vexp);
+    sumsq = convertMat(zeros(d, m));
+    sumsq.set(aopts.initsumsq);
+    waitsteps = aopts.waitsteps;
+    epsilon = aopts.epsilon;
+    mask = aopts.mask;
   }
 }
 
@@ -238,15 +267,15 @@ object LinLayer {
     var outdim = 0;
     
     def copyTo(opts:Options):Options = {
-    	super.copyTo(opts);
-    	opts.constFeat = constFeat;
-    	opts.aopts = aopts;
-    	opts.outdim = outdim;
-    	opts;
+      super.copyTo(opts);
+      opts.constFeat = constFeat;
+      opts.aopts = aopts;
+      opts.outdim = outdim;
+      opts;
     }
     
     override def clone:Options = {
-    	copyTo(new Options);
+      copyTo(new Options);
     }
     
     override def create(net:Net):LinLayer = {
@@ -267,12 +296,12 @@ object LinLayer {
 class RectLayer(override val net:Net, override val opts:RectLayer.Options = new RectLayer.Options) extends Layer(net, opts) {
 	override def forward = {
 			createoutput;
-			output <-- max(inputOut, 0f);
+			output <-- max(inputData, 0f);
 			clearDeriv;
 	}
 
 	override def backward = {
-			if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (deriv ∘ (inputOut > 0f));
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ (inputData > 0f));
 	}
 }
 
@@ -329,12 +358,12 @@ class GLMLayer(override val net:Net, override val opts:GLMLayer.Options = new GL
 			  	totflops += GLM.linkArray(opts.links(i)).fnflops
 			  }
 			}
-			output <-- GLM.preds(inputOut, ilinks, totflops);
+			output <-- GLM.preds(inputData, ilinks, totflops);
 			clearDeriv;
 	}
 
 	override def backward = {
-			if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (deriv ∘ GLM.derivs(output, target, ilinks, totflops));
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ GLM.derivs(output, target, ilinks, totflops));
 	}
 
 	override def score:FMat = { 
@@ -374,16 +403,16 @@ class NormLayer(override val net:Net, override val opts:NormLayer.Options = new 
 
   override def forward = {
 		createoutput;
-		output <-- inputOut;
+		output <-- inputData;
 		clearDeriv;
   }
 
   override def backward = {
-    if (input.deriv.asInstanceOf[AnyRef] != null) {
+    if (inputDeriv.asInstanceOf[AnyRef] != null) {
     	if (sconst.asInstanceOf[AnyRef] == null) sconst = output.zeros(1,1);
     	sconst.set(math.min(0.1f, math.max(-0.1f, (opts.targetNorm - norm(output)/output.length).toFloat * opts.weight)));
-    	input.deriv = output ∘ sconst;
-    	input.deriv ~ input.deriv + deriv;
+    	inputDeriv = output ∘ sconst;
+    	inputDeriv ~ inputDeriv + deriv;
     }
   }
 }
@@ -420,9 +449,9 @@ class DropoutLayer(override val net:Net, override val opts:DropoutLayer.Options 
 
   override def forward = {
 		createoutput;
-		randmat = inputOut + 20f;   // Hack to make a cached container to hold the random output
+		randmat = inputData + 20f;   // Hack to make a cached container to hold the random output
 		if (nopts.predict) {
-			output ~ inputOut * opts.frac;
+			output ~ inputData * opts.frac;
 		} else {
 			if (useGPU) {
 				grand(randmat.asInstanceOf[GMat]); 
@@ -430,13 +459,13 @@ class DropoutLayer(override val net:Net, override val opts:DropoutLayer.Options 
 				rand(randmat.asInstanceOf[FMat]);
 			}
 			randmat ~ (randmat < opts.frac)
-			output ~ inputOut ∘ randmat;
+			output ~ inputData ∘ randmat;
 		}
 		clearDeriv;
   }
 
   override def backward = {
-		if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + deriv ∘ randmat;
+		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv ∘ randmat;
   }
 }
 
@@ -467,17 +496,18 @@ object DropoutLayer {
 class AddLayer(override val net:Net, override val opts:AddLayer.Options = new AddLayer.Options) extends Layer(net, opts) { 
   
   override val _inputs = new Array[Layer](opts.ninputs);
+  override val _inputNums = new Array[Int](opts.ninputs);
 
 	override def forward = {
-			createoutput(inputOut.nrows, inputOut.ncols);
-			output <-- inputOut;
-			(1 until inputlength).map((i:Int) => output ~ output + inputs(i).output);
+			createoutput(inputData.nrows, inputData.ncols);
+			output <-- inputData;
+			(1 until inputlength).map((i:Int) => output ~ output + inputDatas(i));
 			clearDeriv;
 	}
 
 	override def backward = {
 			(0 until inputlength).map((i:Int) => {
-				if (inputs(i).deriv.asInstanceOf[AnyRef] != null) inputs(i).deriv ~ inputs(i).deriv + deriv
+				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + deriv
 			});
 	}
 }
@@ -510,18 +540,19 @@ object AddLayer {
 class MulLayer(override val net:Net, override val opts:MulLayer.Options = new MulLayer.Options) extends Layer(net, opts) {  
   
 	override val _inputs = new Array[Layer](opts.ninputs);
+	override val _inputNums = new Array[Int](opts.ninputs);
 
 	override def forward = {
-			createoutput(inputOut.nrows, inputOut.ncols);
-			output <-- inputOut;
-			(1 until inputlength).map((i:Int) => output ~ output ∘ inputs(i).output);
+			createoutput(inputData.nrows, inputData.ncols);
+			output <-- inputData;
+			(1 until inputlength).map((i:Int) => output ~ output ∘ inputDatas(i));
 			clearDeriv;
 	}
 
 	override def backward = {
 			val doutput = deriv ∘ output;
 			(0 until inputlength).map((i:Int) => {
-				if (inputs(i).deriv.asInstanceOf[AnyRef] != null) inputs(i).deriv ~ inputs(i).deriv + doutput / inputs(i).output;
+				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + doutput / inputDatas(i);
 			});
 	}
 }
@@ -555,17 +586,17 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Options 
 
 	override def forward = {
 			createoutput;
-			val exps = exp(inputOut - maxi(inputOut));  // ensures sum(exps) is between 1 and nfeats
+			val exps = exp(inputData - maxi(inputData));  // ensures sum(exps) is between 1 and nfeats
 			output ~ exps / sum(exps);
 			clearDeriv;
 	}
 
 	override def backward = {
-			val exps = exp(inputOut - maxi(inputOut));
+			val exps = exp(inputData - maxi(inputData));
 			val sumexps = sum(exps);
 			val isum = 1f / (sumexps ∘ sumexps);
-			if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~
-			input.deriv + ((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))) ;
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~
+			inputDeriv + ((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))) ;
 	}
 }
 
@@ -589,13 +620,13 @@ class TanhLayer(override val net:Net, override val opts:TanhLayer.Options = new 
 
 	override def forward = {
 			createoutput;
-			tanh(inputOut, output);
+			tanh(inputData, output);
 			clearDeriv;
 	}
 
 	override def backward = {
-			val tmp = tanh(inputOut);
-			if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + (1 - tmp ∘ tmp) ∘ deriv;
+			val tmp = tanh(inputData);
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (1 - tmp ∘ tmp) ∘ deriv;
 	}
 }
 
@@ -623,18 +654,18 @@ class SigmoidLayer(override val net:Net, override val opts:SigmoidLayer.Options 
   override def forward = {
 		createoutput;
 		if (ilinks.asInstanceOf[AnyRef] == null) {
-			ilinks = izeros(inputOut.nrows, 1);
+			ilinks = izeros(inputData.nrows, 1);
 			ilinks.set(GLM.logistic);
 			ilinks = convertMat(ilinks);
 		}
-		if (totflops == 0L) totflops = inputOut.nrows * GLM.linkArray(1).fnflops;
-		output <-- GLM.preds(inputOut, ilinks, totflops);
+		if (totflops == 0L) totflops = inputData.nrows * GLM.linkArray(1).fnflops;
+		output <-- GLM.preds(inputData, ilinks, totflops);
 		clearDeriv;
 }
 
   override def backward = {
 		val tmp = output - (output ∘ output);
-		if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + tmp ∘ deriv;
+		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + tmp ∘ deriv;
 }
 }
 
@@ -660,21 +691,21 @@ class SoftplusLayer(override val net:Net, override val opts:SoftplusLayer.Option
 
   override def forward = {
 		createoutput;
-		val big = inputOut > 60f;      
-		output ~ ((1 - big) ∘ ln(1f + exp(min(60f, inputOut)))) + big ∘ inputOut;
+		val big = inputData > 60f;      
+		output ~ ((1 - big) ∘ ln(1f + exp(min(60f, inputData)))) + big ∘ inputData;
 		clearDeriv;
   }
 
   override def backward = {
 		if (ilinks.asInstanceOf[AnyRef] == null) {
-			ilinks = izeros(inputOut.nrows, 1);
+			ilinks = izeros(inputData.nrows, 1);
 			ilinks.set(GLM.logistic);
 		}
-		if (totflops == 0L) totflops = inputOut.nrows * GLM.linkArray(1).fnflops;
+		if (totflops == 0L) totflops = inputData.nrows * GLM.linkArray(1).fnflops;
 		ilinks = convertMat(ilinks);
-		if (input.deriv.asInstanceOf[AnyRef] != null) {
-			val tmp = GLM.preds(inputOut, ilinks, totflops);
-			input.deriv ~ input.deriv + tmp ∘ deriv;
+		if (inputDeriv.asInstanceOf[AnyRef] != null) {
+			val tmp = GLM.preds(inputData, ilinks, totflops);
+			inputDeriv ~ inputDeriv + tmp ∘ deriv;
 		}
   }
 }
@@ -699,12 +730,12 @@ class LnLayer(override val net:Net, override val opts:LnLayer.Options = new LnLa
 
 	override def forward = {
 			createoutput;
-			ln(inputOut, output);
+			ln(inputData, output);
 			clearDeriv;
 	}
 
 	override def backward = {
-			if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + deriv/inputOut;    
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv/inputData;    
 	}
 }
 
@@ -729,12 +760,12 @@ class ExpLayer(override val net:Net, override val opts:ExpLayer.Options = new Ex
 
 	override def forward = {
 			createoutput;
-			exp(inputOut, output);
+			exp(inputData, output);
 			clearDeriv;
 	}
 
 	override def backward = {
-			if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + deriv ∘ output;    
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv ∘ output;    
 	}
 }
 
@@ -759,14 +790,14 @@ class SumLayer(override val net:Net, override val opts:SumLayer.Options = new Su
 	var vmap:Mat = null;
 
   override def forward = {
-		createoutput(1, inputOut.ncols);
-		output <-- sum(inputOut);
+		createoutput(1, inputData.ncols);
+		output <-- sum(inputData);
 		clearDeriv;
   }
 
   override def backward = {
 		if (vmap.asInstanceOf[AnyRef] == null) vmap = deriv.ones(output.nrows, 1);
-		if (input.deriv.asInstanceOf[AnyRef] != null) input.deriv ~ input.deriv + vmap * deriv;    
+		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (vmap * deriv);    
   }
 }
 
@@ -788,22 +819,20 @@ class CopyLayer(override val net:Net, override val opts:CopyLayer.Options = new 
 
   override def forward = {
   	if (output.asInstanceOf[AnyRef] == null) {
-  	  val io = input.output(opts.inputnum);
+  	  val io = inputData;
   	  output = io.zeros(io.nrows, io.ncols);
   	}
-		output <-- input.output(opts.inputnum);
+		output <-- inputData;
 		clearDeriv;
   }
 
   override def backward = {
-    if (input.derivs(opts.inputnum).asInstanceOf[AnyRef] != null) input.derivs(opts.inputnum) ~ input.derivs(opts.inputnum) + deriv    
+    if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv    
   }
 }
 
 object CopyLayer {  
   class Options extends Layer.Options {
-    
-    var inputnum = 0;
     
   	override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
   	
@@ -813,6 +842,74 @@ object CopyLayer {
   def apply(net:Net) = new CopyLayer(net, new Options);
   
   def apply(net:Net, opts:Options) = new CopyLayer(net, opts);
+
+}
+
+class SplitLayer(override val net:Net, override val opts:SplitLayer.Options = new SplitLayer.Options) extends Layer(net, opts) {
+  override val _outputs = new Array[Mat](opts.nparts);
+  override val _derivs = new Array[Mat](opts.nparts);
+  var nblock:Int = 0;
+  var colranges = new Array[Mat](opts.nparts);
+  
+  override def forward = {
+    if (output.asInstanceOf[AnyRef] == null) {
+      nblock = inputData.ncols / opts.nparts;
+      for (i <- 0 until opts.nparts) {
+        colranges(i) = convertMat(irow((i*nblock)->((i+1)*nblock)));
+      }
+    }
+    for (i <- 0 until opts.nparts) {
+      setoutput(i, inputData.colslice(i*nblock, (i+1)* nblock));
+    }
+    clearDeriv;
+  }
+
+  override def backward = {
+    if (inputDeriv.asInstanceOf[AnyRef] != null) {
+      for (i <- 0 until opts.nparts) {
+        inputDeriv(?, colranges(i)) = inputDeriv(?, colranges(i)) + derivs(i);
+      }
+    }   
+  }
+}
+
+object SplitLayer {  
+  class Options extends Layer.Options {
+    
+    var nparts = 1;
+    
+    override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
+    
+    override def create(net:Net):SplitLayer = {apply(net, this);}
+  }
+  
+  def apply(net:Net) = new SplitLayer(net, new Options);
+  
+  def apply(net:Net, opts:Options) = new SplitLayer(net, opts);
+
+}
+/*
+ * Designed to map linear integer feature arrays to sparse matrices. Doesnt deal with derivatives.
+ */
+
+class OnehotLayer(override val net:Net, override val opts:OnehotLayer.Options = new OnehotLayer.Options) extends Layer(net, opts) {
+
+  override def forward = {
+    output = oneHot(inputData);
+  }
+}
+
+object OnehotLayer {  
+  class Options extends Layer.Options {
+    
+    override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
+    
+    override def create(net:Net):OnehotLayer = {apply(net, this);}
+  }
+  
+  def apply(net:Net) = new OnehotLayer(net, new Options);
+  
+  def apply(net:Net, opts:Options) = new OnehotLayer(net, opts);
 
 }
 

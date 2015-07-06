@@ -20,6 +20,20 @@ __forceinline__ __device__ int solve1(int j) {
   return (int)(v+2e-5f);   
 }
 
+__forceinline__ __device__ void solvex(int n, int v, int &i, int &j) {
+  int n1 = ((n >> 1) << 1) + 1;
+  int n2 = (n + 1) >> 1;
+  int even = (n1 != n);
+  j = v / n1;
+  i = v - n1 * j;
+  if (j > i - even) {
+    i = n1 - i - 1;
+    j = n2 + n2 - j + 1;
+  } else {
+    i = i - even;
+  }
+}
+
 // Feature hashing multiply and multiply-transpose.
 // This one enumerates, hashes and multiplies all pairs of features.
 //
@@ -39,6 +53,8 @@ __global__ void __hashmult(int nrows, int nfeats, int ncols, int bound1, int bou
     for (int j = threadIdx.y; j < todo; j += blockDim.y) {   // j indexes a worker for this column
       int j1 = solve1(j);                                    // Compute the first and second indices
       int j2 = j - j1*(j1+1)/2; 
+      //      int j1, j2;
+      //      solvex(todo, j, j1, j2);
       float f1 = Bdata[jstart + j1];                         // Get the two features
       float f2 = Bdata[jstart + j2];
       int r1 = Bir[jstart + j1];                             // And their row indices
@@ -66,17 +82,95 @@ __global__ void __hashmult(int nrows, int nfeats, int ncols, int bound1, int bou
   }
 }
 
+__forceinline__ __device__ int hash2(int a, int b, int modulus) {
+  return  (((a * 453423453) + b) * 34143242142) % modulus;
+}
 
+#if __CUDA_ARCH__ >= 300
+
+// This version is designed for few (or one) row in A. It allocates one warp per column
+
+__global__ void __hashmult2(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+  bool doit = false;
+  int istart = ((long long)blockIdx.x) * ncols / gridDim.x;
+  int iend = ((long long)(blockIdx.x+1)) * ncols / gridDim.x;
+  for (int i = istart; i < iend ; i++) {                     // i is the column index
+    int jstart = Bjc[i];                                     // Range of nz rows in this column
+    int jend = Bjc[i+1];
+    int nr = jend - jstart;                                  // Number of nz rows
+    for (int j1 = 0; j1 < nr; j1 += blockDim.x) {               // work on a block of data
+      float f1 = 0;
+      int r1 = -1;
+      if (j1 + threadIdx.x < nr) {
+	f1 = Bdata[jstart + j1 + threadIdx.x];                // Get the two features
+	r1 = Bir[jstart + j1 + threadIdx.x];                  // And their row indices
+      }
+      for (int j2 = j1; j2 < nr; j2 += blockDim.x) {             // work on a block of data
+	float f2 = 0;
+	int r2 = -1;
+	if (j2 + threadIdx.x < nr) {
+	  f2 = Bdata[jstart + j2 + threadIdx.x];
+	  r2 = Bir[jstart + j2 + threadIdx.x];
+	}
+	for (int k = 0; k < 32; k++) {
+	  float f2shift = __shfl(f2, k);
+	  int r2shift = __shfl(r2, k);
+	  if (j2 + k < nr && r1 >= 0) {
+	    int ind = mmhash2(r1, r2shift, nfeats);           // Hash the indices
+	    long long rank = r1 + 1;
+	    float prod = f1;
+	    doit = false;
+	    if (j1 + threadIdx.x == j2 + k) {
+	      doit = (rank < bound1);
+	    } else if (j1 + threadIdx.x < j2 + k) {
+	      prod *= f2shift;
+	      rank *= r2shift + 1;
+	      doit = (rank < bound2);
+	    }
+	    if (doit) {
+	      if (transpose > 0) {
+		for (int m = 0; m < nrows; m++) {
+		  float sum = A[m + nrows * i] * prod;    // Do the product
+		  atomicAdd(&C[m + nrows * ind], sum);
+		  //		  atomicAdd(&C[0], sum);
+		}
+	      } else {
+		for (int m = 0; m < nrows; m++) {
+		  float sum = A[m + nrows * ind] * prod;  // Do the product
+		  atomicAdd(&C[m + nrows * i], sum);
+		  //		  atomicAdd(&C[0], sum);
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+  }
+}
+
+#else
+
+__global__ void __hashmult2(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {}
+
+#endif
 
 int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
-  int nt = max(1, 256/nrows);
-  dim3 threadDim(nrows, nt, 1);
-  int nblocks = min(MAXXGRID, ncols);
-  __hashmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
+  if (nrows >= 0) {
+    int nt = max(1, 256/nrows);
+    dim3 threadDim(nrows, nt, 1);
+    int nblocks = min(MAXXGRID, ncols);
+    __hashmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
+  } else {
+    dim3 threadDim(32, 1, 1);
+    int nblocks = min(MAXXGRID, ncols);
+    __hashmult2<<<nblocks,threadDim>>>(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
+  }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
 }
+
 
 __forceinline__ __device__ void __gupdate(float grad, int i, int ithere, int jthere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                                           float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
@@ -116,6 +210,8 @@ __global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, 
     for (int j = threadIdx.y; j < todo; j += blockDim.y) {   // j indexes a worker for this column
       int j1 = solve1(j);                                    // Compute the first and second indices
       int j2 = j - j1*(j1+1)/2; 
+      //      int j1, j2;
+      //      solvex(todo, j, j1, j2);
       float f1 = Bdata[jstart + j1];                         // Get the two features
       float f2 = Bdata[jstart + j2];
       int r1 = Bir[jstart + j1];                             // And their row indices
@@ -212,4 +308,3 @@ int hashcross(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir
   cudaError_t err = cudaGetLastError();
   return err;
 }
-

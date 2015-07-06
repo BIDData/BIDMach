@@ -1,11 +1,16 @@
 :silent
 import BIDMach.networks.LSTMnextWord
 
-val dir="../data/rcv1/"
+val dir="d:/data/twitter/featurized3/"
+val wlim = 10000
 
-val a = loadSMat(dir + "docs.smat.lz4")(0->10000,?)
+val a = loadIMat(dir + "sentfeats000000.imat.lz4")(1,?)
+val ibad = find((a >= wlim) + (a <= 0));
+a(0,ibad) = wlim - 1; 
 
-val ta = loadSMat(dir + "testdocs.smat.lz4")(0->10000,?)
+val ta = loadIMat(dir + "sentfeats000001.imat.lz4")(1,?)
+val tibad = find((ta >= wlim) + (ta <= 0));
+ta(0,tibad) = wlim - 1; 
 
 val (nn,opts) = LSTMnextWord.learner(a)
 

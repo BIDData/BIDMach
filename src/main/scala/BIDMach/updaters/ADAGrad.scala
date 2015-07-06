@@ -268,8 +268,11 @@ object ADAGrad {
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
-        CUMACH.hashmultADAGrad(nr, nfeats, nc, bound1,  bound2, ga.data, gsb.data, gsb.ir, gsb.jc, transpose,
+        val err = CUMACH.hashmultADAGrad(nr, nfeats, nc, bound1,  bound2, ga.data, gsb.data, gsb.ir, gsb.jc, transpose,
             gmm.data, gssq.data, gmaskdata, masknr, glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps)
+	if (err != 0) {
+	    throw new RuntimeException("hashMultUpdate error " + jcuda.runtime.JCuda.cudaGetErrorString(err));
+	}
       }
     }    
   }
