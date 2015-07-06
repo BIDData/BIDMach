@@ -36,6 +36,10 @@ class BayesNet(val dag:Mat,
   var batchSize:Int = -1
   var lastBatchSize:Int = -1
   var counts:Mat = null
+  var onesVector:Mat = null
+  var onesVectorLast:Mat = null
+  var untilVector:Mat = null
+  var untilVectorLast:Mat = null
 
   /**
    * Performs a series of initialization steps.
@@ -134,80 +138,33 @@ class BayesNet(val dag:Mat,
       for (c <- 0 until graph.ncolors) {
 
         // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
-        
-        //usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
-        
-        // Daniel you dont need the above construction, you can just do:
-        usertrans(?, colorInfo(c).idsInColor) = 0
+        usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
         val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
         val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
         val logProbs = ln(mm(replicatedOffsetMatrix))
-        val nonExponentiatedProbs = logProbs * colorInfo(c).combinationMatrix
+        val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrix).t
         
-        // Daniel: Lets simplify and parallelize from here:
-        // Since the states per node are fixed lets put them in a matrix colorInfo(c).keys = 0,0,0,1,1,1,2,2,2,2 
-        // where the length of each group is the number of states and the number is the node id. 
-        // you can define also a scattering matrix ikeys = 2,5,9 which contains the index of the last element in the group,
-        // and then bkeys = ikeys(keys) = 2,2,2,5,5,5,9,9,9,9.
-        // Finally construct a samplemat of dimension 1 x nnodes for each color group to hold random values. 
-        // 
-        /*
-         * val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys)
-         * val probs = exp(nonExponentiatedProbs - maxInGroup)               // avoid overflow and exp
-         * val cumprobs = cumsumByKey(probs, keys);                          // their cumulative sum in groups
-         * val normedProbs = cumprobs / cumprobs(bkeys);                     // normalize
-         * val greater = normedProbs > rand(colorInfo(c).samplemat)(keys);   // find cumsum vals that are bigger than the sample
-         * val sampleids = cumsumByKey(greater)(ikeys)                        // already has the right dimensions
-        */
-        
-        // dont need the loop over nodes any more...
-        
-        
-        // Now we can sample for each color in this color group.
-        for (i <- 0 until colorInfo(c).numNodes) {
-          val start = colorInfo(c).startingIndices(i).dv.toInt
-          val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
-          val probsBeforeScaling = float(nonExponentiatedProbs(?, start until start+numStates).t)
-          val maxProb = maxi(maxi(probsBeforeScaling,2),1)
-          val probs = if (maxProb.dv > 80) exp( probsBeforeScaling - (maxProb - 80) ) else exp(probsBeforeScaling)
-          val samples = float( zeroMap( (probs.nrows, probs.ncols) ) )
-          val keys = samples + 0
-          val cumsumMatrix = samples + 0
-          val normalizedProbs = probs / sum(probs, 1)
-//          BIDMat.SciFunctions.multinomial(normalizedProbs, keys, cumsumMatrix, samples, 1)
-          val (maxVals, indices) = maxi2( samples )
-          usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
-          zeroMap( (probs.nrows, probs.ncols) ).clear
-        }
+        // Set up two vectors that we'll use for replication and scaling purposes.
+        val onesVec = if (batchSize == user.ncols) onesVector else onesVectorLast
+        val untilVec = if (batchSize == user.ncols) untilVector else untilVectorLast
 
-        /* // Here is an alternative to do the multinomial sampling.
-        if (useGPUnow) {
-          for (i <- 0 until colorInfo(c).numNodes) {
-            val start = colorInfo(c).startingIndices(i).dv.toInt
-            val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
-            val probsBeforeScaling = float(nonExponentiatedProbs(?, start until start+numStates).t)
-            val maxProb = maxi(maxi(probsBeforeScaling,2),1)
-            val probs = if (maxProb.dv > 80) exp( probsBeforeScaling - (maxProb - 80) ) else exp(probsBeforeScaling)
-            zeroMap( (probs.nrows, probs.ncols) ).clear
-            val samples = zeroMap( (probs.nrows, probs.ncols) )
-            edu.berkeley.bid.CUMACH.multinomial(probs.nrows, probs.ncols, probs.asInstanceOf[GMat].data, 
-                        samples.asInstanceOf[GIMat].data, sum(probs,1).asInstanceOf[GMat].data, 1)
-            val (maxVals, indices) = maxi2( float(samples) ) 
-            usertrans(?, colorInfo(c).idsInColor(i)) = float(indices.t)
-          }
-        } else {
-          // TODO for now I'll randomly put samples here because we don't have a CPU multinomial sampler
-          // Or we could assume binary stuff for now :) (don't do this for general case obviously)
-          val normMatrix = mm / (mm.t * normConstMatrix).t
-          val realLogProbs = ln(normMatrix(replicatedOffsetMatrix))
-          val probs = exp(realLogProbs * colorInfo(c).combinationMatrix).t
-          val p0 = probs(0 until probs.nrows by 2, ?)
-          val p1 = probs(1 until probs.nrows by 2, ?)
-          val p = p1 / (p1 + p0)
-          var samples:Mat = rand(p.nrows, p.ncols)
-          samples = (samples <= p)
-          usertrans(?, colorInfo(c).idsInColor) = samples.t
-        } */
+        // Parallel multinomial sampling. Note: colorInfo(c).{keys,scaledKeys,ikeys,bkeys} are all ROW vectors.
+        val keysMatrix = (colorInfo(c).keys).t * onesVec                        // Replicate keys across columns
+        val bkeysOffsets = int(untilVec * (colorInfo(c).keys).ncols)           // Add to bkeysMatrix to get correct column indices
+        val bkeysMatrix = int(colorInfo(c).bkeys.t * onesVec) + bkeysOffsets    // Again, replicate keys across columns
+        val maxInGroup = cummaxByKey(nonExponentiatedProbs, keysMatrix)(bkeysMatrix)
+        val probs = exp(nonExponentiatedProbs - maxInGroup)
+        val cumprobs = cumsumByKey(probs, keysMatrix)
+        val normedProbs = cumprobs / cumprobs(bkeysMatrix)
+        
+        // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
+        val randMatrix = zeroMap( (colorInfo(c).numNodes, usertrans.nrows) )
+        randMatrix <-- convertMat(rand(randMatrix.nrows, randMatrix.ncols) * 0.99999f)
+        val randOffsets = int(untilVec * colorInfo(c).numNodes)
+        val lessThan = normedProbs < randMatrix(int((colorInfo(c).scaledKeys).t * onesVec) + randOffsets)
+        randMatrix.clear
+        val sampleIDs = cumsumByKey(lessThan, keysMatrix)(int((colorInfo(c).ikeys).t * onesVec) + bkeysOffsets)
+        usertrans(?, colorInfo(c).idsInColor) = sampleIDs.t
         
         // After we finish sampling with this color group, we override the known values.
         val data = full(sdata)
@@ -259,7 +216,8 @@ class BayesNet(val dag:Mat,
   /** 
    * Determines a variety of information for this color group, and stores it in a ColorGroup object. 
    * First, it establishes some basic information from each color group. Then it computes the more
-   * complicated replication matrices, stride vectors, and combination matrices.
+   * complicated replication matrices, stride vectors, and combination matrices. Check the colorInfo
+   * class for details on what the individual matrices represent.
    * 
    * @param c The integer index of the given color group.
    */
@@ -274,6 +232,7 @@ class BayesNet(val dag:Mat,
     val startingIndices = izeros(cg.numNodes,1)
     startingIndices(1 until cg.numNodes) = cumsum(IMat(statesPerNode(cg.idsInColor)))(0 until cg.numNodes-1)
     cg.startingIndices = convertMat(startingIndices)
+    cg.samplemat = zeros(1, cg.numNodes)
 
     // Gather useful information for determining the replication, stride, and combination matrices
     var ncols = 0
@@ -322,10 +281,28 @@ class BayesNet(val dag:Mat,
     val vv = ones(ncols, 1)
     cg.strideVector = convertMat(strideVector)
     cg.replicationMatrix = if (useGPUnow) GSMat(sparse(ii,jj,vv)) else sparse(ii,jj,vv) 
-      
-    // Form the combination matrix (# of rows is # of columns of replication matrix)
+    
+    // Form keys and ikeys vectors
     val numStatesIds = statesPerNode(cg.idsInColor)
     val ncolsCombo = sum(numStatesIds).dv.toInt
+    val keys = izeros(1, ncolsCombo)
+    val scaledKeys = izeros(1, ncolsCombo)
+    val ikeys = izeros(1, cg.numNodes)
+    var keyIndex = 0
+    for (i <- 0 until cg.numNodes) {
+      val nodeIndex = cg.idsInColor(i)
+      val numStates = statesPerNode(nodeIndex).dv.toInt
+      keys(keyIndex until keyIndex+numStates) = nodeIndex * iones(1,numStates)
+      scaledKeys(keyIndex until keyIndex+numStates) = i * iones(1,numStates)
+      keyIndex += numStates
+      ikeys(i) = keyIndex-1
+    }
+    cg.scaledKeys = convertMat(scaledKeys)
+    cg.keys = convertMat(keys)
+    cg.ikeys = convertMat(ikeys)
+    cg.bkeys = cg.ikeys(cg.scaledKeys)
+
+    // Form the combination matrix (# of rows is # of columns of replication matrix)
     val indicesColumns = izeros(1,cg.numNodes)
     indicesColumns(1 until cg.numNodes) = cumsum(numStatesIds.asInstanceOf[IMat])(0 until cg.numNodes-1)
     val nrowsCombo = ncols
@@ -370,21 +347,19 @@ class BayesNet(val dag:Mat,
       for (c <- 0 until graph.ncolors) {
         val numVars = colorInfo(c).numNodes
         zeroMap += ((batchSize,numVars) -> mm.zeros(batchSize,numVars))
-        for (i <- 0 until colorInfo(c).numNodes) {
-          val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
-          zeroMap += ((numStates,batchSize) -> mm.izeros(numStates,batchSize))
-        }
+        zeroMap += ((numVars,batchSize) -> mm.zeros(numVars,batchSize))
       }
+      onesVector = mm.ones(1, batchSize)
+      untilVector = convertMat( float(0 until batchSize) )
     } else if (ncols != batchSize) { // We are on the last mini-batch of the first pass
       lastBatchSize = ncols
       for (c <- 0 until graph.ncolors) {
         val numVars = colorInfo(c).numNodes
         zeroMap += ((lastBatchSize,numVars) -> mm.zeros(lastBatchSize,numVars))
-        for (i <- 0 until colorInfo(c).numNodes) {
-          val numStates = statesPerNode(colorInfo(c).idsInColor(i)).dv.toInt
-          zeroMap += ((numStates,lastBatchSize) -> mm.izeros(numStates,lastBatchSize))         
-        }
+        zeroMap += ((numVars,lastBatchSize) -> mm.zeros(numVars,lastBatchSize))
       }
+      onesVectorLast = mm.ones(1, lastBatchSize)
+      untilVectorLast = convertMat( float(0 until lastBatchSize) )
     }
   }
   
@@ -634,4 +609,9 @@ class ColorGroup {
   var replicationMatrix:Mat = null
   var strideVector:Mat = null
   var combinationMatrix:Mat = null
+  var keys:Mat = null
+  var scaledKeys:Mat = null
+  var ikeys:Mat = null
+  var bkeys:Mat = null
+  var samplemat:Mat = null
 }
