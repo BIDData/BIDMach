@@ -31,29 +31,23 @@ class BayesNet(val dag:Mat,
   var statesPerNode:Mat = null              // Variables can have an arbitrary number of states
   var colorInfo:Array[ColorGroup] = null    // Gives us, for each color, a colorStuff class (of arrays)
   var zeroMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a zero matrix (to avoid allocation)
+  var randMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a rand matrix (to avoid allocation)
   var normConstMatrix:Mat = null            // Normalizes the cpt. Do cpt / (cpt.t * nConstMat).t
-  var useGPUnow:Boolean = false             // NOTE: Ideally, we will NOT need to use this at all!
+  var useGPUnow:Boolean = false
   var batchSize:Int = -1
-  var lastBatchSize:Int = -1
   var counts:Mat = null
-  var onesVector:Mat = null
-  var onesVectorLast:Mat = null
-  var untilVector:Mat = null
-  var untilVectorLast:Mat = null
-  var didWeAddMoreMatrices:Boolean = false
 
   /**
    * Performs a series of initialization steps.
    * 
    * - Builds iproject/pproject for local offsets and computing probabilities, respectively.
-   * - For each color group, determine all necessary matrices for use in uupdate later.
-   * - Build the CPT, which is actually counts, not probabilities. I initialize it to be ones.
+   * - For each color group, determine some necessary matrices for uupdate later.
+   * - Build the CPT, which is actually counts, not probabilities. I initialize it randomly.
    * 
    * Note that the randomization of the input data to be put back in the data is done in uupdate.
    */
   override def init() = {
     useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
-    didWeAddMoreMatrices = false
 
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
     statesPerNode = IMat(states)
@@ -69,7 +63,6 @@ class BayesNet(val dag:Mat,
     cptOffset = convertMat(cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     val cpt = convertMat(rand(lengthCPT,1))
-    println("starting cpt: " + cpt.t)
     
     // To finish building CPT, we normalize it based on the batch size and normalizing constant matrix.
     normConstMatrix = getNormConstMatrix(lengthCPT)
@@ -83,18 +76,18 @@ class BayesNet(val dag:Mat,
     updatemats = new Array[Mat](1)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
 
-    // For each color group, pre-compute all relevant matrices we need later (this does a lot!)
+    // For each color group, pre-compute most relevant matrices we need later (this does a lot!)
     colorInfo = new Array[ColorGroup](graph.ncolors)
     for (c <- 0 until graph.ncolors) {
       colorInfo(c) = computeAllColorGroupInfo(c)
     }
     zeroMap = new HashMap[(Int,Int),Mat]()
+    randMap = new HashMap[(Int,Int),Mat]()
 
-    // To wrap it up, create/convert a few matrices, reset some variables, and add some debugging info
+    // Finally, create/convert a few matrices, reset some variables, and add some debugging info
     counts = mm.izeros(mm.length, 1)
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
-    lastBatchSize = -1
   } 
    
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
@@ -103,7 +96,7 @@ class BayesNet(val dag:Mat,
     mupdate(gmats(0), gmats(1), ipass)
   }
   
-  /** Calls a uupdate/evalfunsequence. Known data is in gmats(0), sampled data is in gmats(1). */
+  /** Calls a uupdate/evalfun sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
     uupdate(gmats(0), gmats(1), ipass)
     evalfun(gmats(0), gmats(1))
@@ -112,10 +105,9 @@ class BayesNet(val dag:Mat,
   /**
    * Computes an update for the conditional probability table by sampling each variable once (for now).
    * 
-   * On the first ipass, it randomizes the user matrix except for those values that are already known from
-   * sdata. This method also establishes zero matrices of varying sizes to be put in zeroMap for caching
-   * purposes. Then, for any pass over the data, this iterates through each color group, iterates through
-   * each of its nodes, and samples using the multinomial function. EDIT: No, now there's a better way! :)
+   * In the first ipass, it randomizes the user matrix except for those values are already known from
+   * sdata. It also establishes various matrices to be put in the colorInfo array or the hash maps (for
+   * caching purposes). For each data batch, it iterates through color groups and samples in parallel.
    * 
    * @param sdata The sparse data matrix for this batch (0s = unknowns), which the user matrix shifts by -1.
    * @param user A data matrix with the same dimensions as sdata, and whose columns represent various iid
@@ -126,11 +118,10 @@ class BayesNet(val dag:Mat,
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     var numGibbsIterations = opts.samplingRate
     
-    // For the first pass, there are a lot of matrices we create in establishZeroMatrices/establishRemaining...
+    // For the first pass, we need to create a lot of matrices that rely on knowledge of the batch size.
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
-      establishZeroMatrices(sdata.ncols)
-      establishRemainingColorGroupMatrices(sdata.ncols)
+      establishMatrices(sdata.ncols)
       val state = convertMat(rand(sdata.nrows, sdata.ncols))
       state <-- float( min( int(statesPerNode ∘ state), statesPerNode-1 ) ) // Need an extra float() outside
       val data = full(sdata)
@@ -163,7 +154,7 @@ class BayesNet(val dag:Mat,
         val normedProbs = cumprobs / cumprobs(bkeys)
         
         // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
-        val randMatrix = zeroMap( (colorInfo(c).numNodes, usertrans.nrows) )
+        val randMatrix = randMap( (colorInfo(c).numNodes, usertrans.nrows) )
         rand(randMatrix)
         randMatrix <-- randMatrix * 0.99999f
         val lessThan = normedProbs < randMatrix(randIndices)
@@ -236,7 +227,6 @@ class BayesNet(val dag:Mat,
     val startingIndices = izeros(cg.numNodes,1)
     startingIndices(1 until cg.numNodes) = cumsum(IMat(statesPerNode(cg.idsInColor)))(0 until cg.numNodes-1)
     cg.startingIndices = convertMat(startingIndices)
-    cg.samplemat = zeros(1, cg.numNodes)
 
     // Gather useful information for determining the replication, stride, and combination matrices
     var ncols = 0
@@ -334,65 +324,56 @@ class BayesNet(val dag:Mat,
     return cg
   }
   
-  /** All right, I lied, we really should do a little more for each color group. */
-  def establishRemainingColorGroupMatrices(ncols:Int) = {
-    if (!didWeAddMoreMatrices || ncols != batchSize) {
-      if (!didWeAddMoreMatrices) {
-        for (c <- 0 until graph.ncolors) {
-          colorInfo(c).keysMatrix = (colorInfo(c).keys).t * onesVector
-          colorInfo(c).bkeysOffsets = int(untilVector * colorInfo(c).keys.ncols)
-          colorInfo(c).bkeysMatrix = int(colorInfo(c).bkeys.t * onesVector) + colorInfo(c).bkeysOffsets
-          val randOffsets = int(untilVector * colorInfo(c).numNodes)
-          colorInfo(c).randMatrixIndices = int((colorInfo(c).scaledKeys).t * onesVector) + randOffsets
-          colorInfo(c).sampleIDindices = int((colorInfo(c).ikeys).t * onesVector) + colorInfo(c).bkeysOffsets
-        } 
-        didWeAddMoreMatrices = true
-      } else if (ncols != batchSize) {
-        for (c <- 0 until graph.ncolors) {
-          colorInfo(c).keysMatrixLast = (colorInfo(c).keys).t * onesVectorLast
-          colorInfo(c).bkeysOffsetsLast = int(untilVectorLast * colorInfo(c).keys.ncols)
-          colorInfo(c).bkeysMatrixLast = int(colorInfo(c).bkeys.t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
-          val randOffsets = int(untilVectorLast * colorInfo(c).numNodes)
-          colorInfo(c).randMatrixIndicesLast = int((colorInfo(c).scaledKeys).t * onesVectorLast) + randOffsets
-          colorInfo(c).sampleIDindicesLast = int((colorInfo(c).ikeys).t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
-        }
-      }
-    }
-  }
-
   /**
-   * Creates zero matrices to be put in the zero map based on the size of the data, the number of
-   * variables in each color group, and the number of states of those variables. One class of zero
-   * matrices "zero-out"s the user-transpose matrix columns when we sample from the color group,
-   * which means indexing starts at the beginning of CPT blocks of those variables. The second set
-   * of zero matrices is to create an empty "samples" matrix when doing multinomial sampling.
+   * Called during the first pass over the data to set up matrices for later. These matrices are
+   * used in future uupdate calls, and they depend on the batch size, hence why we can only form
+   * these during the pass over the data, and not in init().
    * 
-   * @param ncols The number of columns of sdata, (i.e. the batchSize), which might be different for
-   *    the last mini-batch.
+   * There are several types of matrices we create:
+   * 
+   *  - zero matrices to put in zeroMap, for clearing out usertrans
+   *  - "rand" matries to put in randMap, for containers to randomize values during sampling
+   *  - five colorInfo(c) matrices for the purposes of sampling
+   * 
+   * In the very likely case that the last batch does not have the same number of columns as the
+   * first n-1 batches, then we need to repeat this process for that batch.
+   * 
+   * @param ncols The number of columns in the current data, or the batch size.
    */
-  def establishZeroMatrices(ncols:Int) = {
-    if (batchSize == -1) { // We are on the first mini-batch of the first pass
+  def establishMatrices(ncols:Int) = {
+    if (batchSize == -1) { // Only true if we're on the first mini-batch of ipass = 0.
       batchSize = ncols
-      lastBatchSize = ncols
+      val onesVector = mm.ones(1, ncols)
+      val untilVector = convertMat( float(0 until ncols) )
       for (c <- 0 until graph.ncolors) {
         val numVars = colorInfo(c).numNodes
-        zeroMap += ((batchSize,numVars) -> mm.zeros(batchSize,numVars))
-        zeroMap += ((numVars,batchSize) -> mm.zeros(numVars,batchSize))
+        val randOffsets = int(untilVector * numVars)
+        zeroMap += ((ncols,numVars) -> mm.zeros(ncols,numVars))
+        randMap += ((numVars,ncols) -> mm.zeros(numVars,ncols))
+        colorInfo(c).keysMatrix = (colorInfo(c).keys).t * onesVector
+        colorInfo(c).bkeysOffsets = int(untilVector * colorInfo(c).keys.ncols)
+        colorInfo(c).bkeysMatrix = int(colorInfo(c).bkeys.t * onesVector) + colorInfo(c).bkeysOffsets
+        colorInfo(c).randMatrixIndices = int((colorInfo(c).scaledKeys).t * onesVector) + randOffsets
+        colorInfo(c).sampleIDindices = int((colorInfo(c).ikeys).t * onesVector) + colorInfo(c).bkeysOffsets
       }
-      onesVector = mm.ones(1, batchSize)
-      untilVector = convertMat( float(0 until batchSize) )
-    } else if (ncols != batchSize) { // We are on the last mini-batch of the first pass
-      lastBatchSize = ncols
+    } 
+    else if (ncols != batchSize) { // On the last batch of ipass = 0 w/different # of columns
+      val onesVectorLast = mm.ones(1, ncols)
+      val untilVectorLast = convertMat( float(0 until ncols) )
       for (c <- 0 until graph.ncolors) {
         val numVars = colorInfo(c).numNodes
-        zeroMap += ((lastBatchSize,numVars) -> mm.zeros(lastBatchSize,numVars))
-        zeroMap += ((numVars,lastBatchSize) -> mm.zeros(numVars,lastBatchSize))
+        val randOffsets = int(untilVectorLast * numVars)
+        zeroMap += ((ncols,numVars) -> mm.zeros(ncols,numVars))
+        randMap += ((numVars,ncols) -> mm.zeros(numVars,ncols))
+        colorInfo(c).keysMatrixLast = (colorInfo(c).keys).t * onesVectorLast
+        colorInfo(c).bkeysOffsetsLast = int(untilVectorLast * colorInfo(c).keys.ncols)
+        colorInfo(c).bkeysMatrixLast = int(colorInfo(c).bkeys.t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
+        colorInfo(c).randMatrixIndicesLast = int((colorInfo(c).scaledKeys).t * onesVectorLast) + randOffsets
+        colorInfo(c).sampleIDindicesLast = int((colorInfo(c).ikeys).t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
       }
-      onesVectorLast = mm.ones(1, lastBatchSize)
-      untilVectorLast = convertMat( float(0 until lastBatchSize) )
     }
   }
-  
+ 
   /**
    * Creates normalizing matrix N that we can then multiply with the CPT to get a column vector
    * of the same length as the CPT but such that it has normalized probabilties, not counts.
@@ -502,8 +483,6 @@ object BayesNet  {
  * @param n The number of vertices in the graph. 
  * @param statesPerNode A column vector where elements denote number of states for corresponding variables.
  */
-// TODO investigate all non-Mat matrices (IMat, FMat, etc.) to see if these can be Mats
-// TODO Also see if connectParents, moralize, and color can be converted to GPU friendly code
 class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
  
   var mrf: Mat = null
@@ -619,14 +598,21 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
 
 
 /**
- * This will store a set of pre-computed variables (usually matrices) for each color group.
+ * This will store a lot of pre-computed variables (mostly matrices) for each color group.
  * 
- * Some important ones are:
- *  - replicationMatrix is a sparse matrix of rows of ones, used to replicate columns
- *  - strideVector is a vector where groups are (0 until k)*stride(x) where k is determined
- *    by the node or its parent, and stride(x) is 1 if the node is in the color group.
- *  - combinationMatrix is a sparse identity matrix that combines parents with children for
- *    probability computations
+ * A high-level description of the categories:
+ * 
+ * - numNodes and numNodesCh are the number of nodes, and the number of nodes and children
+ *     in this color group, respectively.
+ * - idsInColor and chIdsInColor are indices of the variables in this color group, and in
+ *     this color group plus children of those nodes, respectively.
+ * - replicationMatrix is a sparse matrix of rows of ones, used to replicate columns
+ * - strideVector is a vector where groups are (0 until k)*stride(x) where k is determined
+ *     by the node or its parent, and stride(x) is 1 if the node is in the color group.
+ * - combinationMatrix is a sparse identity matrix that combines parents with children for
+ *     probability computations
+ * - keys, scaledKeys, ikeys, and bkeys are for the purposes of
+ * - the remaining ten (!) matrices rely on knowledge
  */
 class ColorGroup {
   var numNodes:Int = -1
@@ -643,7 +629,6 @@ class ColorGroup {
   var scaledKeys:Mat = null
   var ikeys:Mat = null
   var bkeys:Mat = null
-  var samplemat:Mat = null
   var keysMatrix:Mat = null
   var keysMatrixLast:Mat = null
   var bkeysMatrix:Mat = null
