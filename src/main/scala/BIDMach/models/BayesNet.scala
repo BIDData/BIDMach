@@ -164,9 +164,8 @@ class BayesNet(val dag:Mat,
         
         // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
         val randMatrix = zeroMap( (colorInfo(c).numNodes, usertrans.nrows) )
-        randMatrix <-- convertMat(rand(randMatrix.nrows, randMatrix.ncols) * 0.99999f)
+        rand(randMatrix) * 0.99999f
         val lessThan = normedProbs < randMatrix(randIndices)
-        randMatrix.clear
         val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
         usertrans(?, colorInfo(c).idsInColor) = sampleIDs.t
         
