@@ -553,6 +553,11 @@ class MulLayer(override val net:Net, override val opts:MulLayer.Options = new Mu
   
 	override val _inputs = new Array[Layer](opts.ninputs);
 	override val _inputNums = new Array[Int](opts.ninputs);
+  val qeps = 1e-40f;
+  
+  def guardSmall(a:Mat, eps:Float):Mat = {
+    a + (abs(a) < eps) * (2*eps);
+  }
 
 	override def forward = {
 			createoutput(inputData.nrows, inputData.ncols);
@@ -562,10 +567,15 @@ class MulLayer(override val net:Net, override val opts:MulLayer.Options = new Mu
 	}
 
 	override def backward = {
+    if (_inputs.length == 2) {
+      if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + deriv ∘ inputDatas(1);
+      if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + deriv ∘ inputDatas(0);
+    } else {
 			val doutput = deriv ∘ output;
 			(0 until inputlength).map((i:Int) => {
-				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + doutput / inputDatas(i);
+				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + doutput / guardSmall(inputDatas(i), qeps);
 			});
+    }
 	}
 }
 
@@ -594,7 +604,8 @@ object MulLayer {
  * Softmax layer. Output = exp(input) / sum(exp(input))
  */
 
-class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Options = new SoftmaxLayer.Options) extends Layer(net, opts) {    
+class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Options = new SoftmaxLayer.Options) extends Layer(net, opts) { 
+  var coloffsets:Mat = null;
 
 	override def forward = {
 			createoutput;
@@ -610,6 +621,12 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Options 
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~
 			inputDeriv + ((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))) ;
 	}
+  
+  override def score:FMat = {
+    if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
+    val inds = target + coloffsets;
+    FMat(mean(ln(output(inds))));   
+  }
 }
 
 object SoftmaxLayer {  

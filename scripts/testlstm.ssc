@@ -16,15 +16,16 @@ val (nn,opts) = LSTMnextWord.learner(a)
 
 //opts.aopts = opts
 
+opts.lrate = 0.0001f
 opts.batchSize=4000
-opts.width=2;
+opts.width=1;
 opts.height=1;
-opts.dim=256;
+opts.dim=128;
 opts.nvocab = 10000;
 //opts.debug =1;
 
 opts.reg1weight = 0.0001
-opts.npasses = 5
+opts.npasses = 1
 
 val dnn = nn.model.asInstanceOf[LSTMnextWord]
 nn.train

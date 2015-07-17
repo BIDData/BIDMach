@@ -93,11 +93,11 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   	val nr = batchSize / opts.width;
   	val in0 = gmats(0);
   	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = in0.izeros(1,1);
-  	if (allButFirst.asInstanceOf[AnyRef] == null) allButFirst = convertMat(1->(in0.ncols));
+  	if (allButFirst.asInstanceOf[AnyRef] == null) allButFirst = convertMat(irow(1->(in0.ncols)));
   	val inshift = in0(0, allButFirst) \ dummyword;
-    val in = inshift.view(nr, opts.width).t;
+    val in = inshift.view(nr, opts.width);
     for (j <- 0 until opts.width) {
-    	val incol = in.colslice(j,j+1);
+    	val incol = in.colslice(j,j+1).t;
     	getlayer(j, height+1).target = 
     			if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
     }

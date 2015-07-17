@@ -119,14 +119,14 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	ss ~ ss *@ (one - nw);
     	ss ~ ss + newsquares;
     	if (opts.waitsteps < nsteps) {
-    		if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADA 0 "+i);
+    		if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
     		val tmp = ss ^ ve;
-    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 1 "+i);
+    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in powered sumsquares matrix "+i);
     		tmp ~ tmp *@ tscale;
-    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 2 "+i);
+//    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
     		tmp ~ tmp + opts.epsilon;
     		tmp ~ um / tmp;
-    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADA 3 "+i);
+    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
     		tmp ~ tmp *@ lrate;
     		mm ~ mm + tmp;
     		if (mask != null) mm ~ mm *@ mask;

@@ -138,9 +138,15 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   			i += 1;
   		}
   		if (putBack >= 0) {
-  			layers(layers.length-1).output.colslice(0, gmats(0).ncols, gmats(1));
+  			output_layers(output_layers.length-1).output.colslice(0, gmats(0).ncols, gmats(1));
   		}
-  		layers(layers.length-1).score;
+      var sc = output_layers(0).score;
+  		var j = 1;
+      while (j < output_layers.length) {
+        sc ~ sc + output_layers(j).score;
+        j += 1;
+      }
+      sc;
   	} else {
   	  zeros(1,1)
   	}
