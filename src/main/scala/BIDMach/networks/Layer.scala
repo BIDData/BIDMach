@@ -128,6 +128,17 @@ class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
   	deriv.clear;
   }
   
+  def clearDerivs = {
+    if (deriv.asInstanceOf[AnyRef] == null) {
+      for (i <- 0 until _outputs.length) {
+        _derivs(i) = output.zeros(_outputs(i).nrows, _outputs(i).ncols);
+      }
+    }
+    for (i <- 0 until _derivs.length) {
+      _derivs(i).clear
+    }
+  }
+  
   def getModelMats(net:Net):Unit = {}
 }
 
@@ -138,6 +149,7 @@ object Layer {
     var myLayer:Layer = null;
     var myGhost:Options = null;
     var parent:Options = null;
+    var outputNumbers:Array[Int] = null;
     
     def copyTo(opts:Options):Options = {
       opts.inputs(0) = inputs(0);
@@ -861,7 +873,7 @@ class SplitLayer(override val net:Net, override val opts:SplitLayer.Options = ne
     for (i <- 0 until opts.nparts) {
       setoutput(i, inputData.colslice(i*nblock, (i+1)* nblock));
     }
-    clearDeriv;
+    clearDerivs;
   }
 
   override def backward = {
@@ -979,7 +991,6 @@ class CompoundLayer(override val net:Net, override val opts:CompoundLayer.Option
 object CompoundLayer {
   class Options extends ModelLayer.Options {  	  
 	  var lopts:Array[Layer.Options] = null;
-	  var outputNumbers:Array[Int] = null;
  	  var prefix = "";
   }
 }

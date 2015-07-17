@@ -22,6 +22,7 @@ import scala.collection.mutable.HashMap;
 
 class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var layers:Array[Layer] = null;
+  var output_layers:Array[Layer] = null;
   var targmap:Mat = null;
   var mask:Mat = null;
   var bufmat:Mat = null;
@@ -36,6 +37,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
+    if (output_layers == null) output_layers = Array(layers(layers.length-1));
 	  if (modelMap == null) {
 	  	modelMap = HashMap();
 	  	imodel = 0;
@@ -100,7 +102,11 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     		layers(i).forward;
     		i += 1;
     	}
-    	layers(i-1).deriv.set(1);
+      var j = 0;
+      while (j < output_layers.length) {
+    	  output_layers(j).deriv.set(1);
+    	  j += 1;
+      }
     	for (j <- 0 until updatemats.length) updatemats(j).clear;
     	while (i > 1) {
     		i -= 1;

@@ -4,21 +4,21 @@ import BIDMach.networks.LSTMnextWord
 val dir="d:/data/twitter/featurized3/"
 val wlim = 10000
 
-val a = loadIMat(dir + "sentfeats000000.imat.lz4")(1,?)
-val ibad = find((a >= wlim) + (a <= 0));
-a(0,ibad) = wlim - 1; 
+val a0 = loadIMat(dir + "sentfeats000000.imat.lz4")(1,?)
+val igood = find((a0 < wlim) *@ (a0 >= 0));
+val a = a0(0,igood);
 
-val ta = loadIMat(dir + "sentfeats000001.imat.lz4")(1,?)
-val tibad = find((ta >= wlim) + (ta <= 0));
-ta(0,tibad) = wlim - 1; 
+val ta0 = loadIMat(dir + "sentfeats000001.imat.lz4")(1,?)
+val tigood = find((ta0 < wlim) *@ (ta0 >= 0));
+val ta = ta0(0,tigood);
 
 val (nn,opts) = LSTMnextWord.learner(a)
 
-opts.aopts = opts
+//opts.aopts = opts
 
-opts.batchSize=10000
-opts.width=10;
-opts.height=3;
+opts.batchSize=4000
+opts.width=2;
+opts.height=1;
 opts.dim=256;
 opts.nvocab = 10000;
 //opts.debug =1;
@@ -26,9 +26,9 @@ opts.nvocab = 10000;
 opts.reg1weight = 0.0001
 opts.npasses = 5
 
+val dnn = nn.model.asInstanceOf[LSTMnextWord]
 nn.train
 
-val dnn = nn.model.asInstanceOf[LSTMnextWord]
 
 :silent
 

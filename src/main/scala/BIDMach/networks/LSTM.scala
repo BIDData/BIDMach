@@ -24,8 +24,8 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   var width = 0;
   val preamble_size = 3;
   // define some getters/setters on the grid
-  def getlayer(i:Int, j:Int):Layer = layers(j + i * width + preamble_size);
-  def setlayer(i:Int, j:Int, ll:Layer) = {layers(j + i * width + preamble_size) = ll};
+  def getlayer(j:Int, i:Int):Layer = layers(j + i * width + preamble_size);
+  def setlayer(j:Int, i:Int, ll:Layer) = {layers(j + i * width + preamble_size) = ll};
 	
 	override def createLayers = {
 	  lopts = opts.lopts;
@@ -33,11 +33,11 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
 	  width = opts.width;  
     layers = new Array[Layer]((height+2) * width + preamble_size);  
     lopts.constructNet;
-    val leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
+    leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
     layers(0) = InputLayer(this);
-    val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim * opts.width};
+    val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim};
     layers(1) = LinLayer(this, lopts1).setinput(0, layers(0));
     val spopts = new SplitLayer.Options{nparts = opts.width};
     layers(2) = SplitLayer(this, spopts).setinput(0, layers(1));
@@ -46,15 +46,20 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
     for (i <- 0 until height) {
       for (j <- 0 until width) {
         val layer = LSTMLayer(this, lopts);
-        layer.setinout(2, layers(2), j);                 // input 2 is an output from the split layer
+        if (i > 0) {
+          layer.setinput(2, getlayer(j, i-1));           // in most layers, input 2 (i) is from layer below
+        } else {
+        	layer.setinout(2, layers(2), j);               // on bottom layer, input 2 is j^th output from the split layer
+        }
         if (j > 0) {
-          layer.setinput(0, getlayer(j-1, i));           // input 0 is layer to the left, output 0
-          layer.setinout(1, getlayer(j-1, i), 1);        // input 1 is layer to the left, output 1
+          layer.setinput(0, getlayer(j-1, i));           // input 0 (prev_h) is layer to the left, output 0 (h)
+          layer.setinout(1, getlayer(j-1, i), 1);        // input 1 (prev_c) is layer to the left, output 1 (c)
+        } else {
+          layer.setinput(0, leftedge);                   // in first column, just use dummy (zeros) input
+          layer.setinput(1, leftedge);
         }
         setlayer(j, i, layer);
       }
-      getlayer(0, i).setinput(0, leftedge);              // set left edge inputs
-      getlayer(0, i).setinput(1, leftedge);
     }
     
     // the top layers
@@ -66,15 +71,21 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
     	val smlayer = SoftmaxLayer(this, sopts).setinput(0, linlayer);
     	setlayer(j, height+1, smlayer);
     }
+    
+    // output layers
+    output_layers = new Array[Layer](width);
+    for (j <- 0 until width) {
+      output_layers(j) = getlayer(j, height+1);
+    }
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width %d %d" format (batchSize, opts.width))
     val nr = batchSize / opts.width;
-    val in = gmats(0).view(nr, opts.width).t.view(batchSize,1);
+    val in = gmats(0).view(nr, opts.width).t.view(1, batchSize);
     layers(0).output = oneHot(in, opts.nvocab);
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
-      leftedge.output = in.izeros(opts.dim, batchSize);
+      leftedge.output = convertMat(zeros(opts.dim, nr));
     }
   }
   
@@ -179,8 +190,8 @@ object LSTMLayer {
 	class Options extends CompoundLayer.Options {	
 	  	  
 	  def constructNet = {
+			val prev_h = new CopyLayer.Options;
 	    val prev_c = new CopyLayer.Options;
-	    val prev_h = new CopyLayer.Options;
 	    val i = new CopyLayer.Options;
 	    
 	  	val il1 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il1"};

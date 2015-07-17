@@ -103,7 +103,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
     		layers(i).forward;
     		i += 1;
     	}
-    	layers(i-1).deriv.set(1);
+      layers(layers.length-1).deriv.set(1);   	
     	for (j <- 0 until updatemats.length) updatemats(j).clear;
     	while (i > 1) {
     		i -= 1;
