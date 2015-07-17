@@ -83,10 +83,10 @@ class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
   def inputs(i:Int) = _inputs(i);
   def outputs(i:Int) = _outputs(i);
   def derivs(i:Int) = _derivs(i);  
-  def setoutput(i:Int, v:Mat) = {_outputs(i) = v;}
-  def setderiv(i:Int, v:Mat) = {_derivs(i) = v;}
-  def setinput(i:Int, v:Layer) = {_inputs(i) = v; _inputNums(i) = 0;}
-  def setinout(i:Int, v:Layer, j:Int) = {_inputs(i) = v; _inputNums(i) = j;}
+  def setoutput(i:Int, v:Mat):Layer = {_outputs(i) = v; this}
+  def setderiv(i:Int, v:Mat):Layer = {_derivs(i) = v; this}
+  def setinput(i:Int, v:Layer):Layer = {_inputs(i) = v; _inputNums(i) = 0; this}
+  def setinout(i:Int, v:Layer, j:Int):Layer = {_inputs(i) = v; _inputNums(i) = j; this}
   
   // Setters and getters for the first input or output
   def input = _inputs(0);
@@ -915,14 +915,16 @@ object OnehotLayer {
 
 class CompoundLayer(override val net:Net, override val opts:CompoundLayer.Options = new CompoundLayer.Options) extends ModelLayer(net, opts) {
 	
-	override def setinput(i:Int, v:Layer) = {               // Assumes the inputs are the first k layers in internal_layers
+	override def setinput(i:Int, v:Layer):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
 	  _inputs(i) = v;
 	  internal_layers(i).setinput(0, v);
+    this
 	}
 	
-  override def setinout(i:Int, v:Layer, j:Int) = {               // Assumes the inputs are the first k layers in internal_layers
+  override def setinout(i:Int, v:Layer, j:Int):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
 	  _inputs(i) = v;
 	  internal_layers(i).setinout(0, v, j);
+    this
 	}
 	
 	var internal_layers:Array[Layer] = null;

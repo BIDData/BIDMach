@@ -17,55 +17,62 @@ import scala.collection.mutable.HashMap;
 class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Options) extends Net(opts) {
   
   var dummyword:Mat = null;
+  var allButFirst:Mat = null;
   var leftedge:Layer = null;
+  var lopts:LSTMLayer.Options = null;
+  var height = 0;
+  var width = 0;
+  val preamble_size = 3;
+  // define some getters/setters on the grid
+  def getlayer(i:Int, j:Int):Layer = layers(j + i * width + preamble_size);
+  def setlayer(i:Int, j:Int, ll:Layer) = {layers(j + i * width + preamble_size) = ll};
 	
 	override def createLayers = {
-	  val lopts = opts.lopts;
-	  val height = opts.height;
-	  val width = opts.width;
-	  
-    layers = new Array[Layer]((height+4)*width);
+	  lopts = opts.lopts;
+	  height = opts.height;
+	  width = opts.width;  
+    layers = new Array[Layer]((height+2) * width + preamble_size);  
     lopts.constructNet;
-    val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim};
-    val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab};
-    val sopts = new SoftmaxLayer.Options;
-    leftedge = InputLayer(this);
-    for (j <- 0 until width) {
-      layers(j) = InputLayer(this);
-    	layers(j + width) = LinLayer(this, lopts1);
-    	layers(j + width).setinput(0, layers(j));
-    }
-    for (i <- 2 until height + 2) {
+    val leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
+    
+    // the preamble (bottom) layers
+    layers(0) = InputLayer(this);
+    val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim * opts.width};
+    layers(1) = LinLayer(this, lopts1).setinput(0, layers(0));
+    val spopts = new SplitLayer.Options{nparts = opts.width};
+    layers(2) = SplitLayer(this, spopts).setinput(0, layers(1));
+    
+    // the main grid
+    for (i <- 0 until height) {
       for (j <- 0 until width) {
         val layer = LSTMLayer(this, lopts);
-        layer.setinput(2, layers(j + (i - 1) * width));
+        layer.setinout(2, layers(2), j);                 // input 2 is an output from the split layer
         if (j > 0) {
-          layer.setinput(0, layers(j - 1 + i * width));
-          layer.setinout(1, layers(j - 1 + i * width), 1);
+          layer.setinput(0, getlayer(j-1, i));           // input 0 is layer to the left, output 0
+          layer.setinout(1, getlayer(j-1, i), 1);        // input 1 is layer to the left, output 1
         }
-        layers(j + i * width) = layer;
+        setlayer(j, i, layer);
       }
-      layers(i * width).setinput(0, leftedge);
-      layers(i * width).setinput(1, leftedge);
+      getlayer(0, i).setinput(0, leftedge);              // set left edge inputs
+      getlayer(0, i).setinput(1, leftedge);
     }
+    
+    // the top layers
+    val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab};
+    val sopts = new SoftmaxLayer.Options;
     for (j <- 0 until width) {
-    	val linlayer = LinLayer(this, lopts2); 
-    	linlayer.setinput(0, layers(j + (height + 1) * width));
-    	layers(j + (height + 2) * width) = linlayer;
-    	
-    	val smlayer = SoftmaxLayer(this, sopts);
-    	smlayer.setinput(0, linlayer);
-    	layers(j + (height + 3) * width) = smlayer;
+    	val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(j, height - 1));
+    	setlayer(j, height, linlayer);    	
+    	val smlayer = SoftmaxLayer(this, sopts).setinput(0, linlayer);
+    	setlayer(j, height+1, smlayer);
     }
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width %d %d" format (batchSize, opts.width))
     val nr = batchSize / opts.width;
-    val in = gmats(0).view(nr, opts.width).t;
-    for (i <- 0 until opts.width) {
-      layers(i).output = in.colslice(i,i+1);
-    }	
+    val in = gmats(0).view(nr, opts.width).t.view(batchSize,1);
+    layers(0).output = oneHot(in, opts.nvocab);
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
       leftedge.output = in.izeros(opts.dim, batchSize);
     }
@@ -73,14 +80,15 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	val nr = batchSize / opts.width;
-  	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = gmats(0).izeros(1,1);
   	val in0 = gmats(0);
-  	val inshift = in0(0,1->(in0.ncols)) \ dummyword;
+  	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = in0.izeros(1,1);
+  	if (allButFirst.asInstanceOf[AnyRef] == null) allButFirst = convertMat(1->(in0.ncols));
+  	val inshift = in0(0, allButFirst) \ dummyword;
     val in = inshift.view(nr, opts.width).t;
-    for (i <- 0 until opts.width) {
-      val incol = in.colslice(i,i+1);
-      layers(i + opts.width * (opts.height + 3)).target = 
-      		if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
+    for (j <- 0 until opts.width) {
+    	val incol = in.colslice(j,j+1);
+    	getlayer(j, height+1).target = 
+    			if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
     }
   }
 }
