@@ -12,7 +12,7 @@ import scala.util.hashing.MurmurHash3;
 import scala.collection.mutable.HashMap;
 
 /*
- * LSTM next Word prediction model, which comprises a rectangular array of LSTM compound layers.
+ * LSTM next Word prediction model, which comprises a rectangular grid of LSTM compound layers.
  */
 class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Options) extends Net(opts) {
   
@@ -64,11 +64,11 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
     
     // the top layers
     val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab};
-    val sopts = new SoftmaxLayer.Options;
+    val sopts = new SoftmaxOutputLayer.Options;
     for (j <- 0 until width) {
     	val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(j, height - 1));
     	setlayer(j, height, linlayer);    	
-    	val smlayer = SoftmaxLayer(this, sopts).setinput(0, linlayer);
+    	val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
     	setlayer(j, height+1, smlayer);
     }
     

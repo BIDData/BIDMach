@@ -619,14 +619,8 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxLayer.Options 
 			val sumexps = sum(exps);
 			val isum = 1f / (sumexps ∘ sumexps);
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~
-			inputDeriv + ((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))) ;
+			inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))));
 	}
-  
-  override def score:FMat = {
-    if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
-    val inds = target + coloffsets;
-    FMat(mean(ln(output(inds))));   
-  }
 }
 
 object SoftmaxLayer {  
@@ -640,6 +634,53 @@ object SoftmaxLayer {
   def apply(net:Net) = new SoftmaxLayer(net, new Options);
   
   def apply(net:Net, opts:Options) = new SoftmaxLayer(net, opts);
+}
+
+/**
+ * Softmax layer. Output = exp(input) / sum(exp(input))
+ */
+
+class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLayer.Options = new SoftmaxOutputLayer.Options) extends Layer(net, opts) { 
+  var coloffsets:Mat = null;
+
+  override def forward = {
+      createoutput;
+      val exps = exp(inputData - maxi(inputData));  // ensures sum(exps) is between 1 and nfeats
+      output ~ exps / sum(exps);
+      clearDeriv;
+  }
+
+  override def backward = {
+		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
+		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
+			  val exps = exp(inputData - maxi(inputData));
+			  val sumexps = sum(exps);
+			  val isum = 1f / (sumexps ∘ sumexps);
+        deriv ~ exps / (- sum(exps));
+        val inds = target + coloffsets;
+			  deriv(inds) = deriv(inds) + 1f;
+			  inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))));
+      }
+  }
+  
+  override def score:FMat = {
+    if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
+    val inds = target + coloffsets;
+    FMat(mean(ln(output(inds))));   
+  }
+}
+
+object SoftmaxOutputLayer {  
+  class Options extends Layer.Options {
+   
+    override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
+    
+    override def create(net:Net):SoftmaxOutputLayer = {apply(net, this);}
+  }
+  
+  def apply(net:Net) = new SoftmaxOutputLayer(net, new Options);
+  
+  def apply(net:Net, opts:Options) = new SoftmaxOutputLayer(net, opts);
 }
 /**
  * Tanh layer. 

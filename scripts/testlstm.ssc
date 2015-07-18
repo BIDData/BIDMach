@@ -16,7 +16,7 @@ val (nn,opts) = LSTMnextWord.learner(a)
 
 //opts.aopts = opts
 
-opts.lrate = 0.0001f
+opts.lrate = 0.01f
 opts.batchSize=4000
 opts.width=1;
 opts.height=1;
