@@ -12,28 +12,36 @@
 //val realCPT = .7 on .3 on .6 on .4 on .95 on .05 on .2 on .8 on .3 on .4 on .3 on .05 on .25 on .7 on .9 on .08 on .02 on .5 on .3 on .2 on .1 on .9 on .4 on .6 on .99 on .01
 //val data1 = loadSMat("data/bayesnet_student_data/dataStudentTrainDense50k.lz4")
 //val data2 = loadSMat("data/bayesnet_student_data/dataStudentTrain100k.lz4")
-val data3 = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
-val data4 = loadFMat("data/bayesnet_student_data/dataStudent_1000000.txt")
+//val data3 = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
+//val data4 = loadFMat("data/bayesnet_student_data/dataStudent_1000000.txt")
+val data5 = loadFMat("data/bayesnet_student_data/dataStudent_10k_50perc.txt")
 
-val somedata = data3(?, 0 until 50000)
-val realdata = data4(?, 0 until 50000)
-realdata <-- (realdata + 1)
-val (ii,jj,kk) = find3(realdata)
-val alldata = sparse(ii,jj,kk,5,50000)
+//val somedata = data3(?, 0 until 10000)
+//val realdata = data4(?, 0 until 50000)
+//realdata <-- (realdata + 1)
+//val (ii,jj,kk) = find3(realdata)
+//val alldata = sparse(ii,jj,kk,5,50000)
 
 val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
 val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
 
-val (nn0 , opts0) = BIDMach.models.BayesNet.learner(states , dag , somedata)
-val (nn1 , opts1) = BIDMach.models.BayesNet.learner(states , dag , realdata)
+val (nn , opts) = BIDMach.models.BayesNet.learner(states , dag , data5)
+opts.npasses = 20
+opts.useGPU = true
+nn.train
+nn.modelmats(0).t
 
-opts0.npasses = 10
-opts0.useGPU = false
-opts0.what
-nn0.train
-nn0.modelmats(0).t
+//val (nn0 , opts0) = BIDMach.models.BayesNet.learner(states , dag , somedata)
+//val (nn1 , opts1) = BIDMach.models.BayesNet.learner(states , dag , alldata)
 
-opts0.useGPU = true
-nn0.train
-nn0.modelmats(0).t
+//opts0.npasses = 20
+//opts0.useGPU = true
+//opts0.what
+//nn0.train
+//nn0.modelmats(0).t
 
+//opts1.npasses = 6
+//opts1.useGPU = false
+//opts1.alpha = 0f
+//nn1.train
+//nn1.modelmats(0).t

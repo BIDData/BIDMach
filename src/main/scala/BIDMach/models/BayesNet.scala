@@ -422,6 +422,53 @@ class BayesNet(val dag:Mat,
       println()
     }
   } 
+  
+  /** A debugging method to print out the CPT of one variable (prettily). */
+  def showCpt(nodeID: Int) {
+    println("\nCPT for node indexed at " + nodeID)
+    val startingOffset = cptOffset(nodeID)
+    val numStates = statesPerNode(nodeID).dv.toInt
+    val normalizedCPT = ( mm / (mm.t * normConstMatrix).t )
+    val parentIndices = find(SMat(graph.dag)(?,nodeID))
+    println("Parents: " + parentIndices.t)
+    
+    if (parentIndices.length == 0) {
+      var str = "\t"
+      for (j <- 0 until numStates) {
+        str += " %.4f".format(normalizedCPT(startingOffset + j).dv)
+      }
+      println(str)
+    } else {
+      val totalParentSlots = prod(IMat(statesPerNode)(parentIndices)).dv.toInt
+      val parentStates = statesPerNode(parentIndices)
+      val statesList = izeros(1,parentIndices.length)
+      var currentOffset = startingOffset
+      for (i <- 0 until totalParentSlots) {
+        if (i > 0) updateStatesString(statesList, parentStates, parentIndices.length-1)
+        var str = ""
+        for (i <- 0 until statesList.length) {
+          str += statesList(i).dv.toInt + " "
+        }
+        str += "\t"
+        for (j <- 0 until numStates) {
+          str += " %.4f".format(normalizedCPT(currentOffset + j).dv)
+        }
+        println(str)
+        currentOffset += numStates
+      }
+    }
+  }
+  
+  /** Recursive, helper method for updating the states list. */
+  def updateStatesString(statesList:Mat, parentStates:Mat, j:Int) {
+    if (statesList(j).dv.toInt < parentStates(j).dv.toInt-1) {
+      statesList(j) += 1
+    } else {
+      statesList(j) = 0
+      updateStatesString(statesList, parentStates, j-1)
+    }
+  }
+
 }
 
 
@@ -611,8 +658,9 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
  *     by the node or its parent, and stride(x) is 1 if the node is in the color group.
  * - combinationMatrix is a sparse identity matrix that combines parents with children for
  *     probability computations
- * - keys, scaledKeys, ikeys, and bkeys are for the purposes of
- * - the remaining ten (!) matrices rely on knowledge
+ * - keys, scaledKeys, ikeys, and bkeys help us with multinomial sampling
+ * - The remaining ten (!) matrices rely on knowledge of the batch size. They are expanded
+ *     versions of the previous matrices that use the batch size to increase their elements.
  */
 class ColorGroup {
   var numNodes:Int = -1
