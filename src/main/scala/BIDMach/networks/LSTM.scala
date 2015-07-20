@@ -32,12 +32,13 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
 	  height = opts.height;
 	  width = opts.width;  
     layers = new Array[Layer]((height+2) * width + preamble_size);  
+    lopts.aopts = opts.aopts;
     lopts.constructNet;
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
     layers(0) = InputLayer(this);
-    val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim};
+    val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim; aopts = opts.aopts};
     layers(1) = LinLayer(this, lopts1).setinput(0, layers(0));
     val spopts = new SplitLayer.Options{nparts = opts.width};
     layers(2) = SplitLayer(this, spopts).setinput(0, layers(1));
@@ -63,7 +64,7 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
     }
     
     // the top layers
-    val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab};
+    val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
     val sopts = new SoftmaxOutputLayer.Options;
     for (j <- 0 until width) {
     	val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(j, height - 1));

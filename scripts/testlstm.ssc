@@ -12,11 +12,11 @@ val ta0 = loadIMat(dir + "sentfeats000001.imat.lz4")(1,?)
 val tigood = find((ta0 < wlim) *@ (ta0 >= 0));
 val ta = ta0(0,tigood);
 
-val (nn,opts) = LSTMnextWord.learner(a)
+val (nn,opts) = LSTMnextWord.learnerX(a)
 
-//opts.aopts = opts
+opts.aopts = opts
 
-opts.lrate = 0.01f
+opts.lrate = 0.02f
 opts.batchSize=4000
 opts.width=1;
 opts.height=1;

@@ -146,7 +146,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
         sc ~ sc + output_layers(j).score;
         j += 1;
       }
-      sc;
+      sc * (1f/output_layers.length)
   	} else {
   	  zeros(1,1)
   	}

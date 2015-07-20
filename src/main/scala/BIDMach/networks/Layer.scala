@@ -213,7 +213,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   var vexp:Mat = null;
   var texp:Mat = null;
   var lrate:Mat = null;
-  var sumsq:Mat = null;
+//  var sumsq:Mat = null;
   var mask:Mat = null;
   var firststep = -1f;
   var waitsteps = 0;
@@ -247,7 +247,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
       val istep = (pos + firststep)/firststep;
-      ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), sumsq, mask, lrate, texp, vexp, epsilon, istep, waitsteps);
+      ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
       val dprod = deriv *^ inputData;
       updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (sum(deriv,2) \ dprod) else dprod);
@@ -264,8 +264,8 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
     lrate = convertMat(aopts.lrate);
     texp = convertMat(aopts.texp);
     vexp = convertMat(aopts.vexp);
-    sumsq = convertMat(zeros(d, m));
-    sumsq.set(aopts.initsumsq);
+//    sumsq = convertMat(zeros(d, m));
+    updatemats(imodel).set(aopts.initsumsq);
     waitsteps = aopts.waitsteps;
     epsilon = aopts.epsilon;
     mask = aopts.mask;
@@ -655,11 +655,13 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLa
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			  val exps = exp(inputData - maxi(inputData));
 			  val sumexps = sum(exps);
-			  val isum = 1f / (sumexps ∘ sumexps);
+        val preds = exps / sumexps;
+//			  val isum = 1f / (sumexps ∘ sumexps);
+//        inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv)))); 
         deriv ~ exps / (- sum(exps));
         val inds = target + coloffsets;
-			  deriv(inds) = deriv(inds) + 1f;
-			  inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))));
+			  deriv(inds) = deriv(inds) + 1f;               // deriv = target - preds
+        inputDeriv ~ inputDeriv + deriv; 
       }
   }
   
@@ -1042,6 +1044,10 @@ class CompoundLayer(override val net:Net, override val opts:CompoundLayer.Option
 	  	for (j <- 0 until opts.lopts(i).inputs.length) {
     		if (opts.lopts(i).inputs(j) != null) internal_layers(i).setinput(j, opts.lopts(i).inputs(j).myLayer);
     	}
+      internal_layers(i) match {
+        case aa:LinLayer => aa.opts.aopts = opts.aopts;
+        case _ =>
+      }
 	  }
 	}
 }
@@ -1049,6 +1055,7 @@ class CompoundLayer(override val net:Net, override val opts:CompoundLayer.Option
 object CompoundLayer {
   class Options extends ModelLayer.Options {  	  
 	  var lopts:Array[Layer.Options] = null;
+    var aopts:ADAGrad.Opts = null;
  	  var prefix = "";
   }
 }
