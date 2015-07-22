@@ -49,8 +49,10 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  if (updatemats == null) updatemats = new Array[Mat](modelmats.length);
 	  for (i <- 0 until modelmats.length) {
 	  	if (modelmats(i).asInstanceOf[AnyRef] != null) modelmats(i) = convertMat(modelmats(i));
-	  	if (updatemats(i).asInstanceOf[AnyRef] != null) updatemats(i) = convertMat(updatemats(i));
-      updatemats(i).clear;
+	  	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+        updatemats(i) = convertMat(updatemats(i));
+        updatemats(i).clear;
+	  	}
 	  };
 	  if (useGPU) copyMats(mats, gmats);
 	  val pb = putBack;
