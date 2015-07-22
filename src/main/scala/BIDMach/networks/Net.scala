@@ -50,6 +50,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  for (i <- 0 until modelmats.length) {
 	  	if (modelmats(i).asInstanceOf[AnyRef] != null) modelmats(i) = convertMat(modelmats(i));
 	  	if (updatemats(i).asInstanceOf[AnyRef] != null) updatemats(i) = convertMat(updatemats(i));
+      updatemats(i).clear;
 	  };
 	  if (useGPU) copyMats(mats, gmats);
 	  val pb = putBack;
@@ -107,7 +108,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	  output_layers(j).deriv.set(1);
     	  j += 1;
       }
-    	for (j <- 0 until updatemats.length) updatemats(j).clear;
+      if (opts.aopts == null) {
+    	  for (j <- 0 until updatemats.length) updatemats(j).clear;
+      }
     	while (i > 1) {
     		i -= 1;
     		if (opts.debug > 0) {
@@ -140,15 +143,15 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		if (putBack >= 0) {
   			output_layers(output_layers.length-1).output.colslice(0, gmats(0).ncols, gmats(1));
   		}
-      var sc = output_layers(0).score;
-  		var j = 1;
+      val scores = zeros(output_layers.length, 1);
+  		var j = 0;
       while (j < output_layers.length) {
-        sc ~ sc + output_layers(j).score;
+        scores(j) = output_layers(j).score.v;
         j += 1;
       }
-      sc * (1f/output_layers.length)
+      scores;
   	} else {
-  	  zeros(1,1)
+  	  zeros(output_layers.length, 1);
   	}
   }
   

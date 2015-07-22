@@ -4,9 +4,10 @@ import BIDMach.networks.LSTMnextWord
 val dir="d:/data/twitter/featurized3/"
 val wlim = 10000
 
-val a0 = loadIMat(dir + "sentfeats000000.imat.lz4")(1,?)
+val a0 = loadIMat(dir + "sentfeats000000.imat.lz4")(1,?);
 val igood = find((a0 < wlim) *@ (a0 >= 0));
 val a = a0(0,igood);
+//val a = a1(0,0->400000);
 
 val ta0 = loadIMat(dir + "sentfeats000001.imat.lz4")(1,?)
 val tigood = find((ta0 < wlim) *@ (ta0 >= 0));
@@ -16,13 +17,14 @@ val (nn,opts) = LSTMnextWord.learnerX(a)
 
 opts.aopts = opts
 
-opts.lrate = 0.02f
+opts.lrate = 0.2f
 opts.batchSize=4000
-opts.width=1;
+opts.width=2;
 opts.height=1;
 opts.dim=128;
 opts.nvocab = 10000;
 //opts.debug =1;
+opts.autoReset=false
 
 opts.reg1weight = 0.0001
 opts.npasses = 1
@@ -30,7 +32,15 @@ opts.npasses = 1
 val dnn = nn.model.asInstanceOf[LSTMnextWord]
 nn.train
 
+val ll = dnn.layers
+val d1 = ll(3).asInstanceOf[BIDMach.networks.LSTMLayer]
+val d2 = ll(4).asInstanceOf[BIDMach.networks.LSTMLayer]
+val dl1 = d1.internal_layers
+val dl2 = d2.internal_layers
 
+val in = ll(0).output.asInstanceOf[GSMat];
+val rin = IMat(new GIMat(1, in.nc, in.ir, in.nc));
+val dict = Dict(loadSBMat(dir+"../alldict.gz"));
 :silent
 
 

@@ -30,6 +30,8 @@ case class Learner(
   val ropts:Mixin.Opts = if (mixins != null) mixins(0).opts else null
   val uopts:Updater.Opts = if (updater != null) updater.opts else null
   var useGPU = false
+  var reslist:ListBuffer[FMat] = null;
+  var samplist:ListBuffer[Float] = null;
 	
   def setup = {
 	Learner.setupPB(datasource, dopts.putBack, mopts.dim)   
@@ -64,8 +66,8 @@ case class Learner(
     var lasti = 0;
     var bytes = 0L;
     if (updater != null) updater.clear;
-    val reslist = new ListBuffer[FMat];
-    val samplist = new ListBuffer[Float];
+    reslist = new ListBuffer[FMat];
+    samplist = new ListBuffer[Float];
     while (ipass < opts.npasses && ! done) {
       if (opts.debugMem && ipass > 0) Mat.debugMem = true;
     	var lastp = 0f

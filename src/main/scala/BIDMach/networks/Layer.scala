@@ -218,14 +218,15 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   var firststep = -1f;
   var waitsteps = 0;
   var epsilon = 0f;
+  var ADAinitialized = false;
 
   override def forward = {
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       val outdim = if (opts.outdim == 0) (inputData.nrows + (if (opts.constFeat) 1 else 0)) else opts.outdim;
       modelmats(imodel) = convertMat(normrnd(0, 1, outdim, inputData.nrows + (if (opts.constFeat) 1 else 0)));
-      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
-      if (opts.aopts != null) initADAGrad;  
+      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
     }
+    if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.constFeat) {
       modelmats(imodel).colslice(1, modelmats(imodel).ncols);
     } else {
@@ -269,6 +270,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
     waitsteps = aopts.waitsteps;
     epsilon = aopts.epsilon;
     mask = aopts.mask;
+    ADAinitialized = true;
   }
 }
 
@@ -960,6 +962,53 @@ object SplitLayer {
   def apply(net:Net, opts:Options) = new SplitLayer(net, opts);
 
 }
+
+class StackLayer(override val net:Net, override val opts:StackLayer.Options = new StackLayer.Options) extends Layer(net, opts) {
+  override val _inputs = new Array[Layer](opts.ninputs);
+  override val _inputNums = new Array[Int](opts.ninputs);
+
+  var colranges = new Array[Mat](opts.ninputs);
+  
+  override def forward = {
+    if (output.asInstanceOf[AnyRef] == null) {
+      var orows = 0;
+      for (i <- 0 until opts.ninputs) {
+        val thisrow = inputDatas(i).nrows;
+        colranges(i) = convertMat(irow(orows -> (orows + thisrow)));
+        orows += thisrow;
+      }
+      output = convertMat(zeros(orows, inputData.ncols));
+    }
+    for (i <- 0 until opts.ninputs) {
+      output(colranges(i), ?) = inputDatas(i);
+    }
+    clearDeriv;
+  }
+
+  override def backward = {
+		for (i <- 0 until opts.ninputs) {
+			if (inputDerivs(i).asInstanceOf[AnyRef] != null) {
+        inputDerivs(i) <-- deriv(colranges(i), ?)
+      }
+    }   
+  }
+}
+
+object StackLayer {  
+  class Options extends Layer.Options {
+    
+    var ninputs = 1;
+    
+    override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
+    
+    override def create(net:Net):StackLayer = {apply(net, this);}
+  }
+  
+  def apply(net:Net) = new StackLayer(net, new Options);
+  
+  def apply(net:Net, opts:Options) = new StackLayer(net, opts);
+
+}
 /*
  * Designed to map linear integer feature arrays to sparse matrices. Doesnt deal with derivatives.
  */
@@ -995,6 +1044,7 @@ class CompoundLayer(override val net:Net, override val opts:CompoundLayer.Option
 	
   override def setinout(i:Int, v:Layer, j:Int):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
 	  _inputs(i) = v;
+    _inputNums(i) = j;
 	  internal_layers(i).setinout(0, v, j);
     this
 	}

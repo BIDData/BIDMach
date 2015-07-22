@@ -83,7 +83,7 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width %d %d" format (batchSize, opts.width))
     val nr = batchSize / opts.width;
-    val in = gmats(0).view(nr, opts.width).t.view(1, batchSize);
+    val in = gmats(0).view(opts.width, nr).t.view(1, batchSize);
     layers(0).output = oneHot(in, opts.nvocab);
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
       leftedge.output = convertMat(zeros(opts.dim, nr));
@@ -93,10 +93,10 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	val nr = batchSize / opts.width;
   	val in0 = gmats(0);
-  	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = in0.izeros(1,1);
-  	if (allButFirst.asInstanceOf[AnyRef] == null) allButFirst = convertMat(irow(1->(in0.ncols)));
+  	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = in0.izeros(1,opts.width);
+  	if (allButFirst.asInstanceOf[AnyRef] == null) allButFirst = convertMat(irow(opts.width->(in0.ncols)));
   	val inshift = in0(0, allButFirst) \ dummyword;
-    val in = inshift.view(nr, opts.width);
+    val in = inshift.view(opts.width, nr).t;
     for (j <- 0 until opts.width) {
     	val incol = in.colslice(j,j+1).t;
     	getlayer(j, height+1).target = 
