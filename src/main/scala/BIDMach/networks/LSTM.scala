@@ -255,6 +255,72 @@ object LSTMLayer {
 
 }
 
+class LSTMLayer2(override val net:Net, override val opts:LSTMLayer2.Options = new LSTMLayer2.Options) extends CompoundLayer(net, opts) {
+  override val _inputs = new Array[Layer](3);
+  override val _inputNums = Array(0,0,0);
+  override val _outputs = new Array[Mat](2);
+  override val _derivs = new Array[Mat](2);
+}
+
+object LSTMLayer2 {
+  class Options extends CompoundLayer.Options { 
+        
+    def constructNet = {
+      val prev_h = new CopyLayer.Options;
+      val prev_c = new CopyLayer.Options;
+      val i = new CopyLayer.Options;
+      val prev_hc = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = prev_c}; 
+      
+      val il = new LinLayer.Options{inputs(0) = prev_hc;   modelName = prefix + "LSTM_all"};
+      
+      val sp = new SplitLayer.Options{nparts = 4;}
+
+      val in_gate = new SigmoidLayer.Options{inputs(0) = sp;     inputNums(0) = 0};
+      val out_gate = new SigmoidLayer.Options{inputs(0) = sp;    inputNums(0) = 1};
+      val forget_gate = new SigmoidLayer.Options{inputs(0) = sp; inputNums(0) = 2};
+      val in_gate2 = new TanhLayer.Options{inputs(0) = sp;       inputNums(0) = 3};
+      
+      val in_prod = new MulLayer.Options{inputs(0) = in_gate;    inputs(1) = in_gate2};
+      val f_prod = new MulLayer.Options{inputs(0) = forget_gate; inputs(1) = prev_c};
+      val next_c = new AddLayer.Options{inputs(0) = in_prod;     inputs(1) = f_prod};
+      
+      val next_tanh = new TanhLayer.Options{inputs(0) = next_c;};
+      val next_h = new MulLayer.Options{inputs(0) = out_gate;    inputs(1) = next_tanh};
+      
+      lopts = Array(prev_h, prev_c, i,                                         // First 3 layers should be inputs
+                    il, sp, 
+                    in_gate,                                                   // Otherwise the ordering should support forward-backward inference
+                    out_gate, 
+                    forget_gate, 
+                    in_gate2, 
+                    in_prod, f_prod, next_c, 
+                    next_tanh, next_h);
+      
+      lopts.map(_.parent = this);
+      outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
+    }
+    
+
+    override def clone:Options = {
+      copyTo(new Options).asInstanceOf[Options];
+    }
+
+    override def create(net:Net):LSTMLayer2 = {
+      apply(net, this);
+    }
+  }
+  
+  def apply(net:Net) = new LSTMLayer2(net, new Options);
+  
+  def apply(net:Net, opts:Options) = {
+    val x = new LSTMLayer2(net, opts);
+    x.construct;
+    x;
+  }
+  
+
+}
+
 
 
 

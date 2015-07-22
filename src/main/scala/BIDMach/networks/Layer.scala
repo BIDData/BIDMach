@@ -146,6 +146,7 @@ class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
 object Layer {  
   class Options{
     val inputs:Array[Options] = Array(null);
+    val inputNums:Array[Int] = Array(0);
     var myLayer:Layer = null;
     var myGhost:Options = null;
     var parent:Options = null;
@@ -530,6 +531,7 @@ object AddLayer {
   class Options extends Layer.Options {
     var ninputs = 2;
     override val inputs:Array[Layer.Options] = new Array[Layer.Options](ninputs);
+    override val inputNums:Array[Int] = new Array[Int](ninputs);
     
     def copyTo(opts:Options):Options = {
   		super.copyTo(opts);
@@ -585,6 +587,7 @@ object MulLayer {
   class Options extends Layer.Options {
     var ninputs = 2;
     override val inputs:Array[Layer.Options] = new Array[Layer.Options](ninputs);
+    override val inputNums:Array[Int] = new Array[Int](ninputs);
     
     def copyTo(opts:Options):Options = {
   		super.copyTo(opts);
@@ -997,7 +1000,9 @@ class StackLayer(override val net:Net, override val opts:StackLayer.Options = ne
 object StackLayer {  
   class Options extends Layer.Options {
     
-    var ninputs = 1;
+    var ninputs = 2;
+    override val inputs:Array[Layer.Options] = new Array[Layer.Options](ninputs);
+    override val inputNums:Array[Int] = new Array[Int](ninputs);
     
     override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
     

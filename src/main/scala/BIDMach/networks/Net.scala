@@ -69,7 +69,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
     for (i <- 0 until opts.layers.nlayers) {
     	for (j <- 0 until layerOptionss(i).inputs.length) {
-    		if (layerOptionss(i).inputs(j) != null) layers(i).setinput(j, layerOptionss(i).inputs(j).myLayer);
+    		if (layerOptionss(i).inputs(j) != null) layers(i).setinout(j, layerOptionss(i).inputs(j).myLayer,
+    				                                                          layerOptionss(i).inputNums(j));
     	}
     }
   }
