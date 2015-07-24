@@ -13,21 +13,25 @@ val ta0 = loadIMat(dir + "sentfeats000001.imat.lz4")(1,?)
 val tigood = find((ta0 < wlim) *@ (ta0 >= 0));
 val ta = ta0(0,tigood);
 
-val (nn,opts) = LSTMnextWord.learnerX(a)
+val (nn,opts) = LSTMnextWord.learner(a)
 
-opts.aopts = opts
+//opts.aopts = opts
 
-opts.lrate = 0.2f
-opts.batchSize=4000
+//opts.useGPU = false
+//Mat.useCache = false
+
+opts.lrate = 0.3f
+opts.batchSize=10000
 opts.width=2;
 opts.height=1;
 opts.dim=128;
+opts.kind = 3;
 opts.nvocab = 10000;
-//opts.debug =1;
 opts.autoReset=false
+//opts.debug =1;
 
 opts.reg1weight = 0.0001
-opts.npasses = 1
+opts.npasses = 10
 
 val dnn = nn.model.asInstanceOf[LSTMnextWord]
 nn.train
@@ -42,5 +46,8 @@ val in = ll(0).output.asInstanceOf[GSMat];
 val rin = IMat(new GIMat(1, in.nc, in.ir, in.nc));
 val dict = Dict(loadSBMat(dir+"../alldict.gz"));
 :silent
+
+val lres = nn.results.ncols
+mean(nn.results(?,(lres-11)->(lres-1)),2)
 
 

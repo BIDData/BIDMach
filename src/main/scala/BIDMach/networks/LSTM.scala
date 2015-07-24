@@ -16,8 +16,7 @@ import scala.collection.mutable.HashMap;
  */
 class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Options) extends Net(opts) {
   
-  var dummyword:Mat = null;
-  var allButFirst:Mat = null;
+  var shiftedInds:Mat = null;
   var leftedge:Layer = null;
   var lopts:LSTMLayer.Options = null;
   var height = 0;
@@ -30,9 +29,15 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
 	override def createLayers = {
 	  lopts = opts.lopts;
 	  height = opts.height;
-	  width = opts.width;  
-    layers = new Array[Layer]((height+2) * width + preamble_size);  
+	  width = opts.width; 
+    lopts.dim = opts.dim;
+    layers = if (opts.allout) {
+    	new Array[Layer]((height+2) * width + preamble_size);  
+    } else {
+      new Array[Layer]((height) * width + preamble_size + 2);
+    }
     lopts.aopts = opts.aopts;
+    lopts.kind = opts.kind;
     lopts.constructNet;
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
@@ -40,8 +45,8 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
     layers(0) = InputLayer(this);
     val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim; aopts = opts.aopts};
     layers(1) = LinLayer(this, lopts1).setinput(0, layers(0));
-    val spopts = new SplitLayer.Options{nparts = opts.width};
-    layers(2) = SplitLayer(this, spopts).setinput(0, layers(1));
+    val spopts = new SplitHorizLayer.Options{nparts = opts.width};
+    layers(2) = SplitHorizLayer(this, spopts).setinput(0, layers(1));
     
     // the main grid
     for (i <- 0 until height) {
@@ -66,17 +71,21 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
     // the top layers
     val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
     val sopts = new SoftmaxOutputLayer.Options;
-    for (j <- 0 until width) {
-    	val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(j, height - 1));
-    	setlayer(j, height, linlayer);    	
-    	val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
-    	setlayer(j, height+1, smlayer);
-    }
-    
-    // output layers
-    output_layers = new Array[Layer](width);
-    for (j <- 0 until width) {
-      output_layers(j) = getlayer(j, height+1);
+    if (opts.allout) {
+    	output_layers = new Array[Layer](width);
+    	for (j <- 0 until width) {
+    		val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(j, height - 1));
+    		setlayer(j, height, linlayer);    	
+    		val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
+    		setlayer(j, height+1, smlayer);
+    		output_layers(j) = smlayer;
+    	}
+    } else {
+      val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(width-1, height - 1));
+      layers(width*height+preamble_size) = linlayer;
+      val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);   
+      layers(width*height+preamble_size+1) = smlayer;    
+      output_layers = Array(smlayer);
     }
   }
   
@@ -93,14 +102,17 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	val nr = batchSize / opts.width;
   	val in0 = gmats(0);
-  	if (dummyword.asInstanceOf[AnyRef] == null) dummyword = in0.izeros(1,opts.width);
-  	if (allButFirst.asInstanceOf[AnyRef] == null) allButFirst = convertMat(irow(opts.width->(in0.ncols)));
-  	val inshift = in0(0, allButFirst) \ dummyword;
+  	if (shiftedInds.asInstanceOf[AnyRef] == null) shiftedInds = convertMat(irow(1->in0.ncols) \ (in0.ncols-1));
+  	val inshift = in0(0, shiftedInds);
     val in = inshift.view(opts.width, nr).t;
-    for (j <- 0 until opts.width) {
-    	val incol = in.colslice(j,j+1).t;
-    	getlayer(j, height+1).target = 
-    			if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
+    if (opts.allout) {
+    	for (j <- 0 until opts.width) {
+    		val incol = in.colslice(j,j+1).t;
+    		getlayer(j, height+1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
+    	}
+    } else {
+      val incol = in.colslice(opts.width-1, opts.width).t;
+      layers(height*width + preamble_size + 1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
     }
   }
 }
@@ -110,6 +122,8 @@ object LSTMnextWord {
     var width = 1;
     var height = 1;
     var nvocab = 100000;
+    var kind = 0;
+    var allout = false;
     var lopts:LSTMLayer.Options = null;   
   }
   
@@ -182,15 +196,30 @@ object LSTMnextWord {
 
 class LSTMLayer(override val net:Net, override val opts:LSTMLayer.Options = new LSTMLayer.Options) extends CompoundLayer(net, opts) {
 	override val _inputs = new Array[Layer](3);
-	override val _inputNums = Array(0,0,0);
+	override val _inputTerminals = Array(0,0,0);
 	override val _outputs = new Array[Mat](2);
 	override val _derivs = new Array[Mat](2);
 }
 
 object LSTMLayer {
 	class Options extends CompoundLayer.Options {	
+    
+    var dim = 0;
+    var kind = 0;
+    
+    def constructNet = {
+      kind match {
+        case 0 => constructNet0
+        case 1 => constructNet1
+        case 2 => constructNet2
+        case 3 => constructNet3
+        case _ => throw new RuntimeException("LSTMLayer type %d not recognized" format kind);
+      }
+    }
+    
+    // Basic LSTM topology with 8 linear layers
 	  	  
-	  def constructNet = {
+	  def constructNet0 = {
 			val prev_h = new CopyLayer.Options;
 	    val prev_c = new CopyLayer.Options;
 	    val i = new CopyLayer.Options;
@@ -233,6 +262,121 @@ object LSTMLayer {
 	  	lopts.map(_.parent = this);
 	  	outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
 	  }
+    
+    // LSTM with all layers grouped into 1 - not very stable to train
+    
+    def constructNet1 = {
+      val prev_h = new CopyLayer.Options;
+      val prev_c = new CopyLayer.Options;
+      val i = new CopyLayer.Options;
+      
+      val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
+      val il = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_all"; outdim = 4*dim};      
+      val sp = new SplitVertLayer.Options{inputs(0) = il;  nparts = 4;}
+
+      val in_gate = new SigmoidLayer.Options{inputs(0) = sp;     inputTerminals(0) = 0};
+      val out_gate = new SigmoidLayer.Options{inputs(0) = sp;    inputTerminals(0) = 1};
+      val forget_gate = new SigmoidLayer.Options{inputs(0) = sp; inputTerminals(0) = 2};
+      val in_gate2 = new TanhLayer.Options{inputs(0) = sp;       inputTerminals(0) = 3};
+      
+      val in_prod = new MulLayer.Options{inputs(0) = in_gate;    inputs(1) = in_gate2};
+      val f_prod = new MulLayer.Options{inputs(0) = forget_gate; inputs(1) = prev_c};
+      val next_c = new AddLayer.Options{inputs(0) = in_prod;     inputs(1) = f_prod};
+      
+      val next_tanh = new TanhLayer.Options{inputs(0) = next_c;};
+      val next_h = new MulLayer.Options{inputs(0) = out_gate;    inputs(1) = next_tanh};
+      
+      lopts = Array(prev_h, prev_c, i,                                         // First 3 layers should be inputs
+                    prev_hi, il, sp, 
+                    in_gate,                                                   // Otherwise the ordering should support forward-backward inference
+                    out_gate, 
+                    forget_gate, 
+                    in_gate2, 
+                    in_prod, f_prod, next_c, 
+                    next_tanh, next_h);
+      
+      lopts.map(_.parent = this);
+      outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
+    }
+    
+    // LSTM with 4 linear layers, with h and x stacked as inputs
+    
+    def constructNet2 = {
+      val prev_h = new CopyLayer.Options;
+      val prev_c = new CopyLayer.Options;
+      val i = new CopyLayer.Options;
+      
+      val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
+
+      val lin1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1";  outdim = dim}
+      val in_gate = new SigmoidLayer.Options{inputs(0) = lin1};
+      
+      val lin2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2";  outdim = dim}
+      val out_gate = new SigmoidLayer.Options{inputs(0) = lin2};
+      
+      val lin3 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin3";  outdim = dim}
+      val forget_gate = new SigmoidLayer.Options{inputs(0) = lin3};
+      
+      val lin4 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin4";  outdim = dim}
+      val in_gate2 = new TanhLayer.Options{inputs(0) = lin4};
+      
+      val in_prod = new MulLayer.Options{inputs(0) = in_gate;    inputs(1) = in_gate2};
+      val f_prod = new MulLayer.Options{inputs(0) = forget_gate; inputs(1) = prev_c};
+      val next_c = new AddLayer.Options{inputs(0) = in_prod;     inputs(1) = f_prod};
+      
+      val next_tanh = new TanhLayer.Options{inputs(0) = next_c;};
+      val next_h = new MulLayer.Options{inputs(0) = out_gate;    inputs(1) = next_tanh};
+      
+      lopts = Array(prev_h, prev_c, i,                                         // First 3 layers should be inputs
+                    prev_hi,  
+                    lin1, in_gate,                                                   // Otherwise the ordering should support forward-backward inference
+                    lin2, out_gate, 
+                    lin3, forget_gate, 
+                    lin4, in_gate2, 
+                    in_prod, f_prod, next_c, 
+                    next_tanh, next_h);
+      
+      lopts.map(_.parent = this);
+      outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
+    }
+    
+    // LSTM with two sets of layers, paired outputs. More stable to train than the single linlayer network
+    
+    def constructNet3 = {
+      val prev_h = new CopyLayer.Options;
+      val prev_c = new CopyLayer.Options;
+      val i = new CopyLayer.Options;
+          
+      val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
+      val il1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1"; outdim = 2*dim};      
+      val sp1 = new SplitVertLayer.Options{inputs(0) = il1;  nparts = 2;}
+      val il2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2"; outdim = 2*dim};      
+      val sp2 = new SplitVertLayer.Options{inputs(0) = il2;  nparts = 2;}
+
+      val in_gate = new SigmoidLayer.Options{inputs(0) = sp1;     inputTerminals(0) = 0};
+      val out_gate = new SigmoidLayer.Options{inputs(0) = sp1;    inputTerminals(0) = 1};
+      val forget_gate = new SigmoidLayer.Options{inputs(0) = sp2; inputTerminals(0) = 0};
+      val in_gate2 = new TanhLayer.Options{inputs(0) = sp2;       inputTerminals(0) = 1};
+      
+      val in_prod = new MulLayer.Options{inputs(0) = in_gate;    inputs(1) = in_gate2};
+      val f_prod = new MulLayer.Options{inputs(0) = forget_gate; inputs(1) = prev_c};
+      val next_c = new AddLayer.Options{inputs(0) = in_prod;     inputs(1) = f_prod};
+      
+      val next_tanh = new TanhLayer.Options{inputs(0) = next_c;};
+      val next_h = new MulLayer.Options{inputs(0) = out_gate;    inputs(1) = next_tanh};
+      
+      lopts = Array(prev_h, prev_c, i,                                         // First 3 layers should be inputs
+                    prev_hi, il1, sp1, il2, sp2,
+                    in_gate,                                                   // Otherwise the ordering should support forward-backward inference
+                    out_gate, 
+                    forget_gate, 
+                    in_gate2, 
+                    in_prod, f_prod, next_c, 
+                    next_tanh, next_h);
+      
+      lopts.map(_.parent = this);
+      outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
+    }
 	  
 
 	  override def clone:Options = {
@@ -251,77 +395,4 @@ object LSTMLayer {
     x.construct;
     x;
   }
-  
-
 }
-
-class LSTMLayer2(override val net:Net, override val opts:LSTMLayer2.Options = new LSTMLayer2.Options) extends CompoundLayer(net, opts) {
-  override val _inputs = new Array[Layer](3);
-  override val _inputNums = Array(0,0,0);
-  override val _outputs = new Array[Mat](2);
-  override val _derivs = new Array[Mat](2);
-}
-
-object LSTMLayer2 {
-  class Options extends CompoundLayer.Options { 
-        
-    def constructNet = {
-      val prev_h = new CopyLayer.Options;
-      val prev_c = new CopyLayer.Options;
-      val i = new CopyLayer.Options;
-      val prev_hc = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = prev_c}; 
-      
-      val il = new LinLayer.Options{inputs(0) = prev_hc;   modelName = prefix + "LSTM_all"};
-      
-      val sp = new SplitLayer.Options{nparts = 4;}
-
-      val in_gate = new SigmoidLayer.Options{inputs(0) = sp;     inputNums(0) = 0};
-      val out_gate = new SigmoidLayer.Options{inputs(0) = sp;    inputNums(0) = 1};
-      val forget_gate = new SigmoidLayer.Options{inputs(0) = sp; inputNums(0) = 2};
-      val in_gate2 = new TanhLayer.Options{inputs(0) = sp;       inputNums(0) = 3};
-      
-      val in_prod = new MulLayer.Options{inputs(0) = in_gate;    inputs(1) = in_gate2};
-      val f_prod = new MulLayer.Options{inputs(0) = forget_gate; inputs(1) = prev_c};
-      val next_c = new AddLayer.Options{inputs(0) = in_prod;     inputs(1) = f_prod};
-      
-      val next_tanh = new TanhLayer.Options{inputs(0) = next_c;};
-      val next_h = new MulLayer.Options{inputs(0) = out_gate;    inputs(1) = next_tanh};
-      
-      lopts = Array(prev_h, prev_c, i,                                         // First 3 layers should be inputs
-                    il, sp, 
-                    in_gate,                                                   // Otherwise the ordering should support forward-backward inference
-                    out_gate, 
-                    forget_gate, 
-                    in_gate2, 
-                    in_prod, f_prod, next_c, 
-                    next_tanh, next_h);
-      
-      lopts.map(_.parent = this);
-      outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
-    }
-    
-
-    override def clone:Options = {
-      copyTo(new Options).asInstanceOf[Options];
-    }
-
-    override def create(net:Net):LSTMLayer2 = {
-      apply(net, this);
-    }
-  }
-  
-  def apply(net:Net) = new LSTMLayer2(net, new Options);
-  
-  def apply(net:Net, opts:Options) = {
-    val x = new LSTMLayer2(net, opts);
-    x.construct;
-    x;
-  }
-  
-
-}
-
-
-
-
-
