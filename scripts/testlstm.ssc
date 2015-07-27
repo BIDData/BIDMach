@@ -20,18 +20,19 @@ val (nn,opts) = LSTMnextWord.learner(a)
 //opts.useGPU = false
 //Mat.useCache = false
 
+opts.npasses = 3
 opts.lrate = 0.3f
 opts.batchSize=10000
-opts.width=2;
+opts.width=5;
 opts.height=1;
-opts.dim=128;
+opts.dim=64;
 opts.kind = 3;
 opts.nvocab = 10000;
 opts.autoReset=false
+opts.bylevel = false;
 //opts.debug =1;
 
-opts.reg1weight = 0.0001
-opts.npasses = 10
+opts.reg1weight = 0.00001
 
 val dnn = nn.model.asInstanceOf[LSTMnextWord]
 nn.train

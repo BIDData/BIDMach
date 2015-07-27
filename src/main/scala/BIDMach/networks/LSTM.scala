@@ -18,7 +18,6 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   
   var shiftedInds:Mat = null;
   var leftedge:Layer = null;
-  var lopts:LSTMLayer.Options = null;
   var height = 0;
   var width = 0;
   val preamble_size = 3;
@@ -27,18 +26,13 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
   def setlayer(j:Int, i:Int, ll:Layer) = {layers(j + i * width + preamble_size) = ll};
 	
 	override def createLayers = {
-	  lopts = opts.lopts;
 	  height = opts.height;
 	  width = opts.width; 
-    lopts.dim = opts.dim;
     layers = if (opts.allout) {
     	new Array[Layer]((height+2) * width + preamble_size);  
     } else {
       new Array[Layer]((height) * width + preamble_size + 2);
     }
-    lopts.aopts = opts.aopts;
-    lopts.kind = opts.kind;
-    lopts.constructNet;
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
@@ -50,6 +44,12 @@ class LSTMnextWord(override val opts:LSTMnextWord.Opts = new LSTMnextWord.Option
     
     // the main grid
     for (i <- 0 until height) {
+    	val lopts = new LSTMLayer.Options;
+    	lopts.dim = opts.dim;
+    	lopts.aopts = opts.aopts;
+    	lopts.kind = opts.kind;
+    	lopts.prefix = if (opts.bylevel) "level_%d" format i; else ""
+    	lopts.constructNet;
       for (j <- 0 until width) {
         val layer = LSTMLayer(this, lopts);
         if (i > 0) {
@@ -123,8 +123,8 @@ object LSTMnextWord {
     var height = 1;
     var nvocab = 100000;
     var kind = 0;
-    var allout = false;
-    var lopts:LSTMLayer.Options = null;   
+    var allout = true;
+    var bylevel = true;
   }
   
   class Options extends Opts {}
@@ -146,7 +146,6 @@ object LSTMnextWord {
   def learner(mat0:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
-    opts.lopts = new LSTMLayer.Options;
   	val nn = new Learner(
   	    new MatDS(Array(mat0), opts), 
   	    new LSTMnextWord(opts), 
@@ -159,7 +158,6 @@ object LSTMnextWord {
   def learnerX(mat0:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
-    opts.lopts = new LSTMLayer.Options;
   	val nn = new Learner(
   	    new MatDS(Array(mat0), opts), 
   	    new LSTMnextWord(opts), 
@@ -178,7 +176,6 @@ object LSTMnextWord {
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
-    opts.lopts = new LSTMLayer.Options;
     implicit val threads = threadPool(4);
     val ds = new FilesDS(opts)
   	val nn = new Learner(
