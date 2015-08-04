@@ -55,8 +55,8 @@ class Translator(override val opts:Translator.Opts = new Translator.Options) ext
       loptsDst.aopts = opts.aopts;
     	loptsSrc.kind = opts.kind;
       loptsDst.kind = opts.kind;
-    	loptsSrc.prefix = if (opts.bylevel) "SrcLevel_%d" format i; else "";
-    	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "";
+    	loptsSrc.prefix = if (opts.bylevel) "SrcLevel_%d" format i; else "Src";
+    	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "Dst";
     	loptsSrc.constructNet;
       loptsDst.constructNet;
       for (j <- 0 until 2*width) {
@@ -64,7 +64,11 @@ class Translator(override val opts:Translator.Opts = new Translator.Options) ext
         if (i > 0) {
           layer.setinput(2, getlayer(j, i-1));           // in most layers, input 2 (i) is from layer below
         } else {
-        	layer.setinout(2, layers(2), j);               // on bottom layer, input 2 is j^th output from the split layer
+          if (j < width) {
+        	  layer.setinout(2, layers(4), j);             // on bottom layer, input 2 is j^th output from the src split layer
+          } else {
+            layer.setinout(2, layers(5), j-width);       // on bottom layer, input 2 is j^th output from the dst split layer         
+          }
         }
         if (j > 0) {
           layer.setinput(0, getlayer(j-1, i));           // input 0 (prev_h) is layer to the left, output 0 (h)
