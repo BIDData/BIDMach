@@ -14,37 +14,37 @@ import scala.collection.mutable.HashMap;
 /*
  * LSTM next Word prediction model, which comprises a rectangular grid of LSTM compound layers.
  */
-class Translator(override val opts:Translator.Opts = new Translator.Options) extends Net(opts) {
+class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends Net(opts) {
   
   var shiftedInds:Mat = null;
   var leftedge:Layer = null;
   var height = 0;
   var width = 0;
-  val preamble_size = 6;
+  var srcn = 0;
+  var dstn = 0;
+  val preamble_rows = 2;
   // define some getters/setters on the grid
-  def getlayer(j:Int, i:Int):Layer = layers(j + i * width + preamble_size);
-  def setlayer(j:Int, i:Int, ll:Layer) = {layers(j + i * width + preamble_size) = ll};
+  def getlayer(r:Int, c:Int):Layer = layers(r + c * height);
+  def setlayer(r:Int, c:Int, ll:Layer) = {layers(r + c * height) = ll};
 	
 	override def createLayers = {
-	  height = opts.height;
+	  height = opts.height + preamble_rows + 1;
 	  width = opts.width; 
-    layers =  new Array[Layer]((height+1) * width + preamble_size);
+    layers =  new Array[Layer](height * width);
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
-    layers(0) = InputLayer(this);
-    layers(1) = InputLayer(this);
-    
     val lopts1 = new LinLayer.Options{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts};
-    layers(2) = LinLayer(this, lopts1).setinput(0, layers(0));
     val lopts2 = new LinLayer.Options{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts};
-    layers(3) = LinLayer(this, lopts2).setinput(0, layers(1));
-    
-    val spopts = new SplitHorizLayer.Options{nparts = opts.width};
-    layers(4) = SplitHorizLayer(this, spopts).setinput(0, layers(2));
-    val spopts2 = new SplitHorizLayer.Options{nparts = opts.width};
-    layers(5) = SplitHorizLayer(this, spopts2).setinput(0, layers(3));
-    
+    for (j <- 0 until 2*width) {
+    	setlayer(0, j, InputLayer(this));
+      if (j < width) {
+    	  setlayer(1, j, LinLayer(this, lopts1).setinput(0, getlayer(j, 0)));
+      } else {
+        setlayer(1, j, LinLayer(this, lopts2).setinput(0, getlayer(j, 0)));
+      }
+    }
+
     // the main grid
     for (i <- 0 until height) {
     	val loptsSrc = new LSTMLayer.Options;
@@ -60,24 +60,16 @@ class Translator(override val opts:Translator.Opts = new Translator.Options) ext
     	loptsSrc.constructNet;
       loptsDst.constructNet;
       for (j <- 0 until 2*width) {
-        val layer = LSTMLayer(this, if (j < width) loptsSrc else loptsDst);
-        if (i > 0) {
-          layer.setinput(2, getlayer(j, i-1));           // in most layers, input 2 (i) is from layer below
-        } else {
-          if (j < width) {
-        	  layer.setinout(2, layers(4), j);             // on bottom layer, input 2 is j^th output from the src split layer
-          } else {
-            layer.setinout(2, layers(5), j-width);       // on bottom layer, input 2 is j^th output from the dst split layer         
-          }
-        }
+    	  val layer = LSTMLayer(this, if (j < width) loptsSrc else loptsDst);
+    	  layer.setinput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below
         if (j > 0) {
-          layer.setinput(0, getlayer(j-1, i));           // input 0 (prev_h) is layer to the left, output 0 (h)
-          layer.setinout(1, getlayer(j-1, i), 1);        // input 1 (prev_c) is layer to the left, output 1 (c)
+          layer.setinput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
+          layer.setinout(1, getlayer(i+preamble_rows, j-1), 1);        // input 1 (prev_c) is layer to the left, output 1 (c)
         } else {
           layer.setinput(0, leftedge);                   // in first column, just use dummy (zeros) input
           layer.setinput(1, leftedge);
         }
-        setlayer(j, i, layer);
+        setlayer(i+preamble_rows, j, layer);
       }
     }
     
@@ -86,38 +78,49 @@ class Translator(override val opts:Translator.Opts = new Translator.Options) ext
     val sopts = new SoftmaxOutputLayer.Options;
     output_layers = new Array[Layer](width);
     for (j <- 0 until width) {
-    	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(j+width, height - 1));
-    	setlayer(j, height, linlayer);    	
+    	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(height-2, j+width));
+    	setlayer(height-1, j, linlayer);    	
     	val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
-    	setlayer(j + width, height, smlayer);
+    	setlayer(height-1, j+width, smlayer);
     	output_layers(j) = smlayer;
     }
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
-    if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width %d %d" format (batchSize, opts.width))
-    val nr = batchSize / opts.width;
-    val in = gmats(0).view(opts.width, nr).t.view(1, batchSize);
-    layers(0).output = oneHot(in, opts.nvocab);
+    val src = gmats(0);
+    val dst = gmats(1);
+    srcn = src.colslice(0,1).nnz;
+    dstn = dst.colslice(0,1).nnz;
+    val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
+    val dstdata = int(dst.contents.view(dstn, batchSize).t);
+    val srcmat = oneHot(srcdata.contents, opts.nvocab);
+    val dstmat = oneHot(dstdata.contents, opts.nvocab);
+    for (i <- 0 until srcn) {
+      val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
+      layers(opts.width + i - srcn).output = cols;
+    }
+    for (i <- 0 until dstn) {
+      val cols = dstmat.colslice(i*batchSize, (i+1)*batchSize);
+      layers(opts.width + i).output = cols;
+    }
+    
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
-      leftedge.output = convertMat(zeros(opts.dim, nr));
+      leftedge.output = convertMat(zeros(opts.dim, batchSize));
     }
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
-  	val nr = batchSize / opts.width;
-  	val in0 = gmats(0);
-  	if (shiftedInds.asInstanceOf[AnyRef] == null) shiftedInds = convertMat(irow(1->in0.ncols) \ (in0.ncols-1));
-  	val inshift = in0(0, shiftedInds);
-    val in = inshift.view(opts.width, nr).t;
-    for (j <- 0 until opts.width) {
-    	val incol = in.colslice(j,j+1).t;
-    	getlayer(j, height+1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
+	  val dst = gmats(1);
+    val dstdata = int(dst.contents.view(dstn, batchSize).t);
+    for (j <- 0 until dstn-1) {
+    	val incol = dstdata.colslice(j+1,j+2).t;
+    	getlayer(height-1,width+j).target = incol;
     }
+    // add the <EOS> symbols in last column
   }
 }
 
-object Translator {
+object SeqToSeq {
   trait Opts extends Net.Opts {
     var width = 1;
     var height = 1;
@@ -129,7 +132,7 @@ object Translator {
   class Options extends Opts {}
   
    def mkNetModel(fopts:Model.Opts) = {
-    new Translator(fopts.asInstanceOf[Translator.Opts])
+    new SeqToSeq(fopts.asInstanceOf[SeqToSeq.Opts])
   }
   
   def mkUpdater(nopts:Updater.Opts) = {
@@ -140,14 +143,14 @@ object Translator {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
-  class LearnOptions extends Learner.Options with Translator.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnOptions extends Learner.Options with SeqToSeq.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
   	    new MatDS(Array(mat0), opts), 
-  	    new Translator(opts), 
+  	    new SeqToSeq(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
@@ -159,14 +162,14 @@ object Translator {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
   	    new MatDS(Array(mat0), opts), 
-  	    new Translator(opts), 
+  	    new SeqToSeq(opts), 
   	    null,
   	    null, 
   	    opts)
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with Translator.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with SeqToSeq.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
 
@@ -179,7 +182,7 @@ object Translator {
     val ds = new FilesDS(opts)
   	val nn = new Learner(
   			ds, 
-  	    new Translator(opts), 
+  	    new SeqToSeq(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    opts)
