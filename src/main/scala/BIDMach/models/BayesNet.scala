@@ -190,7 +190,7 @@ class BayesNet(val dag:Mat,
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val index = int(cptOffset + (user.t * iproject).t)
     val linearIndices = index(?)
-    counts <-- accum(linearIndices, 1, counts.length, 1)
+    counts <-- float(accum(linearIndices, 1, counts.length, 1))
     genericGammaRand(counts + dirichletPrior, dirichletScale, updatemats(0))
   }
  
