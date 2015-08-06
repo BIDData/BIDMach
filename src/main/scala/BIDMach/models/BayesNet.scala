@@ -36,6 +36,8 @@ class BayesNet(val dag:Mat,
   var useGPUnow:Boolean = false
   var batchSize:Int = -1
   var counts:Mat = null
+  var dirichletPrior:Mat = null
+  var dirichletScale:Mat = null
 
   /**
    * Performs a series of initialization steps.
@@ -85,7 +87,9 @@ class BayesNet(val dag:Mat,
     randMap = new HashMap[(Int,Int),Mat]()
 
     // Finally, create/convert a few matrices, reset some variables, and add some debugging info
-    counts = mm.izeros(mm.length, 1)
+    counts = mm.zeros(mm.length, 1)
+    dirichletPrior = mm.ones(mm.length, 1)
+    dirichletScale = mm.ones(mm.length, 1)
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
   } 
@@ -172,10 +176,10 @@ class BayesNet(val dag:Mat,
   }
 
   /**
-   * After one set of Gibbs sampling iterations, we put the sampled counts in the updatemats(0)
-   * value so that it gets "averaged into" the cpt (mm or modelmats(0)), from the IncNorm updater.
-   * Also, if the uupdate call involved more than one Gibbs sampling iterations, then the mupdate 
-   * effectively "thins" the sampler by only taking results from every n^th^ sample.
+   * After one set of Gibbs sampling iterations, we have a set of counts for each slot in the cpt.
+   * We add values from the dirichletPrior, then sample all the parameters independently from a Gamma
+   * distribution Gamma(shape,scale=1), where the shape is the count they have. Then the values are
+   * put in updatemats(0) to be "averaged into" the cpt based on IncNorm.
    * 
    * @param sdata The sparse data matrix for this batch (0s = unknowns), which we do not use here.
    * @param user A data matrix with the same dimensions as sdata, and whose columns represent various
@@ -187,7 +191,7 @@ class BayesNet(val dag:Mat,
     val index = int(cptOffset + (user.t * iproject).t)
     val linearIndices = index(?)
     counts <-- accum(linearIndices, 1, counts.length, 1)
-    updatemats(0) <-- (float(counts) + opts.alpha)
+    genericGammaRand(counts + dirichletPrior, dirichletScale, updatemats(0))
   }
  
   /**
@@ -484,7 +488,6 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var alpha = 0.1f
     var samplingRate = 1
     var numSamplesBurn = 0
   }
@@ -507,6 +510,7 @@ object BayesNet  {
     opts.npasses = 2 
     opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
     opts.putBack = 1        // Because this stores samples across ipasses, as required by Gibbs sampling
+    opts.power = 0          // So that the sampled CPT parameters are exactly what we use next iteration
     val secondMatrix = data.zeros(data.nrows,data.ncols)
 
     val nn = new Learner(
