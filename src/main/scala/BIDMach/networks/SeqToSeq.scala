@@ -16,7 +16,7 @@ import scala.collection.mutable.HashMap;
  */
 class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends Net(opts) {
   
-  var shiftedInds:Mat = null;
+  var EOS:Mat = null;
   var leftedge:Layer = null;
   var height = 0;
   var width = 0;
@@ -89,21 +89,22 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     val src = gmats(0);
     val dst = gmats(1);
-    srcn = src.colslice(0,1).nnz;
-    dstn = dst.colslice(0,1).nnz;
+    srcn = src.nnz/src.ncols;
+    if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
+    dstn = dst.nnz/dst.ncols;
+    if (dstn*dst.ncols != dst.nnz) throw new RuntimeException("SeqToSeq dst batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
     val dstdata = int(dst.contents.view(dstn, batchSize).t);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
     val dstmat = oneHot(dstdata.contents, opts.nvocab);
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
-      layers(opts.width + i - srcn).output = cols;
+      layers(width + i - srcn).output = cols;
     }
     for (i <- 0 until dstn) {
       val cols = dstmat.colslice(i*batchSize, (i+1)*batchSize);
-      layers(opts.width + i).output = cols;
-    }
-    
+      layers(width + i).output = cols;
+    }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
       leftedge.output = convertMat(zeros(opts.dim, batchSize));
     }
@@ -116,7 +117,79 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     	val incol = dstdata.colslice(j+1,j+2).t;
     	getlayer(height-1,width+j).target = incol;
     }
-    // add the <EOS> symbols in last column
+    if (EOS.asInstanceOf[AnyRef] == null) {
+      EOS = convertMat(iones(1, batchSize) * opts.EOSsym);
+    }
+    getlayer(height-1, width+dstn-1).target = EOS;
+  }
+  
+  override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
+    if (batchSize < 0) batchSize = gmats(0).ncols;
+    if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
+      assignInputs(gmats, ipass, pos);
+      assignTargets(gmats, ipass, pos);
+      if (mask.asInstanceOf[AnyRef] != null) {
+        modelmats(0) ~ modelmats(0) ∘ mask;
+      }
+      val minlayer = (width - srcn) * height;
+      val maxlayer = (width + dstn) * height;
+      var i = minlayer;
+      while (i < maxlayer) {
+        if (opts.debug > 0) {
+          println("dobatch forward %d %s" format (i, layers(i).getClass))
+        }
+        layers(i).forward;
+        i += 1;
+      }
+      var j = 0;
+      while (j < output_layers.length) {
+        output_layers(j).deriv.set(1);
+        j += 1;
+      }
+      if (opts.aopts == null) {
+        for (j <- 0 until updatemats.length) updatemats(j).clear;
+      }
+      while (i > minlayer) {
+        i -= 1;
+        if (opts.debug > 0) {
+          println("dobatch backward %d %s" format (i, layers(i).getClass))
+        }
+        layers(i).backward(ipass, pos);
+      }
+    }
+  }
+  
+  override def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
+    if (batchSize < 0) batchSize = gmats(0).ncols;
+    if (batchSize == gmats(0).ncols) { 
+      assignInputs(gmats, ipass, pos);
+      assignTargets(gmats, ipass, pos);
+      if (mask.asInstanceOf[AnyRef] != null) {
+        modelmats(0) ~ modelmats(0) ∘ mask;
+      }
+      val minlayer = (width - srcn) * height;
+      val maxlayer = (width + dstn) * height;
+      var i = minlayer;
+      while (i < maxlayer) {
+        if (opts.debug > 0) {
+          println("evalbatch forward %d %s" format (i, layers(i).getClass))
+        }
+        layers(i).forward;
+        i += 1;
+      }
+      if (putBack >= 0) {
+        output_layers(dstn-1).output.colslice(0, gmats(0).ncols, gmats(1));
+      }
+      val scores = zeros(output_layers.length, 1);
+      var j = 0;
+      while (j < dstn) {
+        scores(j) = output_layers(j).score.v;
+        j += 1;
+      }
+      scores;
+    } else {
+      zeros(output_layers.length, 1);
+    }
   }
 }
 
@@ -127,6 +200,7 @@ object SeqToSeq {
     var nvocab = 100000;
     var kind = 0;
     var bylevel = true;
+    var EOSsym = 1;
   }
   
   class Options extends Opts {}
