@@ -16,7 +16,7 @@ import scala.collection.mutable.HashMap;
  */
 class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends Net(opts) {
   
-  var EOS:Mat = null;
+  var PADsym:Mat = null;
   var leftedge:Layer = null;
   var height = 0;
   var fullheight = 0;
@@ -97,7 +97,6 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     val src = gmats(0);
     val dstx = gmats(1);
-    val dsty = gmats(1);
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
     dstxn = dstx.nnz/dstx.ncols;
@@ -108,11 +107,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
-      layers(width + i - srcn).output = cols;
+      layers(inwidth + i - srcn).output = cols;
     }
     for (i <- 0 until dstxn) {
       val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
-      layers(width + i).output = cols;
+      layers(inwidth + i).output = cols;
     }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
       leftedge.output = convertMat(zeros(opts.dim, batchSize));
@@ -120,18 +119,21 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
-	  val dsty = gmats(2);
+	  val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
 	  dstyn = dsty.nnz/dsty.ncols;
     if (dstyn*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn, batchSize).t);
-    for (j <- 0 until dstyn) {
-    	val incol = dstydata.colslice(j,j+1).t;
+    val dstylim = if (gmats.length > 2) dstyn else dstyn - 1;
+    for (j <- 0 until dstylim) {
+    	val incol = if (gmats.length > 2) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t ;
     	getlayer(fullheight+1,j).target = incol;
     }
-    if (EOS.asInstanceOf[AnyRef] == null) {
-      EOS = convertMat(iones(1, batchSize) * opts.EOSsym);
+    if (PADsym.asInstanceOf[AnyRef] == null) {
+      PADsym = convertMat(iones(1, batchSize) * opts.PADsymbol);
     }
-    getlayer(fullheight+1, dstyn).target = EOS;
+    if (dstylim < dstxn) {
+    	getlayer(fullheight+1, dstylim).target = PADsym;
+    }
   }
   
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
@@ -212,7 +214,7 @@ object SeqToSeq {
     var nvocab = 100000;
     var kind = 0;
     var bylevel = true;
-    var EOSsym = 1;
+    var PADsymbol = 1;
   }
   
   class Options extends Opts {}
