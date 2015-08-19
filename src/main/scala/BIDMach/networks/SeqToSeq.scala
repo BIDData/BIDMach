@@ -19,26 +19,34 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var EOS:Mat = null;
   var leftedge:Layer = null;
   var height = 0;
+  var fullheight = 0;
+  var inwidth = 0;
+  var outwidth = 0;
   var width = 0;
   var srcn = 0;
-  var dstn = 0;
+  var dstxn = 0;
+  var dstyn = 0;
   val preamble_rows = 2;
   // define some getters/setters on the grid
-  def getlayer(r:Int, c:Int):Layer = layers(r + c * height);
-  def setlayer(r:Int, c:Int, ll:Layer) = {layers(r + c * height) = ll};
+  def lindex(r:Int, c:Int) = if (c < inwidth) (r + c * fullheight) else (width * fullheight + r + (c - inwidth) * (fullheight + 2));
+  def getlayer(r:Int, c:Int):Layer = layers(lindex(r,c));
+  def setlayer(r:Int, c:Int, ll:Layer) = {layers(lindex(r,c)) = ll};
 	
 	override def createLayers = {
-	  height = opts.height + preamble_rows + 1;
-	  width = opts.width; 
-    layers =  new Array[Layer](height * width);
+    height = opts.height;
+	  fullheight = height + preamble_rows;
+	  inwidth = opts.inwidth; 
+    outwidth = opts.outwidth;
+    width = inwidth + outwidth;
+    layers =  new Array[Layer](fullheight * width + outwidth * 2);
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
     val lopts1 = new LinLayer.Options{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts};
     val lopts2 = new LinLayer.Options{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts};
-    for (j <- 0 until 2*width) {
+    for (j <- 0 until width) {
     	setlayer(0, j, InputLayer(this));
-      if (j < width) {
+      if (j < inwidth) {
     	  setlayer(1, j, LinLayer(this, lopts1).setinput(0, getlayer(j, 0)));
       } else {
         setlayer(1, j, LinLayer(this, lopts2).setinput(0, getlayer(j, 0)));
@@ -59,8 +67,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "Dst";
     	loptsSrc.constructNet;
       loptsDst.constructNet;
-      for (j <- 0 until 2*width) {
-    	  val layer = LSTMLayer(this, if (j < width) loptsSrc else loptsDst);
+      for (j <- 0 until width) {
+    	  val layer = LSTMLayer(this, if (j < inwidth) loptsSrc else loptsDst);
     	  layer.setinput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below
         if (j > 0) {
           layer.setinput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
@@ -76,33 +84,34 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     // the top layers
     val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
     val sopts = new SoftmaxOutputLayer.Options;
-    output_layers = new Array[Layer](width);
-    for (j <- 0 until width) {
-    	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(height-2, j+width));
-    	setlayer(height-1, j, linlayer);    	
+    output_layers = new Array[Layer](outwidth);
+    for (j <- 0 until outwidth) {
+    	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(height-1, j+inwidth));
+    	setlayer(height, j, linlayer);    	
     	val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
-    	setlayer(height-1, j+width, smlayer);
+    	setlayer(height+1, j, smlayer);
     	output_layers(j) = smlayer;
     }
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     val src = gmats(0);
-    val dst = gmats(1);
+    val dstx = gmats(1);
+    val dsty = gmats(1);
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
-    dstn = dst.nnz/dst.ncols;
-    if (dstn*dst.ncols != dst.nnz) throw new RuntimeException("SeqToSeq dst batch not fixed length");
+    dstxn = dstx.nnz/dstx.ncols;
+    if (dstxn*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
-    val dstdata = int(dst.contents.view(dstn, batchSize).t);
+    val dstxdata = int(dstx.contents.view(dstxn, batchSize).t);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
-    val dstmat = oneHot(dstdata.contents, opts.nvocab);
+    val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
       layers(width + i - srcn).output = cols;
     }
-    for (i <- 0 until dstn) {
-      val cols = dstmat.colslice(i*batchSize, (i+1)*batchSize);
+    for (i <- 0 until dstxn) {
+      val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
       layers(width + i).output = cols;
     }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
@@ -111,16 +120,18 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
-	  val dst = gmats(1);
-    val dstdata = int(dst.contents.view(dstn, batchSize).t);
-    for (j <- 0 until dstn-1) {
-    	val incol = dstdata.colslice(j+1,j+2).t;
-    	getlayer(height-1,width+j).target = incol;
+	  val dsty = gmats(2);
+	  dstyn = dsty.nnz/dsty.ncols;
+    if (dstyn*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
+    val dstydata = int(dsty.contents.view(dstyn, batchSize).t);
+    for (j <- 0 until dstyn) {
+    	val incol = dstydata.colslice(j,j+1).t;
+    	getlayer(fullheight+1,j).target = incol;
     }
     if (EOS.asInstanceOf[AnyRef] == null) {
       EOS = convertMat(iones(1, batchSize) * opts.EOSsym);
     }
-    getlayer(height-1, width+dstn-1).target = EOS;
+    getlayer(fullheight+1, dstyn).target = EOS;
   }
   
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
@@ -131,8 +142,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       if (mask.asInstanceOf[AnyRef] != null) {
         modelmats(0) ~ modelmats(0) ∘ mask;
       }
-      val minlayer = (width - srcn) * height;
-      val maxlayer = (width + dstn) * height;
+      val minlayer = lindex(0, inwidth - srcn);
+      val maxlayer = lindex(0, inwidth + dstxn); 
       var i = minlayer;
       while (i < maxlayer) {
         if (opts.debug > 0) {
@@ -167,8 +178,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       if (mask.asInstanceOf[AnyRef] != null) {
         modelmats(0) ~ modelmats(0) ∘ mask;
       }
-      val minlayer = (width - srcn) * height;
-      val maxlayer = (width + dstn) * height;
+      val minlayer = lindex(0, inwidth - srcn);
+      val maxlayer = lindex(0, inwidth + dstxn); 
       var i = minlayer;
       while (i < maxlayer) {
         if (opts.debug > 0) {
@@ -178,11 +189,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         i += 1;
       }
       if (putBack >= 0) {
-        output_layers(dstn-1).output.colslice(0, gmats(0).ncols, gmats(1));
+        output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));
       }
       val scores = zeros(output_layers.length, 1);
       var j = 0;
-      while (j < dstn) {
+      while (j < dstxn) {
         scores(j) = output_layers(j).score.v;
         j += 1;
       }
@@ -195,7 +206,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 
 object SeqToSeq {
   trait Opts extends Net.Opts {
-    var width = 1;
+    var inwidth = 1;
+    var outwidth = 1;
     var height = 1;
     var nvocab = 100000;
     var kind = 0;
