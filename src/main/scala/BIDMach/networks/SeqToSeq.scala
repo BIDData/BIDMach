@@ -28,7 +28,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var dstyn = 0;
   val preamble_rows = 2;
   // define some getters/setters on the grid
-  def lindex(r:Int, c:Int) = if (r < fullheight) (r + c * fullheight) else (width * fullheight + r + (c - inwidth) * (fullheight + 2));
+  def lindex(r:Int, c:Int) = if (r < fullheight) (r + c * fullheight) else (width * fullheight + (r - fullheight) + c * 2);
   def getlayer(r:Int, c:Int):Layer = layers(lindex(r,c));
   def setlayer(r:Int, c:Int, ll:Layer) = {layers(lindex(r,c)) = ll};
 	
