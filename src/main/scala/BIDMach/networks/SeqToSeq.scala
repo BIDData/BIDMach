@@ -264,7 +264,7 @@ object SeqToSeq {
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts;
     opts.fnames = fnames
-    opts.batchSize = 100000;
+    opts.batchSize = 128;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
     val ds = new FilesDS(opts)
@@ -276,5 +276,23 @@ object SeqToSeq {
   	    opts)
     (nn, opts)
   } 
+  
+  
+  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+    val opts = new FDSopts;
+    opts.fnames = fnames
+    opts.batchSize = 128;
+    opts.eltsPerSample = 500;
+    implicit val threads = threadPool(4);
+    val ds = new FilesDS(opts)
+    val nn = new Learner(
+        ds, 
+        new SeqToSeq(opts), 
+        null,
+        null, 
+        opts)
+    (nn, opts)
+  }
+  
 }
 
