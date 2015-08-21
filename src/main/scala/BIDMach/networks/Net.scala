@@ -29,6 +29,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var modelMap:HashMap[String,Int] = null;
   var batchSize = -1;
   var imodel = 0;
+  var initialize = false;
 
   override def init() = {
 	  mats = datasource.next;
@@ -57,7 +58,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  if (useGPU) copyMats(mats, gmats);
 	  val pb = putBack;
 	  putBack = -1;
+    initialize = true;
     evalbatch(gmats, 0, 0);
+    initialize = false;
     putBack = pb;
 	  datasource.reset;
   }
