@@ -86,10 +86,10 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val sopts = new SoftmaxOutputLayer.Options;
     output_layers = new Array[Layer](outwidth);
     for (j <- 0 until outwidth) {
-    	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(height-1, j+inwidth));
-    	setlayer(height, j, linlayer);    	
+    	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
+    	setlayer(fullheight, j, linlayer);    	
     	val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
-    	setlayer(height+1, j, smlayer);
+    	setlayer(fullheight+1, j, smlayer);
     	output_layers(j) = smlayer;
     }
   }
