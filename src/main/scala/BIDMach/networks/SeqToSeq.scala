@@ -108,12 +108,12 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     srcn = math.min(srcn, opts.inwidth);
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
-      layers(inwidth + i - srcn).output = cols;
+      getlayer(0, inwidth + i - srcn).output = cols;
     }
     dstxn = math.min(dstxn, opts.outwidth);
     for (i <- 0 until dstxn) {
       val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
-      layers(inwidth + i).output = cols;
+      getlayer(0, inwidth + i).output = cols;
     }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
       leftedge.output = convertMat(zeros(opts.dim, batchSize));
