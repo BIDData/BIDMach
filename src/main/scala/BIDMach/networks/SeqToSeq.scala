@@ -28,7 +28,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var dstyn = 0;
   val preamble_rows = 2;
   // define some getters/setters on the grid
-  def lindex(r:Int, c:Int) = if (r < fullheight) (r + c * fullheight) else (width * fullheight + (r - fullheight) + c * 2);
+  def lindex(r:Int, c:Int) = if (c < inwidth) (r + c * fullheight) else (inwidth * fullheight + r + (c - inwidth) * (fullheight + 2));
   def getlayer(r:Int, c:Int):Layer = layers(lindex(r,c));
   def setlayer(r:Int, c:Int, ll:Layer) = {layers(lindex(r,c)) = ll};
 	
@@ -87,9 +87,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     output_layers = new Array[Layer](outwidth);
     for (j <- 0 until outwidth) {
     	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
-    	setlayer(fullheight, j, linlayer);    	
+    	setlayer(fullheight, inwidth + j, linlayer);    	
     	val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
-    	setlayer(fullheight+1, j, smlayer);
+    	setlayer(fullheight+1, inwidth + j, smlayer);
     	output_layers(j) = smlayer;
     }
   }
@@ -128,13 +128,13 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstylim = math.min(opts.outwidth, if (gmats.length > 2) dstyn else dstyn - 1);
     for (j <- 0 until dstylim) {
     	val incol = if (gmats.length > 2) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t ;
-    	getlayer(fullheight+1,j).target = incol;
+    	getlayer(fullheight+1,j+inwidth).target = incol;
     }
     if (PADsym.asInstanceOf[AnyRef] == null) {
       PADsym = convertMat(iones(1, batchSize) * opts.PADsymbol);
     }
     if (dstylim < dstxn) {
-    	getlayer(fullheight+1, dstylim).target = PADsym;
+    	getlayer(fullheight+1, dstylim+inwidth).target = PADsym;
     }
   }
   
