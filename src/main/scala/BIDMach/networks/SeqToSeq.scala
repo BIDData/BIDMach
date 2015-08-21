@@ -105,10 +105,12 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstxdata = int(dstx.contents.view(dstxn, batchSize).t);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
     val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
+    srcn = math.min(srcn, opts.inwidth);
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
       layers(inwidth + i - srcn).output = cols;
     }
+    dstxn = math.min(dstxn, opts.outwidth);
     for (i <- 0 until dstxn) {
       val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
       layers(inwidth + i).output = cols;
@@ -123,7 +125,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 	  dstyn = dsty.nnz/dsty.ncols;
     if (dstyn*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn, batchSize).t);
-    val dstylim = if (gmats.length > 2) dstyn else dstyn - 1;
+    val dstylim = math.min(opts.outwidth, if (gmats.length > 2) dstyn else dstyn - 1);
     for (j <- 0 until dstylim) {
     	val incol = if (gmats.length > 2) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t ;
     	getlayer(fullheight+1,j).target = incol;
