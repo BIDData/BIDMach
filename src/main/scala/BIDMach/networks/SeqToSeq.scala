@@ -47,9 +47,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     for (j <- 0 until width) {
     	setlayer(0, j, InputLayer(this));
       if (j < inwidth) {
-    	  setlayer(1, j, LinLayer(this, lopts1).setinput(0, getlayer(j, 0)));
+    	  setlayer(1, j, LinLayer(this, lopts1).setinput(0, getlayer(0, j)));
       } else {
-        setlayer(1, j, LinLayer(this, lopts2).setinput(0, getlayer(j, 0)));
+        setlayer(1, j, LinLayer(this, lopts2).setinput(0, getlayer(0, j)));
       }
     }
 
