@@ -106,6 +106,14 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
     val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     srcn = math.min(srcn, opts.inwidth);
+    if (srcn < inwidth) {
+      for (i <- 0 until height) {
+        val leftlayer = getlayer(i+preamble_rows, inwidth-srcn-1);
+        if (leftlayer.output.asInstanceOf[AnyRef] == null) {
+        	leftlayer.output = convertMat(zeros(opts.dim, batchSize));
+        }       
+      }
+    }
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
       getlayer(0, inwidth + i - srcn).output = cols;
