@@ -111,6 +111,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         val leftlayer = getlayer(i+preamble_rows, inwidth-srcn-1);
         if (leftlayer.output.asInstanceOf[AnyRef] == null) {
         	leftlayer.output = convertMat(zeros(opts.dim, batchSize));
+          leftlayer.setoutput(1, convertMat(zeros(opts.dim, batchSize)));
         }       
       }
     }
