@@ -16,7 +16,7 @@ import scala.collection.mutable.HashMap;
  */
 class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends Net(opts) {
   
-  var PADsym:Mat = null;
+  var PADrow:Mat = null;
   var leftedge:Layer = null;
   var height = 0;
   var fullheight = 0;
@@ -94,6 +94,10 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     }
   }
   
+  def mapOOV(in:Mat) = {
+    in ~ in + ((in > opts.nvocab) ∘ (opts.OOVsym - in))
+  }
+  
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     val src = gmats(0);
     val dstx = gmats(1);
@@ -103,6 +107,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (dstxn*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
     val dstxdata = int(dstx.contents.view(dstxn, batchSize).t);
+    mapOOV(srcdata);
+    mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
     val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     srcn = math.min(srcn, opts.inwidth);
@@ -139,11 +145,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     	val incol = if (gmats.length > 2) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t ;
     	getlayer(fullheight+1,j+inwidth).target = incol;
     }
-    if (PADsym.asInstanceOf[AnyRef] == null) {
-      PADsym = convertMat(iones(1, batchSize) * opts.PADsymbol);
+    if (PADrow.asInstanceOf[AnyRef] == null) {
+      PADrow = convertMat(iones(1, batchSize) * opts.PADsym);
     }
     if (dstylim < dstxn) {
-    	getlayer(fullheight+1, dstylim+inwidth).target = PADsym;
+    	getlayer(fullheight+1, dstylim+inwidth).target = PADrow;
     }
   }
   
@@ -225,7 +231,8 @@ object SeqToSeq {
     var nvocab = 100000;
     var kind = 0;
     var bylevel = true;
-    var PADsymbol = 1;
+    var PADsym = 1;
+    var OOVsym = 2;
   }
   
   class Options extends Opts {}
