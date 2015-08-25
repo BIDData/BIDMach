@@ -17,6 +17,7 @@ import scala.collection.mutable.HashMap;
 class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends Net(opts) {
   
   var PADrow:Mat = null;
+  var OOVelem:Mat = null;
   var leftedge:Layer = null;
   var height = 0;
   var fullheight = 0;
@@ -95,7 +96,10 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   }
   
   def mapOOV(in:Mat) = {
-    in ~ in + ((in > opts.nvocab) ∘ (opts.OOVsym - in))
+    if (OOVelem.asInstanceOf[AnyRef] == null) {
+      OOVelem = convertMat(iones(1,1) * opts.OOVsym);
+    }
+    in ~ in + ((in > opts.nvocab) ∘ (OOVelem - in))
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
