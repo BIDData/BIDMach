@@ -180,7 +180,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       }
       var j = 0;
       while (j < output_layers.length) {
-        output_layers(j).deriv.set(1);
+        if (output_layers(j).deriv.asInstanceOf[AnyRef] != null) {
+        	output_layers(j).deriv.set(1);
+        }
         j += 1;
       }
       if (opts.aopts == null) {
