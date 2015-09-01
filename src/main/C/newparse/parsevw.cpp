@@ -71,20 +71,30 @@ stringIndexer::
 
 int parseLine(char * line, const char * delim1, const char * delim2, const char *delim3,
               const char * delim4, stringIndexer &si, stringIndexer &ns, fvector &labels, imatrix &imat, ivector &nsv, fvector &fvec)  {
-  char *here, *next, *fpos;
+  char *here, *next, *fpos, *tag;
   int label, indx;
-  float fval;
+  float fval, importance;
   ivector iv;
 
   here = line;
   next = strpbrk(here, delim1);     // get the label(s)
   *(next++) = 0;
-  sscanf(here, "%d", &label);
+  label = 0;
+  if (strlen(here) > 0) {
+    sscanf(here, "%d", &label);
+  }
   here = next;
   labels.push_back(label);
 
-  next = strpbrk(here, delim2);     // get the tag
-  *(next++) = 0;                   
+  next = strpbrk(here, delim2);     // get the tag or importance
+  importance = 1.0f;
+  if (*next == ' ') {               // delim is space, must be importance
+    *(next++) = 0;
+    sscanf(here, "%f", &importance);
+    here = next;
+    next = strpbrk(here, delim2);   // get the tag
+  } 
+  tag = here;
   // Do nothing with the tag for now
   here = next;                      // points just after the "|"
   int nsi = 0;
@@ -155,7 +165,7 @@ int main(int argc, char ** argv) {
   char *here, *linebuf, *readbuf;
   char *ifname = NULL;
   string odname="", dictname = "", suffix = "";
-  string delim1=" ", delim2="|", delim3=" ", delim4=":";
+  string delim1=" ", delim2=" |", delim3=" ", delim4=":";
   while (iarg < argc) {
     if (strncmp(argv[iarg], "-i", 2) == 0) {
       ifname = argv[++iarg];
