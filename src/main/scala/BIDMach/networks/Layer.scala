@@ -254,7 +254,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
       val istep = (pos + firststep)/firststep;
       ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
-      if (dprod.asInstanceOf[AnyRef] != null) {
+      if (dprod.asInstanceOf[AnyRef] == null) {
         dprod = updatemats(imodel) + 0f;
       }
       dprod ~ deriv *^ inputData;
