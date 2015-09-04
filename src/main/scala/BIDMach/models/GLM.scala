@@ -695,7 +695,6 @@ object GLM {
   def learner(ds:DataSource):(Learner, GOptions) = {
     val mopts = new GOptions;
     mopts.lrate = 1f
-    mopts.autoReset = false
     val model = new GLM(mopts)
     val mm = new Learner(
         ds, 
@@ -708,7 +707,6 @@ object GLM {
   def learnerX(ds:DataSource):(Learner, GOptions) = {
     val mopts = new GOptions;
     mopts.lrate = 1f
-    mopts.autoReset = false
     mopts.aopts = mopts;
     val model = new GLM(mopts)
     val mm = new Learner(
@@ -726,7 +724,6 @@ object GLM {
   def learner(fnames:List[String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
-    mopts.autoReset = false;
     val model = new GLM(mopts);
     mopts.fnames = fnames.map((a:String) => FilesDS.simpleEnum(a,1,0));
     implicit val ec = threadPool(fnames.length + 2);
@@ -736,6 +733,24 @@ object GLM {
         model, 
         mkRegularizer(mopts),
         new ADAGrad(mopts), mopts)
+    (mm, mopts)
+  }
+  
+    // A learner that uses a files data source specified by a list of strings.  
+  def learnerX(fnames:List[String]):(Learner, FGOptions) = {
+    val mopts = new FGOptions;
+    mopts.lrate = 1f;
+    mopts.aopts = mopts;
+    val model = new GLM(mopts);
+    mopts.fnames = fnames.map((a:String) => FilesDS.simpleEnum(a,1,0));
+    implicit val ec = threadPool(fnames.length + 2);
+    val ds = new FilesDS(mopts)(ec);    
+    val mm = new Learner(
+        ds, 
+        model, 
+        mkRegularizer(mopts),
+        null,
+        mopts)
     (mm, mopts)
   }
   

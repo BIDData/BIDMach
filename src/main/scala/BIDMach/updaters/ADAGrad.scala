@@ -81,6 +81,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   			if (java.lang.Double.isNaN(sum(sum(mm)).dv)) throw new RuntimeException("ADA0 3 "+i);
   			if (mask != null) mm ~ mm *@ mask;
   		}
+      um.clear;
   	}
   }
 	

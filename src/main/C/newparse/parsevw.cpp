@@ -166,6 +166,10 @@ int main(int argc, char ** argv) {
   char *ifname = NULL;
   string odname="", dictname = "", suffix = "";
   string delim1=" ", delim2=" |", delim3=" ", delim4=":";
+  if (argc < 2) {
+    printf("%s", usage);
+    return 1;
+  }
   while (iarg < argc) {
     if (strncmp(argv[iarg], "-i", 2) == 0) {
       ifname = argv[++iarg];
