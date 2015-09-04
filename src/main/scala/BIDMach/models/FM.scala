@@ -354,6 +354,24 @@ object FM {
         new ADAGrad(mopts), mopts)
     (mm, mopts)
   }
+  
+  class FGOptions extends Learner.Options with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FilesDS.Opts
+    
+  // A learner that uses a files data source specified by a list of strings.  
+  def learner(fnames:List[String]):(Learner, FGOptions) = {
+    val mopts = new FGOptions;
+    mopts.lrate = 1f;
+    val model = new FM(mopts);
+    mopts.fnames = fnames.map((a:String) => FilesDS.simpleEnum(a,1,0));
+    implicit val ec = threadPool(fnames.length + 2);
+    val ds = new FilesDS(mopts)(ec);    
+    val mm = new Learner(
+        ds, 
+        model, 
+        mkRegularizer(mopts),
+        new ADAGrad(mopts), mopts)
+    (mm, mopts)
+  }
      
   def learnBatch(mat0:Mat, d:Int) = {
     val opts = new LearnOptions
