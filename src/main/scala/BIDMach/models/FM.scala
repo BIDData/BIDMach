@@ -340,6 +340,9 @@ object FM {
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.links = mopts.links.copy;
     nopts.putBack = 1;
+    nopts.dim1 = mopts.dim1;
+    nopts.dim2 = mopts.dim2;
+    nopts.strictFM = mopts.strictFM;
     val newmod = new FM(nopts);
     newmod.refresh = false
     model.copyTo(newmod)
