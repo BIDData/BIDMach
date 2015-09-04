@@ -87,10 +87,10 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     rmod.iweight = iweight;    
     rmod.mv = mv;
     rmod.mm1 = mm1;
-    rmod.mm2 = mm2;
+    if (opts.dim2 > 0) rmod.mm2 = mm2;
     rmod.uv = uv;
-    rmod.um1 = um2;
-    rmod.um2 = um2;
+    rmod.um1 = um1;
+    if (opts.dim2 > 0) rmod.um2 = um2;
   }
   
   override def init() = {
@@ -100,21 +100,21 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     if (refresh) {
     	mv = modelmats(0);
     	mm1 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim1).toFloat, opts.dim1, mv.ncols));
-    	mm2 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim2).toFloat, opts.dim2, mv.ncols));
+    	if (opts.dim2 > 0) mm2 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim2).toFloat, opts.dim2, mv.ncols));
     	ulim = convertMat(row(opts.lim))
     	llim = convertMat(row(-opts.lim))
-    	setmodelmats(Array(mv, mm1, mm2));
+    	if (opts.dim2 > 0) setmodelmats(Array(mv, mm1, mm2)) else setmodelmats(Array(mv, mm1))
     	if (mask.asInstanceOf[AnyRef] != null) {
     		mv ~ mv ∘ mask;
     		mm1 ~ mm1 ∘ mask;
-    		mm2 ~ mm2 ∘ mask;
+    		if (opts.dim2 > 0) mm2 ~ mm2 ∘ mask;
     	}
     }
-    (0 until 3).map((i) => modelmats(i) = convertMat(modelmats(i)))
+    (0 until modelmats.length).map((i) => modelmats(i) = convertMat(modelmats(i)))
     uv = updatemats(0)
     um1 = uv.zeros(opts.dim1, uv.ncols)
-    um2 = uv.zeros(opts.dim2, uv.ncols)
-    updatemats = Array(uv, um1, um2)
+    if (opts.dim2 > 0) um2 = uv.zeros(opts.dim2, uv.ncols)
+    updatemats = if (opts.dim2 > 0) Array(uv, um1, um2) else Array(uv, um1)
     totflops = 0L
     for (i <- 0 until opts.links.length) {
       totflops += linkArray(opts.links(i)).fnflops
@@ -135,12 +135,20 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
   def mupdate3(in:Mat, targ:Mat, dweights:Mat) = {
     val ftarg = full(targ);
     val vt1 = mm1 * in
-    val vt2 = mm2 * in
-    val eta = mv * in + (vt1 ∙ vt1) - (vt2 ∙ vt2)
+    var vt2:Mat = null
+    val eta = mv * in + (vt1 ∙ vt1) 
+    if (opts.dim2 > 0) {
+      vt2 = mm2 * in;
+      eta ~ eta - (vt2 ∙ vt2);
+    }
     if (opts.strictFM) {   // Strictly follow the FM formula (remove diag terms) vs. let linear predictor cancel them. 
       xs = in.copy
       (xs.contents ~ xs.contents) ∘ xs.contents          // xs is the element-wise square of in.
-      eta ~ eta - (((mm1 ∘ mm1) - (mm2 ∘ mm2)) * xs) 
+      if (opts.dim2 > 0) {
+    	  eta ~ eta - (((mm1 ∘ mm1) - (mm2 ∘ mm2)) * xs) 
+      } else {
+        eta ~ eta - ((mm1 ∘ mm1) * xs)
+      }
     }
     if (opts.lim > 0) {
       max(eta, llim, eta);
@@ -151,24 +159,24 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     if (dweights.asInstanceOf[AnyRef] != null) eta ~ eta ∘ dweights
     uv ~ eta *^ in
     um1 ~ ((eta * 2f) ∘ vt1) *^ in
-    um2 ~ ((eta * -2f) ∘ vt2) *^ in
+    if (opts.dim2 > 0) um2 ~ ((eta * -2f) ∘ vt2) *^ in
     if (opts.strictFM) {
       val xeta = (eta * 2f) *^ xs
       um1 ~ um1 - (mm1 ∘ xeta);
-      um2 ~ um2 + (mm2 ∘ xeta);
+      if (opts.dim2 > 0) um2 ~ um2 + (mm2 ∘ xeta);
     }
     if (mask.asInstanceOf[AnyRef] != null) {
       uv ~ uv ∘ mask;
       um1 ~ um1 ∘ mask;
-      um2 ~ um2 ∘ mask;
+      if (opts.dim2 > 0) um2 ~ um2 ∘ mask;
     }
   }
   
   // Update a simple factorization A*B for the second order terms. 
   def mupdate4(in:Mat, targ:Mat, dweights:Mat) = {
     val ftarg = full(targ);
-    val vt1 = mm1 * in
-    val vt2 = mm2 * in
+    val vt1 = mm1 * in;
+    val vt2 = mm2 * in;
     val eta = mv * in + (vt1 ∙ vt2)
     GLM.preds(eta, eta, mylinks, totflops)
     GLM.derivs(eta, ftarg, eta, mylinks, totflops)
@@ -197,13 +205,19 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
   
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
     val ftarg = full(targ)
-    val vt1 = mm1 * in
-    val vt2 = mm2 * in
-    val eta = mv * in + (vt1 dot vt1) - (vt2 dot vt2)
+    val vt1 = mm1 * in;
+    var vt2:Mat = null;
+    if (opts.dim2 > 0) {
+    	vt2 = mm2 * in;
+    }
+    val eta = mv * in + (vt1 dot vt1);
+    if (opts.dim2 > 0) {
+      eta ~ eta - (vt2 dot vt2);
+    }
     if (opts.strictFM) {
       in.contents ~ in.contents ∘ in.contents;
       eta ~ eta - ((mm1 ∘ mm1) * in);
-      eta ~ eta + ((mm2 ∘ mm2) * in);
+      if (opts.dim2 > 0) eta ~ eta + ((mm2 ∘ mm2) * in);
     }
     if (opts.lim > 0) {
       max(eta, - opts.lim, eta)
