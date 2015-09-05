@@ -96,13 +96,13 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
   override def init() = {
     super.init()
     mylinks = if (useGPU) GIMat(opts.links) else opts.links
-    iweight = if (opts.iweight.asInstanceOf[AnyRef] != null) convertMat(opts.iweight) else null
+    iweight = if (opts.iweight.asInstanceOf[AnyRef] != null) convertMat(opts.iweight) else null;
+    ulim = convertMat(row(opts.lim));
+    llim = convertMat(row(-opts.lim));
     if (refresh) {
     	mv = modelmats(0);
     	mm1 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim1).toFloat, opts.dim1, mv.ncols));
     	if (opts.dim2 > 0) mm2 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim2).toFloat, opts.dim2, mv.ncols));
-    	ulim = convertMat(row(opts.lim))
-    	llim = convertMat(row(-opts.lim))
     	if (opts.dim2 > 0) setmodelmats(Array(mv, mm1, mm2)) else setmodelmats(Array(mv, mm1))
     	if (mask.asInstanceOf[AnyRef] != null) {
     		mv ~ mv ∘ mask;
