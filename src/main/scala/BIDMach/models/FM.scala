@@ -220,8 +220,8 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
       if (opts.dim2 > 0) eta ~ eta + ((mm2 ∘ mm2) * in);
     }
     if (opts.lim > 0) {
-      max(eta, - opts.lim, eta)
-      min(eta, opts.lim, eta)
+      max(eta, llim, eta)
+      min(eta, ulim, eta)
     }
     GLM.preds(eta, eta, mylinks, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, totflops)
