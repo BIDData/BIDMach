@@ -110,7 +110,10 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     		if (opts.dim2 > 0) mm2 ~ mm2 ∘ mask;
     	}
     }
-    (0 until modelmats.length).map((i) => modelmats(i) = convertMat(modelmats(i)))
+    (0 until modelmats.length).map((i) => modelmats(i) = convertMat(modelmats(i)));
+    mv = modelmats(0);
+    mm1 = modelmats(1);
+    if (opts.dim2 > 0) mm2 = modelmats(2);
     uv = updatemats(0)
     um1 = uv.zeros(opts.dim1, uv.ncols)
     if (opts.dim2 > 0) um2 = uv.zeros(opts.dim2, uv.ncols)
