@@ -585,14 +585,14 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_testarrays
 }
 
 #define APPLYCFN(fn)                                        \
-  for (int i = istart; i < iend; i++) {                     \
+  for (i = istart; i < iend; i++) {                         \
     float x = A[i];                                         \
     B[i] = (fn);         				    \
   }
 
 
 #define APPLYCOP(fn)                                        \
-  for (int i = istart; i < iend; i++) {                     \
+  for (i = istart; i < iend; i++) {                         \
     float x = A[i];                                         \
     float y = B[i];                                         \
     C[i] = (fn);         				    \
@@ -624,6 +624,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_applyfwd
   for (ithread = 0; ithread < nthreads; ithread++) {
     int istart = (1L * ithread * n)/nthreads;
     int iend = (1L * (ithread+1) * n)/nthreads;
+    int i;
     switch (ifn) {
     case SIGMOIDN: APPLYCFN(SIGMOIDX); break;
     case SOFTPLUSN: APPLYCFN(SOFTPLUSX); break;
@@ -645,6 +646,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_applyderiv
   for (ithread = 0; ithread < nthreads; ithread++) {
     int istart = (1L * ithread * n)/nthreads;
     int iend = (1L * (ithread+1) * n)/nthreads;
+    int i;
     switch (ifn) {
     case SIGMOIDN: APPLYCOP(SIGMOIDY); break;
     case TANHN: APPLYCOP(TANHY); break;

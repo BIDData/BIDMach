@@ -39,7 +39,7 @@ __device__ float deriv_tanh(float a, float d) {
 }
 
 __device__ float deriv_softplus(float a, float d) {
-  return d * forward_logistic(a);
+  return d * forward_sigmoid(a);
 }
 
 __device__ const fntype forwardfns[] = {
