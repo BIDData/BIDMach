@@ -75,3 +75,7 @@ int word2vecEvalNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, fl
 int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C);
 
 int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *C, float lrate);
+
+int apply_fwd(float *A, float *B, int ifn, int n);
+
+int apply_deriv(float *A, float *B, float *C, int ifn, int n);

@@ -1,5 +1,7 @@
 package edu.berkeley.bid;
 
+import jcuda.Pointer;
+
 public final class CPUMACH {
 
   private CPUMACH() {}
@@ -28,5 +30,9 @@ public final class CPUMACH {
   public static native double word2vecEvalPos(int nrows, int ncols, int shift, int [] W, int [] LB, int [] UB, float [] A, float [] B, int nthreads);
 
   public static native void testarrays(float [] [] a);
+  
+  public static native int applyfwd(float [] A, float [] B, int ifn, int n, int nthreads);
+  
+  public static native int applyderiv(float [] A, float [] B, float [] C, int ifn, int n, int nthreads);
 }
 

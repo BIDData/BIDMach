@@ -481,4 +481,23 @@ extern "C" {
     return word2vecBwd(nrows, ncols, nwa, nwb, WA, WB, A, B, C, lrate);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applyfwd
+  (JNIEnv *env, jobject obj, jobject jA, jobject jB, jint ifn, jint n)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *B = (float*)getPointer(env, jB);
+
+    return apply_fwd(A, B, ifn, n);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_applyderiv
+  (JNIEnv *env, jobject obj, jobject jA, jobject jB, jobject jC, jint ifn, jint n)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *B = (float*)getPointer(env, jB);
+    float *C = (float*)getPointer(env, jC);
+
+    return apply_deriv(A, B, C, ifn, n);
+  }
+
 }

@@ -10,13 +10,12 @@ __device__ float link_logistic(float a) {return log(a/(1.0f - a));}
 
 __device__ float mean_linear(float a) {return a;}
 __device__ float mean_logistic(float a) {
-  float tmp;
-  if (a > 0) {
-    tmp = exp(-a);
-    return 1.0f/(1.0f + tmp);
+  if (a > 20.0f) {
+    return 1.0f;
+  } else if (a < -80.0f) {
+    return 0.0f;
   } else {
-    tmp = exp(a);
-    return tmp/(1.0f + tmp);
+    return 1.0f/(1.0f + exp(-a));
   }
 }
 

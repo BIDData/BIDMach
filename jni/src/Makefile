@@ -1,7 +1,7 @@
 include Makefile.incl
 
 CUDA_OBJS=BIDMach_CUMACH.$(OBJ) Samplers.$(OBJ) Dtree.$(OBJ) Devel.$(OBJ) GLM.$(OBJ) HashMult.$(OBJ) \
-          DNN127.$(OBJ) Logger.$(OBJ) JNIUtils.$(OBJ) PointerUtils.$(OBJ)
+          DNN.$(OBJ) DNN127.$(OBJ) Logger.$(OBJ) JNIUtils.$(OBJ) PointerUtils.$(OBJ)
 
 CPU_OBJS=BIDMach_CPUMACH.$(OBJ)
 

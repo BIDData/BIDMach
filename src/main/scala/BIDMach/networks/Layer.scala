@@ -8,6 +8,8 @@ import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
+import edu.berkeley.bid.CPUMACH
+import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3;
 import scala.collection.mutable.HashMap;
 
@@ -241,7 +243,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   }
 
   override def backward(ipass:Int, pos:Long) = {
-    val mm = if (opts.constFeat && imodel > 0) {
+    val mm = if (opts.constFeat) {
       modelmats(imodel).colslice(1, modelmats(imodel).ncols);
     } else {
       modelmats(imodel);
@@ -709,8 +711,7 @@ class TanhLayer(override val net:Net, override val opts:TanhLayer.Options = new 
 	}
 
 	override def backward = {
-			val tmp = tanh(inputData);
-			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + ((1 - tmp ∘ tmp) ∘ deriv);
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.TANHFN);
 	}
 }
 
@@ -728,28 +729,19 @@ object TanhLayer {
 }
 
 /**
- * Sigmoid layer. Uses GLM implementations of logistic functions for performance. 
+ * Sigmoid layer.  
  */
 
 class SigmoidLayer(override val net:Net, override val opts:SigmoidLayer.Options = new SigmoidLayer.Options) extends Layer(net, opts) {
-	var ilinks:Mat = null;
-  var totflops = 0L;
 
   override def forward = {
 		createoutput;
-		if (ilinks.asInstanceOf[AnyRef] == null) {
-			ilinks = izeros(inputData.nrows, 1);
-			ilinks.set(GLM.logistic);
-			ilinks = convertMat(ilinks);
-		}
-		if (totflops == 0L) totflops = inputData.nrows * GLM.linkArray(1).fnflops;
-		output <-- GLM.preds(inputData, ilinks, totflops);
+    LayerFn.applyfwd(inputData, output, LayerFn.SIGMOIDFN);
 		clearDeriv;
 }
 
   override def backward = {
-		val tmp = output - (output ∘ output);
-		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (tmp ∘ deriv);
+		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.SIGMOIDFN);
 }
 }
 
@@ -764,33 +756,23 @@ object SigmoidLayer {
   def apply(net:Net) = new SigmoidLayer(net, new Options);
   
   def apply(net:Net, opts:Options) = new SigmoidLayer(net, opts); 
+  
 }
 /**
  * Softplus layer.  
  */
 
 class SoftplusLayer(override val net:Net, override val opts:SoftplusLayer.Options = new SoftplusLayer.Options) extends Layer(net, opts) {
-	var ilinks:Mat = null;
   var totflops = 0L;
 
   override def forward = {
 		createoutput;
-		val big = inputData > 60f;      
-		output ~ ((1 - big) ∘ ln(1f + exp(min(60f, inputData)))) + (big ∘ inputData);
+    LayerFn.applyfwd(inputData, output, LayerFn.SOFTPLUSFN);
 		clearDeriv;
   }
 
   override def backward = {
-		if (ilinks.asInstanceOf[AnyRef] == null) {
-			ilinks = izeros(inputData.nrows, 1);
-			ilinks.set(GLM.logistic);
-		}
-		if (totflops == 0L) totflops = inputData.nrows * GLM.linkArray(1).fnflops;
-		ilinks = convertMat(ilinks);
-		if (inputDeriv.asInstanceOf[AnyRef] != null) {
-			val tmp = GLM.preds(inputData, ilinks, totflops);
-			inputDeriv ~ inputDeriv + (tmp ∘ deriv);
-		}
+		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(inputData, deriv, LayerFn.SOFTPLUSFN);
   }
 }
 
@@ -1187,6 +1169,54 @@ class LayerOptions(val nlayers:Int) {
       }
     }
     lopts;
+  }
+}
+
+object LayerFn {
+  final val SIGMOIDFN = 0;
+  final val TANHFN = 1;
+  final val SOFTPLUSFN = 2;
+  
+  val fwdflops = irow(20, 20, 40);
+  val bwdflops = irow(3, 3, 20);
+  
+  def applyfwd(a:Mat, ifn:Int):Mat = applyfwd(a, null, ifn);
+  
+  def applyfwd(a:Mat, out:Mat, ifn:Int):Mat = {
+    Mat.nflops += 1L * a.length * fwdflops(ifn);
+    a match {
+      case af:FMat => {
+        val omat = FMat.newOrCheckFMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
+        CPUMACH.applyfwd(af.data, omat.data, ifn, a.length, Mat.numThreads);
+        omat
+      }
+      case ag:GMat => {
+        val omat = GMat.newOrCheckGMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
+        CUMACH.applyfwd(ag.data, omat.data, ifn, a.length);
+        omat
+      }
+    }
+  }
+
+  def applyderiv(a:Mat, b:Mat, ifn:Int):Mat = applyderiv(a, b, null, ifn)
+      
+  def applyderiv(a:Mat, b:Mat, out:Mat, ifn:Int):Mat = {
+	  Mat.nflops += 1L * a.length * bwdflops(ifn);
+    if (a.nrows != b.nrows || a.ncols != b.ncols) {
+      throw new RuntimeException("applyderiv rows or columns dont match (%d %d) (%d %d" format (a.nrows, a.ncols, b.nrows, b.ncols));
+    }
+    (a, b) match {
+      case (af:FMat, bf:FMat) => {
+        val omat = FMat.newOrCheckFMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
+        CPUMACH.applyderiv(af.data, bf.data, omat.data, ifn, a.length, Mat.numThreads);
+        omat
+      }
+      case (ag:GMat, bg:GMat) => {
+        val omat = GMat.newOrCheckGMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
+        CUMACH.applyderiv(ag.data, bg.data, omat.data, ifn, a.length);
+        omat
+      }
+    }
   }
 }
  

@@ -583,3 +583,75 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_testarrays
   free(X);
   free(Y);
 }
+
+#define APPLYCFN(fn)                                        \
+  for (int i = istart; i < iend; i++) {                     \
+    float x = A[i];                                         \
+    B[i] = (fn);         				    \
+  }
+
+
+#define APPLYCOP(fn)                                        \
+  for (int i = istart; i < iend; i++) {                     \
+    float x = A[i];                                         \
+    float y = B[i];                                         \
+    C[i] = (fn);         				    \
+  }
+
+#define SIGMOIDN 0
+#define TANHN 1
+#define SOFTPLUSN 2
+
+#define SIGMOIDX (x > 20.0f) ? 1.0f : ((x < -80.0f) ? 0.0f : 1.0f/(1.0f + exp(-x)))
+
+#define SOFTPLUSX (x > 20.0f) ? x : ((x < -20.0f) ? 0.0f : log(1.0f + exp(x)))
+
+#define SIGMOIDY (y * (x - x * x))
+
+#define TANHY (y * (1.0f - x * x))
+
+#define SOFTPLUSY y * ((x > 20.0f) ? 1.0f : ((x < -80.0f) ? 0.0f : 1.0f/(1.0f + exp(-x))))
+  
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_applyfwd
+(JNIEnv *env, jobject obj, jfloatArray jA, jfloatArray jB, jint ifn, jint n, jint nthreads)
+{
+  int ithread;
+  float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
+  float * B = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jB, JNI_FALSE));
+
+#pragma omp parallel for
+  for (ithread = 0; ithread < nthreads; ithread++) {
+    int istart = (1L * ithread * n)/nthreads;
+    int iend = (1L * (ithread+1) * n)/nthreads;
+    switch (ifn) {
+    case SIGMOIDN: APPLYCFN(SIGMOIDX); break;
+    case SOFTPLUSN: APPLYCFN(SOFTPLUSX); break;
+    }
+  }
+  (*env)->ReleasePrimitiveArrayCritical(env, jB, B, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
+}
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_applyderiv
+(JNIEnv *env, jobject obj, jfloatArray jA, jfloatArray jB, jfloatArray jC, jint ifn, jint n, jint nthreads)
+{
+  int ithread;
+  float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
+  float * B = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jB, JNI_FALSE));
+  float * C = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jC, JNI_FALSE));
+
+#pragma omp parallel for
+  for (ithread = 0; ithread < nthreads; ithread++) {
+    int istart = (1L * ithread * n)/nthreads;
+    int iend = (1L * (ithread+1) * n)/nthreads;
+    switch (ifn) {
+    case SIGMOIDN: APPLYCOP(SIGMOIDY); break;
+    case TANHN: APPLYCOP(TANHY); break;
+    case SOFTPLUSN: APPLYCOP(SOFTPLUSY); break;
+    }
+  }
+  (*env)->ReleasePrimitiveArrayCritical(env, jC, C, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jB, B, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
+}
