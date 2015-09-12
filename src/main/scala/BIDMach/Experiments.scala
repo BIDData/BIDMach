@@ -9,7 +9,7 @@ import BIDMach.updaters._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import java.util.concurrent.Executors
-
+// test commit
 object Experiments {
   
   def clearbit(a:IMat) {
