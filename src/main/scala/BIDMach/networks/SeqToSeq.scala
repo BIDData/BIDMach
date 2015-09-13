@@ -43,8 +43,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
-    val lopts1 = new LinLayer.Options{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts};
-    val lopts2 = new LinLayer.Options{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts};
+    val lopts1 = new LinLayer.Options{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; constFeat=opts.constFeat};
+    val lopts2 = new LinLayer.Options{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts; constFeat=opts.constFeat};
     for (j <- 0 until width) {
     	setlayer(0, j, InputLayer(this));
       if (j < inwidth) {
@@ -56,14 +56,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 
     // the main grid
     for (i <- 0 until height) {
-    	val loptsSrc = new LSTMLayer.Options;
-      val loptsDst = new LSTMLayer.Options;
-    	loptsSrc.dim = opts.dim;
-      loptsDst.dim = opts.dim;
-    	loptsSrc.aopts = opts.aopts;
-      loptsDst.aopts = opts.aopts;
-    	loptsSrc.kind = opts.kind;
-      loptsDst.kind = opts.kind;
+    	val loptsSrc = new LSTMLayer.Options{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; constFeat = opts.constFeat};
+      val loptsDst = new LSTMLayer.Options{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; constFeat = opts.constFeat};
     	loptsSrc.prefix = if (opts.bylevel) "SrcLevel_%d" format i; else "Src";
     	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "Dst";
     	loptsSrc.constructNet;
@@ -83,7 +77,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     }
     
     // the top layers
-    val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
+    val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; constFeat = opts.constFeat};
     val sopts = new SoftmaxOutputLayer.Options{scoreType = opts.scoreType};
     output_layers = new Array[Layer](outwidth);
     for (j <- 0 until outwidth) {
