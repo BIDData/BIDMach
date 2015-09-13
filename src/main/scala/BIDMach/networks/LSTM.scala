@@ -46,23 +46,23 @@ object LSTMLayer {
 	    val prev_c = new CopyLayer.Options;
 	    val i = new CopyLayer.Options;
 	    
-	  	val il1 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il1"; constFeat = constFeat};
-	  	val ph1 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph1"; constFeat = constFeat};
+	  	val il1 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il1"; constFeat = this.constFeat};
+	  	val ph1 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph1"; constFeat = this.constFeat};
 	  	val sum1 = new AddLayer.Options{inputs(0) = il1;   inputs(1) = ph1};
 	  	val in_gate = new SigmoidLayer.Options{inputs(0) = sum1};
 	  	
-	  	val il2 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il2"; constFeat = constFeat};
-	  	val ph2 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph12"; constFeat = constFeat};
+	  	val il2 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il2"; constFeat = this.constFeat};
+	  	val ph2 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph12"; constFeat = this.constFeat};
 	  	val sum2 = new AddLayer.Options{inputs(0) = il2;   inputs(1) = ph2};
 	  	val out_gate = new SigmoidLayer.Options{inputs(0) = sum2};
 	  	
-	  	val il3 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il3"; constFeat = constFeat};
-	  	val ph3 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph13"; constFeat = constFeat};
+	  	val il3 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il3"; constFeat = this.constFeat};
+	  	val ph3 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph13"; constFeat = this.constFeat};
 	  	val sum3 = new AddLayer.Options{inputs(0) = il3;   inputs(1) = ph3};
 	  	val forget_gate = new SigmoidLayer.Options{inputs(0) = sum3};
 	  	
-	    val il4 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il4"; constFeat = constFeat};
-	  	val ph4 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph14"; constFeat = constFeat};
+	    val il4 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il4"; constFeat = this.constFeat};
+	  	val ph4 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph14"; constFeat = this.constFeat};
 	  	val sum4 = new AddLayer.Options{inputs(0) = il4;   inputs(1) = ph4};
 	  	val in_gate2 = new TanhLayer.Options{inputs(0) = sum4};
 	  	
@@ -93,7 +93,7 @@ object LSTMLayer {
       val i = new CopyLayer.Options;
       
       val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
-      val il = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_all"; outdim = 4*dim; constFeat = constFeat};      
+      val il = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_all"; outdim = 4*dim; constFeat = this.constFeat};      
       val sp = new SplitVertLayer.Options{inputs(0) = il;  nparts = 4;}
 
       val in_gate = new SigmoidLayer.Options{inputs(0) = sp;     inputTerminals(0) = 0};
@@ -130,16 +130,16 @@ object LSTMLayer {
       
       val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
 
-      val lin1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1";  outdim = dim; constFeat = constFeat}
+      val lin1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1";  outdim = dim; constFeat = this.constFeat}
       val in_gate = new SigmoidLayer.Options{inputs(0) = lin1};
       
-      val lin2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2";  outdim = dim; constFeat = constFeat}
+      val lin2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2";  outdim = dim; constFeat = this.constFeat}
       val out_gate = new SigmoidLayer.Options{inputs(0) = lin2};
       
-      val lin3 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin3";  outdim = dim; constFeat = constFeat}
+      val lin3 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin3";  outdim = dim; constFeat = this.constFeat}
       val forget_gate = new SigmoidLayer.Options{inputs(0) = lin3};
       
-      val lin4 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin4";  outdim = dim; constFeat = constFeat}
+      val lin4 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin4";  outdim = dim; constFeat = this.constFeat}
       val in_gate2 = new TanhLayer.Options{inputs(0) = lin4};
       
       val in_prod = new MulLayer.Options{inputs(0) = in_gate;    inputs(1) = in_gate2};
@@ -170,9 +170,9 @@ object LSTMLayer {
       val i = new CopyLayer.Options;
           
       val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
-      val il1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1"; outdim = 2*dim; constFeat = constFeat};      
+      val il1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1"; outdim = 2*dim; constFeat = this.constFeat};      
       val sp1 = new SplitVertLayer.Options{inputs(0) = il1;  nparts = 2;}
-      val il2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2"; outdim = 2*dim; constFeat = constFeat};      
+      val il2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2"; outdim = 2*dim; constFeat = this.constFeat};      
       val sp2 = new SplitVertLayer.Options{inputs(0) = il2;  nparts = 2;}
 
       val in_gate = new SigmoidLayer.Options{inputs(0) = sp1;     inputTerminals(0) = 0};
