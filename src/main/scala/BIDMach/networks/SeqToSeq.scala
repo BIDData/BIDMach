@@ -84,7 +84,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     
     // the top layers
     val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
-    val sopts = new SoftmaxOutputLayer.Options;
+    val sopts = new SoftmaxOutputLayer.Options{scoreType = opts.scoreType};
     output_layers = new Array[Layer](outwidth);
     for (j <- 0 until outwidth) {
     	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
@@ -242,6 +242,7 @@ object SeqToSeq {
     var bylevel = true;
     var PADsym = 1;
     var OOVsym = 2;
+    var scoreType = 0;
   }
   
   class Options extends Opts {}
