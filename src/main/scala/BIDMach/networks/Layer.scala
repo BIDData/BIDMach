@@ -682,12 +682,18 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLa
   override def score:FMat = {
     if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
     val inds = target + coloffsets;
-    FMat(mean(ln(output(inds))));   
+    if (opts.scoreType == 1) {
+      FMat(mean(output(inds) == maxi(output)));
+    } else {
+    	FMat(mean(ln(output(inds))));   
+    }
   }
 }
 
 object SoftmaxOutputLayer {  
   class Options extends Layer.Options {
+    
+    var scoreType = 0;
    
     override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
     

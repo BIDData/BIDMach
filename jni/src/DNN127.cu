@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <MatKernel.hpp>
 
-#define BYDIMF 2
-#define CDIM 5
+#define BYDIMF 5
+#define CDIM 10
 
 #define BYDIMB 5
 
@@ -543,7 +543,7 @@ template<int NSKIP, int BYDIM>
  * Combined forward-backward word2vec kernel
  */
 
-template<int NWA, int NWB, int MAXD, int BYDIM>
+template<int NWA, int NWB, int BYDIM>
   __global__ void __word2vecNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
   const int NWAB = NWA*NWB;
   __shared__ float CC[NWA*NWB*BYDIM];
@@ -667,7 +667,7 @@ template<int NWA, int NWB, int MAXD, int BYDIM>
 }
 
 
-template<int NWA, int NWB, int MAXD, int BYDIM>
+template<int NWA, int NWB, int BYDIM>
   __global__ void __word2vecNegFilt(int nrows, int ncols, int nwords, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
   const int NWAB = NWA*NWB;
   __shared__ float CC[NWA*NWB*BYDIM];
@@ -828,7 +828,7 @@ template<int NWA, int NWB, int MAXD, int BYDIM>
  */
 
 
-template<int NWA, int NWB, int MAXD, int BYDIM>
+template<int NWA, int NWB, int BYDIM>
   __global__ void __word2vecEvalNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *Retval) {
   const int NWAB = NWA*NWB;
   __shared__ float CC[NWA*NWB*BYDIM];
@@ -1366,16 +1366,16 @@ template<int NWA, int NWB, int MAXDIM>
 template<int SKIP, int BYDIM, int NREPS>
   __global__ void __word2vecPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float lrate, float vexp) {}
 
-template<int NWA, int NWB, int MAXD, int BYDIM>
+template<int NWA, int NWB, int BYDIM>
   __global__ void __word2vecNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {}
 
-template<int NWA, int NWB, int MAXD, int BYDIM>
+template<int NWA, int NWB, int BYDIM>
   __global__ void __word2vecNegFilt(int nrows, int ncols, int nwords, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {}
 
 template<int SKIP, int BYDIM, int NREPS>
   __global__ void __word2vecEvalPos(int nrows, int ncols, int *W, int *LB, int *UB, float *A, float *B, float *Retval) {}
 
-template<int NWA, int NWB, int MAXD, int BYDIM>
+template<int NWA, int NWB, int BYDIM>
   __global__ void __word2vecEvalNeg(int nrows, int ncols, int *WA, int *WB, float *A, float *B, float *Retval) {}
 
 template<int NWA, int NWB, int BDIM>
@@ -1389,12 +1389,31 @@ template<int NWA, int NWB, int MAXDIM>
 int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float *A, float *B, float lrate, float vexp) {
   dim3 threads(32, CDIM, 1);
   int nblocks = min(64, ncols);
-  switch(skip) {
-  case 5 : __word2vecPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
-  case 3 : __word2vecPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
-  case 2 : __word2vecPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
-  default : printf("word2vecPos unsupport size %d\n", skip); return 1;
-  }
+  if (nrows <= 320) {
+    switch(skip) {
+    case 5 : __word2vecPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    case 3 : __word2vecPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    case 2 : __word2vecPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    default : printf("word2vecPos unsupport size %d\n", skip); return 1;
+    }
+  } else if (nrows <= 640) {
+    switch(skip) {
+    case 5 : __word2vecPos<5, CDIM, 20/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    case 3 : __word2vecPos<3, CDIM, 20/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    case 2 : __word2vecPos<2, CDIM, 20/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    default : printf("word2vecPos unsupport size %d\n", skip); return 1;
+    }
+  } else if (nrows <= 1280) {
+    switch(skip) {
+    case 5 : __word2vecPos<5, CDIM, 40/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    case 3 : __word2vecPos<3, CDIM, 40/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    case 2 : __word2vecPos<2, CDIM, 40/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate, vexp); break;
+    default : printf("word2vecPos unsupport size %d\n", skip); return 1;
+    }
+  } else {
+    printf("word2vecPos too many rows %d\n", nrows);
+    return 1;
+  }        
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
   return err;
@@ -1402,16 +1421,30 @@ int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float 
 
 
 int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
-  dim3 threads(32, BYDIMF, 1);
-  int nblocks = min(2048, 2 + (ncols - 1));
   int which = nwa*10000 + nwb;
-  switch (which) {
-  case  50001: __word2vecNeg<5,1,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
-  case  50005: __word2vecNeg<5,5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
-  case 100005: __word2vecNeg<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
-  case  50010: __word2vecNeg<5,10,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
-    //  case 150010: __word2vecNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
-  default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+  int nblocks = min(2048, 2 + (ncols - 1));
+  if (nrows <= 320) {
+    const int bydim = 2;
+    dim3 threads(32, bydim, 1);
+    switch (which) {
+    case  50001: __word2vecNeg<5,1,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+    case  50005: __word2vecNeg<5,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+    case 100005: __word2vecNeg<10,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+    case  50010: __word2vecNeg<5,10,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+      //  case 150010: __word2vecNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+    default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+    }
+  } else {
+    const int bydim = 5;
+    dim3 threads(32, bydim, 1);
+    switch (which) {
+    case  50001: __word2vecNeg<5,1,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+    case  50005: __word2vecNeg<5,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+    case 100005: __word2vecNeg<10,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+    case  50010: __word2vecNeg<5,10,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate, vexp); break;
+      //  case 150010: __word2vecNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, lrate); break;
+    default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+    }
   }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
@@ -1419,16 +1452,30 @@ int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
 }
 
 int word2vecNegFilt(int nrows, int ncols, int nwords, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float lrate, float vexp) {
-  dim3 threads(32, BYDIMF, 1);
-  int nblocks = min(2048, 2 + (ncols - 1));
   int which = nwa*10000 + nwb;
-  switch (which) {
-  case  50001: __word2vecNegFilt<5,1,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
-  case  50005: __word2vecNegFilt<5,5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
-  case 100005: __word2vecNegFilt<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
-  case  50010: __word2vecNegFilt<5,10,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
-    //  case 150010: __word2vecNegFilt<15,10,15><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
-  default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+  int nblocks = min(2048, 2 + (ncols - 1));
+  if (nrows <= 320) {
+    const int bydim = 2;
+    dim3 threads(32, bydim, 1);
+    switch (which) {
+    case  50001: __word2vecNegFilt<5,1,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+    case  50005: __word2vecNegFilt<5,5,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+    case 100005: __word2vecNegFilt<10,5,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+    case  50010: __word2vecNegFilt<5,10,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+      //  case 150010: __word2vecNegFilt<15,10,15><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate); break;
+    default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+    }
+  } else {
+    const int bydim = 5;
+    dim3 threads(32, bydim, 1);
+    switch (which) {
+    case  50001: __word2vecNegFilt<5,1,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+    case  50005: __word2vecNegFilt<5,5,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+    case 100005: __word2vecNegFilt<10,5,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+    case  50010: __word2vecNegFilt<5,10,bydim><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate, vexp); break;
+      //  case 150010: __word2vecNegFilt<15,10,15><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, lrate); break;
+    default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
+    }
   }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
@@ -1438,11 +1485,30 @@ int word2vecNegFilt(int nrows, int ncols, int nwords, int nwa, int nwb, int *WA,
 int word2vecEvalPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float *A, float *B, float *Retval) {
   dim3 threads(32, CDIM, 1);
   int nblocks = min(64, ncols);
-  switch(skip) {
-  case 5 : __word2vecEvalPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
-  case 3 : __word2vecEvalPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
-  case 2 : __word2vecEvalPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
-  default : printf("word2vecEvalPos unsupport size %d\n", skip); return 1;
+  if (nrows <= 320) {
+    switch(skip) {
+    case 5 : __word2vecEvalPos<5, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    case 3 : __word2vecEvalPos<3, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    case 2 : __word2vecEvalPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    default : printf("word2vecEvalPos unsupport size %d\n", skip); return 1;
+    }
+  } else if (nrows <= 640) {
+    switch(skip) {
+    case 5 : __word2vecEvalPos<5, CDIM, 20/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    case 3 : __word2vecEvalPos<3, CDIM, 20/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    case 2 : __word2vecEvalPos<2, CDIM, 20/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    default : printf("word2vecEvalPos unsupport size %d\n", skip); return 1;
+    }
+  } else if (nrows <= 1280) {
+    switch(skip) {
+    case 5 : __word2vecEvalPos<5, CDIM, 40/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    case 3 : __word2vecEvalPos<3, CDIM, 40/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    case 2 : __word2vecEvalPos<2, CDIM, 40/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, Retval); break;
+    default : printf("word2vecEvalPos unsupport size %d\n", skip); return 1;
+    }
+  } else {
+    printf("word2vecEvalPos nrows too large %d\n", nrows);
+    return 1;
   }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();
@@ -1451,16 +1517,30 @@ int word2vecEvalPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, fl
 
 
 int word2vecEvalNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float *A, float *B, float *Retval) {
-  dim3 threads(32, BYDIMF, 1);
-  int nblocks = min(2048, 2 + (ncols - 1));
   int which = nwa*10000 + nwb;
-  switch (which) {
-  case 50001: __word2vecEvalNeg<5,1,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
-  case 50005: __word2vecEvalNeg<5,5,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
-  case 100005: __word2vecEvalNeg<10,5,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
-  case 50010: __word2vecEvalNeg<5,10,10,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
-    //  case 150010: __word2vecEvalNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
-  default : printf("word2vecEvalNeg unsupport size combination %d %d\n", nwa, nwb); return 1;
+  int nblocks = min(2048, 2 + (ncols - 1));
+  if (nrows <= 320) {
+    const int bydim = 2;
+    dim3 threads(32, bydim, 1);
+    switch (which) {
+    case 50001: __word2vecEvalNeg<5,1,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    case 50005: __word2vecEvalNeg<5,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    case 100005: __word2vecEvalNeg<10,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    case 50010: __word2vecEvalNeg<5,10,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    //  case 150010: __word2vecEvalNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, Retval); break;
+    default : printf("word2vecEvalNeg unsupport size combination %d %d\n", nwa, nwb); return 1;
+    }
+  } else {
+    const int bydim = 5;
+    dim3 threads(32, bydim, 1);
+    switch (which) {
+    case 50001: __word2vecEvalNeg<5,1,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    case 50005: __word2vecEvalNeg<5,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    case 100005: __word2vecEvalNeg<10,5,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    case 50010: __word2vecEvalNeg<5,10,bydim><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, Retval); break;
+    //  case 150010: __word2vecEvalNeg<15,10,15><<<nblocks,threads>>>(nrows, ncols, nwords, WA, WB, A, B, Retval); break;
+    default : printf("word2vecEvalNeg unsupport size combination %d %d\n", nwa, nwb); return 1;
+    }
   }
   cudaDeviceSynchronize();
   int err = cudaGetLastError();

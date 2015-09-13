@@ -16,8 +16,8 @@ val pc = zeros(tc.nrows, tc.ncols)
 val (nn,opts)=GLM.learnerX(a,c,1)
 
 opts.batchSize=10000
-opts.lrate = 0.1f
-opts.npasses = 4
+opts.lrate = 0.02f
+opts.npasses = 3
 opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
