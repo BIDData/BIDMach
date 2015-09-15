@@ -225,25 +225,23 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   var ADAinitialized = false;
 
   override def forward = {
+    val modelcols = inputData.nrows;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
-      modelmats(imodel) = convertMat(normrnd(0, 1, outdim, inputData.nrows + (if (opts.constFeat) 1 else 0)));
+      modelmats(imodel) = convertMat(normrnd(0, 1, outdim, modelcols + (if (opts.constFeat) 1 else 0)));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
-    val mm = if (opts.constFeat) {
-      modelmats(imodel).colslice(1, modelmats(imodel).ncols);
-    } else {
-      modelmats(imodel);
-    }
+    val mm = if (opts.constFeat) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     createoutput(mm.nrows, inputData.ncols);
     output ~ mm * inputData;
-    if (opts.constFeat) output ~ output + modelmats(imodel).colslice(0, 1);
+    if (opts.constFeat) output ~ output + modelmats(imodel).colslice(modelcols, modelcols+1);
     clearDeriv;
   }
 
   override def backward(ipass:Int, pos:Long) = {
-    val mm = if (opts.constFeat) modelmats(imodel).colslice(1, modelmats(imodel).ncols) else modelmats(imodel)
+	  val modelcols = inputData.nrows;
+    val mm = if (opts.constFeat) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel)
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
       inputDeriv ~ inputDeriv + (mm ^* deriv);
     }
@@ -253,14 +251,10 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
       ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
       if (dprod.asInstanceOf[AnyRef] == null) {
-        if (opts.constFeat) {
-          dprod = updatemats(imodel).colslice(1, modelmats(imodel).ncols)
-        } else {
-        	dprod = updatemats(imodel) + 0f;
-        }
+        dprod = if (opts.constFeat) updatemats(imodel).view(modelmats(imodel).nrows, modelcols) else updatemats(imodel) + 0f;
       }
       dprod ~ deriv *^ inputData;
-      updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (sum(deriv,2) \ dprod) else dprod);
+      updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (dprod \ sum(deriv,2)) else dprod);
     }
   }
 
