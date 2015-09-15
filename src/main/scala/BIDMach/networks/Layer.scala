@@ -254,7 +254,9 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
         dprod = if (opts.constFeat) updatemats(imodel).colslice(0, modelcols) else updatemats(imodel) + 0f;
       }
       dprod ~ deriv *^ inputData;
-      updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (dprod \ sum(deriv,2)) else dprod);
+      val um = updatemats(imodel).view(updatemats(imodel).nrows, modelcols);
+      um ~ um + dprod;
+      if (opts.constFeat) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv,2)
     }
   }
 
