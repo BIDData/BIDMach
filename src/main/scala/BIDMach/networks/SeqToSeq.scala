@@ -255,11 +255,11 @@ object SeqToSeq {
     
   class LearnOptions extends Learner.Options with SeqToSeq.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
-  def learner(mat0:Mat) = {
+  def learner(mat0:Mat, mat1:Mat) = {
     val opts = new LearnOptions;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+    opts.batchSize = 128;
   	val nn = new Learner(
-  	    new MatDS(Array(mat0), opts), 
+  	    new MatDS(Array(mat0, mat1), opts), 
   	    new SeqToSeq(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
