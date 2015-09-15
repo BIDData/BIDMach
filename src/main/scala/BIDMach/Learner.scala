@@ -100,7 +100,7 @@ case class Learner(
         	lastp = dsp - (dsp % opts.pstep)
         	print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
         			100f*lastp, 
-        			Learner.scoreSummary(reslist, lasti, reslist.length),
+        			Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
         			gf._1,
         			gf._2, 
         			bytes*1e-9,
@@ -166,7 +166,7 @@ case class Learner(
         lastp = dsp - (dsp % opts.pstep)
         print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
             100f*lastp, 
-            Learner.scoreSummary(reslist, lasti, reslist.length),
+            Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
             gf._1,
             gf._2, 
             bytes*1e-9,
@@ -333,7 +333,7 @@ case class ParLearner(
       		if (reslist.length > lasti) {
       			print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
       					100f*lastp, 
-      					Learner.scoreSummary(reslist, lasti, reslist.length),
+      					Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
       					gf._1,
       					gf._2, 
       					bytes*1e-9,
@@ -728,6 +728,7 @@ object Learner {
   	var useCache = true
   	var updateAll = false
   	var debugMem = false
+    var cumScore = false
   }
   
   def numBytes(mat:Mat):Long = {
@@ -766,15 +767,16 @@ object Learner {
     }
   }
   
-  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, length:Int):String = {
-    var i = lasti
+  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, length:Int, cumScore:Boolean = false):String = {
+    val istart = if (cumScore) 0 else lasti
+    var i = 0
     var sum = 0.0
     while (i < length) {
       val scoremat = reslist(i)
       sum += mean(scoremat(?,0)).v
       i += 1
     }
-    ("ll=%6.5f" format sum/(length-lasti))    
+    ("ll=%6.5f" format sum/(length-istart))    
   }
   
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
