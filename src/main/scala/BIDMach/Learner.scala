@@ -768,7 +768,7 @@ object Learner {
   }
   
   def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):String = {
-    val istart = if (cumScore == 0) lasti else {if (cumScore == 1) 0 else len/2};
+    val istart = if (cumScore == 0) lasti else {if (cumScore == 1) 0 else if (cumScore == 2) len/2 else 3*len/4};
     var i = 0
     var sum = 0.0
     while (i < len) {
