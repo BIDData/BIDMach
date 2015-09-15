@@ -213,15 +213,15 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       if (putBack >= 0) {
         output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));
       }
-      val scores = zeros(output_layers.length, 1);
+      var score = 0f
       var j = 0;
-      while (j < dstxn) {
-        scores(j) = output_layers(j).score.v;
+      while (j < dstxn-1) {
+        score += output_layers(j).score.v;
         j += 1;
       }
-      scores;
+      row(score/(dstxn-1))
     } else {
-      zeros(output_layers.length, 1);
+      zeros(1, 1);
     }
   }
 }
