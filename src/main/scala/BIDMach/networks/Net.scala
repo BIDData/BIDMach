@@ -200,7 +200,7 @@ object Net  {
     var targetNorm:Float = 1f;
     var targmap:Mat = null;
     var dmask:Mat = null;
-    var constFeat:Boolean = false;
+    var hasBias:Boolean = false;
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
     var layers:LayerOptions = null;
@@ -222,7 +222,7 @@ object Net  {
     layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
+    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
@@ -233,7 +233,7 @@ object Net  {
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
     layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
@@ -251,7 +251,7 @@ object Net  {
     layers(0) = new InputLayer.Options;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
+    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
@@ -264,7 +264,7 @@ object Net  {
     		layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat = opts.constFeat; aopts = opts.aopts};
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
     layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
@@ -283,7 +283,7 @@ object Net  {
     for (i <- 1 until depth - 2) {
     	(i % 4) match {
     	  case 1 => {
-    	  	layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; constFeat = opts.constFeat; aopts = opts.aopts};
+    	  	layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     	  	w = (taper*w).toInt;
     	  }
     	  case 2 => {
@@ -302,7 +302,7 @@ object Net  {
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; constFeat =  opts.constFeat; aopts = opts.aopts};
+    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
     layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
@@ -403,7 +403,7 @@ object Net  {
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1);
     opts.links = mopts.links;
     opts.layers = mopts.layers;
-    opts.addConstFeat = mopts.asInstanceOf[DataSource.Opts].addConstFeat;
+    opts.hasBias = mopts.hasBias;
     opts.putBack = 1;
     opts.dropout = 1f;
     
