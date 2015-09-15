@@ -770,10 +770,9 @@ object Learner {
   def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):String = {
     val istart = if (cumScore == 0) lasti else {if (cumScore == 1) 0 else if (cumScore == 2) len/2 else 3*len/4};
     var i = 0
-    var sum = 0.0
-    while (i < len) {
-      val scoremat = reslist(i)
-      sum += mean(scoremat(?,0)).v
+    var sum = 0.0;
+    for (scoremat <- reslist) {
+      if (i >= istart) sum += mean(scoremat(?,0)).v
       i += 1
     }
     ("ll=%6.5f" format sum/(len - istart))    
@@ -781,7 +780,7 @@ object Learner {
   
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
     val out = FMat(reslist(0).nrows, reslist.length)
-    var i = 0
+    var i = 0;
     while (i < reslist.length) {
       val scoremat = reslist(i)
       out(?, i) = scoremat(?,0)
