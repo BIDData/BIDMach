@@ -243,11 +243,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   }
 
   override def backward(ipass:Int, pos:Long) = {
-    val mm = if (opts.constFeat) {
-      modelmats(imodel).colslice(1, modelmats(imodel).ncols);
-    } else {
-      modelmats(imodel);
-    }
+    val mm = if (opts.constFeat) modelmats(imodel).colslice(1, modelmats(imodel).ncols) else modelmats(imodel)
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
       inputDeriv ~ inputDeriv + (mm ^* deriv);
     }
@@ -257,7 +253,11 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
       ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
       if (dprod.asInstanceOf[AnyRef] == null) {
-        dprod = updatemats(imodel) + 0f;
+        if (opts.constFeat) {
+          dprod = updatemats(imodel).colslice(1, modelmats(imodel).ncols)
+        } else {
+        	dprod = updatemats(imodel) + 0f;
+        }
       }
       dprod ~ deriv *^ inputData;
       updatemats(imodel) ~ updatemats(imodel) + (if (opts.constFeat) (sum(deriv,2) \ dprod) else dprod);
