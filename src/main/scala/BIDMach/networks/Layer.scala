@@ -226,7 +226,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
 
   override def forward = {
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-      val outdim = if (opts.outdim == 0) (inputData.nrows + (if (opts.constFeat) 1 else 0)) else opts.outdim;
+      val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
       modelmats(imodel) = convertMat(normrnd(0, 1, outdim, inputData.nrows + (if (opts.constFeat) 1 else 0)));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
     }
