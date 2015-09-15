@@ -1,5 +1,5 @@
 package edu.berkeley.bid;
-import jcuda.*;
+import jcuda.Pointer;
 
 public final class CUMACH {
 

@@ -1,13 +1,11 @@
 package edu.berkeley.bid;
 
-import jcuda.Pointer;
-
 public final class CPUMACH {
 
   private CPUMACH() {}
 
   static {
-      jcuda.LibUtils.loadLibrary("bidmachcpu");
+      LibUtils.loadLibrary("bidmachcpu");
   } 
  
   
