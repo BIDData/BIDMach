@@ -728,7 +728,7 @@ object Learner {
   	var useCache = true
   	var updateAll = false
   	var debugMem = false
-    var cumScore = false
+    var cumScore = 0
   }
   
   def numBytes(mat:Mat):Long = {
@@ -767,16 +767,16 @@ object Learner {
     }
   }
   
-  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, length:Int, cumScore:Boolean = false):String = {
-    val istart = if (cumScore) 0 else lasti
+  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):String = {
+    val istart = if (cumScore == 0) lasti else {if (cumScore == 1) 0 else len/2};
     var i = 0
     var sum = 0.0
-    while (i < length) {
+    while (i < len) {
       val scoremat = reslist(i)
       sum += mean(scoremat(?,0)).v
       i += 1
     }
-    ("ll=%6.5f" format sum/(length-istart))    
+    ("ll=%6.5f" format sum/(len - istart))    
   }
   
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
