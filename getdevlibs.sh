@@ -14,27 +14,25 @@ BIDMACH_ROOT=`pwd`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
 
 if [ `uname` = "Darwin" ]; then
-    binnames="\{*.dylib,*.jnilib\}"
+    binnames=".dylib,.jnilib"
     cdir="osx"
-else if [ "$OS" = "Windows_NT" ]; then
-    binnames="*.dll"
+elif [ "$OS" = "Windows_NT" ]; then
+    binnames=".dll"
     cdir="win"
 else 
-    binnames="*.so"
+    binnames=".so"
     cdir="linux"
 fi
 
-source="http://bid2.berkeley.edu/bid-data-project"
+source="http://www.cs.berkeley.edu/~jfc/biddata"
 
 cd ${BIDMACH_ROOT}/lib
-wget ${source}/lib/*.txt
-wget ${source}/lib/*.html
-wget ${source}/lib/*.jar
-wget ${source}/lib/${binnames}
+wget -r -A.txt,.html,.jar ${source}/lib/
+wget -r -A${binnames} ${source}/lib/
 
 mkdir -p ${BIDMACH_ROOT}/cbin
 cd ${BIDMACH_ROOT}/cbin
-wget ${source}/cbin/${cdir}/*
+wget -r -A.exe ${source}/cbin/${cdir}/
 
 mv ${BIDMACH_ROOT}/lib/BIDMach.jar ${BIDMACH_ROOT}
 
