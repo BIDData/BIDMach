@@ -670,7 +670,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLa
 //			  val isum = 1f / (sumexps ∘ sumexps);
 //        inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv)))); 
 //        deriv ~ exps / (- sum(exps));
-        deriv <-- (- output);
+        deriv ~ 0f - output;
         val inds = target + coloffsets;
 			  deriv(inds) = deriv(inds) + 1f;               // deriv = target - preds
         inputDeriv ~ inputDeriv + deriv; 
