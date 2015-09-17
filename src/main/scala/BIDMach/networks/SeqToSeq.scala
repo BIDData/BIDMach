@@ -295,8 +295,8 @@ object SeqToSeq {
   	val nn = new Learner(
   			ds, 
   	    new SeqToSeq(opts), 
-  	    Array(new L1Regularizer(opts)),
-  	    if (regularize) new ADAGrad(opts) else null, 
+  	    if (regularize) Array(new L1Regularizer(opts)) else null,
+  	    new ADAGrad(opts), 
   	    opts)
     (nn, opts)
   } 
