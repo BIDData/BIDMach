@@ -58,7 +58,7 @@ class BayesNet(val dag:Mat,
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
     
-    // Build the CPT. For now, it stores counts, and to avoid div-by-zero errors, initialize randomly.
+    // Build the CPT. To avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
@@ -96,6 +96,8 @@ class BayesNet(val dag:Mat,
    
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
+    debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
+    mm <-- ( mm / (mm.t * normConstMatrix).t ) // Normalize the cpt before each sampling!
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
@@ -152,11 +154,12 @@ class BayesNet(val dag:Mat,
         val sampleIndices = if (user.ncols == batchSize) colorInfo(c).sampleIDindices else colorInfo(c).sampleIDindicesLast
         
         // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
-        val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys)
-        val probs = exp(nonExponentiatedProbs - maxInGroup)
+        //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
+        //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
+        val probs = exp(nonExponentiatedProbs)
         val cumprobs = cumsumByKey(probs, keys)
         val normedProbs = cumprobs / cumprobs(bkeys)
-        
+       
         // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
         val randMatrix = randMap( (colorInfo(c).numNodes, usertrans.nrows) )
         rand(randMatrix)
@@ -427,6 +430,15 @@ class BayesNet(val dag:Mat,
     }
   } 
   
+  /** A one-liner that we can insert in a place with ipass and here to debug the cpt. */
+  def debugCpt(ipass:Int, here:Long) {
+    println("\n\n\nCurrently on ipass = " + ipass + " with here = " + here + ". This is the CPT:")
+    for (k <- 0 until graph.n) {
+      showCpt(k)
+    }
+    println()
+  }
+  
   /** A debugging method to print out the CPT of one variable (prettily). */
   def showCpt(nodeID: Int) {
     println("\nCPT for node indexed at " + nodeID)
@@ -488,6 +500,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
+    var copiesForSAME = 1
     var samplingRate = 1
     var numSamplesBurn = 0
   }
@@ -510,8 +523,8 @@ object BayesNet  {
     opts.npasses = 2 
     opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
     opts.putBack = 1        // Because this stores samples across ipasses, as required by Gibbs sampling
-    opts.power = 0          // So that the sampled CPT parameters are exactly what we use next iteration
-    val secondMatrix = data.zeros(data.nrows,data.ncols)
+    opts.power = 0.0f       // So that the sampled CPT parameters are exactly what we use next iteration
+    val secondMatrix = data.zeros(opts.copiesForSAME*data.nrows,data.ncols)
 
     val nn = new Learner(
         new MatDS(Array(data:Mat, secondMatrix), opts),
