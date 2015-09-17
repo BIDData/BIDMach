@@ -13,26 +13,33 @@ pushd "${BIDMACH_ROOT}"  > /dev/null
 BIDMACH_ROOT=`pwd`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
 
+source="http://www.cs.berkeley.edu/~jfc/biddata"
+cd ${BIDMACH_ROOT}/lib
+
 if [ `uname` = "Darwin" ]; then
-    binnames=".dylib,.jnilib"
-    cdir="osx"
+    subdir="osx"
+    curl -o liblist.txt ${source}/lib/liblist_osx.txt 
 elif [ "$OS" = "Windows_NT" ]; then
-    binnames=".dll"
-    cdir="win"
-else 
-    binnames=".so"
-    cdir="linux"
+    subdir="win"
+    curl -o liblist.txt ${source}/lib/liblist_win.txt
+else
+    subdir="linux"
+    curl -o liblist.txt ${source}/lib/liblist_linux.txt
 fi
 
-source="http://www.cs.berkeley.edu/~jfc/biddata"
-
-cd ${BIDMACH_ROOT}/lib
-wget -r -A.txt,.html,.jar ${source}/lib/
-wget -r -A${binnames} ${source}/lib/
+while read fname; do
+   echo -e "\nDownloading ${fname}"
+   curl --retry 2 -O ${source}/lib/${fname}
+done < liblist.txt
 
 mkdir -p ${BIDMACH_ROOT}/cbin
 cd ${BIDMACH_ROOT}/cbin
-wget -r -A.exe ${source}/cbin/${cdir}/
+curl -o exelist.txt ${source}/cbin/exelist.txt
+
+while read fname; do
+    echo -e "\nDownloading ${fname}"
+    curl --retry 2 -O ${source}/cbin/${subdir}/${fname}
+done < exelist.txt
 
 mv ${BIDMACH_ROOT}/lib/BIDMach.jar ${BIDMACH_ROOT}
 
