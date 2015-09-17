@@ -86,6 +86,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   }
 	
   def update(ipass:Int, step:Long):Unit = { 
+    val start = toc;
     modelmats = model.modelmats
     updatemats = model.updatemats
     val nsteps = if (step == 0) 1f else {
@@ -133,6 +134,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     		if (mask != null) mm ~ mm *@ mask;
     	}
     }
+    runningtime += toc - start;
   }
 }
 

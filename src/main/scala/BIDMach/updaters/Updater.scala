@@ -7,7 +7,8 @@ import BIDMach.models._
 
 
 abstract class Updater(val opts:Updater.Opts = new Updater.Options) {
-  var model:Model = null
+  var model:Model = null;
+  var runningtime = 0.0;
   
   def init(model0:Model) = {
     model = model0 
