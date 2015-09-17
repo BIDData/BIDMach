@@ -69,9 +69,6 @@ class BayesNet(val dag:Mat,
     // To finish building CPT, we normalize it based on the batch size and normalizing constant matrix.
     normConstMatrix = getNormConstMatrix(lengthCPT)
     cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
-    val mats = datasource.next
-    cpt <-- (cpt * mats(0).ncols)
-    datasource.reset
     setmodelmats(new Array[Mat](1))
     modelmats(0) = cpt
     mm = modelmats(0)
