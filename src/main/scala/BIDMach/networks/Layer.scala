@@ -652,6 +652,7 @@ object SoftmaxLayer {
 
 class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLayer.Options = new SoftmaxOutputLayer.Options) extends Layer(net, opts) { 
   var coloffsets:Mat = null;
+  var zero:Mat = null;
 
   override def forward = {
       createoutput;
@@ -670,7 +671,8 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLa
 //			  val isum = 1f / (sumexps ∘ sumexps);
 //        inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv)))); 
 //        deriv ~ exps / (- sum(exps));
-        deriv ~ 0f - output;
+		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
+        deriv ~ zero - output;
         val inds = target + coloffsets;
 			  deriv(inds) = deriv(inds) + 1f;               // deriv = target - preds
         inputDeriv ~ inputDeriv + deriv; 
