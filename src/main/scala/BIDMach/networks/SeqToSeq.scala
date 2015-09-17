@@ -285,7 +285,7 @@ object SeqToSeq {
   
   def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)));
 
-  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+  def learner(fnames:List[(Int)=>String], regularize:Boolean = false):(Learner, FDSopts) = {   
     val opts = new FDSopts;
     opts.fnames = fnames
     opts.batchSize = 128;
@@ -296,7 +296,7 @@ object SeqToSeq {
   			ds, 
   	    new SeqToSeq(opts), 
   	    Array(new L1Regularizer(opts)),
-  	    new ADAGrad(opts), 
+  	    if (regularize) new ADAGrad(opts) else null, 
   	    opts)
     (nn, opts)
   } 
