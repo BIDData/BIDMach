@@ -44,6 +44,12 @@ installcudalib: cudalib
 installcpulib: cpulib
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
 
+upload: all
+	if [ -d /biddata/lib ]; then \
+	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) /biddata/lib ; \
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  /biddata/lib ; else \
+	scp $(LIBPREPEND)bidmach*$(LIBAPPEND) bid01.ist.berkeley.edu:biddata/lib ; fi
+
 clean:
 	rm -f *.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib
 
