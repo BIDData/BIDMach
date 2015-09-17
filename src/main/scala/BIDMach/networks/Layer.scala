@@ -243,7 +243,8 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
 	  val modelcols = inputData.nrows;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel)
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      inputDeriv ~ inputDeriv + (mm ^* deriv);
+//      inputDeriv ~ inputDeriv + (mm ^* deriv);
+      mm.madd(deriv, inputDeriv, true, false);
     }
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
