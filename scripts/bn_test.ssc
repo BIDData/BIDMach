@@ -24,5 +24,5 @@ val (nn , opts) = BIDMach.models.BayesNet.learner(states , dag , data_50perc)
 opts.npasses = 10
 opts.useGPU = true
 opts.what
-//nn.train
-//nn.modelmats(0).t
+nn.train
+nn.modelmats(0).t

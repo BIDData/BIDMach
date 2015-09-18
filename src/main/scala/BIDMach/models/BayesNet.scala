@@ -25,10 +25,13 @@ class BayesNet(val dag:Mat,
 
   var mm:Mat = null                         // Local copy of the cpt
   var cptOffset:Mat = null                  // For global variable offsets
+  var cptOffsetSAME:Mat = null              // A stacked version of cptOffset, for SAME
   var graph:Graph = null                    // Data structure representing the DAG
   var iproject:Mat = null                   // Local CPT offset matrix
+  var iprojectBlockedSAME:Mat = null        // A sparse matrix with diagonal blocks of iproject, for SAMELocal CPT offset matrix
   var pproject:Mat = null                   // Parent tracking matrix
   var statesPerNode:Mat = null              // Variables can have an arbitrary number of states
+  var statesPerNodeSAME:Mat = null          // A stacked version of statesPerNode, for SAME
   var colorInfo:Array[ColorGroup] = null    // Gives us, for each color, a colorStuff class (of arrays)
   var zeroMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a zero matrix (to avoid allocation)
   var randMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a rand matrix (to avoid allocation)
@@ -38,6 +41,7 @@ class BayesNet(val dag:Mat,
   var counts:Mat = null
   var dirichletPrior:Mat = null
   var dirichletScale:Mat = null
+  var onesSAMEvector:Mat = null             // This the ones(copiesForSAME), has type IMat or GIMat
 
   /**
    * Performs a series of initialization steps.
@@ -53,16 +57,19 @@ class BayesNet(val dag:Mat,
 
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
     statesPerNode = IMat(states)
+    statesPerNodeSAME = iones(opts.copiesForSAME,1) kron IMat(statesPerNode)
     graph = new Graph(dag, opts.dim, statesPerNode)
     graph.color
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
+    iprojectBlockedSAME = createBlockedIproject
     
     // Build the CPT. To avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cptOffset = convertMat(cptOffset)
+    cptOffsetSAME = iones(opts.copiesForSAME,1) kron IMat(cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     val cpt = convertMat(rand(lengthCPT,1))
     
@@ -87,13 +94,16 @@ class BayesNet(val dag:Mat,
     counts = mm.zeros(mm.length, 1)
     dirichletPrior = mm.ones(mm.length, 1)
     dirichletScale = mm.ones(mm.length, 1)
+    onesSAMEvector = if (useGPUnow) gones(opts.copiesForSAME,1) else iones(opts.copiesForSAME,1) // TODO Fix typing, GMat vs IMat issue
     statesPerNode = convertMat(statesPerNode) 
+    statesPerNodeSAME = convertMat(statesPerNodeSAME) 
+    cptOffsetSAME = convertMat(cptOffsetSAME)
     batchSize = -1
   } 
    
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
+    //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
     mm <-- ( mm / (mm.t * normConstMatrix).t ) // Normalize the cpt before each sampling!
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
@@ -119,56 +129,68 @@ class BayesNet(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    var numGibbsIterations = opts.samplingRate
-    
+
+    // For SAME, we need to replicate by stacking matrices. TODO clumsy workaround due to type problems.
+    val stackedData = {
+      sdata match {
+        case sdata:SMat => onesSAMEvector.asInstanceOf[IMat] kron full(sdata)
+        case sdata:GSMat => onesSAMEvector.asInstanceOf[GMat] kron full(sdata)
+        case sdata:FMat => onesSAMEvector.asInstanceOf[IMat] kron sdata
+        case sdata:GMat => onesSAMEvector.asInstanceOf[GMat] kron sdata
+      }  
+    }
+    val select = stackedData > 0
+
     // For the first pass, we need to create a lot of matrices that rely on knowledge of the batch size.
+    var numGibbsIterations = opts.samplingRate
     if (ipass == 0) {
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
       establishMatrices(sdata.ncols)
-      val state = convertMat(rand(sdata.nrows, sdata.ncols))
-      state <-- float( min( int(statesPerNode ∘ state), statesPerNode-1 ) ) // Need an extra float() outside
-      val data = full(sdata)
-      val select = data > 0
-      user ~ (select ∘ (data-1)) + ((1-select) ∘ state)
+      val state = convertMat(rand(sdata.nrows * opts.copiesForSAME, sdata.ncols))
+      state <-- float( min( int(statesPerNodeSAME ∘ state), statesPerNodeSAME-1 ) )
+      user ~ (select ∘ (stackedData-1)) + ((1-select) ∘ state)
     }
     val usertrans = user.t
-
+    
     for (k <- 0 until numGibbsIterations) {
       for (c <- 0 until graph.ncolors) {
+        for (copy <- 0 until opts.copiesForSAME) {
+          val start = copy * graph.n
+          val end = (copy+1) * graph.n
+          val colorIndices = colorInfo(c).idsInColor + start
+        
+          // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
+          usertrans(?, colorIndices) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) ) 
+          val offsetMatrix = usertrans(?, start until end) * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
+          val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
+          val logProbs = ln(mm(replicatedOffsetMatrix))
+          val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrix).t
 
-        // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
-        usertrans(?, colorInfo(c).idsInColor) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) )
-        val offsetMatrix = usertrans * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
-        val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
-        val logProbs = ln(mm(replicatedOffsetMatrix))
-        val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrix).t
+          // Establish matrices needed for the multinomial sampling
+          val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
+          val bkeys = if (user.ncols == batchSize) colorInfo(c).bkeysMatrix else colorInfo(c).bkeysMatrixLast
+          val bkeysOff = if (user.ncols == batchSize) colorInfo(c).bkeysOffsets else colorInfo(c).bkeysOffsetsLast
+          val randIndices = if (user.ncols == batchSize) colorInfo(c).randMatrixIndices else colorInfo(c).randMatrixIndicesLast
+          val sampleIndices = if (user.ncols == batchSize) colorInfo(c).sampleIDindices else colorInfo(c).sampleIDindicesLast
         
-        // Establish matrices needed for the multinomial sampling
-        val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
-        val bkeys = if (user.ncols == batchSize) colorInfo(c).bkeysMatrix else colorInfo(c).bkeysMatrixLast
-        val bkeysOff = if (user.ncols == batchSize) colorInfo(c).bkeysOffsets else colorInfo(c).bkeysOffsetsLast
-        val randIndices = if (user.ncols == batchSize) colorInfo(c).randMatrixIndices else colorInfo(c).randMatrixIndicesLast
-        val sampleIndices = if (user.ncols == batchSize) colorInfo(c).sampleIDindices else colorInfo(c).sampleIDindicesLast
-        
-        // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
-        //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
-        //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
-        val probs = exp(nonExponentiatedProbs)
-        val cumprobs = cumsumByKey(probs, keys)
-        val normedProbs = cumprobs / cumprobs(bkeys)
+          // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
+          //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
+          //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
+          val probs = exp(nonExponentiatedProbs)
+          val cumprobs = cumsumByKey(probs, keys)
+          val normedProbs = cumprobs / cumprobs(bkeys)
        
-        // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
-        val randMatrix = randMap( (colorInfo(c).numNodes, usertrans.nrows) )
-        rand(randMatrix)
-        randMatrix <-- randMatrix * 0.99999f
-        val lessThan = normedProbs < randMatrix(randIndices)
-        val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
-        usertrans(?, colorInfo(c).idsInColor) = sampleIDs.t
-        
-        // After we finish sampling with this color group, we override the known values.
-        val data = full(sdata)
-        val select = data > 0
-        usertrans ~ (select *@ (data-1)).t + ((1-select) *@ usertrans.t).t
+          // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
+          val randMatrix = randMap( (colorInfo(c).numNodes, usertrans.nrows) )
+          rand(randMatrix)
+          randMatrix <-- randMatrix * 0.99999f
+          val lessThan = normedProbs < randMatrix(randIndices)
+          val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
+          usertrans(?, colorIndices) = sampleIDs.t
+        }
+
+        // After sampling with this color group over all copies (from SAME), we override the known values.
+        usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t
       }     
     }
 
@@ -188,7 +210,7 @@ class BayesNet(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    val index = int(cptOffset + (user.t * iproject).t)
+    val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
     val linearIndices = index(?)
     counts <-- float(accum(linearIndices, 1, counts.length, 1))
     genericGammaRand(counts + dirichletPrior, dirichletScale, updatemats(0))
@@ -202,7 +224,7 @@ class BayesNet(val dag:Mat,
    * sample, which can do since we assume i.i.d.). 
    */
   def evalfun(sdata:Mat, user:Mat):FMat = {  
-    val index = int(cptOffset + (user.t * iproject).t)
+    val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
     val cptNormalized = mm / (mm.t * normConstMatrix).t
     val result = FMat( sum(sum(ln(cptNormalized(index)),1),2) ) / user.ncols
     return result
@@ -417,6 +439,40 @@ class BayesNet(val dag:Mat,
     }
   }
   
+  /**
+   * Forms a blocked iproject matrix. It creates k={SAME parameter} copies of iproject on diagonal.
+   * We use this during mupdate where we do user.t * iproject, where user could have copies from SAME.
+   * For the actual values v=[...]^T, we can actually use the kron operator.
+   */
+  def createBlockedIproject : Mat = {
+    //println("Inside createBlockedIproject")
+    val n = iproject.ncols
+    val (ii,jj,vv) = find3(SMat(iproject))
+    val vvv = iones(opts.copiesForSAME,1) kron vv
+    var iii = izeros(1,1)
+    var jjj = izeros(1,1)
+    
+    //println("vv.t = " + vv.t) 
+    //println("vvv.t = " + vvv.t) 
+    //println("size(vv) and size(vvv) are " + size(vv) + " and " + size(vvv) + ", respectively.")
+    
+    for (k <- 0 until opts.copiesForSAME) {
+      iii = iii on (ii + k*n)
+      jjj = jjj on (jj + k*n)
+    }
+    
+    //println("size(iii) = " + size(iii))
+    //println("size(jjj) = " + size(jjj))
+    
+    val res = sparse(iii(1 until iii.length), jjj(1 until jjj.length), vvv, n*opts.copiesForSAME, n*opts.copiesForSAME)
+    
+    //println("full(res)\n" + full(res))
+    //println("full(res).t\n" + (full(res)).t)
+    if (useGPUnow) return GSMat(res) else return res
+  }
+  
+  // The remaining methods are for debugging only
+  
   /** A debugging method to print matrices, without being constrained by the command line's cropping. */
   def printMatrix(mat: Mat) = {
     for(i <- 0 until mat.nrows) {
@@ -497,7 +553,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var copiesForSAME = 1
+    var copiesForSAME = 2
     var samplingRate = 1
     var numSamplesBurn = 0
   }
