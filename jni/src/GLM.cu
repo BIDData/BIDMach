@@ -28,9 +28,9 @@ __device__ float deriv_svm(float p, float t) {
 }
 
 
-#define eps 1.0e-10f
+#define EPS 1.0e-10f
 __device__ float ll_linear(float a, float t) {return (t-a)*(a-t);}
-__device__ float ll_logistic(float a, float b) {return log(a * b + (1.0f - a) * (1.0f - b) + eps);}
+__device__ float ll_logistic(float a, float b) {return log(a * b + (1.0f - a) * (1.0f - b) + EPS);}
 __device__ float ll_maxp(float a, float t) {return a * t + (1.0f - a) * (1.0f - t) - 1.0f;}
 __device__ float ll_svm(float p, float t) {
   float tt = 2 * t - 1;
@@ -89,9 +89,8 @@ __device__ double dderiv_svm(double p, double t) {
 }
 
 
-#define eps 1.0e-10f
 __device__ double dll_linear(double a, double t) {return (t-a)*(a-t);}
-__device__ double dll_logistic(double a, double b) {return log(a * b + (1.0 - a) * (1.0 - b) + eps);}
+__device__ double dll_logistic(double a, double b) {return log(a * b + (1.0 - a) * (1.0 - b) + EPS);}
 __device__ double dll_maxp(double a, double t) {return a * t + (1.0 - a) * (1.0 - t) - 1.0;}
 __device__ double dll_svm(double p, double t) {
   double tt = 2 * t - 1;
@@ -373,4 +372,43 @@ int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir,
   return err;
 }
 
+
+__global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, float nw, float *ve, int nve, float *ts, int nts,
+			  float *lr, int nlr, float eps, int doupdate) {
+  int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
+  int nthreads = blockDim.x * gridDim.x * gridDim.y;
+  int i, irow, icol;
+  float mmval, umval, sqval, veval, tsval, lrval, denom;
+  for (i = ithread; i < nrows*ncols; i += nthreads) {
+    icol = i / nrows;
+    irow = i - icol * nrows;
+    umval = um[i];
+    sqval = ssq[i];
+    ssq[i] = (nw * umval * umval) + (1 - nw) * sqval;
+    if (doupdate) {
+      mmval = mm[i];
+      veval = (nve > 1) ? ve[irow] : ve[0];
+      tsval = (nts > 1) ? ts[irow] : ts[0];
+      lrval = (nlr > 1) ? lr[irow] : lr[0];
+      denom = (veval == 0.5f) ? sqrtf(sqval) : powf(sqval, veval);
+      denom = denom * tsval + eps;
+      mmval += (umval / denom) * lrval;
+      if (mask != NULL) {
+	mmval *= mask[i];
+      }
+      mm[i] = mmval;
+    }
+  }
+}
+
+int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, float nw, float *ve, int nve, float *ts, int nts,
+	    float *lrate, int nlrate, float eps, int doupdate) {
+  int nthreads;
+  dim3 griddims;
+  setsizes(nrows*ncols, &griddims, &nthreads);
+  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
                               
