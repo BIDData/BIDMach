@@ -118,9 +118,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	}
     	(mm, um, ss, ve, tscale, lrate) match {
     	  case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
-    	    val gmask = if (mask.asInstanceOf[AnyRef] == null) null else mask.asInstanceOf[GMat].data
-    	  	CUMACH.ADAGrad(mm.nrows, mm.ncols, gmm.data, gum.data, gss.data, gmask, nw.dv.toFloat, gve.data, ve.nrows,
-    	  			gts.data, tscale.nrows, glrate.data, lrate.nrows, opts.epsilon, if (opts.waitsteps < nsteps) 1 else 0);
+    	  	ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.epsilon, (opts.waitsteps < nsteps));
     	  }
     	  case _ => {
     	  	val newsquares = um *@ um;
@@ -287,6 +285,12 @@ object ADAGrad {
 	}
       }
     }    
+  }
+  
+  def ADAGradx(mm:GMat, um:GMat, ss:GMat, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, epsilon:Float, doupdate:Boolean) = {
+  	val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.data, mask.nrows);
+  	CUMACH.ADAGrad(mm.nrows, mm.ncols, mm.data, um.data, ss.data, gmask, maskr, nw, ve.data, ve.nrows,
+  			ts.data, ts.nrows, lrate.data, lrate.nrows, epsilon, if (doupdate) 1 else 0);
   }
 }
 

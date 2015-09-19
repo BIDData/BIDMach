@@ -96,7 +96,7 @@ public final class CUMACH {
     
     public static native int applyderiv(Pointer A, Pointer B, Pointer C, int ifn, int n);
     
-    public static native int ADAGrad(int nrows, int ncols, Pointer mm, Pointer um, Pointer ssq, Pointer mask, float nw, Pointer ve, int nve,
+    public static native int ADAGrad(int nrows, int ncols, Pointer mm, Pointer um, Pointer ssq, Pointer mask, int maskr, float nw, Pointer ve, int nve,
         Pointer ts, int nts, Pointer lrate, int nlrate, float eps, int doupdate);
 
 }

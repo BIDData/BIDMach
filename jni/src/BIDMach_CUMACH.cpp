@@ -501,7 +501,7 @@ extern "C" {
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_ADAGrad
-  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jmm, jobject jum, jobject jssq, jobject jmask,
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jmm, jobject jum, jobject jssq, jobject jmask, jint maskr,
    jfloat nw, jobject jve, jint nve, jobject jts, jint nts, jobject jlr, jint nlr, jfloat eps, jint doupdate)
   {
     float *mm = (float*)getPointer(env, jmm);
@@ -512,7 +512,7 @@ extern "C" {
     float *ts = (float*)getPointer(env, jts);
     float *lr = (float*)getPointer(env, jlr);
 
-    return ADAGrad(nrows, ncols, mm, um, ssq, mask, nw, ve, nve, ts, nts, lr, nlr, eps, doupdate);
+    return ADAGrad(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lr, nlr, eps, doupdate);
   }
 
 }

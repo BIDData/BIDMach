@@ -373,40 +373,45 @@ int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir,
 }
 
 
-__global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, float nw, float *ve, int nve, float *ts, int nts,
-			  float *lr, int nlr, float eps, int doupdate) {
+__global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, 
+                          float *ts, int nts, float *lr, int nlr, float eps, int doupdate) {
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;
-  float mmval, umval, sqval, veval, tsval, lrval, denom;
+  float mmval, umval, sqval, newss, veval, tsval, lrval, denom;
   for (i = ithread; i < nrows*ncols; i += nthreads) {
     icol = i / nrows;
     irow = i - icol * nrows;
     umval = um[i];
     sqval = ssq[i];
-    ssq[i] = (nw * umval * umval) + (1 - nw) * sqval;
+    newss = (nw * umval * umval) + (1 - nw) * sqval;
+    ssq[i] = newss;
     if (doupdate) {
       mmval = mm[i];
       veval = (nve > 1) ? ve[irow] : ve[0];
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
-      denom = (veval == 0.5f) ? sqrtf(sqval) : powf(sqval, veval);
+      denom = (veval == 0.5f) ? sqrtf(newss) : powf(newss, veval);
       denom = denom * tsval + eps;
       mmval += (umval / denom) * lrval;
-      if (mask != NULL) {
-      	mmval *= mask[i];
+      if (maskr > 0) {
+        if (maskr > 1) {
+          mmval *= mask[i]; 
+        } else {
+          mmval *= mask[icol];
+        }
       }
       mm[i] = mmval;
     }
   }
 }
 
-int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, float nw, float *ve, int nve, float *ts, int nts,
+int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
 	    float *lrate, int nlrate, float eps, int doupdate) {
   int nthreads;
   dim3 griddims;
   setsizes(nrows*ncols, &griddims, &nthreads);
-  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;

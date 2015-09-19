@@ -80,5 +80,5 @@ int apply_fwd(float *A, float *B, int ifn, int n);
 
 int apply_deriv(float *A, float *B, float *C, int ifn, int n);
 
-int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, float nw, float *ve, int nve,
+int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve,
             float *ts, int nts, float *lrate, int nlrate, float eps, int doupdate);

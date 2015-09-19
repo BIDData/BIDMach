@@ -257,16 +257,6 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
     } else {
     	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
     	deriv.madd(inputData, um, false, true);
-/*      inputData match {
-        case (_:FMat) | (_:GMat) => deriv.madd(inputData, um, false, true);
-        case _ => {
-        	if (dprod.asInstanceOf[AnyRef] == null) {
-        		dprod = if (opts.hasBias) updatemats(imodel).colslice(0, modelcols) else updatemats(imodel) + 0f;
-        	}
-        	dprod ~ deriv *^ inputData;
-        	um ~ um + dprod;         
-        }
-      }*/
       if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv,2)
     }
     backwardtime += toc - start;
@@ -707,12 +697,6 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLa
 		  val start = toc;
 		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
-/*			  val exps = exp(inputData - maxi(inputData));
-			  val sumexps = sum(exps);
-        val preds = exps / sumexps; */
-//			  val isum = 1f / (sumexps ∘ sumexps);
-//        inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv)))); 
-//        deriv ~ exps / (- sum(exps));
 		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
         deriv ~ zero - output;
         val inds = target + coloffsets;
@@ -746,6 +730,117 @@ object SoftmaxOutputLayer {
   def apply(net:Net) = new SoftmaxOutputLayer(net, new Options);
   
   def apply(net:Net, opts:Options) = new SoftmaxOutputLayer(net, opts);
+}
+
+class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLayer.Options = new NegsampOutputLayer.Options) extends ModelLayer(net, opts) { 
+  var coloffsets:Mat = null;
+  var zero:Mat = null;
+  var vexp:Mat = null;
+  var texp:Mat = null;
+  var lrate:Mat = null;
+  var expt:Mat = null;
+//  var sumsq:Mat = null;
+  var mask:Mat = null;
+  var dprod:Mat = null;
+  var firststep = -1f;
+  var waitsteps = 0;
+  var epsilon = 0f;
+  var ADAinitialized = false;
+  var randwords:Mat = null;
+  var irandwords:Mat = null;
+  var irange:Mat = null;
+  var prods:Mat = null;
+  var mm:Mat = null;
+
+  override def forward = {
+		val start = toc;
+		val modelrows = inputData.nrows;
+		val nfeats = if (opts.outdim == 0) inputData.nrows else opts.outdim;
+    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+      modelmats(imodel) = convertMat(normrnd(0, 1, modelrows + (if (opts.hasBias) 1 else 0), nfeats));
+      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, nfeats);  
+    }
+    if (opts.aopts != null && !ADAinitialized) initADAGrad;
+    if (randwords.asInstanceOf[AnyRef] == null) randwords = convertMat(zeros(opts.nsamps, inputData.ncols));
+    if (irandwords.asInstanceOf[AnyRef] == null) irandwords = convertMat(izeros(opts.nsamps + 1, inputData.ncols));
+    if (expt.asInstanceOf[AnyRef] == null) expt = convertMat(row(opts.expt));
+    if (irange.asInstanceOf[AnyRef] == null) irange = convertMat(icol(0 -> opts.nsamps));
+    mm = if (opts.hasBias) modelmats(imodel).view(modelrows, nfeats) else modelmats(imodel); 
+    
+    rand(randwords);                                                        // Compute some random negatives
+    irandwords(irange, ?) = min(nfeats-1, int(nfeats * (randwords ^ expt)));
+    irandwords(opts.nsamps, ?) = target;
+    
+    val indmat = nHot(irandwords, nfeats);
+    prods = DDS(mm, inputData, indmat);
+    output = prods.contents.view(opts.nsamps+1, inputData.ncols);
+//    if (opts.hasBias) deal with bias
+    output ~ output - maxi(output)
+    exp(output, output);  // ensures sum(exps) is between 1 and nfeats
+    output ~ output / sum(output);
+    forwardtime += toc - start;
+  }
+
+  override def backward = {
+		val start = toc;
+		val modelrows = inputData.nrows;
+		val nfeats = if (opts.outdim == 0) inputData.nrows else opts.outdim;
+		if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
+		deriv = - output;
+		deriv(opts.nsamps, ?) = deriv(opts.nsamps, ?) + 1f;               // deriv = target - preds
+		val um = if (opts.hasBias) updatemats(imodel).view(modelrows, nfeats) else updatemats(imodel); 
+		prods.contents <-- output.contents
+		inputData.madd(prods, um, false, true);
+		// deal with bias
+		if (inputDeriv.asInstanceOf[AnyRef] != null) {
+      mm.madd(prods, inputDeriv)
+		}
+		backwardtime += toc - start;
+  }
+  
+  def initADAGrad {
+    val aopts = opts.aopts;
+    val mm = modelmats(imodel); 
+    val d = mm.nrows;
+    val m = mm.ncols;
+    firststep = -1f;
+    lrate = convertMat(aopts.lrate);
+    texp = convertMat(aopts.texp);
+    vexp = convertMat(aopts.vexp);
+//    sumsq = convertMat(zeros(d, m));
+    updatemats(imodel).set(aopts.initsumsq);
+    waitsteps = aopts.waitsteps;
+    epsilon = aopts.epsilon;
+    mask = aopts.mask;
+    ADAinitialized = true;
+  }
+  
+  override def score:FMat = {
+    if (opts.scoreType == 1) {
+      FMat(mean(output(opts.nsamps, ?) == maxi(output)));
+    } else {
+    	FMat(mean(ln(output(opts.nsamps, ?))));   
+    }
+  }
+}
+
+object NegsampOutputLayer {  
+  class Options extends ModelLayer.Options {
+    var nsamps = 100;
+    var hasBias:Boolean = false;
+    var aopts:ADAGrad.Opts = null;
+    var outdim = 0; 
+    var scoreType = 0;
+    var expt = 0.5;
+   
+    override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
+    
+    override def create(net:Net):NegsampOutputLayer = {apply(net, this);}
+  }
+  
+  def apply(net:Net) = new NegsampOutputLayer(net, new Options);
+  
+  def apply(net:Net, opts:Options) = new NegsampOutputLayer(net, opts);
 }
 /**
  * Tanh layer. 
