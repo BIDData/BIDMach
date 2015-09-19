@@ -739,13 +739,11 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
   var expt:Mat = null;
 //  var sumsq:Mat = null;
   var mask:Mat = null;
-  var dprod:Mat = null;
   var firststep = -1f;
   var waitsteps = 0;
   var epsilon = 0f;
   var ADAinitialized = false;
   var randwords:Mat = null;
-  var irandwords:Mat = null;
   var onerow:Mat = null;
   var prods:Mat = null;
   var inputMat:Mat = null;
@@ -762,14 +760,13 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     if (randwords.asInstanceOf[AnyRef] == null) randwords = convertMat(zeros(opts.nsamps + 1, inputData.ncols));
-    if (irandwords.asInstanceOf[AnyRef] == null) irandwords = convertMat(izeros(opts.nsamps + 1, inputData.ncols));
     if (expt.asInstanceOf[AnyRef] == null) expt = convertMat(row(opts.expt));
     if (onerow.asInstanceOf[AnyRef] == null) onerow = convertMat(ones(1, inputData.ncols));
     val mm = modelmats(imodel); 
     inputMat = if (opts.hasBias) (inputData on onerow) else inputData;
     
     rand(randwords);                                                        // Compute some random negatives
-    irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));
+    val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));
     irandwords(opts.nsamps, ?) = target;
     
     val indmat = nHot(irandwords, nfeats);
@@ -795,9 +792,9 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 		inputMat.madd(prods, um, false, true);
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			if (opts.hasBias) {
-				mm.madd(prods, inputMat);
+				inputMat ~ mm * prods;
 				if (irange.asInstanceOf[AnyRef] == null) irange = convertMat(icol(0->opts.nsamps));
-				inputDeriv(irange, ?) = inputMat;
+				inputDeriv = inputDeriv + inputMat(irange, ?);
 			} else {
 				mm.madd(prods, inputDeriv);
 			}
