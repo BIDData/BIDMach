@@ -105,6 +105,7 @@ class BayesNet(val dag:Mat,
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
     //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
     mm <-- ( mm / (mm.t * normConstMatrix).t ) // Normalize the cpt before each sampling!
+    //computeNormDifference(ipass,here) // For testing convergence to the true distribution
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
@@ -445,33 +446,22 @@ class BayesNet(val dag:Mat,
    * For the actual values v=[...]^T, we can actually use the kron operator.
    */
   def createBlockedIproject : Mat = {
-    //println("Inside createBlockedIproject")
     val n = iproject.ncols
     val (ii,jj,vv) = find3(SMat(iproject))
     val vvv = iones(opts.copiesForSAME,1) kron vv
     var iii = izeros(1,1)
     var jjj = izeros(1,1)
-    
-    //println("vv.t = " + vv.t) 
-    //println("vvv.t = " + vvv.t) 
-    //println("size(vv) and size(vvv) are " + size(vv) + " and " + size(vvv) + ", respectively.")
-    
     for (k <- 0 until opts.copiesForSAME) {
       iii = iii on (ii + k*n)
       jjj = jjj on (jj + k*n)
     }
-    
-    //println("size(iii) = " + size(iii))
-    //println("size(jjj) = " + size(jjj))
-    
     val res = sparse(iii(1 until iii.length), jjj(1 until jjj.length), vvv, n*opts.copiesForSAME, n*opts.copiesForSAME)
-    
-    //println("full(res)\n" + full(res))
-    //println("full(res).t\n" + (full(res)).t)
     if (useGPUnow) return GSMat(res) else return res
   }
   
-  // The remaining methods are for debugging only
+  // ---------------------------------------------
+  // The remaining methods are for debugging only.
+  // ---------------------------------------------
   
   /** A debugging method to print matrices, without being constrained by the command line's cropping. */
   def printMatrix(mat: Mat) = {
@@ -485,11 +475,24 @@ class BayesNet(val dag:Mat,
   
   /** A one-liner that we can insert in a place with ipass and here to debug the cpt. */
   def debugCpt(ipass:Int, here:Long) {
-    println("\n\n\nCurrently on ipass = " + ipass + " with here = " + here + ". This is the CPT:")
+    println("\n\nCurrently on ipass = " + ipass + " with here = " + here + ". This is the CPT:")
     for (k <- 0 until graph.n) {
       showCpt(k)
     }
     println()
+  }
+  
+  /**
+   * A debugging method to compute the norm of difference between normalized real/estimated cpts.
+   * Note: this *does* assume our mm is already normalized!
+   * Obviously we'll have to replace the real cpt with what we already have...
+   */
+  def computeNormDifference(ipass:Int, here:Long) = {
+    val firstThree = .7 on .3 on .6 on .4 on .95 on .05 on .2 on .8
+    val lastTwo = .3 on .4 on .3 on .05 on .25 on .7 on .9 on .08 on .02 on .5 on .3 on .2 on .1 on .9 on .4 on .6 on .99 on .01 
+    val real = firstThree on lastTwo
+    val differenceNorm = norm(real - mm)
+    println("Currently on ipass = " + ipass + " with here = " + here + "; l-2 norm of (realCpt - mm) is: " + differenceNorm)
   }
   
   /** A debugging method to print out the CPT of one variable (prettily). */
@@ -553,7 +556,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var copiesForSAME = 2
+    var copiesForSAME = 4
     var samplingRate = 1
     var numSamplesBurn = 0
   }
@@ -571,7 +574,7 @@ object BayesNet  {
     class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
     opts.dim = dag.ncols
-    opts.batchSize = math.min(100000, data.ncols/20 + 1)
+    opts.batchSize = math.min(100000, data.ncols/40 + 1)
     opts.useGPU = false
     opts.npasses = 2 
     opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
