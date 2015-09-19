@@ -394,7 +394,7 @@ __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq
       denom = denom * tsval + eps;
       mmval += (umval / denom) * lrval;
       if (mask != NULL) {
-	mmval *= mask[i];
+      	mmval *= mask[i];
       }
       mm[i] = mmval;
     }

@@ -500,4 +500,19 @@ extern "C" {
     return apply_deriv(A, B, C, ifn, n);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_ADAGrad
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jmm, jobject jum, jobject jssq, jobject jmask,
+   jfloat nw, jobject jve, jint nve, jobject jts, jint nts, jobject jlr, jint nlr, jfloat eps, jint doupdate)
+  {
+    float *mm = (float*)getPointer(env, jmm);
+    float *um = (float*)getPointer(env, jum);
+    float *ssq = (float*)getPointer(env, jssq);
+    float *mask = (float*)getPointer(env, jmask);
+    float *ve = (float*)getPointer(env, jve);
+    float *ts = (float*)getPointer(env, jts);
+    float *lr = (float*)getPointer(env, jlr);
+
+    return ADAGrad(nrows, ncols, mm, um, ssq, mask, nw, ve, nve, ts, nts, lr, nlr, eps, doupdate);
+  }
+
 }

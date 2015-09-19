@@ -246,7 +246,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   override def backward(ipass:Int, pos:Long) = {
     val start = toc;
 	  val modelcols = inputData.nrows;
-    val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel)
+    val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
       mm.madd(deriv, inputDeriv, true, false);
     }
@@ -255,8 +255,9 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
       val istep = (pos + firststep)/firststep;
       ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
-    	val um = updatemats(imodel).view(updatemats(imodel).nrows, modelcols);
-      inputData match {
+    	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
+    	deriv.madd(inputData, um, false, true);
+/*      inputData match {
         case (_:FMat) | (_:GMat) => deriv.madd(inputData, um, false, true);
         case _ => {
         	if (dprod.asInstanceOf[AnyRef] == null) {
@@ -265,7 +266,7 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
         	dprod ~ deriv *^ inputData;
         	um ~ um + dprod;         
         }
-      }
+      }*/
       if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv,2)
     }
     backwardtime += toc - start;

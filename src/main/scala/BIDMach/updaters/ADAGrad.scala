@@ -116,22 +116,31 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	} else {
     		lrate <-- opts.lrate;
     	}
-    	val newsquares = um *@ um;
-    	newsquares ~ newsquares *@ nw;
-    	ss ~ ss *@ (one - nw);
-    	ss ~ ss + newsquares;
-    	if (opts.waitsteps < nsteps) {
-    		if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
-    		val tmp = ss ^ ve;
-    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in powered sumsquares matrix "+i);
-    		tmp ~ tmp *@ tscale;
-//    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
-    		tmp ~ tmp + opts.epsilon;
-    		tmp ~ um / tmp;
-    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
-    		tmp ~ tmp *@ lrate;
-    		mm ~ mm + tmp;
-    		if (mask != null) mm ~ mm *@ mask;
+    	(mm, um, ss, ve, tscale, lrate) match {
+    	  case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
+    	    val gmask = if (mask.asInstanceOf[AnyRef] == null) null else mask.asInstanceOf[GMat].data
+    	  	CUMACH.ADAGrad(mm.nrows, mm.ncols, gmm.data, gum.data, gss.data, gmask, nw.dv.toFloat, gve.data, ve.nrows,
+    	  			gts.data, tscale.nrows, glrate.data, lrate.nrows, opts.epsilon, if (opts.waitsteps < nsteps) 1 else 0);
+    	  }
+    	  case _ => {
+    	  	val newsquares = um *@ um;
+    	  	newsquares ~ newsquares *@ nw;
+    	  	ss ~ ss *@ (one - nw);
+    	  	ss ~ ss + newsquares;
+    	  	if (opts.waitsteps < nsteps) {
+    	  		if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
+    	  		val tmp = ss ^ ve;
+    	  		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in powered sumsquares matrix "+i);
+    	  		tmp ~ tmp *@ tscale;
+    	  		//    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
+    	  		tmp ~ tmp + opts.epsilon;
+    	  		tmp ~ um / tmp;
+    	  		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
+    	  		tmp ~ tmp *@ lrate;
+    	  		mm ~ mm + tmp;
+    	  		if (mask != null) mm ~ mm *@ mask;
+    	  	}
+    	  }
     	}
     }
     runningtime += toc - start;
