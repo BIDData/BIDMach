@@ -65,7 +65,7 @@ if [ "$1" = "notebook" ]; then
     else
         KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"$DJAVA_NATIVE\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\"]"
     fi
-    ipython notebook --profile scala --KernelManager.kernel_cmd="$KERNEL_CMD"
+    ipython notebook --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
     ${BIDMACH_ROOT}/scripts/scala/scala -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "$@"
 fi
