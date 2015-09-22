@@ -158,7 +158,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstylim = math.min(opts.outwidth, if (gmats.length > 2) dstyn else dstyn - 1);
     for (j <- 0 until dstylim) {
     	val incol = if (gmats.length > 2) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t ;
-    	getlayer(fullheight+1,j+inwidth).target = incol;
+    	output_layers(j).target = incol;
     }
     if (PADrow.asInstanceOf[AnyRef] == null) {
       PADrow = convertMat(iones(1, batchSize) * opts.PADsym);
