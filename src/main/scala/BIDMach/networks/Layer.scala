@@ -804,7 +804,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 			if (opts.hasBias) {
 				inputMat ~ mm * prods;
 				if (irange.asInstanceOf[AnyRef] == null) irange = convertMat(icol(0->inputData.nrows));
-				inputDeriv = inputDeriv + inputMat(irange, ?);
+				inputDeriv ~ inputDeriv + inputMat(irange, ?);
 			} else {
 				mm.madd(prods, inputDeriv);
 			}
