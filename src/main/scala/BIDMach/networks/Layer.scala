@@ -210,6 +210,8 @@ object ModelLayer {
   }
 }
 
+trait OutputLayer {}
+
 /**
  * Linear layer. 
  * Includes a model matrix that contains the linear map. 
@@ -680,7 +682,7 @@ object SoftmaxLayer {
  * Softmax layer. Output = exp(input) / sum(exp(input))
  */
 
-class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLayer.Options = new SoftmaxOutputLayer.Options) extends Layer(net, opts) { 
+class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputLayer.Options = new SoftmaxOutputLayer.Options) extends Layer(net, opts) with OutputLayer { 
   var coloffsets:Mat = null;
   var zero:Mat = null;
 
@@ -739,7 +741,7 @@ object SoftmaxOutputLayer {
   def apply(net:Net, opts:Options) = new SoftmaxOutputLayer(net, opts);
 }
 
-class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLayer.Options = new NegsampOutputLayer.Options) extends ModelLayer(net, opts) { 
+class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLayer.Options = new NegsampOutputLayer.Options) extends ModelLayer(net, opts) with OutputLayer { 
   var vexp:Mat = null;
   var texp:Mat = null;
   var lrate:Mat = null;

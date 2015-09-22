@@ -29,17 +29,19 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var dstyn = 0;
   val preamble_rows = 2;
   // define some getters/setters on the grid
-  def lindex(r:Int, c:Int) = if (c < inwidth) (r + c * fullheight) else (inwidth * fullheight + r + (c - inwidth) * (fullheight + 2));
+  var heightDiff = 2;
+  def lindex(r:Int, c:Int) = if (c < inwidth) (r + c * fullheight) else (inwidth * fullheight + r + (c - inwidth) * (fullheight + heightDiff));
   def getlayer(r:Int, c:Int):Layer = layers(lindex(r,c));
   def setlayer(r:Int, c:Int, ll:Layer) = {layers(lindex(r,c)) = ll};
 	
 	override def createLayers = {
     height = opts.height;
+    heightDiff = if (opts.netType == 0) 2 else 1;
 	  fullheight = height + preamble_rows;
 	  inwidth = opts.inwidth; 
     outwidth = opts.outwidth;
     width = inwidth + outwidth;
-    layers =  new Array[Layer](fullheight * width + outwidth * 2);
+    layers =  new Array[Layer](fullheight * width + outwidth * heightDiff);
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
@@ -77,15 +79,25 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     }
     
     // the top layers
-    val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
-    val sopts = new SoftmaxOutputLayer.Options{scoreType = opts.scoreType};
     output_layers = new Array[Layer](outwidth);
-    for (j <- 0 until outwidth) {
-    	val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
-    	setlayer(fullheight, inwidth + j, linlayer);    	
-    	val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
-    	setlayer(fullheight+1, inwidth + j, smlayer);
-    	output_layers(j) = smlayer;
+    if (opts.netType == 0) {
+    	val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
+    	val sopts = new SoftmaxOutputLayer.Options{scoreType = opts.scoreType};
+    	for (j <- 0 until outwidth) {
+    		val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
+    		setlayer(fullheight, inwidth + j, linlayer);    	
+    		val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
+    		setlayer(fullheight+1, inwidth + j, smlayer);
+    		output_layers(j) = smlayer;
+    	}
+    } else {
+      val nsopts = new NegsampOutputLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias; 
+                                                  scoreType = opts.scoreType; nsamps = opts.nsamps; expt = opts.expt};
+      for (j <- 0 until outwidth) {
+        val nslayer = NegsampOutputLayer(this, nsopts).setinput(0, getlayer(fullheight-1, j+inwidth));
+        setlayer(fullheight, inwidth + j, nslayer);      
+        output_layers(j) = nslayer;
+      }    
     }
   }
   
@@ -110,17 +122,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
     val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     srcn = math.min(srcn, opts.inwidth);
-    if (srcn < inwidth) {
-      for (i <- 0 until height) {
-        val leftlayer = getlayer(i+preamble_rows, inwidth-srcn-1);
-        if (leftlayer.output.asInstanceOf[AnyRef] == null) {
-        	leftlayer.output = convertMat(zeros(opts.dim, batchSize));
-        }
-        if (leftlayer.outputs(1).asInstanceOf[AnyRef] == null) {
-          leftlayer.setoutput(1, convertMat(zeros(opts.dim, batchSize)));
-        }       
-      }
-    }
+    if (srcn < inwidth) initPrevCol;
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
       getlayer(0, inwidth + i - srcn).output = cols;
@@ -133,6 +135,18 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
       leftedge.output = convertMat(zeros(opts.dim, batchSize));
     }
+  }
+  
+  def initPrevCol = {
+	  for (i <- 0 until height) {
+		  val leftlayer = getlayer(i+preamble_rows, inwidth-srcn-1);
+		  if (leftlayer.output.asInstanceOf[AnyRef] == null) {
+			  leftlayer.output = convertMat(zeros(opts.dim, batchSize));
+		  }
+		  if (leftlayer.outputs(1).asInstanceOf[AnyRef] == null) {
+			  leftlayer.setoutput(1, convertMat(zeros(opts.dim, batchSize)));
+		  }       
+	  }
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
@@ -228,15 +242,18 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 
 object SeqToSeq {
   trait Opts extends Net.Opts {
-    var inwidth = 1;
-    var outwidth = 1;
-    var height = 1;
-    var nvocab = 100000;
-    var kind = 0;
-    var bylevel = true;
-    var PADsym = 1;
-    var OOVsym = 2;
-    var scoreType = 0;
+    var inwidth = 1;     // Max src sentence length
+    var outwidth = 1;    // Max dst sentence lenth
+    var height = 1;      // Number of LSTM layers vertically
+    var nvocab = 100000; // Vocabulary size
+    var kind = 0;        // LSTM type, see below
+    var bylevel = true;  // Use different models for each level
+    var netType = 0;     // Network type, 0 = softmax output, 1 = Neg Sampling output
+    var PADsym = 1;      // Padding symbol
+    var OOVsym = 2;      // OOV symbol
+    var scoreType = 0;   // Score type, 0 = LL, 1 = accuracy, 2 = LL of full Softmax, 3 = accuracy of full Softmax
+    var nsamps = 100;    // Number of negative samples
+    var expt = 0.8f;     // Negative sampling exponent (tail boost)
   }
   
   class Options extends Opts {}
