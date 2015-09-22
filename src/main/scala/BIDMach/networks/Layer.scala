@@ -158,6 +158,7 @@ object Layer {
     
     def copyTo(opts:Options):Options = {
       opts.inputs(0) = inputs(0);
+      opts.inputTerminals(0) = inputTerminals(0);
       myGhost = opts;
       opts;
     }
@@ -721,6 +722,11 @@ object SoftmaxOutputLayer {
   class Options extends Layer.Options {
     
     var scoreType = 0;
+    
+    override def copyTo(newopts:Options):Options = {
+      newopts.scoreType = scoreType;
+      newopts;
+    }
    
     override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
     
@@ -749,6 +755,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
   var inputMat:Mat = null;
   var targMat:Mat = null;
   var irange:Mat = null;
+  var coloffsets:Mat = null;
 
   override def forward = {
 		val start = toc;
@@ -820,10 +827,22 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
   }
   
   override def score:FMat = {
-    if (opts.scoreType == 1) {
-      FMat(mean(output(opts.nsamps, ?) == maxi(output)));
+    if (opts.scoreType < 2) {
+      opts.scoreType match {
+        case 0 => FMat(mean(ln(output(opts.nsamps, ?))));
+        case 1 => FMat(mean(output(opts.nsamps, ?) == maxi(output)));
+      }    	   
     } else {
-    	FMat(mean(ln(output(opts.nsamps, ?))));   
+      val mprod = modelmats(imodel) ^* inputMat;
+      mprod ~ mprod - maxi(mprod);
+      exp(mprod, mprod);
+      mprod ~ mprod / sum(mprod);
+      if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
+      val inds = target + coloffsets;
+      opts.scoreType match {
+        case 2 => FMat(mean(ln(mprod(inds))));
+        case 3 => FMat(mean(mprod(inds) == maxi(mprod)));        
+      }
     }
   }
 }
@@ -836,6 +855,16 @@ object NegsampOutputLayer {
     var outdim = 0; 
     var scoreType = 0;
     var expt = 0.5;
+    
+    override def copyTo(newopts:Options):Options = {
+      newopts.nsamps = nsamps;
+      newopts.hasBias = hasBias;
+      newopts.aopts = aopts;
+      newopts.outdim = outdim;
+      newopts.expt = expt;
+      newopts.scoreType = scoreType;
+      newopts;
+    }
    
     override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
     
