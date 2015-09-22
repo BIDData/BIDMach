@@ -723,9 +723,10 @@ object SoftmaxOutputLayer {
     
     var scoreType = 0;
     
-    override def copyTo(newopts:Options):Options = {
-      newopts.scoreType = scoreType;
-      newopts;
+    def copyTo(opts:Options):Options = {
+      super.copyTo(opts);
+      opts.scoreType = scoreType;
+      opts;
     }
    
     override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
@@ -856,14 +857,15 @@ object NegsampOutputLayer {
     var scoreType = 0;
     var expt = 0.5;
     
-    override def copyTo(newopts:Options):Options = {
-      newopts.nsamps = nsamps;
-      newopts.hasBias = hasBias;
-      newopts.aopts = aopts;
-      newopts.outdim = outdim;
-      newopts.expt = expt;
-      newopts.scoreType = scoreType;
-      newopts;
+    def copyTo(opts:Options):Options = {
+      super.copyTo(opts);
+      opts.nsamps = nsamps;
+      opts.hasBias = hasBias;
+      opts.aopts = aopts;
+      opts.outdim = outdim;
+      opts.expt = expt;
+      opts.scoreType = scoreType;
+      opts;
     }
    
     override def clone:Options = {copyTo(new Options).asInstanceOf[Options];}
