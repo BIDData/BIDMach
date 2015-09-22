@@ -11,7 +11,7 @@ class MatDS(var mats:Array[Mat], override val opts:MatDS.Opts = new MatDS.Option
   var there = 0
   var blockSize = 0
   var totalSize = 0
-  var umat:Mat = null
+  var umat:Mat = null;
   
   def init = {
     sizeMargin = opts.sizeMargin
@@ -68,9 +68,8 @@ class MatDS(var mats:Array[Mat], override val opts:MatDS.Opts = new MatDS.Option
   }
   
   override def putBack(tmats:Array[Mat],n:Int):Unit = {
-    for (i <- 1 to n) {
-    	tmats(i).colslice(0, tmats(i).ncols, mats(i), here)
-    }
+    for (i <- 1 to n)
+    	tmats(i).colslice(0, tmats(i).ncols, mats(i), here, true);
   }
   
   def progress = {

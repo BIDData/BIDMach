@@ -84,6 +84,9 @@ mm5.train
 
 val pa5 = (ta5 != 0);
 val (nn5,nopts5) = SFA.predictor(mm5.model,a5,fact5,pa5)
+nopts5.batchSize = 10000;
+
+nn5.predict
 
 val diff = ta5.contents - pa5.contents
 val rmse = sqrt((diff ^* diff) / diff.length)
