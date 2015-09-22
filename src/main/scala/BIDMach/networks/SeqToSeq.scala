@@ -164,7 +164,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       PADrow = convertMat(iones(1, batchSize) * opts.PADsym);
     }
     if (dstylim < dstxn) {
-    	getlayer(fullheight+1, dstylim+inwidth).target = PADrow;
+    	output_layers(dstylim).target = PADrow;
     }
   }
   
