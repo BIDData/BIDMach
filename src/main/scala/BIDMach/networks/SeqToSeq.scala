@@ -186,12 +186,13 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         layers(i).forward;
         i += 1;
       }
-      var j = 0;
-      while (j < output_layers.length) {
-        if (output_layers(j).deriv.asInstanceOf[AnyRef] != null) {
-        	output_layers(j).deriv.set(1);
-        }
-        j += 1;
+      for (j <- 0 until output_layers.length) {
+    	  output_layers(j) match {
+    	  case _:OutputLayer => {}
+    	  case _ => {
+    		  if (output_layers(j).deriv.asInstanceOf[AnyRef] != null) output_layers(j).deriv.set(1);
+    	  }
+    	  }
       }
       if (opts.aopts == null) {
         for (j <- 0 until updatemats.length) updatemats(j).clear;

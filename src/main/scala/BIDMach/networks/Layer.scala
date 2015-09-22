@@ -840,7 +840,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
       mprod ~ mprod - maxi(mprod);
       exp(mprod, mprod);
       mprod ~ mprod / sum(mprod);
-      if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
+      if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->mprod.ncols)*mprod.nrows);
       val inds = target + coloffsets;
       opts.scoreType match {
         case 2 => FMat(mean(ln(mprod(inds))));
