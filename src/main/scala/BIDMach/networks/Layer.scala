@@ -746,8 +746,6 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
   var texp:Mat = null;
   var lrate:Mat = null;
   var iexpt:Mat = null;
-  var cexpt:Mat = null;
-  var cfact:Mat = null;
 //  var sumsq:Mat = null;
   var mask:Mat = null;
   var firststep = -1f;
@@ -761,13 +759,13 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
   var targMat:Mat = null;
   var irange:Mat = null;
   var coloffsets:Mat = null;
-  var correction = 1f;
+  var correction:Mat = null;
 
   override def forward = {
 		val start = toc;
 		val modelrows = inputData.nrows;
 		val nfeats = if (opts.outdim == 0) inputData.nrows else opts.outdim;
-		correction = 1f * nfeats / opts.nsamps;
+		correction = convertMat((ones(opts.nsamps, 1) * (1f * nfeats / opts.nsamps)) on ones(1,1));
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = convertMat(normrnd(0, 1, modelrows + (if (opts.hasBias) 1 else 0), nfeats));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, nfeats);  
@@ -791,7 +789,9 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
     exp(output, output);  // ensures sum(exps) is between 1 and nfeats
     val sout = sum(output);
     // fix sum
-    if (opts.docorrect) sout ~ (sout * correction) - (output(opts.nsamps, ?) * (correction - 1));
+    if (opts.docorrect) {
+      sout ~ sout *@ correction;
+    }
     output ~ output / sout;
     forwardtime += toc - start;
   }
@@ -805,15 +805,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 		val um = updatemats(imodel);
 		
 		deriv = targMat - output;
-/*    if (opts.docorrect) {
-      if (cexpt.asInstanceOf[AnyRef] != null) cexpt = convertMat(row(opts.expt/(1f - opts.expt)));
-      if (cfact.asInstanceOf[AnyRef] != null) cfact = convertMat(row(opts.expt/(1f-opts.expt)/(1f-opts.expt) + 1f));
-      randwords ~ (cfact * correction) * (randwords ^ cexpt);
-      randwords(opts.nsamps, ?) = 1f;
-      prods.contents ~ deriv.contents *@ randwords.contents;
-    } else {*/
-    	prods.contents <-- deriv.contents;
-//    }
+		prods.contents <-- deriv.contents;
 		inputMat.madd(prods, um, false, true);
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			if (opts.hasBias) {
