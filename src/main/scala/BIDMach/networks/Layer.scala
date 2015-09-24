@@ -779,8 +779,9 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
     val mm = modelmats(imodel); 
     inputMat = if (opts.hasBias) (inputData on onerow) else inputData;
     
-    rand(randwords);                                                        // Compute some random negatives
-    val irandwords = min(nfeats-1, int(nfeats * (randwords ^ iexpt)));
+    rand(randwords);                                                          // Compute some random negatives
+    val irandwords = min(nfeats-2, int((nfeats - 1) * (randwords ^ iexpt)));  // produce power-law values with exponent expt
+    irandwords ~ irandwords + (irandwords >= target);                         // remove targets as possible negative samples
     irandwords(opts.nsamps, ?) = target;
     
     val indmat = nHot(irandwords, nfeats);
