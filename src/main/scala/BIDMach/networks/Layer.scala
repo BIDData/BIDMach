@@ -790,10 +790,10 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 
     output ~ output - maxi(output)
     exp(output, output);  // ensures sum(exps) is between 1 and nfeats
-    val sout = sum(output);
     if (opts.docorrect) {
-      sout ~ (sout * correction) - ((output(opts.nsamps, ?)) * (correction - 1f));
+      output(opts.nsamps, ?) = output(opts.nsamps, ?) * (1/correction);
     }
+    val sout = sum(output);
     output ~ output / sout;
     forwardtime += toc - start;
   }
@@ -807,15 +807,15 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 		val um = updatemats(imodel);
 		
 		deriv = targMat - output;
-		if (opts.docorrect) {
+/*		if (opts.docorrect) {
 			if (cexpt.asInstanceOf[AnyRef] == null) cexpt = convertMat(row(opts.expt/(1f - opts.expt)));
 			if (cfact.asInstanceOf[AnyRef] == null) cfact = convertMat(row(correction * (opts.expt/(1f-opts.expt)/(1f-opts.expt) + 1f)));
 			randwords ~ (randwords ^ cexpt) * cfact;
 			randwords(opts.nsamps, ?) = 1f;
 			prods.contents ~ deriv.contents *@ randwords.contents;
-		} else {
+		} else { */
 			prods.contents <-- deriv.contents;
-		}
+//		}
 		inputMat.madd(prods, um, false, true);
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			if (opts.hasBias) {
