@@ -765,7 +765,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 		val start = toc;
 		val modelrows = inputData.nrows;
 		val nfeats = if (opts.outdim == 0) inputData.nrows else opts.outdim;
-		correction = convertMat((ones(opts.nsamps, 1) * (1f * nfeats / opts.nsamps)) on ones(1,1));
+		if (correction.asInstanceOf[AnyRef] == null) correction = convertMat(row(1f * nfeats / opts.nsamps));
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = convertMat(normrnd(0, 1, modelrows + (if (opts.hasBias) 1 else 0), nfeats));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, nfeats);  
@@ -788,9 +788,8 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
     output ~ output - maxi(output)
     exp(output, output);  // ensures sum(exps) is between 1 and nfeats
     val sout = sum(output);
-    // fix sum
     if (opts.docorrect) {
-      sout ~ sout *@ correction;
+      sout ~ (sout * correction) - ((output(opts.nsamps, ?)) * (correction - 1f));
     }
     output ~ output / sout;
     forwardtime += toc - start;
