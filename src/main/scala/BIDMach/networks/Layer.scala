@@ -745,7 +745,9 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
   var vexp:Mat = null;
   var texp:Mat = null;
   var lrate:Mat = null;
-  var expt:Mat = null;
+  var iexpt:Mat = null;
+  var cexpt:Mat = null;
+  var cfact:Mat = null;
 //  var sumsq:Mat = null;
   var mask:Mat = null;
   var firststep = -1f;
@@ -759,10 +761,12 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
   var targMat:Mat = null;
   var irange:Mat = null;
   var coloffsets:Mat = null;
+  var correction = 1f;
 
   override def forward = {
 		val start = toc;
 		val modelrows = inputData.nrows;
+    correction = 1f * nfeats / opts.nsamps;
 		val nfeats = if (opts.outdim == 0) inputData.nrows else opts.outdim;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = convertMat(normrnd(0, 1, modelrows + (if (opts.hasBias) 1 else 0), nfeats));
@@ -770,13 +774,13 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     if (randwords.asInstanceOf[AnyRef] == null) randwords = convertMat(zeros(opts.nsamps + 1, inputData.ncols));
-    if (expt.asInstanceOf[AnyRef] == null) expt = convertMat(row(opts.expt));
+    if (iexpt.asInstanceOf[AnyRef] == null) iexpt = convertMat(row(1f/(1f-opts.expt)));
     if (onerow.asInstanceOf[AnyRef] == null) onerow = convertMat(ones(1, inputData.ncols));
     val mm = modelmats(imodel); 
     inputMat = if (opts.hasBias) (inputData on onerow) else inputData;
     
     rand(randwords);                                                        // Compute some random negatives
-    val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt)));
+    val irandwords = min(nfeats-1, int(nfeats * (randwords ^ iexpt)));
     irandwords(opts.nsamps, ?) = target;
     
     val indmat = nHot(irandwords, nfeats);
@@ -785,7 +789,10 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 
     output ~ output - maxi(output)
     exp(output, output);  // ensures sum(exps) is between 1 and nfeats
-    output ~ output / sum(output);
+    val sout = sum(output);
+    // fix sum
+    if (opts.docorrect) sout ~ (sout * correction) - (output(opts.nsamps, ?) * (correction - 1));
+    output ~ output / sout;
     forwardtime += toc - start;
   }
 
@@ -798,7 +805,15 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 		val um = updatemats(imodel);
 		
 		deriv = targMat - output;
-		prods.contents <-- deriv.contents
+    if (opts.docorrect) {
+      if (cexpt.asInstanceOf[AnyRef] != null) cexpt = convertMat(row(opts.expt/(1f - opts.expt)));
+      if (cfact.asInstanceOf[AnyRef] != null) cfact = convertMat(row(opts.expt/(1f-opts.expt)/(1f-opts.expt) + 1f));
+      randwords ~ (cfact * correction) * (randwords ^ cexpt);
+      randwords(opts.nsamps, ?) = 1f;
+      prods.contents ~ deriv.contents *@ randwords.contents;
+    } else {
+    	prods.contents <-- deriv.contents;
+    }
 		inputMat.madd(prods, um, false, true);
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			if (opts.hasBias) {
@@ -858,6 +873,7 @@ object NegsampOutputLayer {
     var outdim = 0; 
     var scoreType = 0;
     var expt = 0.5;
+    var docorrect = false;
     
     def copyTo(opts:Options):Options = {
       super.copyTo(opts);
