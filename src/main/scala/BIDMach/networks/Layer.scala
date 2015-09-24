@@ -873,7 +873,7 @@ object NegsampOutputLayer {
     var outdim = 0; 
     var scoreType = 0;
     var expt = 0.5;
-    var docorrect = false;
+    var docorrect = true;
     
     def copyTo(opts:Options):Options = {
       super.copyTo(opts);
