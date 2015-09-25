@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
@@ -75,7 +75,7 @@ case class Learner(
       var istep = 0
       println("pass=%2d" format ipass)
       while (datasource.hasNext) {
-        val mats = datasource.next   
+        val mats = datasource.next
         here += datasource.opts.batchSize
         bytes += mats.map(Learner.numBytes _).reduce(_+_);
         if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
@@ -739,6 +739,7 @@ object Learner {
       case a:LMat => 8L * mat.length;
       case a:SMat => 8L * mat.nnz;
       case a:SDMat => 12L * mat.nnz;
+      case a:TMat => 4L * a.tiles.map( x => numBytes(x) ).reduce( _+_) ; 
     }
   }
     
