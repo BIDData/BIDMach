@@ -131,15 +131,8 @@ class BayesNet(val dag:Mat,
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
 
-    // For SAME, we need to replicate by stacking matrices. TODO clumsy workaround due to type problems.
-    val stackedData = {
-      sdata match {
-        case sdata:SMat => onesSAMEvector.asInstanceOf[IMat] kron full(sdata)
-        case sdata:GSMat => onesSAMEvector.asInstanceOf[GMat] kron full(sdata)
-        case sdata:FMat => onesSAMEvector.asInstanceOf[IMat] kron sdata
-        case sdata:GMat => onesSAMEvector.asInstanceOf[GMat] kron sdata
-      }  
-    }
+    // For SAME, we stack matrices. If kron is missing (type) cases, add them in MatFunctions.scala.
+    val stackedData = kron(onesSAMEvector, sdata)
     val select = stackedData > 0
 
     // For the first pass, we need to create a lot of matrices that rely on knowledge of the batch size.
@@ -556,7 +549,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var copiesForSAME = 4
+    var copiesForSAME = 2
     var samplingRate = 1
     var numSamplesBurn = 0
   }
@@ -574,7 +567,7 @@ object BayesNet  {
     class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
     opts.dim = dag.ncols
-    opts.batchSize = math.min(100000, data.ncols/40 + 1)
+    opts.batchSize = math.min(100000, data.ncols/50 + 1)
     opts.useGPU = false
     opts.npasses = 2 
     opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
