@@ -106,6 +106,7 @@ class BayesNet(val dag:Mat,
     //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
     mm <-- ( mm / (mm.t * normConstMatrix).t ) // Normalize the cpt before each sampling!
     //computeNormDifference(ipass,here) // For testing convergence to the true distribution
+    computeKLDivergence(ipass,here) // Another way of testing convergence (and the better one, BTW).
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
@@ -465,7 +466,62 @@ class BayesNet(val dag:Mat,
       println()
     }
   } 
+   
+  /**
+   * A debugging method to compute the norm of difference between normalized real/estimated cpts.
+   * Note: this *does* assume our mm is already normalized!
+   * Obviously we'll have to replace the real cpt with what we already have...
+   */
+  def computeNormDifference(ipass:Int, here:Long) = {
+    val real = .7 on .3 on .6 on .4 on .95 on .05 on .2 on .8 on
+            .3 on .4 on .3 on .05 on .25 on .7 on .9 on .08 on .02 on .5 on .3 on .2 on .1 on .9 on .4 on .6 on .99 on .01 
+    val differenceNorm = norm(real - mm)
+    println("Currently on ipass = " + ipass + " with here = " + here + "; l-2 norm of (realCpt - mm) is: " + differenceNorm)
+  }
   
+  /**
+   * Another way of computing convergence to a distribution, this time using the KL-divergence.
+   * Again we need to know the real distribution. Also, KL(p,q) assumes that p is the real distribution.
+   * Also, a cpt is actually *multiple* distributions, so we take the *average* of the KL divergences.
+   */
+  def computeKLDivergence(ipass:Int, here:Long) = {
+    val real = .7 on .3 on .6 on .4 on .95 on .05 on .2 on .8 on
+            .3 on .4 on .3 on .05 on .25 on .7 on .9 on .08 on .02 on .5 on .3 on .2 on .1 on .9 on .4 on .6 on .99 on .01 
+    val normalizedCPT = mm / (mm.t * normConstMatrix).t
+
+    var klDivergence = convertMat(float(0))
+    var numDistributions = 0
+    for (k <- 0 until graph.n) {
+      var offset = cptOffset(k).dv.toInt
+      val numStates = statesPerNode(k).dv.toInt
+      val parentIndices = find(SMat(graph.dag)(?,k))
+
+      // Then split based on no parents (one distribution) or some parents (two or more distributions)
+      if (parentIndices.length == 0) {
+        var thisKL = convertMat(float(0))
+        for (j <- 0 until numStates) {
+          thisKL = thisKL + (real(offset+j) * ln( real(offset+j) / normalizedCPT(offset+j) ))
+        }
+        klDivergence = klDivergence + thisKL
+        numDistributions += 1
+      } else {
+        val totalParentSlots = prod(IMat(statesPerNode)(parentIndices)).dv.toInt
+        numDistributions += totalParentSlots
+        for (i <- 0 until totalParentSlots) {       
+          var thisKL = convertMat(float(0))
+          for (j <- 0 until numStates) {
+            thisKL = thisKL + ( real(offset+j) * ln( real(offset+j) / normalizedCPT(offset+j) ))
+          }  
+          klDivergence = klDivergence + thisKL
+          offset += numStates
+        }
+      }
+    }      
+    
+    klDivergence = klDivergence / numDistributions
+    println("Currently on ipass = " + ipass + " with here = " + here + "; KL Divergence is KL(realCpt,mm) is: " + klDivergence)
+  }
+
   /** A one-liner that we can insert in a place with ipass and here to debug the cpt. */
   def debugCpt(ipass:Int, here:Long) {
     println("\n\nCurrently on ipass = " + ipass + " with here = " + here + ". This is the CPT:")
@@ -473,19 +529,6 @@ class BayesNet(val dag:Mat,
       showCpt(k)
     }
     println()
-  }
-  
-  /**
-   * A debugging method to compute the norm of difference between normalized real/estimated cpts.
-   * Note: this *does* assume our mm is already normalized!
-   * Obviously we'll have to replace the real cpt with what we already have...
-   */
-  def computeNormDifference(ipass:Int, here:Long) = {
-    val firstThree = .7 on .3 on .6 on .4 on .95 on .05 on .2 on .8
-    val lastTwo = .3 on .4 on .3 on .05 on .25 on .7 on .9 on .08 on .02 on .5 on .3 on .2 on .1 on .9 on .4 on .6 on .99 on .01 
-    val real = firstThree on lastTwo
-    val differenceNorm = norm(real - mm)
-    println("Currently on ipass = " + ipass + " with here = " + here + "; l-2 norm of (realCpt - mm) is: " + differenceNorm)
   }
   
   /** A debugging method to print out the CPT of one variable (prettily). */
@@ -549,7 +592,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var copiesForSAME = 2
+    var copiesForSAME = 1
     var samplingRate = 1
     var numSamplesBurn = 0
   }
