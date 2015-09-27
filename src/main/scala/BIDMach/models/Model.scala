@@ -1,5 +1,5 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -97,7 +97,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat                                        // Scores (log likelihoods)
   
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
-    if (useGPU) copyMats(amats, gmats)            		
+    if (useGPU) copyMats(amats, gmats)
     dobatch(gmats, ipass, here)
     if ((useGPU || useDouble) && putBack >= 0) {
     	for (i <- 1 to putBack) {
@@ -127,6 +127,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
         	case aa:SMat => GSDMat(aa)
         	case aa:GDMat => aa
         	case aa:GMat => GDMat(aa)
+                case aa:TMat => TMat.TMatGPU(aa,null)
         	}         
         } else {
         	to(i) = from(i) match {
@@ -135,6 +136,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
         	case aa:SMat => GSMat(aa)
         	case aa:GMat => aa
         	case aa:GDMat => GMat(aa)
+                case aa:TMat => TMat.TMatGPU(aa,null)
         	}
         }
       } else {
