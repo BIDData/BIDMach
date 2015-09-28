@@ -1,5 +1,5 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -198,6 +198,32 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       	} else {
       		FMat(g);
       	}
+      }
+    }
+  }
+  
+  def save(dirname:String){
+    for (i <- 0 until modelmats.length) {
+      val mat = modelmats(i);
+      mat match {
+        case mf:FMat => saveFMat(dirname+"/model%02d.fmat.lz4" format i, mf);
+        case md:DMat => saveDMat(dirname+"/model%02d.dmat.lz4" format i, md);
+        case mi:IMat => saveIMat(dirname+"/model%02d.imat.lz4" format i, mi); 
+        case ml:LMat => saveLMat(dirname+"/model%02d.lmat.lz4" format i, ml);
+        case ms:SMat => saveSMat(dirname+"/model%02d.smat.lz4" format i, ms);       
+      }
+    }
+  }
+  
+  def load(dirname:String){
+    for (i <- 0 until modelmats.length) {
+      val mat = modelmats(i);
+      modelmats(i) = mat match {
+        case mf:FMat => loadFMat(dirname+"/model%02d.fmat.lz4" format i);
+        case md:DMat => loadDMat(dirname+"/model%02d.dmat.lz4" format i);
+        case mi:IMat => loadIMat(dirname+"/model%02d.imat.lz4" format i); 
+        case ml:LMat => loadLMat(dirname+"/model%02d.lmat.lz4" format i);
+        case ms:SMat => loadSMat(dirname+"/model%02d.smat.lz4" format i);       
       }
     }
   }
