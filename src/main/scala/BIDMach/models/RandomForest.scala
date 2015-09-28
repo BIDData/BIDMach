@@ -1167,14 +1167,14 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     (new FMat(nsamps, todo/nsamps, outg.data), impure/all);
   }
   
-  def save(fname:String) = {
+  override def save(fname:String) = {
     saveIMat(fname+"itrees.imat.lz4", itrees);
     saveIMat(fname+"ftrees.imat.lz4", ftrees);
     saveIMat(fname+"vtrees.imat.lz4", vtrees);
     saveFMat(fname+"ctrees.fmat.lz4", ctrees);
   }
   
-  def load(fname:String) = {
+  override def load(fname:String) = {
     itrees = loadIMat(fname+"itrees.imat.lz4");
     ftrees = loadIMat(fname+"ftrees.imat.lz4");
     vtrees = loadIMat(fname+"vtrees.imat.lz4");
