@@ -62,7 +62,7 @@ class BayesNet(val dag:Mat,
     graph.color
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
-    iprojectBlockedSAME = createBlockedIproject
+    iprojectBlockedSAME = createBlockedDiagonal(iproject)
     
     // Build the CPT. To avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
@@ -94,7 +94,7 @@ class BayesNet(val dag:Mat,
     counts = mm.zeros(mm.length, 1)
     dirichletPrior = mm.ones(mm.length, 1)
     dirichletScale = mm.ones(mm.length, 1)
-    onesSAMEvector = if (useGPUnow) gones(opts.copiesForSAME,1) else iones(opts.copiesForSAME,1) // TODO Fix typing, GMat vs IMat issue
+    onesSAMEvector = if (useGPUnow) gones(opts.copiesForSAME,1) else iones(opts.copiesForSAME,1)
     statesPerNode = convertMat(statesPerNode) 
     statesPerNodeSAME = convertMat(statesPerNodeSAME) 
     cptOffsetSAME = convertMat(cptOffsetSAME)
@@ -106,7 +106,7 @@ class BayesNet(val dag:Mat,
     //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
     mm <-- ( mm / (mm.t * normConstMatrix).t ) // Normalize the cpt before each sampling!
     //computeNormDifference(ipass,here) // For testing convergence to the true distribution
-    computeKLDivergence(ipass,here) // Another way of testing convergence (and the better one, BTW).
+    //computeKLDivergence(ipass,here) // Another way of testing convergence (and the better one, BTW).
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
   }
@@ -146,47 +146,42 @@ class BayesNet(val dag:Mat,
       user ~ (select ∘ (stackedData-1)) + ((1-select) ∘ state)
     }
     val usertrans = user.t
-    
+   
     for (k <- 0 until numGibbsIterations) {
       for (c <- 0 until graph.ncolors) {
-        for (copy <- 0 until opts.copiesForSAME) {
-          val start = copy * graph.n
-          val end = (copy+1) * graph.n
-          val colorIndices = colorInfo(c).idsInColor + start
         
-          // Prepare our data by establishing the appropriate offset matrices for the entire CPT blocks
-          usertrans(?, colorIndices) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes) ) 
-          val offsetMatrix = usertrans(?, start until end) * colorInfo(c).iprojectSliced + (colorInfo(c).globalOffsetVector).t
-          val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrix) + colorInfo(c).strideVector
-          val logProbs = ln(mm(replicatedOffsetMatrix))
-          val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrix).t
-
-          // Establish matrices needed for the multinomial sampling
-          val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
-          val bkeys = if (user.ncols == batchSize) colorInfo(c).bkeysMatrix else colorInfo(c).bkeysMatrixLast
-          val bkeysOff = if (user.ncols == batchSize) colorInfo(c).bkeysOffsets else colorInfo(c).bkeysOffsetsLast
-          val randIndices = if (user.ncols == batchSize) colorInfo(c).randMatrixIndices else colorInfo(c).randMatrixIndicesLast
-          val sampleIndices = if (user.ncols == batchSize) colorInfo(c).sampleIDindices else colorInfo(c).sampleIDindicesLast
+        // Prepare data by establishing appropriate offset matrices for various CPT blocks. First, clear out usertrans.
+        usertrans(?, colorInfo(c).idsInColorSAME) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes*opts.copiesForSAME) ) 
+        val offsetMatrix = usertrans * colorInfo(c).iprojectSlicedSAME + (colorInfo(c).globalOffsetVectorSAME).t
+        val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrixSAME) + colorInfo(c).strideVectorSAME
+        val logProbs = ln(mm(replicatedOffsetMatrix))
+        val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrixSAME).t
         
-          // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
-          //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
-          //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
-          val probs = exp(nonExponentiatedProbs)
-          val cumprobs = cumsumByKey(probs, keys)
-          val normedProbs = cumprobs / cumprobs(bkeys)
-       
-          // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
-          val randMatrix = randMap( (colorInfo(c).numNodes, usertrans.nrows) )
-          rand(randMatrix)
-          randMatrix <-- randMatrix * 0.99999f
-          val lessThan = normedProbs < randMatrix(randIndices)
-          val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
-          usertrans(?, colorIndices) = sampleIDs.t
-        }
+        // Establish matrices needed for the multinomial sampling
+        val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
+        val bkeys = if (user.ncols == batchSize) colorInfo(c).bkeysMatrix else colorInfo(c).bkeysMatrixLast
+        val bkeysOff = if (user.ncols == batchSize) colorInfo(c).bkeysOffsets else colorInfo(c).bkeysOffsetsLast
+        val randIndices = if (user.ncols == batchSize) colorInfo(c).randMatrixIndices else colorInfo(c).randMatrixIndicesLast
+        val sampleIndices = if (user.ncols == batchSize) colorInfo(c).sampleIDindices else colorInfo(c).sampleIDindicesLast
+      
+        // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
+        //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
+        //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
+        val probs = exp(nonExponentiatedProbs)
+        val cumprobs = cumsumByKey(probs, keys)
+        val normedProbs = cumprobs / cumprobs(bkeys)    
+        
+        // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
+        val randMatrix = randMap( (colorInfo(c).numNodes*opts.copiesForSAME, usertrans.nrows) )
+        rand(randMatrix)
+        randMatrix <-- randMatrix * 0.99999f
+        val lessThan = normedProbs < randMatrix(randIndices)
+        val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
+        usertrans(?, colorInfo(c).idsInColorSAME) = sampleIDs.t // Note the SAME now...
 
         // After sampling with this color group over all copies (from SAME), we override the known values.
         usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t
-      }     
+      }
     }
 
     user <-- usertrans.t
@@ -242,9 +237,17 @@ class BayesNet(val dag:Mat,
     cg.idsInColor = find(IMat(graph.colors) == c)
     cg.numNodes = cg.idsInColor.length
     cg.chIdsInColor = find(FMat(sum(SMat(pproject)(cg.idsInColor,?),1)))
+    cg.idsInColorSAME = cg.idsInColor
+    for (i <- 1 until opts.copiesForSAME) {
+      // Only add copies if necessary, and use consider graph.n here
+      // Unlike other things where we could use kron, here we change indices b/c we use this for matrix indexing
+      cg.idsInColorSAME = cg.idsInColorSAME on (cg.idsInColor + i*graph.n)
+    }
     cg.numNodesCh = cg.chIdsInColor.length
     cg.iprojectSliced = SMat(iproject)(?,cg.chIdsInColor)
+    cg.iprojectSlicedSAME = createBlockedDiagonal(cg.iprojectSliced)
     cg.globalOffsetVector = convertMat(FMat(cptOffset(cg.chIdsInColor))) // Need FMat to avoid GMat+GIMat
+    cg.globalOffsetVectorSAME = kron( convertMat(ones(opts.copiesForSAME,1)), cg.globalOffsetVector )
     val startingIndices = izeros(cg.numNodes,1)
     startingIndices(1 until cg.numNodes) = cumsum(IMat(statesPerNode(cg.idsInColor)))(0 until cg.numNodes-1)
     cg.startingIndices = convertMat(startingIndices)
@@ -295,7 +298,9 @@ class BayesNet(val dag:Mat,
     val jj = icol(0 until ncols)
     val vv = ones(ncols, 1)
     cg.strideVector = convertMat(strideVector)
+    cg.strideVectorSAME = kron( convertMat(iones(1,opts.copiesForSAME)), cg.strideVector) // A bit confusing, since strideVector is a ROW vector
     cg.replicationMatrix = if (useGPUnow) GSMat(sparse(ii,jj,vv)) else sparse(ii,jj,vv) 
+    cg.replicationMatrixSAME = createBlockedDiagonal(cg.replicationMatrix)
     
     // Form keys and ikeys vectors
     val numStatesIds = statesPerNode(cg.idsInColor)
@@ -316,6 +321,26 @@ class BayesNet(val dag:Mat,
     cg.keys = convertMat(keys)
     cg.ikeys = convertMat(ikeys)
     cg.bkeys = cg.ikeys(cg.scaledKeys)
+    
+    // Now make SAME versions of these! The keys needs to have extra appended at end, 
+    // incremented by graph.n just in case we have a color group with just one node.
+    cg.keysSAME = keys
+    for (i <- 1 until opts.copiesForSAME) {
+      cg.keysSAME = cg.keysSAME \ (keys + i*graph.n)
+    }
+    cg.keysSAME = convertMat(cg.keysSAME)
+    cg.bkeysSAME = cg.bkeys
+    for (i <- 1 until opts.copiesForSAME) {
+      cg.bkeysSAME = cg.bkeysSAME \ (cg.bkeys + i*(cg.bkeys).length)
+    }
+    cg.scaledKeysSAME = cg.scaledKeys
+    for (i <- 1 until opts.copiesForSAME) {
+      cg.scaledKeysSAME = cg.scaledKeysSAME \ (cg.scaledKeys + cg.numNodes)
+    }
+    cg.ikeysSAME = cg.ikeys
+    for (i <- 1 until opts.copiesForSAME) {
+      cg.ikeysSAME = cg.ikeysSAME \ (cg.ikeys + i*(cg.bkeys).length)
+    }
 
     // Form the combination matrix (# of rows is # of columns of replication matrix)
     val indicesColumns = izeros(1,cg.numNodes)
@@ -336,6 +361,7 @@ class BayesNet(val dag:Mat,
     } else {
       sparse(iii,jjj,vvv,nrowsCombo,ncolsCombo)
     }
+    cg.combinationMatrixSAME = createBlockedDiagonal(cg.combinationMatrix)
     
     cg.idsInColor = convertMat(cg.idsInColor)
     cg.chIdsInColor = convertMat(cg.chIdsInColor)
@@ -352,7 +378,7 @@ class BayesNet(val dag:Mat,
    * 
    * There are several types of matrices we create:
    * 
-   *  - zero matrices to put in zeroMap, for clearing out usertrans
+   *  - "zero" matrices to put in zeroMap, for clearing out usertrans (must consider opts.copiesForSAME!)
    *  - "rand" matries to put in randMap, for containers to randomize values during sampling
    *  - five colorInfo(c) matrices for the purposes of sampling
    * 
@@ -367,30 +393,30 @@ class BayesNet(val dag:Mat,
       val onesVector = mm.ones(1, ncols)
       val untilVector = convertMat( float(0 until ncols) )
       for (c <- 0 until graph.ncolors) {
-        val numVars = colorInfo(c).numNodes
+        val numVars = colorInfo(c).numNodes * opts.copiesForSAME // SAME!
         val randOffsets = int(untilVector * numVars)
         zeroMap += ((ncols,numVars) -> mm.zeros(ncols,numVars))
         randMap += ((numVars,ncols) -> mm.zeros(numVars,ncols))
-        colorInfo(c).keysMatrix = (colorInfo(c).keys).t * onesVector
-        colorInfo(c).bkeysOffsets = int(untilVector * colorInfo(c).keys.ncols)
-        colorInfo(c).bkeysMatrix = int(colorInfo(c).bkeys.t * onesVector) + colorInfo(c).bkeysOffsets
-        colorInfo(c).randMatrixIndices = int((colorInfo(c).scaledKeys).t * onesVector) + randOffsets
-        colorInfo(c).sampleIDindices = int((colorInfo(c).ikeys).t * onesVector) + colorInfo(c).bkeysOffsets
+        colorInfo(c).keysMatrix = (colorInfo(c).keysSAME).t * onesVector // keys -> keysSAME
+        colorInfo(c).bkeysOffsets = int(untilVector * colorInfo(c).keysSAME.ncols) // keys -> keysSAME
+        colorInfo(c).bkeysMatrix = int(colorInfo(c).bkeysSAME.t * onesVector) + colorInfo(c).bkeysOffsets // bkeys -> bkeysSAME
+        colorInfo(c).randMatrixIndices = int((colorInfo(c).scaledKeysSAME).t * onesVector) + randOffsets // scaledKeys -> scaledKeysSAME
+        colorInfo(c).sampleIDindices = int((colorInfo(c).ikeysSAME).t * onesVector) + colorInfo(c).bkeysOffsets // ikeys -> ikeysSAME
       }
     } 
     else if (ncols != batchSize) { // On the last batch of ipass = 0 w/different # of columns
       val onesVectorLast = mm.ones(1, ncols)
       val untilVectorLast = convertMat( float(0 until ncols) )
       for (c <- 0 until graph.ncolors) {
-        val numVars = colorInfo(c).numNodes
+        val numVars = colorInfo(c).numNodes * opts.copiesForSAME // SAME!
         val randOffsets = int(untilVectorLast * numVars)
         zeroMap += ((ncols,numVars) -> mm.zeros(ncols,numVars))
         randMap += ((numVars,ncols) -> mm.zeros(numVars,ncols))
-        colorInfo(c).keysMatrixLast = (colorInfo(c).keys).t * onesVectorLast
-        colorInfo(c).bkeysOffsetsLast = int(untilVectorLast * colorInfo(c).keys.ncols)
-        colorInfo(c).bkeysMatrixLast = int(colorInfo(c).bkeys.t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
-        colorInfo(c).randMatrixIndicesLast = int((colorInfo(c).scaledKeys).t * onesVectorLast) + randOffsets
-        colorInfo(c).sampleIDindicesLast = int((colorInfo(c).ikeys).t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
+        colorInfo(c).keysMatrixLast = (colorInfo(c).keysSAME).t * onesVectorLast
+        colorInfo(c).bkeysOffsetsLast = int(untilVectorLast * colorInfo(c).keysSAME.ncols)
+        colorInfo(c).bkeysMatrixLast = int(colorInfo(c).bkeysSAME.t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
+        colorInfo(c).randMatrixIndicesLast = int((colorInfo(c).scaledKeysSAME).t * onesVectorLast) + randOffsets
+        colorInfo(c).sampleIDindicesLast = int((colorInfo(c).ikeysSAME).t * onesVectorLast) + colorInfo(c).bkeysOffsetsLast
       }
     }
   }
@@ -433,24 +459,25 @@ class BayesNet(val dag:Mat,
       return res.t
     }
   }
-  
+   
   /**
-   * Forms a blocked iproject matrix. It creates k={SAME parameter} copies of iproject on diagonal.
-   * We use this during mupdate where we do user.t * iproject, where user could have copies from SAME.
-   * For the actual values v=[...]^T, we can actually use the kron operator.
+   * Given a matrix as input, we form a diagonal, blocked version of it. So if a is a (sparse) mat, it is
+   * like calling mkdiag(ones(1,n)) kron full(a), except I think this will be a lot more flexible later. 
+   * Places where we use this: user.t * iproject, usertrans * colorInfo(c).iprojectSliced, etc.
+   * 
+   * @input a A sparse matrix. It does not have to be square!
    */
-  def createBlockedIproject : Mat = {
-    val n = iproject.ncols
-    val (ii,jj,vv) = find3(SMat(iproject))
+  def createBlockedDiagonal(a:Mat) : Mat = {
+    val (ii,jj,vv) = find3(SMat(a))
     val vvv = iones(opts.copiesForSAME,1) kron vv
     var iii = izeros(1,1)
     var jjj = izeros(1,1)
     for (k <- 0 until opts.copiesForSAME) {
-      iii = iii on (ii + k*n)
-      jjj = jjj on (jj + k*n)
+      iii = iii on (ii + k*a.nrows)
+      jjj = jjj on (jj + k*a.ncols)
     }
-    val res = sparse(iii(1 until iii.length), jjj(1 until jjj.length), vvv, n*opts.copiesForSAME, n*opts.copiesForSAME)
-    if (useGPUnow) return GSMat(res) else return res
+    val res = sparse(iii(1 until iii.length), jjj(1 until jjj.length), vvv, a.nrows*opts.copiesForSAME, a.ncols*opts.copiesForSAME)
+    if (useGPUnow) return GSMat(res) else return res         
   }
   
   // ---------------------------------------------
@@ -592,7 +619,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var copiesForSAME = 1
+    var copiesForSAME = 2
     var samplingRate = 1
     var numSamplesBurn = 0
   }
@@ -775,13 +802,20 @@ class ColorGroup {
   var numNodes:Int = -1
   var numNodesCh:Int = -1
   var idsInColor:Mat = null
+  var idsInColorSAME:Mat = null
   var chIdsInColor:Mat = null
   var globalOffsetVector:Mat = null
+  var globalOffsetVectorSAME:Mat = null
   var iprojectSliced:Mat = null
+  var iprojectSlicedSAME:Mat = null
   var startingIndices:Mat = null
   var replicationMatrix:Mat = null
+  var replicationMatrixSAME:Mat = null
   var strideVector:Mat = null
+  var strideVectorSAME:Mat = null
   var combinationMatrix:Mat = null
+  var combinationMatrixSAME:Mat = null
+
   var keys:Mat = null
   var scaledKeys:Mat = null
   var ikeys:Mat = null
@@ -796,4 +830,9 @@ class ColorGroup {
   var sampleIDindicesLast:Mat = null
   var randMatrixIndices:Mat = null
   var randMatrixIndicesLast:Mat = null
+  
+  var keysSAME:Mat = null
+  var bkeysSAME:Mat = null
+  var scaledKeysSAME:Mat = null
+  var ikeysSAME:Mat = null
 }
