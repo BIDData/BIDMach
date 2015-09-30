@@ -23,25 +23,25 @@ class BayesNet(val dag:Mat,
                val states:Mat, 
                override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
-  var mm:Mat = null                         // Local copy of the cpt
-  var cptOffset:Mat = null                  // For global variable offsets
-  var cptOffsetSAME:Mat = null              // A stacked version of cptOffset, for SAME
-  var graph:Graph = null                    // Data structure representing the DAG
-  var iproject:Mat = null                   // Local CPT offset matrix
-  var iprojectBlockedSAME:Mat = null        // A sparse matrix with diagonal blocks of iproject, for SAMELocal CPT offset matrix
-  var pproject:Mat = null                   // Parent tracking matrix
-  var statesPerNode:Mat = null              // Variables can have an arbitrary number of states
-  var statesPerNodeSAME:Mat = null          // A stacked version of statesPerNode, for SAME
-  var colorInfo:Array[ColorGroup] = null    // Gives us, for each color, a colorStuff class (of arrays)
-  var zeroMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a zero matrix (to avoid allocation)
-  var randMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a rand matrix (to avoid allocation)
-  var normConstMatrix:Mat = null            // Normalizes the cpt. Do cpt / (cpt.t * nConstMat).t
-  var useGPUnow:Boolean = false
-  var batchSize:Int = -1
-  var counts:Mat = null
-  var dirichletPrior:Mat = null
-  var dirichletScale:Mat = null
-  var onesSAMEvector:Mat = null             // This the ones(copiesForSAME), has type IMat or GIMat
+  var mm:Mat = null                         // Copy of the cpt, but be careful of aliasing. We keep this normalized.
+  var cptOffset:Mat = null                  // Holds global variable offsets (into the mm = cpt) of each variable.
+  var cptOffsetSAME:Mat = null              // A vertically stacked version of cptOffset, for SAME.
+  var graph:Graph = null                    // Data structure representing the DAG, "columns = parents."
+  var iproject:Mat = null                   // Local CPT offsets; we do "usertrans * iproject" to get the offsets.
+  var iprojectBlockedSAME:Mat = null        // A diagonal, blocked version of iproject, for SAME local CPT offsets.
+  var pproject:Mat = null                   // Parent tracking matrix, for combining probabilities together.
+  var statesPerNode:Mat = null              // Variables can have an arbitrary number of states.
+  var statesPerNodeSAME:Mat = null          // A vertically stacked version of statesPerNode, for SAME.
+  var colorInfo:Array[ColorGroup] = null    // Gives us, for each color, a colorStuff class (of arrays).
+  var zeroMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a zero matrix (to avoid allocation).
+  var randMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a rand matrix (to avoid allocation).
+  var normConstMatrix:Mat = null            // Normalizes the cpt. Do cpt / (cpt.t * nConstMat).t.
+  var useGPUnow:Boolean = false             // Checks (during initialization only) if we're using GPUs or not.
+  var batchSize:Int = -1                    // Holds the batchSize, which we use for some colorInfo matrices.
+  var counts:Mat = null                     // For accumulating counts during the process of uupdate.
+  var dirichletPrior:Mat = null             // The prior we use to smooth the distribution.
+  var dirichletScale:Mat = null             // The scale we use as part of the prior (typically all 1s).
+  var onesSAMEvector:Mat = null             // This the (g)iones(opts.copiesForSAME,1), for certain special uses.
 
   /**
    * Performs a series of initialization steps.
@@ -54,22 +54,23 @@ class BayesNet(val dag:Mat,
    */
   override def init() = {
     useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
+    onesSAMEvector = if (useGPUnow) giones(opts.copiesForSAME,1) else iones(opts.copiesForSAME,1)
 
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
     statesPerNode = IMat(states)
-    statesPerNodeSAME = iones(opts.copiesForSAME,1) kron IMat(statesPerNode)
+    statesPerNodeSAME = kron(onesSAMEvector, IMat(statesPerNode))
     graph = new Graph(dag, opts.dim, statesPerNode)
     graph.color
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
     iprojectBlockedSAME = createBlockedDiagonal(iproject)
-    
+   
     // Build the CPT. To avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
     cptOffset = izeros(graph.n, 1)
     cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
     cptOffset = convertMat(cptOffset)
-    cptOffsetSAME = iones(opts.copiesForSAME,1) kron IMat(cptOffset)
+    cptOffsetSAME = kron(onesSAMEvector,cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     val cpt = convertMat(rand(lengthCPT,1))
     
@@ -94,10 +95,7 @@ class BayesNet(val dag:Mat,
     counts = mm.zeros(mm.length, 1)
     dirichletPrior = mm.ones(mm.length, 1)
     dirichletScale = mm.ones(mm.length, 1)
-    onesSAMEvector = if (useGPUnow) gones(opts.copiesForSAME,1) else iones(opts.copiesForSAME,1)
     statesPerNode = convertMat(statesPerNode) 
-    statesPerNodeSAME = convertMat(statesPerNodeSAME) 
-    cptOffsetSAME = convertMat(cptOffsetSAME)
     batchSize = -1
   } 
    
@@ -105,7 +103,7 @@ class BayesNet(val dag:Mat,
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
     //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
     mm <-- ( mm / (mm.t * normConstMatrix).t ) // Normalize the cpt before each sampling!
-    //computeNormDifference(ipass,here) // For testing convergence to the true distribution
+    computeNormDifference(ipass,here) // For testing convergence to the true distribution
     //computeKLDivergence(ipass,here) // Another way of testing convergence (and the better one, BTW).
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
@@ -142,7 +140,7 @@ class BayesNet(val dag:Mat,
       numGibbsIterations = numGibbsIterations + opts.numSamplesBurn
       establishMatrices(sdata.ncols)
       val state = convertMat(rand(sdata.nrows * opts.copiesForSAME, sdata.ncols))
-      state <-- float( min( int(statesPerNodeSAME ∘ state), statesPerNodeSAME-1 ) )
+      state <-- float( min( int(statesPerNodeSAME ∘ state), int(statesPerNodeSAME-1) ) )
       user ~ (select ∘ (stackedData-1)) + ((1-select) ∘ state)
     }
     val usertrans = user.t
@@ -230,6 +228,9 @@ class BayesNet(val dag:Mat,
    * complicated replication matrices, stride vectors, and combination matrices. Check the colorInfo
    * class for details on what the individual matrices represent.
    * 
+   * Actually, this method name is a bit misleading because some of the color group info relies on
+   * knowing the batch size, and we can't do that until we actually see the data.
+   * 
    * @param c The integer index of the given color group.
    */
   def computeAllColorGroupInfo(c:Int) : ColorGroup = {
@@ -239,19 +240,19 @@ class BayesNet(val dag:Mat,
     cg.chIdsInColor = find(FMat(sum(SMat(pproject)(cg.idsInColor,?),1)))
     cg.idsInColorSAME = cg.idsInColor
     for (i <- 1 until opts.copiesForSAME) {
-      // Only add copies if necessary, and use consider graph.n here
-      // Unlike other things where we could use kron, here we change indices b/c we use this for matrix indexing
+      // Unlike other things where we could use kron, here we change indices b/c we use this
+      // for matrix indexing when "clearing out columns" in usertrans when sampling.
       cg.idsInColorSAME = cg.idsInColorSAME on (cg.idsInColor + i*graph.n)
     }
     cg.numNodesCh = cg.chIdsInColor.length
     cg.iprojectSliced = SMat(iproject)(?,cg.chIdsInColor)
     cg.iprojectSlicedSAME = createBlockedDiagonal(cg.iprojectSliced)
     cg.globalOffsetVector = convertMat(FMat(cptOffset(cg.chIdsInColor))) // Need FMat to avoid GMat+GIMat
-    cg.globalOffsetVectorSAME = kron( convertMat(ones(opts.copiesForSAME,1)), cg.globalOffsetVector )
+    cg.globalOffsetVectorSAME = kron(onesSAMEvector, cg.globalOffsetVector)
     val startingIndices = izeros(cg.numNodes,1)
     startingIndices(1 until cg.numNodes) = cumsum(IMat(statesPerNode(cg.idsInColor)))(0 until cg.numNodes-1)
     cg.startingIndices = convertMat(startingIndices)
-
+    
     // Gather useful information for determining the replication, stride, and combination matrices
     var ncols = 0
     val numOnes = izeros(1,cg.numNodesCh)       // Determine how many 1s to have
@@ -298,7 +299,8 @@ class BayesNet(val dag:Mat,
     val jj = icol(0 until ncols)
     val vv = ones(ncols, 1)
     cg.strideVector = convertMat(strideVector)
-    cg.strideVectorSAME = kron( convertMat(iones(1,opts.copiesForSAME)), cg.strideVector) // A bit confusing, since strideVector is a ROW vector
+    // A bit confusing, since strideVector is a ROW vector
+    cg.strideVectorSAME = kron( onesSAMEvector.t, cg.strideVector)
     cg.replicationMatrix = if (useGPUnow) GSMat(sparse(ii,jj,vv)) else sparse(ii,jj,vv) 
     cg.replicationMatrixSAME = createBlockedDiagonal(cg.replicationMatrix)
     
@@ -462,7 +464,7 @@ class BayesNet(val dag:Mat,
    
   /**
    * Given a matrix as input, we form a diagonal, blocked version of it. So if a is a (sparse) mat, it is
-   * like calling mkdiag(ones(1,n)) kron full(a), except I think this will be a lot more flexible later. 
+   * like calling kron(mkdiag(ones(1,n)), full(a)), except I think this will be a lot more flexible later. 
    * Places where we use this: user.t * iproject, usertrans * colorInfo(c).iprojectSliced, etc.
    * 
    * @input a A sparse matrix. It does not have to be square!
@@ -797,6 +799,7 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
  * - keys, scaledKeys, ikeys, and bkeys help us with multinomial sampling
  * - The remaining ten (!) matrices rely on knowledge of the batch size. They are expanded
  *     versions of the previous matrices that use the batch size to increase their elements.
+ *  - Oh! Don't forge that we have SAME versions of these!
  */
 class ColorGroup {
   var numNodes:Int = -1

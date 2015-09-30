@@ -8,13 +8,13 @@
 //val states = loadIMat("data/states.lz4")
 
 // This is the data I'm using, following Daphne's example DAG
-val data_10perc = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
+//val data_10perc = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
 val data_50perc = loadFMat("data/bayesnet_student_data/dataStudent50Perc1mil.lz4")
-val all = loadFMat("data/bayesnet_student_data/dataStudent_1000000.txt")
-val realdata = all(?, 0 until 50000)
-realdata <-- (realdata + 1)
-val (ii,jj,kk) = find3(realdata)
-val data_full = sparse(ii,jj,kk,5,50000)
+//val all = loadFMat("data/bayesnet_student_data/dataStudent_1000000.txt")
+//val realdata = all(?, 0 until 50000)
+//realdata <-- (realdata + 1)
+//val (ii,jj,kk) = find3(realdata)
+//val data_full = sparse(ii,jj,kk,5,50000)
 
 val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
 val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
