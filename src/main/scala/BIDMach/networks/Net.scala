@@ -88,7 +88,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
   	} else {
-  		layers(layers.length-1).target = gmats(1);
+  		layers(layers.length-1).target = full(gmats(1));
   	}
   }
   
