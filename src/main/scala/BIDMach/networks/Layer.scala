@@ -11,7 +11,7 @@ import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3;
-import scala.collection.mutable.HashMap;
+import java.util.HashMap;
 
 /**
  * Basic Net Layer class. There are currently 17 layer types:
@@ -178,11 +178,11 @@ class ModelLayer(override val net:Net, override val opts:ModelLayer.Options = ne
 		imodel = if (net.opts.nmodelmats > 0) {   // If explicit model numbers are given, use them. 
 			opts.imodel;
 		} else if (opts.modelName.length > 0) {               // If this is a named layer, look it up. 
-			if (net.modelMap.contains(opts.modelName)) {
-				net.modelMap(opts.modelName);
+			if (net.modelMap.containsKey(opts.modelName)) {
+				net.modelMap.get(opts.modelName);
 			} else {
 				val len = net.modelMap.size;
-				net.modelMap(opts.modelName) = len + net.opts.nmodelmats; 	
+				net.modelMap.put(opts.modelName, len + net.opts.nmodelmats); 	
 				len;
 			}
 		} else {                                         // Otherwise return the next available int

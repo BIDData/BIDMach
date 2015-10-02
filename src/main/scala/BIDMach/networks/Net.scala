@@ -9,7 +9,7 @@ import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
 import scala.util.hashing.MurmurHash3;
-import scala.collection.mutable.HashMap;
+import java.util.HashMap;
 
 /**
  * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. 
@@ -40,7 +40,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  createLayers;
     if (output_layers == null) output_layers = Array(layers(layers.length-1));
 	  if (modelMap == null) {
-	  	modelMap = HashMap();
+	  	modelMap = new HashMap[String,Int];
 	  	imodel = 0;
 	  	layers.map(_.getModelMats(this));
 	  }
