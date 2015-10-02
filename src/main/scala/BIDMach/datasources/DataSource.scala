@@ -24,7 +24,7 @@ abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) {
 
 
 object DataSource {
-  trait Opts {
+  trait Opts extends BIDMat.Opts {
     var batchSize = 10000
     var sizeMargin = 3f
     var sample = 1f

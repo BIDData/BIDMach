@@ -24,7 +24,7 @@ abstract class Updater(val opts:Updater.Opts = new Updater.Options) {
 
 
 object Updater {
-  trait Opts {  
+  trait Opts extends BIDMat.Opts {  
   }
   
   class Options extends Opts {}

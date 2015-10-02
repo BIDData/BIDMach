@@ -719,7 +719,7 @@ class ParLearnerF(
 
 object Learner {
   
-  class Options extends BIDMat.Options {
+  class Options extends BIDMat.Opts {
   	var npasses = 2 
   	var evalStep = 11
   	var pstep = 0.01f

@@ -161,6 +161,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	}
   }
   
+  override def saveMetaData(fname:String) = {
+    import java.io._
+    val str = BIDMat.JSON.toJSON(modelMap, true);
+    val writer = new PrintWriter(new File(fname + "metadata.json"));
+    writer.print(str);
+    writer.close;
+  }
+  
   /* 
    * Deal with annoying sub-sized minibatches
    */

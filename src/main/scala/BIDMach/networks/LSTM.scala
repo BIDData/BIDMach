@@ -200,7 +200,6 @@ object LSTMLayer {
       outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
     }
 	  
-
 	  override def clone:Options = {
 		  copyTo(new Options).asInstanceOf[Options];
 	  }

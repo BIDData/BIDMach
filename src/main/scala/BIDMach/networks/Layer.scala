@@ -807,15 +807,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 		val um = updatemats(imodel);
 		
 		deriv = targMat - output;
-/*		if (opts.docorrect) {
-			if (cexpt.asInstanceOf[AnyRef] == null) cexpt = convertMat(row(opts.expt/(1f - opts.expt)));
-			if (cfact.asInstanceOf[AnyRef] == null) cfact = convertMat(row(correction * (opts.expt/(1f-opts.expt)/(1f-opts.expt) + 1f)));
-			randwords ~ (randwords ^ cexpt) * cfact;
-			randwords(opts.nsamps, ?) = 1f;
-			prods.contents ~ deriv.contents *@ randwords.contents;
-		} else { */
-			prods.contents <-- deriv.contents;
-//		}
+		prods.contents <-- deriv.contents;  
 		inputMat.madd(prods, um, false, true);
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			if (opts.hasBias) {
