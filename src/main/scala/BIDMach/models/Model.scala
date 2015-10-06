@@ -84,7 +84,9 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     import BIDMat.JSON
     for (i <- 0 until modelmats.length) {
       val mat = modelmats(i);
-      saveMat(fname+"modelmat%02d.lz4" format i, mat);
+      val f = new File(fname+"modelmat%02d.lz4" format i);
+      f.getParentFile().mkdirs();
+      saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
     }
     val pw = new PrintWriter(new File(fname+"options.json"));
     pw.print(JSON.toJSON(opts));
