@@ -228,13 +228,17 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   var waitsteps = 0;
   var epsilon = 0f;
   var ADAinitialized = false;
+  
+  def initModelMat(nr:Int, nc:Int):Mat = {
+    rand(nr, nc) - 0.5f;
+  }
 
   override def forward = {
     val start = toc;
     val modelcols = inputData.nrows;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
-      modelmats(imodel) = convertMat(normrnd(0, 1, outdim, modelcols + (if (opts.hasBias) 1 else 0)));
+      modelmats(imodel) = convertMat(initModelMat(outdim, modelcols + (if (opts.hasBias) 1 else 0)));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;

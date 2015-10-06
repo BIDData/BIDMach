@@ -32,6 +32,7 @@ case class Learner(
   var useGPU = false
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
+  var lastCheckPoint = 0;
 	
   def setup = {
 	Learner.setupPB(datasource, dopts.putBack, mopts.dim)   
@@ -108,8 +109,12 @@ case class Learner(
         			if (useGPU) {
         				print(", GPUmem=%3.6f" format GPUmem._1) 
         			}
-        	println
-        	lasti = reslist.length
+        	println;
+        	lasti = reslist.length;
+        }
+        if (toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
+          model.save(opts.checkPointFile format lastCheckPoint);
+          lastCheckPoint += 1;          
         }
       }
       if (updater != null) updater.updateM(ipass)
@@ -720,15 +725,17 @@ class ParLearnerF(
 object Learner {
   
   class Options extends BIDMat.Opts {
-  	var npasses = 2 
-  	var evalStep = 11
-  	var pstep = 0.01f
-  	var resFile:String = null
-  	var autoReset = true
-  	var useCache = true
-  	var updateAll = false
-  	var debugMem = false
-    var cumScore = 0
+  	var npasses = 2;
+  	var evalStep = 11;
+  	var pstep = 0.01f;
+  	var resFile:String = null;
+  	var autoReset = true;
+  	var useCache = true;
+  	var updateAll = false;
+  	var debugMem = false;
+    var cumScore = 0;
+    var checkPointFile:String = null;
+    var checkPointInterval = 0f;
   }
   
   def numBytes(mat:Mat):Long = {
