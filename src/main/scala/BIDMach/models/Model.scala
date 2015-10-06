@@ -89,7 +89,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
     }
     val pw = new PrintWriter(new File(fname+"options.json"));
-    pw.print(JSON.toJSON(opts));
+    pw.print(JSON.toJSON(opts), true);
     pw.close;
     saveMetaData(fname);
   }
