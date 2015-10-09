@@ -112,7 +112,7 @@ case class Learner(
         	println;
         	lasti = reslist.length;
         }
-        if (toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
+        if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
           model.save(opts.checkPointFile format lastCheckPoint);
           lastCheckPoint += 1;          
         }
