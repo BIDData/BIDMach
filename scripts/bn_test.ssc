@@ -7,22 +7,15 @@
 //val data = loadSMat("data/sdata_normal.lz4")
 //val states = loadIMat("data/states.lz4")
 
-// This is the data I'm using, following Daphne's example DAG
-val data_10perc = loadSMat("data/bayesnet_student_data/dataStudentTrain100k10perc.lz4")
-val data_50perc = loadFMat("data/bayesnet_student_data/dataStudent50Perc1mil.lz4")
-val all = loadFMat("data/bayesnet_student_data/dataStudent_1000000.txt")
-val realdata = all(?, 0 until 50000)
-realdata <-- (realdata + 1)
-val (ii,jj,kk) = find3(realdata)
-val data_full = sparse(ii,jj,kk,5,50000)
-
+// This is the data I am using following Daphne's example DAG. For now use files named 
+// "data_student_{K}perc{_smat}.lz4" where K is a percent and sometimes we have smats.
+val dat = loadFMat("data/bayesnet_student_data/data_student_10perc.lz4")
 val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
 val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
 
-// Replace the data here with data_10perc, data_50perc, or data_full
-val (nn , opts) = BIDMach.models.BayesNet.learner(states , dag , data_50perc)
-opts.npasses = 5
-opts.useGPU = false
+val (nn , opts) = BIDMach.models.BayesNet.learner(states , dag , dat)
+opts.npasses = 10
+opts.useGPU = true
 opts.what
 nn.train
 nn.modelmats(0).t

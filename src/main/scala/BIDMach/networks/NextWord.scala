@@ -8,8 +8,6 @@ import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
-import scala.util.hashing.MurmurHash3;
-import scala.collection.mutable.HashMap;
 
 /*
  * LSTM next Word prediction model, which comprises a rectangular grid of LSTM compound layers.

@@ -46,23 +46,23 @@ object LSTMLayer {
 	    val prev_c = new CopyLayer.Options;
 	    val i = new CopyLayer.Options;
 	    
-	  	val il1 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il1"; hasBias = this.hasBias};
-	  	val ph1 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph1"; hasBias = this.hasBias};
+	  	val il1 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_input_in_gate"; hasBias = this.hasBias};
+	  	val ph1 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_prev_h_in_gate"; hasBias = this.hasBias};
 	  	val sum1 = new AddLayer.Options{inputs(0) = il1;   inputs(1) = ph1};
 	  	val in_gate = new SigmoidLayer.Options{inputs(0) = sum1};
 	  	
-	  	val il2 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il2"; hasBias = this.hasBias};
-	  	val ph2 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph12"; hasBias = this.hasBias};
+	  	val il2 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_input_out_gate"; hasBias = this.hasBias};
+	  	val ph2 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_prev_h_out_gate"; hasBias = this.hasBias};
 	  	val sum2 = new AddLayer.Options{inputs(0) = il2;   inputs(1) = ph2};
 	  	val out_gate = new SigmoidLayer.Options{inputs(0) = sum2};
 	  	
-	  	val il3 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il3"; hasBias = this.hasBias};
-	  	val ph3 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph13"; hasBias = this.hasBias};
+	  	val il3 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_input_forget_gate"; hasBias = this.hasBias};
+	  	val ph3 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_prev_h_forget_gate"; hasBias = this.hasBias};
 	  	val sum3 = new AddLayer.Options{inputs(0) = il3;   inputs(1) = ph3};
 	  	val forget_gate = new SigmoidLayer.Options{inputs(0) = sum3};
 	  	
-	    val il4 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_il4"; hasBias = this.hasBias};
-	  	val ph4 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_ph14"; hasBias = this.hasBias};
+	    val il4 = new LinLayer.Options{inputs(0) = i;      modelName = prefix + "LSTM_input_tanh"; hasBias = this.hasBias};
+	  	val ph4 = new LinLayer.Options{inputs(0) = prev_h; modelName = prefix + "LSTM_prev_h_tanh"; hasBias = this.hasBias};
 	  	val sum4 = new AddLayer.Options{inputs(0) = il4;   inputs(1) = ph4};
 	  	val in_gate2 = new TanhLayer.Options{inputs(0) = sum4};
 	  	
@@ -130,16 +130,16 @@ object LSTMLayer {
       
       val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
 
-      val lin1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1";  outdim = dim; hasBias = this.hasBias}
+      val lin1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_in_gate";  outdim = dim; hasBias = this.hasBias}
       val in_gate = new SigmoidLayer.Options{inputs(0) = lin1};
       
-      val lin2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2";  outdim = dim; hasBias = this.hasBias}
+      val lin2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_out_gate";  outdim = dim; hasBias = this.hasBias}
       val out_gate = new SigmoidLayer.Options{inputs(0) = lin2};
       
-      val lin3 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin3";  outdim = dim; hasBias = this.hasBias}
+      val lin3 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_forget_gate";  outdim = dim; hasBias = this.hasBias}
       val forget_gate = new SigmoidLayer.Options{inputs(0) = lin3};
       
-      val lin4 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin4";  outdim = dim; hasBias = this.hasBias}
+      val lin4 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_tanh";  outdim = dim; hasBias = this.hasBias}
       val in_gate2 = new TanhLayer.Options{inputs(0) = lin4};
       
       val in_prod = new MulLayer.Options{inputs(0) = in_gate;    inputs(1) = in_gate2};
@@ -170,9 +170,9 @@ object LSTMLayer {
       val i = new CopyLayer.Options;
           
       val prev_hi = new StackLayer.Options{inputs(0) = prev_h; inputs(1) = i};       
-      val il1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin1"; outdim = 2*dim; hasBias = this.hasBias};      
+      val il1 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_in_out"; outdim = 2*dim; hasBias = this.hasBias};      
       val sp1 = new SplitVertLayer.Options{inputs(0) = il1;  nparts = 2;}
-      val il2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_lin2"; outdim = 2*dim; hasBias = this.hasBias};      
+      val il2 = new LinLayer.Options{inputs(0) = prev_hi; modelName = prefix + "LSTM_forget_tanh"; outdim = 2*dim; hasBias = this.hasBias};      
       val sp2 = new SplitVertLayer.Options{inputs(0) = il2;  nparts = 2;}
 
       val in_gate = new SigmoidLayer.Options{inputs(0) = sp1;     inputTerminals(0) = 0};
@@ -200,7 +200,6 @@ object LSTMLayer {
       outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
     }
 	  
-
 	  override def clone:Options = {
 		  copyTo(new Options).asInstanceOf[Options];
 	  }

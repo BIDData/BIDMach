@@ -9,7 +9,7 @@ import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
 import scala.util.hashing.MurmurHash3;
-import scala.collection.mutable.HashMap;
+import java.util.HashMap;
 
 /**
  * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. 
@@ -40,7 +40,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  createLayers;
     if (output_layers == null) output_layers = Array(layers(layers.length-1));
 	  if (modelMap == null) {
-	  	modelMap = HashMap();
+	  	modelMap = new HashMap[String,Int];
 	  	imodel = 0;
 	  	layers.map(_.getModelMats(this));
 	  }
@@ -88,7 +88,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
   	} else {
-  		layers(layers.length-1).target = gmats(1);
+  		layers(layers.length-1).target = full(gmats(1));
   	}
   }
   
@@ -159,6 +159,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	} else {
   	  zeros(output_layers.length, 1);
   	}
+  }
+  
+  override def saveMetaData(fname:String) = {
+    import java.io._
+    val str = BIDMat.JSON.toJSON(modelMap, true);
+    val writer = new PrintWriter(new File(fname + "metadata.json"));
+    writer.print(str);
+    writer.close;
   }
   
   /* 

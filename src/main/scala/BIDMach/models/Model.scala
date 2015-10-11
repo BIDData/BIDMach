@@ -1,8 +1,13 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,SMat,SDMat,TMat}
+
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,LMat,SMat,SDMat,TMat}
+
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,LMat,SMat,SDMat}
+
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import scala.collection.mutable.ListBuffer
 
 /**
  * Abstract class with shared code for all models
@@ -74,6 +79,49 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     for (i <- 0 until modelmats.length) {
       modelmats(i) = mod.modelmats(i);
     }
+  }
+  
+  def saveMetaData(fname:String) = {}
+  
+  def save(fname:String) = {
+    import java.io._
+    import BIDMat.JSON
+    for (i <- 0 until modelmats.length) {
+      val mat = modelmats(i);
+      val f = new File(fname+"modelmat%02d.lz4" format i);
+      f.getParentFile().mkdirs();
+      saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
+    }
+    val pw = new PrintWriter(new File(fname+"options.json"));
+    pw.print(JSON.toJSON(opts), true);
+    pw.close;
+    saveMetaData(fname);
+  }
+  
+  def load(fname:String) = {
+	  import java.io._
+    import BIDMat.JSON
+    if (modelmats.length > 0) {
+    	for (i <- 0 until modelmats.length) {
+    		modelmats(i) = loadMat(fname+"modelmat%02d.lz4" format i);
+    	}
+    } else {
+      var n = 0;
+      var mlist = new ListBuffer[Mat]();
+      while ((new java.io.File(fname+"modelmat%02d.lz4" format n)).exists) {
+        mlist += loadMat(fname+"modelmat%02d.lz4" format n);
+        n += 1;
+      }
+      setmodelmats(mlist.toArray);
+    }
+    val fr = new BufferedReader(new FileReader(fname+"options.json"));
+    val strbuf = new StringBuffer;
+    var line:String = null;
+    while ({line = fr.readLine(); line != null}) {
+      strbuf.append(line).append("\n");
+    }
+    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts];
+    opts.copyFrom(newopts)
   }
   
   def bind(ds:DataSource):Unit = {
@@ -203,12 +251,11 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       }
     }
   }
-  
 }
 
 
 object Model {
-	trait Opts {
+	trait Opts extends BIDMat.Opts{
 	  var nzPerColumn:Int = 0
 	  var startBlock = 8000
 	  var useGPU = true
@@ -218,5 +265,5 @@ object Model {
 	  var debug = 0;
   }
 	
-	class Options extends Opts {}
+	class Options extends Opts {} 
 }

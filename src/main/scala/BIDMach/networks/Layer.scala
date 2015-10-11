@@ -11,7 +11,7 @@ import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3;
-import scala.collection.mutable.HashMap;
+import java.util.HashMap;
 
 /**
  * Basic Net Layer class. There are currently 17 layer types:
@@ -178,11 +178,11 @@ class ModelLayer(override val net:Net, override val opts:ModelLayer.Options = ne
 		imodel = if (net.opts.nmodelmats > 0) {   // If explicit model numbers are given, use them. 
 			opts.imodel;
 		} else if (opts.modelName.length > 0) {               // If this is a named layer, look it up. 
-			if (net.modelMap.contains(opts.modelName)) {
-				net.modelMap(opts.modelName);
+			if (net.modelMap.containsKey(opts.modelName)) {
+				net.modelMap.get(opts.modelName);
 			} else {
 				val len = net.modelMap.size;
-				net.modelMap(opts.modelName) = len + net.opts.nmodelmats; 	
+				net.modelMap.put(opts.modelName, len + net.opts.nmodelmats); 	
 				len;
 			}
 		} else {                                         // Otherwise return the next available int
@@ -228,13 +228,17 @@ class LinLayer(override val net:Net, override val opts:LinLayer.Options = new Li
   var waitsteps = 0;
   var epsilon = 0f;
   var ADAinitialized = false;
+  
+  def initModelMat(nr:Int, nc:Int):Mat = {
+    rand(nr, nc) - 0.5f;
+  }
 
   override def forward = {
     val start = toc;
     val modelcols = inputData.nrows;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
-      modelmats(imodel) = convertMat(normrnd(0, 1, outdim, modelcols + (if (opts.hasBias) 1 else 0)));
+      modelmats(imodel) = convertMat(initModelMat(outdim, modelcols + (if (opts.hasBias) 1 else 0)));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
@@ -807,15 +811,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputLa
 		val um = updatemats(imodel);
 		
 		deriv = targMat - output;
-/*		if (opts.docorrect) {
-			if (cexpt.asInstanceOf[AnyRef] == null) cexpt = convertMat(row(opts.expt/(1f - opts.expt)));
-			if (cfact.asInstanceOf[AnyRef] == null) cfact = convertMat(row(correction * (opts.expt/(1f-opts.expt)/(1f-opts.expt) + 1f)));
-			randwords ~ (randwords ^ cexpt) * cfact;
-			randwords(opts.nsamps, ?) = 1f;
-			prods.contents ~ deriv.contents *@ randwords.contents;
-		} else { */
-			prods.contents <-- deriv.contents;
-//		}
+		prods.contents <-- deriv.contents;  
 		inputMat.madd(prods, um, false, true);
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			if (opts.hasBias) {

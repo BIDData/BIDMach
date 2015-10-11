@@ -20,7 +20,7 @@ abstract class Mixin(val opts:Mixin.Opts = new Mixin.Options) {
 }
 
 object Mixin {
-	trait Opts {}
+	trait Opts extends BIDMat.Opts {}
 	
 	class Options extends Opts {}
 }
