@@ -41,5 +41,7 @@ while read fname; do
     curl --retry 2 -O ${source}/cbin/${subdir}/${fname}
 done < exelist.txt
 
+chmod 755 ${BIDMACH_ROOT}/cbin/*
+
 mv ${BIDMACH_ROOT}/lib/BIDMach.jar ${BIDMACH_ROOT}
 

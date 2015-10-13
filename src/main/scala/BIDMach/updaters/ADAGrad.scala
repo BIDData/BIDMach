@@ -105,9 +105,16 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
       stepn ^ pe;
     }
     val nw = one / stepn;
-    val nmats = math.min(modelmats.length, updatemats.length)
+    val nmats = math.min(modelmats.length, updatemats.length);
 //    println("u sumsq %g" format mini(sumSq(0)).dv)
     for (i <- 0 until nmats) {
+     if (opts.policies.asInstanceOf[AnyRef] != null) {
+       if (opts.policies.length > 1) {
+    	   tscale.set(opts.policies(i)(nsteps));
+       } else {
+         tscale.set(opts.policies(0)(nsteps));
+       }
+     }
     	val mm = modelmats(i);
     	val um = updatemats(i);
     	val ss = sumSq(i);
@@ -126,9 +133,9 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	  	ss ~ ss *@ (one - nw);
     	  	ss ~ ss + newsquares;
     	  	if (opts.waitsteps < nsteps) {
-    	  		if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
+    	  		// if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
     	  		val tmp = ss ^ ve;
-    	  		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in powered sumsquares matrix "+i);
+    	  		// if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in powered sumsquares matrix "+i);
     	  		tmp ~ tmp *@ tscale;
     	  		//    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
     	  		tmp ~ tmp + opts.epsilon;
@@ -151,6 +158,7 @@ object ADAGrad {
     var vexp:FMat = 0.5f
     var epsilon = 1e-5f
     var initsumsq = 1e-5f
+    var policies:Array[(Float)=>Float] = null
   }
   
   class Options extends Opts {}
