@@ -419,4 +419,26 @@ int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask,
   cudaError_t err = cudaGetLastError();
   return err;
 }
-                              
+
+int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
+	    float *lrate, int nlrate, float eps, int doupdate) {
+  int nthreads;
+  dim3 griddims;
+  setsizes(nrows*ncols, &griddims, &nthreads);
+  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
+	    float *lrate, int nlrate, float eps, int doupdate) {
+  int nthreads;
+  dim3 griddims;
+  setsizes(nrows*ncols, &griddims, &nthreads);
+  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+

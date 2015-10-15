@@ -98,5 +98,11 @@ public final class CUMACH {
     
     public static native int ADAGrad(int nrows, int ncols, Pointer mm, Pointer um, Pointer ssq, Pointer mask, int maskr, float nw, Pointer ve, int nve,
         Pointer ts, int nts, Pointer lrate, int nlrate, float eps, int doupdate);
+    
+    public static native int ADAGradm(int nrows, int ncols, Pointer mm, Pointer um, Pointer ssq, Pointer momentum, float mu, Pointer mask, int maskr, float nw, Pointer ve, int nve,
+            Pointer ts, int nts, Pointer lrate, int nlrate, float eps, int doupdate);
+    
+    public static native int ADAGradn(int nrows, int ncols, Pointer mm, Pointer um, Pointer ssq, Pointer momentum, float mu, Pointer mask, int maskr, float nw, Pointer ve, int nve,
+            Pointer ts, int nts, Pointer lrate, int nlrate, float eps, int doupdate);
 
 }
