@@ -134,7 +134,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
           if (opts.momentum.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.momentum.length > 1) opts.momentum(i) else opts.momentum(0);
             ADAGrad.ADAGradm(gmm, gum, gss, momentum.asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.epsilon, (opts.waitsteps < nsteps));
-          } else           if (opts.momentum.asInstanceOf[AnyRef] != null) {
+          } else if (opts.nesterov.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.nesterov.length > 1) opts.nesterov(i) else opts.nesterov(0);
             ADAGrad.ADAGradn(gmm, gum, gss, momentum.asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.epsilon, (opts.waitsteps < nsteps));
           } else {
@@ -151,10 +151,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	  		val tmp = ss ^ ve;
     	  		// if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in powered sumsquares matrix "+i);
     	  		tmp ~ tmp *@ tscale;
-    	  		//    		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
+    	  		// if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
     	  		tmp ~ tmp + opts.epsilon;
     	  		tmp ~ um / tmp;
-    	  		if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
+    	  		// if (java.lang.Double.isNaN(sum(sum(tmp)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
     	  		tmp ~ tmp *@ lrate;                                   // Basic scaled gradient
             if (opts.momentum.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.momentum.length > 1) i else 0;

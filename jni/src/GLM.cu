@@ -409,6 +409,90 @@ __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq
   }
 }
 
+// ADAGRAD with standard momentum
+
+__global__ void __ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr,
+			   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float eps, int doupdate) {
+  int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
+  int nthreads = blockDim.x * gridDim.x * gridDim.y;
+  int i, irow, icol;
+  float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad;
+  float sqnw = sqrtf(nw);
+  float sq1mnw = sqrtf(1-nw);
+  for (i = ithread; i < nrows*ncols; i += nthreads) {
+    icol = i / nrows;
+    irow = i - icol * nrows;
+    umval = um[i];
+    sqval = ssq[i];
+//    newss = (nw * umval * umval) + (1 - nw) * sqval;
+    newss = hypotf(sqnw * umval, sq1mnw * sqval);
+    ssq[i] = newss;
+    if (doupdate) {
+      mmval = mm[i];
+      veval = (nve > 1) ? ve[irow] : ve[0];
+      tsval = (nts > 1) ? ts[irow] : ts[0];
+      lrval = (nlr > 1) ? lr[irow] : lr[0];
+      denom = (veval == 0.5f) ? newss : powf(newss, veval*2);
+      denom = denom * tsval + eps;
+      grad = (umval / denom) * lrval;            // Normal gradient
+      grad += momentum[i];                       // With momentum
+      momentum[i] = mu * grad;                   // Save updated momentum
+      mmval += grad;                             // Add the new gradient
+      if (maskr > 0) {
+        if (maskr > 1) {
+          mmval *= mask[i]; 
+        } else {
+          mmval *= mask[icol];
+        }
+      }
+      mm[i] = mmval;
+    }
+  }
+}
+
+// ADAGRAD with Nesterov momentum
+
+__global__ void __ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr,
+			   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float eps, int doupdate) {
+  int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
+  int nthreads = blockDim.x * gridDim.x * gridDim.y;
+  int i, irow, icol;
+  float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad, oldmom, newmom;
+  float sqnw = sqrtf(nw);
+  float sq1mnw = sqrtf(1-nw);
+  for (i = ithread; i < nrows*ncols; i += nthreads) {
+    icol = i / nrows;
+    irow = i - icol * nrows;
+    umval = um[i];
+    sqval = ssq[i];
+//    newss = (nw * umval * umval) + (1 - nw) * sqval;
+    newss = hypotf(sqnw * umval, sq1mnw * sqval);
+    ssq[i] = newss;
+    if (doupdate) {
+      mmval = mm[i];
+      veval = (nve > 1) ? ve[irow] : ve[0];
+      tsval = (nts > 1) ? ts[irow] : ts[0];
+      lrval = (nlr > 1) ? lr[irow] : lr[0];
+      denom = (veval == 0.5f) ? newss : powf(newss, veval*2);
+      denom = denom * tsval + eps;
+      grad = (umval / denom) * lrval;            // Normal gradient
+      oldmom = momentum[i];                      // Momentum
+      grad += oldmom;                            // New gradient
+      newmom = mu * grad;                        // Compute new momentum
+      momentum[i] = newmom;                      // Save new momentum
+      mmval += grad + newmom - oldmom;
+      if (maskr > 0) {
+        if (maskr > 1) {
+          mmval *= mask[i]; 
+        } else {
+          mmval *= mask[icol];
+        }
+      }
+      mm[i] = mmval;
+    }
+  }
+}
+
 int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
 	    float *lrate, int nlrate, float eps, int doupdate) {
   int nthreads;
@@ -420,23 +504,23 @@ int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask,
   return err;
 }
 
-int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
+int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
 	    float *lrate, int nlrate, float eps, int doupdate) {
   int nthreads;
   dim3 griddims;
   setsizes(nrows*ncols, &griddims, &nthreads);
-  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  __ADAGradm<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
 }
 
-int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
+int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
 	    float *lrate, int nlrate, float eps, int doupdate) {
   int nthreads;
   dim3 griddims;
   setsizes(nrows*ncols, &griddims, &nthreads);
-  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  __ADAGradn<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
   return err;
