@@ -1,4 +1,4 @@
-:silent
+// :silent
 
 // This script needs to be run from <BIDMACH_DIR>/scripts
 
@@ -11,13 +11,6 @@ val a = loadSMat(dir+"/data/rcv1/docs.smat.lz4")
 val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
 val ta = loadSMat(dir+"/data/rcv1/testdocs.smat.lz4")
 val tc = loadFMat(dir+"/data/rcv1/testcats.fmat.lz4")
-
-val aa = TMat(a.nrows, a.ncols, Array(0), Array(0), Array(a))
-val cc = TMat(c.nrows, c.ncols, Array(0), Array(0), Array(c))
-
-val taa = TMat(ta.nrows, ta.ncols, Array(0), Array(0), Array(ta))
-val tcc = TMat(tc.nrows, tc.ncols, Array(0), Array(0), Array(tc))
-
 
 println("\n<<<<<<< Testing GLM on RCV1 (2 passes) >>>>>>>")
 val (mm1,opts1) = GLM.learner(a,c,1)
@@ -36,17 +29,17 @@ val wt = nt / sum(nt);
 println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))
 
 println("\n<<<<<<< Testing GLM on RCV1 (2 passes) with TMat >>>>>>>")
-val (mm1,opts1) = GLM.learner(aa,cc,1)
+val (mm1,opts1) = GLM.learner(a,c,1)
 opts1.useGPU=useGPU
-mm1.train
+mm1.train(TMat.zeros(tc.nrows,tc.ncols,Array(0),Array(0),Array(FMat.zeros(tc.nrows,tc.ncols))))
 
-val pcc = zeros(tcc.nrows, tcc.ncols);
-val (nn1,nopts1) = GLM.predictor(mm1.model,taa,pcc)
+val pcc = zeros(tc.nrows, tc.ncols);
+val (nn1,nopts1) = GLM.predictor(mm1.model,ta,pcc)
 nopts1.useGPU=useGPU
 nn1.predict
 
-val rc = roc2(pcc, tcc, 1-tcc, 1000)
-val mr = mean(rc)(0, 0->100)
-val nt = sum(cc,2)(0->100, 0)
+val rc2 = roc2(pcc, tc, 1-tc, 1000)
+val mr = mean(rc2)(0, 0->100)
+val nt = sum(c,2)(0->100, 0)
 val wt = nt / sum(nt);
 println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))

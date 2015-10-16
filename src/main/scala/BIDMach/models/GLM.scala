@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMACH
@@ -73,8 +73,22 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     rmod.iweight = iweight;    
   }
   
+  def setModel(ref:Boolean,d:Int,m:Int) = {
+    if (ref) {
+    	val mm = zeros(d,m)
+        setmodelmats(Array(mm))
+    }
+  }
+
+  def setModel(ref:Boolean,d:Int,m:Int,tmat:TMat) = {
+    if (ref) {
+    	val mm = TMat.zeros(d,m,tmat.x,tmat.y,tmat.tiles)
+        setmodelmats(Array(mm))
+    }
+  }
+
   override def init() = {
-  	useGPU = opts.useGPU && Mat.hasCUDA > 0
+    useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = if (opts.hashFeatures > 0) opts.hashFeatures else size(data0, 1)
     val targetData = mats.length > 1
@@ -89,19 +103,64 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     sp = sdat / sum(sdat)
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
-    if (refresh) {
-    	val mm = zeros(d,m);
-      setmodelmats(Array(mm))
-    }
+    setModel(refresh,d,m)
+
+    println("after setModel");
     modelmats(0) = convertMat(modelmats(0));
     updatemats = Array(modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols));
+
     targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else opts.targmap
     if (! targetData) {
       targets = if (opts.targets.asInstanceOf[AnyRef] != null) convertMat(opts.targets) else opts.targets
       mask =    if (opts.rmask.asInstanceOf[AnyRef] != null) convertMat(opts.rmask) else opts.rmask
     } 
+
     mylinks = if (useGPU) GIMat(opts.links) else opts.links;
     iweight = opts.iweight;
+
+    if (iweight.asInstanceOf[AnyRef] != null && useGPU) iweight = convertMat(iweight);
+    if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask;
+    totflops = 0L;
+    for (i <- 0 until opts.links.length) {
+      totflops += linkArray(opts.links(i)).fnflops;
+    }
+    ulim = convertMat(opts.lim)
+    llim = - ulim;
+    hashFeatures = opts.hashFeatures;
+    if (opts.aopts != null) initADAGrad(d, m);
+  }
+
+  def init(tmat:TMat) = {
+    useGPU = opts.useGPU && Mat.hasCUDA > 0
+    val data0 = mats(0)
+    val m = if (opts.hashFeatures > 0) opts.hashFeatures else size(data0, 1)
+    val targetData = mats.length > 1
+    val d = if (opts.targmap.asInstanceOf[AnyRef] != null) {
+      opts.targmap.nrows 
+    } else if (opts.targets.asInstanceOf[AnyRef] != null) {
+      opts.targets.nrows 
+    } else {
+      mats(1).nrows  
+    }
+    val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
+    sp = sdat / sum(sdat)
+    println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
+    
+    setModel(refresh,d,m,tmat)
+
+    println("after setModel");
+    modelmats(0) = convertMat(modelmats(0));
+    updatemats = Array(modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols));
+
+    targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else opts.targmap
+    if (! targetData) {
+      targets = if (opts.targets.asInstanceOf[AnyRef] != null) convertMat(opts.targets) else opts.targets
+      mask =    if (opts.rmask.asInstanceOf[AnyRef] != null) convertMat(opts.rmask) else opts.rmask
+    } 
+
+    mylinks = if (useGPU) GIMat(opts.links) else opts.links;
+    iweight = opts.iweight;
+
     if (iweight.asInstanceOf[AnyRef] != null && useGPU) iweight = convertMat(iweight);
     if (mask.asInstanceOf[AnyRef] != null) modelmats(0) ~ modelmats(0) ∘ mask;
     totflops = 0L;
@@ -124,6 +183,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     sumsq.set(aopts.initsumsq);
     waitsteps = aopts.waitsteps;
     epsilon = aopts.epsilon;
+    println("finished initADAGrad")
   }
     
   def mupdate(in:Mat, ipass:Int, pos:Long) = {
@@ -139,6 +199,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     val ftarg = full(targ);
     val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in 
+
     if (opts.lim > 0) {
       max(eta, llim, eta);
       min(eta, ulim, eta);

@@ -50,9 +50,27 @@ case class Learner(
     useGPU = model.useGPU
   }
     
+  def init(tmat:TMat) = {
+    var cacheState = Mat.useCache
+    Mat.useCache = opts.useCache
+    datasource.init
+    model.bind(datasource)
+    model.init
+    if (mixins != null) mixins map (_ init(model))
+    if (updater != null) updater.init(model)
+    Mat.useCache = cacheState;
+    useGPU = model.useGPU
+  }
+ 
   def train = {
     setup
     init
+    retrain
+  }
+
+  def train(tmat:TMat) = {
+    setup
+    init(tmat)
     retrain
   }
    
