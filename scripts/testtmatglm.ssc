@@ -29,17 +29,70 @@ val wt = nt / sum(nt);
 println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))
 
 println("\n<<<<<<< Testing GLM on RCV1 (2 passes) with TMat >>>>>>>")
-val (mm1,opts1) = GLM.learner(a,c,1)
-opts1.useGPU=useGPU
-mm1.train(TMat.zeros(tc.nrows,tc.ncols,Array(0),Array(0),Array(FMat.zeros(tc.nrows,tc.ncols))))
+val (mm2,opts2) = GLM.learner(a,c,1)
+opts2.useGPU=useGPU
+mm2.train(TMat.zeros(tc.nrows,tc.ncols,Array(0),Array(0),Array(FMat.zeros(tc.nrows,tc.ncols))))
 
-val pcc = zeros(tc.nrows, tc.ncols);
-val (nn1,nopts1) = GLM.predictor(mm1.model,ta,pcc)
-nopts1.useGPU=useGPU
-nn1.predict
+val pc2 = zeros(tc.nrows, tc.ncols);
+val (nn2,nopts2) = GLM.predictor(mm2.model,ta,pc2)
+nopts2.useGPU=useGPU
+nn2.predict
 
-val rc2 = roc2(pcc, tc, 1-tc, 1000)
-val mr = mean(rc2)(0, 0->100)
-val nt = sum(c,2)(0->100, 0)
-val wt = nt / sum(nt);
-println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr*wt).dv, mr(6)))
+val rc2 = roc2(pc2, tc, 1-tc, 1000)
+val mr2 = mean(rc2)(0, 0->100)
+val nt2 = sum(c,2)(0->100, 0)
+val wt2 = nt2 / sum(nt2);
+println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr2*wt2).dv, mr2(6)))
+
+println("\n<<<<<<< Testing GLM on RCV1 (2 passes) with TMat >>>>>>>")
+println("\n<<<<<<< Sanity check - use four tiles            >>>>>>>")
+
+val (mm3,opts3) = GLM.learner(a,c,1)
+opts3.useGPU=useGPU
+val t = TMat.zeros(tc.nrows,
+                     tc.ncols,
+                     Array(0,tc.ncols/2,0,tc.ncols/2),
+                     Array(0,0,tc.nrows/2,tc.nrows/2),
+                     Array(FMat.zeros(tc.nrows/2,tc.ncols/2),
+                           FMat.zeros(tc.nrows/2,tc.ncols/2),
+                           FMat.zeros(tc.nrows/2,tc.ncols/2),
+                           FMat.zeros(tc.nrows/2,tc.ncols/2) ))
+
+mm3.train(t)
+
+val pc3 = zeros(tc.nrows, tc.ncols);
+val (nn3,nopts3) = GLM.predictor(mm3.model,ta,pc3)
+nopts3.useGPU=useGPU
+nn3.predict
+
+val rc3 = roc2(pc3, tc, 1-tc, 1000)
+val mr3 = mean(rc3)(0, 0->100)
+val nt3 = sum(c,2)(0->100, 0)
+val wt3 = nt3 / sum(nt3);
+println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr3*wt3).dv, mr3(6)))
+
+println("\n<<<<<<< Testing GLM on RCV1 (2 passes) with TMat >>>>>>>")
+println("\n<<<<<<< Sanity check - use three tiles            >>>>>>>")
+
+val (mm4,opts4) = GLM.learner(a,c,1)
+opts4.useGPU=useGPU
+val t2 = TMat.zeros( tc.nrows,
+                     tc.ncols,
+                     Array(0,tc.ncols/2,0),
+                     Array(0,0,tc.nrows/2),
+                     Array(FMat.zeros(tc.nrows/2,tc.ncols/2),
+                           FMat.zeros(tc.nrows/2,tc.ncols/2),
+                           FMat.zeros(tc.nrows/2,tc.ncols/2) ))
+
+mm4.train(t2)
+
+val pc4 = zeros(tc.nrows, tc.ncols);
+val (nn4,nopts4) = GLM.predictor(mm4.model,ta,pc4)
+nopts4.useGPU=useGPU
+nn4.predict
+
+val rc4 = roc2(pc4, tc, 1-tc, 1000)
+val mr4 = mean(rc4)(0, 0->100)
+val nt4 = sum(c,2)(0->100, 0)
+val wt4 = nt4 / sum(nt4);
+println("ROC AUC: mean %5.4f, cat6 %5.4f" format ((mr4*wt4).dv, mr4(6)))

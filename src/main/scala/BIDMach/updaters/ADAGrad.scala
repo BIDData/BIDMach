@@ -36,6 +36,11 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     stepn = mm.zeros(1,1);
     one = mm.ones(1,1);
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols);
+
+    println("opts.vexp.nrows: " + opts.vexp.nrows);
+    println("opts.vexp.ncols: " + opts.vexp.ncols);
+    println("ve in ADAGrad: " + ve)
+
     if (opts.texp.asInstanceOf[AnyRef] != null) te = mm.zeros(opts.texp.nrows, opts.texp.ncols);
     if (opts.pexp.asInstanceOf[AnyRef] != null) pe = mm.zeros(opts.pexp.nrows, opts.pexp.ncols);
     lrate = mm.zeros(opts.lrate.nrows, 1);

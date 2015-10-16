@@ -139,7 +139,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   }
   
   def init():Unit
-  
+  def init(tmat:TMat):Unit = throw new RuntimeException("init(TMat) not implemented")
+
   def dobatch(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat                                        // Scores (log likelihoods)
@@ -217,6 +218,19 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       		f
       	}
       }
+      case t:TMat => 
+        if (useGPU) {
+          println("in convertMat, matched GPU");
+          val out = TMat.TMatGPU(t,null);
+
+          println("out(0): " + out.tiles(0));
+          println("out(0).type: " + out.tiles(0).mytype);
+
+          out
+      	} else {
+          println("in convertMat, no GPU");
+          t;
+        }
       case i:IMat =>
       if (useGPU) {
         GIMat(i);

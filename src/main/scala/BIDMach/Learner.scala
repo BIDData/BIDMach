@@ -55,7 +55,7 @@ case class Learner(
     Mat.useCache = opts.useCache
     datasource.init
     model.bind(datasource)
-    model.init
+    model.init(tmat)
     if (mixins != null) mixins map (_ init(model))
     if (updater != null) updater.init(model)
     Mat.useCache = cacheState;
