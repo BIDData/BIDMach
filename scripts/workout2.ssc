@@ -1,103 +1,18 @@
-val dir = "/opt/BIDMach"
-val a = loadSMat(dir+"/data/rcv1/docs.smat.lz4")
-val c = loadFMat(dir+"/data/rcv1/cats.fmat.lz4")
+:silent
 
-if (Mat.hasCUDA > 0) {
-println("\n<<<<<<< Testing GLM on RCV1 with GPU >>>>>>>")
-val (mm1,opts1) = GLM.learner(a,c,2)
-mm1.train
-}
+// This script needs to be run from <BIDMACH_DIR>/scripts
 
-println("\n<<<<<<< Testing GLM with MKL, no GPU >>>>>>>")
-val (mm1,opts1) = GLM.learner(a,c,2)
-opts1.useGPU=false
-mm1.train
+var useGPU=false
+var doTwitter=false
 
-println("\n<<<<<<< Testing GLM no MKL >>>>>>>")
-Mat.useMKL=false
-mm1.train
-Mat.useMKL=true
+println("\n<<<<<<< Testing with GPU >>>>>>>")
+:load workout_slave.ssc
 
-if (Mat.hasCUDA > 0) resetGPU
-Mat.clearCaches
+println("\n<<<<<<< Testing without GPU >>>>>>>")
+useGPU = false
+:load workout_slave.ssc
 
-println("\n<<<<<<< Testing FM >>>>>>>")
-val c6 = c(6,?)
-val (mm2,opts2) = FM.learner(a,c6,2)
-opts2.dim1=64
-opts2.dim2=16
-opts2.reg1weight=1
-mm2.train
-
-if (Mat.hasCUDA > 0) resetGPU
-Mat.clearCaches
-if (Mat.hasCUDA > 1) {
-println("\n<<<<<<< Testing parallel LDA >>>>>>>")
-val (mm5,opts5) = LDA.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
-opts5.npasses=2
-mm5.train
-} else if (Mat.hasCUDA > 0) {
-println("\n<<<<<<< Testing LDA with GPU >>>>>>>")
-val (mm5,opts5) = LDA.learner(a, 256)
-opts5.npasses=2
-mm5.train
-}
-
-if (Mat.hasCUDA > 0) resetGPU
-Mat.clearCaches
-println("\n<<<<<<< Testing LDA, no GPU >>>>>>>")
-val (mm5,opts5) = LDA.learner(a, 256)
-opts5.useGPU = false
-opts5.npasses=2
-mm5.train
-
-println("\n<<<<<<< Testing LDA, no MKL >>>>>>>")
-Mat.useMKL=false
-mm5.train
-Mat.useMKL=true
-
-if (Mat.hasCUDA > 0) resetGPU
-Mat.clearCaches
-if (Mat.hasCUDA > 1) {
-println("\n<<<<<<< Testing parallel NMF >>>>>>>")
-val (mm6,opts6) = NMF.learnFPar(FilesDS.encodeDate(2012,3,1,0), FilesDS.encodeDate(2012,3,2,0))
-opts6.npasses=2
-mm6.train
-} else {
-println("\n<<<<<<< Testing NMF >>>>>>>")
-val (mm6,opts6) = NMF.learner(a, 256)
-opts6.npasses=2
-mm6.train
-}
-
-
-val x = rand(32,1000000)           // A causal data matrix
-val b = rand(1,32) - 0.5f         // influence on the treatment
-val z = rand(1,33) - 0.5f         // influence on the outcome
-
-val bx = (b * x)
-val ilink = irow(1,1)
-GLM.preds(bx, bx, ilink, GLM.linkArray, 10)
-val atreat = (rand(1, x.ncols) < bx)
-val xa = x on atreat
-val zx = z * xa
-GLM.preds(zx, zx, ilink, GLM.linkArray, 10)
-val yout = (rand(1, x.ncols) < zx)
-val aa = xa on yout
-
-val targetmat = zeros(2,34)
-targetmat(0,32) = 1
-targetmat(1,33) = 1
-val mask = ones(2,34)
-mask(0,32) = 0
-mask(0,33) = 0
-mask(1,33) = 0
-
-println("\n<<<<<<< Testing IPTW estimators >>>>>>>")
-val (mm7,opts7) = IPTW.learner(aa)
-opts7.targets = targetmat
-opts7.rmask = mask
-opts7.links = ilink
-opts7.useGPU = false
-opts7.npasses = 10
-mm7.train
+println("\n<<<<<<< Testing without MKL >>>>>>>")
+Mat.useMKL = false
+:load workout_slave.ssc
+:silent
