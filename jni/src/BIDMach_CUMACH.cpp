@@ -515,4 +515,36 @@ extern "C" {
     return ADAGrad(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lr, nlr, eps, doupdate);
   }
 
+    JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_ADAGradm
+    (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jmm, jobject jum, jobject jssq, jobject jmom, jfloat mu, jobject jmask, jint maskr,
+   jfloat nw, jobject jve, jint nve, jobject jts, jint nts, jobject jlr, jint nlr, jfloat eps, jint doupdate)
+  {
+    float *mm = (float*)getPointer(env, jmm);
+    float *um = (float*)getPointer(env, jum);
+    float *ssq = (float*)getPointer(env, jssq);
+    float *mom = (float*)getPointer(env, jmom);
+    float *mask = (float*)getPointer(env, jmask);
+    float *ve = (float*)getPointer(env, jve);
+    float *ts = (float*)getPointer(env, jts);
+    float *lr = (float*)getPointer(env, jlr);
+
+    return ADAGradm(nrows, ncols, mm, um, ssq, mom, mu, mask, maskr, nw, ve, nve, ts, nts, lr, nlr, eps, doupdate);
+  }
+  
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_ADAGradn
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jobject jmm, jobject jum, jobject jssq, jobject jmom, jfloat mu, jobject jmask, jint maskr,
+   jfloat nw, jobject jve, jint nve, jobject jts, jint nts, jobject jlr, jint nlr, jfloat eps, jint doupdate)
+  {
+    float *mm = (float*)getPointer(env, jmm);
+    float *um = (float*)getPointer(env, jum);
+    float *ssq = (float*)getPointer(env, jssq);
+    float *mom = (float*)getPointer(env, jmom);
+    float *mask = (float*)getPointer(env, jmask);
+    float *ve = (float*)getPointer(env, jve);
+    float *ts = (float*)getPointer(env, jts);
+    float *lr = (float*)getPointer(env, jlr);
+
+    return ADAGradn(nrows, ncols, mm, um, ssq, mom, mu, mask, maskr, nw, ve, nve, ts, nts, lr, nlr, eps, doupdate);
+  }
+
 }
