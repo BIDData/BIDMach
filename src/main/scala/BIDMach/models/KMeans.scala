@@ -57,7 +57,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)  
     val vm = mini(vmatch)
     max(vm, 0f, vm)
-    val vv = mean(sqrt(vm)).dv
+    val vv = sqrt(mean(vm)).dv
   	row(-vv, math.exp(vv))
   }
   
