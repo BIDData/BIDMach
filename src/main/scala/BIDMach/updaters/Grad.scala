@@ -47,7 +47,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     mu = modelmats(0).zeros(1,1);
   } 
   
-	def update(ipass:Int, step:Long):Unit = {
+	def update(ipass:Int, step:Long, gprogress:Float):Unit = {
   	val nsteps = if (step == 0) 1f else {
   		if (firstStep == 0f) {
   			firstStep = step;
@@ -68,9 +68,9 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
       }
       if (opts.policies.asInstanceOf[AnyRef] != null) {
 			  if (opts.policies.length > 1) {
-				  tscale.set(opts.policies(i)(nsteps));
+				  tscale.set(opts.policies(i)(nsteps, gprogress));
 			  } else {
-				  tscale.set(opts.policies(0)(nsteps));
+				  tscale.set(opts.policies(0)(nsteps, gprogress));
 			  }
 		  }
 	  	if (opts.lrate.ncols > 1) {
@@ -102,11 +102,22 @@ object Grad {
     var pexp:FMat = 0.5f
     var waitsteps = 3
     var mask:FMat = null
-    var policies:Array[(Float)=>Float] = null
+    var policies:Array[(Float, Float)=>Float] = null
     var momentum:FMat = null
     var nesterov:FMat = null
   }
   
   class Options extends Opts {}
+  
+  def PWlinear(segments:FMat):(Float, Float) => Float = {
+    (nsteps:Float, gprogress:Float) => {
+      var i = 1;
+      while (i < segments.nrows && gprogress > segments(i, 0)) {
+        i += 1;
+      }
+      val frac = (gprogress - segments(i-1,0)) / (segments(i,0) - segments(i-1,0));
+      frac * segments(i,1) + (1-frac) * segments(i-1,1);
+    }
+  }
 }
 

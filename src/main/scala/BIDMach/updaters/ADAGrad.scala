@@ -91,7 +91,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   	}
   }
 	
-  def update(ipass:Int, step:Long):Unit = { 
+  def update(ipass:Int, step:Long, gprogress:Float):Unit = { 
     val start = toc;
     modelmats = model.modelmats
     updatemats = model.updatemats
@@ -116,9 +116,9 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     for (i <- 0 until nmats) {
     	if (opts.policies.asInstanceOf[AnyRef] != null) {
     		if (opts.policies.length > 1) {
-    			tscale.set(opts.policies(i)(nsteps));
+    			tscale.set(opts.policies(i)(nsteps, gprogress));
     		} else {
-    			tscale.set(opts.policies(0)(nsteps));
+    			tscale.set(opts.policies(0)(nsteps, gprogress));
     		}
     	}
     	val mm = modelmats(i);

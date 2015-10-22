@@ -79,11 +79,13 @@ case class Learner(
         val mats = datasource.next   
         here += datasource.opts.batchSize
         bytes += mats.map(Learner.numBytes _).reduce(_+_);
+        val dsp = datasource.progress;
+        val gprogress = (ipass + dsp)/opts.npasses;
         if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
           if (opts.updateAll) {
           	model.dobatchg(mats, ipass, here);
           	if (mixins != null) mixins map (_ compute(mats, here));
-          	if (updater != null) updater.update(ipass, here);
+          	if (updater != null) updater.update(ipass, here, gprogress);
           }
         	val scores = model.evalbatchg(mats, ipass, here)
         	reslist.append(scores.newcopy)
@@ -95,7 +97,6 @@ case class Learner(
         }  
         if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
         istep += 1
-        val dsp = datasource.progress
         if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         	val gf = gflop
         	lastp = dsp - (dsp % opts.pstep)

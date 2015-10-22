@@ -14,8 +14,11 @@ abstract class Updater(val opts:Updater.Opts = new Updater.Options) {
     model = model0 
   }
   
-  def update(ipass:Int, step:Long):Unit
   def clear():Unit = {}
+  
+  def update(ipass:Int, step:Long):Unit
+  
+  def update(ipass:Int, step:Long, gprogress:Float):Unit = update(ipass, step)
   
   def updateM(ipass:Int):Unit = {
     model.updatePass(ipass)
