@@ -127,6 +127,7 @@ case class Learner(
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
       resetGPUs
+      Mat.clearCaches
     }
     datasource.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
@@ -189,6 +190,7 @@ case class Learner(
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
       resetGPUs
+      Mat.clearCaches
     }
     datasource.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
