@@ -1,14 +1,12 @@
-//:silent
-val dir="data/netflix/"
+:silent
+val dir="../data/netflix/"
 
-//val a0=loadSMat(dir+"train.smat.lz4")
-//val ta0=loadSMat(dir+"test.smat.lz4")
-val a0=loadSMat(dir+"newtrain.smat.lz4")
-val ta0=loadSMat(dir+"newtest.smat.lz4")
+val exists = (new java.io.File(dir+"newtrain.smat.lz4")).exists
 
-val rebuild = false
+val a0= if (exists) loadSMat(dir+"newtrain.smat.lz4") else loadSMat(dir+"train.smat.lz4")
+val ta0= if (exists) loadSMat(dir+"newtest.smat.lz4") else loadSMat(dir+"test.smat.lz4")
 
-val (a, ta) = if (rebuild) {
+val (a, ta) = if (!exists) {
 val (ii, jj, vv) = find3(a0+ta0);
 val ir = rand(ii.length, 1) < 0.1f;
 val itrain = find(ir == 0);
@@ -61,26 +59,14 @@ opts.uconvg = 1e-3f
 
 nn.train
 
-val mmat = FMat(nn.modelmat)
-val iavg = FMat(nn.modelmats(1))
-val avg = FMat(nn.modelmats(2))
+val pa = (ta != 0);
+val (mm,mopts) = SFA.predictor(nn.model,a,fact,pa)
+mopts.batchSize = 10000;
 
-//val model = nn.model.asInstanceOf[SFA]
-//val (mm, mopts) = SFA.predictor(model, a, fact);
-//mopts.uiter = 7
-//
-//def testme = {
-//mm.predict
-//val mmod = mm.model.asInstanceOf[SFA];
-//val tanz = ta > 0;
-//val preds = DDS(FMat(nn.modelmats(0)), fact, tanz) + FMat(nn.modelmats(1) + nn.modelmats(2))
-//min(preds.contents, 5f, preds.contents)
-//max(preds.contents, 1f, preds.contents)
-//val diff = DMat(preds.contents - ta.contents)
-//val rmse = sqrt((diff ^* diff) / diff.length.toFloat).dv
-//rmse
-//}
-//val rmse = testme
-//
-//println("rmse = %f" format rmse);
-//:silent
+mm.predict
+
+val diff = ta.contents - pa.contents
+val rmse = sqrt((diff ^* diff) / diff.length)
+println("RMSE = %f" format rmse.v);
+
+:silent
