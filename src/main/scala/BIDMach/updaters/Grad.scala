@@ -47,7 +47,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     mu = modelmats(0).zeros(1,1);
   } 
   
-	def update(ipass:Int, step:Long, gprogress:Float):Unit = {
+	override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
   	val nsteps = if (step == 0) 1f else {
   		if (firstStep == 0f) {
   			firstStep = step;

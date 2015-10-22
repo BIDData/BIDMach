@@ -91,7 +91,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   	}
   }
 	
-  def update(ipass:Int, step:Long, gprogress:Float):Unit = { 
+  override def update(ipass:Int, step:Long, gprogress:Float):Unit = { 
     val start = toc;
     modelmats = model.modelmats
     updatemats = model.updatemats
