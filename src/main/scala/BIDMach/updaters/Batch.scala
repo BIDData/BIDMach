@@ -12,7 +12,7 @@ class Batch(override val opts:Batch.Opts = new Batch.Options) extends Updater {
     super.init(model0)
   }
      
-  def update(ipass:Int, step:Long) = {}
+  override def update(ipass:Int, step:Long) = {}
 }
 
 object Batch {

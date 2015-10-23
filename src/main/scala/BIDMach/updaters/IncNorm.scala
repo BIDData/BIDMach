@@ -21,7 +21,7 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
     firstStep = 0f
   }
       
-  def update(ipass:Int, step:Long) = {
+  override def update(ipass:Int, step:Long) = {
   	val modelmats = model.modelmats
   	val updatemats = model.updatemats
   	val mm = modelmats(0)

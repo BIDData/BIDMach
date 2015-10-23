@@ -26,7 +26,7 @@ class Telescoping(override val opts:Telescoping.Opts = new Telescoping.Options) 
     nextCount = 0L
   }
 	
-	def update(ipass:Int, step:Long) = {
+	override def update(ipass:Int, step:Long) = {
 	  if (firstStep == 0 && step > 0) {
 	    firstStep = step
 	  }

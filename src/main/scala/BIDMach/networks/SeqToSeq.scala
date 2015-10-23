@@ -338,5 +338,11 @@ object SeqToSeq {
     (nn, opts)
   }
   
+    def load(fname:String):SeqToSeq = {
+      val mm = new SeqToSeq;
+      mm.load(fname);
+      mm
+    }
+  
 }
 

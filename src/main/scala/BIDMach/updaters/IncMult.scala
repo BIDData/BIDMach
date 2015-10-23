@@ -15,7 +15,7 @@ class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Upda
     rm = model0.modelmats(0).zeros(1,1)
   }
       
-  def update(ipass:Int, step:Long) = {
+  override def update(ipass:Int, step:Long) = {
     val modelmats = model.modelmats
     val updatemats = model.updatemats
     val mm = modelmats(0)

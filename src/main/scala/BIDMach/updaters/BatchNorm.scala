@@ -19,7 +19,7 @@ class BatchNorm(override val opts:BatchNorm.Opts = new BatchNorm.Options) extend
     }
   }
      
-  def update(ipass:Int, step:Long) = {
+  override def update(ipass:Int, step:Long) = {
   	val updatemats = model.updatemats
     for (i <- 0 until accumulators.length) {
     	accumulators(i) ~ accumulators(i) + updatemats(i) 

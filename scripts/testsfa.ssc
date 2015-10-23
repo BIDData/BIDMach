@@ -20,10 +20,12 @@ saveSMat(dir+"newtest.smat.lz4", ta)
 (a0, ta0)
 }
 
-val d = 512
+val d = 256
 
 val fact = zeros(d, a.ncols);
 val (nn,opts) = SFA.learnerX(a,fact,d)
+
+opts.langevin = 0.3f
 
 // good values for movielens 10m
 opts.lambdam = 5f
@@ -49,7 +51,7 @@ opts.startup = 1
 opts.npasses = 3
 opts.evalStep = 31
 opts.doUsers = true
-opts.lrate = 0.003  // For ADAGRAD
+//opts.lrate = 0.003  // For ADAGRAD
 //opts.texp = null
 opts.uconvg = 1e-3f
 //opts.weightByUser = true
@@ -64,6 +66,9 @@ val (mm,mopts) = SFA.predictor(nn.model,a,fact,pa)
 mopts.batchSize = 10000;
 
 mm.predict
+
+min(pa.contents,5,pa.contents)
+max(pa.contents,1,pa.contents)
 
 val diff = ta.contents - pa.contents
 val rmse = sqrt((diff ^* diff) / diff.length)

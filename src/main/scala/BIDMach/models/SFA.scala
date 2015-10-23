@@ -324,6 +324,23 @@ object SFA  {
     (nn, opts)
   }
   
+   def learnerY(mat0:Mat, user0:Mat, d:Int) = {
+    class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with ADAGrad.Opts
+    val opts = new xopts
+    opts.dim = d
+    opts.putBack = 1
+    opts.npasses = 4
+    opts.lrate = 0.1;
+    opts.initUval = 0f;
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    val nn = new Learner(
+        new MatDS(Array(mat0, user0), opts),
+        new SFA(opts), 
+        null,
+        new ADAGrad(opts), opts)
+    (nn, opts)
+  }
+  
    def predictor(model0:Model, mat1:Mat, preds:Mat) = {
   	class xopts extends Learner.Options with SFA.Opts with MatDS.Opts with Grad.Opts
     val model = model0.asInstanceOf[SFA]

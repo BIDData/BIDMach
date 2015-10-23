@@ -1,4 +1,5 @@
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 #include <stdio.h>
 #include <MatKernel.hpp>
 
@@ -372,15 +373,20 @@ int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir,
   return err;
 }
 
+__global__ void __nrandinit(curandState *rstates) {
+  int id = threadIdx.x + blockDim.x * blockIdx.x;
+  curand_init(1234, id, 0, &rstates[id]);
+}
 
 __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, 
-                          float *ts, int nts, float *lr, int nlr, float eps, int doupdate) {
+                          float *ts, int nts, float *lr, int nlr, float langevin, float eps, int doupdate, curandState *rstates) {
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;
-  float mmval, umval, sqval, newss, veval, tsval, lrval, denom;
+  float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad;
   float sqnw = sqrtf(nw);
   float sq1mnw = sqrtf(1-nw);
+  curandState *prstate = &rstates[ithread];
   for (i = ithread; i < nrows*ncols; i += nthreads) {
     icol = i / nrows;
     irow = i - icol * nrows;
@@ -395,8 +401,10 @@ __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
       denom = (veval == 0.5f) ? newss : powf(newss, veval*2);
-      denom = denom * tsval + eps;
-      mmval += (umval / denom) * lrval;
+      denom = denom + eps;
+      grad = (umval / denom);
+      if (langevin > 0) grad += curand_normal(prstate) * langevin;
+      mmval += grad * lrval * tsval;
       if (maskr > 0) {
         if (maskr > 1) {
           mmval *= mask[i]; 
@@ -412,13 +420,14 @@ __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq
 // ADAGRAD with standard momentum
 
 __global__ void __ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr,
-			   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float eps, int doupdate) {
+			   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float langevin, float eps, int doupdate, curandState *rstates) {
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;
   float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad;
   float sqnw = sqrtf(nw);
   float sq1mnw = sqrtf(1-nw);
+  curandState *prstate = &rstates[ithread];
   for (i = ithread; i < nrows*ncols; i += nthreads) {
     icol = i / nrows;
     irow = i - icol * nrows;
@@ -433,8 +442,10 @@ __global__ void __ADAGradm(int nrows, int ncols, float *mm, float *um, float *ss
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
       denom = (veval == 0.5f) ? newss : powf(newss, veval*2);
-      denom = denom * tsval + eps;
-      grad = (umval / denom) * lrval;            // Normal gradient
+      denom = denom + eps;
+      grad = (umval / denom);
+      if (langevin > 0) grad += curand_normal(prstate) * langevin;
+      grad = grad * lrval * tsval;               // Normal gradient
       grad += momentum[i];                       // With momentum
       momentum[i] = mu * grad;                   // Save updated momentum
       mmval += grad;                             // Add the new gradient
@@ -453,13 +464,14 @@ __global__ void __ADAGradm(int nrows, int ncols, float *mm, float *um, float *ss
 // ADAGRAD with Nesterov momentum
 
 __global__ void __ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr,
-			   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float eps, int doupdate) {
+			   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float langevin, float eps, int doupdate, curandState *rstates) {
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;
   float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad, oldmom, newmom;
   float sqnw = sqrtf(nw);
   float sq1mnw = sqrtf(1-nw);
+  curandState *prstate = &rstates[ithread];
   for (i = ithread; i < nrows*ncols; i += nthreads) {
     icol = i / nrows;
     irow = i - icol * nrows;
@@ -474,8 +486,10 @@ __global__ void __ADAGradn(int nrows, int ncols, float *mm, float *um, float *ss
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
       denom = (veval == 0.5f) ? newss : powf(newss, veval*2);
-      denom = denom * tsval + eps;
-      grad = (umval / denom) * lrval;            // Normal gradient
+      denom = denom + eps;
+      grad = (umval / denom);
+      if (langevin > 0) grad += curand_normal(prstate) * langevin;
+      grad = grad * lrval * tsval;               // Normal gradient
       oldmom = momentum[i];                      // Momentum
       grad += oldmom;                            // New gradient
       newmom = mu * grad;                        // Compute new momentum
@@ -494,34 +508,91 @@ __global__ void __ADAGradn(int nrows, int ncols, float *mm, float *um, float *ss
 }
 
 int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
-	    float *lrate, int nlrate, float eps, int doupdate) {
+	    float *lrate, int nlrate, float langevin, float eps, int doupdate) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
-  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  int basesize;
+  if (langevin > 0) {
+    basesize = max(32, nrows * ncols / 32);
+  } else {
+    basesize = max(32, nrows * ncols);
+  }
+  setsizes(basesize, &griddims, &nthreads);
+  int ntt = nthreads * griddims.x * griddims.y;
+  curandState *rstates = NULL;
+  if (langevin > 0) {
+    cudaError_t err = cudaMalloc(( void **)& rstates , ntt * sizeof(curandState));
+    if (err > 0) {
+      fprintf(stderr, "Error in cudaMalloc %d", err);
+      return err;
+    }
+    cudaDeviceSynchronize();
+    __nrandinit<<<griddims,nthreads>>>(rstates); 
+    cudaDeviceSynchronize();
+  }
+  __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, langevin, eps, doupdate, rstates);
   cudaDeviceSynchronize();
+  if (langevin > 0)   cudaFree(rstates);
   cudaError_t err = cudaGetLastError();
   return err;
 }
 
 int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
-	    float *lrate, int nlrate, float eps, int doupdate) {
+	    float *lrate, int nlrate, float langevin, float eps, int doupdate) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
-  __ADAGradm<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  int basesize;
+  if (langevin > 0) {
+    basesize = max(32, nrows * ncols / 32);
+  } else {
+    basesize = max(32, nrows * ncols);
+  }
+  setsizes(basesize, &griddims, &nthreads);
+  int ntt = nthreads * griddims.x * griddims.y;
+  curandState *rstates = NULL;
+  if (langevin > 0) {
+    cudaError_t err = cudaMalloc(( void **)& rstates , ntt * sizeof(curandState));
+    if (err > 0) {
+      fprintf(stderr, "Error in cudaMalloc %d", err);
+      return err;
+    }
+    cudaDeviceSynchronize();
+    __nrandinit<<<griddims,nthreads>>>(rstates); 
+    cudaDeviceSynchronize();
+  }
+  __ADAGradm<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, langevin, eps, doupdate, rstates);
   cudaDeviceSynchronize();
+  if (langevin > 0)   cudaFree(rstates);
   cudaError_t err = cudaGetLastError();
   return err;
 }
 
 int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr, float nw, float *ve, int nve, float *ts, int nts,
-	    float *lrate, int nlrate, float eps, int doupdate) {
+	    float *lrate, int nlrate, float langevin, float eps, int doupdate) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
-  __ADAGradn<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, eps, doupdate);
+  int basesize;
+  if (langevin > 0) {
+    basesize = max(32, nrows * ncols / 32);
+  } else {
+    basesize = max(32, nrows * ncols);
+  }
+  setsizes(basesize, &griddims, &nthreads);
+  int ntt = nthreads * griddims.x * griddims.y;
+  curandState *rstates = NULL;
+  if (langevin > 0) {
+    cudaError_t err = cudaMalloc(( void **)& rstates , ntt * sizeof(curandState));
+    if (err > 0) {
+      fprintf(stderr, "Error in cudaMalloc %d", err);
+      return err;
+    }
+    cudaDeviceSynchronize();
+    __nrandinit<<<griddims,nthreads>>>(rstates); 
+    cudaDeviceSynchronize();
+  }
+  __ADAGradn<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, langevin, eps, doupdate, rstates);
   cudaDeviceSynchronize();
+  if (langevin > 0)   cudaFree(rstates);
   cudaError_t err = cudaGetLastError();
   return err;
 }

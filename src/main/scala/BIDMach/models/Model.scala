@@ -138,7 +138,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   def dobatch(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
   
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat                                        // Scores (log likelihoods)
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat                                // Scores (log likelihoods)
   
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
     if (useGPU) copyMats(amats, gmats)            		
@@ -260,4 +260,5 @@ object Model {
   }
 	
 	class Options extends Opts {} 
+  
 }
