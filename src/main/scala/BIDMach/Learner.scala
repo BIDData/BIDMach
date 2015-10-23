@@ -93,7 +93,7 @@ case class Learner(
         } else {
         	model.dobatchg(mats, ipass, here)
         	if (mixins != null) mixins map (_ compute(mats, here))
-        	if (updater != null) updater.update(ipass, here)
+        	if (updater != null) updater.update(ipass, here, gprogress)
         }  
         if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
         istep += 1
@@ -283,6 +283,8 @@ case class ParLearner(
     var istep = 0
     var lastp = 0f
     var running = true
+    var progress = 0f;
+    var gprogress = 0f;
 
     for (ithread <- 0 until opts.nthreads) {
     	Future {
@@ -297,7 +299,7 @@ case class ParLearner(
     				} else {
     					models(ithread).dobatchg(cmats(ithread), ipass, here)
     					if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here))
-    					if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here)
+    					if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress)
     				}
     			} catch {
     			case e:Exception => {
@@ -323,6 +325,8 @@ case class ParLearner(
     		for (ithread <- 0 until opts.nthreads) {
     			if (datasource.hasNext) {
     				val mats = datasource.next
+            progress = datasource.progress
+            gprogress = (ipass + progress)/opts.npasses
     				for (j <- 0 until mats.length) {
     				  cmats(ithread)(j) = safeCopy(mats(j), ithread) 
     				}
@@ -492,6 +496,7 @@ case class ParLearnerx(
 	  val samplist = new ListBuffer[Float]    	  	
 	  var lastp = 0f
 	  var lasti = 0
+    var gprogress = 0f
 	  done.clear
 	  for (ithread <- 0 until opts.nthreads) {
 	  	Future {
@@ -504,6 +509,7 @@ case class ParLearnerx(
 	  				val mats = datasources(ithread).next
 	  				here += datasources(ithread).opts.batchSize
 	  				bytes += mats.map(Learner.numBytes _).reduce(_+_);
+            gprogress = (dsProgress + ipass)/opts.npasses
 	  				models(0).synchronized {
 	  					istep += 1
 	  					istep0 += 1
@@ -517,7 +523,7 @@ case class ParLearnerx(
 	  						models(ithread).synchronized {
 	  							models(ithread).dobatchg(mats, ipass, here)
 	  							if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(mats, here))
-	  							updaters(ithread).update(ipass, here)
+	  							updaters(ithread).update(ipass, here, gprogress)
 	  						}
 	  					}
 	  				} catch {

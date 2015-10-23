@@ -25,7 +25,7 @@ class CG(override val opts:CG.Opts = new CG.Options) extends Updater(opts) {
 	  lastStep = -1
   }
 	
-	def update(ipass:Int, step:Long) = {
+	override def update(ipass:Int, step:Long) = {
 	  val updatemats = model.updatemats
 	  if (ipass < opts.spasses) {
 	    mm <-- updatemats(0)

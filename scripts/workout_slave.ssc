@@ -79,6 +79,7 @@ opts5.regumean = 0.1f;
 opts5.uiter = 8
 opts5.npasses=5
 opts5.batchSize = 1000
+opts5.langevin = 3f
 
 mm5.train
 
