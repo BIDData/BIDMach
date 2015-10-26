@@ -1,0 +1,123 @@
+:silent
+
+ /**
+  * LSTM preparation script. 
+  * 
+  * This scripts process a collection of sentences in SMat format, and produces SMat outputs for src and dst sentences. 
+  *
+  * The input is assumed to be in the form:
+  *  
+  *  w00  w01 
+  * 
+  * Currently only the following sentence is included as context. 
+  */
+
+val fromdir = "/data01/livejournal/sentences/";                // Directory with input sentences
+val todir = "/data01/livejournal/srcdst/";                     // Directory for output sentences
+val cs0 = CSMat(loadSBMat(fromdir + "masterDict.sbmat"));      // Dictionary - optional - but useful for debugging
+val dict = Dict(csrow(" ") on cs0);
+val padsym = 1;                                                // Padding symbol
+val maxlen = 40;                                               // Maximum sentence length, truncate longer sentences
+val minlen = 2;                                                // Minimum sentence length, discard shorter sentences
+val revsrc = true;                                             // Reverse the src sentences
+val revdst = false;                                            // Reverse the dst sentences
+val bsize = 128;                                               // Batch size
+var ifile = 110;
+
+while (ifile < 1132) {
+
+    try {
+
+	val sents0 = loadSMat(fromdir+"data%d_sent.smat.lz4" format ifile);
+	val lens0 = int(sum(sents0 != 0));                         // Get sentence lengths
+
+	val iig = find(lens0 >= minlen);                           // Check min length threshold and trim if needed
+	val sents = sents0(?,iig);
+	val lens = lens0(0, iig);
+
+	val nsents = sents.ncols;
+	val npairs = nsents-1;
+	val lens2 = lens(0, 0->(nsents-1)) on lens(0, 1->nsents);  // Stack the sentence lengths for consecutive sentences
+
+	val (ss, ii) = sortrows(lens2.t);                          // lex sort the length pairs and get permutation indices in ii
+
+	val nbatches = npairs / bsize;
+	val nsents2 = bsize * (npairs / bsize);                    // Round length to a multiple of batch size
+	val ii2 = ii((npairs - nsents2)->npairs);                  // Drop the shortest sentences, giving a multiple of batch size.
+	val i2d = ii2.view(bsize, nbatches);                       // Put inds in a 2d matrix, with columns which are minibatches
+
+	val ip = randperm(nbatches);
+	val j2d = i2d(?,ip);                                       // Randomly permute the minibatches
+
+	val srclens = lens(j2d);                                   // Src sentence lengths arranged by minibatch
+	val srcmaxlen = maxi(srclens);                             // Max length in each minibatch - others get padded to this
+	val srcnnz = sum(srcmaxlen).v*bsize;                       // number of non-zeros in src matrix
+
+	val dstlens = lens(j2d+1);                                 // Dst sentence lengths arranged by minibatch
+	val dstmaxlen = maxi(dstlens);                             // Max length in each minibatch - others get padded to this
+	val dstnnz = sum(dstmaxlen).v*bsize;                       // number of non-zeros in dst matrix
+
+	var ibatch = 0;
+	val isrc = izeros(srcnnz, 1);                              // row, col, val matrices for the final src SMat
+	val jsrc = izeros(srcnnz, 1);
+	val vsrc = zeros(srcnnz, 1);
+	var psrc = 0;
+
+	val idst = izeros(dstnnz, 1);
+	val jdst = izeros(dstnnz, 1);
+	val vdst = zeros(dstnnz, 1);
+	var pdst = 0;
+
+	while (ibatch < nbatches) {
+	    val srci = j2d(?,ibatch);                              // src sentence indices for this minibatch
+	    val srcn0 = srcmaxlen(ibatch);                         // max length for this minibatch
+	    val srcn = math.min(srcn0, maxlen);
+	    val srcblk = full(sents(0->srcn,srci));                // the actual src block for this minibatch, as a dense matrix
+	    val srcz = (srcblk == 0);                              // missing vals
+	    srcblk ~ srcblk + (srcz * padsym);                     // add padsym in missing vals
+	    if (revsrc) {                                          // Reverse the src sentences
+		val revinds = icol((srcn-1) to 0 by -1);
+		srcblk <-- srcblk(revinds,?);
+	    }
+	    val (ii, jj, vv) = find3(srcblk);                      // back to sparse indices
+	    val ilen = ii.length;
+	    isrc(psrc->(psrc+ilen),0) = ii;                        // Add the src data to the global buffers
+	    jsrc(psrc->(psrc+ilen),0) = jj + ibatch*bsize;         // Offset the column indices appropriately
+	    vsrc(psrc->(psrc+ilen),0) = vv;
+	    psrc += ilen;
+
+	    val dsti = srci + 1;                                   // dst sentence indices for this minibatch
+	    val dstn0 = dstmaxlen(ibatch);                         // max length for this minibatch
+	    val dstn = math.min(dstn0, maxlen);
+	    val dstblk = full(sents(0->dstn,dsti));                // the actual dst block for this minibatch, as a dense matrix
+	    val dstz = (dstblk == 0);                              // missing vals
+	    dstblk ~ dstblk + (dstz * padsym);                     // add padsym for missing vals
+	    if (revdst) {                                          // Reverse the dst sentences
+		val revinds = icol((dstn-1) to 0 by -1);
+		dstblk <-- dstblk(revinds,?);
+	    }
+	    val (ii2, jj2, vv2) = find3(dstblk);                   // back to sparse indices
+	    val ilen2 = ii2.length;
+	    idst(pdst->(pdst+ilen2),0) = ii2;                      // Add the dst data to the global buffers
+	    jdst(pdst->(pdst+ilen2),0) = jj2 + ibatch*bsize;       // Offset the column indices appropriately
+	    vdst(pdst->(pdst+ilen2),0) = vv2;
+	    pdst += ilen2;
+
+	    ibatch += 1;
+	}
+	val srcmat = sparse(isrc, jsrc, vsrc, maxlen, nsents2);
+	val dstmat = sparse(idst, jdst, vdst, maxlen, nsents2);
+    
+	saveSMat(todir + "src%04d.smat.lz4" format (ifile-1), srcmat);
+	saveSMat(todir + "dst%04d.smat.lz4" format (ifile-1), dstmat);
+	saveIMat(todir + "inds%04d.imat.lz4" format (ifile-1), iig(j2d(?),0).t);	      
+    }
+    catch {
+    case _: Exception => {println("problem with file %d" format ifile)}
+    case _: Throwable => {println("problem with file %d" format ifile)}
+    }
+    print(".");
+    ifile += 1;
+}
+println();
+:silent
