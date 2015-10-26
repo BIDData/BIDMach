@@ -3,41 +3,77 @@
  /**
   * LSTM preparation script. 
   * 
-  * This scripts process a collection of sentences in SMat format, and produces SMat outputs for src and dst sentences. 
+  * This script processes a collection of sentences in SMat format, and produces SMat outputs of length-collated sentences
+  * for LSTM training. 
   *
-  * The input is assumed to be in the form:
+  * The input is assumed to be a sparse matrix in the form:
   *  
-  *  w00  w01 
+  *  w00  w01  w02 ...
+  *  w10  w11  w12 ...
+  *  w20       w22 ...
+  *  w30           
   * 
-  * Currently only the following sentence is included as context. 
+  * where wij is the dictionary index of the i'th word in the j'th sentence. 
+  * i.e. consecutives words in the same sentence lie in consecutive rows of a column, and a k-word sentence lies in the
+  * first k rows of a column. 
+  *
+  * We also assume there is an IMat with a row of the form:
+  *
+  *  p0    p1    p2 ...
+  * 
+  * where pi is the paragraph number for sentence i. Its the third row for this particular dataset. Change for yours. Context
+  * sentences are limited to the same paragraph.
+  *
+  * The output is in the same form, but split into "src" and "dst" sentences, and collated by lengths.
+  * The src sentences are used on the left side of a sequence-to-sequence LSTM and the dst sentences are used on the right side.
+  * Each output minibatch contains sentences of exactly the same length. A padding symbol is added to make this possible. 
+  *
+  * So the output looks like this: 
+  *
+  *  w00  w01  w02 ...
+  *  w10  w11  w12 ...
+  *  w20  w21  w22 ...
+  *  w30P w31P w32 ...
+  *
+  * where words with a P suffix are padding symbols. 
+  *
+  * The minibatches are randomly permuted after collation to avoid training bias.
+  *         
+  * LIMITATIONS:
+  *
+  *   Currently only the following sentence is included as context. 
+  *
+  *   Since float values are used to hold word ids, the maximum dictionary size is 16M. Use SDMat if this is a problem. 
   */
 
 val fromdir = "/data01/livejournal/sentences/";                // Directory with input sentences
 val todir = "/data01/livejournal/srcdst/";                     // Directory for output sentences
 val cs0 = CSMat(loadSBMat(fromdir + "masterDict.sbmat"));      // Dictionary - optional - but useful for debugging
-val dict = Dict(csrow(" ") on cs0);
+val dict = Dict(csrow(" ") on cs0);                            // This dataset has one-based word ids, so we offset the dict.
 val padsym = 1;                                                // Padding symbol
 val maxlen = 40;                                               // Maximum sentence length, truncate longer sentences
 val minlen = 2;                                                // Minimum sentence length, discard shorter sentences
 val revsrc = true;                                             // Reverse the src sentences
 val revdst = false;                                            // Reverse the dst sentences
 val bsize = 128;                                               // Batch size
-var ifile = 110;
+var ifile = 1;
 
 while (ifile < 1132) {
 
     try {
 
 	val sents0 = loadSMat(fromdir+"data%d_sent.smat.lz4" format ifile);
+	val data0 = loadIMat(fromdir+"data%d.imat" format ifile);
 	val lens0 = int(sum(sents0 != 0));                         // Get sentence lengths
 
-	val iig = find(lens0 >= minlen);                           // Check min length threshold and trim if needed
+	val samepost = (data0(2,?) == (data0(2,1->data0.ncols) \ -1)); // 1 when next sentence from same post
+	val iig = find((lens0 >= minlen) *@ samepost);             // Check min length threshold and trim if needed
 	val sents = sents0(?,iig);
 	val lens = lens0(0, iig);
 
 	val nsents = sents.ncols;
 	val npairs = nsents-1;
-	val lens2 = lens(0, 0->(nsents-1)) on lens(0, 1->nsents);  // Stack the sentence lengths for consecutive sentences
+	val lens2 = lens(0, 0->(nsents-1)) on lens(0, 1->nsents);  // Stack the length vectors for this sentence and next sentence
 
 	val (ss, ii) = sortrows(lens2.t);                          // lex sort the length pairs and get permutation indices in ii
 
@@ -63,7 +99,7 @@ while (ifile < 1132) {
 	val vsrc = zeros(srcnnz, 1);
 	var psrc = 0;
 
-	val idst = izeros(dstnnz, 1);
+	val idst = izeros(dstnnz, 1);                              // row, col, val matrices for the final dst SMat
 	val jdst = izeros(dstnnz, 1);
 	val vdst = zeros(dstnnz, 1);
 	var pdst = 0;
