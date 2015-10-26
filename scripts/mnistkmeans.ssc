@@ -24,12 +24,12 @@ def learn(fnames:String, d:Int = 256):(Learner, SFDSopts) = _learn(List(FilesDS.
 
 val dir = "../data/MNIST8M/parts/";
 
-val (nn, opts) = learn(dir+"alls%02d.fmat.lz4", 1024);
+val (nn, opts) = learn(dir+"alls%02d.fmat.lz4", 4096);
 
 opts.nend = 70;
 
 opts.batchSize = 20000;
-opts.npasses = 3;
+opts.npasses = 20;
 
 
 

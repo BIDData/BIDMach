@@ -1,5 +1,5 @@
 :silent
-val dir="c:/code/BIDMach/data/rcv1/"
+val dir="../data/rcv1/"
 
 val a0 = loadSMat(dir + "docs.smat.lz4")(0->100000,?)
 val c0 = loadFMat(dir + "cats.fmat.lz4")(0->100,?)
@@ -25,7 +25,7 @@ opts.lrate = 0.4f // best for 6-layer
 opts.lrate = 0.2f 
 opts.texp = 0.4f
 opts.nweight = 1e-4f
-
+opts.useGPU = false
 DNN.dlayers4(7,500,0.5f,100,opts,2)
 
 nn.train
