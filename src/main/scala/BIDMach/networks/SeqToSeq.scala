@@ -18,6 +18,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var OOVelem:Mat = null;
   var leftedge:Layer = null;
   var leftStart:Mat = null;
+  var dstxMat:Mat = null;
   var height = 0;
   var fullheight = 0;
   var inwidth = 0;
@@ -124,7 +125,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     mapOOV(srcdata);
     mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
-    val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
+    dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     srcn = math.min(srcn, opts.inwidth);
     if (srcn < inwidth) initPrevCol;
     for (i <- 0 until srcn) {
