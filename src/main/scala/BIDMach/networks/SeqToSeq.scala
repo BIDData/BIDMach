@@ -19,6 +19,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var leftedge:Layer = null;
   var leftStart:Mat = null;
   var dstxdata:Mat = null;
+  var dstxdata0:Mat = null;
   var height = 0;
   var fullheight = 0;
   var inwidth = 0;
@@ -116,7 +117,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstxn0 = dstx.nnz/dstx.ncols;
     if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
-    val dstxdata0 = int(dstx.contents.view(dstxn, batchSize).t);
+    dstxdata0 = int(dstx.contents.view(dstxn, batchSize).t);
     dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
     if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
       leftStart = convertMat(izeros(dstx.ncols,1));
