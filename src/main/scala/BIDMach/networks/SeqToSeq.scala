@@ -138,7 +138,6 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     dstxn = math.min(dstxn, opts.outwidth);
     for (i <- 0 until dstxn) {
       val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
-      println("col %d, %d %d" format (i, cols.nrows, cols.ncols))
       getlayer(0, inwidth + i).output = cols;
     }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
