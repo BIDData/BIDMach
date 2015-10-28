@@ -114,15 +114,17 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstx = gmats(1);
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
+    val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows.
+    
     val dstxn0 = dstx.nnz/dstx.ncols;
-    if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length");
-    val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
+    if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length"); 
     val dstxdata0 = int(dstx.contents.view(dstxn0, batchSize).t);
     var dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
     if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
       leftStart = convertMat(izeros(dstx.ncols,1));
     }
     val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
+    
     mapOOV(srcdata);
     mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
@@ -161,7 +163,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (dstyn*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn, batchSize).t);
     mapOOV(dstydata);
-    val doShift = !(gmats.length > 2);
+    val doShift = !(gmats.length > 2) && opts.addStart;
     val dstylim = math.min(opts.outwidth, if (doShift) dstyn-1 else dstyn);
     for (j <- 0 until dstylim) {
     	val incol = if (doShift) dstydata.colslice(j+1,j+2).t else dstydata.colslice(j,j+1).t ;
