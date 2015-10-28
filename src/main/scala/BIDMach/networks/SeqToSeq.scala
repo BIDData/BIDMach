@@ -119,7 +119,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstxn0 = dstx.nnz/dstx.ncols;
     if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length"); 
     val dstxdata0 = int(dstx.contents.view(dstxn0, batchSize).t);
-    var dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
+    dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
     if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
       leftStart = convertMat(izeros(batchSize, 1));
     }
