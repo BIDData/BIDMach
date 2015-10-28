@@ -111,10 +111,12 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstx = gmats(1);
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
-    dstxn = dstx.nnz/dstx.ncols;
-    if (dstxn*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length");
+    val dstxn0 = dstx.nnz/dstx.ncols;
+    if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
-    val dstxdata = int(dstx.contents.view(dstxn, batchSize).t);
+    val dstxdata0 = int(dstx.contents.view(dstxn, batchSize).t);
+    dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
+    val dstxdata = if (opts.addStart) ((iones(dstx.ncols, 1)*opts.STARTsym) \ dstxdata0) else dstxdata0;
     mapOOV(srcdata);
     mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
@@ -250,6 +252,8 @@ object SeqToSeq {
     var netType = 0;     // Network type, 0 = softmax output, 1 = Neg Sampling output
     var PADsym = 1;      // Padding symbol
     var OOVsym = 2;      // OOV symbol
+    var STARTsym = 1;    // Start symbol
+    var addStart = true; // Add the start symbol to dst sentences
     var scoreType = 0;   // Score type, 0 = LL, 1 = accuracy, 2 = LL of full Softmax, 3 = accuracy of full Softmax
     var nsamps = 100;    // Number of negative samples
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
