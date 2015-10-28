@@ -121,7 +121,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstxdata0 = int(dstx.contents.view(dstxn0, batchSize).t);
     var dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
     if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
-      leftStart = convertMat(izeros(dstx.ncols,1));
+      leftStart = convertMat(izeros(batchSize, 1));
     }
     val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
     
@@ -138,6 +138,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     dstxn = math.min(dstxn, opts.outwidth);
     for (i <- 0 until dstxn) {
       val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
+      println("col %d, %d %d" format (i, cols.nrows, cols.ncols))
       getlayer(0, inwidth + i).output = cols;
     }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
