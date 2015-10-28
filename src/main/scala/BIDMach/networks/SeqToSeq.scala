@@ -17,6 +17,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var PADrow:Mat = null;
   var OOVelem:Mat = null;
   var leftedge:Layer = null;
+  var leftStart:Mat = null;
   var height = 0;
   var fullheight = 0;
   var inwidth = 0;
@@ -116,7 +117,10 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
     val dstxdata0 = int(dstx.contents.view(dstxn, batchSize).t);
     dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
-    val dstxdata = if (opts.addStart) ((iones(dstx.ncols, 1)*opts.STARTsym) \ dstxdata0) else dstxdata0;
+    if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
+      leftStart = convertMat(izeros(dstx.ncols,1));
+    }
+    val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
     mapOOV(srcdata);
     mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
