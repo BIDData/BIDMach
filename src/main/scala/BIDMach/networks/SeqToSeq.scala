@@ -171,8 +171,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       PADrow = convertMat(iones(1, batchSize) * opts.PADsym);
     }
     dstyn = math.min(dstyn0 + (if (opts.addStart) 1 else 0), opts.outwidth);
-    if (opts.addStart && dstyn < opts.outwidth) {
-    	output_layers(dstyn).target = PADrow;
+    if (opts.addStart && dstyn0 < opts.outwidth) {
+    	output_layers(dstyn0).target = PADrow;
     }
   }
   
