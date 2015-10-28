@@ -159,21 +159,20 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
 	  val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
-	  dstyn = dsty.nnz/dsty.ncols;
-    if (dstyn*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
+	  val dstyn0 = dsty.nnz/dsty.ncols;
+    if (dstyn0*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn, batchSize).t);
     mapOOV(dstydata);
-    val doShift = !(gmats.length > 2) && opts.addStart;
-    val dstylim = math.min(opts.outwidth, if (doShift) dstyn-1 else dstyn);
-    for (j <- 0 until dstylim) {
-    	val incol = if (doShift) dstydata.colslice(j+1,j+2).t else dstydata.colslice(j,j+1).t ;
+    dstyn = math.min(dstyn0, opts.outwidth);
+    for (j <- 0 until dstyn) {
+    	val incol = dstydata.colslice(j,j+1).t ;
     	output_layers(j).target = incol;
     }
     if (PADrow.asInstanceOf[AnyRef] == null) {
       PADrow = convertMat(iones(1, batchSize) * opts.PADsym);
     }
-    if (doShift) {
-    	output_layers(dstylim).target = PADrow;
+    if (opts.addStart && dstyn < opts.outwidth) {
+    	output_layers(dstyn).target = PADrow;
     }
   }
   
