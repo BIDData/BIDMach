@@ -18,7 +18,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var OOVelem:Mat = null;
   var leftedge:Layer = null;
   var leftStart:Mat = null;
-  var dstxmat:Mat = null;
+  var dstxdata:Mat = null;
   var height = 0;
   var fullheight = 0;
   var inwidth = 0;
@@ -121,11 +121,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
       leftStart = convertMat(izeros(dstx.ncols,1));
     }
-    val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
+    dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
     mapOOV(srcdata);
     mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
-    dstxmat = oneHot(dstxdata.contents, opts.nvocab);
+    val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     srcn = math.min(srcn, opts.inwidth);
     if (srcn < inwidth) initPrevCol;
     for (i <- 0 until srcn) {
