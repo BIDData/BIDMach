@@ -39,6 +39,7 @@ class BayesNet(val dag:Mat,
   var useGPUnow:Boolean = false             // Checks (during initialization only) if we're using GPUs or not.
   var batchSize:Int = -1                    // Holds the batchSize, which we use for some colorInfo matrices.
   var counts:Mat = null                     // For accumulating counts during the process of uupdate.
+  var counts2:Mat = null                    // A second, auxiliary matrix during process of computing new cpt.
   var dirichletPrior:Mat = null             // The prior we use to smooth the distribution.
   var dirichletScale:Mat = null             // The scale we use as part of the prior (typically all 1s).
   var onesSAMEvector:Mat = null             // This the (g)iones(opts.copiesForSAME,1), for certain special uses.
@@ -93,6 +94,7 @@ class BayesNet(val dag:Mat,
 
     // Finally, create/convert a few matrices, reset some variables, and add some debugging info
     counts = mm.zeros(mm.length, 1)
+    counts2 = mm.zeros(mm.length, 1)
     dirichletPrior = mm.ones(mm.length, 1)
     dirichletScale = mm.ones(mm.length, 1)
     statesPerNode = convertMat(statesPerNode) 
@@ -102,8 +104,7 @@ class BayesNet(val dag:Mat,
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
     //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
-    mm <-- ( mm / (mm.t * normConstMatrix).t ) // Normalize the cpt before each sampling!
-    computeNormDifference(ipass,here) // For testing convergence to the true distribution
+    //computeNormDifference(ipass,here) // For testing convergence to the true distribution
     //computeKLDivergence(ipass,here) // Another way of testing convergence (and the better one, BTW).
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
@@ -201,7 +202,8 @@ class BayesNet(val dag:Mat,
     val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
     val linearIndices = index(?)
     counts <-- float(accum(linearIndices, 1, counts.length, 1))
-    genericGammaRand(counts + dirichletPrior, dirichletScale, updatemats(0))
+    genericGammaRand(counts + dirichletPrior, dirichletScale, counts2)
+    updatemats(0) <-- (counts2 / (counts2.t * normConstMatrix).t) 
   }
  
   /**
@@ -213,8 +215,7 @@ class BayesNet(val dag:Mat,
    */
   def evalfun(sdata:Mat, user:Mat):FMat = {  
     val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
-    val cptNormalized = mm / (mm.t * normConstMatrix).t
-    val result = FMat( sum(sum(ln(cptNormalized(index)),1),2) ) / user.ncols
+    val result = FMat( sum(sum(ln(mm(index)),1),2) ) / (user.ncols * opts.copiesForSAME)
     return result
   }
   
@@ -621,7 +622,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var copiesForSAME = 2
+    var copiesForSAME = 10
     var samplingRate = 1
     var numSamplesBurn = 0
   }
