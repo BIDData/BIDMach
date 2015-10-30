@@ -163,16 +163,17 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (dstyn0*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn0, batchSize).t);
     mapOOV(dstydata);
-    for (j <- 0 until math.min(dstyn0, opts.outwidth)) {
-    	val incol = dstydata.colslice(j,j+1).t ;
+    val dstyn1 = math.min(dstyn0 - (if (opts.addStart) 0 else 1), opts.outwidth);
+    for (j <- 0 until dstyn1) {
+    	val incol = if (opts.addStart) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t
     	output_layers(j).target = incol;
     }
     if (PADrow.asInstanceOf[AnyRef] == null) {
       PADrow = convertMat(iones(1, batchSize) * opts.PADsym);
     }
-    dstyn = math.min(dstyn0 + (if (opts.addStart) 1 else 0), opts.outwidth);
-    if (opts.addStart && dstyn0 < opts.outwidth) {
-    	output_layers(dstyn0).target = PADrow;
+    dstyn = math.min(dstyn1 + 1, opts.outwidth);
+    if (dstyn1 < opts.outwidth) {
+    	output_layers(dstyn1).target = PADrow;
     }
   }
   
