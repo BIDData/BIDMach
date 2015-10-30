@@ -309,15 +309,15 @@ object SeqToSeq {
   
   class FDSopts extends Learner.Options with SeqToSeq.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
-  def learner(fn1:String, fn2:String, regularize:Boolean):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), regularize);
+  def learner(fn1:String, fn2:String, regularize:Boolean):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), regularize, true);
   
-   def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), false);
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), false, true);
   
   def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)));
   
-  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = learner(fnames, false);
+  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = learner(fnames, false, true);
   
-  def learner(fnames:List[(Int)=>String], regularize:Boolean):(Learner, FDSopts) = {   
+  def learner(fnames:List[(Int)=>String], regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = {   
     val opts = new FDSopts;
     opts.fnames = fnames
     opts.batchSize = 128;
@@ -328,11 +328,10 @@ object SeqToSeq {
   			ds, 
   	    new SeqToSeq(opts), 
   	    if (regularize) Array(new L1Regularizer(opts)) else null,
-  	    new ADAGrad(opts), 
+  	    if (adagrad) new ADAGrad(opts) else new Grad(opts), 
   	    opts)
     (nn, opts)
-  } 
-  
+  }  
   
   def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts;
