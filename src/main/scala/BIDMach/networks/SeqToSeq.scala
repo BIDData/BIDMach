@@ -309,7 +309,7 @@ object SeqToSeq {
   
   class FDSopts extends Learner.Options with SeqToSeq.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
-  def learner(fn1:String, fn2:String, regularize:Boolean):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), regularize, true);
+  def learner(fn1:String, fn2:String, regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), regularize, adagrad);
   
   def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), false, true);
   
