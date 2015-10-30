@@ -9,7 +9,7 @@
 
 // This is the data I am using following Daphne's example DAG. For now use files named 
 // "data_student_{K}perc{_smat}.lz4" where K is a percent and sometimes we have smats.
-val dat = loadFMat("data/bayesnet_student_data/data_student_10perc.lz4")
+val dat = loadFMat("data/bayesnet_student_data/data_student_50perc.lz4")
 val dag = loadSMat("data/bayesnet_student_data/dagStudent.lz4")
 val states = loadIMat("data/bayesnet_student_data/statesStudent.lz4")
 
