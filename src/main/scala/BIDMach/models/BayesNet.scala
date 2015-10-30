@@ -16,11 +16,13 @@ import scala.collection.mutable._
  * 
  * Haoyu Chen and Daniel Seita are building off of Huasha Zhao's original code.
  * 
- * The input needs to be (1) a graph, (2) a sparse data matrix, and (3) a states-per-node file.
+ * The input needs to be (1) a graph, (2) a sparse data matrix, (3) a matrix of equivalence classes
+ * (optional, can set to null if needed), and (4) a states-per-node file.
  * Make sure the dag and states files are aligned, and that variables are in a topological ordering!
  */
 class BayesNet(val dag:Mat, 
                val states:Mat, 
+               val equivClasses:Mat,
                override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
   var mm:Mat = null                         // Copy of the cpt, but be careful of aliasing. We keep this normalized.
@@ -43,6 +45,7 @@ class BayesNet(val dag:Mat,
   var dirichletPrior:Mat = null             // The prior we use to smooth the distribution.
   var dirichletScale:Mat = null             // The scale we use as part of the prior (typically all 1s).
   var onesSAMEvector:Mat = null             // This the (g)iones(opts.copiesForSAME,1), for certain special uses.
+  var equivClassCountMap:Mat = null         // Used to combine counts from same equiv. classes so they get pooled together.
 
   /**
    * Performs a series of initialization steps.
@@ -75,6 +78,12 @@ class BayesNet(val dag:Mat,
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
     val cpt = convertMat(rand(lengthCPT,1))
     
+    // New! If we have equivalence classes, form equiv matrix and use it on the initialized cpt.
+    if (equivClasses != null) {
+      equivClassCountMap = createEquivClassMatrix(numSlotsInCpt, cptOffset, lengthCPT)
+      cpt <-- (cpt.t * equivClassCountMap).t // This makes the random values approach 0.5 w/more variables.
+    }
+    
     // To finish building CPT, we normalize it based on the batch size and normalizing constant matrix.
     normConstMatrix = getNormConstMatrix(lengthCPT)
     cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
@@ -103,7 +112,7 @@ class BayesNet(val dag:Mat,
    
   /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
+    debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
     //computeNormDifference(ipass,here) // For testing convergence to the true distribution
     //computeKLDivergence(ipass,here) // Another way of testing convergence (and the better one, BTW).
     uupdate(gmats(0), gmats(1), ipass)
@@ -203,6 +212,9 @@ class BayesNet(val dag:Mat,
     val linearIndices = index(?)
     counts <-- float(accum(linearIndices, 1, counts.length, 1))
     genericGammaRand(counts + dirichletPrior, dirichletScale, counts2)
+    if (equivClasses != null) {
+      counts2 <-- (counts2.t * equivClassCountMap).t
+    }
     updatemats(0) <-- (counts2 / (counts2.t * normConstMatrix).t) 
   }
  
@@ -483,6 +495,43 @@ class BayesNet(val dag:Mat,
     if (useGPUnow) return GSMat(res) else return res         
   }
   
+  /** 
+   * Creates the sparse, blocked matrix with lots of identities, that can map values in the same
+   * equivalence classes together in the appropriate slots (before normalization). We should be able
+   * to do: eClassMatrix * cpt to get them to combine appropriately, but due to sparse * dense problems,
+   * we actually do (cpt.t * eClassMatrix).t. Note that our matrix here is guaranteed symmetric.
+   * Also, we're going to assume that variables are only part of ONE cpt, for now. Let's be nice to myself.
+   * This is pretty inefficient, but hey, we only do this once ...
+   * 
+   * @param numSlots A vector where numSlots(i) = number of total CPT slots w.r.t. variable i.
+   * @param cptOffset The usual stuff
+   * @param n The length of the cpt
+   */ 
+  def createEquivClassMatrix(numSlots:Mat, cptOffset:Mat, n:Int) : Mat = {
+    var iii = IMat(0 until n).t // B/c we iterate through equiv classes, so need to add cases for non-equiv vars
+    var jjj = IMat(0 until n).t // Same reasoning
+
+    for (c <- 0 until equivClasses.ncols) {
+      // Note: by construction of equivClasses, vars.length >= 2.
+      // Also note: we will also require consecutive vars to be here, for simplicity.
+      // And we'll use kron for now ... b/c it shouldn't be *that* expensive.
+      val vars = find(IMat(equivClasses(?,c))) 
+      val start = cptOffset(vars(0)).dv.toInt
+      val eye = mkdiag( ones(numSlots(vars(0)).dv.toInt,1) )
+      
+      // TODO put more cases for kron to handle IMat and FMat (and IMat-IMat pairs)
+      // nonShiftedMatrix is the set of identity matrix blocks together, then we add 'start' to rows and cols
+      val nonShiftedMatrix = kron(ones(vars.length,vars.length), eye)
+      val (ii,jj) = find2(IMat(nonShiftedMatrix))
+      iii = iii on (ii + start)
+      jjj = jjj on (jj + start)
+    }
+
+    val vvv = iones(iii.length, 1)
+    val res = sparse(iii, jjj, vvv , n, n) > 0 // Add > 0 b/c some repetition might lead to 2s in diagonal.
+    if (useGPUnow) return GSMat(res) else return res         
+  }
+  
   // ---------------------------------------------
   // The remaining methods are for debugging only.
   // ---------------------------------------------
@@ -614,7 +663,7 @@ class BayesNet(val dag:Mat,
  * There are three things the BayesNet needs as input:
  * 
  *  - A states per node array. Each value needs to be an integer that is at least two.
- *  - A DAG array, in which column i represents node i and its parents.
+ *  - A DAG array, in which column i represents node i and ones in that column are its parents.
  *  - A sparse data matrix, where 0 indicates an unknown element, and rows are variables.
  * 
  * That's it. Other settings, such as the number of Gibbs iterations, are set in "opts".
@@ -622,7 +671,7 @@ class BayesNet(val dag:Mat,
 object BayesNet  {
   
   trait Opts extends Model.Opts {
-    var copiesForSAME = 10
+    var copiesForSAME = 1
     var samplingRate = 1
     var numSamplesBurn = 0
   }
@@ -634,8 +683,10 @@ object BayesNet  {
    * using (assuming proper names):
    * 
    * val (nn,opts) = BayesNet.learner(loadIMat("states.lz4"), loadSMat("dag.lz4"), loadSMat("sdata.lz4"))
+   * 
+   * New: we're adding in an eClass, but we can set that to be null if needed.
    */
-  def learner(statesPerNode:Mat, dag:Mat, data:Mat) = {
+  def learner(statesPerNode:Mat, dag:Mat, eClasses:Mat, data:Mat) = {
 
     class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts 
     val opts = new xopts
@@ -650,7 +701,7 @@ object BayesNet  {
 
     val nn = new Learner(
         new MatDS(Array(data:Mat, secondMatrix), opts),
-        new BayesNet(SMat(dag), statesPerNode, opts),
+        new BayesNet(SMat(dag), statesPerNode, eClasses, opts),
         null,
         new IncNorm(opts),
         opts)
