@@ -46,12 +46,11 @@ class BayesNet(val dag:Mat,
   var dirichletScale:Mat = null             // The scale we use as part of the prior (typically all 1s).
   var onesSAMEvector:Mat = null             // This the (g)iones(opts.copiesForSAME,1), for certain special uses.
   
-  // For equivalence classes
+  // For equivalence classes (not in the ICLR 2016 paper, I guess)
   var equivClassCountMap:Mat = null         // Used to combine counts from same equiv. classes so they get pooled together.
   var equivClassVector:Mat = null           // A vector used to clear out components except leading variables in CPT
   
   // Extra debugging/info gathering
-  var previousCPT:Mat = null
   val real1 = .7 on .3 on .6 on .4 on .95 on .05 on .2 on .8 on .3 on .4 on .3 on .05 on .25 
   val real2 = .7 on .9 on .08 on .02 on .5 on .3 on .2 on .1 on .9 on .4 on .6 on .99 on .01     
   val real = real1 on real2
@@ -62,6 +61,10 @@ class BayesNet(val dag:Mat,
   var predProbsColIndex:Int = 0
   var correct = 0f
   var total = 0f
+  var previousCPT:Mat = null
+  
+  // Miscellaneous, we might want to keep these recorded
+  val randSeed:Int = 0
 
   /**
    * Performs a series of initialization steps.
@@ -73,12 +76,11 @@ class BayesNet(val dag:Mat,
    * Note that the randomization of the input data to be put back in the data is done in uupdate.
    */
   override def init() = {
-    setseed(0)
-    // New, some stuff for predicting
-    //predProbs = zeros(334*2, 4367) // Yeah, do mult by two...(EDIT: this will be a bit more complicated than I thought)
-    //tdata = loadSMat("data/dlm_data_official/dlm_test_random.lz4")
-    //println("Total number of nonzero data points to test in tdata is " + tdata.nnz)
-    
+    // Some estuff for experiments
+    setseed(randSeed)
+    println("randSeed = " + randSeed)
+    previousCPT = loadFMat("data/ICLR_2016_MOOC_Extras/cpt_iter500_seed0.lz4")
+
     // Now back to normal...
     useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
     onesSAMEvector = if (useGPUnow) giones(opts.copiesForSAME,1) else iones(opts.copiesForSAME,1)
@@ -129,26 +131,41 @@ class BayesNet(val dag:Mat,
     // Finally, create/convert a few matrices, reset some variables, and add some debugging info
     counts = mm.zeros(mm.length, 1)
     counts2 = mm.zeros(mm.length, 1)
-    dirichletPrior = 10*mm.ones(mm.length, 1)
+    dirichletPrior = mm.ones(mm.length, 1)
     dirichletScale = mm.ones(mm.length, 1)
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
   } 
    
-  /** Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1). */
+  /**
+   * Calls a uupdate/mupdate sequence. Known data is in gmats(0), sampled data is in gmats(1).
+   * If I want to debug, I have several options here:
+   *
+   * //debugCpt(ipass, here)
+   * //computeNormDifference(ipass,here)
+   * //computeKL(ipass, here, real)
+   * 
+   * This is for the MOOC data
+   * //println("\nIpass = " + ipass + ", here = " + here)
+   * //showCpt(0)
+   * //showCpt(186)
+   * //showCpt(187)
+   * //showCpt(372)
+   * //println("")
+   * 
+   * New (Nov. 2015): if we reach some iteration where we want to do foward sampling to generate data,
+   * then do that here after saving the CPT. Then we run this with that generated data.
+   */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    //debugCpt(ipass, here) // For debugging; it pretty-prints the CPT tables.
-    //computeNormDifference(ipass,here)
-    //computeKL(ipass, here, real)
-    //if (previousCPT != null) computeKL(ipass, here, previousCPT)
-    //println("\nIpass = " + ipass + ", here = " + here)
-    //showCpt(0)
-    //showCpt(186)
-    //showCpt(187)
-    //showCpt(372)
-    //println("")
+    computeKL(ipass, here, previousCPT) // NOTE! Use 'real' for student data, 'previousCPT' for MOOC data
+    //if (ipass == 500) {
+    //  saveFMat("cpt_iter" + ipass + "_seed" + randSeed + ".lz4", FMat(mm))
+    //  generateDataFromCPT(ipass)
+    //  sys.exit
+    //}
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
+    //println(evalfun(gmats(0), gmats(1))) // Useful if I want to debug for 1-mini-batch data, I guess.
   }
   
   /** Calls a uupdate/evalfun sequence. Known data is in gmats(0), sampled data is in gmats(1). */
@@ -223,41 +240,7 @@ class BayesNet(val dag:Mat,
         // After sampling with this color group over all copies (from SAME), we override the known values.
         usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t
       }
-        
-      //// Finally, after we sampled for everything *in this minibatch*, predict (I hope this is right...)
-      //if (true) {
-      //  //val norms = probs / cumprobs(bkeys) // If we wanted some probabilities but I don't think it's needed
-      //  var num = 512
-      //  if (usertrans.nrows != 512) {
-      //     num = usertrans.nrows
-      //  }
-      //  val tdata_subset = tdata(?, predProbsColIndex until predProbsColIndex + num)
-      //  val (r,c,v) = find3(tdata_subset)
-      //  for (i <- 0 until tdata_subset.nnz) {
-      //    val ri = r(i).toInt
-      //    val ci = c(i).toInt
-      //    val pred = usertrans(IMat(ci), ri).dv.toInt // Confusing, usertrans is TRANSPOSE of our data
-      //    val real = (v(i)-1).dv.toInt // Note: subtract one because it's 1-2 valued in our data, but 0-1 in usertrans
-      //    if (pred == real) {
-      //      correct = correct + 1
-      //    }
-      //    total = total + 1
-      //  }
-      //  predProbsColIndex = predProbsColIndex + 512
-      //  if (predProbsColIndex >= 4367) {
-      //    println("predprobs = " + predProbsColIndex)
-      //    predProbsColIndex = 0 
-      //  }
-      //}
     }
-    
-    //// Only applies on the last one
-    //if (predProbsColIndex == 0) {
-    //  println("=====> " + correct/total + " = " + correct + "/" + total + ", for ipass = " + ipass + " <=====")
-    //  correct = 0
-    //  total = 0
-    //}
-    
     user <-- usertrans.t
   }
 
@@ -274,7 +257,6 @@ class BayesNet(val dag:Mat,
    * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
    */
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-    previousCPT = mm+0 // I think this should work for testing purposes
     val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
     val linearIndices = index(?)
     counts <-- float(accum(linearIndices, 1, counts.length, 1))
@@ -678,7 +660,7 @@ class BayesNet(val dag:Mat,
     }      
     
     klDivergence = klDivergence / numDistributions
-    println(klDivergence + "\t = KL(...,mm) for (ipass,here) = (" + ipass + "," + here + ").")
+    println(klDivergence + "  " + ipass + " KLDiv")
   }
   
   /** A one-liner that we can insert in a place with ipass and here to debug the cpt. */
@@ -734,6 +716,33 @@ class BayesNet(val dag:Mat,
       statesList(j) = 0
       updateStatesString(statesList, parentStates, j-1)
     }
+  }
+  
+  /** New, do this to experiment with the MOOC data. Do forward sampling (inefficiently, sorry). */
+  def generateDataFromCPT(ipass:Int) = {
+    val nrows = 4367 // CHANGE AS NEEDED!
+    val output = zeros(nrows, graph.n)
+    println("\nCurrently generating data from this cpt, via forward sampling, with num samples = " + nrows + ".\n")
+    println("\nour cpt:\n" + mm.t)
+
+    for (n <- 0 until graph.n) {
+      if (n % 25 == 0) {
+        println("Finished with node " + n + " of " + graph.n + ".")
+      }
+      val startingIndices = FMat(output * full(iproject)(?,n)) + FMat(cptOffset(n)) // Important, we only take the column
+      val a = statesPerNode(n).dv.toInt // number of states for this node
+      val b = float(0 until a)          // [0,1,...,a-1] ROW vector
+      val indices = kron(ones(nrows,1), b)
+      val indicesIntoCPT = IMat(startingIndices + indices)
+      val cptValues = FMat(mm(indicesIntoCPT)) // Each row is a sample, and must add to one due to normalized probabilities.
+      val normedCumSums = cumsumByKey(cptValues.t, ones(cptValues.ncols, cptValues.nrows))
+      val randVec = kron(ones(a,1), (rand(1, nrows) * 0.99999f))
+      val lessThan = normedCumSums < randVec
+      val sampleIDs = sum(lessThan, 1)
+      output(?,n) = sampleIDs.t
+    }
+
+    saveFMat("newMOOCdata_" + ipass + "ipasses_" + randSeed + ".lz4", output.t) // transposed!
   }
 
 }
