@@ -83,6 +83,10 @@ class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
   var forwardtime = 0.0
   var backwardtime = 0.0
   
+  private var _GUID = Mat.myrand.nextLong
+  def setGUID(v:Long):Unit = {_GUID = v}
+  def GUID:Long = _GUID
+  
   // Setters and getters for general elements of those arrays
   def inputs(i:Int) = _inputs(i);
   def outputs(i:Int) = _outputs(i);

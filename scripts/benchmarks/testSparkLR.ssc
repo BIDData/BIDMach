@@ -8,7 +8,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.util.MLUtils
 import scala.compat.Platform._ 
 
-val nnodes = 1
+val nnodes = 4
 
 val t0=currentTime
 // Load training data in LIBSVM format.

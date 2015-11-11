@@ -17,6 +17,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var PADrow:Mat = null;
   var OOVelem:Mat = null;
   var leftedge:Layer = null;
+  var leftStart:Mat = null;
+  var dstxdata:Mat = null;
+  var dstxdata0:Mat = null;
   var height = 0;
   var fullheight = 0;
   var inwidth = 0;
@@ -111,10 +114,17 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstx = gmats(1);
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
-    dstxn = dstx.nnz/dstx.ncols;
-    if (dstxn*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length");
-    val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows. 
-    val dstxdata = int(dstx.contents.view(dstxn, batchSize).t);
+    val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows.
+    
+    val dstxn0 = dstx.nnz/dstx.ncols;
+    if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length"); 
+    val dstxdata0 = int(dstx.contents.view(dstxn0, batchSize).t);
+    dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
+    if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
+      leftStart = convertMat(izeros(batchSize, 1));
+    }
+    val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
+    
     mapOOV(srcdata);
     mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
@@ -149,20 +159,21 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
 	  val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
-	  dstyn = dsty.nnz/dsty.ncols;
-    if (dstyn*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
-    val dstydata = int(dsty.contents.view(dstyn, batchSize).t);
+	  val dstyn0 = dsty.nnz/dsty.ncols;
+    if (dstyn0*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
+    val dstydata = int(dsty.contents.view(dstyn0, batchSize).t);
     mapOOV(dstydata);
-    val dstylim = math.min(opts.outwidth, if (gmats.length > 2) dstyn else dstyn - 1);
-    for (j <- 0 until dstylim) {
-    	val incol = if (gmats.length > 2) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t ;
+    val dstyn1 = math.min(dstyn0 - (if (opts.addStart) 0 else 1), opts.outwidth);
+    for (j <- 0 until dstyn1) {
+    	val incol = if (opts.addStart) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t
     	output_layers(j).target = incol;
     }
     if (PADrow.asInstanceOf[AnyRef] == null) {
       PADrow = convertMat(iones(1, batchSize) * opts.PADsym);
     }
-    if (dstylim < dstxn) {
-    	output_layers(dstylim).target = PADrow;
+    dstyn = math.min(dstyn1 + 1, opts.outwidth);
+    if (dstyn1 < opts.outwidth) {
+    	output_layers(dstyn1).target = PADrow;
     }
   }
   
@@ -250,6 +261,8 @@ object SeqToSeq {
     var netType = 0;     // Network type, 0 = softmax output, 1 = Neg Sampling output
     var PADsym = 1;      // Padding symbol
     var OOVsym = 2;      // OOV symbol
+    var STARTsym = 1;    // Start symbol
+    var addStart = true; // Add the start symbol to dst sentences
     var scoreType = 0;   // Score type, 0 = LL, 1 = accuracy, 2 = LL of full Softmax, 3 = accuracy of full Softmax
     var nsamps = 100;    // Number of negative samples
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
@@ -297,15 +310,15 @@ object SeqToSeq {
   
   class FDSopts extends Learner.Options with SeqToSeq.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
-  def learner(fn1:String, fn2:String, regularize:Boolean):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), regularize);
+  def learner(fn1:String, fn2:String, regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), regularize, adagrad);
   
-   def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), false);
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), false, true);
   
   def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)));
   
-  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = learner(fnames, false);
+  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = learner(fnames, false, true);
   
-  def learner(fnames:List[(Int)=>String], regularize:Boolean):(Learner, FDSopts) = {   
+  def learner(fnames:List[(Int)=>String], regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = {   
     val opts = new FDSopts;
     opts.fnames = fnames
     opts.batchSize = 128;
@@ -316,11 +329,10 @@ object SeqToSeq {
   			ds, 
   	    new SeqToSeq(opts), 
   	    if (regularize) Array(new L1Regularizer(opts)) else null,
-  	    new ADAGrad(opts), 
+  	    if (adagrad) new ADAGrad(opts) else new Grad(opts), 
   	    opts)
     (nn, opts)
-  } 
-  
+  }  
   
   def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts;
