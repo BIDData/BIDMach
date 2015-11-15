@@ -25,6 +25,9 @@ class BayesNet(val dag:Mat,
                val equivClasses:Mat,
                override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
+  // Miscellaneous, we might want to keep these recorded
+  val randSeed:Int = 9999
+  
   var mm:Mat = null                         // Copy of the cpt, but be careful of aliasing. We keep this normalized.
   var cptOffset:Mat = null                  // Holds global variable offsets (into the mm = cpt) of each variable.
   var cptOffsetSAME:Mat = null              // A vertically stacked version of cptOffset, for SAME.
@@ -40,13 +43,17 @@ class BayesNet(val dag:Mat,
   var normConstMatrix:Mat = null            // Normalizes the cpt. Do cpt / (cpt.t * nConstMat).t.
   var useGPUnow:Boolean = false             // Checks (during initialization only) if we're using GPUs or not.
   var batchSize:Int = -1                    // Holds the batchSize, which we use for some colorInfo matrices.
-  var counts:Mat = null                     // For accumulating counts during the process of uupdate.
-  var counts2:Mat = null                    // A second, auxiliary matrix during process of computing new cpt.
-  var dirichletPrior:Mat = null             // The prior we use to smooth the distribution.
+
+  var counts1:Mat = null                    // This will accumulate counts that we use for the actual distribution.
+  var counts2:Mat = null                    // This will be the counts that we use for the *previous* step that we SUBTRACT.
+  var counts3:Mat = null                    // Use this as a copy, because the GPU genericGammaRand doesn't seem to be working.
+  var counts4:Mat = null                    // This is like counts1, but WITH Dirichlets!
+
+  var dirichletPrior:Mat = null             // The prior we use to smooth the distribution. If all 1s, SAME will keep it the same.
   var dirichletScale:Mat = null             // The scale we use as part of the prior (typically all 1s).
   var onesSAMEvector:Mat = null             // This the (g)iones(opts.copiesForSAME,1), for certain special uses.
   
-  // For equivalence classes (not in the ICLR 2016 paper, I guess)
+  // For equivalence classes (not in the ICLR 2016 paper)
   var equivClassCountMap:Mat = null         // Used to combine counts from same equiv. classes so they get pooled together.
   var equivClassVector:Mat = null           // A vector used to clear out components except leading variables in CPT
   
@@ -56,15 +63,12 @@ class BayesNet(val dag:Mat,
   val real = real1 on real2
 
   // Only for the DLM MOOC data (must tweak for other datasets)
-  var predProbs:Mat = null
-  var tdata:SMat = null;
-  var predProbsColIndex:Int = 0
-  var correct = 0f
-  var total = 0f
   var previousCPT:Mat = null
-  
-  // Miscellaneous, we might want to keep these recorded
-  val randSeed:Int = 0
+  var predictions:Mat = null // Stores the counts we sample during the testing data, depends on SAME
+  var predictionsRand:Mat = null // Random matrix for the predictions, again depends on SAME
+  var numIterationsPredict = 501 // How many times we iterate. Then prob of a 1 is numIterationsPredict/2 if we have counts.
+  var numInitialBurn = 500 // Number of sampling passes we IGNORE, before starting numIterationsPredict
+  var areWePredicting:Boolean = false // Indicator for us in the prediction process for uupdate
 
   /**
    * Performs a series of initialization steps.
@@ -76,10 +80,12 @@ class BayesNet(val dag:Mat,
    * Note that the randomization of the input data to be put back in the data is done in uupdate.
    */
   override def init() = {
-    // Some estuff for experiments
+    // Some stuff for experiments and predictions...
     setseed(randSeed)
     println("randSeed = " + randSeed)
-    previousCPT = loadFMat("data/ICLR_2016_MOOC_Extras/cpt_iter500_seed0.lz4")
+    previousCPT = loadFMat("data/ICLR_2016_MOOC_Extras/cpt_iter500_seed0.txt") // MOOC forward sampling experiment
+    //predictions = gzeros(334 * opts.copiesForSAME,1367)     // NOTE! When we sample, we actually only use the top block ...
+    //predictionsRand = gzeros(334 * opts.copiesForSAME,1367) // NOTE! When we sample, we actually only use the top block ...
 
     // Now back to normal...
     useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
@@ -129,10 +135,13 @@ class BayesNet(val dag:Mat,
     randMap = new HashMap[(Int,Int),Mat]()
 
     // Finally, create/convert a few matrices, reset some variables, and add some debugging info
-    counts = mm.zeros(mm.length, 1)
+    counts1 = mm.zeros(mm.length, 1)
     counts2 = mm.zeros(mm.length, 1)
-    dirichletPrior = mm.ones(mm.length, 1)
-    dirichletScale = mm.ones(mm.length, 1)
+    counts3 = zeros(mm.length, 1)   // FMat, until the genericGammaRand works on the GPU.
+    counts4 = mm.zeros(mm.length, 1)
+
+    dirichletPrior = ones(mm.length, 1) // Change to mm.ones when genericGammaRand works
+    dirichletScale = ones(mm.length, 1) // Change to mm.ones when genericGammaRand works
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
   } 
@@ -157,20 +166,28 @@ class BayesNet(val dag:Mat,
    * then do that here after saving the CPT. Then we run this with that generated data.
    */
   override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    computeKL(ipass, here, previousCPT) // NOTE! Use 'real' for student data, 'previousCPT' for MOOC data
-    //if (ipass == 500) {
-    //  saveFMat("cpt_iter" + ipass + "_seed" + randSeed + ".lz4", FMat(mm))
+    //if (ipass == 500) { // Only for saving CPT and generating data from this CPT via forward/direct sampling.
+    //  saveFMat("cpt_iter" + ipass + "_seed" + randSeed + ".txt", FMat(mm))
     //  generateDataFromCPT(ipass)
     //  sys.exit
     //}
+    computeKL(ipass, here, previousCPT) // NOTE! Use 'real' for student data, 'previousCPT' for MOOC data
+
+    // Compute counts that we SUBTRACT away later! Call now b/c later, gmats(1)=user gets overrided.
+    if (ipass > 0) {
+      val index = int(cptOffsetSAME + (gmats(1).t * iprojectBlockedSAME).t)
+      val linearIndices = index(?)
+      counts2 <-- float(accum(linearIndices, 1, counts2.length, 1))
+    }
+
     uupdate(gmats(0), gmats(1), ipass)
     mupdate(gmats(0), gmats(1), ipass)
-    //println(evalfun(gmats(0), gmats(1))) // Useful if I want to debug for 1-mini-batch data, I guess.
   }
   
   /** Calls a uupdate/evalfun sequence. Known data is in gmats(0), sampled data is in gmats(1). */
   override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
-    uupdate(gmats(0), gmats(1), ipass)
+    //areWePredicting = true
+    //uupdate(gmats(0), gmats(1), ipass) // For evaluation w/gflops, we don't really need this?
     evalfun(gmats(0), gmats(1))
   }
  
@@ -202,8 +219,19 @@ class BayesNet(val dag:Mat,
       state <-- float( min( int(statesPerNodeSAME ∘ state), int(statesPerNodeSAME-1) ) )
       user ~ (select ∘ (stackedData-1)) + ((1-select) ∘ state)
     }
+    
+    // NEW! If we are doing prediction accuracy, we override "user" so that it is completely random.
+    // Applies to all batches; after ipass = 0, we still need to randomize so we ignore putback stuff.
+    if (areWePredicting) {
+      numGibbsIterations = numIterationsPredict + numInitialBurn // Completely override it with what we use.
+      rand(predictionsRand)
+      user <-- float( min( int(statesPerNodeSAME ∘ predictionsRand), int(statesPerNodeSAME-1) ) )
+      predictions.clear
+    }
+    
+    // Now back to normal from prediction accuracy. usertrans is still user.t
     val usertrans = user.t
-   
+
     for (k <- 0 until numGibbsIterations) {
       for (c <- 0 until graph.ncolors) {
         
@@ -238,8 +266,20 @@ class BayesNet(val dag:Mat,
         usertrans(?, colorInfo(c).idsInColorSAME) = sampleIDs.t // Note the SAME now...
 
         // After sampling with this color group over all copies (from SAME), we override the known values.
-        usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t
+        // NEW! If we are predicting, we have to AVOID the overriding data thing!
+        if (areWePredicting) {
+          // Do nothing
+        } else { // This was the old part of the code.
+          usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t
+        }
       }
+      
+      // NEW! After *all* nodes sampled *without* overriding known values, we increment predictions.
+      // Then if we have another Gibbs iteration, it continues from these values, and we again increment.
+      if (areWePredicting && k > numInitialBurn) {
+        predictions ~ predictions + usertrans.t
+      }
+
     }
     user <-- usertrans.t
   }
@@ -259,19 +299,28 @@ class BayesNet(val dag:Mat,
   def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
     val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
     val linearIndices = index(?)
-    counts <-- float(accum(linearIndices, 1, counts.length, 1))
+    if (ipass > 0) {
+      counts1 ~ counts1 - counts2       // Drop the corresponding previous mini-batch
+    }
+    counts1 ~ counts1 + float(accum(linearIndices, 1, counts1.length, 1)) // Accumulate w/current mini-batch
 
     // First accumulate raw counts. Then, after setting dirichlet prior to all and sampling,
     // we only take the first per equiv class (thus, equivClassVector), then re-accumulate.
-    if (equivClasses != null) {
-      counts <-- (counts.t * equivClassCountMap).t
-    }
-    genericGammaRand(counts + dirichletPrior, dirichletScale, counts2)
-    if (equivClasses != null) {
-      counts2 <-- (counts2 *@ equivClassVector)
-      counts2 <-- (counts2.t * equivClassCountMap).t
-    }
-    updatemats(0) <-- (counts2 / (counts2.t * normConstMatrix).t) 
+    //if (equivClasses != null) {
+    //  counts1 <-- (counts1.t * equivClassCountMap).t
+    //}
+
+    // New, test for GPU/CPU differences
+    //genericGammaRand(counts1 + dirichletPrior, dirichletScale, counts3) // GPU
+    genericGammaRand(FMat(counts1) + dirichletPrior, dirichletScale, counts3) // CPU
+    counts4 <-- convertMat(counts3)
+
+    //if (equivClasses != null) {
+    //  counts2 <-- (counts2 *@ equivClassVector)
+    //  counts2 <-- (counts2.t * equivClassCountMap).t
+    //}
+
+    updatemats(0) <-- (counts4 / (counts4.t * normConstMatrix).t) 
   }
  
   /**
@@ -282,6 +331,38 @@ class BayesNet(val dag:Mat,
    * sample, which can do since we assume i.i.d.). 
    */
   def evalfun(sdata:Mat, user:Mat):FMat = {  
+
+    // Take the 'predictions' matrix, iterate through the known indices of sdata, and see if they match.
+    // Remember that 'predictions' has counts and we take majority by doing numIterationsPredict / 2.0.
+    // Also, sdata is on a 1-2 scale, while predictions assumes we added up a bunch of 0s and 1s.
+    if (areWePredicting) {
+      areWePredicting = false
+      val threshold = numIterationsPredict / 2.0
+      var totalOnes = 0f
+      var totalTwos = 0f
+      //println("threshold = " + threshold)
+      var correct = 0f
+      val (r, c, v) = find3(SMat(sdata))
+      for (i <- 0 until sdata.nnz) {
+        val ri = IMat(r(i).toInt)
+        val ci = c(i).toInt
+        var pred = 1
+        if (predictions(ri,ci).dv >= threshold) {
+          pred = 2
+          totalTwos = totalTwos + 1
+        } else {
+          totalOnes = totalOnes + 1
+        }
+        if (pred == v(i).toInt) {
+          correct = correct + 1
+        }
+        //println("ri,ci = " + ri + "," + ci + ", predictions(ri,ci) = " + predictions(ri,ci).dv)
+      }
+      val res = correct / sdata.nnz
+      println("Accuracy: " + res + " = " + correct + " / " + sdata.nnz + ". Total 0/1 predicted = " + totalOnes.toInt + "," + totalTwos.toInt + ", with random seed " + randSeed + ".")
+      //sys.exit
+    } 
+
     val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
     val result = FMat( sum(sum(ln(mm(index)),1),2) ) / (user.ncols * opts.copiesForSAME)
     return result
@@ -757,7 +838,7 @@ class BayesNet(val dag:Mat,
  * 
  * That's it. Other settings, such as the number of Gibbs iterations, are set in "opts".
  */
-object BayesNet  {
+object BayesNet {
   
   trait Opts extends Model.Opts {
     var copiesForSAME = 1

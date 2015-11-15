@@ -2,18 +2,6 @@
 
 // BayesNet.scala now assuming general case.
 
-// This is the DLM data. Note the other data from forward sampling when needed.
-val dag = loadSMat("data/official_dlm_data/dag_sorted.lz4")
-//val data = loadSMat("data/official_dlm_data/all_dlm_data_random.lz4")
-val states = loadIMat("data/official_dlm_data/states.lz4")
-val data = loadSMat("data/ICLR_2016_MOOC_Extras/newMOOCdata_500ipasses_0_cleared.lz4") // From foward sampling then cleared out
-
-// This is the data I am using following Daphne's example DAG. For now use files named 
-// "data_student_{K}perc{_smat}.lz4" where K is a percent and sometimes we have smats.
-//val data = loadFMat("data/official_student_data/data_student_50perc.lz4")
-//val dag = loadSMat("data/official_student_data/dagStudent.lz4")
-//val states = loadIMat("data/official_student_data/statesStudent.lz4")
-
 // NEW! HMM data.
 // val data = loadFMat("data/hmm_data/hmm_data_25perc.lz4")
 // val dag = loadSMat("data/hmm_data/hmm_dag.lz4")
@@ -26,15 +14,35 @@ val data = loadSMat("data/ICLR_2016_MOOC_Extras/newMOOCdata_500ipasses_0_cleared
 // val states = loadFMat("data/jason_sellers_data/all_no_empties_mode_statesPerNode.lz4")
 // val equiv = loadFMat("data/jason_sellers_data/all_no_empties_mode_equivClasses.lz4")
 
+
+
+
+// This is the DLM data. Note the other data from forward sampling when needed.
+val dag = loadSMat("data/official_dlm_data/dag_sorted.lz4")
+//val data = loadSMat("data/official_dlm_data/all_dlm_data_random.lz4")
+val states = loadIMat("data/official_dlm_data/states.lz4")
+// From foward sampling then cleared out (also has random seed 0 and from 500 iterations)
+val data = loadFMat("data/ICLR_2016_MOOC_Extras/newMOOCdata_500ipasses_0_05percknown.txt")
+
+// This is the data I am using following Daphne's example DAG. For now use files named 
+// "data_student_{K}perc{_smat}.lz4" where K is a percent and sometimes we have smats.
+//val data = loadFMat("data/official_student_data/data_student_50perc.lz4")
+//val data_50k = data(? , 0 until 50000) 					// As Haoyu and I discussed ...
+//val dag = loadSMat("data/official_student_data/dagStudent.lz4")
+//val states = loadIMat("data/official_student_data/statesStudent.lz4")
+
 // Now the settings. CHANGE THE "equiv" STUFF TO NULL AS NEEDED! 
 val (nn , opts) = BIDMach.models.BayesNet.learner(states , dag , null , data)
-opts.npasses = 500
+opts.npasses = 100
 opts.useGPU = true
-opts.batchSize = 4367
 
 // Be careful ... this will update each iteration ... but tbh for 5 variable student data we do not need to have this as false
-// Also for the MOOC data we have this as true ... *unless* we want to do training or testing.
-opts.updateAll = true 
+// Also for the MOOC data we have this as true ... *unless* we want to do predictions!
+// Note that the batch size is 4367 for full data but 3000 if doing the prediction accuracy. For Koller usually 50000.
+opts.batchSize = 1000
+opts.updateAll = true
+
 opts.what
 nn.train
 nn.modelmats(0).t
+sys.exit
