@@ -85,12 +85,12 @@ checkword(char * str) {
   char * newstr;
   if (htab.count(str)) {
     userno = htab[str];
-    count[userno-1]++;
+    count[userno]++;
   } else {
     try {
       newstr = new char[strlen(str)+1];
       strcpy(newstr, str);
-      userno = ++size;
+      userno = size++;
       htab[newstr] = userno;
       count.push_back(1);
       unh.push_back(newstr);
