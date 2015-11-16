@@ -26,7 +26,7 @@ class BayesNet(val dag:Mat,
                override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
   // Miscellaneous, we might want to keep these recorded
-  val randSeed:Int = 9999
+  val randSeed:Int = 99999
   
   var mm:Mat = null                         // Copy of the cpt, but be careful of aliasing. We keep this normalized.
   var cptOffset:Mat = null                  // Holds global variable offsets (into the mm = cpt) of each variable.
@@ -46,8 +46,8 @@ class BayesNet(val dag:Mat,
 
   var counts1:Mat = null                    // This will accumulate counts that we use for the actual distribution.
   var counts2:Mat = null                    // This will be the counts that we use for the *previous* step that we SUBTRACT.
-  var counts3:Mat = null                    // Use this as a copy, because the GPU genericGammaRand doesn't seem to be working.
-  var counts4:Mat = null                    // This is like counts1, but WITH Dirichlets!
+  var counts3:Mat = null                    // This is like counts1, but WITH Dirichlets!
+  var counts4:Mat = null
 
   var dirichletPrior:Mat = null             // The prior we use to smooth the distribution. If all 1s, SAME will keep it the same.
   var dirichletScale:Mat = null             // The scale we use as part of the prior (typically all 1s).
@@ -107,17 +107,17 @@ class BayesNet(val dag:Mat,
     cptOffset = convertMat(cptOffset)
     cptOffsetSAME = kron(onesSAMEvector,cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
-    val cpt = convertMat(rand(lengthCPT,1))
+    val cpt = convertMat(rand(lengthCPT,1) + opts.initSmoothFactor)
     
     // New! If we have equivalence classes, form equiv matrix and use it on the initialized cpt.
-    if (equivClasses != null) {
-      val result = createEquivClassMatrix(numSlotsInCpt, cptOffset, lengthCPT)
-      equivClassCountMap = result._1
-      equivClassVector = result._2
-      cpt <-- (cpt.t * equivClassCountMap).t // This makes the random values approach 0.5 w/more variables.
-    } 
+    //if (equivClasses != null) {
+    //  val result = createEquivClassMatrix(numSlotsInCpt, cptOffset, lengthCPT)
+    //  equivClassCountMap = result._1
+    //  equivClassVector = result._2
+    //  cpt <-- (cpt.t * equivClassCountMap).t // This makes the random values approach 0.5 w/more variables.
+    //} 
    
-    // To finish building CPT, we normalize it based on the batch size and normalizing constant matrix.
+    // To finish building CPT, we normalize it using the normalizing constant matrix.
     normConstMatrix = getNormConstMatrix(lengthCPT)
     cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
     setmodelmats(new Array[Mat](1))
@@ -137,11 +137,10 @@ class BayesNet(val dag:Mat,
     // Finally, create/convert a few matrices, reset some variables, and add some debugging info
     counts1 = mm.zeros(mm.length, 1)
     counts2 = mm.zeros(mm.length, 1)
-    counts3 = zeros(mm.length, 1)   // FMat, until the genericGammaRand works on the GPU.
-    counts4 = mm.zeros(mm.length, 1)
-
-    dirichletPrior = ones(mm.length, 1) // Change to mm.ones when genericGammaRand works
-    dirichletScale = ones(mm.length, 1) // Change to mm.ones when genericGammaRand works
+    counts3 = mm.zeros(mm.length, 1)
+    counts4 = zeros(mm.length, 1)
+    dirichletPrior = 10*mm.ones(mm.length, 1)
+    dirichletScale = mm.ones(mm.length, 1)
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
   } 
@@ -171,7 +170,8 @@ class BayesNet(val dag:Mat,
     //  generateDataFromCPT(ipass)
     //  sys.exit
     //}
-    computeKL(ipass, here, previousCPT) // NOTE! Use 'real' for student data, 'previousCPT' for MOOC data
+    // NOTE! Use 'real' for Koller data, 'previousCPT' for synthetic MOOC data, and nothing if real MOOC data.
+    computeKL(ipass, here, previousCPT)
 
     // Compute counts that we SUBTRACT away later! Call now b/c later, gmats(1)=user gets overrided.
     if (ipass > 0) {
@@ -188,7 +188,7 @@ class BayesNet(val dag:Mat,
   override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
     //areWePredicting = true
     //uupdate(gmats(0), gmats(1), ipass) // For evaluation w/gflops, we don't really need this?
-    evalfun(gmats(0), gmats(1))
+    evalfun(gmats(0), gmats(1)) // We don't really need this right now ...
   }
  
   /**
@@ -311,16 +311,16 @@ class BayesNet(val dag:Mat,
     //}
 
     // New, test for GPU/CPU differences
-    //genericGammaRand(counts1 + dirichletPrior, dirichletScale, counts3) // GPU
-    genericGammaRand(FMat(counts1) + dirichletPrior, dirichletScale, counts3) // CPU
-    counts4 <-- convertMat(counts3)
+    genericGammaRand(counts1 + dirichletPrior, dirichletScale, counts3)
+    //genericGammaRand(FMat(counts1 + dirichletPrior), FMat(dirichletScale), counts4) // CPU
+    //counts3 <-- convertMat(counts4)
 
     //if (equivClasses != null) {
     //  counts2 <-- (counts2 *@ equivClassVector)
     //  counts2 <-- (counts2.t * equivClassCountMap).t
     //}
 
-    updatemats(0) <-- (counts4 / (counts4.t * normConstMatrix).t) 
+    updatemats(0) <-- (counts3 / (counts3.t * normConstMatrix).t) 
   }
  
   /**
@@ -363,9 +363,10 @@ class BayesNet(val dag:Mat,
       //sys.exit
     } 
 
-    val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
-    val result = FMat( sum(sum(ln(mm(index)),1),2) ) / (user.ncols * opts.copiesForSAME)
-    return result
+    //val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
+    //val result = FMat( sum(sum(ln(mm(index)),1),2) ) / (user.ncols * opts.copiesForSAME)
+    return FMat(0)
+    //return result
   }
   
   // -----------------------------------
@@ -844,6 +845,7 @@ object BayesNet {
     var copiesForSAME = 1
     var samplingRate = 1
     var numSamplesBurn = 0
+    var initSmoothFactor = 100
   }
   
   class Options extends Opts {}
