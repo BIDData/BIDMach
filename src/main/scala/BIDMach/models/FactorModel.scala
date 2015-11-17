@@ -24,8 +24,9 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     	val msum = sum(modelmat, 2);
     	modelmat ~ modelmat / msum;
     	setmodelmats(Array[Mat](1));
-    	modelmats(0) = convertMat(modelmat);
+    	modelmats(0) = modelmat;
     }
+    modelmats(0) = convertMat(modelmats(0));
     
     if (mats.size > 1) {
       while (datasource.hasNext) {

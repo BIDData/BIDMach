@@ -111,7 +111,14 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     ulim = convertMat(opts.lim)
     llim = - ulim;
     hashFeatures = opts.hashFeatures;
-    if (opts.aopts != null) initADAGrad(d, m);
+    if (opts.aopts != null) {
+      initADAGrad(d, m);
+    } else {
+    	vexp = null;
+    	texp = null;
+    	lrate = null;
+    	sumsq = null;
+    }
   }
   
   def initADAGrad(d:Int, m:Int) = {
