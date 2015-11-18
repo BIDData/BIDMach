@@ -6,30 +6,35 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContextExecutor
 import java.io._
 
+/** 
+ *  Datasource designed to work with Iterators as provided by Spark. 
+ */
+
 class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) extends DataSource(opts) { 
   var sizeMargin = 0f;
   var blockSize = 0;
-  var rowno = 0;
+  var samplesDone = 0;
   var nmats = 1;
   omats = null;
   var fprogress:Float = 0
-  var lastMat:Array[Mat] = null;
-  var lastFname:Array[String] = null;
+  var inMats:Array[Mat] = null;
+  var inFname:Array[String] = null;
+  var iter:Iterator[(AnyRef, AnyRef)] = null;
   
   def reset = {
-    blockSize = opts.batchSize
-    rowno = 0;
-    lastMat = new Array[Mat](nmats);
-    lastFname = new Array[String](nmats);
-    for (i <- 0 until lastMat.length) {lastMat(i) = null;}
-    for (i <- 0 until lastFname.length) {lastFname(i) = null;}
+  	samplesDone = 0;
   }
   
   def init = {
-    reset
-    omats = new Array[Mat](nmats)
+  	samplesDone = 0;
+  	iter = opts.iter;
+  	blockSize = opts.batchSize;
+  	iterNext;
+  	nmats = inMats.length;
+    inFname = new Array[String](nmats);
+    omats = new Array[Mat](nmats);
     for (i <- 0 until nmats) {
-      val mm = lastMat(i);
+      val mm = inMats(i);
       val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
       omats(i) = mm match {
         case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_FMat".##);
@@ -40,30 +45,30 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
     } 
   }
   
-  def next:Array[Mat] = {
+  def next:Array[Mat] = {;
     var donextfile = false;
     var todo = blockSize;
     val featType = opts.featType;
     val threshold = opts.featThreshold;
     while (todo > 0) {
-    	var nrow = rowno;
+    	var samplesTodo = samplesDone;
     	var matqnr = 0
     	for (i <- 0 until nmats) {
-    		val matq = lastMat(i);
+    		val matq = inMats(i);
     		if (matq.asInstanceOf[AnyRef] != null) {
     		  matqnr = if (opts.dorows) matq.nrows else matq.ncols;
-    		  nrow = math.min(rowno + todo, matqnr);
+    		  samplesTodo = math.min(samplesDone + todo, matqnr);
     		  val off = Mat.oneBased
     		  if (opts.dorows) {
     		    val nc = omats(i).ncols;
-    		    val nr = nrow - rowno + blockSize - todo - off; 
+    		    val nr = samplesTodo - samplesDone + blockSize - todo - off; 
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
-    		    omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo); 			  
+    		    omats(i) = matq.rowslice(samplesDone, samplesTodo, omats(i), blockSize - todo); 			  
     		  } else {
     		    val nr = omats(i).nrows;
-    		    val nc = nrow - rowno + blockSize - todo - off;
+    		    val nc = samplesTodo - samplesDone + blockSize - todo - off;
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
-    		  	omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);
+    		  	omats(i) = matq.colslice(samplesDone, samplesTodo, omats(i), blockSize - todo);
     		  }
 
     		  if (featType == 0) {
@@ -71,21 +76,24 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
     		  } else if (featType == 2) {
     		    omats(i) ~ omats(i) >= threshold;
     		  }
-    		  if (matqnr == nrow) donextfile = true;
+    		  if (matqnr == samplesTodo) donextfile = true;
     		} else {
     		  donextfile = true;
     		}
     	}
-    	todo -= nrow - rowno;
+    	todo -= samplesTodo - samplesDone;
     	if (donextfile) {
-    	  rowno = 0;
+    	  samplesDone = 0;
+    	  if (iterHasNext) {
+    	    iterNext();
+    	  }
     	  donextfile = false;
     	} else {
-    	  rowno = nrow;
+    	  samplesDone = samplesTodo;
     	}
-    	fprogress = rowno*1f / matqnr;
+    	fprogress = samplesDone*1f / matqnr;
     }
-    omats
+    omats;
   }
   
   def progress:Float = {
@@ -93,7 +101,17 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
   }
   
   def hasNext:Boolean = {
-    false
+    val matq = inMats(0);
+    val matqnr = if (opts.dorows) matq.nrows else matq.ncols;
+    (iter.hasNext || (matqnr - samplesDone) == 0);
+  }
+  
+  def iterHasNext:Boolean = {
+    iter.hasNext
+  }
+  
+  def iterNext() = {
+    inMats = iter.next._2.asInstanceOf[Array[Mat]];
   }
   
   def lazyTranspose(a:Mat) = {
@@ -134,7 +152,7 @@ object IteratorDS {
   trait Opts extends DataSource.Opts {
     var nmats = 1;
     var dorows:Boolean = false
-    var iterator:Iterator[(AnyRef, AnyRef)] = null;
+    var iter:Iterator[(AnyRef, AnyRef)] = null;
     var eltsPerSample = 10;
     var throwMissing:Boolean = false
   }
