@@ -39,10 +39,10 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
       val mm = inMats(i);
       val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
       omats(i) = mm match {
-        case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_FMat".##);
-        case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_IMat".##);
-        case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_DMat".##);
-        case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_SMat".##);
+        case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_FMat".##);
+        case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_IMat".##);
+        case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_DMat".##);
+        case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_SMat".##);
       }
     } 
   }
@@ -130,10 +130,10 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
       out 
     } else {
     	out match {
-    	case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_FMat".##);
-    	case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_IMat".##);
-    	case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_DMat".##);
-    	case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_SMat".##);
+    	case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_FMat".##);
+    	case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_IMat".##);
+    	case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_DMat".##);
+    	case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_SMat".##);
     	}
     }
   }
