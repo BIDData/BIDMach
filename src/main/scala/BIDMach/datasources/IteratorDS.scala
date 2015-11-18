@@ -2,12 +2,14 @@ package BIDMach.datasources
 import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMat.MatIOtrait
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContextExecutor
 import java.io._
 
 /** 
  *  Datasource designed to work with Iterators as provided by Spark. 
+ *  We assume the iterator returns pairs from a Sequencefile of (StringWritable, MatIO)
  */
 
 class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) extends DataSource(opts) { 
@@ -111,7 +113,7 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
   }
   
   def iterNext() = {
-    inMats = iter.next._2.asInstanceOf[Array[Mat]];
+    inMats = iter.next._2.asInstanceOf[MatIOtrait].get
   }
   
   def lazyTranspose(a:Mat) = {
@@ -152,7 +154,7 @@ object IteratorDS {
   trait Opts extends DataSource.Opts {
     var nmats = 1;
     var dorows:Boolean = false
-    var iter:Iterator[(AnyRef, AnyRef)] = null;
+    var iter:Iterator[Tuple2[AnyRef, MatIOtrait]] = null;
     var eltsPerSample = 10;
     var throwMissing:Boolean = false
   }
