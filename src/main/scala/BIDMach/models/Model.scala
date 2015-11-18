@@ -8,7 +8,7 @@ import scala.collection.mutable.ListBuffer
 /**
  * Abstract class with shared code for all models
  */
-abstract class Model(val opts:Model.Opts = new Model.Options) {
+abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializable {
   
   var datasource:DataSource = null
   

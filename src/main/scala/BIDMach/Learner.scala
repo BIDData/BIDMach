@@ -17,12 +17,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
  *  Basic sequential Learner class with a single datasource 
  */
 
+@SerialVersionUID(100L)
 case class Learner(
     val datasource:DataSource,
     val model:Model, 
     val mixins:Array[Mixin], 
     val updater:Updater, 
-    val opts:Learner.Options = new Learner.Options) {
+    val opts:Learner.Options = new Learner.Options) extends Serializable {
   
   var results:FMat = null
   val dopts:DataSource.Opts = datasource.opts
@@ -213,7 +214,7 @@ case class ParLearner(
     val models:Array[Model], 
     val mixins:Array[Array[Mixin]], 
     val updaters:Array[Updater], 
-    val opts:ParLearner.Options = new ParLearner.Options) {
+    val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
   
   var um:Array[Mat] = null
   var mm:Array[Mat] = null
@@ -435,7 +436,7 @@ case class ParLearnerx(
     val models:Array[Model], 
     val mixins:Array[Array[Mixin]], 
     val updaters:Array[Updater], 
-		val opts:ParLearner.Options = new ParLearner.Options) {
+		val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
   
   var um:Array[Mat] = null
   var mm:Array[Mat] = null
@@ -650,7 +651,7 @@ class ParLearnerxF(
 		mkreg:(Mixin.Opts)=>Array[Mixin],
 		uopts:Updater.Opts,
 		mkupdater:(Updater.Opts)=>Updater,
-		val lopts:ParLearner.Options = new ParLearner.Options) {
+		val lopts:ParLearner.Options = new ParLearner.Options) extends Serializable {
 
   var dds:Array[DataSource] = null
   var models:Array[Model] = null
@@ -698,7 +699,7 @@ class ParLearnerF(
 		mkreg:(Mixin.Opts)=>Array[Mixin],
 		val uopts:Updater.Opts,
 		mkupdater:(Updater.Opts)=>Updater,
-		val lopts:ParLearner.Options = new ParLearner.Options) {
+		val lopts:ParLearner.Options = new ParLearner.Options) extends Serializable {
   var models:Array[Model] = null
   var mixins:Array[Array[Mixin]] = null
   var updaters:Array[Updater] = null

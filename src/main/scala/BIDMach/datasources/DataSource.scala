@@ -4,7 +4,8 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
 
-abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) {   
+@SerialVersionUID(100L)
+abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) extends Serializable {   
   private var _GUID = Mat.myrand.nextLong
   def setGUID(v:Long):Unit = {_GUID = v} 
   def GUID:Long = _GUID

@@ -45,14 +45,13 @@ import BIDMach._
 class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts) {
 
   var mm:Mat = null
-  var alpha:Mat = null 
   var traceMem = false
   
   /** Sets up the modelmats and updatemats arrays and initializes modelmats(0) randomly unless stated otherwise. */
   override def init() = {
-    super.init()
+    super.init();
+    mm = modelmats(0);
     if (refresh) {
-    	mm = modelmats(0);
     	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
     }
     updatemats = new Array[Mat](2);

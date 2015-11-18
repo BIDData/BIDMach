@@ -4,7 +4,8 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
-abstract class Mixin(val opts:Mixin.Opts = new Mixin.Options) { 
+@SerialVersionUID(100L)
+abstract class Mixin(val opts:Mixin.Opts = new Mixin.Options) extends Serializable { 
   val options = opts
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null

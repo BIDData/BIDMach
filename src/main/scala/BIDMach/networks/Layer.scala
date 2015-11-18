@@ -72,8 +72,8 @@ import java.util.HashMap;
 // To set layer A's i^th input to layer B's default (0th) output, do A.setinput(i, B)
 // To set layer A's i^th input to layer B's j^th output, do A.setinout(i, B, j)
 
-  
-class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) {
+@SerialVersionUID(100L)
+class Layer(val net:Net, val opts:Layer.Options = new Layer.Options) extends Serializable {
   // Internal data arrays
   val _inputs = new Array[Layer](1);
   val _inputTerminals = Array(0);
