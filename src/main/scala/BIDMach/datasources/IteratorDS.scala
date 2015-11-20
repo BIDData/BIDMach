@@ -22,9 +22,12 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
   var inMats:Array[Mat] = null;
   var inFname:Array[String] = null;
   var iter:Iterator[(AnyRef, AnyRef)] = null;
+  var nblocks = -1;
+  var iblock = 0;
   
   def reset = {
   	samplesDone = 0;
+  	iblock = 0;
   }
   
   def init = {
@@ -99,17 +102,24 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
   }
   
   def progress:Float = {
-    0f
+    if (nblocks > 0) {
+    	(fprogress + iblock-1)/nblocks;
+    } else 0f
   }
   
   def hasNext:Boolean = {
     val matq = inMats(0);
     val matqnr = if (opts.dorows) matq.nrows else matq.ncols;
-    (iter.hasNext || (matqnr - samplesDone) == 0);
+    val ihn = iter.hasNext;
+    if (! ihn && iblock > 0) {
+      nblocks = iblock;
+    }
+    (ihn || (matqnr - samplesDone) == 0);
   }
   
   def iterHasNext:Boolean = {
-    iter.hasNext
+  	iblock += 1;
+    iter.hasNext;
   }
   
   def iterNext() = {

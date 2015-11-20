@@ -42,6 +42,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   var refresh = true
   
+  var runtimes:FMat = null;
+  
   def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long):Unit = {
     val mlen = models(0).modelmats.length;
     val thisGPU = getGPU;
@@ -194,56 +196,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   def updatePass(ipass:Int) = {}
   
-    
   def convertMat(a:Mat):Mat = {
-    a match {
-      case f:FMat =>
-      if (useGPU) {
-      	if (opts.useDouble) {
-      		GDMat(f);
-      	} else {
-      		GMat(f);
-      	}
-      } else {
-      	if (opts.useDouble) {  
-      		DMat(f);
-      	} else {
-      		f
-      	}
-      }
-      case i:IMat =>
-      if (useGPU) {
-        GIMat(i);
-      } else {
-        i;
-      }
-      case g:GMat => if (useGPU) {
-      	if (opts.useDouble) {
-      		GDMat(g);
-      	} else {
-      	  g
-      	} 
-      } else {
-      	if (opts.useDouble) {
-      	  DMat(FMat(g));
-      	} else {
-      		FMat(g);
-      	}
-      }
-      case g:GDMat => if (useGPU) {
-      	if (opts.useDouble) {
-      		g;
-      	} else {
-      	  GMat(g)
-      	} 
-      } else {
-      	if (opts.useDouble) {
-      	  DMat(g);
-      	} else {
-      		FMat(g);
-      	}
-      }
-    }
+  	Model.convertMat(a, useGPU, opts.useDouble);
   }
 }
 
@@ -261,4 +215,54 @@ object Model {
 	
 	class Options extends Opts {} 
   
+  def convertMat(a:Mat, useGPU:Boolean, useDouble:Boolean):Mat = {	
+	   a match {
+      case f:FMat =>
+      if (useGPU) {
+      	if (useDouble) {
+      		GDMat(f);
+      	} else {
+      		GMat(f);
+      	}
+      } else {
+      	if (useDouble) {  
+      		DMat(f);
+      	} else {
+      		f
+      	}
+      }
+      case i:IMat =>
+      if (useGPU) {
+        GIMat(i);
+      } else {
+        i;
+      }
+      case g:GMat => if (useGPU) {
+      	if (useDouble) {
+      		GDMat(g);
+      	} else {
+      	  g
+      	} 
+      } else {
+      	if (useDouble) {
+      	  DMat(FMat(g));
+      	} else {
+      		FMat(g);
+      	}
+      }
+      case g:GDMat => if (useGPU) {
+      	if (useDouble) {
+      		g;
+      	} else {
+      	  GMat(g)
+      	} 
+      } else {
+      	if (useDouble) {
+      	  DMat(g);
+      	} else {
+      		FMat(g);
+      	}
+      }
+    }
+  }
 }
