@@ -9,6 +9,8 @@ import BIDMach._
 
 /**
  * Click model using online Variational Bayes (Hoffman, Blei and Bach, 2010)
+ * This is the same as the online VB LDA model in this directory, except there are two input matrices, clicks and views. 
+ * Click count is the target value. The view count is used to scale the LDA prediction for that feature. 
  * 
  * '''Parameters'''
  - dim(256): Model dimension
