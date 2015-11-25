@@ -181,14 +181,14 @@ object Click  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
    
-  /** Online Variational Bayes Click algorithm with a matrix datasource. */
-  def learner(mat0:Mat, d:Int) = {
+  /** Online Variational Bayes Click algorithm with a two matrix datasource. */
+  def learner(mat0:Mat, mat1:Mat) = {
     class xopts extends Learner.Options with Click.Opts with MatDS.Opts with IncNorm.Opts
     val opts = new xopts
-    opts.dim = d
+    opts.dim = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatDS(Array(mat0, mat1), opts), 
   	    new Click(opts), 
   	    null,
   	    new IncNorm(opts), 
@@ -218,13 +218,13 @@ object Click  {
   }
      
   /** Batch Variational Bayes Click algorithm with a matrix datasource. */
-  def learnBatch(mat0:Mat, d:Int = 256) = {
+  def learnBatch(mat0:Mat, mat1:Mat) = {
     class xopts extends Learner.Options with Click.Opts with MatDS.Opts with BatchNorm.Opts
     val opts = new xopts
-    opts.dim = d
+    opts.dim = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
-        new MatDS(Array(mat0:Mat), opts), 
+        new MatDS(Array(mat0, mat1), opts), 
         new Click(opts), 
         null, 
         new BatchNorm(opts),
@@ -233,11 +233,11 @@ object Click  {
   }
   
   /** Parallel online Click algorithm with a matrix datasource. */ 
-  def learnPar(mat0:Mat, d:Int = 256) = {
-    class xopts extends ParLearner.Options with Click.Opts with MatDS.Opts with IncNorm.Opts
-    val opts = new xopts
-    opts.dim = d
-    opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
+  def learnPar(mat0:Mat, mat1:Mat) = {
+    class xopts extends ParLearner.Options with Click.Opts with MatDS.Opts with IncNorm.Opts;
+    val opts = new xopts;
+    opts.dim = 1;
+    opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1);
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
   	    new MatDS(Array(mat0:Mat), opts), 
