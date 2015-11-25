@@ -1,5 +1,5 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,LMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -81,9 +81,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   def saveMetaData(fname:String) = {}
   
+  def loadMetaData(fname:String) = {}
+  
   def save(fname:String) = {
     import java.io._
-    import BIDMat.JSON
     for (i <- 0 until modelmats.length) {
       val mat = modelmats(i);
       val f = new File(fname+"modelmat%02d.lz4" format i);
@@ -99,7 +100,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def load(fname:String) = {
 	  import java.io._
     import BIDMat.JSON
-    if (modelmats.length > 0) {
+    if (modelmats != null && modelmats.length > 0) {
     	for (i <- 0 until modelmats.length) {
     		modelmats(i) = loadMat(fname+"modelmat%02d.lz4" format i);
     	}

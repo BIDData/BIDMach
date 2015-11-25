@@ -72,7 +72,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
           layer.setinput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
           layer.setinout(1, getlayer(i+preamble_rows, j-1), 1);        // input 1 (prev_c) is layer to the left, output 1 (c)
         } else {
-          layer.setinput(0, leftedge);                   // in first column, just use dummy (zeros) input
+          layer.setinput(0, leftedge);                                 // in first column, just use dummy (zeros) input
           layer.setinput(1, leftedge);
         }
         setlayer(i+preamble_rows, j, layer);
@@ -352,6 +352,7 @@ object SeqToSeq {
   
     def load(fname:String):SeqToSeq = {
       val mm = new SeqToSeq;
+      mm.loadMetaData(fname);
       mm.load(fname);
       mm
     }

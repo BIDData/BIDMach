@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -167,6 +167,17 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     val writer = new PrintWriter(new File(fname + "metadata.json"));
     writer.print(str);
     writer.close;
+  }
+  
+  override def loadMetaData(fname:String) = {
+    import java.io._
+    val fr = new BufferedReader(new FileReader(fname+"metadata.json"));
+    val strbuf = new StringBuffer;
+    var line:String = null;
+    while ({line = fr.readLine(); line != null}) {
+      strbuf.append(line).append("\n");
+    }
+    modelMap = JSON.fromJSON(strbuf.toString).asInstanceOf[HashMap[String,Int]];
   }
   
   /* 
