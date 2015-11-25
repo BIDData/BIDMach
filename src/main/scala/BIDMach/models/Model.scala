@@ -19,8 +19,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def modelmats:Array[Mat] = {
     if (_modelmats != null) {
       _modelmats
-    } else {
+    } else if (parent_model != null) {
       parent_model._modelmats
+    } else {
+      null
     }
   }
   
