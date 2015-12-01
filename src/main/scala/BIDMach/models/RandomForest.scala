@@ -2,7 +2,7 @@ package BIDMach.models
 
 import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
 import BIDMach.Learner
-import BIDMach.datasources.{DataSource,MatDS}
+import BIDMach.datasources.{DataSource,MatDS,FilesDS,SFilesDS}
 import BIDMach.updaters.Batch
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
@@ -1368,6 +1368,25 @@ object RandomForest {
     opts.useGPU = false;
     val nn = new Learner(
         ds, 
+        new RandomForest(opts), 
+        null, 
+        new Batch(opts),
+        opts)
+    (nn, opts)
+  }
+  
+  class FsOpts extends Learner.Options with RandomForest.Opts with FilesDS.Opts with Batch.Opts
+    
+  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FilesDS.simpleEnum(datafile, 0, 1), FilesDS.simpleEnum(labelfile, 0, 1)))
+  
+  def learner(fnames:List[(Int)=>String]) = {
+    val opts = new FsOpts;
+    opts.nbits = 16;
+    opts.batchSize = 1000;
+    opts.fnames = fnames;
+    implicit val threads = threadPool(4);
+    val nn = new Learner(
+        new FilesDS(opts), 
         new RandomForest(opts), 
         null, 
         new Batch(opts),
