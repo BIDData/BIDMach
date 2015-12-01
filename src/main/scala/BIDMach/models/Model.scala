@@ -96,6 +96,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     val pw = new PrintWriter(new File(fname+"options.json"));
     pw.print(JSON.toJSON(opts), true);
     pw.close;
+    val out  = new FileOutputStream(fname+"options.ser")
+    val output = new ObjectOutputStream(out);
+    output.writeObject(output);
+    output.close;
     saveMetaData(fname);
   }
   
@@ -115,13 +119,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       }
       setmodelmats(mlist.toArray);
     }
-    val fr = new BufferedReader(new FileReader(fname+"options.json"));
-    val strbuf = new StringBuffer;
-    var line:String = null;
-    while ({line = fr.readLine(); line != null}) {
-      strbuf.append(line).append("\n");
-    }
-    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts];
+    val in = new FileInputStream(fname+"options.ser");
+    val input = new ObjectInputStream(in);
+    val newopts = input.readObject.asInstanceOf[Model.Opts];
+    input.close;
     opts.copyFrom(newopts)
   }
   
