@@ -1,5 +1,5 @@
 package BIDMach.datasinks
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,LMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.collection.mutable.ListBuffer
@@ -29,6 +29,8 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
       val nnz0 = imats(i) match {
         case i:SMat => i.nnz;
         case i:GSMat => i.nnz;
+        case i:SDMat => i.nnz;
+        case i:GSDMat => i.nnz;
         case _ => -1;
       }
       mats(i) = if (nnz0 >= 0) {
@@ -45,8 +47,6 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
       }
     }
   }
-  
-
 }
 
 object MatSink {
@@ -68,12 +68,16 @@ object MatSink {
   	m match {
   		case f:FMat => zeros(nr,nc);
   		case g:GMat => zeros(nr,nc);
+  		case f:DMat => dzeros(nr,nc);
+  		case g:GDMat => dzeros(nr,nc);
   		case i:IMat => izeros(nr,nc);
   		case gi:GIMat => izeros(nr,nc);
   		case l:LMat => lzeros(nr,nc);
-  		case l:LMat => lzeros(nr,nc);
+  		case l:GLMat => lzeros(nr,nc);
   		case s:SMat => SMat(nr,nc,s.nnz);
-  		case s:GSMat => SMat(nr,nc,s.nnz);     
+  		case s:GSMat => SMat(nr,nc,s.nnz);
+  		case s:SDMat => SDMat(nr,nc,s.nnz);
+  		case s:GSDMat => SDMat(nr,nc,s.nnz);
   	}
   }
 }
