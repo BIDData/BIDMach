@@ -10,7 +10,7 @@ abstract class DataSink(val opts:DataSink.Opts = new DataSink.Options) extends S
   def setGUID(v:Long):Unit = {_GUID = v} 
   def GUID:Long = _GUID
   def put(m:Array[Mat]);
-  def init:Unit
+  def init:Unit = {}
   def close = {}
   var omats:Array[Mat] = null
 }
