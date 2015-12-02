@@ -124,7 +124,7 @@ object IPTW {
     Array(new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
   }
   
-  class LearnOptions extends Learner.Options with IPTW.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnOptions extends Learner.Options with IPTW.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
      
   // Basic in-memory learner with generated target
   def learner(mat0:Mat) = { 
@@ -133,25 +133,27 @@ object IPTW {
     opts.lrate = 1f
     opts.links = 1
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    new IPTW(opts), 
   	    mkRegularizer(opts),
-  	    new ADAGrad(opts), 
+  	    new ADAGrad(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }  
   
-  class LearnParOptions extends ParLearner.Options with IPTW.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnParOptions extends ParLearner.Options with IPTW.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0), opts), 
+  	    new MatSource(Array(mat0), opts), 
   	    opts, mkModel _,
   	    opts, mkRegularizer _,
   	    opts, mkUpdater _, 
+  	    null, null,
   	    opts)
     (nn, opts)
   }
@@ -165,21 +167,22 @@ object IPTW {
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new ParLearnerF(
-        new MatDS(Array(mat0, targ), opts), 
+        new MatSource(Array(mat0, targ), opts), 
         opts, mkModel _,
         opts, mkRegularizer _,
-        opts, mkUpdater _, 
+        opts, mkUpdater _,
+        null, null,
         opts)
     (nn, opts)
   }
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with IPTW.Opts with SFilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with IPTW.Opts with SFilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+    nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
+		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {
   	
@@ -191,14 +194,15 @@ object IPTW {
   	    opts, mkModel _,
   	    opts, mkRegularizer _,
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts
   	)
   	(nn, opts)
   }
   
   def learnFPar(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+    nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
+		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {	
   	val opts = new LearnFParOptions
@@ -208,6 +212,7 @@ object IPTW {
   	    opts, mkModel _, 
         opts, mkRegularizer _,
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts
   	)
   	(nn, opts)

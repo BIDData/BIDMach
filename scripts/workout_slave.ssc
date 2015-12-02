@@ -94,7 +94,7 @@ val rmse = sqrt((diff ^* diff) / diff.length)
 println("RMSE = %f" format rmse.v);
 
 if ((new java.io.File("../data/MNIST8M/parts/data00.fmat.lz4")).exists) {
-println("\n<<<<<<< Testing RF with FilesDS on MNIST8M (depth 16) >>>>>>>")
+println("\n<<<<<<< Testing Random Forests with FilesSource on MNIST8M (depth 16) >>>>>>>")
 val (mm11,opts11) = RandomForest.learner("../data/MNIST8M/parts/data%02d.fmat.lz4","../data/MNIST8M/parts/cat%02d.imat.lz4")
 opts11.batchSize = 20000
 opts11.depth =  16
@@ -109,7 +109,7 @@ mm11.train
 } 
 
 if ((new java.io.File("../data/uci/pubmed_parts/part00.smat.lz4")).exists) {
-println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed (2 passes) >>>>>>>")
+println("\n<<<<<<< Testing LDA with SFilesSource on Pubmed (2 passes) >>>>>>>")
 val (mm6,opts6) = LDA.learner(List((n:Int)=> ("../data/uci/pubmed_parts/part%02d.smat.lz4" format n)), 128)
 opts6.npasses=2
 opts6.useGPU=useGPU
@@ -119,7 +119,7 @@ mm6.train
 
 if ((new java.io.File("../data/MNIST8M/parts/alls00.fmat.lz4")).exists) {
 if (useGPU && Mat.hasCUDA > 1) {
-println("\n<<<<<<< Testing parallel KMeans with FilesDS on MNIST8M (4 passes) >>>>>>>")
+println("\n<<<<<<< Testing parallel KMeans with FilesSource on MNIST8M (4 passes) >>>>>>>")
 val (mm7,opts7) = KMeans.learnPar("../data/MNIST8M/parts/alls%02d.fmat.lz4", 4096)
 opts7.npasses=4
 opts7.nend=70
@@ -127,7 +127,7 @@ opts7.batchSize=20000
 opts7.nthreads=Mat.hasCUDA
 mm7.train
 } else {
-println("\n<<<<<<< Testing KMeans with FilesDS on MNIST8M (4 passes) >>>>>>>")
+println("\n<<<<<<< Testing KMeans with FilesSource on MNIST8M (4 passes) >>>>>>>")
 val (mm7,opts7) = KMeans.learner(List((n:Int)=> ("../data/MNIST8M/parts/alls%02d.fmat.lz4" format n)), 256)
 opts7.npasses=4
 opts7.nend=70

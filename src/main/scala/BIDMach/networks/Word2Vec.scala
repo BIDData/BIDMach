@@ -1204,23 +1204,24 @@ object Word2Vec  {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
-  class LearnOptions extends Learner.Options with Word2Vec.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  class LearnOptions extends Learner.Options with Word2Vec.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
   
   def learner(mat0:Mat, targ:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, targ), opts), 
+  	    new MatSource(Array(mat0, targ), opts), 
   	    new Word2Vec(opts), 
   	    null,
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with Word2Vec.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0)));
   
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
@@ -1228,12 +1229,13 @@ object Word2Vec  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts);
+    val ds = new FilesSource(opts);
   	val nn = new Learner(
   			ds, 
   	    new Word2Vec(opts), 
   	    null,
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -1254,10 +1256,11 @@ object Word2Vec  {
     opts.nneg = mopts.nneg;
     opts.nreuse = mopts.nreuse;
     val nn = new Learner(
-        new MatDS(Array(mat0, preds), opts), 
+        new MatSource(Array(mat0, preds), opts), 
         newmod, 
         null,
-        null, 
+        null,
+        null,
         opts);
     (nn, opts)
   }
@@ -1280,17 +1283,18 @@ object Word2Vec  {
     opts.nSlices = mopts.nSlices;
     opts.nHeadTerms = mopts.nHeadTerms;
     val nn = new Learner(
-        new MatDS(Array(mat0), opts), 
+        new MatSource(Array(mat0), opts), 
         newmod, 
         null,
-        null, 
+        null,
+        null,
         opts);
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FilesDS.Opts with ADAGrad.Opts;
+  class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FilesSource.Opts with ADAGrad.Opts;
   
-  def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0)))}
+  def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesSource.simpleEnum(fn1,1,0)))}
   
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
@@ -1299,10 +1303,11 @@ object Word2Vec  {
     opts.fnames = fnames;
     implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
-        new FilesDS(opts), 
+        new FilesSource(opts), 
         opts, mkModel _,
         null, null,
-        null, null, 
+        null, null,
+        null, null,
         opts)
     (nn, opts)
   }

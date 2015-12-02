@@ -183,22 +183,23 @@ object Click  {
    
   /** Online Variational Bayes Click algorithm with a two matrix datasource. */
   def learner(mat0:Mat, mat1:Mat) = {
-    class xopts extends Learner.Options with Click.Opts with MatDS.Opts with IncNorm.Opts
+    class xopts extends Learner.Options with Click.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, mat1), opts), 
+  	    new MatSource(Array(mat0, mat1), opts), 
   	    new Click(opts), 
   	    null,
   	    new IncNorm(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   }
   
-  class FsOpts extends Learner.Options with Click.Opts with SFilesDS.Opts with IncNorm.Opts
+  class FsOpts extends Learner.Options with Click.Opts with SFilesSource.Opts with IncNorm.Opts
   
-  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FilesDS.simpleEnum(fpattern, 0, 1)), d)
+  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FilesSource.simpleEnum(fpattern, 0, 1)), d)
   
   /** Online Variational Bayes Click algorithm with a files dataSource. */
   def learner(fnames:List[(Int)=>String], d:Int):(Learner, FsOpts) = { 
@@ -209,48 +210,51 @@ object Click  {
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4)
   	val nn = new Learner(
-  	    new SFilesDS(opts), 
+  	    new SFilesSource(opts), 
   	    new Click(opts), 
   	    null,
-  	    new IncNorm(opts), 
+  	    new IncNorm(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }
      
   /** Batch Variational Bayes Click algorithm with a matrix datasource. */
   def learnBatch(mat0:Mat, mat1:Mat) = {
-    class xopts extends Learner.Options with Click.Opts with MatDS.Opts with BatchNorm.Opts
+    class xopts extends Learner.Options with Click.Opts with MatSource.Opts with BatchNorm.Opts
     val opts = new xopts
     opts.dim = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
-        new MatDS(Array(mat0, mat1), opts), 
+        new MatSource(Array(mat0, mat1), opts), 
         new Click(opts), 
         null, 
         new BatchNorm(opts),
+        null,
         opts)
     (nn, opts)
   }
   
   /** Parallel online Click algorithm with a matrix datasource. */ 
   def learnPar(mat0:Mat, mat1:Mat) = {
-    class xopts extends ParLearner.Options with Click.Opts with MatDS.Opts with IncNorm.Opts;
+    class xopts extends ParLearner.Options with Click.Opts with MatSource.Opts with IncNorm.Opts;
     val opts = new xopts;
     opts.dim = 1;
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1);
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    opts, mkClickmodel _, 
   	    null, null, 
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts)
     (nn, opts)
   }
   
-  class SFDSopts extends ParLearner.Options with Click.Opts with SFilesDS.Opts with IncNorm.Opts
+  class SFDSopts extends ParLearner.Options with Click.Opts with SFilesSource.Opts with IncNorm.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FilesDS.simpleEnum(fnames, 0, 1)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FilesSource.simpleEnum(fnames, 0, 1)), d);
   
   /** Parallel online Click algorithm with one file datasource. */
   def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {
@@ -263,10 +267,11 @@ object Click  {
   	opts.resFile = "../results.mat"
   	implicit val threads = threadPool(4)
   	val nn = new ParLearnerF(
-  	    new SFilesDS(opts),
+  	    new SFilesSource(opts),
   	    opts, mkClickmodel _, 
   	    null, null, 
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts
   	)
   	(nn, opts)

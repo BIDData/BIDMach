@@ -270,34 +270,36 @@ object ICA {
   
   /** ICA with a single matrix datasource. The dimension is based on the input matrix. */
   def learner(mat0:Mat) = {
-    class xopts extends Learner.Options with MatDS.Opts with ICA.Opts with ADAGrad.Opts
+    class xopts extends Learner.Options with MatSource.Opts with ICA.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = size(mat0)(0)
     opts.npasses = 10
     opts.batchSize = math.min(250000, mat0.ncols/15 + 1) // Just a heuristic
     opts.numOrthogIter = math.min(10, 5+math.sqrt(opts.dim).toInt)
     val nn = new Learner(
-        new MatDS(Array(mat0:Mat), opts), 
+        new MatSource(Array(mat0:Mat), opts), 
         new ICA(opts), 
         null,
         new ADAGrad(opts), 
+        null,
         opts)
     (nn, opts)
   }
   
   /** ICA with a files dataSource. */
   def learner(fnames:List[(Int)=>String], d:Int) = {
-    class xopts extends Learner.Options with FilesDS.Opts with ICA.Opts with ADAGrad.Opts
+    class xopts extends Learner.Options with FilesSource.Opts with ICA.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
     opts.fnames = fnames
     opts.batchSize = 25000;
     implicit val threads = threadPool(4)
     val nn = new Learner(
-        new FilesDS(opts), 
+        new FilesSource(opts), 
         new ICA(opts), 
         null,
-        new ADAGrad(opts), 
+        new ADAGrad(opts),
+        null,
         opts)
     (nn, opts)
   }

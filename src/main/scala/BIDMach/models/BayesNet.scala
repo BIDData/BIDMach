@@ -880,7 +880,7 @@ object BayesNet {
    */
   def learner(statesPerNode:Mat, dag:Mat, eClasses:Mat, data:Mat) = {
 
-    class xopts extends Learner.Options with BayesNet.Opts with MatDS.Opts with IncNorm.Opts 
+    class xopts extends Learner.Options with BayesNet.Opts with MatSource.Opts with IncNorm.Opts 
     val opts = new xopts
     opts.dim = dag.ncols
     opts.batchSize = math.min(100000, data.ncols/50 + 1)
@@ -892,10 +892,11 @@ object BayesNet {
     val secondMatrix = data.zeros(opts.copiesForSAME*data.nrows,data.ncols)
 
     val nn = new Learner(
-        new MatDS(Array(data:Mat, secondMatrix), opts),
+        new MatSource(Array(data:Mat, secondMatrix), opts),
         new BayesNet(SMat(dag), statesPerNode, eClasses, opts),
         null,
         new IncNorm(opts),
+        null,
         opts)
     (nn, opts)
   }

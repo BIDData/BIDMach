@@ -161,16 +161,18 @@ object LDAgibbs  {
    * This learner uses stochastic updates (like the standard LDA model)
    */
   def learner(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with LDAgibbs.Opts with MatDS.Opts with IncNorm.Opts
+    class xopts extends Learner.Options with LDAgibbs.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   			new LDAgibbs(opts), 
   			null,
-  			new IncNorm(opts), opts)
+  			new IncNorm(opts), 
+  			null,
+  			opts)
     (nn, opts)
   }
   
@@ -178,17 +180,18 @@ object LDAgibbs  {
    * Batch learner
    */
   def learnBatch(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with LDAgibbs.Opts with MatDS.Opts with BatchNorm.Opts
+    class xopts extends Learner.Options with LDAgibbs.Opts with MatSource.Opts with BatchNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
     opts.uiter = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
-        new MatDS(Array(mat0:Mat), opts), 
+        new MatSource(Array(mat0:Mat), opts), 
         new LDAgibbs(opts), 
         null, 
         new BatchNorm(opts),
+        null,
         opts)
     (nn, opts)
   }
@@ -197,7 +200,7 @@ object LDAgibbs  {
    * Parallel learner with matrix source
    */ 
   def learnPar(mat0:Mat, d:Int = 256) = {
-    class xopts extends ParLearner.Options with LDAgibbs.Opts with MatDS.Opts with IncNorm.Opts
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = -1
@@ -205,10 +208,11 @@ object LDAgibbs  {
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
     val nn = new ParLearnerF(
-        new MatDS(Array(mat0:Mat), opts), 
+        new MatSource(Array(mat0:Mat), opts), 
         opts, mkGibbsLDAmodel _, 
             null, null, 
             opts, mkUpdater _,
+            null, null,
             opts)
     (nn, opts)
   }
@@ -217,21 +221,22 @@ object LDAgibbs  {
    * Parallel learner with multiple file datasources
    */
   def learnFParx(
-      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+      nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
+      nend:Int=FilesSource.encodeDate(2012,12,1,0), 
       d:Int = 256
       ) = {
-    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesDS.Opts with IncNorm.Opts
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.npasses = 4
     opts.resFile = "/big/twitter/test/results.mat"
     val nn = new ParLearnerxF(
-        null, 
-            (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
-            opts, mkGibbsLDAmodel _, 
-            null, null, 
-        opts, mkUpdater _,
+    		null, 
+    		(dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
+    		opts, mkGibbsLDAmodel _, 
+    		null, null, 
+    		opts, mkUpdater _,
+    		null, null,
         opts
     )
     (nn, opts)
@@ -241,11 +246,11 @@ object LDAgibbs  {
    * Parallel learner with single file datasource
    */ 
   def learnFPar(
-      nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-      nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+      nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
+      nend:Int=FilesSource.encodeDate(2012,12,1,0), 
       d:Int = 256
       ) = {   
-    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesDS.Opts with IncNorm.Opts
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.npasses = 4
@@ -255,6 +260,7 @@ object LDAgibbs  {
         opts, mkGibbsLDAmodel _, 
         null, null, 
         opts, mkUpdater _,
+        null, null,
         opts
     )
     (nn, opts)

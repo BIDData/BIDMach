@@ -141,47 +141,50 @@ object NMF  {
   }
     
   def learner(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with NMF.Opts with MatDS.Opts with IncNorm.Opts
+    class xopts extends Learner.Options with NMF.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.uiter = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   			new NMF(opts), 
   			null,
   			new IncNorm(opts), 
+  			null,
   			opts)
     (nn, opts)
   }
      
   def learnBatch(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with NMF.Opts with MatDS.Opts with BatchNorm.Opts
+    class xopts extends Learner.Options with NMF.Opts with MatSource.Opts with BatchNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.uiter = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
-        new MatDS(Array(mat0:Mat), opts), 
+        new MatSource(Array(mat0:Mat), opts), 
         new NMF(opts), 
         null, 
         new BatchNorm(opts),
+        null,
         opts)
     (nn, opts)
   }
   
   def learnPar(mat0:Mat, d:Int = 256) = {
-    class xopts extends ParLearner.Options with NMF.Opts with MatDS.Opts with IncNorm.Opts
+    class xopts extends ParLearner.Options with NMF.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.npasses = 4
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    opts, mkNMFmodel _, 
   			null, null, 
   			opts, mkUpdater _,
+  			null, null,
   			opts)
     (nn, opts)
   }

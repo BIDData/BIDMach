@@ -2,7 +2,7 @@ package BIDMach.models
 
 import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
 import BIDMach.Learner
-import BIDMach.datasources.{DataSource,MatDS,FilesDS,SFilesDS}
+import BIDMach.datasources.{DataSource,MatSource,FilesSource,SFilesSource}
 import BIDMach.updaters.Batch
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
@@ -1348,17 +1348,18 @@ object RandomForest {
   
   class RFopts extends Learner.Options with RandomForest.Opts with DataSource.Opts with Batch.Opts;
   
-  class RFSopts extends RFopts with MatDS.Opts;
+  class RFSopts extends RFopts with MatSource.Opts;
   
   def learner(data:Mat, labels:Mat) = {
     val opts = new RFSopts;
     opts.nbits = 16;
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
     val nn = new Learner(
-        new MatDS(Array(data, labels), opts), 
+        new MatSource(Array(data, labels), opts), 
         new RandomForest(opts), 
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }
@@ -1371,13 +1372,14 @@ object RandomForest {
         new RandomForest(opts), 
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }
   
-  class FsOpts extends Learner.Options with RandomForest.Opts with FilesDS.Opts with Batch.Opts
+  class FsOpts extends Learner.Options with RandomForest.Opts with FilesSource.Opts with Batch.Opts
     
-  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FilesDS.simpleEnum(datafile, 0, 1), FilesDS.simpleEnum(labelfile, 0, 1)))
+  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FilesSource.simpleEnum(datafile, 0, 1), FilesSource.simpleEnum(labelfile, 0, 1)))
   
   def learner(fnames:List[(Int)=>String]) = {
     val opts = new FsOpts;
@@ -1386,10 +1388,11 @@ object RandomForest {
     opts.fnames = fnames;
     implicit val threads = threadPool(4);
     val nn = new Learner(
-        new FilesDS(opts), 
+        new FilesSource(opts), 
         new RandomForest(opts), 
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }
@@ -1400,6 +1403,7 @@ object RandomForest {
         model,
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }
@@ -1407,10 +1411,11 @@ object RandomForest {
   def predictor(model:Model, data:Mat, preds:Mat):(Learner, RFopts) = {
     val opts = model.opts.asInstanceOf[RFSopts];
     val nn = new Learner(
-        new MatDS(Array(data, preds), opts),
+        new MatSource(Array(data, preds), opts),
         model,
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }

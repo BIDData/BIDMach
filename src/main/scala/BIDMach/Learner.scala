@@ -7,6 +7,7 @@ import BIDMat.about
 import BIDMach.models._
 import BIDMach.updaters._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.mixins._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
@@ -23,6 +24,7 @@ case class Learner(
     val model:Model, 
     val mixins:Array[Mixin], 
     val updater:Updater, 
+    val datasink:DataSink,
     val opts:Learner.Options = new Learner.Options) extends Serializable {
   
   var results:FMat = null
@@ -198,9 +200,9 @@ case class Learner(
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
-  def datamats = datasource.asInstanceOf[MatDS].mats
+  def datamats = datasource.asInstanceOf[MatSource].mats
   def modelmats = model.modelmats
-  def datamat = datasource.asInstanceOf[MatDS].mats(0)
+  def datamat = datasource.asInstanceOf[MatSource].mats(0)
   def modelmat = model.modelmats(0)
 }
 
@@ -213,7 +215,8 @@ case class ParLearner(
     val datasource:DataSource, 
     val models:Array[Model], 
     val mixins:Array[Array[Mixin]], 
-    val updaters:Array[Updater], 
+    val updaters:Array[Updater],
+    val datasink:DataSink,
     val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
   
   var um:Array[Mat] = null
@@ -419,9 +422,9 @@ case class ParLearner(
     updaters(ithread).init(models(ithread))      
   }
     
-  def datamats = datasource.asInstanceOf[MatDS].mats
+  def datamats = datasource.asInstanceOf[MatSource].mats
   def modelmats = models(0).modelmats
-  def datamat = datasource.asInstanceOf[MatDS].mats(0)
+  def datamat = datasource.asInstanceOf[MatSource].mats(0)
   def modelmat = models(0).modelmats(0)
 }
 
@@ -436,6 +439,7 @@ case class ParLearnerx(
     val models:Array[Model], 
     val mixins:Array[Array[Mixin]], 
     val updaters:Array[Updater], 
+    val datasinks:Array[DataSink],
 		val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
   
   var um:Array[Mat] = null
@@ -651,17 +655,21 @@ class ParLearnerxF(
 		mkreg:(Mixin.Opts)=>Array[Mixin],
 		uopts:Updater.Opts,
 		mkupdater:(Updater.Opts)=>Updater,
+		sopts:DataSink.Opts,
+		ssfun:(DataSink.Opts, Int)=>DataSink,
 		val lopts:ParLearner.Options = new ParLearner.Options) extends Serializable {
 
-  var dds:Array[DataSource] = null
+  var dds:Array[DataSource] = null;
+  var sss:Array[DataSink] = null
   var models:Array[Model] = null
   var mixins:Array[Array[Mixin]] = null
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null
   
   def setup = {
-    dds = new Array[DataSource](lopts.nthreads)
-    models = new Array[Model](lopts.nthreads)
+    dds = new Array[DataSource](lopts.nthreads);
+    sss = new Array[DataSink](lopts.nthreads);
+    models = new Array[Model](lopts.nthreads);
     if (mkreg != null) mixins = new Array[Array[Mixin]](lopts.nthreads)
     updaters = new Array[Updater](lopts.nthreads)
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
@@ -673,7 +681,7 @@ class ParLearnerxF(
     	updaters(i) = mkupdater(uopts)
     }
     if (0 < Mat.hasCUDA) setGPU(thisGPU)
-    learner = new ParLearnerx(dds, models, mixins, updaters, lopts)
+    learner = new ParLearnerx(dds, models, mixins, updaters, sss, lopts)
     learner.setup
   }
   
@@ -699,6 +707,8 @@ class ParLearnerF(
 		mkreg:(Mixin.Opts)=>Array[Mixin],
 		val uopts:Updater.Opts,
 		mkupdater:(Updater.Opts)=>Updater,
+		val sopts:DataSink.Opts,
+		val ss:DataSink,
 		val lopts:ParLearner.Options = new ParLearner.Options) extends Serializable {
   var models:Array[Model] = null
   var mixins:Array[Array[Mixin]] = null
@@ -717,7 +727,7 @@ class ParLearnerF(
     	if (mkupdater != null) updaters(i) = mkupdater(uopts)
     }
     if (0 < Mat.hasCUDA) setGPU(thisGPU)
-    learner = new ParLearner(ds, models, mixins, updaters, lopts)   
+    learner = new ParLearner(ds, models, mixins, updaters, ss, lopts)   
     learner.setup
   }
   
@@ -775,7 +785,7 @@ object Learner {
   
   def setupPB(ds:DataSource, npb:Int, dim:Int) = {
     ds match {
-    case ddm:MatDS => {
+    case ddm:MatSource => {
     	if (npb >= 0) {
     		ddm.setupPutBack(npb, dim)
     	}

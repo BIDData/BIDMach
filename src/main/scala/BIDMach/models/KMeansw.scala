@@ -135,9 +135,9 @@ object KMeansw  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
   
-  class FsOpts extends Learner.Options with KMeansw.Opts with FilesDS.Opts with IncNorm.Opts
+  class FsOpts extends Learner.Options with KMeansw.Opts with FilesSource.Opts with IncNorm.Opts
   
-  class MemOpts extends Learner.Options with KMeansw.Opts with MatDS.Opts with IncNorm.Opts
+  class MemOpts extends Learner.Options with KMeansw.Opts with MatSource.Opts with IncNorm.Opts
    
   def learner(datamat:Mat, wghts:Mat, d:Int) = {
     val opts = new MemOpts
@@ -146,10 +146,12 @@ object KMeansw  {
     opts.isprob = false
     opts.power = 0.5f
   	val nn = new Learner(
-  	    new MatDS(Array(datamat, wghts), opts), 
+  	    new MatSource(Array(datamat, wghts), opts), 
   	    new KMeansw(opts), 
   	    null,
-  	    new IncNorm(opts), opts)
+  	    new IncNorm(opts), 
+  	    null,
+  	    opts)
     (nn, opts)
   }
   
@@ -160,10 +162,12 @@ object KMeansw  {
     opts.isprob = false
     opts.power = 0.5f
     val nn = new Learner(
-        new MatDS(Array(datamat), opts), 
+        new MatSource(Array(datamat), opts), 
         new KMeansw(opts), 
         null,
-        new IncNorm(opts), opts)
+        new IncNorm(opts), 
+        null,
+        opts)
     (nn, opts)
   } 
    
@@ -176,8 +180,9 @@ object KMeansw  {
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1, preds), nopts), 
         newmod, 
+        null,
         null,
         null,
         nopts)
@@ -185,17 +190,18 @@ object KMeansw  {
   }
    
   def learnPar(mat0:Mat, d:Int = 256) = {
-    class xopts extends ParLearner.Options with KMeansw.Opts with MatDS.Opts with IncNorm.Opts
+    class xopts extends ParLearner.Options with KMeansw.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
     opts.power = 0.5f
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    opts, mkKMeansModel _, 
   	    null, null, 
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts)
     (nn, opts)
   } 

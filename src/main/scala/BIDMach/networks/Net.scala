@@ -338,7 +338,7 @@ object Net  {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
-  class LearnOptions extends Learner.Options with Net.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnOptions extends Learner.Options with Net.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, targ:Mat) = {
     val opts = new LearnOptions;
@@ -348,10 +348,11 @@ object Net  {
     }
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, targ), opts), 
+  	    new MatSource(Array(mat0, targ), opts), 
   	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -362,20 +363,21 @@ object Net  {
     opts.links.set(1);
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, targ), opts), 
+  	    new MatSource(Array(mat0, targ), opts), 
   	    new Net(opts), 
   	    null,
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with Net.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with Net.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
-  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0),
+  		                                                                  FilesSource.simpleEnum(fn2,1,0)));
   
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0)));
 
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts;
@@ -383,20 +385,21 @@ object Net  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts)
+    val ds = new FilesSource(opts)
   	val nn = new Learner(
   			ds, 
   	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   } 
   
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0),
-  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
+  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesSource.simpleEnum(fn1,1,0),
+  		                                                                  FilesSource.simpleEnum(fn2,1,0)));
   
-  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0)));
+  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FilesSource.simpleEnum(fn1,1,0)));
   
   def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
@@ -404,13 +407,14 @@ object Net  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts)
+    val ds = new FilesSource(opts)
     val net = dlayers(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
   	    new Net(opts), 
   	    null,
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -430,17 +434,18 @@ object Net  {
     newmod.refresh = false;
     newmod.copyFrom(model)
     val nn = new Learner(
-        new MatDS(Array(mat0, preds), opts), 
+        new MatSource(Array(mat0, preds), opts), 
         newmod, 
         null,
         null, 
+        null,
         opts);
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with Net.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  class LearnParOptions extends ParLearner.Options with Net.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
   
-  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)))}
+  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesSource.simpleEnum(fn1,1,0), FilesSource.simpleEnum(fn2,1,0)))}
   
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
@@ -449,10 +454,11 @@ object Net  {
     opts.fnames = fnames;
     implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
-        new FilesDS(opts), 
+        new FilesSource(opts), 
         opts, mkNetModel _,
         opts, mkRegularizer _,
         opts, mkUpdater _, 
+        null, null,
         opts)
     (nn, opts)
   }
