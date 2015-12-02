@@ -98,7 +98,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     pw.close;
     val out  = new FileOutputStream(fname+"options.ser")
     val output = new ObjectOutputStream(out);
-    output.writeObject(output);
+    output.writeObject(opts);
     output.close;
     saveMetaData(fname);
   }

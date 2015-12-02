@@ -948,8 +948,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   object giniImpurity extends imptyType {
-    def updatefn(a:Int):Double = { val v = a; v * v }
-    def resultfn(acc:Double, tot:Int) = { val v = math.max(tot,1); 1f - acc / (v * v) }
+    def updatefn(a:Int):Double = { val v = a.toDouble; v * v }
+    def resultfn(acc:Double, tot:Int) = { val v = math.max(tot,1).toDouble; 1f - acc / (v * v) }
     def combinefn(ent1:Double, ent2:Double, tot1:Int, tot2:Int):Double = { (ent1 * tot1 + ent2 * tot2)/math.max(1, tot1 + tot2) }
     val update = updatefn _ ;
     val result = resultfn _ ;
