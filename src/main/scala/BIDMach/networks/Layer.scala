@@ -1393,7 +1393,7 @@ object CompoundLayer {
   }
 }
 
-class LayerOptions(val nlayers:Int) {
+class LayerOptions(val nlayers:Int) extends Serializable {
   
   val layerOptionss = new Array[Layer.Options](nlayers);
   
