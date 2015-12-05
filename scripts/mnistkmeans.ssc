@@ -1,7 +1,7 @@
 val dir="../data/MNIST8M/parts/"
 val (nn, opts) = KMeans.learner(dir+"alls%02d.fmat.lz4",256);
 
-opts.nend = 70;
+opts.nend = 20;
 opts.batchSize = 20000;
 opts.npasses = 20;
 
