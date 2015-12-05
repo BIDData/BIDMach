@@ -1,5 +1,5 @@
 
-val (nn, opts) = MNIST.learner(dir+"alls%02d.fmat.lz4", 4096);
+val (nn, opts) = KMeans.learner(dir+"alls%02d.fmat.lz4", 4096);
 
 opts.nend = 70;
 opts.batchSize = 20000;
