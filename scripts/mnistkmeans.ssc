@@ -1,5 +1,5 @@
 
-class SFDSopts extends Learner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts;
+class SFDSopts extends Learner.Options with KMeans.Opts with FilesSource.Opts with Batch.Opts;
   
 def _learn(fnames:List[(Int) => String], d:Int = 256):(Learner, SFDSopts) = {
     val opts = new SFDSopts;
@@ -11,7 +11,7 @@ def _learn(fnames:List[(Int) => String], d:Int = 256):(Learner, SFDSopts) = {
 //    opts.resFile = "../data/results.mat"
     implicit val threads = threadPool(4)
     val nn = new Learner(
-			 new FilesDS(opts),
+			 new FilesSource(opts),
 			 new KMeans(opts),
 			 null,  
 			 new Batch(opts),
