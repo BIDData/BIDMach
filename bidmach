@@ -18,12 +18,7 @@ BIDMACH_ROOT=`pwd`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
 JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
-if [ -e java_native_path.txt ]; then
-  JAVA_NATIVE=`cat java_native_path.txt`
-else 
-  JAVA_NATIVE=`java getnativepath`
-  echo ${JAVA_NATIVE} > java_native_path.txt
-fi
+JAVA_NATIVE=`java getnativepath`
 if [ `uname` = "Darwin" ]; then
     export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${DYLD_LIBRARY_PATH}"
 else
