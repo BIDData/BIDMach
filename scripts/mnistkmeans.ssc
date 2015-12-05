@@ -20,7 +20,7 @@ def _learn(fnames:List[(Int) => String], d:Int = 256):(Learner, SFDSopts) = {
     (nn, opts);
 };
 
-def learn(fnames:String, d:Int = 256):(Learner, SFDSopts) = _learn(List(FilesDS.simpleEnum(fnames, 0, 1)), d);
+def learn(fnames:String, d:Int = 256):(Learner, SFDSopts) = _learn(List(FilesSource.simpleEnum(fnames, 0, 1)), d);
 
 val dir = "../data/MNIST8M/parts/";
 
