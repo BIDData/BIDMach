@@ -19,7 +19,9 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
     blocks += omats.map(MatSink.copyCPUmat);
   }
 
-  override def close () = {
+  override def close () = mergeBlocks;
+  
+  def mergeBlocks = {
     val ncols = blocks.map(_(0).ncols).reduce(_+_);
     val imats = blocks(0);
     val ablocks = blocks.toArray;

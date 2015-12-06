@@ -4,9 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.collection.mutable.ListBuffer
 
-class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends DataSink(opts) { 
-  var blocks = new ListBuffer[Array[Mat]]();
-  var mats:Array[Mat] = null;
+class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends MatSink(opts) { 
   var ifile = 0;
   var colsdone = 0;
   
@@ -18,7 +16,7 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends D
     colsdone = 0;
   }
   
-  def put = {
+  override def put = {
     blocks += omats.map(MatSink.copyCPUmat);
     colsdone += omats(0).ncols;
     if (colsdone >= opts.ofcols) {
@@ -30,36 +28,11 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends D
   }
 
   override def close () = {
-    mergeBlocks;
+    mergeSaveBlocks;
   }
   
-  def mergeBlocks = {
-    val ncols = blocks.map(_(0).ncols).reduce(_+_);
-    val imats = blocks(0);
-    val ablocks = blocks.toArray;
-    if (mats == null) mats = new Array[Mat](nmats);
-    for (i <- 0 until nmats) {
-      val nrows = imats(i).nrows;
-      val nnz0 = imats(i) match {
-        case i:SMat => i.nnz;
-        case i:GSMat => i.nnz;
-        case i:SDMat => i.nnz;
-        case i:GSDMat => i.nnz;
-        case _ => -1;
-      }
-      mats(i) = if (nnz0 >= 0) {
-        val nnz = ablocks.map(_(i).nnz).reduce(_+_);
-        SMat(nrows, ncols, nnz);
-      } else {
-        MatSink.makeCPUmat(imats(i), nrows, ncols);
-      }
-      var here = 0;
-      for (j <- 0 until ablocks.length) {
-        val am = ablocks(j)(i);
-        am.colslice(0, am.ncols, mats(i), here, true);
-        here += am.ncols;
-      }
-    }
+  def mergeSaveBlocks = {
+    mergeBlocks
     for (i <- 0 until opts.ofnames.length) {
     	saveMat(opts.ofnames(i)(ifile), mats(i));
     }
@@ -67,7 +40,7 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends D
 }
 
 object FileSink {
-  trait Opts extends DataSink.Opts {
+  trait Opts extends MatSink.Opts {
   	var ofnames:List[(Int)=>String] = null;
   	var ofcols = 100000;
   }
