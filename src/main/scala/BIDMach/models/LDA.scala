@@ -149,11 +149,14 @@ object LDA  {
   def mkUpdater(nopts:Updater.Opts) = {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
-   
+
+  class matOpts extends Learner.Options with LDA.Opts with MatSource.Opts with IncNorm.Opts
+  
   /** Online Variational Bayes LDA algorithm with a matrix datasource. */
-  def learner(mat0:Mat, d:Int) = {
-    class xopts extends Learner.Options with LDA.Opts with MatSource.Opts with IncNorm.Opts
-    val opts = new xopts
+  def learner(mat0:Mat):(Learner, matOpts) = learner(mat0, 256);
+  
+  def learner(mat0:Mat, d:Int):(Learner, matOpts)  = {
+    val opts = new matOpts
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
@@ -166,20 +169,22 @@ object LDA  {
     (nn, opts)
   }
   
-  class FsOpts extends Learner.Options with LDA.Opts with SFilesSource.Opts with IncNorm.Opts
+  class fsOpts extends Learner.Options with LDA.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FilesSource.simpleEnum(fpattern, 0, 1)), d)
+  def learner(fpattern:String):(Learner, fsOpts) = learner(fpattern, 256)
+  
+  def learner(fpattern:String, d:Int):(Learner, fsOpts) = learner(List(FileSource.simpleEnum(fpattern, 0, 1)), d)
   
   /** Online Variational Bayes LDA algorithm with a files dataSource. */
-  def learner(fnames:List[(Int)=>String], d:Int):(Learner, FsOpts) = { 
-    val opts = new FsOpts
+  def learner(fnames:List[(Int)=>String], d:Int):(Learner, fsOpts) = { 
+    val opts = new fsOpts
     opts.dim = d
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4)
   	val nn = new Learner(
-  	    new SFilesSource(opts), 
+  	    new SFileSource(opts), 
   	    new LDA(opts), 
   	    null,
   	    new IncNorm(opts), 
@@ -188,10 +193,13 @@ object LDA  {
     (nn, opts)
   }
      
+  class matBatchOpts extends Learner.Options with LDA.Opts with MatSource.Opts with BatchNorm.Opts;
+  
   /** Batch Variational Bayes LDA algorithm with a matrix datasource. */
-  def learnBatch(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with LDA.Opts with MatSource.Opts with BatchNorm.Opts
-    val opts = new xopts
+  def learnBatch(mat0:Mat):(Learner, matBatchOpts) = learnBatch(mat0, 256);
+  
+  def learnBatch(mat0:Mat, d:Int):(Learner, matBatchOpts) = {  
+    val opts = new matBatchOpts;
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
@@ -204,10 +212,13 @@ object LDA  {
     (nn, opts)
   }
   
+  class matParOpts extends ParLearner.Options with LDA.Opts with MatSource.Opts with IncNorm.Opts;
+  
   /** Parallel online LDA algorithm with a matrix datasource. */ 
-  def learnPar(mat0:Mat, d:Int = 256) = {
-    class xopts extends ParLearner.Options with LDA.Opts with MatSource.Opts with IncNorm.Opts
-    val opts = new xopts
+  def learnPar(mat0:Mat):(ParLearnerF, matParOpts) = learnPar(mat0, 256);
+     
+  def learnPar(mat0:Mat, d:Int):(ParLearnerF, matParOpts) = {    
+    val opts = new matParOpts;
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
@@ -221,9 +232,9 @@ object LDA  {
     (nn, opts)
   }
   
-  class SFDSopts extends ParLearner.Options with LDA.Opts with SFilesSource.Opts with IncNorm.Opts
+  class SFDSopts extends ParLearner.Options with LDA.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FilesSource.simpleEnum(fnames, 0, 1)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 0, 1)), d);
   
   /** Parallel online LDA algorithm with one file datasource. */
   def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {
@@ -236,7 +247,7 @@ object LDA  {
   	opts.resFile = "../results.mat"
   	implicit val threads = threadPool(4)
   	val nn = new ParLearnerF(
-  	    new SFilesSource(opts),
+  	    new SFileSource(opts),
   	    opts, mkLDAmodel _, 
   	    null, null, 
   	    opts, mkUpdater _,

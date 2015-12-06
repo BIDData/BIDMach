@@ -167,9 +167,9 @@ object NextWord {
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with NextWord.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with NextWord.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
 
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts;
@@ -177,7 +177,7 @@ object NextWord {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesSource(opts)
+    val ds = new FileSource(opts)
   	val nn = new Learner(
   			ds, 
   	    new NextWord(opts), 

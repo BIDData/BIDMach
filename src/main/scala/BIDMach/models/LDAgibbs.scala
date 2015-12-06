@@ -221,11 +221,11 @@ object LDAgibbs  {
    * Parallel learner with multiple file datasources
    */
   def learnFParx(
-      nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-      nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+      nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+      nend:Int=FileSource.encodeDate(2012,12,1,0), 
       d:Int = 256
       ) = {
-    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesSource.Opts with IncNorm.Opts
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFileSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.npasses = 4
@@ -246,11 +246,11 @@ object LDAgibbs  {
    * Parallel learner with single file datasource
    */ 
   def learnFPar(
-      nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-      nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+      nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+      nend:Int=FileSource.encodeDate(2012,12,1,0), 
       d:Int = 256
       ) = {   
-    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFilesSource.Opts with IncNorm.Opts
+    class xopts extends ParLearner.Options with LDAgibbs.Opts with SFileSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.npasses = 4

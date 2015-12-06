@@ -859,12 +859,12 @@ object DNN  {
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with DNN.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with DNN.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0),
-  		                                                                  FilesSource.simpleEnum(fn2,1,0)));
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
+  		                                                                  FileSource.simpleEnum(fn2,1,0)));
   
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
 
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
@@ -872,7 +872,7 @@ object DNN  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesSource(opts)
+    val ds = new FileSource(opts)
 //    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
@@ -884,10 +884,10 @@ object DNN  {
     (nn, opts)
   } 
   
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesSource.simpleEnum(fn1,1,0),
-  		                                                                  FilesSource.simpleEnum(fn2,1,0)));
+  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
+  		                                                                  FileSource.simpleEnum(fn2,1,0)));
   
-  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FilesSource.simpleEnum(fn1,1,0)));
+  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0)));
   
   def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
@@ -895,7 +895,7 @@ object DNN  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesSource(opts)
+    val ds = new FileSource(opts)
 //    dlayers(3, 0, 1f, targ.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
@@ -960,9 +960,9 @@ object DNN  {
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with DNN.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  class LearnParOptions extends ParLearner.Options with DNN.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
   
-  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesSource.simpleEnum(fn1,1,0), FilesSource.simpleEnum(fn2,1,0)))}
+  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)))}
   
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
@@ -971,7 +971,7 @@ object DNN  {
     opts.fnames = fnames;
     implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
-        new FilesSource(opts), 
+        new FileSource(opts), 
         opts, mkDNNModel _,
         opts, mkRegularizer _,
         opts, mkUpdater _,

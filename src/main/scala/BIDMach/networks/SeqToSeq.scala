@@ -310,13 +310,13 @@ object SeqToSeq {
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with SeqToSeq.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with SeqToSeq.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
-  def learner(fn1:String, fn2:String, regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0), FilesSource.simpleEnum(fn2,1,0)), regularize, adagrad);
+  def learner(fn1:String, fn2:String, regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)), regularize, adagrad);
   
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0), FilesSource.simpleEnum(fn2,1,0)), false, true);
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)), false, true);
   
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesSource.simpleEnum(fn1,1,0), FilesSource.simpleEnum(fn2,1,0)));
+  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)));
   
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = learner(fnames, false, true);
   
@@ -326,7 +326,7 @@ object SeqToSeq {
     opts.batchSize = 128;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesSource(opts)
+    val ds = new FileSource(opts)
   	val nn = new Learner(
   			ds, 
   	    new SeqToSeq(opts), 
@@ -343,7 +343,7 @@ object SeqToSeq {
     opts.batchSize = 128;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesSource(opts)
+    val ds = new FileSource(opts)
     val nn = new Learner(
         ds, 
         new SeqToSeq(opts), 

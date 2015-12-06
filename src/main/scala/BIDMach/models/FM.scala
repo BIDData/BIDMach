@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach._
@@ -228,7 +229,7 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     }
     GLM.preds(eta, eta, mylinks, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, totflops)
-    if (putBack >= 0) {targ <-- eta}
+    if (ogmats != null) {ogmats(0) = eta}
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights))
     } else {
@@ -245,7 +246,7 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     val eta = mv * in + (vt1 dot vt2)
     GLM.preds(eta, eta, mylinks, totflops)
     val v = GLM.llfun(eta, ftarg, mylinks, totflops)
-    if (putBack >= 0) {targ <-- eta}
+    if (ogmats != null) {ogmats(0) = eta}
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights))
     } else {
@@ -311,41 +312,13 @@ object FM {
   
   def learner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 0)
   
-   // This function constructs a learner and a predictor. 
-  def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
-    val mopts = new LearnOptions;
-    val nopts = new LearnOptions;
-    mopts.lrate = row(1f, 0.1f, 0.1f)
-    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    mopts.autoReset = false
-    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
-    nopts.links = mopts.links
-    mopts.links.set(d)
-    nopts.batchSize = mopts.batchSize
-    nopts.putBack = 1
-    val model = new FM(mopts)
-    val mm = new Learner(
-        new MatSource(Array(mat0, targ), mopts), 
-        model, 
-        mkRegularizer(mopts),
-        new ADAGrad(mopts), 
-        null,
-        mopts)
-    val nn = new Learner(
-        new MatSource(Array(mat1, preds), nopts), 
-        model, 
-        null,
-        null, 
-        null,
-        nopts)
-    (mm, mopts, nn, nopts)
-  }
+  class PredOptions extends Learner.Options with FM.Opts with MatSource.Opts with MatSink.Opts
   
   // This function constructs a predictor from an existing model 
-  def predictor(model:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
+  def predictor(model:Model, mat1:Mat):(Learner, PredOptions) = {
     val mod = model.asInstanceOf[FM];
     val mopts = mod.opts;
-    val nopts = new LearnOptions;
+    val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.links = mopts.links.copy;
     nopts.putBack = 1;
@@ -356,11 +329,11 @@ object FM {
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
-        new MatSource(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1), nopts), 
         newmod, 
         null,
         null,
-        null,
+        new MatSink(nopts),
         nopts)
     (nn, nopts)
   }
@@ -384,16 +357,16 @@ object FM {
     (mm, mopts)
   }
   
-  class FGOptions extends Learner.Options with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FilesSource.Opts
+  class FGOptions extends Learner.Options with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FileSource.Opts
     
   // A learner that uses a files data source specified by a list of strings.  
   def learner(fnames:List[String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
     val model = new FM(mopts);
-    mopts.fnames = fnames.map((a:String) => FilesSource.simpleEnum(a,1,0));
+    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
     implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FilesSource(mopts)(ec);    
+    val ds = new FileSource(mopts)(ec);    
     val mm = new Learner(
         ds, 
         model, 
@@ -453,11 +426,11 @@ object FM {
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with FM.Opts with SFilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with FM.Opts with SFileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-    nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+    nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+		nend:Int=FileSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {
   	val opts = new LearnFParOptions
@@ -474,8 +447,8 @@ object FM {
   }
   
   def learnFPar(
-    nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+    nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+		nend:Int=FileSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {	
   	val opts = new LearnFParOptions

@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.Learner
 
@@ -217,6 +218,12 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
    
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
     val preds = DDS(mm, user, sdata) + (iavg + avg);
+    if (ogmats != null) {
+      ogmats(0) = user;
+      if (ogmats.length > 1) {
+        ogmats(1) = preds;
+      }
+    }
   	val dc = sdata.contents;
   	val pc = preds.contents;
   	val vv = (dc - pc) ddot (dc - pc);
@@ -229,6 +236,12 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   	val pc = spreds.contents;
   	val vv = (dc - pc) ddot (dc - pc);
   	val xpreds = DDS(mm, user, preds) + (iavg + avg);
+  	if (ogmats != null) {
+      ogmats(0) = user;
+      if (ogmats.length > 1) {
+        ogmats(1) = xpreds;
+      }
+    }
   	preds.contents <-- xpreds.contents;
   	-sqrt(row(vv/sdata.nnz))
   }
@@ -351,10 +364,11 @@ object SFA  {
     (nn, opts)
   }
   
+   class PredOpts extends Learner.Options with SFA.Opts with MatSource.Opts with MatSink.Opts
+     	
    def predictor(model0:Model, mat1:Mat, preds:Mat) = {
-  	class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with Grad.Opts
     val model = model0.asInstanceOf[SFA]
-    val nopts = new xopts;
+    val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.putBack = 1
     val newmod = new SFA(nopts);
@@ -375,15 +389,14 @@ object SFA  {
         newmod, 
         null,
         null,
-        null,
+        new MatSink(nopts),
         nopts)
     (nn, nopts)
   }
    
   def predictor(model0:Model, mat1:Mat, user:Mat, preds:Mat) = {
-  	class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with Grad.Opts
     val model = model0.asInstanceOf[SFA]
-    val nopts = new xopts;
+    val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.putBack = 2
     val newmod = new SFA(nopts);
@@ -399,12 +412,13 @@ object SFA  {
     nopts.regumean = mopts.regumean;
     nopts.doUsers = mopts.doUsers;
     nopts.weightByUser = mopts.weightByUser;
+    nopts.nmats = 2;
     val nn = new Learner(
         new MatSource(Array(mat1, user, preds), nopts), 
         newmod, 
         null,
         null,
-        null,
+        new MatSink(nopts),
         nopts)
     (nn, nopts)
   }

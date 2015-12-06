@@ -42,11 +42,15 @@ case class Learner(
   }
   
   def init = {
-    var cacheState = Mat.useCache
-    Mat.useCache = opts.useCache
-    datasource.init
-    model.bind(datasource)
-    model.init
+    var cacheState = Mat.useCache;
+    Mat.useCache = opts.useCache;
+    datasource.init;
+    model.bind(datasource);
+    if (datasink.asInstanceOf[AnyRef] != null) {
+      datasink.init;
+      model.bind(datasink);
+    }
+    model.init;
     if (mixins != null) mixins map (_ init(model))
     if (updater != null) updater.init(model)
     Mat.useCache = cacheState;
@@ -79,7 +83,7 @@ case class Learner(
       var istep = 0
       println("pass=%2d" format ipass)
       while (datasource.hasNext) {
-        val mats = datasource.next   
+        val mats = datasource.next;
         here += datasource.opts.batchSize
         bytes += mats.map(Learner.numBytes _).reduce(_+_);
         val dsp = datasource.progress;
@@ -90,7 +94,8 @@ case class Learner(
           	if (mixins != null) mixins map (_ compute(mats, here));
           	if (updater != null) updater.update(ipass, here, gprogress);
           }
-        	val scores = model.evalbatchg(mats, ipass, here)
+        	val scores = model.evalbatchg(mats, ipass, here);
+        	if (datasink != null) datasink.put;
         	reslist.append(scores.newcopy)
         	samplist.append(here)
         } else {
@@ -133,15 +138,20 @@ case class Learner(
       resetGPUs
       Mat.clearCaches
     }
-    datasource.close
-    results = Learner.scores2FMat(reslist) on row(samplist.toList)
+    datasource.close;
+    if (datasink != null) datasink.close;
+    results = Learner.scores2FMat(reslist) on row(samplist.toList);
   }
   
   def predict() = {
-    setup
-    datasource.init
-    model.bind(datasource)
-    val rstate = model.refresh 
+    setup;
+    datasource.init;
+    model.bind(datasource);
+    if (datasink.asInstanceOf[AnyRef] != null) {
+      datasink.init;
+      model.bind(datasink);
+    }
+    val rstate = model.refresh;
     model.refresh = false
     model.init
     val results = repredict
@@ -166,11 +176,11 @@ case class Learner(
       val mats = datasource.next    
       here += datasource.opts.batchSize
       bytes += mats.map(Learner.numBytes _).reduce(_+_);
-      val scores = model.evalbatchg(mats, 0, here)
-      reslist.append(scores.newcopy)
-      samplist.append(here)
-      if (dopts.putBack >= 0) datasource.putBack(mats, dopts.putBack)
-      val dsp = datasource.progress
+      val scores = model.evalbatchg(mats, 0, here);
+      if (datasink != null) datasink.put
+      reslist.append(scores.newcopy);
+      samplist.append(here);
+      val dsp = datasource.progress;
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
@@ -196,14 +206,16 @@ case class Learner(
       resetGPUs
       Mat.clearCaches
     }
-    datasource.close
+    datasource.close;
+    if (datasink != null) datasink.close;
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
   
-  def datamats = datasource.asInstanceOf[MatSource].mats
-  def modelmats = model.modelmats
-  def datamat = datasource.asInstanceOf[MatSource].mats(0)
-  def modelmat = model.modelmats(0)
+  def datamats = datasource.asInstanceOf[MatSource].mats;
+  def modelmats = model.modelmats;
+  def datamat = datasource.asInstanceOf[MatSource].mats(0);
+  def modelmat = model.modelmats(0);
+  def preds = datasink.asInstanceOf[MatSink].mats
 }
 
 

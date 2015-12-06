@@ -178,11 +178,11 @@ object IPTW {
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with IPTW.Opts with SFilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with IPTW.Opts with SFileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-    nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+    nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+		nend:Int=FileSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {
   	
@@ -201,8 +201,8 @@ object IPTW {
   }
   
   def learnFPar(
-    nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+    nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+		nend:Int=FileSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {	
   	val opts = new LearnFParOptions

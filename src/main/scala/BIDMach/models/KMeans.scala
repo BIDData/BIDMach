@@ -139,7 +139,7 @@ object KMeans  {
   	    opts)
     (nn, opts)
   }
-  class fsopts extends Learner.Options with KMeans.Opts with FilesSource.Opts with Batch.Opts
+  class fsopts extends Learner.Options with KMeans.Opts with FileSource.Opts with Batch.Opts
   
   class memopts extends Learner.Options with KMeans.Opts with MatSource.Opts with Batch.Opts
   /**
@@ -152,7 +152,7 @@ object KMeans  {
     opts.batchSize = 10000;
     implicit val threads = threadPool(4)
   	val nn = new Learner(
-  	    new FilesSource(opts), 
+  	    new FileSource(opts), 
   	    new KMeans(opts), 
   	    null,
   	    new Batch(opts), 
@@ -161,7 +161,7 @@ object KMeans  {
     (nn, opts)
   }
   
-  def learner(fnames:String, d:Int):(Learner, fsopts) = learner(List(FilesSource.simpleEnum(fnames,1,0)), d) 
+  def learner(fnames:String, d:Int):(Learner, fsopts) = learner(List(FileSource.simpleEnum(fnames,1,0)), d) 
   
     // This function constructs a predictor from an existing model 
   def predictor(model:Model, mat1:Mat, preds:Mat):(Learner, memopts) = {
@@ -199,9 +199,9 @@ object KMeans  {
     (nn, opts)
   }
   
-  class KSFopts extends ParLearner.Options with KMeans.Opts with FilesSource.Opts with Batch.Opts
+  class KSFopts extends ParLearner.Options with KMeans.Opts with FileSource.Opts with Batch.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, KSFopts) = learnPar(List(FilesSource.simpleEnum(fnames,1,0)), d)
+  def learnPar(fnames:String, d:Int):(ParLearnerF, KSFopts) = learnPar(List(FileSource.simpleEnum(fnames,1,0)), d)
   
   def learnPar(fnames:List[(Int)=>String], d:Int):(ParLearnerF, KSFopts) = {
     val opts = new KSFopts
@@ -211,7 +211,7 @@ object KMeans  {
     opts.batchSize = 20000;
     implicit val threads = threadPool(4)
   	val nn = new ParLearnerF(
-  	    new FilesSource(opts), 
+  	    new FileSource(opts), 
   	    opts, mkKMeansModel _, 
   	    null, null, 
   	    opts, mkUpdater _,

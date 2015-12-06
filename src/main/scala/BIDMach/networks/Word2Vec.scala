@@ -1219,9 +1219,9 @@ object Word2Vec  {
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with Word2Vec.Opts with FilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with Word2Vec.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesSource.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
   
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
@@ -1229,7 +1229,7 @@ object Word2Vec  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesSource(opts);
+    val ds = new FileSource(opts);
   	val nn = new Learner(
   			ds, 
   	    new Word2Vec(opts), 
@@ -1292,9 +1292,9 @@ object Word2Vec  {
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FilesSource.Opts with ADAGrad.Opts;
+  class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FileSource.Opts with ADAGrad.Opts;
   
-  def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesSource.simpleEnum(fn1,1,0)))}
+  def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0)))}
   
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
@@ -1303,7 +1303,7 @@ object Word2Vec  {
     opts.fnames = fnames;
     implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
-        new FilesSource(opts), 
+        new FileSource(opts), 
         opts, mkModel _,
         null, null,
         null, null,

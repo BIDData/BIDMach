@@ -3,6 +3,7 @@ import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import scala.collection.mutable.ListBuffer
 
 /**
@@ -10,11 +11,13 @@ import scala.collection.mutable.ListBuffer
  */
 abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializable {
   
-  var datasource:DataSource = null
+  var datasource:DataSource = null;
   
-  var _modelmats:Array[Mat] = null
+  var datasink:DataSink = null;
   
-  var parent_model:Model = null
+  var _modelmats:Array[Mat] = null;
+  
+  var parent_model:Model = null;
   
   def modelmats:Array[Mat] = {
     if (_modelmats != null) {
@@ -30,19 +33,23 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     _modelmats = a;
   }
   
-  var updatemats:Array[Mat] = null
+  var updatemats:Array[Mat] = null;
   
-  var mats:Array[Mat] = null
+  var mats:Array[Mat] = null;
   
-  var gmats:Array[Mat] = null
+  var gmats:Array[Mat] = null;
   
-  var useGPU = false
+  var omats:Array[Mat] = null;
   
-  var useDouble = false
+  var ogmats:Array[Mat] = null;
   
-  var putBack = -1
+  var useGPU = false;
   
-  var refresh = true
+  var useDouble = false;
+  
+  var putBack = -1;
+  
+  var refresh = true;
   
   var runtimes:FMat = null;
   
@@ -72,6 +79,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     mod.updatemats = updatemats;
     mod.mats = mats;
     mod.gmats = gmats;
+    mod.omats = omats;
+    mod.ogmats = ogmats;
   }
   
   def copyFrom(mod:Model) = {
@@ -140,28 +149,29 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	  }
   }
   
+  def bind(ds:DataSink):Unit = {
+	  datasink = ds;
+	  omats = datasink.omats;
+	  ogmats = new Array[Mat](omats.length);
+  }
+  
   def init():Unit
   
   def dobatch(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
   
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat                                // Scores (log likelihoods)
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
   
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
-    if (useGPU) copyMats(amats, gmats)            		
-    dobatch(gmats, ipass, here)
-    if ((useGPU || useDouble) && putBack >= 0) {
-    	for (i <- 1 to putBack) {
-    		amats(i) <-- gmats(i)
-    	}
-    }
+    if (useGPU) copyMats(amats, gmats);            		
+    dobatch(gmats, ipass, here);
   }
   
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (useGPU) copyMats(amats, gmats)
     val v = evalbatch(gmats, ipass, here)
-    if ((useGPU || useDouble) && putBack >= 0) {
-      for (i <- 1 to putBack) {
-        amats(i) <-- gmats(i)
+    if ((useGPU || useDouble) && omats != null) {
+      for (i <- 0 until omats.length) {
+        omats(i) = Model.convertMat(ogmats(i), false, false);
       }
     }
 	v
@@ -265,6 +275,19 @@ object Model {
       	  DMat(g);
       	} else {
       		FMat(g);
+      	}
+      }
+      case g:GSMat => if (useGPU) {
+      	if (useDouble) {
+      		GSDMat(g);
+      	} else {
+      	  g;
+      	} 
+      } else {
+      	if (useDouble) {
+      	  SDMat(SMat(g));
+      	} else {
+      		SMat(g);
       	}
       }
     }

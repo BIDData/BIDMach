@@ -8,6 +8,7 @@ import scala.concurrent.future
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.CountDownLatch
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach._
@@ -185,11 +186,11 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
     val ftarg = full(targ);
-    val targs = if (!(putBack >= 0) && targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
+    val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in;
     GLM.preds(eta, eta, mylinks, totflops);
     val v = GLM.llfun(eta, targs, mylinks, totflops);
-    if (putBack >= 0) {targ <-- eta};
+    if (ogmats != null) {ogmats(0) = eta;}
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights))
     } else {
@@ -735,16 +736,16 @@ object GLM {
     (mm, mopts)
   }
   
-  class FGOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FilesSource.Opts
+  class FGOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FileSource.Opts
   
   // A learner that uses a files data source specified by a list of strings.  
   def learner(fnames:List[String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
     val model = new GLM(mopts);
-    mopts.fnames = fnames.map((a:String) => FilesSource.simpleEnum(a,1,0));
+    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
     implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FilesSource(mopts)(ec);    
+    val ds = new FileSource(mopts)(ec);    
     val mm = new Learner(
         ds, 
         model, 
@@ -761,9 +762,9 @@ object GLM {
     mopts.lrate = 1f;
     mopts.aopts = mopts;
     val model = new GLM(mopts);
-    mopts.fnames = fnames.map((a:String) => FilesSource.simpleEnum(a,1,0));
+    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
     implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FilesSource(mopts)(ec);    
+    val ds = new FileSource(mopts)(ec);    
     val mm = new Learner(
         ds, 
         model, 
@@ -774,10 +775,12 @@ object GLM {
     (mm, mopts)
   }
   
+  class PredOptions extends Learner.Options with GLM.Opts with MatSource.Opts with MatSink.Opts
+  
   // This function constructs a predictor from an existing model 
-  def predictor(model0:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
+  def predictor(model0:Model, mat1:Mat):(Learner, PredOptions) = {
     val model = model0.asInstanceOf[GLM]
-    val nopts = new LearnOptions;
+    val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.putBack = 1
     val newmod = new GLM(nopts);
@@ -793,11 +796,11 @@ object GLM {
     nopts.hashBound1 = mopts.hashBound1;
     nopts.hashBound2 = mopts.hashBound2;   
     val nn = new Learner(
-        new MatSource(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1), nopts), 
         newmod, 
         null,
         null,
-        null,
+        new MatSink(nopts),
         nopts)
     (nn, nopts)
   }
@@ -919,11 +922,11 @@ object GLM {
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFilesSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-  		nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-  		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+  		nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+  		nend:Int=FileSource.encodeDate(2012,12,1,0), 
   		d:Int = 0
   		) = {
   	val opts = new LearnFParOptions;
@@ -941,8 +944,8 @@ object GLM {
   }
   
   def learnFPar(
-  		nstart:Int=FilesSource.encodeDate(2012,3,1,0), 
-  		nend:Int=FilesSource.encodeDate(2012,12,1,0), 
+  		nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+  		nend:Int=FileSource.encodeDate(2012,12,1,0), 
   		d:Int = 0
   		) = {	
   	val opts = new LearnFParOptions;

@@ -11,8 +11,6 @@ val c = c0(?,ii);
 val ta = loadSMat(dir + "testdocs.smat.lz4")
 val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,?)
 
-val pc = zeros(tc.nrows, tc.ncols)
-
 val (nn,opts)=GLM.learnerX(a,c,1)
 
 opts.batchSize=10000
@@ -22,20 +20,17 @@ opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
 opts.aopts = opts;
-//opts.useGPU = false
 
-//val dd = mkdiag(ones(100,1));
-//val tmap = dd on dd on dd on dd
-//opts.targmap = tmap
-//mopts.targmap = opts.targmap
-
+val model = nn.model.asInstanceOf[GLM]
 nn.train
 
-val (mm, mopts) = GLM.predictor(nn.model, ta, pc)
+val (mm, mopts) = GLM.predictor(nn.model, ta)
 mopts.addConstFeat=opts.addConstFeat;
 mopts.batchSize=20000
 mopts.links = opts.links
 mm.predict
+
+val pc = FMat(mm.preds(0))
 
 //val tc2= tmap * tc
 val rc = roc2(pc, tc, 1-tc, 1000)

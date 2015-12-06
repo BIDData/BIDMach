@@ -4,26 +4,40 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.collection.mutable.ListBuffer
 
-
-class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends DataSink(opts) { 
+class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends DataSink(opts) { 
   var blocks = new ListBuffer[Array[Mat]]();
   var mats:Array[Mat] = null;
+  var ifile = 0;
+  var colsdone = 0;
   
   override def init = { 
     blocks = new ListBuffer[Array[Mat]]();
-    setnmats(opts.nmats);
+    setnmats(opts.ofnames.length);
     omats = new Array[Mat](nmats);
+    ifile = 0;
+    colsdone = 0;
   }
   
   def put = {
     blocks += omats.map(MatSink.copyCPUmat);
+    colsdone += omats(0).ncols;
+    if (colsdone >= opts.ofcols) {
+      mergeBlocks;
+      colsdone = 0;
+      ifile += 1;
+      blocks = new ListBuffer[Array[Mat]]();
+    }
   }
 
   override def close () = {
+    mergeBlocks;
+  }
+  
+  def mergeBlocks = {
     val ncols = blocks.map(_(0).ncols).reduce(_+_);
     val imats = blocks(0);
     val ablocks = blocks.toArray;
-    mats = new Array[Mat](nmats);
+    if (mats == null) mats = new Array[Mat](nmats);
     for (i <- 0 until nmats) {
       val nrows = imats(i).nrows;
       val nnz0 = imats(i) match {
@@ -46,41 +60,20 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
         here += am.ncols;
       }
     }
+    for (i <- 0 until opts.ofnames.length) {
+    	saveMat(opts.ofnames(i)(ifile), mats(i));
+    }
   }
 }
 
-object MatSink {
+object FileSink {
   trait Opts extends DataSink.Opts {
-    var nmats = 1;
+  	var ofnames:List[(Int)=>String] = null;
+  	var ofcols = 100000;
   }
   
   class Options extends Opts {
 
-  }
-  
-  def copyCPUmat(m:Mat):Mat = {
-    val nr = m.nrows;
-    val nc = m.ncols;
-    val out = makeCPUmat(m, nr, nc);
-    out <-- m;
-    out;   
-  }
-  
-  def makeCPUmat(m:Mat,nr:Int, nc:Int):Mat = {
-  	m match {
-  		case f:FMat => zeros(nr,nc);
-  		case g:GMat => zeros(nr,nc);
-  		case f:DMat => dzeros(nr,nc);
-  		case g:GDMat => dzeros(nr,nc);
-  		case i:IMat => izeros(nr,nc);
-  		case gi:GIMat => izeros(nr,nc);
-  		case l:LMat => lzeros(nr,nc);
-  		case l:GLMat => lzeros(nr,nc);
-  		case s:SMat => SMat(nr,nc,s.nnz);
-  		case s:GSMat => SMat(nr,nc,s.nnz);
-  		case s:SDMat => SDMat(nr,nc,s.nnz);
-  		case s:GSDMat => SDMat(nr,nc,s.nnz);
-  	}
   }
 }
 

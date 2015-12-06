@@ -1,10 +1,10 @@
 :silent
-class xopts extends Learner.Options with FilesDS.Opts with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts
+class xopts extends Learner.Options with FileSource.Opts with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts
 val opts = new xopts
 
 val mdir = "d:/criteo/parts/"
-opts.fnames = List(FilesDS.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
-                   FilesDS.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
+opts.fnames = List(FileSource.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
+                   FileSource.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
 opts.nend = 67;
 opts.lrate = 0.0001f;
 opts.reg1weight = 0.001f;
@@ -19,7 +19,7 @@ opts.aopts = opts;
 
 val ds = {
   implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
-  new FilesDS(opts)               // the datasource
+  new FileSource(opts)               // the datasource
 }
 
 
@@ -28,6 +28,7 @@ val nn = new Learner(                  // make a learner instance
     new GLM(opts),                     // the model 
     Array(new L1Regularizer(opts)),    // list of mixins or regularizers
 //    new ADAGrad(opts),                 // the optimization class to use
+    null,
     null,
     opts)                              // pass the options to the learner as well
 

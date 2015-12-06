@@ -197,9 +197,9 @@ object Click  {
     (nn, opts)
   }
   
-  class FsOpts extends Learner.Options with Click.Opts with SFilesSource.Opts with IncNorm.Opts
+  class FsOpts extends Learner.Options with Click.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FilesSource.simpleEnum(fpattern, 0, 1)), d)
+  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(fpattern, 0, 1)), d)
   
   /** Online Variational Bayes Click algorithm with a files dataSource. */
   def learner(fnames:List[(Int)=>String], d:Int):(Learner, FsOpts) = { 
@@ -210,7 +210,7 @@ object Click  {
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4)
   	val nn = new Learner(
-  	    new SFilesSource(opts), 
+  	    new SFileSource(opts), 
   	    new Click(opts), 
   	    null,
   	    new IncNorm(opts),
@@ -252,9 +252,9 @@ object Click  {
     (nn, opts)
   }
   
-  class SFDSopts extends ParLearner.Options with Click.Opts with SFilesSource.Opts with IncNorm.Opts
+  class SFDSopts extends ParLearner.Options with Click.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FilesSource.simpleEnum(fnames, 0, 1)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 0, 1)), d);
   
   /** Parallel online Click algorithm with one file datasource. */
   def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {
@@ -267,7 +267,7 @@ object Click  {
   	opts.resFile = "../results.mat"
   	implicit val threads = threadPool(4)
   	val nn = new ParLearnerF(
-  	    new SFilesSource(opts),
+  	    new SFileSource(opts),
   	    opts, mkClickmodel _, 
   	    null, null, 
   	    opts, mkUpdater _,

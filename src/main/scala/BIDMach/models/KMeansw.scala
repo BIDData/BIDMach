@@ -135,7 +135,7 @@ object KMeansw  {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
   
-  class FsOpts extends Learner.Options with KMeansw.Opts with FilesSource.Opts with IncNorm.Opts
+  class FsOpts extends Learner.Options with KMeansw.Opts with FileSource.Opts with IncNorm.Opts
   
   class MemOpts extends Learner.Options with KMeansw.Opts with MatSource.Opts with IncNorm.Opts
    

@@ -1,48 +1,17 @@
-import BIDMach.models.RandomForest
-
-class xopts extends Learner.Options with FilesDS.Opts with RandomForest.Opts with Batch.Opts
-val opts = new xopts
-
 val mdir = "../data/MNIST8M/parts/"
-opts.fnames = List(FilesDS.simpleEnum(mdir+"data%02d.fmat.lz4", 1, 0),  
-                   FilesDS.simpleEnum(mdir+"cats%02d.imat.lz4", 1, 0));
-opts.nend = 70;                   // Ending file number
 
-val ds = {
-  implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
-  new FilesDS(opts)               // the datasource
-}
+val (nn, opts) = RandomForest.learner(mdir+"data%02d.fmat.lz4", mdir+"cats%02d.imat.lz4")
 
-val nn = new Learner(             // make a learner instance
-    ds,                           // datasource
-    new RandomForest(opts),       // the model 
-    null,                         // list of mixins or regularizers
-    new Batch(opts),              // the optimization class to use
-    opts)                         // pass the options to the learner as well
-
-
-opts.useGPU = true
-opts.trace = 0
+opts.nend = 70
 opts.batchSize = 20000
 opts.depth =  30
 opts.ntrees = 8
-
 opts.nsamps = 32
 opts.nnodes = 500000
 opts.nbits = 16
 opts.gain = 0.001f
-opts.autoReset = true
-
 
 val rf = nn.model.asInstanceOf[RandomForest]
 
 nn.train
-
-opts.nstart=70
-opts.nend=81
-opts.training=false
-
-nn.repredict
-
-val err = mean(nn.results(0,?)) // The final test set error
 
