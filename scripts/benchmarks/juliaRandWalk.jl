@@ -1,10 +1,11 @@
 
-function rw(n::Int64)
-    s::Float32 = 0
-    for i = 1:n
-        s += rand()
+function rw(a)
+    n = length(a)
+    a[1] = rand() - 0.5
+    for i = 2:n
+        a[i] = a[i-1] + rand() - 0.5
     end
-    s
+    a
 end
 
 function fib(n::Int64)
