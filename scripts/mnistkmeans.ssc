@@ -1,9 +1,27 @@
 val dir="../data/MNIST8M/parts/"
-val (nn, opts) = KMeans.learner(dir+"alls%02d.fmat.lz4",256);
+val (nn, opts) = KMeans.learner(dir+"alls%02d.fmat.lz4");
 
-opts.nend = 70;
+val test = loadFMat(dir+"alls70.fmat.lz4");
+val testdata = test.copy;
+testdata(0->10, ?) = 0;
+val (vbest, ibest) = maxi2(test);
+
+opts.dim = 1000
+opts.nend = 20;
 opts.batchSize = 20000;
-opts.npasses = 20;
+opts.npasses = 8;
+
+nn.train
+val centroids = FMat(nn.modelmats(0));
+
+val (mm, opts) = KMeans.predictor(nn.model, testdata);
+
+mm.predict
+val preds = IMat(mm.preds(0))
+
+val (dmy, cmap) = maxi2(centroids, 2);
+
+mean(float(ibest == cmap(preds)))
 
 
 

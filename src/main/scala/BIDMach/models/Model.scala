@@ -171,7 +171,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     val v = evalbatch(gmats, ipass, here)
     if ((useGPU || useDouble) && omats != null) {
       for (i <- 0 until omats.length) {
-        omats(i) = Model.convertMat(ogmats(i), false, false);
+        omats(i) = cpu(ogmats(i));
       }
     }
 	v
