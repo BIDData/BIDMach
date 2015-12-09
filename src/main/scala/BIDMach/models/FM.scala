@@ -224,33 +224,34 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
       if (opts.dim2 > 0) eta ~ eta + ((mm2 ∘ mm2) * in);
     }
     if (opts.lim > 0) {
-      max(eta, llim, eta)
-      min(eta, ulim, eta)
+      max(eta, llim, eta);
+      min(eta, ulim, eta);
     }
-    GLM.preds(eta, eta, mylinks, totflops)
-    val v = GLM.llfun(eta, ftarg, mylinks, totflops)
-    if (ogmats != null) {ogmats(0) = eta}
+    GLM.preds(eta, eta, mylinks, totflops);
+    if (ogmats != null) ogmats(0) = eta;
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops);
     if (dweights.asInstanceOf[AnyRef] != null) {
-      FMat(sum(v ∘  dweights, 2) / sum(dweights))
+      FMat(sum(v ∘  dweights, 2) / sum(dweights));
     } else {
-      FMat(mean(v, 2))
+      FMat(mean(v, 2));
     }
   }
   
   // evaluate a simple A*B factorization of the interactions.
   
   def meval4(in:Mat, targ:Mat, dweights:Mat):FMat = {
-    val ftarg = full(targ)
-    val vt1 = mm1 * in
-    val vt2 = mm2 * in
-    val eta = mv * in + (vt1 dot vt2)
-    GLM.preds(eta, eta, mylinks, totflops)
-    val v = GLM.llfun(eta, ftarg, mylinks, totflops)
-    if (ogmats != null) {ogmats(0) = eta}
+    val ftarg = full(targ);
+    val vt1 = mm1 * in;
+    val vt2 = mm2 * in;
+    val eta = mv * in + (vt1 dot vt2);
+    GLM.preds(eta, eta, mylinks, totflops);
+    if (ogmats != null) ogmats(0) = eta;
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops);
+    if (ogmats != null) {ogmats(0) = eta};
     if (dweights.asInstanceOf[AnyRef] != null) {
-      FMat(sum(v ∘  dweights, 2) / sum(dweights))
+      FMat(sum(v ∘  dweights, 2) / sum(dweights));
     } else {
-      FMat(mean(v, 2))
+      FMat(mean(v, 2));
     }
   }
 
