@@ -39,6 +39,7 @@ curl -o exelist.txt ${source}/cbin/exelist.txt
 while read fname; do
     echo -e "\nDownloading ${fname}"
     curl --retry 2 -o ${fname} ${source}/cbin/${subdir}/${fname}
+    chmod 755 ${fname}
 done < exelist.txt
 
 chmod 755 ${BIDMACH_ROOT}/cbin/*
