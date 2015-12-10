@@ -1,0 +1,57 @@
+// Run approx. SVD on the MNIST8M dataset
+
+val dir="../data/MNIST8M/parts/"
+val (nn, opts) = SVD.learner(dir+"data%02d.fmat.lz4");
+
+opts.nend = 10;
+opts.dim = 100;
+opts.npasses = 30;
+opts.batchSize = 100000;
+
+val model = nn.model.asInstanceOf[SVD]
+
+nn.train
+
+// Singular values and vectors
+
+val svals = FMat(nn.modelmats(1));
+val svecs = FMat(nn.modelmats(0));
+
+// Compute M * M^t directly to compute a reference SVD (can only do this
+// for small feature spaces).
+
+flip
+val tot = zeros(784,784);
+for (i <- 0 until opts.nend) {
+val dd = loadFMat(dir+"data%02d.fmat.lz4" format i);
+tot ~ dd *^ dd;
+print(".");
+}
+println;
+
+// Compute the SVD of M (eigendecomp of M * M^t)
+
+val (xx, yy) = feig(tot);
+val g=gflop
+
+// Get the largest SVs
+val evecs = yy(?,783 to 784 - opts.dim by -1);
+
+// Dot products
+val dots = svecs dot evecs;
+
+// Switch sign in case vector parity doesnt match svecs
+evecs ~ evecs *@ (2*(dots>0) - 1);
+
+// Show the results
+
+Image.show(svecs.view(28,28*opts.dim).t*500+128)
+
+Image.show(evecs.view(28,28*opts.dim).t*500+128)
+
+
+
+
+
+
+

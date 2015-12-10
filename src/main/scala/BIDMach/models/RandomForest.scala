@@ -1398,17 +1398,6 @@ object RandomForest {
     (nn, opts)
   }
   
-  def predictor(model:Model, ds:DataSource, opts:RFopts):(Learner, RFopts) = {
-    val nn = new Learner(
-        ds, 
-        model,
-        null, 
-        new Batch(opts),
-        null,
-        opts)
-    (nn, opts)
-  }
-  
   class PredOpts extends Learner.Options with RandomForest.Opts with MatSource.Opts with MatSink.Opts;
   
   def predictor(model:Model, data:Mat):(Learner, PredOpts) = {

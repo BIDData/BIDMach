@@ -30,6 +30,7 @@ fi
 while read fname; do
    echo -e "\nDownloading ${fname}"
    curl --retry 2  -z ${fname} -o ${fname} ${source}/lib/${fname}
+   chmod 755 ${fname}
 done < liblist.txt
 
 mkdir -p ${BIDMACH_ROOT}/cbin
@@ -39,6 +40,7 @@ curl -o exelist.txt ${source}/cbin/exelist.txt
 while read fname; do
     echo -e "\nDownloading ${fname}"
     curl --retry 2 -o ${fname} ${source}/cbin/${subdir}/${fname}
+    chmod 755 ${fname}
 done < exelist.txt
 
 chmod 755 ${BIDMACH_ROOT}/cbin/*
