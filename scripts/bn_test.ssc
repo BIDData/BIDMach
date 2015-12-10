@@ -19,4 +19,4 @@ opts.updateAll = true
 opts.what
 nn.train
 nn.modelmats(0).t
-sys.exit
+//sys.exit
