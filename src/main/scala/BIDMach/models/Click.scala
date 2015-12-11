@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach._
 
@@ -57,8 +58,8 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
     	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
     }
     updatemats = new Array[Mat](2);
-    updatemats(0) = mm.zeros(mm.nrows, mm.ncols);
-    updatemats(1) = mm.zeros(mm.nrows, 1);
+    updatemats(0) = mm.zeros(mm.nrows, mm.ncols);     // The actual model matrix
+    updatemats(1) = mm.zeros(mm.nrows, 1);            
   }
   
   /**
@@ -123,6 +124,7 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
   override def evalfun(views:Mat, clicks:Mat, user:Mat, ipass:Int, pos:Long):FMat = {  
+  	if (ogmats != null) ogmats(0) = user;
   	val preds = DDS(mm, user, views);
     val dc = clicks.contents;
   	clicks.contents ~ dc - 1;
@@ -164,7 +166,7 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
 object Click  {
   trait Opts extends FactorModel.Opts {
     var LDAeps = 1e-9
-    var exppsi = true
+    var exppsi = false
     var alpha = 0.001f
     var beta = 0.0001f
   }
@@ -233,6 +235,26 @@ object Click  {
         null,
         opts)
     (nn, opts)
+  }
+  
+  class PredOptions extends Learner.Options with Click.Opts with MatSource.Opts with MatSink.Opts;
+  
+    // This function constructs a predictor from an existing model 
+  def predictor(model:Model, mat1:Mat):(Learner, PredOptions) = {
+    val nopts = new PredOptions;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    nopts.dim = model.opts.dim;
+    val newmod = new Click(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod)
+    val nn = new Learner(
+        new MatSource(Array(mat1), nopts), 
+        newmod, 
+        null,
+        null,
+        new MatSink(nopts),
+        nopts)
+    (nn, nopts)
   }
   
   /** Parallel online Click algorithm with a matrix datasource. */ 
