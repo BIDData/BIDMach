@@ -14,7 +14,7 @@ opts.nreuse = 5
 opts.dim = 300
 opts.vocabSize = 1000000
 
-opts.useGPU = false;
+opts.useGPU = true;
 //opts.autoReset = false;
 Mat.useMKL = false;
 
