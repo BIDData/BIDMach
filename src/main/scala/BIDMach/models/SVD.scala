@@ -26,6 +26,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   var Q:Mat = null;                                        // (Left) Singular vectors
   var SV:Mat = null;                                       // Singular values
   var P:Mat = null;
+  var R:Mat = null
   
   def init() = {
   	val nfeats = mats(0).nrows;  	
@@ -34,6 +35,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   	Q = convertMat(Q);                                     // Move to GPU or double if needed
   	P = Q.zeros(Q.nrows, Q.ncols);                         // Zero P
   	SV = Q.zeros(1, opts.dim);                             // Holder for Singular values
+    R = Q.zeros(opts.dim, opts.dim)
   	setmodelmats(Array(Q, SV));                      
   	updatemats = Array(P);
   }
@@ -41,18 +43,39 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   def dobatch(mats:Array[Mat], ipass:Int, pos:Long):Unit = {
     val M = mats(0);
     P ~ P + (Q.t * M *^ M).t                               // Compute P = M * M^t * Q efficiently
+    if (ipass == 0) {
+      subspaceIter; 
+      P.clear
+    }
   }
   
   def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
+	  val M = mats(0);
+    if (ipass == 0)  P ~ P + (Q.t * M *^ M).t
     SV ~ P ∙ Q;                                            // Estimate the singular values
+    max(SV, 1e-6f, SV)
     if (ogmats != null) ogmats(0) = Q.t * mats(0);         // Save right singular vectors
-    val diff = (P / SV) - Q;                               // residual
+    val diff = (P / SV)  - Q;                         // residual
+    if (ipass == 0) P.clear
     row(-(math.sqrt(norm(diff) / diff.length)));           // return the norm of the residual
   }
   
   override def updatePass(ipass:Int) = {   
-    QRdecompt(P, Q, null);                                 // Basic subspace iteration
+    RayleighRitz;
     P.clear;
+  }
+
+
+  def RayleighRitz = {
+    R ~ P ^* Q;
+    val (evals, evecs) = feig(cpu(R));
+    R <-- evecs;
+    Q <-- Q * R;
+    P <-- P * R;
+  }
+  
+  def subspaceIter = {
+	  QRdecompt(P, Q, null);
   }
 }
 
