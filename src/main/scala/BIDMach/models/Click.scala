@@ -240,7 +240,7 @@ object Click  {
   class PredOptions extends Learner.Options with Click.Opts with MatSource.Opts with MatSink.Opts;
   
     // This function constructs a predictor from an existing model 
-  def predictor(model:Model, mat1:Mat):(Learner, PredOptions) = {
+  def predictor(model:Model, mat0:Mat, mat1:Mat):(Learner, PredOptions) = {
     val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.dim = model.opts.dim;
@@ -248,7 +248,7 @@ object Click  {
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
-        new MatSource(Array(mat1), nopts), 
+        new MatSource(Array(mat0, mat1), nopts), 
         newmod, 
         null,
         null,
