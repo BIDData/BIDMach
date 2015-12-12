@@ -83,8 +83,10 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
       opts.targmap.nrows 
     } else if (opts.targets.asInstanceOf[AnyRef] != null) {
       opts.targets.nrows 
-    } else {
+    } else if (mats.length > 1) {
       mats(1).nrows  
+    } else {
+      modelmats(0).nrows;
     }
     val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
     sp = sdat / sum(sdat)
@@ -176,8 +178,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
   
   def meval(in:Mat):FMat = {
-    val targs = targets * in;
-    min(targs, 1f, targs);
+    val targs = if (targets.asInstanceOf[AnyRef] != null) {val targs0 = targets * in; min(targs0, 1f, targs0); targs0} else null
     val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null;
     meval3(in, targs, dweights);
   }
@@ -185,16 +186,20 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def meval2(in:Mat, targ:Mat):FMat = meval3(in, targ, null)
   
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
-    val ftarg = full(targ);
-    val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
+    val ftarg = if (targ.asInstanceOf[AnyRef] != null) full(targ) else null;
+    val targs = if (targmap.asInstanceOf[AnyRef] != null && ftarg.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in;
     GLM.preds(eta, eta, mylinks, totflops);
-    val v = GLM.llfun(eta, targs, mylinks, totflops);
     if (ogmats != null) {ogmats(0) = eta;}
-    if (dweights.asInstanceOf[AnyRef] != null) {
-      FMat(sum(v ∘  dweights, 2) / sum(dweights))
+    if (targs.asInstanceOf[AnyRef] != null) {
+    	val v = GLM.llfun(eta, targs, mylinks, totflops);
+    	if (dweights.asInstanceOf[AnyRef] != null) {
+    		FMat(sum(v ∘  dweights, 2) / sum(dweights))
+    	} else {
+    		FMat(mean(v, 2))
+    	}
     } else {
-      FMat(mean(v, 2))
+      row(0)
     }
   }
   
@@ -782,7 +787,7 @@ object GLM {
     val model = model0.asInstanceOf[GLM]
     val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 1
+    nopts.putBack = 0
     val newmod = new GLM(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);

@@ -42,26 +42,31 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   
   def dobatch(mats:Array[Mat], ipass:Int, pos:Long):Unit = {
     val M = mats(0);
-    P ~ P + (Q.t * M *^ M).t                               // Compute P = M * M^t * Q efficiently
-    if (ipass == 0) {
+    val PP = (Q.t * M *^ M).t                              // Compute P = M * M^t * Q efficiently
+    if (ipass < opts.miniBatchPasses) {
+      P = PP;
       subspaceIter; 
-      P.clear
+    } else {
+      P ~ P + PP;
     }
   }
   
   def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
 	  val M = mats(0);
-    if (ipass == 0)  P ~ P + (Q.t * M *^ M).t
     SV ~ P ∙ Q;                                            // Estimate the singular values
     max(SV, 1e-6f, SV)
-    if (ogmats != null) ogmats(0) = Q.t * mats(0);         // Save right singular vectors
-    val diff = (P / SV)  - Q;                         // residual
-    if (ipass == 0) P.clear
+    if (ogmats != null) ogmats(0) = Q.t * M;               // Save right singular vectors
+    val diff = (P / SV)  - Q;                              // residual
     row(-(math.sqrt(norm(diff) / diff.length)));           // return the norm of the residual
   }
   
-  override def updatePass(ipass:Int) = {   
-    RayleighRitz;
+  override def updatePass(ipass:Int) = {
+    if (ipass >= opts.miniBatchPasses) {
+      if (ipass % 2 == 1)
+      	RayleighRitz;
+      else
+        subspaceIter;
+    }
     P.clear;
   }
 
@@ -69,7 +74,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   def RayleighRitz = {
     R ~ P ^* Q;
     val (evals, evecs) = feig(cpu(R));
-    R <-- evecs;
+    R <-- evecs(?, irow((R.ncols-1) to 0 by -1));
     Q <-- Q * R;
     P <-- P * R;
   }
@@ -81,6 +86,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 
 object SVD  {
   trait Opts extends Model.Opts {
+    var miniBatchPasses = 1;
   }
   
   class Options extends Opts {}
@@ -89,7 +95,8 @@ object SVD  {
   
   def learner(mat:Mat):(Learner, MatOptions) = { 
     val opts = new MatOptions;
-    opts.batchSize = math.min(100000, mat.ncols/30 + 1)
+    opts.batchSize = math.min(100000, mat.ncols/30 + 1);
+    opts.updateAll = true;
   	val nn = new Learner(
   	    new MatSource(Array(mat), opts), 
   			new SVD(opts), 
@@ -106,6 +113,7 @@ object SVD  {
     val opts = new FileOptions;
     opts.batchSize = 10000;
     opts.fnames = List(FileSource.simpleEnum(fnames, 1, 0));
+    opts.updateAll = true;
     implicit val threads = threadPool(4);
   	val nn = new Learner(
   	    new FileSource(opts), 
