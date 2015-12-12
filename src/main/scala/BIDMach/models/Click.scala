@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach._
 
@@ -57,8 +58,8 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
     	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
     }
     updatemats = new Array[Mat](2);
-    updatemats(0) = mm.zeros(mm.nrows, mm.ncols);
-    updatemats(1) = mm.zeros(mm.nrows, 1);
+    updatemats(0) = mm.zeros(mm.nrows, mm.ncols);     // The actual model matrix
+    updatemats(1) = mm.zeros(mm.nrows, 1);            
   }
   
   /**
@@ -77,7 +78,8 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
     if (putBack < 0 || ipass == 0) user.set(1f);
     for (i <- 0 until opts.uiter) {
       val preds = DDS(mm, user, views);	
-      val dc = clicks.contents - 1;                                // Subtract one assuming click counts incremented to avoid sparse matrix misalignment
+//      if (ipass == 0 && pos <= 10000) println("preds "+preds.contents(0->20))
+      val dc = clicks.contents - opts.clickOffset;                 // Subtract one assuming click counts incremented to avoid sparse matrix misalignment
       val dv = views.contents;
       val pc = preds.contents;
       pc ~ pc ∘ dv;                                                // scale the click prediction by the number of views
@@ -86,6 +88,7 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
       val unew = user ∘ (mm * preds) + opts.alpha
       if (opts.exppsi) exppsi(unew, unew)
       user <-- unew   
+//      if (ipass == 0 && pos <= 10000) println("user "+ user(0->20))
     }	
   }
   
@@ -100,7 +103,7 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
    */
   def mupdate(views:Mat, clicks:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
     val preds = DDS(mm, user, views);
-    val dc = clicks.contents -1;
+    val dc = clicks.contents -opts.clickOffset;
     val dv = views.contents;
     val pc = preds.contents;
     pc ~ pc ∘ dv; 
@@ -123,19 +126,17 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
   override def evalfun(views:Mat, clicks:Mat, user:Mat, ipass:Int, pos:Long):FMat = {  
+  	if (ogmats != null) ogmats(0) = user;
   	val preds = DDS(mm, user, views);
-    val dc = clicks.contents;
-  	clicks.contents ~ dc - 1;
+    val dc = clicks.contents - opts.clickOffset;
     val dv = views.contents;    
   	val pc = preds.contents;
     pc ~ pc ∘ dv;
   	max(opts.weps, pc, pc);
+  	val spc = sum(pc);
   	ln(pc, pc);
-  	val sdat = sum(clicks,1);
-  	val mms = sum(mm,2);
-  	val suu = ln(mms ^* user);
-  	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv;
-  	row(vv, math.exp(-vv))
+    val vv = ((dc ∙ pc) - sum(gammaln(dc + 1)) - spc).dv / dc.length;
+  	row(vv)
   }
   
   override def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
@@ -164,9 +165,10 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
 object Click  {
   trait Opts extends FactorModel.Opts {
     var LDAeps = 1e-9
-    var exppsi = true
+    var exppsi = false
     var alpha = 0.001f
     var beta = 0.0001f
+    var clickOffset = 1f
   }
   
   class Options extends Opts {}
@@ -233,6 +235,26 @@ object Click  {
         null,
         opts)
     (nn, opts)
+  }
+  
+  class PredOptions extends Learner.Options with Click.Opts with MatSource.Opts with MatSink.Opts;
+  
+    // This function constructs a predictor from an existing model 
+  def predictor(model:Model, mat0:Mat, mat1:Mat):(Learner, PredOptions) = {
+    val nopts = new PredOptions;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    nopts.dim = model.opts.dim;
+    val newmod = new Click(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod)
+    val nn = new Learner(
+        new MatSource(Array(mat0, mat1), nopts), 
+        newmod, 
+        null,
+        null,
+        new MatSink(nopts),
+        nopts)
+    (nn, nopts)
   }
   
   /** Parallel online Click algorithm with a matrix datasource. */ 
