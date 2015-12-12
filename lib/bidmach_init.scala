@@ -4,7 +4,7 @@ import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Plotting._
 import BIDMach.Learner
-import BIDMach.models.{FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
+import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
 import BIDMach.networks.{DNN}
 import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
 import BIDMach.datasinks.{DataSink,MatSink}
