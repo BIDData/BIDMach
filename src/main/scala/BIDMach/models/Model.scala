@@ -169,7 +169,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (useGPU) copyMats(amats, gmats)
     val v = evalbatch(gmats, ipass, here)
-    if ((useGPU || useDouble) && omats != null) {
+    if (omats != null) {
       for (i <- 0 until omats.length) {
         omats(i) = cpu(ogmats(i));
       }

@@ -2,6 +2,7 @@ package BIDMach.datasinks
 import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMach.datasources._
 import scala.collection.mutable.ListBuffer
 
 class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends MatSink(opts) { 
@@ -13,6 +14,11 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends M
     setnmats(opts.ofnames.length);
     omats = new Array[Mat](nmats);
     ifile = 0;
+    opts match {
+      case fopts:FileSource.Opts => {
+        ifile = fopts.nstart;
+      }
+    }
     colsdone = 0;
   }
   

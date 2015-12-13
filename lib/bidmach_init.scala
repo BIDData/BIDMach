@@ -14,5 +14,4 @@ import BIDMach.causal.{IPTW}
 
 Mat.checkMKL
 Mat.checkCUDA
-$intp.asInstanceOf[scala.tools.nsc.interpreter.ILoop$ILoopInterpreter].getClass.getDeclaredField("$outer").get($intp).asInstanceOf[scala.tools.nsc.interpreter.ILoop].prompt
 
