@@ -22,31 +22,33 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
   override def close () = mergeBlocks;
   
   def mergeBlocks = {
-    val ncols = blocks.map(_(0).ncols).reduce(_+_);
-    val imats = blocks(0);
-    val ablocks = blocks.toArray;
-    mats = new Array[Mat](nmats);
-    for (i <- 0 until nmats) {
-      val nrows = imats(i).nrows;
-      val nnz0 = imats(i) match {
-        case i:SMat => i.nnz;
-        case i:GSMat => i.nnz;
-        case i:SDMat => i.nnz;
-        case i:GSDMat => i.nnz;
-        case _ => -1;
-      }
-      mats(i) = if (nnz0 >= 0) {
-        val nnz = ablocks.map(_(i).nnz).reduce(_+_);
-        SMat(nrows, ncols, nnz);
-      } else {
-        MatSink.makeCPUmat(imats(i), nrows, ncols);
-      }
-      var here = 0;
-      for (j <- 0 until ablocks.length) {
-        val am = ablocks(j)(i);
-        am.colslice(0, am.ncols, mats(i), here, true);
-        here += am.ncols;
-      }
+    if (blocks.size > 0) {
+    	val ncols = blocks.map(_(0).ncols).reduce(_+_);
+    	val imats = blocks(0);
+    	val ablocks = blocks.toArray;
+    	mats = new Array[Mat](nmats);
+    	for (i <- 0 until nmats) {
+    		val nrows = imats(i).nrows;
+    		val nnz0 = imats(i) match {
+    		case i:SMat => i.nnz;
+    		case i:GSMat => i.nnz;
+    		case i:SDMat => i.nnz;
+    		case i:GSDMat => i.nnz;
+    		case _ => -1;
+    		}
+    		mats(i) = if (nnz0 >= 0) {
+    			val nnz = ablocks.map(_(i).nnz).reduce(_+_);
+    			SMat(nrows, ncols, nnz);
+    		} else {
+    			MatSink.makeCPUmat(imats(i), nrows, ncols);
+    		}
+    		var here = 0;
+    		for (j <- 0 until ablocks.length) {
+    			val am = ablocks(j)(i);
+    			am.colslice(0, am.ncols, mats(i), here, true);
+    			here += am.ncols;
+    		}
+    	}
     }
   }
 }

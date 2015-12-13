@@ -20,7 +20,7 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends M
     blocks += omats.map(MatSink.copyCPUmat);
     colsdone += omats(0).ncols;
     if (colsdone >= opts.ofcols) {
-      mergeBlocks;
+      mergeSaveBlocks;
       colsdone = 0;
       ifile += 1;
       blocks = new ListBuffer[Array[Mat]]();
@@ -33,8 +33,10 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends M
   
   def mergeSaveBlocks = {
     mergeBlocks
-    for (i <- 0 until opts.ofnames.length) {
-    	saveMat(opts.ofnames(i)(ifile), mats(i));
+    if (blocks.size > 0) {
+    	for (i <- 0 until opts.ofnames.length) {
+    		saveMat(opts.ofnames(i)(ifile), mats(i));
+    	}
     }
   }
 }
