@@ -190,6 +190,29 @@ object KMeans  {
         nopts)
     (nn, nopts)
   }
+  
+  class FilePredOptions extends Learner.Options with KMeans.Opts with FileSource.Opts with FileSink.Opts;
+  
+    // This function constructs a file-based predictor from an existing model 
+  def predictor(model:Model, infnames:String, outfnames:String):(Learner, FilePredOptions) = {
+    val nopts = new FilePredOptions;
+    nopts.batchSize = 10000;
+    nopts.dim = model.opts.dim;
+    nopts.fnames = List(FileSource.simpleEnum(infnames,1,0));
+    nopts.ofnames = List(FileSource.simpleEnum(outfnames,1,0));
+    val newmod = new KMeans(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod);
+    implicit val threads = threadPool(4);
+    val nn = new Learner(
+        new FileSource(nopts), 
+        newmod, 
+        null,
+        null,
+        new FileSink(nopts),
+        nopts)
+    (nn, nopts)
+  }
    
   class ParOptions extends ParLearner.Options with KMeans.Opts with MatSource.Opts with Batch.Opts
   

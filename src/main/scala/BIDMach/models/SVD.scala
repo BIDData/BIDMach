@@ -164,7 +164,6 @@ object SVD  {
     nopts.dim = model.opts.dim;
     nopts.fnames = List(FileSource.simpleEnum(infnames, 1, 0));
     nopts.ofnames = List(FileSource.simpleEnum(outfnames, 1, 0));
-    nopts.miniBatchPasses = 0;
     val newmod = new SVD(nopts);
     newmod.refresh = false
     model.copyTo(newmod);
