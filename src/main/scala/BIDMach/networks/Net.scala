@@ -8,6 +8,7 @@ import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
+import BIDMach.networks.layers._
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 
@@ -16,7 +17,7 @@ import java.util.HashMap;
  *
  * The network topology is specified by opts.layers which is a sequence of "LayerOptions" objects. There is a LayerOptions
  * Class for each Layer class, which holds the params for defining that layer. There is also an inputs parameter which points
- * to the set of Layer.Options instances that mirror the final network structure. 
+ * to the set of Node instances that mirror the final network structure. 
  *
  */
 
@@ -238,22 +239,22 @@ object Net  {
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
     val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Options;
+    layers(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    		layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
+    	    case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
+    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
@@ -267,24 +268,24 @@ object Net  {
     val depth = (depth0/3)*3;              // Round up to an odd number of layers 
     val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Options;
+    layers(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    		layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
+    	    case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
     	  }
     	} else {
-    		layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    		layers(i) = new NormNode{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
+    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
@@ -298,31 +299,31 @@ object Net  {
     val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of layers 
     val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Options;
+    layers(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	(i % 4) match {
     	  case 1 => {
-    	  	layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    	  	layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     	  	w = (taper*w).toInt;
     	  }
     	  case 2 => {
     	  	nonlin match {
-    	  	case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
-    	  	case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
-    	  	case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
-    	  	case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
+    	  	case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
+    	  	case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
+    	  	case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
     	  	}
     	  }
     	  case 3 => {
-    	  	layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    	  	layers(i) = new NormNode{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
       }
     	  case _ => {
-    	  	layers(i) = new DropoutLayer.Options{inputs(0) = layers(i-1); frac = opts.dropout};
+    	  	layers(i) = new DropoutNode{inputs(0) = layers(i-1); frac = opts.dropout};
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
+    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   

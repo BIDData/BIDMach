@@ -7,6 +7,7 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
+import BIDMach.networks.layers._
 import BIDMach._
 
 /*
@@ -46,8 +47,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
-    val lopts1 = new LinLayer.Options{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
-    val lopts2 = new LinLayer.Options{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
+    val lopts1 = new LinNode{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
+    val lopts2 = new LinNode{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
     for (j <- 0 until width) {
     	setlayer(0, j, InputLayer(this));
       if (j < inwidth) {
@@ -59,8 +60,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 
     // the main grid
     for (i <- 0 until height) {
-    	val loptsSrc = new LSTMLayer.Options{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
-      val loptsDst = new LSTMLayer.Options{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
+    	val loptsSrc = new LSTMNode{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
+      val loptsDst = new LSTMNode{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
     	loptsSrc.prefix = if (opts.bylevel) "SrcLevel_%d" format i; else "Src";
     	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "Dst";
     	loptsSrc.constructNet;
@@ -82,8 +83,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     // the top layers
     output_layers = new Array[Layer](outwidth);
     if (opts.netType == 0) {
-    	val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
-    	val sopts = new SoftmaxOutputLayer.Options{scoreType = opts.scoreType};
+    	val lopts3 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
+    	val sopts = new SoftmaxOutputNode{scoreType = opts.scoreType};
     	for (j <- 0 until outwidth) {
     		val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
     		setlayer(fullheight, inwidth + j, linlayer);    	
@@ -92,7 +93,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     		output_layers(j) = smlayer;
     	}
     } else {
-      val nsopts = new NegsampOutputLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias; 
+      val nsopts = new NegsampOutputNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias; 
                                                   scoreType = opts.scoreType; nsamps = opts.nsamps; expt = opts.expt};
       for (j <- 0 until outwidth) {
         val nslayer = NegsampOutputLayer(this, nsopts).setinput(0, getlayer(fullheight-1, j+inwidth));

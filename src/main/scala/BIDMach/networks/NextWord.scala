@@ -7,6 +7,7 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
+import BIDMach.networks.layers._
 import BIDMach._
 
 /*
@@ -35,14 +36,14 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
     
     // the preamble (bottom) layers
     layers(0) = InputLayer(this);
-    val lopts1 = new LinLayer.Options{modelName = "inWordMap"; outdim = opts.dim; aopts = opts.aopts};
+    val lopts1 = new LinNode{modelName = "inWordMap"; outdim = opts.dim; aopts = opts.aopts};
     layers(1) = LinLayer(this, lopts1).setinput(0, layers(0));
-    val spopts = new SplitHorizLayer.Options{nparts = opts.width};
+    val spopts = new SplitHorizNode{nparts = opts.width};
     layers(2) = SplitHorizLayer(this, spopts).setinput(0, layers(1));
     
     // the main grid
     for (i <- 0 until height) {
-    	val lopts = new LSTMLayer.Options;
+    	val lopts = new LSTMNode;
     	lopts.dim = opts.dim;
     	lopts.aopts = opts.aopts;
     	lopts.kind = opts.kind;
@@ -67,8 +68,8 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
     }
     
     // the top layers
-    val lopts2 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
-    val sopts = new SoftmaxOutputLayer.Options;
+    val lopts2 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
+    val sopts = new SoftmaxOutputNode;
     if (opts.allout) {
     	output_layers = new Array[Layer](width);
     	for (j <- 0 until width) {
