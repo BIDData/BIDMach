@@ -32,6 +32,8 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNodeOpts = n
 	
 	var internal_layers:Array[Layer] = null;
 	
+	var grid:LayerMat = null;
+	
 	override def forward = {
 			val start = toc;
 			if (net.opts.debug == 0) {

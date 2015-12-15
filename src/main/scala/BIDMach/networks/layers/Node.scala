@@ -40,7 +40,7 @@ trait NodeOpts extends Serializable {
 
 class Node extends NodeTerm(null, 0) with NodeOpts {
   
-  override val node = this;
+  override def node = this;
 
   override def clone:Node = {
 		copyTo(new Node).asInstanceOf[Node];
@@ -52,15 +52,17 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
 
 }
 
-class NodeTerm(val node:Node, val term:Int) {  
+class NodeTerm(val _node:Node, val term:Int) {  
   
-  def + (a:NodeTerm) = new AddNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a.node; inputTerminals(1) = a.term};
+  def node = _node;
+  
+  def + (a:NodeTerm) = {val n=node; val t=term; new AddNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
 
-  def *@ (a:NodeTerm) = new MulNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a.node; inputTerminals(1) = a.term};
+  def *@ (a:NodeTerm) = {val n=node; val t=term; new MulNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
     
-  def ∘ (a:NodeTerm) = new MulNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a.node; inputTerminals(1) = a.term};
+  def ∘ (a:NodeTerm) = {val n=node; val t=term; new MulNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
         
-  def on (a:NodeTerm) = new StackNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a.node; inputTerminals(1) = a.term};
+  def on (a:NodeTerm) = {val n=node; val t=term; new StackNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
 }
 
 object Node {
@@ -79,8 +81,8 @@ object Node {
   
   def input = new InputNode
   
-  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null) = {
-    val n = new LinNode{inputs(0) = a.node;  inputTerminals(0) = a.term; outdim = outdim; hasBias = hasBias; aopts=aopts};
+  def linear(a:NodeTerm)(name:String="", odim:Int=0, hBias:Boolean=true, aaopts:ADAGrad.Opts=null) = {
+    val n = new LinNode{inputs(0)=a.node; inputTerminals(0)=a.term; outdim=odim; hasBias=hBias; aopts=aaopts};
     n.modelName = name;
     n
   }
