@@ -24,7 +24,7 @@ trait NodeOpts extends Serializable {
   var myGhost:NodeOpts = null;
   var parent:Node = null;
   var outputNumbers:Array[Int] = null;
-  
+  var name = "";  
   
   def copyTo(opts:NodeOpts):NodeOpts = {
 		opts.inputs(0) = inputs(0);
@@ -38,9 +38,9 @@ trait NodeOpts extends Serializable {
   }
 }
 
-class Node extends NodeOpts {
+class Node extends NodeTerm(null, 0) with NodeOpts {
   
-  val terminal = 0;
+  override val node = this;
 
   override def clone:Node = {
 		copyTo(new Node).asInstanceOf[Node];
@@ -49,35 +49,10 @@ class Node extends NodeOpts {
   def apply(i:Int) = new NodeTerm(this, i);
   
   def create(net:Net):Layer = {null}
-  
-  def + (a:Node) = new AddNode{inputs(0) = this; inputs(1) = a};
-  
-  def *@ (a:Node) = new MulNode{inputs(0) = this; inputs(1) = a};
-  
-  def ∘ (a:Node) = new MulNode{inputs(0) = this; inputs(1) = a};
-  
-  def on (a:Node) = new StackNode{inputs(0) = this; inputs(1) = a};
-  
-  
-  def + (a:NodeTerm) = new AddNode{inputs(0) = this; inputs(1) = a.node; inputTerminals(1) = a.term};
-  
-  def *@ (a:NodeTerm) = new MulNode{inputs(0) = this; inputs(1) = a.node; inputTerminals(1) = a.term};
-  
-  def ∘ (a:NodeTerm) = new MulNode{inputs(0) = this; inputs(1) = a.node; inputTerminals(1) = a.term};
-  
-  def on (a:NodeTerm) = new StackNode{inputs(0) = this; inputs(1) = a.node; inputTerminals(1) = a.term};
 
 }
 
-class NodeTerm(val node:Node, val term:Int) {
-  def + (a:Node) = new AddNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a};
-  
-  def *@ (a:Node) = new MulNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a};
-  
-  def ∘ (a:Node) = new MulNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a};
-  
-  def on (a:Node) = new StackNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a};
-  
+class NodeTerm(val node:Node, val term:Int) {  
   
   def + (a:NodeTerm) = new AddNode{inputs(0) = node; inputTerminals(0) = term; inputs(1) = a.node; inputTerminals(1) = a.term};
 
@@ -89,70 +64,10 @@ class NodeTerm(val node:Node, val term:Int) {
 }
 
 object Node {
-  def copy(a:Node) = new CopyNode{inputs(0) = a}
-  
-  def dropout(a:Node, frac:Float) = new DropoutNode{inputs(0) = a; frac = frac}
-  
-  def exp(a:Node) = new ExpNode{inputs(0) = a};
-  
-  def GLM(a:Node)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
-  
-  def input(a:Node) = new InputNode{inputs(0) = a};
-  
-  def linear(a:Node)(implicit opts:LinNodeOpts) = {
-    val n = new LinNode{inputs(0) = a;}
-    opts.copyOpts(n);
-    n
-  }
-  
-  def linear(a:Node, name:String)(implicit opts:LinNodeOpts) = {
-    val n = new LinNode{inputs(0) = a;}
-    opts.copyOpts(n);
-    n.modelName = name;
-    n
-  }
-  
-  def ln(a:Node) = new LnNode{inputs(0) = a};
-  
-  def negsamp(a:Node)(implicit opts:NegsampOutputNodeOpts) =     {
-    val n = new NegsampOutputNode{inputs(0) = a;}
-    opts.copyOpts(n);
-    n
-  }
-  
-  def norm(a:Node)(implicit opts:NormNodeOpts) =  {
-    val n = new NormNode{inputs(0) = a;}
-    opts.copyOpts(n);
-    n
-  }
-  
-  def oneHot(a:Node) = new OnehotNode{inputs(0) = a};
-  
-  def rect(a:Node) = new RectNode{inputs(0) = a};
-  
-  def sigmoid(a:Node) = new SigmoidNode{inputs(0) = a};
-  
-  def σ(a:Node) = new SigmoidNode{inputs(0) = a};
-  
-  def softmax(a:Node) = new SoftmaxNode{inputs(0) = a};
-  
-  def softmaxout(a:Node)(implicit opts:SoftmaxOutputNodeOpts) =  {
-    val n = new NormNode{inputs(0) = a;}
-    opts.copyOpts(n);
-    n
-  }
-  
-  def softplus(a:Node) = new SoftplusNode{inputs(0) = a};
-  
-  def splithoriz(a:Node, np:Int) = new SplitHorizNode{inputs(0) = a; nparts = np};
-  
-  def splitvert(a:Node, np:Int) = new SplitVertNode{inputs(0) = a; nparts = np};
-  
-  def tanh(a:Node) = new TanhNode{inputs(0) = a};
-  
-  
   
   def copy(a:NodeTerm) = new CopyNode{inputs(0) = a.node; inputTerminals(0) = a.term}
+  
+  def copy = new CopyNode
   
   def dropout(a:NodeTerm, frac:Float) = new DropoutNode{inputs(0) = a.node; inputTerminals(0) = a.term; frac = frac}
   
@@ -162,16 +77,17 @@ object Node {
   
   def input(a:NodeTerm) = new InputNode{inputs(0) = a.node; inputTerminals(0) = a.term};
   
-  def linear(a:NodeTerm)(implicit opts:LinNodeOpts) = {
-    val n = new LinNode{inputs(0) = a.node; inputTerminals(0) = a.term;}
-    opts.copyOpts(n);
+  def input = new InputNode
+  
+  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null) = {
+    val n = new LinNode{inputs(0) = a.node;  inputTerminals(0) = a.term; outdim = outdim; hasBias = hasBias; aopts=aopts};
+    n.modelName = name;
     n
   }
   
-  def linear(a:NodeTerm, name:String)(implicit opts:LinNodeOpts) = {
+  def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {
     val n = new LinNode{inputs(0) = a.node; inputTerminals(0) = a.term;}
     opts.copyOpts(n);
-    opts.modelName = name;
     n
   }
   
@@ -213,5 +129,6 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a.node; inputTerminals(0) = a.term};
   
+  implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n);
 
 }

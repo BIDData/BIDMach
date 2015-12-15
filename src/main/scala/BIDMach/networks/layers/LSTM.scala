@@ -1,4 +1,4 @@
-package BIDMach.networks
+package BIDMach.networks.layers
 
 import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
@@ -7,7 +7,7 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
-import BIDMach.networks.layers._
+import BIDMach.networks._
 import BIDMach._
 import scala.util.hashing.MurmurHash3;
 import scala.collection.mutable.HashMap;
@@ -36,6 +36,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
         case 1 => constructNet1
         case 2 => constructNet2
         case 3 => constructNet3
+        case 4 => constructNet4
         case _ => throw new RuntimeException("LSTMLayer type %d not recognized" format kind);
       }
     }
@@ -122,7 +123,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
     }
     
-    // LSTM with 4 linear layers, with h and x stacked as inputs
+    // LSTM with 4 linear layers, with h and i stacked as inputs
     
     def constructNet2 = {
       val prev_h = new CopyNode;
@@ -199,6 +200,44 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       
       lopts.map(_.parent = this);
       outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
+    }
+    
+    // LSTM with 4 linear layers, with h and i stacked as inputs
+    
+    def constructNet4 = {
+    	import BIDMach.networks.layers.Node._
+    		
+    	val in_h = copy;
+    	val in_c = copy; 
+    	val in_i = copy;
+    	val h_on_i = in_h on in_i;
+
+    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate");
+    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate");   
+    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate");
+    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate");
+    	
+    	val in_gate = σ(lin1);
+    	val out_gate = σ(lin2);
+    	val forget_gate = σ(lin3);
+    	val in_sat = tanh(lin4);
+    	
+    	val in_prod = in_gate ∘ in_sat;
+    	val f_prod = forget_gate ∘ in_c;
+    	val out_c = in_prod + f_prod;
+    	
+    	val out_tanh = tanh(out_c);
+    	val out_h = out_gate ∘ out_tanh;
+
+    	grid = in_h    \   lin1   \  in_gate      \  in_prod  \  out_tanh  on
+             in_c    \   lin2   \  out_gate     \  f_prod   \  out_h     on
+             in_i    \   lin3   \  forget_gate  \  out_c    \  null      on
+             h_on_i  \   lin4   \  in_sat       \  null     \  null;
+    	
+    	lopts = grid.data.filter(_ != null);
+    	lopts.map(_.parent = this);
+    	outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));
+    	
     }
 	  
 	  override def clone:LSTMNode = {

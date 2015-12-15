@@ -91,6 +91,7 @@ trait CompoundNodeOpts extends ModelNodeOpts {
 	var lopts:Array[Node] = null;
   var aopts:ADAGrad.Opts = null;
   var prefix = "";
+  var grid:NodeMat = null;
 }
 
 class CompoundNode extends ModelNode with CompoundNodeOpts {}
