@@ -75,7 +75,10 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
     for (i <- 0 until opts.layers.nlayers) {
     	for (j <- 0 until layerOptionss(i).inputs.length) {
-    		if (layerOptionss(i).inputs(j) != null) layers(i).setInputTerm(j, layerOptionss(i).inputs(j).node.myLayer, layerOptionss(i).inputs(j).term)
+    		if (layerOptionss(i).inputs(j) != null) {
+    			val nodeTerm = layerOptionss(i).inputs(j);
+    			layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+        }
     	}
     }
   }

@@ -21,8 +21,7 @@ import BIDMach.networks._
 
 class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode) extends Layer(net, opts) { 
   
-  override val _inputs = new Array[Layer](opts.ninputs);
-  override val _inputTerminals = new Array[Int](opts.ninputs);
+  override val _inputs = new Array[LayerTerm](opts.ninputs);
 
 	override def forward = {
       val start = toc;

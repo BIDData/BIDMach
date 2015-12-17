@@ -76,8 +76,8 @@ import BIDMach.networks._
 @SerialVersionUID(100L)
 class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0) {
   // Internal data arrays
-  val _inputs = new Array[Layer](1);
-  val _inputTerminals = Array(0);
+  val _inputs = new Array[LayerTerm](1);
+//  val _inputTerminals = Array(0);
   val _outputs = new Array[Mat](1);
   val _derivs = new Array[Mat](1);
   def inputlength = _inputs.length
@@ -90,35 +90,35 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def GUID:Long = _GUID
   
   // Setters and getters for general elements of those arrays
-  def inputLayers(i:Int) = _inputs(i);
+//  def inputLayers(i:Int) = _inputs(i);
   def outputs(i:Int) = _outputs(i);
   def derivs(i:Int) = _derivs(i);  
-  def input(i:Int) = new LayerTerm(_inputs(i), _inputTerminals(i));
+  def input(i:Int) = _inputs(i);
   def apply(i:Int) = new LayerTerm(this, i);
   
   def setOutput(i:Int, v:Mat):Layer = {_outputs(i) = v; this}
   def setDeriv(i:Int, v:Mat):Layer = {_derivs(i) = v; this}
-  def setInputLayer(i:Int, v:Layer): Layer = {_inputs(i) = v; _inputTerminals(i) = 0; this}
-  def setInputTerm(i:Int, v:Layer, j:Int): Layer = {_inputs(i) = v; _inputTerminals(i) = j; this}
-  def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v.layer; _inputTerminals(i) = v.term; this}
+//  def setInputLayer(i:Int, v:Layer): Layer = {_inputs(i) = v; _inputTerminals(i) = 0; this}
+//  def setInputTerm(i:Int, v:Layer, j:Int): Layer = {_inputs(i) = v; _inputTerminals(i) = j; this}
+  def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v; this}
   
   // Setters and getters for the first input or output
-  def inputLayer = _inputs(0);
-  def input = new LayerTerm(_inputs(0), _inputTerminals(0));
+//  def inputLayer = _inputs(0);
+  def input = _inputs(0);
   def output = _outputs(0);
   def deriv = _derivs(0);
   
-  def inputLayer_=(v:Layer): Unit = {_inputs(0) = v;}
-  def input_=(v:LayerTerm): Unit = {_inputs(0) = v.layer; _inputTerminals(0) = v.term;}
+//  def inputLayer_=(v:Layer): Unit = {_inputs(0) = v;}
+  def input_=(v:LayerTerm): Unit = {_inputs(0) = v}
   def output_= (v:Mat):Unit = {_outputs(0) = v};
   def deriv_=(v:Mat):Unit = {_derivs(0) = v};
   
   // Input getters (and one setter) which get the appropriate output from each input layer
-  def inputData = _inputs(0)._outputs(_inputTerminals(0));
-  def inputDeriv = _inputs(0)._derivs(_inputTerminals(0));
-  def inputDeriv_=(v:Mat):Unit = {_inputs(0)._derivs(_inputTerminals(0)) = v}; 
-  def inputDatas(i:Int) = _inputs(i)._outputs(_inputTerminals(i));
-  def inputDerivs(i:Int) = _inputs(i)._derivs(_inputTerminals(i));
+  def inputData = {val i = _inputs(0); i.layer._outputs(i.term);}
+  def inputDeriv = {val i = _inputs(0); i.layer._derivs(i.term);}
+  def inputDeriv_=(v:Mat):Unit = {val i = _inputs(0); i.layer._derivs(i.term) = v;}  
+  def inputDatas(i:Int) = {val lt = _inputs(i); lt.layer._outputs(lt.term);}
+  def inputDerivs(i:Int) = {val lt = _inputs(i); lt.layer._derivs(lt.term);}
   
   var target:Mat = null;
   def forward = {};

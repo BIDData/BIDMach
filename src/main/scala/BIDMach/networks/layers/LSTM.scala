@@ -17,8 +17,7 @@ import scala.collection.mutable.HashMap;
  */
 
 class LSTMLayer(override val net:Net, override val opts:LSTMNode = new LSTMNode) extends CompoundLayer(net, opts) {
-	override val _inputs = new Array[Layer](3);
-	override val _inputTerminals = Array(0,0,0);
+	override val _inputs = new Array[LayerTerm](3);
 	override val _outputs = new Array[Mat](2);
 	override val _derivs = new Array[Mat](2);
 }

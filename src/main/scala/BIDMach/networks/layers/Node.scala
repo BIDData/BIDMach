@@ -18,7 +18,6 @@ import BIDMach.networks._
 
 @SerialVersionUID(100L)
 trait NodeOpts extends Serializable {
-//  val inputTerminals:Array[Int] = Array(0);
   var name = "";  
   
   def copyOpts(opts:NodeOpts):NodeOpts = {
@@ -37,6 +36,7 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
   override def node = this;
   
   def copyTo(opts:Node):Node = {
+    copyOpts(opts);
     opts.inputs(0) = inputs(0);
     myGhost = opts;
     opts;
@@ -49,8 +49,8 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
   def apply(i:Int) = new NodeTerm(this, i);
   
   def create(net:Net):Layer = {null}
-
 }
+
 
 class NodeTerm(val _node:Node, val term:Int) extends Serializable {  
   
@@ -66,10 +66,6 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
 }
 
 object Node {
-  
-//  def _getNode(a:NodeTerm):Node = if (a != null) a.node else null;
-  
-//  def _getTerm(a:NodeTerm):Int = if (a != null) a.term else 0;
   
   def copy(a:NodeTerm) = new CopyNode{inputs(0) = a;}
 
@@ -101,12 +97,6 @@ object Node {
   
   def ln(a:NodeTerm) = new LnNode{inputs(0) = a};
   
-  def negsamp_(a:NodeTerm)(implicit opts:NegsampOutputNodeOpts) =     {
-    val n = new NegsampOutputNode{inputs(0) = a}
-    opts.copyOpts(n);
-    n
-  }
-  
   def negsamp(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -117,6 +107,12 @@ object Node {
     val sct = scoreType;
     val mname = name;
     new NegsampOutputNode{inputs(0)=a; modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr};
+  }
+    
+  def negsamp_(a:NodeTerm)(implicit opts:NegsampOutputNodeOpts) =     {
+    val n = new NegsampOutputNode{inputs(0) = a}
+    opts.copyOpts(n);
+    n
   }
   
   def norm(a:NodeTerm)(implicit opts:NormNodeOpts) =  {

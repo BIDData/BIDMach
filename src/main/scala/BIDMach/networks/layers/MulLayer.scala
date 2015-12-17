@@ -20,8 +20,7 @@ import BIDMach.networks._
 
 class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode) extends Layer(net, opts) {  
   
-	override val _inputs = new Array[Layer](opts.ninputs);
-	override val _inputTerminals = new Array[Int](opts.ninputs);
+	override val _inputs = new Array[LayerTerm](opts.ninputs);
   val qeps = 1e-40f;
   
   def guardSmall(a:Mat, eps:Float):Mat = {

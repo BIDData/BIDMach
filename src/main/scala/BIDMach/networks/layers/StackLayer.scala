@@ -15,8 +15,7 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 class StackLayer(override val net:Net, override val opts:StackNodeOpts = new StackNode) extends Layer(net, opts) {
-  override val _inputs = new Array[Layer](opts.ninputs);
-  override val _inputTerminals = new Array[Int](opts.ninputs);
+  override val _inputs = new Array[LayerTerm](opts.ninputs);
 
   var colranges = new Array[Mat](opts.ninputs);
   
