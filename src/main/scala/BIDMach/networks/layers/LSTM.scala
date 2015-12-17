@@ -309,6 +309,7 @@ object LSTMNode {
     }
     
     opts.netType match {
+      case 0 => {}
       case 1 => {
         for (k <- 0 until ncols) {
         	gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"Grid_output", outdim=opts.outDim, hasBias = opts.hasBias)
