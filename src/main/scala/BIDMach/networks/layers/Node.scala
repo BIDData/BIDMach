@@ -88,8 +88,9 @@ object Node {
   def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null) = {
     val odim = outdim;
     val hBias = hasBias;
-    val aaopts = aopts
-    new LinNode{inputs(0)=_getNode(a); inputTerminals(0)=_getTerm(a); modelName = name; outdim=odim; hasBias=hBias; aopts=aaopts};
+    val aaopts = aopts;
+    val mname = name;
+    new LinNode{inputs(0)=_getNode(a); inputTerminals(0)=_getTerm(a); modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts};
   }
   
   def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {
@@ -114,7 +115,8 @@ object Node {
     val eexpt = expt;
     val dcr = doCorrect;
     val sct = scoreType;
-    new NegsampOutputNode{inputs(0)=_getNode(a); inputTerminals(0)=_getTerm(a); modelName=name; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr};
+    val mname = name;
+    new NegsampOutputNode{inputs(0)=_getNode(a); inputTerminals(0)=_getTerm(a); modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr};
   }
   
   def norm(a:NodeTerm)(implicit opts:NormNodeOpts) =  {

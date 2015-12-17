@@ -218,10 +218,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     	val in_i = copy;
     	val h_on_i = in_h on in_i;
 
-    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=dim);
-    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=dim);   
-    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=dim);
-    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=dim);
+    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=dim, hasBias = hasBias);
+    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=dim, hasBias = hasBias);   
+    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=dim, hasBias = hasBias);
+    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=dim, hasBias = hasBias);
     	
     	val in_gate = σ(lin1);
     	val out_gate = σ(lin2);
