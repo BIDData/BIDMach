@@ -298,9 +298,13 @@ object LSTMNode {
     
     for (k <- 0 until ncols) {
       for (j <- nlin until nrows + nlin) {
-        val left = if (k > 0) gr(j, k-1).asInstanceOf[LSTMNode] else null;
-        val below = gr(j-1, k);        
-        gr(j, k) = lstm(h=left.h, c=left.c, i=below)(opts);
+    	  val below = gr(j-1, k); 
+        if (k > 0) {
+        	val left = gr(j, k-1).asInstanceOf[LSTMNode];
+        	gr(j, k) = lstm(h=left.h, c=left.c, i=below)(opts);
+        } else {
+          gr(j, k) = lstm(h=null, c=null, i=below)(opts);
+        }
       }
     }
     
