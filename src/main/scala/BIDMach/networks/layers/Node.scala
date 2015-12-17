@@ -18,29 +18,29 @@ import BIDMach.networks._
 
 @SerialVersionUID(100L)
 trait NodeOpts extends Serializable {
-  val inputs:Array[NodeOpts] = Array(null);
-  val inputTerminals:Array[Int] = Array(0);
-  var myLayer:Layer = null;
-  var myGhost:NodeOpts = null;
-  var parent:Node = null;
-  var outputNumbers:Array[Int] = null;
+//  val inputTerminals:Array[Int] = Array(0);
   var name = "";  
   
-  def copyTo(opts:NodeOpts):NodeOpts = {
-		opts.inputs(0) = inputs(0);
-		opts.inputTerminals(0) = inputTerminals(0);
-		myGhost = opts;
-		opts;
-  }
-  
   def copyOpts(opts:NodeOpts):NodeOpts = {
+    opts.name = name;
 		opts;
   }
 }
 
 class Node extends NodeTerm(null, 0) with NodeOpts {
+	val inputs:Array[NodeTerm] = Array(null);
+  var myLayer:Layer = null;
+  var myGhost:Node = null;
+  var parent:Node = null;
+  var outputNumbers:Array[Int] = null;
   
   override def node = this;
+  
+  def copyTo(opts:Node):Node = {
+    opts.inputs(0) = inputs(0);
+    myGhost = opts;
+    opts;
+  }
 
   override def clone:Node = {
 		copyTo(new Node).asInstanceOf[Node];
@@ -67,21 +67,21 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
 
 object Node {
   
-  def _getNode(a:NodeTerm):Node = if (a != null) a.node else null;
+//  def _getNode(a:NodeTerm):Node = if (a != null) a.node else null;
   
-  def _getTerm(a:NodeTerm):Int = if (a != null) a.term else 0;
+//  def _getTerm(a:NodeTerm):Int = if (a != null) a.term else 0;
   
-  def copy(a:NodeTerm) = new CopyNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a);}
+  def copy(a:NodeTerm) = new CopyNode{inputs(0) = a;}
 
   def copy = new CopyNode
   
-  def dropout(a:NodeTerm, frac:Float) = new DropoutNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a); frac = frac}
+  def dropout(a:NodeTerm, frac:Float) = new DropoutNode{inputs(0) = a; frac = frac}
   
-  def exp(a:NodeTerm) = new ExpNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def exp(a:NodeTerm) = new ExpNode{inputs(0) = a;};
   
-  def GLM(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a); links = opts.links};
+  def GLM(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
   
-  def input(a:NodeTerm) = new InputNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
   
   def input = new InputNode
   
@@ -90,19 +90,19 @@ object Node {
     val hBias = hasBias;
     val aaopts = aopts;
     val mname = name;
-    new LinNode{inputs(0)=_getNode(a); inputTerminals(0)=_getTerm(a); modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts};
+    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts};
   }
   
   def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {
-    val n = new LinNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a);}
+    val n = new LinNode{inputs(0) = a;}
     opts.copyOpts(n);
     n
   }
   
-  def ln(a:NodeTerm) = new LnNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def ln(a:NodeTerm) = new LnNode{inputs(0) = a};
   
   def negsamp_(a:NodeTerm)(implicit opts:NegsampOutputNodeOpts) =     {
-    val n = new NegsampOutputNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a);}
+    val n = new NegsampOutputNode{inputs(0) = a}
     opts.copyOpts(n);
     n
   }
@@ -116,45 +116,42 @@ object Node {
     val dcr = doCorrect;
     val sct = scoreType;
     val mname = name;
-    new NegsampOutputNode{inputs(0)=_getNode(a); inputTerminals(0)=_getTerm(a); modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr};
+    new NegsampOutputNode{inputs(0)=a; modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr};
   }
   
   def norm(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
-    val n = new NormNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a);}
+    val n = new NormNode{inputs(0) = a;}
     opts.copyOpts(n);
     n
   }
   
-  def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a};
   
-  def rect(a:NodeTerm) = new RectNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def rect(a:NodeTerm) = new RectNode{inputs(0) = a};
   
-  def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
   
-  def σ(a:NodeTerm) = new SigmoidNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def σ(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
 
-  def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
   
-  def softmaxout(a:NodeTerm)(scoreTyp:Int=0) =  new SoftmaxOutputNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a); scoreType=scoreTyp}
+  def softmaxout(a:NodeTerm)(scoreTyp:Int=0) =  new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp}
   
-  def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = a};
   
-  def splithoriz(a:NodeTerm, np:Int) = new SplitHorizNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a); nparts = np};
+  def splithoriz(a:NodeTerm, np:Int) = new SplitHorizNode{inputs(0) = a; nparts = np};
   
-  def splitvert(a:NodeTerm, np:Int) = new SplitVertNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a); nparts = np};
+  def splitvert(a:NodeTerm, np:Int) = new SplitVertNode{inputs(0) = a; nparts = np};
   
-  def tanh(a:NodeTerm) = new TanhNode{inputs(0) = _getNode(a); inputTerminals(0) = _getTerm(a)};
+  def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
   def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm)(opts:LSTMNodeOpts) = {
     val n = new LSTMNode;
     opts.copyOpts(n);
     n.constructGraph;
-    n.inputs(0) = _getNode(h);
-    n.inputs(1) = _getNode(c);
-    n.inputs(2) = _getNode(i);
-    n.inputTerminals(0) = _getTerm(h);
-    n.inputTerminals(1) = _getTerm(c);
-    n.inputTerminals(2) = _getTerm(i);
+    n.inputs(0) = h;
+    n.inputs(1) = c;
+    n.inputs(2) = i;
     n
   }
   

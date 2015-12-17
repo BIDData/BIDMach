@@ -33,8 +33,8 @@ trait LSTMNodeOpts extends CompoundNodeOpts {
 
 class LSTMNode extends CompoundNode with LSTMNodeOpts {	
   
-	  override val inputs:Array[NodeOpts] = Array(null, null, null);
-    override val inputTerminals:Array[Int] = Array(0,0,0);
+	  override val inputs:Array[NodeTerm] = Array(null, null, null);
+//    override val inputTerminals:Array[Int] = Array(0,0,0);
     
     def constructGraph = {
       kind match {
@@ -104,10 +104,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val il = new LinNode{inputs(0) = prev_hi; modelName = prefix + "LSTM_all"; outdim = 4*dim; hasBias = this.hasBias};      
       val sp = new SplitVertNode{inputs(0) = il;  nparts = 4;}
 
-      val in_gate = new SigmoidNode{inputs(0) = sp;     inputTerminals(0) = 0};
-      val out_gate = new SigmoidNode{inputs(0) = sp;    inputTerminals(0) = 1};
-      val forget_gate = new SigmoidNode{inputs(0) = sp; inputTerminals(0) = 2};
-      val in_gate2 = new TanhNode{inputs(0) = sp;       inputTerminals(0) = 3};
+      val in_gate = new SigmoidNode{inputs(0) = sp(0)};
+      val out_gate = new SigmoidNode{inputs(0) = sp(1)};
+      val forget_gate = new SigmoidNode{inputs(0) = sp(2)};
+      val in_gate2 = new TanhNode{inputs(0) = sp(3)};
       
       val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = in_gate2};
       val f_prod = new MulNode{inputs(0) = forget_gate; inputs(1) = prev_c};
@@ -183,10 +183,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val il2 = new LinNode{inputs(0) = prev_hi; modelName = prefix + "LSTM_forget_tanh"; outdim = 2*dim; hasBias = this.hasBias};      
       val sp2 = new SplitVertNode{inputs(0) = il2;  nparts = 2;}
 
-      val in_gate = new SigmoidNode{inputs(0) = sp1;     inputTerminals(0) = 0};
-      val out_gate = new SigmoidNode{inputs(0) = sp1;    inputTerminals(0) = 1};
-      val forget_gate = new SigmoidNode{inputs(0) = sp2; inputTerminals(0) = 0};
-      val in_gate2 = new TanhNode{inputs(0) = sp2;       inputTerminals(0) = 1};
+      val in_gate = new SigmoidNode{inputs(0) = sp1(0)};
+      val out_gate = new SigmoidNode{inputs(0) = sp1(1)};
+      val forget_gate = new SigmoidNode{inputs(0) = sp2(0)};
+      val in_gate2 = new TanhNode{inputs(0) = sp2(1)};
       
       val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = in_gate2};
       val f_prod = new MulNode{inputs(0) = forget_gate; inputs(1) = prev_c};
@@ -218,10 +218,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     	val in_i = copy;
     	val h_on_i = in_h on in_i;
 
-    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=dim, hasBias = hasBias);
-    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=dim, hasBias = hasBias);   
-    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=dim, hasBias = hasBias);
-    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=dim, hasBias = hasBias);
+    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=dim, hasBias=hasBias);
+    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=dim, hasBias=hasBias);   
+    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=dim, hasBias=hasBias);
+    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=dim, hasBias=hasBias);
     	
     	val in_gate = σ(lin1);
     	val out_gate = σ(lin2);

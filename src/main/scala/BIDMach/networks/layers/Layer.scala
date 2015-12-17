@@ -186,7 +186,7 @@ class LayerOptions(val nlayers:Int) extends Serializable {
     }
     for (i <- 0 until nlayers) {
       for (j <- 0 until layerOptionss(i).inputs.length) {
-      	if (layerOptionss(i).inputs(j) != null) lopts.layerOptionss(i).inputs(j) = layerOptionss(i).inputs(j).myGhost;
+      	if (layerOptionss(i).inputs(j) != null) lopts.layerOptionss(i).inputs(j) = layerOptionss(i).inputs(j).node.myGhost;
       }
     }
     lopts;
