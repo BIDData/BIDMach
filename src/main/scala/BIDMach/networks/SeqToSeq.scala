@@ -60,8 +60,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     srcNodeGrid = LSTMNode.grid(height, inwidth, gridopts);
     dstNodeGrid = LSTMNode.grid(height, outwidth, gridopts);
     
- //   srcGrid = srcNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
-  //  dstGrid = dstNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
+    srcGrid = srcNodeGrid.map(_.create(this));
+    dstGrid = dstNodeGrid.map(_.create(this));
     
 //    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setInput(1, from(1));}}
     
