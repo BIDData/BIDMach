@@ -300,7 +300,7 @@ object LSTMNode {
       for (j <- nlin until nrows + nlin) {
     	  val below = gr(j-1, k); 
         if (k > 0) {
-        	val left = gr(j, k-1).asInstanceOf[LSTMNode];
+        	val left = gr(j, k-1).asInstanceOf[LSTMNode]
         	gr(j, k) = lstm(h=left.h, c=left.c, i=below)(opts);
         } else {
           gr(j, k) = lstm(h=null, c=null, i=below)(opts);
