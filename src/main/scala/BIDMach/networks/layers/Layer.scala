@@ -74,7 +74,7 @@ import BIDMach.networks._
 // To set layer A's i^th input to layer B's j^th output, do A.setinout(i, B, j)
 
 @SerialVersionUID(100L)
-class Layer(val net:Net, val opts:NodeOpts = new Node) extends Serializable {
+class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0) {
   // Internal data arrays
   val _inputs = new Array[Layer](1);
   val _inputTerminals = Array(0);
@@ -83,25 +83,33 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends Serializable {
   def inputlength = _inputs.length
   var forwardtime = 0.0
   var backwardtime = 0.0
+  override def layer = this
   
   private var _GUID = Mat.myrand.nextLong
   def setGUID(v:Long):Unit = {_GUID = v}
   def GUID:Long = _GUID
   
   // Setters and getters for general elements of those arrays
-  def inputs(i:Int) = _inputs(i);
+  def inputLayers(i:Int) = _inputs(i);
   def outputs(i:Int) = _outputs(i);
   def derivs(i:Int) = _derivs(i);  
+  def input(i:Int) = new LayerTerm(_inputs(i), _inputTerminals(i));
+  def apply(i:Int) = new LayerTerm(this, i);
+  
   def setoutput(i:Int, v:Mat):Layer = {_outputs(i) = v; this}
   def setderiv(i:Int, v:Mat):Layer = {_derivs(i) = v; this}
-  def setinput(i:Int, v:Layer):Layer = {_inputs(i) = v; _inputTerminals(i) = 0; this}
-  def setinout(i:Int, v:Layer, j:Int):Layer = {_inputs(i) = v; _inputTerminals(i) = j; this}
+  def setInputLayer(i:Int, v:Layer): Layer = {_inputs(i) = v; _inputTerminals(i) = 0; this}
+  def setInputTerm(i:Int, v:Layer, j:Int): Layer = {_inputs(i) = v; _inputTerminals(i) = j; this}
+  def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v.layer; _inputTerminals(i) = v.term; this}
   
   // Setters and getters for the first input or output
-  def input = _inputs(0);
+  def inputLayer = _inputs(0);
+  def input = new LayerTerm(_inputs(0), _inputTerminals(0));
   def output = _outputs(0);
   def deriv = _derivs(0);
-  def input_=(v:Layer):Unit = {_inputs(0) = v;}
+  
+  def inputLayer_=(v:Layer): Unit = {_inputs(0) = v;}
+  def input_=(v:LayerTerm): Unit = {_inputs(0) = v.layer; _inputTerminals(0) = v.term;}
   def output_= (v:Mat):Unit = {_outputs(0) = v};
   def deriv_=(v:Mat):Unit = {_derivs(0) = v};
   
@@ -153,6 +161,10 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends Serializable {
 
 
 object Layer {  
+}
+
+class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
+  def layer = _layer;
 }
 
 trait OutputLayer {}

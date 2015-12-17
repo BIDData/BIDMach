@@ -21,6 +21,10 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var leftStart:Mat = null;
   var dstxdata:Mat = null;
   var dstxdata0:Mat = null;
+  var srcGrid:LayerMat = null;
+  var dstGrid:LayerMat = null;
+  var srcNodeGrid:NodeMat = null;
+  var dstNodeGrid:NodeMat = null;
   var height = 0;
   var fullheight = 0;
   var inwidth = 0;
@@ -44,7 +48,22 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     outwidth = opts.outwidth;
     width = inwidth + outwidth;
     layers =  new Array[Layer](fullheight * width + outwidth * heightDiff);
-    leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
+    leftedge = InputLayer(this);                     // dummy layer, left edge of zeros   
+    
+    var gridopts = new LSTMNode.GridOpts;
+    gridopts.dim = opts.dim;
+    gridopts.aopts = opts.aopts;
+    gridopts.hasBias = opts.hasBias;
+    gridopts.kind = opts.kind;
+    gridopts.outdim = opts.nvocab;
+    
+    srcNodeGrid = LSTMNode.grid(height, inwidth, gridopts);
+    dstNodeGrid = LSTMNode.grid(height, outwidth, gridopts);
+    
+    srcGrid = srcNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
+    dstGrid = dstNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
+    
+    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setinout(1, from, 1);}}
     
     // the preamble (bottom) layers
     val lopts1 = new LinNode{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
@@ -64,8 +83,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       val loptsDst = new LSTMNode{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
     	loptsSrc.prefix = if (opts.bylevel) "SrcLevel_%d" format i; else "Src";
     	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "Dst";
-    	loptsSrc.constructNet;
-      loptsDst.constructNet;
+    	loptsSrc.constructGraph;
+      loptsDst.constructGraph;
       for (j <- 0 until width) {
     	  val layer = LSTMLayer(this, if (j < inwidth) loptsSrc else loptsDst);
     	  layer.setinput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below

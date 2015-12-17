@@ -30,20 +30,24 @@ trait LSTMNodeOpts extends CompoundNodeOpts {
 }
 
 class LSTMNode extends CompoundNode with LSTMNodeOpts {	
-    def constructNet = {
+  
+	  override val inputs:Array[NodeOpts] = Array(null, null, null);
+    override val inputTerminals:Array[Int] = Array(0,0,0);
+    
+    def constructGraph = {
       kind match {
-        case 0 => constructNet0
-        case 1 => constructNet1
-        case 2 => constructNet2
-        case 3 => constructNet3
-        case 4 => constructNet4
+        case 0 => constructGraph0
+        case 1 => constructGraph1
+        case 2 => constructGraph2
+        case 3 => constructGraph3
+        case 4 => constructGraph4
         case _ => throw new RuntimeException("LSTMLayer type %d not recognized" format kind);
       }
     }
   
     // Basic LSTM topology with 8 linear layers
 	  	  
-	  def constructNet0 = {
+	  def constructGraph0 = {
 			val prev_h = new CopyNode;
 	    val prev_c = new CopyNode;
 	    val i = new CopyNode;
@@ -89,7 +93,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     // LSTM with all layers grouped into 1 - not very stable to train
     
-    def constructNet1 = {
+    def constructGraph1 = {
       val prev_h = new CopyNode;
       val prev_c = new CopyNode;
       val i = new CopyNode;
@@ -125,7 +129,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     // LSTM with 4 linear layers, with h and i stacked as inputs
     
-    def constructNet2 = {
+    def constructGraph2 = {
       val prev_h = new CopyNode;
       val prev_c = new CopyNode;
       val i = new CopyNode;
@@ -166,7 +170,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     // LSTM with two sets of layers, paired outputs. More stable to train than the single linlayer network
     
-    def constructNet3 = {
+    def constructGraph3 = {
       val prev_h = new CopyNode;
       val prev_c = new CopyNode;
       val i = new CopyNode;
@@ -204,7 +208,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     // LSTM with 4 linear layers, with h and i stacked as inputs
     
-    def constructNet4 = {
+    def constructGraph4 = {
     	import BIDMach.networks.layers.Node._
     		
     	val in_h = copy;
@@ -247,9 +251,66 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  override def create(net:Net):LSTMLayer = {
 		  LSTMLayer(net, this);
 	  }
+    
+    def h = apply(0);
+    
+    def c = apply(1);
 	}
 
+
   
+object LSTMNode {    
+  
+  def apply() = {
+    val n = new LSTMNode;
+    n.constructGraph;
+    n
+  }
+  
+  def apply(opts:LSTMNodeOpts) = {
+    val n = new LSTMNode;
+    opts.copyOpts(n);
+    n.constructGraph;
+    n
+  }
+  
+  class GridOpts extends LSTMNodeOpts with SoftmaxOutputNodeOpts with NegsampOutputNodeOpts {var outdim:Int = 0; var netType = 0};
+  
+  def grid(nrows:Int, ncols:Int, opts:GridOpts) = {
+    import BIDMach.networks.layers.Node._
+    val nlin = 2;
+    val nsoft = if (opts.netType > 0) 2 else 0
+    val gr = NodeMat(nrows + nlin + nsoft, ncols);
+    
+    for (k <- 0 until ncols) {
+    	gr(0, k) = input
+    }
+    
+    for (k <- 0 until ncols) {
+    	gr(1, k) = linear(gr(0, k))(opts.modelName+"Grid_input", outdim=opts.dim, hasBias = opts.hasBias)
+    }
+    
+    for (k <- 0 until ncols) {
+      for (j <- nlin until nrows + nlin) {
+        val left = if (k > 0) gr(j, k-1).asInstanceOf[LSTMNode] else null;
+        val below = gr(j-1, k);        
+        gr(j, k) = lstm(h=left.h, c=left.c, i=below)(opts);
+      }
+    }
+    
+    if (opts.netType > 0) {
+    	for (k <- 0 until ncols) {
+    		gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(opts.modelName+"Grid_output", outdim=opts.dim, hasBias = opts.hasBias)
+        gr(nrows + nlin + 1, k) = opts.netType match {
+          case 1 => softmaxout(gr(nrows + nlin, k))(opts.scoreType);
+          case 2 => negsamp(gr(nrows + nlin, k))(opts)
+        }
+      }
+    }
+    gr
+  }
+}
+
 object LSTMLayer {    
   
   def apply(net:Net) = new LSTMLayer(net, new LSTMNode);
@@ -259,4 +320,6 @@ object LSTMLayer {
     x.construct;
     x;
   }
+  
+
 }

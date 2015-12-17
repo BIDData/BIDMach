@@ -48,7 +48,7 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
     	lopts.aopts = opts.aopts;
     	lopts.kind = opts.kind;
     	lopts.prefix = if (opts.bylevel) "level_%d" format i; else ""
-    	lopts.constructNet;
+    	lopts.constructGraph;
       for (j <- 0 until width) {
         val layer = LSTMLayer(this, lopts);
         if (i > 0) {

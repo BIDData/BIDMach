@@ -65,8 +65,6 @@ case class NodeMat(override val nrows:Int, override val ncols:Int, override val 
 
   override def update(i:Int, jv:Mat, b:Mat):NodeMat = NodeMat(_update(IMat.ielem(i), jv.asInstanceOf[IMat], b.asInstanceOf[NodeMat]))
   
-  
-  
   def update(iv:Mat, b:Node):NodeMat = NodeMat(_update(iv.asInstanceOf[IMat], b))
   
   def update(iv:Mat, jv:Mat, b:Node):NodeMat = NodeMat(_update(iv.asInstanceOf[IMat], jv.asInstanceOf[IMat], b))
@@ -80,6 +78,14 @@ case class NodeMat(override val nrows:Int, override val ncols:Int, override val 
 	def ccMatOpScalar(b: Node, f:(Node, Node) => Node, old:NodeMat) = NodeMat(ggMatOpScalar(b, f, old))
 	
 	def ccReduceOp(n:Int, f1:(Node) => Node, f2:(Node, Node) => Node, old:NodeMat) = NodeMat(ggReduceOp(n, f1, f2, old))
+  
+  def map(f: Node => Layer) = {
+    val out = LayerMat(nrows, ncols);
+    for (i <- 0 until length) {
+      out(i) = f(data(i));
+    }
+    out;
+  }
 	
 	override def printOne(i:Int):String = {
 	  val v = data(i)
