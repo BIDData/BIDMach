@@ -2,6 +2,7 @@ package BIDMach.networks.layers
 import BIDMat.Mat
 import BIDMat.IMat
 import BIDMat.DenseMat
+import scala.collection.mutable.HashMap
 
 case class LayerMat(override val nrows:Int, override val ncols:Int, override val data:Array[Layer]) extends DenseMat[Layer](nrows, ncols, data) {	
     
@@ -80,14 +81,54 @@ case class LayerMat(override val nrows:Int, override val ncols:Int, override val
 	def ccMatOpScalar(b: Layer, f:(Layer, Layer) => Layer, old:LayerMat) = LayerMat(ggMatOpScalar(b, f, old))
 	
 	def ccReduceOp(n:Int, f1:(Layer) => Layer, f2:(Layer, Layer) => Layer, old:LayerMat) = LayerMat(ggReduceOp(n, f1, f2, old))
+  
+  var layerMap:HashMap[Layer,Int] = null;
 	
-	override def printOne(i:Int):String = {
-	  val v = data(i)
-	  if (v != null)
-		  v.toString()
-		else	
-		  ""
-	}
+   def rebuildMap = {
+    layerMap = new HashMap[Layer,Int]();
+    for (i <- 0 until data.length) {
+      layerMap(data(i)) = i;
+    }
+  }
+  
+  def alphaCoords(layerTerm:LayerTerm) = {
+    val layer = layerTerm.layer;
+    val term = layerTerm.term;
+    if (layerMap == null) {
+      rebuildMap;
+    }
+    val i = layerMap(layer);
+    if (data(i) != layer) rebuildMap;
+    val coli = i / nrows;
+    val rowi = i - coli * nrows;
+    val v:Int = 'A';
+    val coli0 = coli % 26;
+    val ch0 = Character.toChars(v + coli0)(0).toString;
+    val ch = if (coli < 26) {
+      ch0;
+    } else {
+      val ch1 = Character.toChars(v + coli0/26)(0).toString;
+      ch1 + ch0;
+    } 
+    val ostr = ch + rowi.toString;  
+    if (term == 0) {
+      ostr;
+    } else {
+      ostr + "[" + term.toString + "]";
+    }
+  }
+  
+  override def printOne(i:Int):String = {
+    val v = data(i)
+    if (v != null) {
+      var ns = v.toString();
+      val ostring = v.inputs.map((x:LayerTerm) => if (x != null) alphaCoords(x) else "null").reduce(_+","+_);
+      ns + "(" + ostring +")";
+    }
+    else  
+      ""
+  }
+
 		
 	def \ (b: LayerMat) = horzcat(b);
 	def \ (b: Layer) = horzcat(LayerMat.elem(b))

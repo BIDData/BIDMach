@@ -77,20 +77,19 @@ import BIDMach.networks._
 class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0) {
   // Internal data arrays
   val _inputs = new Array[LayerTerm](1);
-//  val _inputTerminals = Array(0);
   val _outputs = new Array[Mat](1);
   val _derivs = new Array[Mat](1);
   def inputlength = _inputs.length
   var forwardtime = 0.0
   var backwardtime = 0.0
   override def layer = this
+  def inputs = _inputs;
   
   private var _GUID = Mat.myrand.nextLong
   def setGUID(v:Long):Unit = {_GUID = v}
   def GUID:Long = _GUID
   
   // Setters and getters for general elements of those arrays
-//  def inputLayers(i:Int) = _inputs(i);
   def outputs(i:Int) = _outputs(i);
   def derivs(i:Int) = _derivs(i);  
   def input(i:Int) = _inputs(i);
@@ -98,17 +97,13 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   
   def setOutput(i:Int, v:Mat):Layer = {_outputs(i) = v; this}
   def setDeriv(i:Int, v:Mat):Layer = {_derivs(i) = v; this}
-//  def setInputLayer(i:Int, v:Layer): Layer = {_inputs(i) = v; _inputTerminals(i) = 0; this}
-//  def setInputTerm(i:Int, v:Layer, j:Int): Layer = {_inputs(i) = v; _inputTerminals(i) = j; this}
   def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v; this}
   
   // Setters and getters for the first input or output
-//  def inputLayer = _inputs(0);
   def input = _inputs(0);
   def output = _outputs(0);
   def deriv = _derivs(0);
   
-//  def inputLayer_=(v:Layer): Unit = {_inputs(0) = v;}
   def input_=(v:LayerTerm): Unit = {_inputs(0) = v}
   def output_= (v:Mat):Unit = {_outputs(0) = v};
   def deriv_=(v:Mat):Unit = {_derivs(0) = v};
