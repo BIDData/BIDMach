@@ -56,13 +56,13 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
   
   def node = _node;
   
-  def + (a:NodeTerm) = {val n=node; val t=term; new AddNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
+  def + (a:NodeTerm) = {val n=this; new AddNode{inputs(0)=n; inputs(1)=a}};
 
-  def *@ (a:NodeTerm) = {val n=node; val t=term; new MulNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
+  def *@ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
     
-  def ∘ (a:NodeTerm) = {val n=node; val t=term; new MulNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
+  def ∘ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
         
-  def on (a:NodeTerm) = {val n=node; val t=term; new StackNode{inputs(0)=n; inputTerminals(0)=t; inputs(1)=a.node; inputTerminals(1)=a.term}};
+  def on (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
 }
 
 object Node {

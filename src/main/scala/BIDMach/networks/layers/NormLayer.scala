@@ -53,15 +53,15 @@ trait NormNodeOpts extends NodeOpts {
   		opts.weight = weight;
   		opts;
     }
-	
-	 def copyTo(opts:NormNodeOpts):NormNodeOpts = {
-    this.asInstanceOf[NodeOpts].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
 }
 
 class NormNode extends Node with NormNodeOpts {  
+    
+   def copyTo(opts:NormNode):NormNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
     
     override def clone:NormNode = {copyTo(new NormNode).asInstanceOf[NormNode];}
     

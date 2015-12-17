@@ -15,7 +15,7 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 
-class CompoundLayer(override val net:Net, override val opts:CompoundNodeOpts = new CompoundNode) extends ModelLayer(net, opts) {
+class CompoundLayer(override val net:Net, override val opts:CompoundNode = new CompoundNode) extends ModelLayer(net, opts) {
 	
 	override def setInputLayer(i:Int, v:Layer):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
 	  _inputs(i) = v;
@@ -86,7 +86,7 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNodeOpts = n
 	  }
 	  for (i <- 0 until internal_layers.length) {
 	  	for (j <- 0 until opts.lopts(i).inputs.length) {
-    		if (opts.lopts(i).inputs(j) != null) internal_layers(i).setInputLayer(j, opts.lopts(i).inputs(j).myLayer);
+    		if (opts.lopts(i).inputs(j) != null) internal_layers(i).setInputLayer(j, opts.lopts(i).inputs(j).node.myLayer);
     	}
       internal_layers(i) match {
         case aa:LinLayer => aa.opts.aopts = opts.aopts;
@@ -97,10 +97,11 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNodeOpts = n
 }
 
 trait CompoundNodeOpts extends ModelNodeOpts {
-	var lopts:Array[Node] = null;
   var aopts:ADAGrad.Opts = null;
   var prefix = "";
-  var grid:NodeMat = null;
 }
 
-class CompoundNode extends ModelNode with CompoundNodeOpts {}
+class CompoundNode extends ModelNode with CompoundNodeOpts {
+	var grid:NodeMat = null;
+  var lopts:Array[Node] = null;
+}

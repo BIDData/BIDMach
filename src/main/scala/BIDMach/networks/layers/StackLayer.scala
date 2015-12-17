@@ -52,11 +52,10 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 
 trait StackNodeOpts extends NodeOpts {  
   var ninputs = 2;
-  override val inputs = new Array[NodeOpts](ninputs);
-  override val inputTerminals = new Array[Int](ninputs);
 }
 
 class StackNode extends Node with StackNodeOpts {
+	override val inputs = new Array[NodeTerm](ninputs);
 
 	override def clone:StackNode = {copyTo(new StackNode).asInstanceOf[StackNode];}
 

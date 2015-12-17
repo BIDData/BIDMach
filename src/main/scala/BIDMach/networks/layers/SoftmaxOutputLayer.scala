@@ -65,15 +65,15 @@ trait SoftmaxOutputNodeOpts extends NodeOpts {
 			opts.scoreType = scoreType;
 			opts;
 	}
-	
-	 def copyTo(opts:SoftmaxOutputNodeOpts):SoftmaxOutputNodeOpts = {
-    this.asInstanceOf[NodeOpts].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
 }
 
 class SoftmaxOutputNode extends Node with SoftmaxOutputNodeOpts {
+  
+  def copyTo(opts:SoftmaxOutputNode):SoftmaxOutputNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
 
 	override def clone:SoftmaxOutputNode = {copyTo(new SoftmaxOutputNode).asInstanceOf[SoftmaxOutputNode];}
 

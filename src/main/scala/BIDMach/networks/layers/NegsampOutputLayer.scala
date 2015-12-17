@@ -153,15 +153,15 @@ trait NegsampOutputNodeOpts extends ModelNodeOpts {
 			opts.scoreType = scoreType;
 			opts;
 	}
-   
-  def copyTo(opts:NegsampOutputNodeOpts):NegsampOutputNodeOpts = {
-    this.asInstanceOf[NodeOpts].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
 }
 
 class NegsampOutputNode extends ModelNode with NegsampOutputNodeOpts {
+  
+  def copyTo(opts:NegsampOutputNode):NegsampOutputNode = {
+    this.asInstanceOf[ModelNode].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
 
 	override def clone:NegsampOutputNode = {copyTo(new NegsampOutputNode).asInstanceOf[NegsampOutputNode];}
 

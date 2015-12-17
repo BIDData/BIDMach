@@ -102,15 +102,14 @@ trait LinNodeOpts extends ModelNodeOpts {
   		opts.outdim = outdim;
   		opts;
   }
-  
-  def copyTo(opts:LinNodeOpts):LinNodeOpts = {
-    this.asInstanceOf[NodeOpts].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
 }
     
 class LinNode extends ModelNode with LinNodeOpts {
+  def copyTo(opts:LinNode):LinNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
     
   override def clone:LinNode = {
     copyTo(new LinNode).asInstanceOf[LinNode];

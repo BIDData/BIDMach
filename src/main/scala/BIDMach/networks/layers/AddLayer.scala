@@ -44,17 +44,16 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
 
 trait AddNodeOpts extends NodeOpts {
 	var ninputs = 2;
-	override val inputs:Array[NodeOpts] = new Array[NodeOpts](ninputs);
-	override val inputTerminals:Array[Int] = new Array[Int](ninputs);
-	
-	def copyTo(opts:AddNodeOpts):AddNodeOpts = {
-			super.copyTo(opts);
-			opts.ninputs = ninputs;
-			opts;
-	}
 }
 
 class AddNode extends Node with AddNodeOpts {
+	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
+  
+   def copyTo(opts:AddNode):AddNode = {
+      super.copyTo(opts);
+      opts.ninputs = ninputs;
+      opts;
+  }
 
 	override def clone:AddNode = {copyTo(new AddNode).asInstanceOf[AddNode];}
 
