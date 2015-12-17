@@ -85,9 +85,10 @@ object Node {
   
   def input = new InputNode
   
-  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aaopts:ADAGrad.Opts=null) = {
+  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null) = {
     val odim = outdim;
     val hBias = hasBias;
+    val aaopts = aopts
     new LinNode{inputs(0)=_getNode(a); inputTerminals(0)=_getTerm(a); modelName = name; outdim=odim; hasBias=hBias; aopts=aaopts};
   }
   
