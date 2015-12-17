@@ -63,7 +63,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
  //   srcGrid = srcNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
   //  dstGrid = dstNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
     
-    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setInput(1, from(1));}}
+//    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setInput(1, from(1));}}
     
     // the preamble (bottom) layers
     val lopts1 = new LinNode{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
