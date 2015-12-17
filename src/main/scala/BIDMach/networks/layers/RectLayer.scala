@@ -23,7 +23,7 @@ import BIDMach.networks._
 class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectNode) extends Layer(net, opts) {
 	override def forward = {
       val start = toc;
-			createoutput;
+			createOutput;
 			output <-- max(inputData, 0f);
 			clearDeriv;
 			forwardtime += toc - start;

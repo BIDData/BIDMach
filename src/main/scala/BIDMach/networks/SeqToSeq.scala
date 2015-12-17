@@ -55,7 +55,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     gridopts.aopts = opts.aopts;
     gridopts.hasBias = opts.hasBias;
     gridopts.kind = opts.kind;
-    gridopts.outdim = opts.nvocab;
+    gridopts.outDim = opts.nvocab;
     
     srcNodeGrid = LSTMNode.grid(height, inwidth, gridopts);
     dstNodeGrid = LSTMNode.grid(height, outwidth, gridopts);
@@ -63,7 +63,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     srcGrid = srcNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
     dstGrid = dstNodeGrid.map((x:Node) => LSTMLayer(this, x.asInstanceOf[LSTMNode]));
     
-    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setinout(1, from, 1);}}
+    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setInput(1, from(1));}}
     
     // the preamble (bottom) layers
     val lopts1 = new LinNode{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
@@ -71,9 +71,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     for (j <- 0 until width) {
     	setlayer(0, j, InputLayer(this));
       if (j < inwidth) {
-    	  setlayer(1, j, LinLayer(this, lopts1).setinput(0, getlayer(0, j)));
+    	  setlayer(1, j, LinLayer(this, lopts1).setInput(0, getlayer(0, j)));
       } else {
-        setlayer(1, j, LinLayer(this, lopts2).setinput(0, getlayer(0, j)));
+        setlayer(1, j, LinLayer(this, lopts2).setInput(0, getlayer(0, j)));
       }
     }
 
@@ -87,13 +87,13 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       loptsDst.constructGraph;
       for (j <- 0 until width) {
     	  val layer = LSTMLayer(this, if (j < inwidth) loptsSrc else loptsDst);
-    	  layer.setinput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below
+    	  layer.setInput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below
         if (j > 0) {
-          layer.setinput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
-          layer.setinout(1, getlayer(i+preamble_rows, j-1), 1);        // input 1 (prev_c) is layer to the left, output 1 (c)
+          layer.setInput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
+          layer.setInput(1, getlayer(i+preamble_rows, j-1)(1));        // input 1 (prev_c) is layer to the left, output 1 (c)
         } else {
-          layer.setinput(0, leftedge);                                 // in first column, just use dummy (zeros) input
-          layer.setinput(1, leftedge);
+          layer.setInput(0, leftedge);                                 // in first column, just use dummy (zeros) input
+          layer.setInput(1, leftedge);
         }
         setlayer(i+preamble_rows, j, layer);
       }
@@ -105,9 +105,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     	val lopts3 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
     	val sopts = new SoftmaxOutputNode{scoreType = opts.scoreType};
     	for (j <- 0 until outwidth) {
-    		val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
+    		val linlayer = LinLayer(this, lopts3).setInput(0, getlayer(fullheight-1, j+inwidth));
     		setlayer(fullheight, inwidth + j, linlayer);    	
-    		val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
+    		val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);
     		setlayer(fullheight+1, inwidth + j, smlayer);
     		output_layers(j) = smlayer;
     	}
@@ -115,7 +115,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       val nsopts = new NegsampOutputNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias; 
                                                   scoreType = opts.scoreType; nsamps = opts.nsamps; expt = opts.expt};
       for (j <- 0 until outwidth) {
-        val nslayer = NegsampOutputLayer(this, nsopts).setinput(0, getlayer(fullheight-1, j+inwidth));
+        val nslayer = NegsampOutputLayer(this, nsopts).setInput(0, getlayer(fullheight-1, j+inwidth));
         setlayer(fullheight, inwidth + j, nslayer);      
         output_layers(j) = nslayer;
       }    
@@ -172,7 +172,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 			  leftlayer.output = convertMat(zeros(opts.dim, batchSize));
 		  }
 		  if (leftlayer.outputs(1).asInstanceOf[AnyRef] == null) {
-			  leftlayer.setoutput(1, convertMat(zeros(opts.dim, batchSize)));
+			  leftlayer.setOutput(1, convertMat(zeros(opts.dim, batchSize)));
 		  }       
 	  }
   }

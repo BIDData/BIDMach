@@ -23,7 +23,7 @@ class SigmoidLayer(override val net:Net, override val opts:SigmoidNodeOpts = new
 
   override def forward = {
 		val start = toc;
-		createoutput;
+		createOutput;
     LayerFn.applyfwd(inputData, output, LayerFn.SIGMOIDFN);
 		clearDeriv;
 		forwardtime += toc - start;

@@ -23,7 +23,7 @@ class ExpLayer(override val net:Net, override val opts:ExpNodeOpts = new ExpNode
 
 	override def forward = {
 			val start = toc;
-			createoutput;
+			createOutput;
 			exp(inputData, output);
 			clearDeriv;
 			forwardtime += toc - start;

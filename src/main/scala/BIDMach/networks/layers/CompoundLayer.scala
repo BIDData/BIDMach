@@ -17,16 +17,23 @@ import BIDMach.networks._
 
 class CompoundLayer(override val net:Net, override val opts:CompoundNodeOpts = new CompoundNode) extends ModelLayer(net, opts) {
 	
-	override def setinput(i:Int, v:Layer):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
+	override def setInputLayer(i:Int, v:Layer):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
 	  _inputs(i) = v;
-	  internal_layers(i).setinput(0, v);
+	  internal_layers(i).setInputLayer(0, v);
     this
 	}
+  
+  override def setInput(i:Int, v:LayerTerm):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
+    _inputs(i) = v.layer;
+    _inputTerminals(i) = v.term;
+    internal_layers(i).setInputTerm(0, v.layer, v.term);
+    this
+  }
 	
-  override def setinout(i:Int, v:Layer, j:Int):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
+  override def setInputTerm(i:Int, v:Layer, j:Int):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
 	  _inputs(i) = v;
     _inputTerminals(i) = j;
-	  internal_layers(i).setinout(0, v, j);
+	  internal_layers(i).setInputTerm(0, v, j);
     this
 	}
 	
@@ -79,7 +86,7 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNodeOpts = n
 	  }
 	  for (i <- 0 until internal_layers.length) {
 	  	for (j <- 0 until opts.lopts(i).inputs.length) {
-    		if (opts.lopts(i).inputs(j) != null) internal_layers(i).setinput(j, opts.lopts(i).inputs(j).myLayer);
+    		if (opts.lopts(i).inputs(j) != null) internal_layers(i).setInputLayer(j, opts.lopts(i).inputs(j).myLayer);
     	}
       internal_layers(i) match {
         case aa:LinLayer => aa.opts.aopts = opts.aopts;

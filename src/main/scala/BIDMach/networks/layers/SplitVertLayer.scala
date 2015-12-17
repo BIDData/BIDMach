@@ -29,7 +29,7 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 			  }
 		  }
 		  for (i <- 0 until opts.nparts) {
-			  setoutput(i, inputData(rowranges(i), ?));
+			  setOutput(i, inputData(rowranges(i), ?));
 		  }
 		  clearDerivs;
 		  forwardtime += toc - start;

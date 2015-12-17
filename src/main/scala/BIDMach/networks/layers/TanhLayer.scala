@@ -22,7 +22,7 @@ class TanhLayer(override val net:Net, override val opts:TanhNodeOpts = new TanhN
 
 	override def forward = {
 			val start = toc;
-			createoutput;
+			createOutput;
 			tanh(inputData, output);
 			clearDeriv;
 			forwardtime += toc - start;

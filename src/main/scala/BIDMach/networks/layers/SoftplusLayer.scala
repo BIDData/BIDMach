@@ -24,7 +24,7 @@ class SoftplusLayer(override val net:Net, override val opts:SoftplusNodeOpts = n
 
   override def forward = {
 		  val start = toc;
-		  createoutput;
+		  createOutput;
 		  LayerFn.applyfwd(inputData, output, LayerFn.SOFTPLUSFN);
 		  clearDeriv;
 		  forwardtime += toc - start;

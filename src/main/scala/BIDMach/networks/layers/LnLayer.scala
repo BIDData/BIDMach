@@ -23,7 +23,7 @@ class LnLayer(override val net:Net, override val opts:LnNodeOpts = new LnNode) e
 
 	override def forward = {
 			val start = toc;
-			createoutput;
+			createOutput;
 			ln(inputData, output);
 			clearDeriv;
 			forwardtime += toc - start;

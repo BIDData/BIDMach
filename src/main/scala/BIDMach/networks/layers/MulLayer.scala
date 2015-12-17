@@ -30,7 +30,7 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
 
 	override def forward = {
     val start = toc;
-	  createoutput(inputData.nrows, inputData.ncols);
+	  createOutput(inputData.nrows, inputData.ncols);
 	  output <-- inputData;
 	  (1 until inputlength).map((i:Int) => output ~ output ∘ inputDatas(i));
 	  clearDeriv;

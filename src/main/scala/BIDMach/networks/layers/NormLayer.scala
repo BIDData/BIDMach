@@ -25,7 +25,7 @@ class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormN
 
   override def forward = {
 		val start = toc;
-		createoutput;
+		createOutput;
 		output <-- inputData;
 		clearDeriv;
 		forwardtime += toc - start;

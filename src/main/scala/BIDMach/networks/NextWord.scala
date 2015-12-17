@@ -37,9 +37,9 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
     // the preamble (bottom) layers
     layers(0) = InputLayer(this);
     val lopts1 = new LinNode{modelName = "inWordMap"; outdim = opts.dim; aopts = opts.aopts};
-    layers(1) = LinLayer(this, lopts1).setinput(0, layers(0));
+    layers(1) = LinLayer(this, lopts1).setInput(0, layers(0));
     val spopts = new SplitHorizNode{nparts = opts.width};
-    layers(2) = SplitHorizLayer(this, spopts).setinput(0, layers(1));
+    layers(2) = SplitHorizLayer(this, spopts).setInput(0, layers(1));
     
     // the main grid
     for (i <- 0 until height) {
@@ -52,16 +52,16 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
       for (j <- 0 until width) {
         val layer = LSTMLayer(this, lopts);
         if (i > 0) {
-          layer.setinput(2, getlayer(j, i-1));           // in most layers, input 2 (i) is from layer below
+          layer.setInput(2, getlayer(j, i-1));           // in most layers, input 2 (i) is from layer below
         } else {
-        	layer.setinout(2, layers(2), j);               // on bottom layer, input 2 is j^th output from the split layer
+        	layer.setInput(2, layers(2)(j));               // on bottom layer, input 2 is j^th output from the split layer
         }
         if (j > 0) {
-          layer.setinput(0, getlayer(j-1, i));           // input 0 (prev_h) is layer to the left, output 0 (h)
-          layer.setinout(1, getlayer(j-1, i), 1);        // input 1 (prev_c) is layer to the left, output 1 (c)
+          layer.setInput(0, getlayer(j-1, i));           // input 0 (prev_h) is layer to the left, output 0 (h)
+          layer.setInput(1, getlayer(j-1, i)(1));        // input 1 (prev_c) is layer to the left, output 1 (c)
         } else {
-          layer.setinput(0, leftedge);                   // in first column, just use dummy (zeros) input
-          layer.setinput(1, leftedge);
+          layer.setInput(0, leftedge);                   // in first column, just use dummy (zeros) input
+          layer.setInput(1, leftedge);
         }
         setlayer(j, i, layer);
       }
@@ -73,16 +73,16 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
     if (opts.allout) {
     	output_layers = new Array[Layer](width);
     	for (j <- 0 until width) {
-    		val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(j, height - 1));
+    		val linlayer = LinLayer(this, lopts2).setInput(0, getlayer(j, height - 1));
     		setlayer(j, height, linlayer);    	
-    		val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
+    		val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);
     		setlayer(j, height+1, smlayer);
     		output_layers(j) = smlayer;
     	}
     } else {
-      val linlayer = LinLayer(this, lopts2).setinput(0, getlayer(width-1, height - 1));
+      val linlayer = LinLayer(this, lopts2).setInput(0, getlayer(width-1, height - 1));
       layers(width*height+preamble_size) = linlayer;
-      val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);   
+      val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);   
       layers(width*height+preamble_size+1) = smlayer;    
       output_layers = Array(smlayer);
     }

@@ -45,7 +45,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
-    createoutput(mm.nrows, inputData.ncols);
+    createOutput(mm.nrows, inputData.ncols);
     output ~ mm * inputData;
     if (opts.hasBias) output ~ output + modelmats(imodel).colslice(modelcols, modelcols+1);
     clearDeriv;

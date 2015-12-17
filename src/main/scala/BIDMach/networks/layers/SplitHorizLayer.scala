@@ -29,7 +29,7 @@ class SplitHorizLayer(override val net:Net, override val opts:SplitHorizNodeOpts
 			  }
 		  }
 		  for (i <- 0 until opts.nparts) {
-			  setoutput(i, inputData.colslice(i*nblock, (i+1)* nblock));
+			  setOutput(i, inputData.colslice(i*nblock, (i+1)* nblock));
 		  }
 		  clearDerivs;
 		  forwardtime += toc - start;

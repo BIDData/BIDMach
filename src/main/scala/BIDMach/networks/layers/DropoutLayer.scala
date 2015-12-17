@@ -24,7 +24,7 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 
   override def forward = {
     val start = toc;
-		createoutput;
+		createOutput;
 		randmat = inputData + 20f;   // Hack to make a cached container to hold the random output
 		if (nopts.predict) {
 			output ~ inputData * opts.frac;

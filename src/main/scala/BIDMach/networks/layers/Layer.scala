@@ -96,8 +96,8 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def input(i:Int) = new LayerTerm(_inputs(i), _inputTerminals(i));
   def apply(i:Int) = new LayerTerm(this, i);
   
-  def setoutput(i:Int, v:Mat):Layer = {_outputs(i) = v; this}
-  def setderiv(i:Int, v:Mat):Layer = {_derivs(i) = v; this}
+  def setOutput(i:Int, v:Mat):Layer = {_outputs(i) = v; this}
+  def setDeriv(i:Int, v:Mat):Layer = {_derivs(i) = v; this}
   def setInputLayer(i:Int, v:Layer): Layer = {_inputs(i) = v; _inputTerminals(i) = 0; this}
   def setInputTerm(i:Int, v:Layer, j:Int): Layer = {_inputs(i) = v; _inputTerminals(i) = j; this}
   def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v.layer; _inputTerminals(i) = v.term; this}
@@ -132,11 +132,11 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   lazy val nopts = net.opts;
   def convertMat(mat:Mat) = {net.convertMat(mat);}
 
-  def createoutput = {
+  def createOutput = {
   	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(inputData.nrows, inputData.ncols);
   }
 
-  def createoutput(nrows:Int, ncols:Int) = {
+  def createOutput(nrows:Int, ncols:Int) = {
   	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(nrows, ncols);
   }
 
