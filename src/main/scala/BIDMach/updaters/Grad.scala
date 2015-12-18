@@ -124,7 +124,7 @@ object Grad {
     var pexp:FMat = 0.5f
     var waitsteps = 3
     var mask:FMat = null
-    var policies:Array[(Float, Float)=>Float] = null
+    var policies:Array[(Float, Float)=>Float] = null   // One policy for each model mat
     var momentum:FMat = null
     var nesterov:FMat = null
     var langevin = 0f;

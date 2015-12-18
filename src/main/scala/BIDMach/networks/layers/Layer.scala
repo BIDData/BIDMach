@@ -37,7 +37,7 @@ import BIDMach.networks._
  *
  *
  *
- * Currently only four Layer types need params:
+ * Currently only four Layer types need function parameters:
  - LinLayer: "outside" holds the output dimensions of the FClayer (input dimension set by previous layer). 
  - GLMLayer: "links" holds the links matrix (integer optss for loss types, see GLM), for the output of that layer. Its size should match the number of targets.
  - NormLayer: "targetNorm" holds a target per-element norm, and "weight" is the weight for this term in the derivative calculation.

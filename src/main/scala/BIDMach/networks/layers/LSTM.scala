@@ -71,9 +71,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	    val il4 = new LinNode{inputs(0) = i;      modelName = prefix + "LSTM_input_tanh"; hasBias = this.hasBias};
 	  	val ph4 = new LinNode{inputs(0) = prev_h; modelName = prefix + "LSTM_prev_h_tanh"; hasBias = this.hasBias};
 	  	val sum4 = new AddNode{inputs(0) = il4;   inputs(1) = ph4};
-	  	val in_gate2 = new TanhNode{inputs(0) = sum4};
+	  	val g = new TanhNode{inputs(0) = sum4};
 	  	
-	  	val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = in_gate2};
+	  	val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = g};
 	  	val f_prod = new MulNode{inputs(0) = forget_gate; inputs(1) = prev_c};
 	  	val next_c = new AddNode{inputs(0) = in_prod;     inputs(1) = f_prod};
 	  	
@@ -84,7 +84,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  	              il1, ph1, sum1, in_gate,                                   // Otherwise the ordering should support forward-backward inference
 	  	              il2, ph2, sum2, out_gate, 
 	  	              il3, ph3, sum3, forget_gate, 
-	  			          il4, ph4, sum4, in_gate2, 
+	  			          il4, ph4, sum4, g, 
 	  			          in_prod, f_prod, next_c, 
 	  			          next_tanh, next_h);
 	  	
@@ -92,7 +92,13 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  	outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
 	  }
     
-    // LSTM with all layers grouped into 1 - not very stable to train
+    // LSTM with all linear weights grouped into single matrix, to more fully use GPU.
+    // Observed not very stable to train
+    // 
+    //  | Wi_in     Wh_in     |
+    //  | Wi_out    Wh_out    | | i |
+    //  | Wi_forget Wh_forget | | h |
+    //  | Wi_g      Wh_g      |
     
     def constructGraph1 = {
       val prev_h = new CopyNode;
@@ -106,9 +112,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val in_gate = new SigmoidNode{inputs(0) = sp(0)};
       val out_gate = new SigmoidNode{inputs(0) = sp(1)};
       val forget_gate = new SigmoidNode{inputs(0) = sp(2)};
-      val in_gate2 = new TanhNode{inputs(0) = sp(3)};
+      val g = new TanhNode{inputs(0) = sp(3)};
       
-      val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = in_gate2};
+      val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = g};
       val f_prod = new MulNode{inputs(0) = forget_gate; inputs(1) = prev_c};
       val next_c = new AddNode{inputs(0) = in_prod;     inputs(1) = f_prod};
       
@@ -120,7 +126,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
                     in_gate,                                                   // Otherwise the ordering should support forward-backward inference
                     out_gate, 
                     forget_gate, 
-                    in_gate2, 
+                    g, 
                     in_prod, f_prod, next_c, 
                     next_tanh, next_h);
       
@@ -129,6 +135,8 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     }
     
     // LSTM with 4 linear layers, with h and i stacked as inputs
+    //  | Wi_in Wh_in | | i |   +  | Wi_out Wh_out | | i |   +  | Wi_forget Wh_forget | | i |   +  | Wi_g Wh_g | | i |
+    //                  | h |                        | h |                              | h |                    | h |
     
     def constructGraph2 = {
       val prev_h = new CopyNode;
@@ -147,9 +155,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val forget_gate = new SigmoidNode{inputs(0) = lin3};
       
       val lin4 = new LinNode{inputs(0) = prev_hi; modelName = prefix + "LSTM_tanh";  outdim = dim; hasBias = this.hasBias}
-      val in_gate2 = new TanhNode{inputs(0) = lin4};
+      val g = new TanhNode{inputs(0) = lin4};
       
-      val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = in_gate2};
+      val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = g};
       val f_prod = new MulNode{inputs(0) = forget_gate; inputs(1) = prev_c};
       val next_c = new AddNode{inputs(0) = in_prod;     inputs(1) = f_prod};
       
@@ -161,7 +169,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
                     lin1, in_gate,                                                   // Otherwise the ordering should support forward-backward inference
                     lin2, out_gate, 
                     lin3, forget_gate, 
-                    lin4, in_gate2, 
+                    lin4, g, 
                     in_prod, f_prod, next_c, 
                     next_tanh, next_h);
       
@@ -169,7 +177,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       outputNumbers = Array(lopts.length-1, lopts.length-3);                   // Specifies the output layer numbers (next_h and next_c)
     }
     
-    // LSTM with two sets of layers, paired outputs. More stable to train than the single linlayer network
+    // LSTM with two sets of linear weights, paired outputs. More stable to train than the single linlayer network
+    //
+    //  | Wi_in  Wh_in  | | i |   +  | Wi_forget Wh_forget | | i |
+    //  | Wi_out Wh_out | | h |      | Wi_g      Wh_g      | | h |
     
     def constructGraph3 = {
       val prev_h = new CopyNode;
@@ -185,9 +196,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val in_gate = new SigmoidNode{inputs(0) = sp1(0)};
       val out_gate = new SigmoidNode{inputs(0) = sp1(1)};
       val forget_gate = new SigmoidNode{inputs(0) = sp2(0)};
-      val in_gate2 = new TanhNode{inputs(0) = sp2(1)};
+      val g = new TanhNode{inputs(0) = sp2(1)};
       
-      val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = in_gate2};
+      val in_prod = new MulNode{inputs(0) = in_gate;    inputs(1) = g};
       val f_prod = new MulNode{inputs(0) = forget_gate; inputs(1) = prev_c};
       val next_c = new AddNode{inputs(0) = in_prod;     inputs(1) = f_prod};
       
@@ -199,7 +210,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
                     in_gate,                                                   // Otherwise the ordering should support forward-backward inference
                     out_gate, 
                     forget_gate, 
-                    in_gate2, 
+                    g, 
                     in_prod, f_prod, next_c, 
                     next_tanh, next_h);
       

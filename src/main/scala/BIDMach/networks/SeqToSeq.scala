@@ -44,8 +44,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     height = opts.height;
     heightDiff = if (opts.netType == 0) 2 else 1;
 	  fullheight = height + preamble_rows;
-	  inwidth = opts.inwidth; 
-    outwidth = opts.outwidth;
+	  inwidth = opts.inwidth;  // aka srcwidth
+    outwidth = opts.outwidth;  // aka dstwidth
     width = inwidth + outwidth;
     layers =  new Array[Layer](fullheight * width + outwidth * heightDiff);
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros   
@@ -273,7 +273,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 object SeqToSeq {
   trait Opts extends Net.Opts {
     var inwidth = 1;     // Max src sentence length
-    var outwidth = 1;    // Max dst sentence lenth
+    var outwidth = 1;    // Max dst sentence length
     var height = 1;      // Number of LSTM layers vertically
     var nvocab = 100000; // Vocabulary size
     var kind = 0;        // LSTM type, see below
@@ -290,7 +290,7 @@ object SeqToSeq {
   
   class Options extends Opts {}
   
-   def mkNetModel(fopts:Model.Opts) = {
+  def mkNetModel(fopts:Model.Opts) = {
     new SeqToSeq(fopts.asInstanceOf[SeqToSeq.Opts])
   }
   

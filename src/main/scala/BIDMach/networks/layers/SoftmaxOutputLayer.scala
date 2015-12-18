@@ -17,7 +17,9 @@ import BIDMach.networks._
 
 /**
  * Softmax layer. Output = exp(input) / sum(exp(input))
+ * Differs from SoftmaxLayer in that it includes a score method.
  */
+
 
 class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNodeOpts = new SoftmaxOutputNode) extends Layer(net, opts) with OutputLayer { 
   var coloffsets:Mat = null;

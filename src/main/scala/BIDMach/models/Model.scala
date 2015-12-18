@@ -162,6 +162,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
   
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
+    // If useGPU==false then gmats is an alias to amats
     if (useGPU) copyMats(amats, gmats);            		
     dobatch(gmats, ipass, here);
   }
