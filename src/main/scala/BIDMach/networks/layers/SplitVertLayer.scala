@@ -44,6 +44,10 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 		  }
 		  backwardtime += toc - start;
   }
+  
+  override def toString = {
+    "splitverte@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait SplitVertNodeOpts extends NodeOpts {  
@@ -55,6 +59,10 @@ class SplitVertNode extends Node with SplitVertNodeOpts {
 	override def clone:SplitVertNode = {copyTo(new SplitVertNode).asInstanceOf[SplitVertNode];}
 
   override def create(net:Net):SplitVertLayer = {SplitVertLayer(net, this);}
+  
+  override def toString = {
+    "splitverte@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object SplitVertLayer {  

@@ -49,6 +49,10 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 			val v = GLM.llfun(output, target, ilinks, totflops);
 			FMat(mean(v, 2));
 	}
+  
+  override def toString = {
+    "glm@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait GLMNodeOpts extends NodeOpts { 
@@ -65,6 +69,10 @@ class GLMNode extends Node with GLMNodeOpts {
 	override def clone:GLMNode = {copyTo(new GLMNode);}   
 
 	override def create(net:Net):GLMLayer = {GLMLayer(net, this);}
+  
+  override def toString = {
+    "glm@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
   
 object GLMLayer {

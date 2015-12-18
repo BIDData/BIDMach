@@ -131,6 +131,10 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
       }
     }
   }
+  
+  override def toString = {
+    "negsamp@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait NegsampOutputNodeOpts extends ModelNodeOpts {  
@@ -166,6 +170,10 @@ class NegsampOutputNode extends ModelNode with NegsampOutputNodeOpts {
 	override def clone:NegsampOutputNode = {copyTo(new NegsampOutputNode).asInstanceOf[NegsampOutputNode];}
 
 	override def create(net:Net):NegsampOutputLayer = {NegsampOutputLayer(net, this);}
+  
+  override def toString = {
+    "negsamp@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
   
 object NegsampOutputLayer {

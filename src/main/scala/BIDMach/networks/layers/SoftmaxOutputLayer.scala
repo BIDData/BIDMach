@@ -55,6 +55,10 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
     	FMat(mean(ln(output(inds))));   
     }
   }
+  
+  override def toString = {
+    "softmaxout@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait SoftmaxOutputNodeOpts extends NodeOpts {
@@ -78,6 +82,10 @@ class SoftmaxOutputNode extends Node with SoftmaxOutputNodeOpts {
 	override def clone:SoftmaxOutputNode = {copyTo(new SoftmaxOutputNode).asInstanceOf[SoftmaxOutputNode];}
 
 	override def create(net:Net):SoftmaxOutputLayer = {SoftmaxOutputLayer(net, this);}
+  
+   override def toString = {
+    "softmaxout@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
   
 object SoftmaxOutputLayer { 

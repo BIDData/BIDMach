@@ -40,6 +40,10 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new
         inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))));
 			backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "softmax@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait SoftmaxNodeOpts extends NodeOpts {  
@@ -51,6 +55,10 @@ class SoftmaxNode extends Node with SoftmaxNodeOpts {
 	override def clone:SoftmaxNode = {copyTo(new SoftmaxNode).asInstanceOf[SoftmaxNode];};
 
   override def create(net:Net):SoftmaxLayer = {SoftmaxLayer(net, this);}
+  
+  override def toString = {
+    "softmax@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object SoftmaxLayer {

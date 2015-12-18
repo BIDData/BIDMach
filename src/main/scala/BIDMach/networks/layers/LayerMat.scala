@@ -87,43 +87,50 @@ case class LayerMat(override val nrows:Int, override val ncols:Int, override val
    def rebuildMap = {
     layerMap = new HashMap[Layer,Int]();
     for (i <- 0 until data.length) {
-      layerMap(data(i)) = i;
+      layerMap.put(data(i), i);
     }
   }
   
   def alphaCoords(layerTerm:LayerTerm) = {
-    val layer = layerTerm.layer;
-    val term = layerTerm.term;
-    if (layerMap == null) {
-      rebuildMap;
-    }
-    val i = layerMap(layer);
-    if (data(i) != layer) rebuildMap;
-    val coli = i / nrows;
-    val rowi = i - coli * nrows;
-    val v:Int = 'A';
-    val coli0 = coli % 26;
-    val ch0 = Character.toChars(v + coli0)(0).toString;
-    val ch = if (coli < 26) {
-      ch0;
+    if (layerTerm == null) {
+      "null"
     } else {
-      val ch1 = Character.toChars(v + coli0/26)(0).toString;
-      ch1 + ch0;
-    } 
-    val ostr = ch + rowi.toString;  
-    if (term == 0) {
-      ostr;
-    } else {
-      ostr + "[" + term.toString + "]";
+    	val layer = layerTerm.layer;
+    	val term = layerTerm.term;
+    	if (layerMap == null) {
+    		rebuildMap;
+    	}
+    	if (layerMap.contains(layer)) {
+    		val i = layerMap(layer);
+    		if (data(i) != layer) rebuildMap;
+    		val coli = i / nrows;
+    		val rowi = i - coli * nrows;
+    		val v:Int = 'A';
+    		val coli0 = coli % 26;
+    		val ch0 = Character.toChars(v + coli0)(0).toString;
+    		val ch = if (coli < 26) {
+    			ch0;
+    		} else {
+    			val ch1 = Character.toChars(v + coli0/26)(0).toString;
+    			ch1 + ch0;
+    		} 
+    		val ostr = ch + rowi.toString;  
+    		if (term == 0) {
+    			ostr;
+    		} else {
+    			ostr + "[" + term.toString + "]";
+    		}
+      } else {
+        "<==="
+      }
     }
   }
   
   override def printOne(i:Int):String = {
     val v = data(i)
     if (v != null) {
-      var ns = v.toString();
-      val ostring = v.inputs.map((x:LayerTerm) => if (x != null) alphaCoords(x) else "null").reduce(_+","+_);
-      ns + "(" + ostring +")";
+      val ostring = v.inputs.map(alphaCoords(_)).reduce(_+","+_);
+      v.toString() + "(" + ostring +")";
     }
     else  
       ""

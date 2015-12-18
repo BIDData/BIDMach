@@ -41,6 +41,10 @@ class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormN
     }
     backwardtime += toc - start;
   }
+  
+  override def toString = {
+    "norm@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait NormNodeOpts extends NodeOpts {
@@ -57,16 +61,20 @@ trait NormNodeOpts extends NodeOpts {
 
 class NormNode extends Node with NormNodeOpts {  
     
-   def copyTo(opts:NormNode):NormNode = {
-    this.asInstanceOf[Node].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
-    
-    override def clone:NormNode = {copyTo(new NormNode).asInstanceOf[NormNode];}
-    
-    override def create(net:Net):NormLayer = {NormLayer(net, this);}
-  }
+	def copyTo(opts:NormNode):NormNode = {
+			this.asInstanceOf[Node].copyTo(opts);
+			copyOpts(opts);
+			opts
+	}
+
+	override def clone:NormNode = {copyTo(new NormNode).asInstanceOf[NormNode];};
+
+	override def create(net:Net):NormLayer = {NormLayer(net, this);}
+
+	override def toString = {
+			"norm@"+Integer.toHexString(hashCode % 0x10000).toString
+	}
+}
   
 object NormLayer {  
   

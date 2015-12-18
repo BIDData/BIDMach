@@ -35,6 +35,10 @@ class SoftplusLayer(override val net:Net, override val opts:SoftplusNodeOpts = n
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(inputData, deriv, LayerFn.SOFTPLUSFN);
 		  backwardtime += toc - start;
   }
+  
+   override def toString = {
+    "softplus@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait SoftplusNodeOpts extends NodeOpts {  
@@ -45,6 +49,10 @@ class SoftplusNode extends Node with SoftplusNodeOpts {
 	override def clone:SoftplusNode = {copyTo(new SoftplusNode).asInstanceOf[SoftplusNode];}
 
   override def create(net:Net):SoftplusLayer = {SoftplusLayer(net, this);}
+  
+  override def toString = {
+    "softplus@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object SoftplusLayer {  
