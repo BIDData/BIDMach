@@ -1,0 +1,22 @@
+:silent
+import BIDMach.tools.{SeqToSeqData,SeqToSeqDict,printmat}
+
+// Example of how to use SeqToSeqData
+
+// Options:
+val opts = new SeqToSeqData.Options;
+opts.srcvocabmaxsize = 150000;                                  // Max vocabulary size.  If <= 0, no maxsize performed.  If >= 1, must provide dict name.
+opts.dstvocabmaxsize =  80000;                                  // Max vocabulary size.  If <= 0, no maxsize performed.  If >= 1, must provide dict name.
+opts.srcminlen = 1;                                             // Minimum sentence length, discard shorter sentences
+opts.srcmaxlen = 12;                                            // Maximum sentence length, truncate longer sentences
+opts.dstminlen = 1;                                             // Minimum sentence length, discard shorter sentences
+opts.dstmaxlen = 12;                                            // Maximum sentence length, truncate longer sentences
+opts.revsrc = true;                                             // Reverse the src sentences
+opts.revdst = false;                                            // Reverse the dst sentences
+
+
+// Make data
+val sd = new SeqToSeqData(opts);
+sd.prepSeqToSeqDataWildcard("/path/to/dir/",
+                            ("src_*.imat","dst_*.imat"),
+                            (("srcdict.sbmat","srcdict.imat"),("dstdict.sbmat","dstdict.imat")))
