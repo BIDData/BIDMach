@@ -152,6 +152,10 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   }
   
   def getModelMats(net:Net):Unit = {}
+  
+  override def toString = {
+    "layer@"+(hashCode % 0x10000).toString
+  }
 }
 
 

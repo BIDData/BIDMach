@@ -34,6 +34,10 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ (inputData > 0f));
 			backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "rect@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait RectNodeOpts extends NodeOpts {
@@ -51,6 +55,10 @@ class RectNode extends Node with RectNodeOpts {
   
   override def create(net:Net):RectLayer = {
   	RectLayer(net, this);
+  }
+  
+  override def toString = {
+    "rect@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 

@@ -41,6 +41,10 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
     myGhost = opts;
     opts;
   }
+  
+  override def toString = {
+    "node@"+(hashCode % 0x10000).toString
+  }
 
   override def clone:Node = {
 		copyTo(new Node).asInstanceOf[Node];

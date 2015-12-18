@@ -44,6 +44,10 @@ class SplitHorizLayer(override val net:Net, override val opts:SplitHorizNodeOpts
 		  }  
 		  backwardtime += toc - start;
   }
+  
+  override def toString = {
+    "splithorize@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait SplitHorizNodeOpts extends NodeOpts { 
@@ -55,6 +59,10 @@ class SplitHorizNode extends Node with SplitHorizNodeOpts {
 	override def clone:SplitHorizNode = {copyTo(new SplitHorizNode).asInstanceOf[SplitHorizNode];}
 
   override def create(net:Net):SplitHorizLayer = {SplitHorizLayer(net, this);}
+  
+  override def toString = {
+    "splithorize@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object SplitHorizLayer {  

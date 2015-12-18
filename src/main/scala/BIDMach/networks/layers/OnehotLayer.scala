@@ -24,6 +24,10 @@ class OnehotLayer(override val net:Net, override val opts:OnehotNodeOpts = new O
 		  output = oneHot(inputData);
 		  forwardtime += toc - start;
   }
+  
+  override def toString = {
+    "onehot@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait OnehotNodeOpts extends NodeOpts {  
@@ -34,6 +38,10 @@ class OnehotNode extends Node with OnehotNodeOpts {
 	override def clone:OnehotNode = {copyTo(new OnehotNode).asInstanceOf[OnehotNode];}
 
   override def create(net:Net):OnehotLayer = {OnehotLayer(net, this);}
+  
+  override def toString = {
+    "onehot@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object OnehotLayer {  

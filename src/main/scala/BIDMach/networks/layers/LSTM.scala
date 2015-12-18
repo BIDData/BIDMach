@@ -20,6 +20,10 @@ class LSTMLayer(override val net:Net, override val opts:LSTMNode = new LSTMNode)
 	override val _inputs = new Array[LayerTerm](3);
 	override val _outputs = new Array[Mat](2);
 	override val _derivs = new Array[Mat](2);
+  
+  override def toString = {
+    "LSTM@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait LSTMNodeOpts extends CompoundNodeOpts {
@@ -263,6 +267,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  override def create(net:Net):LSTMLayer = {
 		  LSTMLayer(net, this);
 	  }
+    
+    override def toString = {
+    "LSTM@"+Integer.toHexString(hashCode % 0x10000).toString
+    }
     
     def h = apply(0);
     

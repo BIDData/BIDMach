@@ -46,6 +46,10 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  }  
 		  backwardtime += toc - start;
   }
+  
+  override def toString = {
+    "stack@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 
@@ -59,6 +63,10 @@ class StackNode extends Node with StackNodeOpts {
 	override def clone:StackNode = {copyTo(new StackNode).asInstanceOf[StackNode];}
 
   override def create(net:Net):StackLayer = {StackLayer(net, this);}
+  
+  override def toString = {
+    "stack@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object StackLayer {  

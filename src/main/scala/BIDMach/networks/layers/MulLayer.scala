@@ -49,6 +49,10 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
     }
     backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "mul@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait MulNodeOpts extends NodeOpts {  
@@ -67,6 +71,10 @@ class MulNode extends Node with MulNodeOpts {
 	override def clone:MulNode = {copyTo(new MulNode).asInstanceOf[MulNode];}
 
 	override def create(net:Net):MulLayer = {MulLayer(net, this);}
+  
+  override def toString = {
+    "mul@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
   
 object MulLayer {  

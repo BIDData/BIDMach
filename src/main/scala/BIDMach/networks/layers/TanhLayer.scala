@@ -33,6 +33,10 @@ class TanhLayer(override val net:Net, override val opts:TanhNodeOpts = new TanhN
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.TANHFN);
 			backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "tanh@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait TanhNodeOpts extends NodeOpts {  
@@ -43,6 +47,10 @@ class TanhNode extends Node with TanhNodeOpts {
 	override def clone:TanhNode = {copyTo(new TanhNode).asInstanceOf[TanhNode];}
 
   override def create(net:Net):TanhLayer = {TanhLayer(net, this);}
+  
+  override def toString = {
+    "tanh@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object TanhLayer {  

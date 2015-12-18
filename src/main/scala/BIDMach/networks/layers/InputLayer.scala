@@ -35,6 +35,10 @@ class InputNode extends Node with InputNodeOpts {
   override def create(net:Net):InputLayer = {
     InputLayer(net, this);
   }
+  
+  override def toString = {
+    "input@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 
@@ -44,4 +48,8 @@ object InputLayer {
   def apply(net:Net) = new InputLayer(net, new InputNode);
   
   def apply(net:Net, opts:InputNodeOpts) = new InputLayer(net, opts);
+  
+  override def toString = {
+    "input@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }

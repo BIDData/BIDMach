@@ -46,6 +46,10 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ randmat);
 		backwardtime += toc - start;
   }
+  
+  override def toString = {
+    "dropout@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait DropoutNodeOpts extends NodeOpts {
@@ -54,16 +58,20 @@ trait DropoutNodeOpts extends NodeOpts {
     
     
 class DropoutNode extends Node with DropoutNodeOpts { 
-    def copyTo(opts:DropoutNode):DropoutNode = {
-  		super.copyTo(opts);
-  		opts.frac = frac;
-  		opts;
-    }
-    
-    override def clone:DropoutNode = {copyTo(new DropoutNode);}
-    
-    override def create(net:Net):DropoutLayer = {DropoutLayer(net, this);}
-  }
+	def copyTo(opts:DropoutNode):DropoutNode = {
+			super.copyTo(opts);
+			opts.frac = frac;
+			opts;
+	}
+
+	override def clone:DropoutNode = {copyTo(new DropoutNode);}
+
+	override def create(net:Net):DropoutLayer = {DropoutLayer(net, this);}
+
+	override def toString = {
+			"dropout@"+Integer.toHexString(hashCode % 0x10000).toString
+	}
+}
   
 object DropoutLayer { 
   

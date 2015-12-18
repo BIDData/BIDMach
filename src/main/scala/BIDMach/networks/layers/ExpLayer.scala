@@ -34,6 +34,10 @@ class ExpLayer(override val net:Net, override val opts:ExpNodeOpts = new ExpNode
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ output);  
 			backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "exp@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 
@@ -45,6 +49,10 @@ class ExpNode extends Node with ExpNodeOpts {
 	override def clone:ExpNode = {copyTo(new ExpNode).asInstanceOf[ExpNode];}
 
   override def create(net:Net):ExpLayer = {ExpLayer(net, this);}
+  
+  override def toString = {
+    "exp@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object ExpLayer {  

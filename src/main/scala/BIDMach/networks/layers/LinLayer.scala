@@ -88,6 +88,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     mask = aopts.mask;
     ADAinitialized = true;
   }
+  
+  override def toString = {
+    "linear@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait LinNodeOpts extends ModelNodeOpts {
@@ -109,6 +113,10 @@ class LinNode extends ModelNode with LinNodeOpts {
     this.asInstanceOf[Node].copyTo(opts);
     copyOpts(opts);
     opts
+  }
+  
+  override def toString = {
+    "linear@"+Integer.toHexString(hashCode % 0x10000).toString
   }
     
   override def clone:LinNode = {

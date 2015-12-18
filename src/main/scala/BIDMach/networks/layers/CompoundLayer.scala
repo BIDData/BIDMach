@@ -83,6 +83,10 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNode = new C
       }
 	  }
 	}
+  
+  override def toString = {
+    "compound@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait CompoundNodeOpts extends ModelNodeOpts {
@@ -93,4 +97,8 @@ trait CompoundNodeOpts extends ModelNodeOpts {
 class CompoundNode extends ModelNode with CompoundNodeOpts {
 	var grid:NodeMat = null;
   var lopts:Array[Node] = null;
+  
+  override def toString = {
+    "compound@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
