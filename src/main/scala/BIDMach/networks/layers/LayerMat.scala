@@ -5,8 +5,6 @@ import BIDMat.DenseMat
 import scala.collection.mutable.HashMap
 
 case class LayerMat(override val nrows:Int, override val ncols:Int, override val data:Array[Layer]) extends DenseMat[Layer](nrows, ncols, data) {	
-    
-	def size() = length;
 	
 	override def t:LayerMat = LayerMat(gt(null))
 	
