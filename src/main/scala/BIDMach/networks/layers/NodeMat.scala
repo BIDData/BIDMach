@@ -5,8 +5,6 @@ import BIDMat.DenseMat
 import scala.collection.mutable.HashMap;
 
 case class NodeMat(override val nrows:Int, override val ncols:Int, override val data:Array[Node]) extends DenseMat[Node](nrows, ncols, data) {	
-    
-	def size() = length;
   
   var nodeMap:HashMap[Node,Int] = null;
 	
