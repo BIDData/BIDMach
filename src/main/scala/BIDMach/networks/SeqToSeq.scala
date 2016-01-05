@@ -7,6 +7,7 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
+import BIDMach.networks.layers._
 import BIDMach._
 
 /*
@@ -20,6 +21,10 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var leftStart:Mat = null;
   var dstxdata:Mat = null;
   var dstxdata0:Mat = null;
+  var srcGrid:LayerMat = null;
+  var dstGrid:LayerMat = null;
+  var srcNodeGrid:NodeMat = null;
+  var dstNodeGrid:NodeMat = null;
   var height = 0;
   var fullheight = 0;
   var inwidth = 0;
@@ -43,37 +48,52 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     outwidth = opts.outwidth;
     width = inwidth + outwidth;
     layers =  new Array[Layer](fullheight * width + outwidth * heightDiff);
-    leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
+    leftedge = InputLayer(this);                     // dummy layer, left edge of zeros   
+    
+    var gridopts = new LSTMNode.GridOpts;
+    gridopts.dim = opts.dim;
+    gridopts.aopts = opts.aopts;
+    gridopts.hasBias = opts.hasBias;
+    gridopts.kind = opts.kind;
+    gridopts.outDim = opts.nvocab;
+    
+    srcNodeGrid = LSTMNode.grid(height, inwidth, gridopts);
+    dstNodeGrid = LSTMNode.grid(height, outwidth, gridopts);
+    
+    srcGrid = srcNodeGrid.map(_.create(this));
+    dstGrid = dstNodeGrid.map(_.create(this));
+    
+//    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setInput(1, from(1));}}
     
     // the preamble (bottom) layers
-    val lopts1 = new LinLayer.Options{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
-    val lopts2 = new LinLayer.Options{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
+    val lopts1 = new LinNode{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
+    val lopts2 = new LinNode{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
     for (j <- 0 until width) {
     	setlayer(0, j, InputLayer(this));
       if (j < inwidth) {
-    	  setlayer(1, j, LinLayer(this, lopts1).setinput(0, getlayer(0, j)));
+    	  setlayer(1, j, LinLayer(this, lopts1).setInput(0, getlayer(0, j)));
       } else {
-        setlayer(1, j, LinLayer(this, lopts2).setinput(0, getlayer(0, j)));
+        setlayer(1, j, LinLayer(this, lopts2).setInput(0, getlayer(0, j)));
       }
     }
 
     // the main grid
     for (i <- 0 until height) {
-    	val loptsSrc = new LSTMLayer.Options{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
-      val loptsDst = new LSTMLayer.Options{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
+    	val loptsSrc = new LSTMNode{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
+      val loptsDst = new LSTMNode{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
     	loptsSrc.prefix = if (opts.bylevel) "SrcLevel_%d" format i; else "Src";
     	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "Dst";
-    	loptsSrc.constructNet;
-      loptsDst.constructNet;
+    	loptsSrc.constructGraph;
+      loptsDst.constructGraph;
       for (j <- 0 until width) {
     	  val layer = LSTMLayer(this, if (j < inwidth) loptsSrc else loptsDst);
-    	  layer.setinput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below
+    	  layer.setInput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below
         if (j > 0) {
-          layer.setinput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
-          layer.setinout(1, getlayer(i+preamble_rows, j-1), 1);        // input 1 (prev_c) is layer to the left, output 1 (c)
+          layer.setInput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
+          layer.setInput(1, getlayer(i+preamble_rows, j-1)(1));        // input 1 (prev_c) is layer to the left, output 1 (c)
         } else {
-          layer.setinput(0, leftedge);                   // in first column, just use dummy (zeros) input
-          layer.setinput(1, leftedge);
+          layer.setInput(0, leftedge);                                 // in first column, just use dummy (zeros) input
+          layer.setInput(1, leftedge);
         }
         setlayer(i+preamble_rows, j, layer);
       }
@@ -82,20 +102,20 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     // the top layers
     output_layers = new Array[Layer](outwidth);
     if (opts.netType == 0) {
-    	val lopts3 = new LinLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
-    	val sopts = new SoftmaxOutputLayer.Options{scoreType = opts.scoreType};
+    	val lopts3 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
+    	val sopts = new SoftmaxOutputNode{scoreType = opts.scoreType};
     	for (j <- 0 until outwidth) {
-    		val linlayer = LinLayer(this, lopts3).setinput(0, getlayer(fullheight-1, j+inwidth));
+    		val linlayer = LinLayer(this, lopts3).setInput(0, getlayer(fullheight-1, j+inwidth));
     		setlayer(fullheight, inwidth + j, linlayer);    	
-    		val smlayer = SoftmaxOutputLayer(this, sopts).setinput(0, linlayer);
+    		val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);
     		setlayer(fullheight+1, inwidth + j, smlayer);
     		output_layers(j) = smlayer;
     	}
     } else {
-      val nsopts = new NegsampOutputLayer.Options{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias; 
+      val nsopts = new NegsampOutputNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias; 
                                                   scoreType = opts.scoreType; nsamps = opts.nsamps; expt = opts.expt};
       for (j <- 0 until outwidth) {
-        val nslayer = NegsampOutputLayer(this, nsopts).setinput(0, getlayer(fullheight-1, j+inwidth));
+        val nslayer = NegsampOutputLayer(this, nsopts).setInput(0, getlayer(fullheight-1, j+inwidth));
         setlayer(fullheight, inwidth + j, nslayer);      
         output_layers(j) = nslayer;
       }    
@@ -152,7 +172,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 			  leftlayer.output = convertMat(zeros(opts.dim, batchSize));
 		  }
 		  if (leftlayer.outputs(1).asInstanceOf[AnyRef] == null) {
-			  leftlayer.setoutput(1, convertMat(zeros(opts.dim, batchSize)));
+			  leftlayer.setOutput(1, convertMat(zeros(opts.dim, batchSize)));
 		  }       
 	  }
   }
@@ -282,16 +302,17 @@ object SeqToSeq {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
-  class LearnOptions extends Learner.Options with SeqToSeq.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnOptions extends Learner.Options with SeqToSeq.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, mat1:Mat, regularize:Boolean = false) = {
     val opts = new LearnOptions;
     opts.batchSize = 128;
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, mat1), opts), 
+  	    new MatSource(Array(mat0, mat1), opts), 
   	    new SeqToSeq(opts), 
   	    if (regularize) Array(new L1Regularizer(opts)) else null,
   	    new ADAGrad(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -300,21 +321,22 @@ object SeqToSeq {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, mat1), opts), 
+  	    new MatSource(Array(mat0, mat1), opts), 
   	    new SeqToSeq(opts), 
   	    null,
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with SeqToSeq.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with SeqToSeq.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
-  def learner(fn1:String, fn2:String, regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), regularize, adagrad);
+  def learner(fn1:String, fn2:String, regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)), regularize, adagrad);
   
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)), false, true);
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)), false, true);
   
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)));
+  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)));
   
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = learner(fnames, false, true);
   
@@ -324,12 +346,13 @@ object SeqToSeq {
     opts.batchSize = 128;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts)
+    val ds = new FileSource(opts)
   	val nn = new Learner(
   			ds, 
   	    new SeqToSeq(opts), 
   	    if (regularize) Array(new L1Regularizer(opts)) else null,
-  	    if (adagrad) new ADAGrad(opts) else new Grad(opts), 
+  	    if (adagrad) new ADAGrad(opts) else new Grad(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }  
@@ -340,18 +363,20 @@ object SeqToSeq {
     opts.batchSize = 128;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts)
+    val ds = new FileSource(opts)
     val nn = new Learner(
         ds, 
         new SeqToSeq(opts), 
         null,
         null, 
+        null,
         opts)
     (nn, opts)
   }
   
     def load(fname:String):SeqToSeq = {
       val mm = new SeqToSeq;
+      mm.loadMetaData(fname);
       mm.load(fname);
       mm
     }

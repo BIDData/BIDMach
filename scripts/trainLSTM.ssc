@@ -9,7 +9,7 @@ val dir = "/data01/livejournal/srcdst/";  // Directory for input data
 
 val (nn, opts) = SeqToSeq.learner(dir + "src%04d.smat.lz4", dir + "dst%04d.smat.lz4");
 
-opts.lrate = 0.0005f;                     // Learning rate
+opts.lrate = 0.1f;                       // Learning rate
 opts.nvocab = 100000;                     // Vocabulary limit
 opts.npasses = 2;                         // Number of passes over the dataset
 opts.height = 2;                          // Height of the network
@@ -17,7 +17,7 @@ opts.dim = 256;                           // Dimension of LSTM units
 opts.batchSize = 128;                     // Batch size
 opts.nstart = 0;                          // File start number
 opts.nend = 1132;                         // File end number
-opts.checkPointFile = dir + "../models/livejournal_256d_%02d/"; // Where to save models
+opts.checkPointFile = dir + "../models/livejournal_256d_1lr_%02d/"; // Where to save models
 opts.checkPointInterval = 24f;            // How often to save in hours
 opts.netType = 0;                         // Net type (softmax=0, or negsampling=1)
 opts.scoreType = 1;                       // Score type (logloss=0, accuracy=1)
@@ -28,6 +28,7 @@ opts.pstep = 0.0001f;                     // How often to print
 opts.cumScore = 3;                        // Accumulate scores for less-noisy printing
 opts.PADsym = 1;                          // The padding symbol
 opts.OOVsym = 2;                          // The OOV symbol
+opts STARTsym = 0;
 opts.reg1weight = 1e-9f                   // L1 regularization weight
 
 println(opts.what)

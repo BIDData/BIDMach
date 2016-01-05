@@ -6,7 +6,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContextExecutor
 import java.io._
 
-class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val ec:ExecutionContextExecutor) extends DataSource(opts) { 
+class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(implicit val ec:ExecutionContextExecutor) extends DataSource(opts) { 
   var sizeMargin = 0f
   var blockSize = 0 
   @volatile var fileno = 0
@@ -88,9 +88,9 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       permfn = genperm(nstart, nend)
     } else {
       permfn = (n:Int) => {                                                    // Stripe reads across disks (different days)
-        val (yy, mm, dd, hh) = FilesDS.decodeDate(n)
+        val (yy, mm, dd, hh) = FileSource.decodeDate(n)
         val hhdd = hh + 24 * (dd - 1)
-        FilesDS.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
+        FileSource.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
       } 
     }
     rowno = 0;
@@ -114,10 +114,10 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       var mm = HMat.loadMat(fnames(i)(nstart));
       val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
       omats(i) = mm match {
-        case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_FMat".##);
-        case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_IMat".##);
-        case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_DMat".##);
-        case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_SMat".##);
+        case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_FMat".##);
+        case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_IMat".##);
+        case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_DMat".##);
+        case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_SMat".##);
       }
     } 
   }
@@ -231,10 +231,10 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
       out 
     } else {
     	out match {
-    	case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_FMat".##);
-    	case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_IMat".##);
-    	case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_DMat".##);
-    	case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "FilesDS_SMat".##);
+    	case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_FMat".##);
+    	case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_IMat".##);
+    	case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_DMat".##);
+    	case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_SMat".##);
     	}
     }
   }
@@ -274,32 +274,32 @@ class FilesDS(override val opts:FilesDS.Opts = new FilesDS.Options)(implicit val
 }
 
 
-object FilesDS {
+object FileSource {
   
-  def apply(opts:FilesDS.Opts, nthreads:Int):FilesDS = {
+  def apply(opts:FileSource.Opts, nthreads:Int):FileSource = {
     implicit val ec = threadPool(nthreads);
-    new FilesDS(opts);
+    new FileSource(opts);
   }
   
-  def apply(opts:FilesDS.Opts):FilesDS = apply(opts, 4);
+  def apply(opts:FileSource.Opts):FileSource = apply(opts, 4);
   
-  def apply(fname:String, opts:FilesDS.Opts, nthreads:Int):FilesDS = {
+  def apply(fname:String, opts:FileSource.Opts, nthreads:Int):FileSource = {
     opts.fnames = List(simpleEnum(fname, 1, 0));
     implicit val ec = threadPool(nthreads);
-    new FilesDS(opts);
+    new FileSource(opts);
   }
   
-  def apply(fname:String, opts:FilesDS.Opts):FilesDS = apply(fname, opts, 4);
+  def apply(fname:String, opts:FileSource.Opts):FileSource = apply(fname, opts, 4);
   
-  def apply(fname:String):FilesDS = apply(fname, new FilesDS.Options, 4);
+  def apply(fname:String):FileSource = apply(fname, new FileSource.Options, 4);
   
-  def apply(fn1:String, fn2:String, opts:FilesDS.Opts, nthreads:Int) = {
+  def apply(fn1:String, fn2:String, opts:FileSource.Opts, nthreads:Int) = {
     opts.fnames = List(simpleEnum(fn1, 1, 0), simpleEnum(fn2, 1, 0));
     implicit val ec = threadPool(nthreads);
-    new FilesDS(opts);
+    new FileSource(opts);
   }
   
-  def apply(fn1:String, fn2:String, opts:FilesDS.Opts):FilesDS = apply(fn1, fn2, opts, 4);
+  def apply(fn1:String, fn2:String, opts:FileSource.Opts):FileSource = apply(fn1, fn2, opts, 4);
   
   def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = (((12*yy + mm) * 31) + dd)*24 + hh
   

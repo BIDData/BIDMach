@@ -1,10 +1,10 @@
 :silent
-class xopts extends Learner.Options with FilesDS.Opts with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts
+class xopts extends Learner.Options with FileSource.Opts with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts
 val opts = new xopts
 
 val mdir = "d:/criteo/parts/"
-opts.fnames = List(FilesDS.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
-                   FilesDS.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
+opts.fnames = List(FileSource.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
+                   FileSource.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
 opts.nend = 77;
 opts.lrate = 3e-12f*row(1,0,0) + 1e-12f*row(0,1,1)
 opts.lrate = 1e-4f*row(1,0,0) + 1e-8f*row(0,1,1)
@@ -22,7 +22,7 @@ opts.strictFM = true;
 
 val ds = {
   implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
-  new FilesDS(opts)               // the datasource
+  new FileSource(opts)               // the datasource
 }
 
 
@@ -31,6 +31,7 @@ val nn = new Learner(                  // make a learner instance
     new FM(opts),                     // the model 
     Array(new L1Regularizer(opts)),    // list of mixins or regularizers
     new BIDMach.updaters.ADAGrad(opts),                 // the optimization class to use
+    null,
     opts)                              // pass the options to the learner as well
 
 

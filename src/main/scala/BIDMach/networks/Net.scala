@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -8,6 +8,7 @@ import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
+import BIDMach.networks.layers._
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 
@@ -16,7 +17,7 @@ import java.util.HashMap;
  *
  * The network topology is specified by opts.layers which is a sequence of "LayerOptions" objects. There is a LayerOptions
  * Class for each Layer class, which holds the params for defining that layer. There is also an inputs parameter which points
- * to the set of Layer.Options instances that mirror the final network structure. 
+ * to the set of Node instances that mirror the final network structure. 
  *
  */
 
@@ -41,9 +42,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     if (output_layers == null) output_layers = Array(layers(layers.length-1));
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
-	  	imodel = 0;
-	  	layers.map(_.getModelMats(this));
 	  }
+	  imodel = 0;
+	  layers.map(_.getModelMats(this));
 	  if (refresh) {
 	  	setmodelmats(new Array[Mat](imodel + modelMap.size));
 	  }
@@ -74,8 +75,10 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
     for (i <- 0 until opts.layers.nlayers) {
     	for (j <- 0 until layerOptionss(i).inputs.length) {
-    		if (layerOptionss(i).inputs(j) != null) layers(i).setinout(j, layerOptionss(i).inputs(j).myLayer,
-    				                                                          layerOptionss(i).inputTerminals(j));
+    		if (layerOptionss(i).inputs(j) != null) {
+    			val nodeTerm = layerOptionss(i).inputs(j);
+    			layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+        }
     	}
     }
   }
@@ -169,6 +172,17 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     writer.close;
   }
   
+  override def loadMetaData(fname:String) = {
+    import java.io._
+    val fr = new BufferedReader(new FileReader(fname+"metadata.json"));
+    val strbuf = new StringBuffer;
+    var line:String = null;
+    while ({line = fr.readLine(); line != null}) {
+      strbuf.append(line).append("\n");
+    }
+    modelMap = JSON.fromJSON(strbuf.toString).asInstanceOf[HashMap[String,Int]];
+  }
+  
   /* 
    * Deal with annoying sub-sized minibatches
    */
@@ -227,22 +241,22 @@ object Net  {
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
     val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Options;
+    layers(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    		layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
+    	    case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
+    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
@@ -256,24 +270,24 @@ object Net  {
     val depth = (depth0/3)*3;              // Round up to an odd number of layers 
     val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Options;
+    layers(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    		layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
+    	    case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
+    	    case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
+    	    case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
+    	    case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
     	  }
     	} else {
-    		layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    		layers(i) = new NormNode{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
+    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
@@ -287,31 +301,31 @@ object Net  {
     val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of layers 
     val layers = new LayerOptions(depth);
     var w = width;
-    layers(0) = new InputLayer.Options;
+    layers(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	(i % 4) match {
     	  case 1 => {
-    	  	layers(i) = new LinLayer.Options{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    	  	layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     	  	w = (taper*w).toInt;
     	  }
     	  case 2 => {
     	  	nonlin match {
-    	  	case 1 => layers(i) = new TanhLayer.Options{inputs(0) = layers(i-1)};
-    	  	case 2 => layers(i) = new SigmoidLayer.Options{inputs(0) = layers(i-1)};
-    	  	case 3 => layers(i) = new RectLayer.Options{inputs(0) = layers(i-1)};
-    	  	case 4 => layers(i) = new SoftplusLayer.Options{inputs(0) = layers(i-1)};
+    	  	case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
+    	  	case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
+    	  	case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
+    	  	case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
     	  	}
     	  }
     	  case 3 => {
-    	  	layers(i) = new NormLayer.Options{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    	  	layers(i) = new NormNode{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
       }
     	  case _ => {
-    	  	layers(i) = new DropoutLayer.Options{inputs(0) = layers(i-1); frac = opts.dropout};
+    	  	layers(i) = new DropoutNode{inputs(0) = layers(i-1); frac = opts.dropout};
     	  }
     	}
     }
-    layers(depth-2) = new LinLayer.Options{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMLayer.Options{inputs(0) = layers(depth-2); links = opts.links};
+    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
+    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
     layers;
   }
   
@@ -327,7 +341,7 @@ object Net  {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
-  class LearnOptions extends Learner.Options with Net.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnOptions extends Learner.Options with Net.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, targ:Mat) = {
     val opts = new LearnOptions;
@@ -337,10 +351,11 @@ object Net  {
     }
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, targ), opts), 
+  	    new MatSource(Array(mat0, targ), opts), 
   	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -351,20 +366,21 @@ object Net  {
     opts.links.set(1);
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0, targ), opts), 
+  	    new MatSource(Array(mat0, targ), opts), 
   	    new Net(opts), 
   	    null,
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with Net.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0),
-  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
+  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
+  		                                                                  FileSource.simpleEnum(fn2,1,0)));
   
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FilesDS.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
 
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts;
@@ -372,20 +388,21 @@ object Net  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts)
+    val ds = new FileSource(opts)
   	val nn = new Learner(
   			ds, 
   	    new Net(opts), 
   	    Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   } 
   
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0),
-  		                                                                  FilesDS.simpleEnum(fn2,1,0)));
+  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
+  		                                                                  FileSource.simpleEnum(fn2,1,0)));
   
-  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FilesDS.simpleEnum(fn1,1,0)));
+  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0)));
   
   def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
     val opts = new FDSopts
@@ -393,13 +410,14 @@ object Net  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
-    val ds = new FilesDS(opts)
+    val ds = new FileSource(opts)
     val net = dlayers(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-layer network
   	val nn = new Learner(
   			ds, 
   	    new Net(opts), 
   	    null,
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -419,17 +437,18 @@ object Net  {
     newmod.refresh = false;
     newmod.copyFrom(model)
     val nn = new Learner(
-        new MatDS(Array(mat0, preds), opts), 
+        new MatSource(Array(mat0, preds), opts), 
         newmod, 
         null,
         null, 
+        null,
         opts);
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with Net.Opts with FilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  class LearnParOptions extends ParLearner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
   
-  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FilesDS.simpleEnum(fn1,1,0), FilesDS.simpleEnum(fn2,1,0)))}
+  def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)))}
   
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
@@ -438,10 +457,11 @@ object Net  {
     opts.fnames = fnames;
     implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
-        new FilesDS(opts), 
+        new FileSource(opts), 
         opts, mkNetModel _,
         opts, mkRegularizer _,
         opts, mkUpdater _, 
+        null, null,
         opts)
     (nn, opts)
   }

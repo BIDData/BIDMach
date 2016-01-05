@@ -1,15 +1,15 @@
 
-val opts = new SFilesDS.Options;
+val opts = new SFileSource.Options;
 
 def getDS() = {
     implicit val threads = threadPool(4)
-    new SFilesDS(opts);
+    new SFileSource(opts);
 }
 
 val ds=getDS;
 
 opts.nend=10;
-opts.fnames=List(FilesDS.simpleEnum("../data/uci/pubmed_parts/part%02d.smat.lz4", 1, 0));
+opts.fnames=List(FileSource.simpleEnum("../data/uci/pubmed_parts/part%02d.smat.lz4", 1, 0));
 opts.batchSize = 100000;
 opts.fcounts = 141043
 opts.eltsPerSample = 400;

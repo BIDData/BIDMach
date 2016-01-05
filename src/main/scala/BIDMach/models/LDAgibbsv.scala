@@ -163,17 +163,19 @@ object LDAgibbsv {
   /*
 * This learner uses stochastic updates (like the standard LDA model)
 */
-  def learn(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with LDAgibbsv.Opts with MatDS.Opts with IncNorm.Opts
+  def learner(mat0:Mat, d:Int = 256) = {
+    class xopts extends Learner.Options with LDAgibbsv.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
    val nn = new Learner(
-   new MatDS(Array(mat0:Mat), opts),
+   new MatSource(Array(mat0:Mat), opts),
    new LDAgibbsv(opts),
    null,
-   new IncNorm(opts), opts)
+   new IncNorm(opts), 
+   null,
+   opts)
     (nn, opts)
   }
   

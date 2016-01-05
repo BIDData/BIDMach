@@ -67,8 +67,8 @@ int checkword(char * str, strhash &htab, ivector &wcount, ivector &tokens, unhas
       char * newstr = new char[strlen(str)+1];
       strcpy(newstr, str);
       wcount.push_back(1);
-      unh.push_back(newstr);
       userno = unh.size();
+      unh.push_back(newstr);
       htab[newstr] = userno;
     } catch (bad_alloc) {
       cerr << "stringIndexer:checkstr: allocation error" << endl;

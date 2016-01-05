@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach._
 
@@ -54,20 +55,21 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   }
     
   def evalfun(sdata:Mat):FMat = {  
-    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)  
-    val vm = mini(vmatch)
-    max(vm, 0f, vm)
-    val vv = mean(vm).dv
-  	row(-vv)
+    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata);
+    val (vm, im) = mini2(vmatch);
+    if (ogmats != null) {ogmats(0) = im;};
+    max(vm, 0f, vm);
+    val vv = mean(vm).dv;
+  	row(-vv);
   }
   
   override def evalfun(sdata:Mat, targ:Mat):FMat = {  
-    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)  
-    val (vm, im) = mini2(vmatch)
-    if (putBack >= 0) {targ <-- im}
-    max(vm, 0f, vm)
-    val vv = mean(vm).dv
-  	row(-vv)
+    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata);
+    val (vm, im) = mini2(vmatch);
+    if (ogmats != null) {ogmats(0) = im;};
+    max(vm, 0f, vm);
+    val vv = mean(vm).dv;
+  	row(-vv);
   }
   
   override def updatePass(ipass:Int) = {
@@ -123,80 +125,118 @@ object KMeans  {
   def mkUpdater(nopts:Updater.Opts) = {
   	new Batch(nopts.asInstanceOf[Batch.Opts])
   } 
+  
+  class MatOptions extends Learner.Options with KMeans.Opts with MatSource.Opts with Batch.Opts
    
-  def learner(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
-    val opts = new xopts
+  def learner(mat0:Mat, d:Int):(Learner, MatOptions) = {
+    val opts = new MatOptions
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     opts.npasses = 10
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    new KMeans(opts), 
   	    null,
-  	    new Batch(opts), opts)
+  	    new Batch(opts), 
+  	    null,
+  	    opts)
     (nn, opts)
   }
-  class fsopts extends Learner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts
   
-  class memopts extends Learner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
+  def learner(mat0:Mat):(Learner, MatOptions) = learner(mat0, 256)
+  
+  class FileOptions extends Learner.Options with KMeans.Opts with FileSource.Opts with Batch.Opts
   /**
    * KMeans with a files dataSource
    */
-  def learner(fnames:List[(Int)=>String], d:Int) = {
-    val opts = new fsopts
+  def learner(fnames:List[(Int)=>String], d:Int):(Learner, FileOptions) = {
+    val opts = new FileOptions
     opts.dim = d
     opts.fnames = fnames
     opts.batchSize = 10000;
     implicit val threads = threadPool(4)
   	val nn = new Learner(
-  	    new FilesDS(opts), 
+  	    new FileSource(opts), 
   	    new KMeans(opts), 
   	    null,
   	    new Batch(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   }
   
-  def learner(fnames:String, d:Int):(Learner, fsopts) = learner(List(FilesDS.simpleEnum(fnames,1,0)), d) 
+  def learner(fnames:List[(Int)=>String]):(Learner, FileOptions) = learner(fnames, 256);
+  
+  def learner(fnames:String, d:Int):(Learner, FileOptions) = learner(List(FileSource.simpleEnum(fnames,1,0)), d);
+  
+  def learner(fnames:String):(Learner, FileOptions) = learner(List(FileSource.simpleEnum(fnames,1,0)), 256);
+  
+  class PredOptions extends Learner.Options with KMeans.Opts with MatSource.Opts with MatSink.Opts;
   
     // This function constructs a predictor from an existing model 
-  def predictor(model:Model, mat1:Mat, preds:Mat):(Learner, memopts) = {
-    val nopts = new memopts;
+  def predictor(model:Model, mat1:Mat):(Learner, PredOptions) = {
+    val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 1
     nopts.dim = model.opts.dim;
     val newmod = new KMeans(nopts);
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1), nopts), 
         newmod, 
         null,
         null,
+        new MatSink(nopts),
+        nopts)
+    (nn, nopts)
+  }
+  
+  class FilePredOptions extends Learner.Options with KMeans.Opts with FileSource.Opts with FileSink.Opts;
+  
+    // This function constructs a file-based predictor from an existing model 
+  def predictor(model:Model, infnames:String, outfnames:String):(Learner, FilePredOptions) = {
+    val nopts = new FilePredOptions;
+    nopts.batchSize = 10000;
+    nopts.dim = model.opts.dim;
+    nopts.fnames = List(FileSource.simpleEnum(infnames,1,0));
+    nopts.ofnames = List(FileSource.simpleEnum(outfnames,1,0));
+    val newmod = new KMeans(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod);
+    implicit val threads = threadPool(4);
+    val nn = new Learner(
+        new FileSource(nopts), 
+        newmod, 
+        null,
+        null,
+        new FileSink(nopts),
         nopts)
     (nn, nopts)
   }
    
-  def learnPar(mat0:Mat, d:Int = 256) = {
-    class xopts extends ParLearner.Options with KMeans.Opts with MatDS.Opts with Batch.Opts
-    val opts = new xopts
+  class ParOptions extends ParLearner.Options with KMeans.Opts with MatSource.Opts with Batch.Opts
+  
+  def learnPar(mat0:Mat, d:Int):(ParLearnerF, ParOptions) = {
+    val opts = new ParOptions
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.npasses = 10
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    opts, mkKMeansModel _, 
   	    null, null, 
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts)
     (nn, opts)
   }
   
-  class KSFopts extends ParLearner.Options with KMeans.Opts with FilesDS.Opts with Batch.Opts
+  def learnPar(mat0:Mat):(ParLearnerF, ParOptions) = learnPar(mat0, 256)
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, KSFopts) = learnPar(List(FilesDS.simpleEnum(fnames,1,0)), d)
+  class KSFopts extends ParLearner.Options with KMeans.Opts with FileSource.Opts with Batch.Opts
+  
+  def learnPar(fnames:String, d:Int):(ParLearnerF, KSFopts) = learnPar(List(FileSource.simpleEnum(fnames,1,0)), d)
   
   def learnPar(fnames:List[(Int)=>String], d:Int):(ParLearnerF, KSFopts) = {
     val opts = new KSFopts
@@ -206,10 +246,11 @@ object KMeans  {
     opts.batchSize = 20000;
     implicit val threads = threadPool(4)
   	val nn = new ParLearnerF(
-  	    new FilesDS(opts), 
+  	    new FileSource(opts), 
   	    opts, mkKMeansModel _, 
   	    null, null, 
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts)
     (nn, opts)
   }

@@ -265,7 +265,7 @@ object SMF {
   class Options extends Opts {} 
   
   def learner(mat0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SMF.Opts with MatDS.Opts with Grad.Opts
+    class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = -1
@@ -274,15 +274,17 @@ object SMF {
     opts.initUval = 0f;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts),
+  	    new MatSource(Array(mat0:Mat), opts),
   	    new SMF(opts), 
   	    null,
-  	    new Grad(opts), opts)
+  	    new Grad(opts), 
+  	    null,
+  	    opts)
     (nn, opts)
   }
   
   def learnerX(mat0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SMF.Opts with MatDS.Opts with ADAGrad.Opts
+    class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = -1
@@ -292,15 +294,17 @@ object SMF {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
     opts.aopts = opts;
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts),
+  	    new MatSource(Array(mat0:Mat), opts),
   	    new SMF(opts), 
   	    null,
-  	    null, opts);
+  	    null, 
+  	    null,
+  	    opts);
     (nn, opts)
   }
   
   def learner(mat0:Mat, user0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SMF.Opts with MatDS.Opts with Grad.Opts
+    class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
@@ -309,15 +313,17 @@ object SMF {
     opts.initUval = 0f;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
-        new MatDS(Array(mat0, user0), opts),
+        new MatSource(Array(mat0, user0), opts),
         new SMF(opts), 
         null,
-        new Grad(opts), opts)
+        new Grad(opts), 
+        null,
+        opts)
     (nn, opts)
   }
   
   def learnerX(mat0:Mat, user0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SMF.Opts with MatDS.Opts with ADAGrad.Opts
+    class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
     opts.putBack = 1
@@ -327,15 +333,17 @@ object SMF {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
     opts.aopts = opts;
     val nn = new Learner(
-        new MatDS(Array(mat0, user0), opts),
+        new MatSource(Array(mat0, user0), opts),
         new SMF(opts), 
         null,
-        null, opts)
+        null, 
+        null,
+        opts)
     (nn, opts)
   }
   
    def predictor(model0:Model, mat1:Mat, preds:Mat) = {
-  	class xopts extends Learner.Options with SMF.Opts with MatDS.Opts with Grad.Opts
+  	class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with Grad.Opts
     val model = model0.asInstanceOf[SMF]
     val nopts = new xopts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
@@ -353,8 +361,9 @@ object SMF {
     nopts.doUsers = mopts.doUsers;
     nopts.weightByUser = mopts.weightByUser;
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1, preds), nopts), 
         newmod, 
+        null,
         null,
         null,
         nopts)

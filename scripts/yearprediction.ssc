@@ -1,10 +1,9 @@
 :silent
-import BIDMach.models.RandomForest
 
-class xopts extends Learner.Options with MatDS.Opts with RandomForest.Opts with Batch.Opts
+class xopts extends Learner.Options with MatSource.Opts with RandomForest.Opts with Batch.Opts
 val opts = new xopts
 
-val mdir = "/code/BIDMach/data/YearPrediction/"
+val mdir = "../data/YearPrediction/"
 val data = loadFMat(mdir+"train.fmat.lz4");
 val cats = loadFMat(mdir+"cats.fmat.lz4");
 
@@ -18,20 +17,22 @@ val test = data(?,itest);
 val testcats = cats(?,itest);
 val preds = zeros(testcats.nrows, testcats.ncols);
 
-val ds = new MatDS(Array(train.asInstanceOf[Mat],traincats), opts);
+val ds = new MatSource(Array(train.asInstanceOf[Mat],traincats), opts);
 
-val dsp = new MatDS(Array(test.asInstanceOf[Mat],preds), opts);
+val dsp = new MatSource(Array(test.asInstanceOf[Mat],preds), opts);
 
 val nn = new Learner(             // make a learner instance
     ds,                           // datasource
     new RandomForest(opts),       // the model 
     null,                         // list of mixins or regularizers
     new Batch(opts),              // the optimization class to use
+    null,
     opts)                         // pass the options to the learner as well
 
 val mm = new Learner(             // make a predictor
     dsp,                          // datasource
     nn.model,
+    null,
     null,
     null,
     opts)                         // pass the options to the learner as well

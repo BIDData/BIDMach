@@ -15,7 +15,7 @@ import java.io._
  * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
-class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
+class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options)(override implicit val ec:ExecutionContextExecutor) extends FileSource(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null
@@ -75,7 +75,7 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
  //       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
         while (k < mat.nrows && mat.data(k) == irow && mat.data(k+mrows) < lims(j)) {
           if (xoff + k >= omat.ir.length) {
-            throw new RuntimeException("SFilesDS index out of range. Try increasing opts.eltsPerSample")
+            throw new RuntimeException("SFileSource index out of range. Try increasing opts.eltsPerSample")
           }
           omat.ir(xoff + k) = mat.data(k+mrows) + yoff
           omat.data(xoff + k) = if (featType == 0) {
@@ -183,7 +183,7 @@ class SFilesDSv1(override val opts:SFilesDS.Opts = new SFilesDS.Options)(overrid
  * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
-class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override implicit val ec:ExecutionContextExecutor) extends FilesDS(opts) {
+class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options)(override implicit val ec:ExecutionContextExecutor) extends FileSource(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null
@@ -244,7 +244,7 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
  //       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
         while (k < lastk && mat.ir(k)-ioff < lims(j)) {
           if (xoff + k >= omat.ir.length) {
-            throw new RuntimeException("SFilesDS index out of range. Try increasing opts.eltsPerSample");
+            throw new RuntimeException("SFileSource index out of range. Try increasing opts.eltsPerSample");
           }
           omat.ir(xoff + k) = mat.ir(k) + offsets(j);
           omat.data(xoff + k) = if (featType == 0) {
@@ -348,8 +348,8 @@ class SFilesDS(override val opts:SFilesDS.Opts = new SFilesDS.Options)(override 
 
 }
 
-object SFilesDS {
-  trait Opts extends FilesDS.Opts {
+object SFileSource {
+  trait Opts extends FileSource.Opts {
   	var fcounts:IMat = null
   }
   

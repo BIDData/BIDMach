@@ -1,26 +1,31 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,LMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import scala.collection.mutable.ListBuffer
 
 /**
  * Abstract class with shared code for all models
  */
-abstract class Model(val opts:Model.Opts = new Model.Options) {
+abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializable {
   
-  var datasource:DataSource = null
+  var datasource:DataSource = null;
   
-  var _modelmats:Array[Mat] = null
+  var datasink:DataSink = null;
   
-  var parent_model:Model = null
+  var _modelmats:Array[Mat] = null;
+  
+  var parent_model:Model = null;
   
   def modelmats:Array[Mat] = {
     if (_modelmats != null) {
       _modelmats
-    } else {
+    } else if (parent_model != null) {
       parent_model._modelmats
+    } else {
+      null
     }
   }
   
@@ -28,19 +33,25 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     _modelmats = a;
   }
   
-  var updatemats:Array[Mat] = null
+  var updatemats:Array[Mat] = null;
   
-  var mats:Array[Mat] = null
+  var mats:Array[Mat] = null;
   
-  var gmats:Array[Mat] = null
+  var gmats:Array[Mat] = null;
   
-  var useGPU = false
+  var omats:Array[Mat] = null;
   
-  var useDouble = false
+  var ogmats:Array[Mat] = null;
   
-  var putBack = -1
+  var useGPU = false;
   
-  var refresh = true
+  var useDouble = false;
+  
+  var putBack = -1;
+  
+  var refresh = true;
+  
+  var runtimes:FMat = null;
   
   def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long):Unit = {
     val mlen = models(0).modelmats.length;
@@ -68,6 +79,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
     mod.updatemats = updatemats;
     mod.mats = mats;
     mod.gmats = gmats;
+    mod.omats = omats;
+    mod.ogmats = ogmats;
   }
   
   def copyFrom(mod:Model) = {
@@ -79,9 +92,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   def saveMetaData(fname:String) = {}
   
+  def loadMetaData(fname:String) = {}
+  
   def save(fname:String) = {
     import java.io._
-    import BIDMat.JSON
     for (i <- 0 until modelmats.length) {
       val mat = modelmats(i);
       val f = new File(fname+"modelmat%02d.lz4" format i);
@@ -89,15 +103,19 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
     }
     val pw = new PrintWriter(new File(fname+"options.json"));
-    pw.print(JSON.toJSON(opts), true);
+    pw.print(JSON.toJSON(opts, true));
     pw.close;
+    val out  = new FileOutputStream(fname+"options.ser")
+    val output = new ObjectOutputStream(out);
+    output.writeObject(opts);
+    output.close;
     saveMetaData(fname);
   }
   
   def load(fname:String) = {
 	  import java.io._
     import BIDMat.JSON
-    if (modelmats.length > 0) {
+    if (modelmats != null && modelmats.length > 0) {
     	for (i <- 0 until modelmats.length) {
     		modelmats(i) = loadMat(fname+"modelmat%02d.lz4" format i);
     	}
@@ -110,13 +128,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
       }
       setmodelmats(mlist.toArray);
     }
-    val fr = new BufferedReader(new FileReader(fname+"options.json"));
-    val strbuf = new StringBuffer;
-    var line:String = null;
-    while ({line = fr.readLine(); line != null}) {
-      strbuf.append(line).append("\n");
-    }
-    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts];
+    val in = new FileInputStream(fname+"options.ser");
+    val input = new ObjectInputStream(in);
+    val newopts = input.readObject.asInstanceOf[Model.Opts];
+    input.close;
     opts.copyFrom(newopts)
   }
   
@@ -134,28 +149,29 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
 	  }
   }
   
+  def bind(ds:DataSink):Unit = {
+	  datasink = ds;
+	  omats = datasink.omats;
+	  ogmats = new Array[Mat](omats.length);
+  }
+  
   def init():Unit
   
   def dobatch(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
   
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat                                // Scores (log likelihoods)
+  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
   
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
-    if (useGPU) copyMats(amats, gmats)            		
-    dobatch(gmats, ipass, here)
-    if ((useGPU || useDouble) && putBack >= 0) {
-    	for (i <- 1 to putBack) {
-    		amats(i) <-- gmats(i)
-    	}
-    }
+    if (useGPU) copyMats(amats, gmats);            		
+    dobatch(gmats, ipass, here);
   }
   
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
     if (useGPU) copyMats(amats, gmats)
     val v = evalbatch(gmats, ipass, here)
-    if ((useGPU || useDouble) && putBack >= 0) {
-      for (i <- 1 to putBack) {
-        amats(i) <-- gmats(i)
+    if (omats != null) {
+      for (i <- 0 until omats.length) {
+        omats(i) = cpu(ogmats(i));
       }
     }
 	v
@@ -194,56 +210,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) {
   
   def updatePass(ipass:Int) = {}
   
-    
   def convertMat(a:Mat):Mat = {
-    a match {
-      case f:FMat =>
-      if (useGPU) {
-      	if (opts.useDouble) {
-      		GDMat(f);
-      	} else {
-      		GMat(f);
-      	}
-      } else {
-      	if (opts.useDouble) {  
-      		DMat(f);
-      	} else {
-      		f
-      	}
-      }
-      case i:IMat =>
-      if (useGPU) {
-        GIMat(i);
-      } else {
-        i;
-      }
-      case g:GMat => if (useGPU) {
-      	if (opts.useDouble) {
-      		GDMat(g);
-      	} else {
-      	  g
-      	} 
-      } else {
-      	if (opts.useDouble) {
-      	  DMat(FMat(g));
-      	} else {
-      		FMat(g);
-      	}
-      }
-      case g:GDMat => if (useGPU) {
-      	if (opts.useDouble) {
-      		g;
-      	} else {
-      	  GMat(g)
-      	} 
-      } else {
-      	if (opts.useDouble) {
-      	  DMat(g);
-      	} else {
-      		FMat(g);
-      	}
-      }
-    }
+  	Model.convertMat(a, useGPU, opts.useDouble);
   }
 }
 
@@ -261,4 +229,67 @@ object Model {
 	
 	class Options extends Opts {} 
   
+  def convertMat(a:Mat, useGPU:Boolean, useDouble:Boolean):Mat = {	
+	   a match {
+      case f:FMat =>
+      if (useGPU) {
+      	if (useDouble) {
+      		GDMat(f);
+      	} else {
+      		GMat(f);
+      	}
+      } else {
+      	if (useDouble) {  
+      		DMat(f);
+      	} else {
+      		f
+      	}
+      }
+      case i:IMat =>
+      if (useGPU) {
+        GIMat(i);
+      } else {
+        i;
+      }
+      case g:GMat => if (useGPU) {
+      	if (useDouble) {
+      		GDMat(g);
+      	} else {
+      	  g
+      	} 
+      } else {
+      	if (useDouble) {
+      	  DMat(FMat(g));
+      	} else {
+      		FMat(g);
+      	}
+      }
+      case g:GDMat => if (useGPU) {
+      	if (useDouble) {
+      		g;
+      	} else {
+      	  GMat(g)
+      	} 
+      } else {
+      	if (useDouble) {
+      	  DMat(g);
+      	} else {
+      		FMat(g);
+      	}
+      }
+      case g:GSMat => if (useGPU) {
+      	if (useDouble) {
+      		GSDMat(g);
+      	} else {
+      	  g;
+      	} 
+      } else {
+      	if (useDouble) {
+      	  SDMat(SMat(g));
+      	} else {
+      		SMat(g);
+      	}
+      }
+    }
+  }
 }

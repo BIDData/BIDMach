@@ -24,8 +24,8 @@ object Experiments {
 object MNIST {
   def datasource(dir:String="/data/MNIST8M/parts/", nlast:Int = 80, n:Int = 1, i:Int = 0) = {
     implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(8))
-    val opts1 = new FilesDS.Options {  
-    fnames = List(FilesDS.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
+    val opts1 = new FileSource.Options {  
+    fnames = List(FileSource.simpleEnum(dir+"/part%02d.imat.lz4", n, i));
     nstart = 0;
     nend = nlast;
     order = 0;
@@ -34,8 +34,8 @@ object MNIST {
     featType = 2;
     featThreshold = 128;
     }
-    val opts2 = new SFilesDS.Options {  
-    fnames = List(FilesDS.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
+    val opts2 = new SFileSource.Options {  
+    fnames = List(FileSource.simpleEnum(dir+"/cats3col%02d.imat.lz4", n, i));
     nstart = opts1.nstart;
     nend = opts1.nend;
     order = opts1.order;
@@ -44,7 +44,7 @@ object MNIST {
     fcounts = irow(10);
     eltsPerSample = 2;
     }
-    new StackedDS(new FilesDS(opts1), new SFilesDS(opts2))
+    new StackedDS(new FileSource(opts1), new SFileSource(opts2))
   }
 
 }
@@ -333,8 +333,8 @@ object Twitter {
 	}
 	
 	def logisticModelPar(
-	    nstart0:Int = FilesDS.encodeDate(2012,3,1,0),
-			nend0:Int = FilesDS.encodeDate(2013,7,1,0),
+	    nstart0:Int = FileSource.encodeDate(2012,3,1,0),
+			nend0:Int = FileSource.encodeDate(2013,7,1,0),
 			nuni0:Int = 50,
 			nbi0:Int = 100,
 			ntri0:Int = 200		
@@ -367,7 +367,7 @@ object Twitter {
 	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	new ParLearnerF(ds, gopts, GLM.mkGLMModel _, null, null, aopts, GLM.mkUpdater _)	  
+  	new ParLearnerF(ds, gopts, GLM.mkGLMModel _, null, null, aopts, GLM.mkUpdater _, null, null)	  
 	}
 	
 	def logisticModel(
@@ -380,7 +380,7 @@ object Twitter {
 			nbi0:Int = 100,
 			ntri0:Int = 200		
 			) = { 
-	  val ds = new MatDS(Array(mat:Mat))
+	  val ds = new MatSource(Array(mat:Mat))
 	  val gd = getGramDict(nuni0, nbi0, ntri0)
 	  val em = getEmoticonMap(nuni0, nbi0, ntri0)
 	  val nfeats = gd.length + 1
@@ -401,7 +401,7 @@ object Twitter {
 	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	Learner(ds, new GLM(gopts), null, new ADAGrad(aopts))	  
+  	Learner(ds, new GLM(gopts), null, new ADAGrad(aopts), null)	  
 	}
 	
 	  
@@ -409,13 +409,13 @@ object Twitter {
   val twitterSmileyFeatureDir = "/disk%02d/twitter/smiley/featurized/%04d/%02d/%02d/"
   
   def twitterWords(
-      nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
-        nend0:Int = FilesDS.encodeDate(2012,12,1,0), 
+      nstart0:Int = FileSource.encodeDate(2012,3,1,0), 
+        nend0:Int = FileSource.encodeDate(2012,12,1,0), 
         n:Int = 1, 
         i:Int = 0, 
         nfeats:Int = 100000) = {
-    val opts = new SFilesDS.Options {  
-        fnames = List(FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
+    val opts = new SFileSource.Options {  
+        fnames = List(FileSource.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i))
         fcounts = icol(nfeats)
         nstart = nstart0/n
         nend = nend0/n
@@ -424,17 +424,17 @@ object Twitter {
         eltsPerSample = 40
         lookahead = 3
     }
-    new SFilesDS(opts)
+    new SFileSource(opts)
   }
   
   def twitterSmileyWords(
-        nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
-        nend0:Int = FilesDS.encodeDate(2013,7,1,0), 
+        nstart0:Int = FileSource.encodeDate(2012,3,1,0), 
+        nend0:Int = FileSource.encodeDate(2013,7,1,0), 
         n:Int = 1, 
         i:Int = 0, 
         nfeats:Int = 100000) = {
-    val opts = new SFilesDS.Options {  
-        fnames = List(FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
+    val opts = new SFileSource.Options {  
+        fnames = List(FileSource.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i))
         fcounts = icol(nfeats)
         nstart = nstart0/n
         nend = nend0/n
@@ -443,22 +443,22 @@ object Twitter {
         eltsPerSample = 40
         lookahead = 3
     }
-    new SFilesDS(opts)
+    new SFileSource(opts)
   }
   
   def twitterNgrams(
-      nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
-        nend0:Int = FilesDS.encodeDate(2012,12,1,0), 
+      nstart0:Int = FileSource.encodeDate(2012,3,1,0), 
+        nend0:Int = FileSource.encodeDate(2012,12,1,0), 
         n:Int = 1, 
         i:Int = 0, 
         nuni0:Int = 50, 
         nbi0:Int = 100, 
         ntri0:Int = 200) = {
-    val opts = new SFilesDS.Options {  
+    val opts = new SFileSource.Options {  
         fnames = List(
-                FilesDS.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i),
-                FilesDS.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
-                FilesDS.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
+                FileSource.sampleFun(twitterFeatureDir + "unifeats%02d.lz4", n, i),
+                FileSource.sampleFun(twitterFeatureDir + "bifeats%02d.lz4", n, i),
+                FileSource.sampleFun(twitterFeatureDir + "trifeats%02d.lz4", n, i)
             )
         fcounts = icol(nuni0*1000,nbi0*1000,ntri0*1000)
         nstart = nstart0/n
@@ -468,22 +468,22 @@ object Twitter {
         eltsPerSample = 40
         lookahead = 3
     }
-    new SFilesDS(opts)
+    new SFileSource(opts)
   }
   
   def twitterSmileyNgrams(
-      nstart0:Int = FilesDS.encodeDate(2012,3,1,0), 
-        nend0:Int = FilesDS.encodeDate(2013,7,1,0), 
+      nstart0:Int = FileSource.encodeDate(2012,3,1,0), 
+        nend0:Int = FileSource.encodeDate(2013,7,1,0), 
         n:Int = 1, 
         i:Int = 0, 
         nuni0:Int = 50, 
         nbi0:Int = 100, 
         ntri0:Int = 200) = {
-    val opts = new SFilesDS.Options {  
+    val opts = new SFileSource.Options {  
         fnames = List(
-                FilesDS.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i),
-                FilesDS.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
-                FilesDS.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)
+                FileSource.sampleFun(twitterSmileyFeatureDir + "unifeats%02d.lz4", n, i),
+                FileSource.sampleFun(twitterSmileyFeatureDir + "bifeats%02d.lz4", n, i),
+                FileSource.sampleFun(twitterSmileyFeatureDir + "trifeats%02d.lz4", n, i)
             )
         fcounts = icol(nuni0*1000,nbi0*1000,ntri0*1000)
         nstart = nstart0/n
@@ -493,12 +493,12 @@ object Twitter {
         eltsPerSample = 40
         lookahead = 3
     }
-    new SFilesDS(opts)
+    new SFileSource(opts)
   }
    
   def twitterWordBlend(
-        nstart0:Int = FilesDS.encodeDate(2012,3,1,0),
-        nend0:Int = FilesDS.encodeDate(2013,7,1,0),
+        nstart0:Int = FileSource.encodeDate(2012,3,1,0),
+        nend0:Int = FileSource.encodeDate(2013,7,1,0),
         n:Int = 1,
         i:Int = 0,
         nfeats:Int = 10000) = {  
@@ -508,16 +508,16 @@ object Twitter {
         ds1.opts.lookahead = 2
         ds2.opts.lookahead = 2
     }
-    val opts3 = new BlendedDS.Options
+    val opts3 = new BlendedSource.Options
     opts3.afrac = 0.5f
     opts3.samp1 = 0.1f
     opts3.samp2 = 1f
-    new BlendedDS(ds1, ds2, opts3)
+    new BlendedSource(ds1, ds2, opts3)
   }
   
   def twitterNgramBlend( 
-        nstart0:Int = FilesDS.encodeDate(2012,3,1,0),
-        nend0:Int = FilesDS.encodeDate(2013,7,1,0),
+        nstart0:Int = FileSource.encodeDate(2012,3,1,0),
+        nend0:Int = FileSource.encodeDate(2013,7,1,0),
         n:Int = 1,
         i:Int = 0,
         nuni0:Int = 50,
@@ -529,16 +529,16 @@ object Twitter {
         ds1.opts.lookahead = 2
         ds2.opts.lookahead = 2
     }
-    val opts3 = new BlendedDS.Options
+    val opts3 = new BlendedSource.Options
     opts3.afrac = 0.7f
     opts3.samp1 = 0.1f
     opts3.samp2 = 1f
-    new BlendedDS(ds1, ds2, opts3)
+    new BlendedSource(ds1, ds2, opts3)
   }  
   
   def testSources(nthreads:Int=4,ff:(Int,Int,Int,Int,Int)=>DataSource = twitterWords, nfeats:Int=100000):IMat = { 
-    val nstart0 = FilesDS.encodeDate(2012,3,22,0)
-    val nend0 = FilesDS.encodeDate(2013,7,1,0)
+    val nstart0 = FileSource.encodeDate(2012,3,22,0)
+    val nend0 = FileSource.encodeDate(2013,7,1,0)
     var bytes = 0L
     var done = 0L
     var step = 10000000000L

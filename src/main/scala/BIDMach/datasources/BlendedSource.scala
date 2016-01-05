@@ -4,8 +4,8 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
 
-class BlendedDS(val s1:DataSource, val s2:DataSource, 
-    override val opts:BlendedDS.Opts = new BlendedDS.Options) extends DataSource(opts) {
+class BlendedSource(val s1:DataSource, val s2:DataSource, 
+    override val opts:BlendedSource.Opts = new BlendedSource.Options) extends DataSource(opts) {
 
   var sizeMargin = 0f 
   var here = 0L
@@ -127,7 +127,7 @@ class BlendedDS(val s1:DataSource, val s2:DataSource,
 }
 
 
-object BlendedDS {
+object BlendedSource {
   trait Opts extends DataSource.Opts {
   	var bBlock = 1000
   	var afrac = 0.5f

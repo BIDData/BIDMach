@@ -2,7 +2,8 @@ package BIDMach.models
 
 import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
 import BIDMach.Learner
-import BIDMach.datasources.{DataSource,MatDS}
+import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
+import BIDMach.datasinks._
 import BIDMach.updaters.Batch
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
@@ -128,7 +129,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   var t4 = 0f;
   var t5 = 0f;
   var t6 = 0f;
-  val runtimes = zeros(8,1);
+  runtimes = zeros(8,1);
   var x:Mat = null;
   var y:Mat = null;
   var useIfeats = false;
@@ -344,16 +345,16 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     ynodes = fnodes;
     if (opts.regression) {
       var mm = mean(fnodes);
-      if (datasource.opts.putBack == 1) {
+      if (ogmats != null) {
         val pcats = if (cats.nrows == 1) mm else mm on sqrt(variance(fnodes))
-        cats <-- pcats;
+        ogmats(0) = pcats;
       }
       val diff = mm - FMat(cats)
       if (opts.MAE) -mean(abs(diff)) else -(diff dotr diff)/diff.length
     } else {
       val mm = tally(fnodes);
-      if (datasource.opts.putBack == 1) {
-        cats <-- mm;
+      if (ogmats != null) {
+        ogmats(0) = mm;
       }
       -mean(FMat(mm != IMat(cats)));
     }
@@ -948,8 +949,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
   
   object giniImpurity extends imptyType {
-    def updatefn(a:Int):Double = { val v = a; v * v }
-    def resultfn(acc:Double, tot:Int) = { val v = math.max(tot,1); 1f - acc / (v * v) }
+    def updatefn(a:Int):Double = { val v = a.toDouble; v * v }
+    def resultfn(acc:Double, tot:Int) = { val v = math.max(tot,1).toDouble; 1f - acc / (v * v) }
     def combinefn(ent1:Double, ent2:Double, tot1:Int, tot2:Int):Double = { (ent1 * tot1 + ent2 * tot2)/math.max(1, tot1 + tot2) }
     val update = updatefn _ ;
     val result = resultfn _ ;
@@ -1348,17 +1349,18 @@ object RandomForest {
   
   class RFopts extends Learner.Options with RandomForest.Opts with DataSource.Opts with Batch.Opts;
   
-  class RFSopts extends RFopts with MatDS.Opts;
+  class RFSopts extends RFopts with MatSource.Opts;
   
   def learner(data:Mat, labels:Mat) = {
     val opts = new RFSopts;
     opts.nbits = 16;
     opts.batchSize = math.min(100000000/data.nrows, data.ncols);
     val nn = new Learner(
-        new MatDS(Array(data, labels), opts), 
+        new MatSource(Array(data, labels), opts), 
         new RandomForest(opts), 
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }
@@ -1371,37 +1373,53 @@ object RandomForest {
         new RandomForest(opts), 
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }
   
-  def predictor(model:Model, ds:DataSource, opts:RFopts):(Learner, RFopts) = {
+  class FsOpts extends Learner.Options with RandomForest.Opts with FileSource.Opts with Batch.Opts
+    
+  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(datafile, 0, 1), FileSource.simpleEnum(labelfile, 0, 1)))
+  
+  def learner(fnames:List[(Int)=>String]) = {
+    val opts = new FsOpts;
+    opts.nbits = 16;
+    opts.batchSize = 1000;
+    opts.fnames = fnames;
+    implicit val threads = threadPool(4);
     val nn = new Learner(
-        ds, 
-        model,
+        new FileSource(opts), 
+        new RandomForest(opts), 
         null, 
         new Batch(opts),
+        null,
         opts)
     (nn, opts)
   }
   
-  def predictor(model:Model, data:Mat, preds:Mat):(Learner, RFopts) = {
-    val opts = model.opts.asInstanceOf[RFSopts];
+  class PredOpts extends Learner.Options with RandomForest.Opts with MatSource.Opts with MatSink.Opts;
+  
+  def predictor(model:Model, data:Mat):(Learner, PredOpts) = {
+    val opts = new PredOpts;
+    opts.copyFrom(model.opts);
     val nn = new Learner(
-        new MatDS(Array(data, preds), opts),
+        new MatSource(Array(data), opts),
         model,
         null, 
-        new Batch(opts),
+        null,
+        new MatSink(opts),
         opts)
     (nn, opts)
   }
   
-  def predictor(modelname:String, ds:DataSource):(Learner, RFopts) = {
-    val opts = new RFopts;
-    opts.useGPU = false;
+  class FilePredOpts extends Learner.Options with RandomForest.Opts with FileSource.Opts with MatSink.Opts;
+    
+  def load(modelname:String):RandomForest = {
+    val opts = new RandomForest.Options;
     val model = new RandomForest(opts);
-    model.load(modelname);
-    predictor(model, ds, opts)
+    model.load(modelname); 
+    model;
   }
   
   def entropy(a:DMat):Double = {

@@ -5,6 +5,10 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
+/** 
+ * Incrementally update two moving averages using updatemats(0) and updatemats(1), and compute the model
+ * as their ratio. 
+ */
 class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Updater(opts) {
   
   var firstStep = 0f

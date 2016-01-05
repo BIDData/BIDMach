@@ -8,6 +8,7 @@ import scala.concurrent.future
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.CountDownLatch
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach._
@@ -82,8 +83,10 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
       opts.targmap.nrows 
     } else if (opts.targets.asInstanceOf[AnyRef] != null) {
       opts.targets.nrows 
-    } else {
+    } else if (mats.length > 1) {
       mats(1).nrows  
+    } else {
+      modelmats(0).nrows;
     }
     val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
     sp = sdat / sum(sdat)
@@ -111,7 +114,14 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     ulim = convertMat(opts.lim)
     llim = - ulim;
     hashFeatures = opts.hashFeatures;
-    if (opts.aopts != null) initADAGrad(d, m);
+    if (opts.aopts != null) {
+      initADAGrad(d, m);
+    } else {
+    	vexp = null;
+    	texp = null;
+    	lrate = null;
+    	sumsq = null;
+    }
   }
   
   def initADAGrad(d:Int, m:Int) = {
@@ -168,8 +178,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
   
   def meval(in:Mat):FMat = {
-    val targs = targets * in;
-    min(targs, 1f, targs);
+    val targs = if (targets.asInstanceOf[AnyRef] != null) {val targs0 = targets * in; min(targs0, 1f, targs0); targs0} else null
     val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null;
     meval3(in, targs, dweights);
   }
@@ -177,16 +186,20 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def meval2(in:Mat, targ:Mat):FMat = meval3(in, targ, null)
   
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
-    val ftarg = full(targ);
-    val targs = if (!(putBack >= 0) && targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
+    val ftarg = if (targ.asInstanceOf[AnyRef] != null) full(targ) else null;
+    val targs = if (targmap.asInstanceOf[AnyRef] != null && ftarg.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in;
     GLM.preds(eta, eta, mylinks, totflops);
-    val v = GLM.llfun(eta, targs, mylinks, totflops);
-    if (putBack >= 0) {targ <-- eta};
-    if (dweights.asInstanceOf[AnyRef] != null) {
-      FMat(sum(v ∘  dweights, 2) / sum(dweights))
+    if (ogmats != null) {ogmats(0) = eta;}
+    if (targs.asInstanceOf[AnyRef] != null) {
+    	val v = GLM.llfun(eta, targs, mylinks, totflops);
+    	if (dweights.asInstanceOf[AnyRef] != null) {
+    		FMat(sum(v ∘  dweights, 2) / sum(dweights))
+    	} else {
+    		FMat(mean(v, 2))
+    	}
     } else {
-      FMat(mean(v, 2))
+      row(0)
     }
   }
   
@@ -585,8 +598,8 @@ object GLM {
 	  new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
   }
   
-  class LearnOptions extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
-  class Learn12Options extends Learner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts with L2Regularizer.Opts
+  class LearnOptions extends Learner.Options with GLM.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class Learn12Options extends Learner.Options with GLM.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts with L2Regularizer.Opts
      
   // Basic in-memory learner with generated target
   def learner(mat0:Mat, d:Int = 0) = { 
@@ -594,10 +607,11 @@ object GLM {
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    new GLM(opts), 
   	    mkRegularizer(opts),
   	    new ADAGrad(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   } 
@@ -611,10 +625,11 @@ object GLM {
     opts.lrate = 1f
     opts.aopts = opts
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    new GLM(opts), 
   	    mkRegularizer(opts),
   	    null, 
+  	    null,
   	    opts)
     (nn, opts)
   } 
@@ -630,10 +645,11 @@ object GLM {
     mopts.links.set(d)
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatDS(Array(mat0, targ), mopts), 
+        new MatSource(Array(mat0, targ), mopts), 
         model, 
         mkRegularizer(mopts),
         new ADAGrad(mopts), 
+        null,
         mopts)
     (mm, mopts)
   }
@@ -649,10 +665,11 @@ object GLM {
     val model = new GLM(mopts)
     mopts.aopts = mopts;
     val mm = new Learner(
-        new MatDS(Array(mat0, targ), mopts), 
+        new MatSource(Array(mat0, targ), mopts), 
         model, 
         mkRegularizer(mopts),
         null, 
+        null,
         mopts)
     (mm, mopts)
   }
@@ -675,15 +692,18 @@ object GLM {
     nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatDS(Array(mat0, targ), mopts), 
+        new MatSource(Array(mat0, targ), mopts), 
         model, 
         mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts), 
+        null,
+        mopts)
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1, preds), nopts), 
         model, 
         null,
         null, 
+        null,
         nopts)
     (mm, mopts, nn, nopts)
   }
@@ -700,7 +720,9 @@ object GLM {
         ds, 
         model, 
         mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts),
+        null,
+        mopts)
     (mm, mopts)
   }
   
@@ -714,25 +736,28 @@ object GLM {
         model, 
         mkRegularizer(mopts),
         null,
+        null,
         mopts);
     (mm, mopts)
   }
   
-  class FGOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FilesDS.Opts
+  class FGOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FileSource.Opts
   
   // A learner that uses a files data source specified by a list of strings.  
   def learner(fnames:List[String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
     val model = new GLM(mopts);
-    mopts.fnames = fnames.map((a:String) => FilesDS.simpleEnum(a,1,0));
+    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
     implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FilesDS(mopts)(ec);    
+    val ds = new FileSource(mopts)(ec);    
     val mm = new Learner(
         ds, 
         model, 
         mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts), 
+        null,
+        mopts)
     (mm, mopts)
   }
   
@@ -742,24 +767,27 @@ object GLM {
     mopts.lrate = 1f;
     mopts.aopts = mopts;
     val model = new GLM(mopts);
-    mopts.fnames = fnames.map((a:String) => FilesDS.simpleEnum(a,1,0));
+    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
     implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FilesDS(mopts)(ec);    
+    val ds = new FileSource(mopts)(ec);    
     val mm = new Learner(
         ds, 
         model, 
         mkRegularizer(mopts),
         null,
+        null,
         mopts)
     (mm, mopts)
   }
   
+  class PredOptions extends Learner.Options with GLM.Opts with MatSource.Opts with MatSink.Opts
+  
   // This function constructs a predictor from an existing model 
-  def predictor(model0:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
+  def predictor(model0:Model, mat1:Mat):(Learner, PredOptions) = {
     val model = model0.asInstanceOf[GLM]
-    val nopts = new LearnOptions;
+    val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 1
+    nopts.putBack = 0
     val newmod = new GLM(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);
@@ -773,10 +801,11 @@ object GLM {
     nopts.hashBound1 = mopts.hashBound1;
     nopts.hashBound2 = mopts.hashBound2;   
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1), nopts), 
         newmod, 
         null,
         null,
+        new MatSink(nopts),
         nopts)
     (nn, nopts)
   }
@@ -791,10 +820,12 @@ object GLM {
     mopts.reg2weight = 1f
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatDS(Array(mat0, targ), mopts), 
+        new MatSource(Array(mat0, targ), mopts), 
         model, 
         mkL1L2Regularizers(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts), 
+        null,
+        mopts)
     (mm, mopts)
   }
   
@@ -812,13 +843,16 @@ object GLM {
     nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatDS(Array(mat0, targ), mopts), 
+        new MatSource(Array(mat0, targ), mopts), 
         model, 
         mkL1L2Regularizers(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts), 
+        null,
+        mopts)
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1, preds), nopts), 
         model, 
+        null,
         null,
         null,
         nopts)
@@ -833,8 +867,9 @@ object GLM {
     nopts.links.set(3)
     nopts.putBack = 1
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1, preds), nopts), 
         model.asInstanceOf[GLM], 
+        null,
         null,
         null,
         nopts)
@@ -847,25 +882,27 @@ object GLM {
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     val nn = new Learner(
-        new MatDS(Array(mat0, targ), opts), 
+        new MatSource(Array(mat0, targ), opts), 
         new GLM(opts), 
         mkRegularizer(opts), 
         new ADAGrad(opts),
+        null,
         opts)
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with GLM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnParOptions extends ParLearner.Options with GLM.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0), opts), 
+  	    new MatSource(Array(mat0), opts), 
   	    opts, mkGLMModel _,
   	    opts, mkRegularizer _,
   	    opts, mkUpdater _, 
+  	    null, null,
   	    opts)
     (nn, opts)
   }
@@ -879,21 +916,22 @@ object GLM {
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new ParLearnerF(
-        new MatDS(Array(mat0, targ), opts), 
+        new MatSource(Array(mat0, targ), opts), 
         opts, mkGLMModel _,
         opts, mkRegularizer _,
         opts, mkUpdater _, 
+        null, null,
         opts)
     (nn, opts)
   }
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-  		nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-  		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+  		nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+  		nend:Int=FileSource.encodeDate(2012,12,1,0), 
   		d:Int = 0
   		) = {
   	val opts = new LearnFParOptions;
@@ -904,14 +942,15 @@ object GLM {
   			opts, mkGLMModel _,
   			opts, mkRegularizer _,
   			opts, mkUpdater _,
+  			null, null,
   			opts
   			)
   	(nn, opts)
   }
   
   def learnFPar(
-  		nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-  		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+  		nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+  		nend:Int=FileSource.encodeDate(2012,12,1,0), 
   		d:Int = 0
   		) = {	
   	val opts = new LearnFParOptions;
@@ -921,6 +960,7 @@ object GLM {
   			opts, mkGLMModel _, 
   			opts, mkRegularizer _,
   			opts, mkUpdater _,
+  			null, null,
   			opts
   			)
   	(nn, opts)

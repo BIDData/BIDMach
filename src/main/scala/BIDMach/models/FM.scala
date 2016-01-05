@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach._
@@ -223,33 +224,34 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
       if (opts.dim2 > 0) eta ~ eta + ((mm2 ∘ mm2) * in);
     }
     if (opts.lim > 0) {
-      max(eta, llim, eta)
-      min(eta, ulim, eta)
+      max(eta, llim, eta);
+      min(eta, ulim, eta);
     }
-    GLM.preds(eta, eta, mylinks, totflops)
-    val v = GLM.llfun(eta, ftarg, mylinks, totflops)
-    if (putBack >= 0) {targ <-- eta}
+    GLM.preds(eta, eta, mylinks, totflops);
+    if (ogmats != null) ogmats(0) = eta;
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops);
     if (dweights.asInstanceOf[AnyRef] != null) {
-      FMat(sum(v ∘  dweights, 2) / sum(dweights))
+      FMat(sum(v ∘  dweights, 2) / sum(dweights));
     } else {
-      FMat(mean(v, 2))
+      FMat(mean(v, 2));
     }
   }
   
   // evaluate a simple A*B factorization of the interactions.
   
   def meval4(in:Mat, targ:Mat, dweights:Mat):FMat = {
-    val ftarg = full(targ)
-    val vt1 = mm1 * in
-    val vt2 = mm2 * in
-    val eta = mv * in + (vt1 dot vt2)
-    GLM.preds(eta, eta, mylinks, totflops)
-    val v = GLM.llfun(eta, ftarg, mylinks, totflops)
-    if (putBack >= 0) {targ <-- eta}
+    val ftarg = full(targ);
+    val vt1 = mm1 * in;
+    val vt2 = mm2 * in;
+    val eta = mv * in + (vt1 dot vt2);
+    GLM.preds(eta, eta, mylinks, totflops);
+    if (ogmats != null) ogmats(0) = eta;
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops);
+    if (ogmats != null) {ogmats(0) = eta};
     if (dweights.asInstanceOf[AnyRef] != null) {
-      FMat(sum(v ∘  dweights, 2) / sum(dweights))
+      FMat(sum(v ∘  dweights, 2) / sum(dweights));
     } else {
-      FMat(mean(v, 2))
+      FMat(mean(v, 2));
     }
   }
 
@@ -277,16 +279,18 @@ object FM {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   } 
   
-  class LearnOptions extends Learner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnOptions extends Learner.Options with FM.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
      
   def learner(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    new FM(opts), 
   	    mkRegularizer(opts),
-  	    new ADAGrad(opts), opts)
+  	    new ADAGrad(opts), 
+  	    null,
+  	    opts)
     (nn, opts)
   }
   
@@ -298,48 +302,24 @@ object FM {
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new Learner(
-        new MatDS(Array(mat0, targ), opts), 
+        new MatSource(Array(mat0, targ), opts), 
         new FM(opts), 
         mkRegularizer(opts),
         new ADAGrad(opts),
+        null,
         opts)
     (nn, opts)
   }
   
   def learner(mat0:Mat, targ:Mat):(Learner, LearnOptions) = learner(mat0, targ, 0)
   
-   // This function constructs a learner and a predictor. 
-  def learner(mat0:Mat, targ:Mat, mat1:Mat, preds:Mat, d:Int):(Learner, LearnOptions, Learner, LearnOptions) = {
-    val mopts = new LearnOptions;
-    val nopts = new LearnOptions;
-    mopts.lrate = row(1f, 0.1f, 0.1f)
-    mopts.batchSize = math.min(10000, mat0.ncols/30 + 1)
-    mopts.autoReset = false
-    if (mopts.links == null) mopts.links = izeros(targ.nrows,1)
-    nopts.links = mopts.links
-    mopts.links.set(d)
-    nopts.batchSize = mopts.batchSize
-    nopts.putBack = 1
-    val model = new FM(mopts)
-    val mm = new Learner(
-        new MatDS(Array(mat0, targ), mopts), 
-        model, 
-        mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
-    val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
-        model, 
-        null,
-        null, 
-        nopts)
-    (mm, mopts, nn, nopts)
-  }
+  class PredOptions extends Learner.Options with FM.Opts with MatSource.Opts with MatSink.Opts
   
   // This function constructs a predictor from an existing model 
-  def predictor(model:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
+  def predictor(model:Model, mat1:Mat):(Learner, PredOptions) = {
     val mod = model.asInstanceOf[FM];
     val mopts = mod.opts;
-    val nopts = new LearnOptions;
+    val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.links = mopts.links.copy;
     nopts.putBack = 1;
@@ -350,10 +330,11 @@ object FM {
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
-        new MatDS(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1), nopts), 
         newmod, 
         null,
         null,
+        new MatSink(nopts),
         nopts)
     (nn, nopts)
   }
@@ -371,25 +352,29 @@ object FM {
         ds, 
         model, 
         mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts), 
+        null,
+        mopts)
     (mm, mopts)
   }
   
-  class FGOptions extends Learner.Options with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FilesDS.Opts
+  class FGOptions extends Learner.Options with FM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FileSource.Opts
     
   // A learner that uses a files data source specified by a list of strings.  
   def learner(fnames:List[String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
     val model = new FM(mopts);
-    mopts.fnames = fnames.map((a:String) => FilesDS.simpleEnum(a,1,0));
+    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
     implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FilesDS(mopts)(ec);    
+    val ds = new FileSource(mopts)(ec);    
     val mm = new Learner(
         ds, 
         model, 
         mkRegularizer(mopts),
-        new ADAGrad(mopts), mopts)
+        new ADAGrad(mopts), 
+        null,
+        mopts)
     (mm, mopts)
   }
      
@@ -398,25 +383,27 @@ object FM {
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     opts.links.set(d)
     val nn = new Learner(
-        new MatDS(Array(mat0), opts), 
+        new MatSource(Array(mat0), opts), 
         new FM(opts), 
         mkRegularizer(opts),
         new ADAGrad(opts),
+        null,
         opts)
     (nn, opts)
   }
   
-  class LearnParOptions extends ParLearner.Options with FM.Opts with MatDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnParOptions extends ParLearner.Options with FM.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnPar(mat0:Mat, d:Int) = {
     val opts = new LearnParOptions
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     opts.links.set(d)
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0), opts), 
+  	    new MatSource(Array(mat0), opts), 
   	    opts, mkFMModel _,
   	    opts, mkRegularizer _,
   	    opts, mkUpdater _, 
+  	    null, null,
   	    opts)
     (nn, opts)
   }
@@ -429,21 +416,22 @@ object FM {
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new ParLearnerF(
-        new MatDS(Array(mat0, targ), opts), 
+        new MatSource(Array(mat0, targ), opts), 
         opts, mkFMModel _,
         opts, mkRegularizer _,
         opts, mkUpdater _, 
+        null, null,
         opts)
     (nn, opts)
   }
   
   def learnPar(mat0:Mat, targ:Mat):(ParLearnerF, LearnParOptions) = learnPar(mat0, targ, 0)
   
-  class LearnFParOptions extends ParLearner.Options with FM.Opts with SFilesDS.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class LearnFParOptions extends ParLearner.Options with FM.Opts with SFileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+    nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+		nend:Int=FileSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {
   	val opts = new LearnFParOptions
@@ -453,14 +441,15 @@ object FM {
   	    opts, mkFMModel _,
         opts, mkRegularizer _,
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts
   	)
   	(nn, opts)
   }
   
   def learnFPar(
-    nstart:Int=FilesDS.encodeDate(2012,3,1,0), 
-		nend:Int=FilesDS.encodeDate(2012,12,1,0), 
+    nstart:Int=FileSource.encodeDate(2012,3,1,0), 
+		nend:Int=FileSource.encodeDate(2012,12,1,0), 
 		d:Int = 0
 		) = {	
   	val opts = new LearnFParOptions
@@ -469,6 +458,7 @@ object FM {
   	    opts, mkFMModel _, 
         opts, mkRegularizer _,
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts
   	)
   	(nn, opts)

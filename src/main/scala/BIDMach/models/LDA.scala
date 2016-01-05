@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach._
 
@@ -45,14 +46,13 @@ import BIDMach._
 class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts) {
 
   var mm:Mat = null
-  var alpha:Mat = null 
   var traceMem = false
   
   /** Sets up the modelmats and updatemats arrays and initializes modelmats(0) randomly unless stated otherwise. */
   override def init() = {
-    super.init()
+    super.init();
+    mm = modelmats(0);
     if (refresh) {
-    	mm = modelmats(0);
     	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
     }
     updatemats = new Array[Mat](2);
@@ -117,7 +117,8 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
    *   multiplied by modelmats(0) to form sdata.
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
-  def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {  
+  def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
+    if (ogmats != null) ogmats(0) = user;
   	val preds = DDS(mm, user, sdata);
   	val dc = sdata.contents;
   	val pc = preds.contents;
@@ -150,77 +151,112 @@ object LDA  {
   def mkUpdater(nopts:Updater.Opts) = {
   	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
-   
+
+  class MatOpts extends Learner.Options with LDA.Opts with MatSource.Opts with IncNorm.Opts
+  
   /** Online Variational Bayes LDA algorithm with a matrix datasource. */
-  def learner(mat0:Mat, d:Int) = {
-    class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
-    val opts = new xopts
+  def learner(mat0:Mat):(Learner, MatOpts) = learner(mat0, 256);
+  
+  def learner(mat0:Mat, d:Int):(Learner, MatOpts)  = {
+    val opts = new MatOpts
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    new LDA(opts), 
   	    null,
-  	    new IncNorm(opts), 
+  	    new IncNorm(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }
   
-  class FsOpts extends Learner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
+  class FileOpts extends Learner.Options with LDA.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FilesDS.simpleEnum(fpattern, 0, 1)), d)
+  def learner(fpattern:String):(Learner, FileOpts) = learner(fpattern, 256)
+  
+  def learner(fpattern:String, d:Int):(Learner, FileOpts) = learner(List(FileSource.simpleEnum(fpattern, 0, 1)), d)
   
   /** Online Variational Bayes LDA algorithm with a files dataSource. */
-  def learner(fnames:List[(Int)=>String], d:Int):(Learner, FsOpts) = { 
-    val opts = new FsOpts
+  def learner(fnames:List[(Int)=>String], d:Int):(Learner, FileOpts) = { 
+    val opts = new FileOpts
     opts.dim = d
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4)
   	val nn = new Learner(
-  	    new SFilesDS(opts), 
+  	    new SFileSource(opts), 
   	    new LDA(opts), 
   	    null,
   	    new IncNorm(opts), 
+  	    null,
   	    opts)
     (nn, opts)
   }
+  
+  class PredOptions extends Learner.Options with LDA.Opts with MatSource.Opts with MatSink.Opts;
+  
+    // This function constructs a predictor from an existing model 
+  def predictor(model:Model, mat1:Mat):(Learner, PredOptions) = {
+    val nopts = new PredOptions;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    nopts.dim = model.opts.dim;
+    val newmod = new LDA(nopts);
+    newmod.refresh = false
+    model.copyTo(newmod)
+    val nn = new Learner(
+        new MatSource(Array(mat1), nopts), 
+        newmod, 
+        null,
+        null,
+        new MatSink(nopts),
+        nopts)
+    (nn, nopts)
+  }
      
+  class MatBatchOpts extends Learner.Options with LDA.Opts with MatSource.Opts with BatchNorm.Opts;
+  
   /** Batch Variational Bayes LDA algorithm with a matrix datasource. */
-  def learnBatch(mat0:Mat, d:Int = 256) = {
-    class xopts extends Learner.Options with LDA.Opts with MatDS.Opts with BatchNorm.Opts
-    val opts = new xopts
+  def learnBatch(mat0:Mat):(Learner, MatBatchOpts) = learnBatch(mat0, 256);
+  
+  def learnBatch(mat0:Mat, d:Int):(Learner, MatBatchOpts) = {  
+    val opts = new MatBatchOpts;
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
-        new MatDS(Array(mat0:Mat), opts), 
+        new MatSource(Array(mat0:Mat), opts), 
         new LDA(opts), 
         null, 
         new BatchNorm(opts),
+        null,
         opts)
     (nn, opts)
   }
   
+  class MatParOpts extends ParLearner.Options with LDA.Opts with MatSource.Opts with IncNorm.Opts;
+  
   /** Parallel online LDA algorithm with a matrix datasource. */ 
-  def learnPar(mat0:Mat, d:Int = 256) = {
-    class xopts extends ParLearner.Options with LDA.Opts with MatDS.Opts with IncNorm.Opts
-    val opts = new xopts
+  def learnPar(mat0:Mat):(ParLearnerF, MatParOpts) = learnPar(mat0, 256);
+     
+  def learnPar(mat0:Mat, d:Int):(ParLearnerF, MatParOpts) = {    
+    val opts = new MatParOpts;
     opts.dim = d
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
-  	    new MatDS(Array(mat0:Mat), opts), 
+  	    new MatSource(Array(mat0:Mat), opts), 
   	    opts, mkLDAmodel _, 
   	    null, null, 
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts)
     (nn, opts)
   }
   
-  class SFDSopts extends ParLearner.Options with LDA.Opts with SFilesDS.Opts with IncNorm.Opts
+  class SFDSopts extends ParLearner.Options with LDA.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FilesDS.simpleEnum(fnames, 0, 1)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 0, 1)), d);
   
   /** Parallel online LDA algorithm with one file datasource. */
   def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {
@@ -233,10 +269,11 @@ object LDA  {
   	opts.resFile = "../results.mat"
   	implicit val threads = threadPool(4)
   	val nn = new ParLearnerF(
-  	    new SFilesDS(opts),
+  	    new SFileSource(opts),
   	    opts, mkLDAmodel _, 
   	    null, null, 
   	    opts, mkUpdater _,
+  	    null, null,
   	    opts
   	)
   	(nn, opts)

@@ -61,11 +61,12 @@ opts.uconvg = 1e-3f
 
 nn.train
 
-val pa = (ta != 0);
-val (mm,mopts) = SFA.predictor(nn.model,a,fact,pa)
+val (mm,mopts) = SFA.predictor(nn.model,a,fact,ta)
 mopts.batchSize = 10000;
 
 mm.predict
+
+val pa = SMat(mm.preds(1));
 
 min(pa.contents,5,pa.contents)
 max(pa.contents,1,pa.contents)

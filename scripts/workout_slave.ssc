@@ -9,10 +9,11 @@ val (mm1,opts1) = GLM.learner(a,c,1)
 opts1.useGPU=useGPU
 mm1.train
 
-val pc = zeros(tc.nrows, tc.ncols);
-val (nn1,nopts1) = GLM.predictor(mm1.model,ta,pc)
+val (nn1,nopts1) = GLM.predictor(mm1.model,ta)
 nopts1.useGPU=useGPU
 nn1.predict
+
+val pc = FMat(nn1.preds(0))
 
 val rc = roc2(pc, tc, 1-tc, 1000)
 val mr = mean(rc)(0, 0->100)
@@ -35,13 +36,13 @@ opts2.dim2 = 32
 //opts2.strictFM = true
 mm2.train
 
-val p6 = zeros(1,ta.ncols)
 val tc6 = tc(6,?)
-val (nn2,nopts2) = FM.predictor(mm2.model,ta,p6)
+val (nn2,nopts2) = FM.predictor(mm2.model,ta)
 nopts2.useGPU=useGPU
 nopts2.batchSize=10000
 nopts2.addConstFeat = true
 nn2.predict
+val p6 = FMat(nn2.preds(0))
 val rr2 = roc(p6,tc6,1-tc6,100)
 println("ROC AUC cat6 %5.4f" format mean(rr2).dv)
 
@@ -83,27 +84,44 @@ opts5.langevin = 3f
 
 mm5.train
 
-val pa5 = (ta5 != 0);
-val (nn5,nopts5) = SFA.predictor(mm5.model,a5,fact5,pa5)
+val (nn5,nopts5) = SFA.predictor(mm5.model,a5,fact5,ta5)
 nopts5.batchSize = 10000;
 
 nn5.predict
+val pa5 = SMat(nn5.preds(1))
 
 val diff = ta5.contents - pa5.contents
 val rmse = sqrt((diff ^* diff) / diff.length)
 println("RMSE = %f" format rmse.v);
 
+if ((new java.io.File("../data/MNIST8M/parts/data00.fmat.lz4")).exists) {
+println("\n<<<<<<< Testing Random Forests with FileSource on MNIST8M (depth 16) >>>>>>>")
+val (mm11,opts11) = RandomForest.learner("../data/MNIST8M/parts/data%02d.fmat.lz4","../data/MNIST8M/parts/cat%02d.imat.lz4")
+opts11.batchSize = 20000
+opts11.depth =  16
+opts11.ntrees = 8
+opts11.useGPU = useGPU
+opts11.nend = 10
+
+opts11.nsamps = 32
+opts11.nnodes = 50000
+opts11.nbits = 16
+mm11.train
+} 
+
 if ((new java.io.File("../data/uci/pubmed_parts/part00.smat.lz4")).exists) {
-println("\n<<<<<<< Testing LDA with SFilesDS on Pubmed (2 passes) >>>>>>>")
+println("\n<<<<<<< Testing LDA with SFileSource on Pubmed (2 passes) >>>>>>>")
 val (mm6,opts6) = LDA.learner(List((n:Int)=> ("../data/uci/pubmed_parts/part%02d.smat.lz4" format n)), 128)
+opts6.nend = 10
 opts6.npasses=2
 opts6.useGPU=useGPU
 mm6.train
 }
 
+
 if ((new java.io.File("../data/MNIST8M/parts/alls00.fmat.lz4")).exists) {
 if (useGPU && Mat.hasCUDA > 1) {
-println("\n<<<<<<< Testing parallel KMeans with FilesDS on MNIST8M (4 passes) >>>>>>>")
+println("\n<<<<<<< Testing parallel KMeans with FileSource on MNIST8M (4 passes) >>>>>>>")
 val (mm7,opts7) = KMeans.learnPar("../data/MNIST8M/parts/alls%02d.fmat.lz4", 4096)
 opts7.npasses=4
 opts7.nend=70
@@ -111,7 +129,7 @@ opts7.batchSize=20000
 opts7.nthreads=Mat.hasCUDA
 mm7.train
 } else {
-println("\n<<<<<<< Testing KMeans with FilesDS on MNIST8M (4 passes) >>>>>>>")
+println("\n<<<<<<< Testing KMeans with FileSource on MNIST8M (4 passes) >>>>>>>")
 val (mm7,opts7) = KMeans.learner(List((n:Int)=> ("../data/MNIST8M/parts/alls%02d.fmat.lz4" format n)), 256)
 opts7.npasses=4
 opts7.nend=70

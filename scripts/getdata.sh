@@ -20,11 +20,14 @@ ${BIDMACH_SCRIPTS}/getuci.sh nips
 
 ${BIDMACH_SCRIPTS}/getuci.sh nytimes
 
+# this one is huge, make sure you really want it
 # ${BIDMACH_SCRIPTS}/getuci.sh pubmed
 
 ${BIDMACH_SCRIPTS}/getdigits.sh
 
 ${BIDMACH_SCRIPTS}/getmovies.sh
+
+${BIDMACH_SCRIPTS}/getmnist8m.sh
 
 
 
