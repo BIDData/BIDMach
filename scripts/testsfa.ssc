@@ -22,10 +22,9 @@ saveSMat(dir+"newtest.smat.lz4", ta)
 
 val d = 256
 
-val fact = zeros(d, a.ncols);
-val (nn,opts) = SFA.learnerX(a,fact,d)
+val (nn,opts) = SFA.learnerX(a,d)
 
-opts.langevin = 0.3f
+opts.langevin = 0.0f
 
 // good values for movielens 10m
 opts.lambdam = 5f
@@ -36,9 +35,9 @@ opts.batchSize = 2000
 
 // good values for netflix
 opts.batchSize = 1000 
-opts.lambdau =0.5f;
+opts.lambdau =0.2f;
 opts.regumean = 0.01f;
-opts.lambdam = 0.03f;
+opts.lambdam = 0.1f;
 opts.regmmean = 0.001f;
 
 val lambda = 15f
@@ -46,7 +45,7 @@ opts.lambdau = lambda;
 opts.regumean = lambda;
 opts.lambdam = lambda / 500000;
 opts.regmmean = opts.lambdam
-opts.uiter = 4
+opts.uiter = 5
 opts.startup = 1
 opts.npasses = 3
 opts.evalStep = 31
@@ -54,15 +53,14 @@ opts.doUsers = true
 //opts.lrate = 0.003  // For ADAGRAD
 //opts.texp = null
 opts.uconvg = 1e-3f
-//opts.weightByUser = true
-//opts.traceConverge = true
-//opts.autoReset = false
-//opts.useDouble = true
 
 nn.train
 
-val (mm,mopts) = SFA.predictor(nn.model,a,fact,ta)
+val xa = (ta != 0);
+
+val (mm,mopts) = SFA.predictor(nn.model,a,xa)
 mopts.batchSize = 10000;
+mopts.uiter=3
 
 mm.predict
 

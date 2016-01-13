@@ -1,5 +1,4 @@
 #include <jni.h>
-#include <mkl.h>
 #include <omp.h>
 #include <math.h>
 
