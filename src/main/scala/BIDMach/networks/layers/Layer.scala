@@ -244,7 +244,6 @@ object LayerFn {
   def applyderiv(a:ND, b:ND, out:ND, ifn:Int):ND = {
 	  Mat.nflops += 1L * a.length * bwdflops(ifn);
 	  checkdims(a.dims, b.dims);
-    checkdims(a.dims, out.dims);
     (a, b) match {
       case (af:FND, bf:FND) => {
         val oND = FND.newOrCheckFND(a.dims, out, a.GUID, ifn, "LayerFn".##);
