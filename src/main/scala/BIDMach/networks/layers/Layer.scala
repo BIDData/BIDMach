@@ -126,6 +126,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   lazy val useGPU = net.useGPU;
   lazy val nopts = net.opts;
   def convertMat(mat:Mat) = {net.convertMat(mat);}
+  def convertMat(mat:ND) = {net.convertMat(mat);}
 
   def createOutput = {
   	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(inputData.dims);
