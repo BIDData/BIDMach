@@ -22,7 +22,7 @@ class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode
 
   override def forward = {
 		  val start = toc;
-		  createOutput(1, inputData.ncols);
+		  createOutput(1 \ inputData.ncols);
 		  output.asMat <-- sum(inputData.asMat);
 		  clearDeriv;
 		  forwardtime += toc - start;
