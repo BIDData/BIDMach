@@ -15,7 +15,7 @@ if [[ "$OS" == Darwin* ]] ; then
 elif [[ "$OS" == Linux* ]] ; then
     OS="linux"
 elif [[ "$OS" == CYGWIN* ]] ; then
-    if [[ "$OS" == *WOW64* ]] ; then
+    if [[ "$OS" == *WOW* ]] ; then
         ARCH="x86_64"
     fi
 	OS="windows"

@@ -29,11 +29,7 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 		if (nopts.predict) {
 			output ~ inputData * opts.frac;
 		} else {
-			if (useGPU) {
-				grand(randmat.asInstanceOf[GMat]); 
-			} else {
-				rand(randmat.asInstanceOf[FMat]);
-			}
+			rand(randmat);
 			randmat ~ randmat < opts.frac
 			output ~ inputData ∘ randmat;
 		}

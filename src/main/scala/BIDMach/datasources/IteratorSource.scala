@@ -166,7 +166,7 @@ object IteratorSource {
     var dorows:Boolean = false
     @transient var iter:Iterator[Tuple2[AnyRef, MatIOtrait]] = null;
     var eltsPerSample = 10;
-    var throwMissing:Boolean = false
+    var throwMissing:Boolean = false; 
   }
   
   class Options extends Opts {}

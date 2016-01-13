@@ -328,7 +328,7 @@ class BayesNet(val dag:Mat,
     //  counts1 <-- (counts1.t * equivClassCountMap).t
     //}
 
-    genericGammaRand(counts1 + dirichletPrior, dirichletScale, counts3)
+    gamrnd(counts1 + dirichletPrior, dirichletScale, counts3)
     val t13 = toc;
     runtimes(8) += t13 - t12;
     
