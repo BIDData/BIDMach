@@ -41,7 +41,7 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  val start = toc;
 		  for (i <- 0 until opts.ninputs) {
 			  if (inputDerivs(i).asInstanceOf[AnyRef] != null) {
-				  inputDerivs(i) <-- deriv(colranges(i), ?)
+				  inputDerivs(i) <-- deriv.asMat(colranges(i), ?)
 			  }
 		  }  
 		  backwardtime += toc - start;
