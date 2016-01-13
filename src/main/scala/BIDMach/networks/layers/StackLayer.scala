@@ -28,10 +28,10 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 				  colranges(i) = convertMat(irow(orows -> (orows + thisrow)));
 				  orows += thisrow;
 			  }
-			  output = convertMat(zeros(orows, inputData.ncols));
+			  output = convertMat(zeros(orows \ inputData.ncols));
 		  }
 		  for (i <- 0 until opts.ninputs) {
-			  output(colranges(i), ?) = inputDatas(i);
+			  output.asMat(colranges(i), ?) = inputDatas(i).asMat;
 		  }
 		  clearDeriv;
 		  forwardtime += toc - start;

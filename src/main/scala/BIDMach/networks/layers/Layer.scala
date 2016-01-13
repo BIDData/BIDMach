@@ -208,11 +208,13 @@ object LayerFn {
       while (i0 < dims0.length && i1 < dims1.length) {
         while (i0 < dims0.length && dims0(i0) == 1) i0 += 1;
         while (i1 < dims1.length && dims1(i1) == 1) i1 += 1; 
-        if ((i0 >= dims0.length) != (i1 <= dims0.length)) {
+        if ((i0 >= dims0.length) != (i1 >= dims1.length)) {
           throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString);
-        } else if (i0 < dims0.length && i1 < dims1.length && dims0(i0) != dims0(i1)) {
+        } else if (i0 < dims0.length && i1 < dims1.length && dims0(i0) != dims1(i1)) {
         	throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString);           
         }
+        i0 += 1;
+        i1 += 1;
       }
     }
   }
