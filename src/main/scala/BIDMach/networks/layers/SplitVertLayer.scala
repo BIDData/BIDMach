@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,ND,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -15,8 +15,8 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts = new SplitVertNode) extends Layer(net, opts) {
-  override val _outputs = new Array[Mat](opts.nparts);
-  override val _derivs = new Array[Mat](opts.nparts);
+  override val _outputs = new Array[ND](opts.nparts);
+  override val _derivs = new Array[ND](opts.nparts);
   var nblock:Int = 0;
   var rowranges = new Array[Mat](opts.nparts);
   

@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -18,12 +18,12 @@ import BIDMach.networks._
  */
 
 class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode) extends Layer(net, opts) {
-	var vmap:Mat = null;
+	var vmap:ND = null;
 
   override def forward = {
 		  val start = toc;
 		  createOutput(1, inputData.ncols);
-		  output <-- sum(inputData);
+		  output.asMat <-- sum(inputData.asMat);
 		  clearDeriv;
 		  forwardtime += toc - start;
   }

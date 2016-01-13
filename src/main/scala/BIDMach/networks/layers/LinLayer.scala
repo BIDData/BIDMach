@@ -57,16 +57,16 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
 	  val modelcols = inputData.nrows;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      mm.madd(deriv, inputDeriv, true, false);
+      mm.madd(deriv.asMat, inputDeriv.asMat, true, false);
     }
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
       val istep = (pos + firststep)/firststep;
-      ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
+      ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
     	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
-    	deriv.madd(inputData, um, false, true);
-      if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv,2)
+    	deriv.asMat.madd(inputData.asMat, um, false, true);
+      if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv.asMat,2)
     }
     backwardtime += toc - start;
   }

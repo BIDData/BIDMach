@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -20,7 +20,7 @@ import BIDMach.networks._
  */
 
 class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new DropoutNode) extends Layer(net, opts) {  
-	var randmat:Mat = null;
+	var randmat:ND = null;
 
   override def forward = {
     val start = toc;

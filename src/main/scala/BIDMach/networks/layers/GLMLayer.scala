@@ -34,19 +34,19 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 			  	totflops += GLM.linkArray(opts.links(i)).fnflops
 			  }
 			}
-			output <-- GLM.preds(inputData, ilinks, totflops);
+			output.asMat <-- GLM.preds(inputData.asMat, ilinks, totflops);
 			clearDeriv;
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
-			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ GLM.derivs(output, target, ilinks, totflops));
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv.asMat ~ inputDeriv.asMat + (deriv.asMat ∘ GLM.derivs(output.asMat, target, ilinks, totflops));
 			backwardtime += toc - start;
 	}
 
 	override def score:FMat = { 
-			val v = GLM.llfun(output, target, ilinks, totflops);
+			val v = GLM.llfun(output.asMat, target, ilinks, totflops);
 			FMat(mean(v, 2));
 	}
   

@@ -35,7 +35,7 @@ class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormN
 		val start = toc;
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
     	if (sconst.asInstanceOf[AnyRef] == null) sconst = output.zeros(1,1);
-    	sconst.set(math.min(0.1f, math.max(-0.1f, (opts.targetNorm - norm(output)/output.length).toFloat * opts.weight)));
+    	sconst.set(math.min(0.1f, math.max(-0.1f, (opts.targetNorm - norm(output.asMat)/output.length).toFloat * opts.weight)));
     	inputDeriv = output ∘ sconst;
     	inputDeriv ~ inputDeriv + deriv;
     }

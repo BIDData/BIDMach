@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -77,8 +77,8 @@ import BIDMach.networks._
 class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0) {
   // Internal data arrays
   val _inputs = new Array[LayerTerm](1);
-  val _outputs = new Array[Mat](1);
-  val _derivs = new Array[Mat](1);
+  val _outputs = new Array[ND](1);
+  val _derivs = new Array[ND](1);
   def inputlength = _inputs.length
   var forwardtime = 0.0
   var backwardtime = 0.0
@@ -95,8 +95,8 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def input(i:Int) = _inputs(i);
   def apply(i:Int) = new LayerTerm(this, i);
   
-  def setOutput(i:Int, v:Mat):Layer = {_outputs(i) = v; this}
-  def setDeriv(i:Int, v:Mat):Layer = {_derivs(i) = v; this}
+  def setOutput(i:Int, v:ND):Layer = {_outputs(i) = v; this}
+  def setDeriv(i:Int, v:ND):Layer = {_derivs(i) = v; this}
   def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v; this}
   
   // Setters and getters for the first input or output
@@ -105,13 +105,13 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def deriv = _derivs(0);
   
   def input_=(v:LayerTerm): Unit = {_inputs(0) = v}
-  def output_= (v:Mat):Unit = {_outputs(0) = v};
-  def deriv_=(v:Mat):Unit = {_derivs(0) = v};
+  def output_= (v:ND):Unit = {_outputs(0) = v};
+  def deriv_=(v:ND):Unit = {_derivs(0) = v};
   
   // Input getters (and one setter) which get the appropriate output from each input layer
   def inputData = {val i = _inputs(0); i.layer._outputs(i.term);}
   def inputDeriv = {val i = _inputs(0); i.layer._derivs(i.term);}
-  def inputDeriv_=(v:Mat):Unit = {val i = _inputs(0); i.layer._derivs(i.term) = v;}  
+  def inputDeriv_=(v:ND):Unit = {val i = _inputs(0); i.layer._derivs(i.term) = v;}  
   def inputDatas(i:Int) = {val lt = _inputs(i); lt.layer._outputs(lt.term);}
   def inputDerivs(i:Int) = {val lt = _inputs(i); lt.layer._derivs(lt.term);}
   
@@ -128,22 +128,22 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def convertMat(mat:Mat) = {net.convertMat(mat);}
 
   def createOutput = {
-  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(inputData.nrows, inputData.ncols);
+  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(inputData.dims);
   }
 
-  def createOutput(nrows:Int, ncols:Int) = {
-  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(nrows, ncols);
+  def createOutput(dims:IMat) = {
+  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(dims);
   }
 
   def clearDeriv = {
-  	if (deriv.asInstanceOf[AnyRef] == null) deriv = output.zeros(output.nrows, output.ncols);
+  	if (deriv.asInstanceOf[AnyRef] == null) deriv = output.zeros(output.dims);
   	deriv.clear;
   }
   
   def clearDerivs = {
     if (deriv.asInstanceOf[AnyRef] == null) {
       for (i <- 0 until _outputs.length) {
-        _derivs(i) = output.zeros(_outputs(i).nrows, _outputs(i).ncols);
+        _derivs(i) = output.zeros(_outputs(i).dims);
       }
     }
     for (i <- 0 until _derivs.length) {
@@ -200,41 +200,58 @@ object LayerFn {
   val fwdflops = irow(20, 20, 40);
   val bwdflops = irow(3, 3, 20);
   
-  def applyfwd(a:Mat, ifn:Int):Mat = applyfwd(a, null, ifn);
-  
-  def applyfwd(a:Mat, out:Mat, ifn:Int):Mat = {
-    Mat.nflops += 1L * a.length * fwdflops(ifn);
-    a match {
-      case af:FMat => {
-        val omat = FMat.newOrCheckFMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
-        CPUMACH.applyfwd(af.data, omat.data, ifn, a.length, Mat.numThreads);
-        omat
+  // Loosely check dimensions. Skip dimensions of 1 in either tensor.
+  def checkdims(dims0:IMat, dims1:IMat) = {
+    if (dims1.asInstanceOf[AnyRef] != null) {
+      var i0 = 0;
+      var i1 = 0;
+      while (i0 < dims0.length && i1 < dims1.length) {
+        while (i0 < dims0.length && dims0(i0) == 1) i0 += 1;
+        while (i1 < dims1.length && dims1(i1) == 1) i1 += 1; 
+        if ((i0 >= dims0.length) != (i1 <= dims0.length)) {
+          throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString);
+        } else if (i0 < dims0.length && i1 < dims1.length && dims0(i0) != dims0(i1)) {
+        	throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString);           
+        }
       }
-      case ag:GMat => {
-        val omat = GMat.newOrCheckGMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
-        CUMACH.applyfwd(ag.data, omat.data, ifn, a.length);
-        omat
+    }
+  }
+  
+  def applyfwd(a:ND, ifn:Int):ND = applyfwd(a, null, ifn);
+  
+  def applyfwd(a:ND, out:ND, ifn:Int):ND = {
+    Mat.nflops += 1L * a.length * fwdflops(ifn);
+    checkdims(a.dims, out.dims);
+    a match {
+      case af:FND => {
+        val oND = FND.newOrCheckFND(a.dims, out, a.GUID, ifn, "LayerFn".##);
+        CPUMACH.applyfwd(af.data, oND.data, ifn, a.length, Mat.numThreads);
+        oND
+      }
+      case ag:GND => {
+        val oND = GND.newOrCheckGND(a.dims, out, a.GUID, ifn, "LayerFn".##);
+        CUMACH.applyfwd(ag.data, oND.data, ifn, a.length);
+        oND
       }
     }
   }
 
-  def applyderiv(a:Mat, b:Mat, ifn:Int):Mat = applyderiv(a, b, null, ifn)
+  def applyderiv(a:ND, b:ND, ifn:Int):ND = applyderiv(a, b, null, ifn)
       
-  def applyderiv(a:Mat, b:Mat, out:Mat, ifn:Int):Mat = {
+  def applyderiv(a:ND, b:ND, out:ND, ifn:Int):ND = {
 	  Mat.nflops += 1L * a.length * bwdflops(ifn);
-    if (a.nrows != b.nrows || a.ncols != b.ncols) {
-      throw new RuntimeException("applyderiv rows or columns dont match (%d %d) (%d %d" format (a.nrows, a.ncols, b.nrows, b.ncols));
-    }
+	  checkdims(a.dims, b.dims);
+    checkdims(a.dims, out.dims);
     (a, b) match {
-      case (af:FMat, bf:FMat) => {
-        val omat = FMat.newOrCheckFMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
-        CPUMACH.applyderiv(af.data, bf.data, omat.data, ifn, a.length, Mat.numThreads);
-        omat
+      case (af:FND, bf:FND) => {
+        val oND = FND.newOrCheckFND(a.dims, out, a.GUID, ifn, "LayerFn".##);
+        CPUMACH.applyderiv(af.data, bf.data, oND.data, ifn, a.length, Mat.numThreads);
+        oND
       }
-      case (ag:GMat, bg:GMat) => {
-        val omat = GMat.newOrCheckGMat(a.nrows, a.ncols, out, a.GUID, ifn, "LayerFn".##);
-        CUMACH.applyderiv(ag.data, bg.data, omat.data, ifn, a.length);
-        omat
+      case (ag:GND, bg:GND) => {
+        val oND = GND.newOrCheckGND(a.dims, out, a.GUID, ifn, "LayerFn".##);
+        CUMACH.applyderiv(ag.data, bg.data, oND.data, ifn, a.length);
+        oND
       }
     }
   }

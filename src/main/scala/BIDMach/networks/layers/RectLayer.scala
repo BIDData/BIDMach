@@ -24,7 +24,7 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 	override def forward = {
       val start = toc;
 			createOutput;
-			output <-- max(inputData, 0f);
+			output.asMat <-- max(inputData.asMat, 0f);
 			clearDeriv;
 			forwardtime += toc - start;
 	}
