@@ -40,7 +40,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
         deriv.asMat ~ zero - output.asMat;
         val inds = target + coloffsets;
-			  deriv(inds) = deriv(inds) + 1f;               // deriv = target - preds
+			  deriv.asMat(inds) = deriv.asMat(inds) + 1f;               // deriv = target - preds
         inputDeriv ~ inputDeriv + deriv; 
       }
 		  backwardtime += toc - start;
