@@ -66,8 +66,6 @@ case class Learner(
   }
     
   def train = {
-    setup
-    init
     retrain
   }
    
@@ -79,6 +77,7 @@ case class Learner(
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
+    firstPass(null);
     while (ipass < opts.npasses && ! done) {
       nextPass(null);
     }

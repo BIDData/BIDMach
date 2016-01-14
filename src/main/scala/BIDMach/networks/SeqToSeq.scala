@@ -126,7 +126,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (OOVelem.asInstanceOf[AnyRef] == null) {
       OOVelem = convertMat(iones(1,1) * opts.OOVsym);
     }
-    in ~ in + ((in > opts.nvocab) ∘ (OOVelem - in))
+    in ~ in + ((in >= opts.nvocab) ∘ (OOVelem - in))
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
