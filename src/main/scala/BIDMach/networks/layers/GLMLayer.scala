@@ -46,8 +46,8 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 	}
 
 	override def score:FMat = { 
-			val v = GLM.llfun(output.asMat, target, ilinks, totflops);
-			FMat(mean(v, 2));
+			val v = if (target.asInstanceOf[AnyRef] != null) GLM.llfun(output.asMat, target, ilinks, totflops) else row(0);
+			FMat(mean(mean(v, 2)));
 	}
   
   override def toString = {

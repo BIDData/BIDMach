@@ -48,8 +48,8 @@ import BIDMach.networks._
  * In other words, the options classes allow construction of a mirror of the actual network topology. This allows patterns of
  * structure to be repeated using a single Options graph structure. 
  * 
- * Each LayerOptions instance has up to two inputs which are other LayerOptions instances (or null). This graph structure can be cyclic. 
- * When the model is created, the Layer structure mimics the LayerOptions structure. 
+ * Each NodeSet instance has up to two inputs which are other NodeSet instances (or null). This graph structure can be cyclic. 
+ * When the model is created, the Layer structure mimics the NodeSet structure. 
  * 
  * You can also create the Layer graph directly using the "setinput()" method in each layer. 
  */
@@ -169,24 +169,24 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
 
 trait OutputLayer {}
 
-class LayerOptions(val nlayers:Int) extends Serializable {
+class NodeSet(val nnodes:Int) extends Serializable {
   
-  val layerOptionss = new Array[Node](nlayers);
+  val nodes = new Array[Node](nnodes);
   
-  def apply(i:Int):Node = layerOptionss(i);
+  def apply(i:Int):Node = nodes(i);
   
-  def update(i:Int, lopts:Node) = {layerOptionss(i) = lopts; this}
+  def update(i:Int, lopts:Node) = {nodes(i) = lopts; this}
   
-  override def clone = copyTo(new LayerOptions(nlayers));
+  override def clone = copyTo(new NodeSet(nnodes));
   
-  def copyTo(lopts:LayerOptions):LayerOptions = {
-    for (i <- 0 until nlayers) {
-      lopts.layerOptionss(i) = layerOptionss(i).clone;
-      layerOptionss(i).myGhost = lopts.layerOptionss(i);
+  def copyTo(lopts:NodeSet):NodeSet = {
+    for (i <- 0 until nnodes) {
+      lopts.nodes(i) = nodes(i).clone;
+      nodes(i).myGhost = lopts.nodes(i);
     }
-    for (i <- 0 until nlayers) {
-      for (j <- 0 until layerOptionss(i).inputs.length) {
-      	if (layerOptionss(i).inputs(j) != null) lopts.layerOptionss(i).inputs(j) = layerOptionss(i).inputs(j).node.myGhost;
+    for (i <- 0 until nnodes) {
+      for (j <- 0 until nodes(i).inputs.length) {
+      	if (nodes(i).inputs(j) != null) lopts.nodes(i).inputs(j) = nodes(i).inputs(j).node.myGhost;
       }
     }
     lopts;

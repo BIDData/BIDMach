@@ -10,10 +10,8 @@ val (ss, ii) = sort2(rr);
 val a = a0(?,ii);
 val c = c0(?,ii);
 
-val ta = loadSMat(dir + "testdocs.smat.lz4")(0->100000,?)
-val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,?)
-
-val pc = zeros(tc.nrows, tc.ncols)
+val ta = loadSMat(dir + "testdocs.smat.lz4")(0->100000,0->23000)
+val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,0->23000)
 
 val opts = new Net.LearnOptions
 
@@ -28,19 +26,22 @@ opts.lrate = 0.2f
 opts.texp = 0.4f
 opts.nweight = 1e-4f
 
-val net = Net.dlayers4(7,500,0.5f,100,opts,2);
+val net = Net.dnodes4(7,500,0.5f,100,opts,2);
 
-val (nn,opts0) = Net.learnerX(net,a,c);
+val (nn,opts0) = Net.learnerX(a,c);
+opts0.nodeset = net
+val dnn = nn.model.asInstanceOf[Net]
 
 nn.train
 
-val dnn = nn.model.asInstanceOf[Net]
 
-val (mm,mopts) = Net.predictor(dnn, ta, pc);
+val (mm,mopts) = Net.predictor(dnn, ta);
+val dmm = mm.model.asInstanceOf[Net]
 mopts.batchSize=1000
 
-
 mm.predict
+
+val pc = FMat(mm.preds(0))
 
 val rc = roc2(pc, tc, 1-tc, 1000)
 val counts = sum(tc,2);
