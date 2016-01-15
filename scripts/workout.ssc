@@ -6,7 +6,7 @@ var useGPU=true
 var doTwitter=false
 
 println("\n<<<<<<< Testing with GPU >>>>>>>")
-//:load workout_slave.ssc
+:load workout_slave.ssc
 
 println("\n<<<<<<< Testing without GPU >>>>>>>")
 useGPU = false
