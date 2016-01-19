@@ -126,7 +126,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (OOVelem.asInstanceOf[AnyRef] == null) {
       OOVelem = convertMat(iones(1,1) * opts.OOVsym);
     }
-    in ~ in + ((in > opts.nvocab) ∘ (OOVelem - in))
+    in ~ in + ((in >= opts.nvocab) ∘ (OOVelem - in))
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
@@ -161,7 +161,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       getlayer(0, inwidth + i).output = cols;
     }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
-      leftedge.output = convertMat(zeros(opts.dim, batchSize));
+      leftedge.output = convertMat(zeros(opts.dim \ batchSize));
     }
   }
   
@@ -169,10 +169,10 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 	  for (i <- 0 until height) {
 		  val leftlayer = getlayer(i+preamble_rows, inwidth-srcn-1);
 		  if (leftlayer.output.asInstanceOf[AnyRef] == null) {
-			  leftlayer.output = convertMat(zeros(opts.dim, batchSize));
+			  leftlayer.output = convertMat(zeros(opts.dim \ batchSize));
 		  }
 		  if (leftlayer.outputs(1).asInstanceOf[AnyRef] == null) {
-			  leftlayer.setOutput(1, convertMat(zeros(opts.dim, batchSize)));
+			  leftlayer.setOutput(1, convertMat(zeros(opts.dim \ batchSize)));
 		  }       
 	  }
   }

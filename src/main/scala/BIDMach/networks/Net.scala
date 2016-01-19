@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GS
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
@@ -15,7 +16,7 @@ import java.util.HashMap;
 /**
  * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. 
  *
- * The network topology is specified by opts.layers which is a sequence of "LayerOptions" objects. There is a LayerOptions
+ * The network topology is specified by opts.layers which is a sequence of "NodeSet" objects. There is a NodeSet
  * Class for each Layer class, which holds the params for defining that layer. There is also an inputs parameter which points
  * to the set of Node instances that mirror the final network structure. 
  *
@@ -67,16 +68,16 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
   
   def createLayers = {
-    val layerOptionss = opts.layers.layerOptionss;
-    layers = new Array[Layer](opts.layers.nlayers);
-    for (i <- 0 until opts.layers.nlayers) {
-      layers(i) = layerOptionss(i).create(this);
-      layerOptionss(i).myLayer = layers(i);
+    val nodes = opts.nodeset.nodes;
+    layers = new Array[Layer](opts.nodeset.nnodes);
+    for (i <- 0 until opts.nodeset.nnodes) {
+      layers(i) = nodes(i).create(this);
+      nodes(i).myLayer = layers(i);
     }
-    for (i <- 0 until opts.layers.nlayers) {
-    	for (j <- 0 until layerOptionss(i).inputs.length) {
-    		if (layerOptionss(i).inputs(j) != null) {
-    			val nodeTerm = layerOptionss(i).inputs(j);
+    for (i <- 0 until opts.nodeset.nnodes) {
+    	for (j <- 0 until nodes(i).inputs.length) {
+    		if (nodes(i).inputs(j) != null) {
+    			val nodeTerm = nodes(i).inputs(j);
     			layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
         }
     	}
@@ -90,7 +91,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
-  	} else {
+  	} else if (gmats.length > 1) {
   		layers(layers.length-1).target = full(gmats(1));
   	}
   }
@@ -157,6 +158,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		var j = 0;
       while (j < output_layers.length) {
         scores(j) = output_layers(j).score.v;
+        if (ogmats != null && j < ogmats.length) ogmats(j) = output_layers(j).output.asMat;
         j += 1;
       }
       scores;
@@ -226,108 +228,108 @@ object Net  {
     var hasBias:Boolean = false;
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
-    var layers:LayerOptions = null;
+    var nodeset:NodeSet = null;
   }
   
   class Options extends Opts {}
   
   
   /**
-   * Build a net with a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are Linear alternating with Rect, starting and ending with Linear. 
-   * First Linear layer width is given as an argument, then it tapers off by taper.
+   * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
+   * Intermediate nodes are Linear alternating with Rect, starting and ending with Linear. 
+   * First Linear node width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
-    val depth = (depth0/2)*2 + 1;              // Round up to an odd number of layers 
-    val layers = new LayerOptions(depth);
+  def dnodes(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
+    val depth = (depth0/2)*2 + 1;              // Round up to an odd number of nodes 
+    val nodes = new NodeSet(depth);
     var w = width;
-    layers(0) = new InputNode;
+    nodes(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	if (i % 2 == 1) {
-    		layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    		nodes(i) = new LinNode{inputs(0) = nodes(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
+    	    case 1 => nodes(i) = new TanhNode{inputs(0) = nodes(i-1)};
+    	    case 2 => nodes(i) = new SigmoidNode{inputs(0) = nodes(i-1)};
+    	    case 3 => nodes(i) = new RectNode{inputs(0) = nodes(i-1)};
+    	    case 4 => nodes(i) = new SoftplusNode{inputs(0) = nodes(i-1)};
     	  }
     	}
     }
-    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
-    layers;
+    nodes(depth-2) = new LinNode{inputs(0) = nodes(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
+    nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
+    nodes;
   }
   
   /**
-   * Build a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are linear, Rect, Norm, starting and ending with Linear. 
-   * First Linear layer width is given as an argument, then it tapers off by taper.
+   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
+   * Intermediate nodes are linear, Rect, Norm, starting and ending with Linear. 
+   * First Linear node width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
-    val depth = (depth0/3)*3;              // Round up to an odd number of layers 
-    val layers = new LayerOptions(depth);
+  def dnodes3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
+    val depth = (depth0/3)*3;              // Round up to an odd number of nodes 
+    val nodes = new NodeSet(depth);
     var w = width;
-    layers(0) = new InputNode;
+    nodes(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	if (i % 3 == 1) {
-    		layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    		nodes(i) = new LinNode{inputs(0) = nodes(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     		w = (taper*w).toInt;
     	} else if (i % 3 == 2) {
     	  nonlin match {
-    	    case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
-    	    case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
-    	    case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
-    	    case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
+    	    case 1 => nodes(i) = new TanhNode{inputs(0) = nodes(i-1)};
+    	    case 2 => nodes(i) = new SigmoidNode{inputs(0) = nodes(i-1)};
+    	    case 3 => nodes(i) = new RectNode{inputs(0) = nodes(i-1)};
+    	    case 4 => nodes(i) = new SoftplusNode{inputs(0) = nodes(i-1)};
     	  }
     	} else {
-    		layers(i) = new NormNode{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    		nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     }
-    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
-    layers;
+    nodes(depth-2) = new LinNode{inputs(0) = nodes(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
+    nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
+    nodes;
   }
   
   /**
-   * Build a stack of layers. layer(0) is an input layer, layer(n-1) is a GLM layer. 
-   * Intermediate layers are Linear, Rect, Norm, Dropout, starting and ending with Linear. 
-   * First Linear layer width is given as an argument, then it tapers off by taper.
+   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
+   * Intermediate nodes are Linear, Rect, Norm, Dropout, starting and ending with Linear. 
+   * First Linear node width is given as an argument, then it tapers off by taper.
    */
   
-  def dlayers4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):LayerOptions = {
-    val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of layers 
-    val layers = new LayerOptions(depth);
+  def dnodes4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
+    val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of nodes 
+    val nodes = new NodeSet(depth);
     var w = width;
-    layers(0) = new InputNode;
+    nodes(0) = new InputNode;
     for (i <- 1 until depth - 2) {
     	(i % 4) match {
     	  case 1 => {
-    	  	layers(i) = new LinNode{inputs(0) = layers(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
+    	  	nodes(i) = new LinNode{inputs(0) = nodes(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
     	  	w = (taper*w).toInt;
     	  }
     	  case 2 => {
     	  	nonlin match {
-    	  	case 1 => layers(i) = new TanhNode{inputs(0) = layers(i-1)};
-    	  	case 2 => layers(i) = new SigmoidNode{inputs(0) = layers(i-1)};
-    	  	case 3 => layers(i) = new RectNode{inputs(0) = layers(i-1)};
-    	  	case 4 => layers(i) = new SoftplusNode{inputs(0) = layers(i-1)};
+    	  	case 1 => nodes(i) = new TanhNode{inputs(0) = nodes(i-1)};
+    	  	case 2 => nodes(i) = new SigmoidNode{inputs(0) = nodes(i-1)};
+    	  	case 3 => nodes(i) = new RectNode{inputs(0) = nodes(i-1)};
+    	  	case 4 => nodes(i) = new SoftplusNode{inputs(0) = nodes(i-1)};
     	  	}
     	  }
     	  case 3 => {
-    	  	layers(i) = new NormNode{inputs(0) = layers(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    	  	nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
       }
     	  case _ => {
-    	  	layers(i) = new DropoutNode{inputs(0) = layers(i-1); frac = opts.dropout};
+    	  	nodes(i) = new DropoutNode{inputs(0) = nodes(i-1); frac = opts.dropout};
     	  }
     	}
     }
-    layers(depth-2) = new LinNode{inputs(0) = layers(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
-    layers(depth-1) = new GLMNode{inputs(0) = layers(depth-2); links = opts.links};
-    layers;
+    nodes(depth-2) = new LinNode{inputs(0) = nodes(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
+    nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
+    nodes;
   }
   
   def mkNetModel(fopts:Model.Opts) = {
@@ -412,7 +414,7 @@ object Net  {
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
     val ds = new FileSource(opts)
-    val net = dlayers(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-layer network
+    val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
   	val nn = new Learner(
   			ds, 
   	    new Net(opts), 
@@ -422,27 +424,30 @@ object Net  {
   	    opts)
     (nn, opts)
   }
+
   
-  def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
+  class PredOptions extends Learner.Options with Net.Opts with MatSource.Opts with MatSink.Opts
+  
+  def predictor(model0:Model, mat0:Mat):(Learner, PredOptions) = {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
-    val opts = new LearnOptions;
+    val opts = new PredOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1);
     opts.links = mopts.links;
-    opts.layers = mopts.layers;
+    opts.nodeset = mopts.nodeset.clone;
+    opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
     opts.hasBias = mopts.hasBias;
-    opts.putBack = 1;
     opts.dropout = 1f;
     
     val newmod = new Net(opts);
     newmod.refresh = false;
     newmod.copyFrom(model)
     val nn = new Learner(
-        new MatSource(Array(mat0, preds), opts), 
+        new MatSource(Array(mat0), opts), 
         newmod, 
         null,
         null, 
-        null,
+        new MatSink(opts),
         opts);
     (nn, opts)
   }

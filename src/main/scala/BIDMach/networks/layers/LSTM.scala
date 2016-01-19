@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,ND,SBMat,CMat,CSMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -18,8 +18,8 @@ import scala.collection.mutable.HashMap;
 
 class LSTMLayer(override val net:Net, override val opts:LSTMNode = new LSTMNode) extends CompoundLayer(net, opts) {
 	override val _inputs = new Array[LayerTerm](3);
-	override val _outputs = new Array[Mat](2);
-	override val _derivs = new Array[Mat](2);
+	override val _outputs = new Array[ND](2);
+	override val _derivs = new Array[ND](2);
   
   override def toString = {
     "LSTM@"+Integer.toHexString(hashCode % 0x10000).toString

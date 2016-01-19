@@ -21,7 +21,7 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
   var fprogress:Float = 0
   var inMats:Array[Mat] = null;
   var inFname:Array[String] = null;
-  var iter:Iterator[(AnyRef, MatIOtrait)] = null;
+  @transient var iter:Iterator[(AnyRef, MatIOtrait)] = null;
   var nblocks = -1;
   var iblock = 0;
   
@@ -164,9 +164,9 @@ object IteratorSource {
   trait Opts extends DataSource.Opts {
     var nmats = 1;
     var dorows:Boolean = false
-    var iter:Iterator[Tuple2[AnyRef, MatIOtrait]] = null;
+    @transient var iter:Iterator[Tuple2[AnyRef, MatIOtrait]] = null;
     var eltsPerSample = 10;
-    var throwMissing:Boolean = false
+    var throwMissing:Boolean = false; 
   }
   
   class Options extends Opts {}
