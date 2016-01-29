@@ -1,3 +1,0 @@
-int cols
-int rows
-float vals

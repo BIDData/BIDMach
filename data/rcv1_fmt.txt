@@ -1,3 +1,0 @@
-word catname
-int docid
-int dmy
