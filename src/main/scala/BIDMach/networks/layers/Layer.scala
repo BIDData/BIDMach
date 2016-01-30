@@ -98,6 +98,8 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def setOutput(i:Int, v:ND):Layer = {_outputs(i) = v; this}
   def setDeriv(i:Int, v:ND):Layer = {_derivs(i) = v; this}
   def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v; this}
+  def setInputs(v0:LayerTerm, v1:LayerTerm) = {_inputs(0)=v0; _inputs(1)=v1; this}
+  def setInputs(v0:LayerTerm, v1:LayerTerm, v2:LayerTerm) = {_inputs(0)=v0; _inputs(1)=v1; _inputs(2)=v2; this}
   
   // Setters and getters for the first input or output
   def input = _inputs(0);

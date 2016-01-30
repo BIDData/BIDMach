@@ -17,7 +17,7 @@ import BIDMach.networks._
 
 
 @SerialVersionUID(100L)
-trait NodeOpts extends Serializable {
+trait NodeOpts extends BIDMat.Opts {
   var name = "";  
   
   def copyOpts(opts:NodeOpts):NodeOpts = {
@@ -145,9 +145,10 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
-  def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm)(opts:LSTMNodeOpts) = {
+  def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm, m:String)(opts:LSTMNodeOpts) = {
     val n = new LSTMNode;
     opts.copyOpts(n);
+    n.modelName = m;
     n.constructGraph;
     n.inputs(0) = h;
     n.inputs(1) = c;
