@@ -134,10 +134,8 @@ elif [ "$OS" = "linux" ] ; then
 	GCC="g++"
 	NVCC="nvcc" 
 	NVCCFLAGS="-c -use_fast_math  -I$BIDMACH_ROOT/jni/include \
-          -gencode arch=compute_30,code=sm_30 \
-          -gencode arch=compute_35,code=sm_35 \
-          -gencode arch=compute_50,code=sm_50 \
-          -gencode arch=compute_52,code=sm_52 \
+          -gencode arch=compute_32,code=sm_32 \
+          -gencode arch=compute_53,code=sm_53 \
           --machine ${MBITS}  -Xcompiler \"-fPIC -c -O2 -g -march=${ARMARCH} -DNDEBUG\""
 	OBJ="o"
 	OUTFLG="-o "
