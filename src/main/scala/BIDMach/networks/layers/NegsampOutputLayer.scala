@@ -51,7 +51,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
     if (iexpt.asInstanceOf[AnyRef] == null) iexpt = convertMat(row(1f/(1f-opts.expt)));
     if (onerow.asInstanceOf[AnyRef] == null) onerow = convertMat(ones(1, inputData.ncols));
     val mm = modelmats(imodel); 
-    inputMat = if (opts.hasBias) (inputData on onerow) else inputData;
+    inputMat = if (opts.hasBias) (inputData.asMat on onerow) else inputData.asMat;
     
     rand(randwords);                                                          // Compute some random negatives
     val irandwords = min(nfeats-2, int((nfeats - 1) * (randwords ^ iexpt)));  // produce power-law values with exponent expt
@@ -62,13 +62,13 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
     prods = DDS(mm, inputMat, indmat);
     output = prods.contents.view(opts.nsamps+1, inputData.ncols);
 
-    output ~ output - maxi(output)
+    output.asMat ~ output.asMat - maxi(output.asMat)
     exp(output, output);  // ensures sum(exps) is between 1 and nfeats
     if (opts.docorrect) {
       output(opts.nsamps, ?) = output(opts.nsamps, ?) * (1/correction);
     }
-    val sout = sum(output);
-    output ~ output / sout;
+    val sout = sum(output.asMat);
+    output.asMat ~ output.asMat / sout;
     forwardtime += toc - start;
   }
 
@@ -81,7 +81,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
 		val um = updatemats(imodel);
 		
 		deriv = targMat - output;
-		prods.contents <-- deriv.contents;  
+		prods.contents <-- deriv.asMat.contents;  
 		inputMat.madd(prods, um, false, true);
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			if (opts.hasBias) {
@@ -89,7 +89,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
 				if (irange.asInstanceOf[AnyRef] == null) irange = convertMat(icol(0->inputData.nrows));
 				inputDeriv ~ inputDeriv + inputMat(irange, ?);
 			} else {
-				mm.madd(prods, inputDeriv);
+				mm.madd(prods, inputDeriv.asMat);
 			}
 		}
 		backwardtime += toc - start;
@@ -115,8 +115,8 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
   override def score:FMat = {
     if (opts.scoreType < 2) {
       opts.scoreType match {
-        case 0 => FMat(mean(ln(output(opts.nsamps, ?))));
-        case 1 => FMat(mean(output(opts.nsamps, ?) == maxi(output)));
+        case 0 => FMat(mean(ln(output.asMat(opts.nsamps, ?))));
+        case 1 => FMat(mean(output.asMat(opts.nsamps, ?) == maxi(output.asMat)));
       }    	   
     } else {
       val mprod = modelmats(imodel) ^* inputMat;

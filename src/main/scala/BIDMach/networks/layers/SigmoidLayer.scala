@@ -30,9 +30,9 @@ class SigmoidLayer(override val net:Net, override val opts:SigmoidNodeOpts = new
 }
 
   override def backward = {
-		  val start = toc;
-		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.SIGMOIDFN);
-		  backwardtime += toc - start;
+		val start = toc;
+		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.SIGMOIDFN);
+		backwardtime += toc - start;
   }
   
   override def toString = {

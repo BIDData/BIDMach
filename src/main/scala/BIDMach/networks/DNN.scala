@@ -346,11 +346,7 @@ class DNN(override val opts:DNN.Opts = new DNN.Options) extends Model(opts) {
       if (opts.predict) {
       	data ~ input.data * frac;
       } else {
-      	if (useGPU) {
-      		grand(randmat.asInstanceOf[GMat]); 
-      	} else {
-      		rand(randmat.asInstanceOf[FMat]);
-      	}
+      	rand(randmat);
       	randmat ~ (randmat < frac)
       	data ~ input.data ∘ randmat;
       }

@@ -77,15 +77,16 @@ opts5.useGPU = useGPU
 opts5.lambdam = 0.025f
 opts5.lambdau = 1f
 opts5.regumean = 0.1f;
-opts5.uiter = 8
+opts5.uiter = 4
 opts5.npasses=5
 opts5.batchSize = 1000
-opts5.langevin = 3f
+opts5.langevin = 0.3f
 
 mm5.train
 
 val (nn5,nopts5) = SFA.predictor(mm5.model,a5,fact5,ta5)
 nopts5.batchSize = 10000;
+nopts5.uiter = 3;
 
 nn5.predict
 val pa5 = SMat(nn5.preds(1))

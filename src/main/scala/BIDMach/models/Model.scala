@@ -1,5 +1,5 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -211,6 +211,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def updatePass(ipass:Int) = {}
   
   def convertMat(a:Mat):Mat = {
+  	Model.convertMat(a, useGPU, opts.useDouble).asInstanceOf[Mat];
+  }
+  
+  def convertMat(a:ND):ND = {
   	Model.convertMat(a, useGPU, opts.useDouble);
   }
 }
@@ -229,7 +233,7 @@ object Model {
 	
 	class Options extends Opts {} 
   
-  def convertMat(a:Mat, useGPU:Boolean, useDouble:Boolean):Mat = {	
+  def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {	
 	   a match {
       case f:FMat =>
       if (useGPU) {
@@ -289,6 +293,16 @@ object Model {
       	} else {
       		SMat(g);
       	}
+      }
+      case g:FND => if (useGPU) {
+      	GND(g);
+      } else {
+      	g
+      }
+      case g:GND => if (useGPU) {
+      	g
+      } else {
+      	FND(g)
       }
     }
   }

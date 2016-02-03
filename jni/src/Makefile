@@ -14,7 +14,7 @@ cudalib: $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 cpulib: $(LIBPREPEND)bidmachcpu$(LIBAPPEND) 
 
 $(LIBPREPEND)bidmachcpu$(LIBAPPEND): $(CPU_OBJS)
-	$(LD) $(LDFLAGS) $(CPU_OBJS) $(MKL_LIBS) $(OUTFLG)$@
+	$(LD) $(LDFLAGS) $(CPU_OBJS) $(CPU_LIBS) $(OUTFLG)$@
 
 $(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(CUDA_OBJS)
 	$(GLD) $(LDFLAGS) $(CUDA_OBJS) $(CUDA_LIBS) $(OUTFLG)$@

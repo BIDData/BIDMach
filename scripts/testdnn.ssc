@@ -25,7 +25,7 @@ opts.lrate = 0.4f // best for 6-layer
 opts.lrate = 0.2f 
 opts.texp = 0.4f
 opts.nweight = 1e-4f
-opts.useGPU = false
+//opts.useGPU = false
 DNN.dlayers4(7,500,0.5f,100,opts,2)
 
 nn.train
