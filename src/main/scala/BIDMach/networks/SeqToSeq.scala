@@ -25,6 +25,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var dstGrid:LayerMat = null;
   var srcNodeGrid:NodeMat = null;
   var dstNodeGrid:NodeMat = null;
+  var srcgridopts:LSTMNode.GridOpts = null;
+  var dstgridopts:LSTMNode.GridOpts = null;
   var height = 0;
 //  var fullheight = 0;
   var inwidth = 0;
@@ -41,12 +43,12 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     outwidth = opts.outwidth;
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros   
     
-    var srcgridopts = new LSTMNode.GridOpts;
+    srcgridopts = new LSTMNode.GridOpts;
     srcgridopts.copyFrom(opts);
     srcgridopts.modelName = "src_level%d";
     srcgridopts.netType = LSTMNode.gridTypeNoOutput;
     
-    var dstgridopts = new LSTMNode.GridOpts;
+    dstgridopts = new LSTMNode.GridOpts;
     srcgridopts.copyFrom(opts);
     dstgridopts.modelName = "dst_level%d";
     dstgridopts.netType = LSTMNode.gridTypeSoftmaxOutput;
