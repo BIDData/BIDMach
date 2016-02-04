@@ -34,20 +34,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var dstxn = 0;
   var dstyn = 0;
   val preamble_rows = 2;
-  // define some getters/setters on the grid
-//  var heightDiff = 2;
-//  def lindex(r:Int, c:Int) = if (c < inwidth) (r + c * fullheight) else (inwidth * fullheight + r + (c - inwidth) * (fullheight + heightDiff));
-//  def getlayer(r:Int, c:Int):Layer = layers(lindex(r,c));
-//  def setlayer(r:Int, c:Int, ll:Layer) = {layers(lindex(r,c)) = ll};
 	
 	override def createLayers = {
     height = opts.height;
-//    heightDiff = if (opts.netType == 0) 2 else 1;
-//	  fullheight = height + preamble_rows;
 	  inwidth = opts.inwidth; 
     outwidth = opts.outwidth;
-//    width = inwidth + outwidth;
-//    layers =  new Array[Layer](fullheight * width + outwidth * heightDiff);
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros   
     
     var srcgridopts = new LSTMNode.GridOpts;

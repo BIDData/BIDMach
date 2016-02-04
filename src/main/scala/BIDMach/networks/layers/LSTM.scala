@@ -31,7 +31,7 @@ trait LSTMNodeOpts extends CompoundNodeOpts {
     var kind = 1;
     var hasBias = false;  
     var scoreType = 0;
-    var outDim = 0;
+    var outdim = 0;
 }
 
 class LSTMNode extends CompoundNode with LSTMNodeOpts {	
@@ -287,6 +287,7 @@ object LSTMNode {
   def grid(nrows:Int, ncols:Int, opts:GridOpts):NodeMat = {
     import BIDMach.networks.layers.Node._
     val nlin = 2;
+    val odim = opts.outdim
     val nsoft = opts.netType match {
       case `gridTypeNoOutput` => 0;
       case `gridTypeNegsampOutput` => 1;
@@ -321,13 +322,13 @@ object LSTMNode {
       case `gridTypeNoOutput` => {}
       case `gridTypeSoftmaxOutput` => {
         for (k <- 0 until ncols) {
-        	gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=opts.outDim, hasBias = opts.hasBias)
+        	gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias = opts.hasBias)
           gr(nrows + nlin + 1, k) = softmaxout(gr(nrows + nlin, k))(opts.scoreType);
         }
       }
       case `gridTypeNegsampOutput` => {
         for (k <- 0 until ncols) {
-          gr(nrows + nlin, k) = negsamp(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=opts.outDim, hasBias=opts.hasBias, scoreType=opts.scoreType)
+          gr(nrows + nlin, k) = negsamp(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias=opts.hasBias, scoreType=opts.scoreType)
         }
       }
     }
