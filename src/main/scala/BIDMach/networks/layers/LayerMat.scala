@@ -204,13 +204,16 @@ object LayerMat {
           if (n(j, i) != null) {
             val inputs = n(j, i).inputs;
             for (k <- 0 until inputs.length) {
-              val layer = inputs(k).node.myLayer;
-              val layerTerm = if (inputs(k).term != 0) {
-                new LayerTerm(layer, inputs(k).term)
-              } else {
-                layer;
+              val input = inputs(k);
+              if (input != null) {
+              	val layer = input.node.myLayer;
+              	val layerTerm = if (input.term != 0) {
+              		new LayerTerm(layer, input.term)
+              	} else {
+              		layer;
+              	}
+              	mat(j, i).setInput(k, layerTerm);
               }
-              mat(j, i).setInput(k, layerTerm);
             }
           }
         }
