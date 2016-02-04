@@ -129,7 +129,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         output_layers(j) = nslayer;
       }    
     }*/
-    
+    layers = srcGrid.data.filter(_ != null) ++ dstGrid.data.filter(_ != null)
     output_layers = new Array[Layer](outwidth);
     for (i <- 0 until outwidth) output_layers(i) = dstGrid(dstGrid.nrows-1, i);
   }
