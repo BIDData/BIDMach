@@ -168,7 +168,7 @@ case class LayerMat(override val nrows:Int, override val ncols:Int, override val
 	}
 	
 	def backward(col1:Int, col2:Int, debug:Int, ipass:Int, ipos:Long) = {
-		for (i <- col2 to col2 by -1) {
+		for (i <- col2 to col1 by -1) {
 			for (j <- (nrows-1) to 0 by -1) {
 				if (debug > 0) {
 					println("  backward (%d,%d) %s" format (j, i, apply(j, i).getClass))
