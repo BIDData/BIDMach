@@ -129,7 +129,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
              h_on_i  \   lin4   \  in_sat       \  null     \  null;
     	
     	val lopts = grid.data;
-    	lopts.map(_.parent = this);
+    	lopts.map((x:Node) => if (x != null) x.parent = this);
     	outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));
     	
     }
