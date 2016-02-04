@@ -92,7 +92,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
                                                 lin4   \  lin8    \   sum4   \   in_sat       \  null     \  null);
     	
     	val lopts = grid.data;
-    	lopts.map(_.parent = this);
+    	lopts.map((x:Node) => if (x != null) x.parent = this);
     	outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));
 	  }
 	     
@@ -164,7 +164,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
              h_on_i  \   null   \  in_sat       \  null     \  null;
       
       val lopts = grid.data;      
-      lopts.map(_.parent = this);
+      lopts.map((x:Node) => if (x != null) x.parent = this);
       outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));                   // Specifies the output layer numbers (next_h and next_c)
     }
     
@@ -200,7 +200,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
              h_on_i  \   sp2    \  in_sat       \  null     \  null;
       
       val lopts = grid.data;      
-      lopts.map(_.parent = this);
+      lopts.map((x:Node) => if (x != null) x.parent = this);
       outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));                   // Specifies the output layer numbers (next_h and next_c)
     }
     
@@ -240,7 +240,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
                                                  spi    \  lin4   \  in_sat       \  null     \  null);
       
       val lopts = grid.data;      
-      lopts.map(_.parent = this);
+      lopts.map((x:Node) => if (x != null) x.parent = this);
       outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));                   // Specifies the output layer numbers (next_h and next_c)
     }
 	  
@@ -288,9 +288,9 @@ object LSTMNode {
     import BIDMach.networks.layers.Node._
     val nlin = 2;
     val nsoft = opts.netType match {
-      case 0 => 0;
-      case 1 => 1;
-      case 2 => 2;
+      case `gridTypeNoOutput` => 0;
+      case `gridTypeNegsampOutput` => 1;
+      case `gridTypeSoftmaxOutput` => 2;
     }
     val gr = NodeMat(nrows + nlin + nsoft, ncols);
     
