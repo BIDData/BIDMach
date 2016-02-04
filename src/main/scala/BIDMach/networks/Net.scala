@@ -45,7 +45,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  	modelMap = new HashMap[String,Int];
 	  }
 	  imodel = 0;
-	  layers.map(_.getModelMats(this));
+	  layers.map((x:Layer) => if (x != null)x.getModelMats(this));
 	  if (refresh) {
 	  	setmodelmats(new Array[Mat](imodel + modelMap.size));
 	  }
