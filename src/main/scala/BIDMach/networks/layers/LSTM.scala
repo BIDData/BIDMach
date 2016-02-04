@@ -32,6 +32,16 @@ trait LSTMNodeOpts extends CompoundNodeOpts {
     var hasBias = false;  
     var scoreType = 0;
     var outdim = 0;
+    
+   def copyOpts(opts:LSTMNodeOpts):LSTMNodeOpts = {
+  		super.copyOpts(opts);
+  		opts.dim = dim;
+  		opts.kind = kind;
+  		opts.hasBias = hasBias;
+  		opts.scoreType = scoreType;
+  		opts.outdim = outdim;
+  		opts;
+    }
 }
 
 class LSTMNode extends CompoundNode with LSTMNodeOpts {	
@@ -292,7 +302,8 @@ object LSTMNode {
   def grid(nrows:Int, ncols:Int, opts:GridOpts):NodeMat = {
     import BIDMach.networks.layers.Node._
     val nlin = 2;
-    val odim = opts.outdim
+    val odim = opts.outdim;
+    val idim = opts.dim;
     val nsoft = opts.netType match {
       case `gridTypeNoOutput` => 0;
       case `gridTypeNegsampOutput` => 1;
@@ -307,7 +318,7 @@ object LSTMNode {
     val modelName = opts.modelName;
     
     for (k <- 0 until ncols) {
-    	gr(1, k) = linear(gr(0, k))((modelName format 0) +"_bottom", outdim=opts.dim, hasBias = opts.hasBias)
+    	gr(1, k) = linear(gr(0, k))((modelName format 0) +"_bottom", outdim=idim, hasBias = opts.hasBias)
     }
     
     for (k <- 0 until ncols) {
