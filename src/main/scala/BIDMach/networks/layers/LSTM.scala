@@ -54,20 +54,21 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  	  
 	  def constructGraph0 = {
     	import BIDMach.networks.layers.Node._
+    	val odim = dim;
     		
     	val in_h = copy;
     	val in_c = copy; 
     	val in_i = copy;
 
-    	val lin1 = linear(in_h)(prefix+"LSTM_h_in_gate", outdim=dim, hasBias=hasBias);
-    	val lin2 = linear(in_h)(prefix+"LSTM_h_out_gate", outdim=dim, hasBias=hasBias);   
-    	val lin3 = linear(in_h)(prefix+"LSTM_h_forget_gate", outdim=dim, hasBias=hasBias);
-    	val lin4 = linear(in_h)(prefix+"LSTM_h_tanh_gate", outdim=dim, hasBias=hasBias);
+    	val lin1 = linear(in_h)(prefix+"LSTM_h_in_gate", outdim=odim, hasBias=hasBias);
+    	val lin2 = linear(in_h)(prefix+"LSTM_h_out_gate", outdim=odim, hasBias=hasBias);   
+    	val lin3 = linear(in_h)(prefix+"LSTM_h_forget_gate", outdim=odim, hasBias=hasBias);
+    	val lin4 = linear(in_h)(prefix+"LSTM_h_tanh_gate", outdim=odim, hasBias=hasBias);
     	
-    	val lin5 = linear(in_i)(prefix+"LSTM_i_in_gate", outdim=dim, hasBias=hasBias);
-    	val lin6 = linear(in_i)(prefix+"LSTM_i_out_gate", outdim=dim, hasBias=hasBias);   
-    	val lin7 = linear(in_i)(prefix+"LSTM_i_forget_gate", outdim=dim, hasBias=hasBias);
-    	val lin8 = linear(in_i)(prefix+"LSTM_i_tanh_gate", outdim=dim, hasBias=hasBias);
+    	val lin5 = linear(in_i)(prefix+"LSTM_i_in_gate", outdim=odim, hasBias=hasBias);
+    	val lin6 = linear(in_i)(prefix+"LSTM_i_out_gate", outdim=odim, hasBias=hasBias);   
+    	val lin7 = linear(in_i)(prefix+"LSTM_i_forget_gate", outdim=odim, hasBias=hasBias);
+    	val lin8 = linear(in_i)(prefix+"LSTM_i_tanh_gate", outdim=odim, hasBias=hasBias);
     	
     	val sum1 = lin1 + lin5;
     	val sum2 = lin2 + lin6;
@@ -100,16 +101,17 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     def constructGraph1 = {
     	import BIDMach.networks.layers.Node._
+    	val odim = dim;
     		
     	val in_h = copy;
     	val in_c = copy; 
     	val in_i = copy;
     	val h_on_i = in_h on in_i;
 
-    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=dim, hasBias=hasBias);
-    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=dim, hasBias=hasBias);   
-    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=dim, hasBias=hasBias);
-    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=dim, hasBias=hasBias);
+    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=odim, hasBias=hasBias);
+    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=odim, hasBias=hasBias);   
+    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=odim, hasBias=hasBias);
+    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=odim, hasBias=hasBias);
     	
     	val in_gate = σ(lin1);
     	val out_gate = σ(lin2);
@@ -137,13 +139,14 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     // LSTM with 1 linear layer, with h and i stacked as inputs, and all 4 output stacked
     
     def constructGraph2 = {
-     import BIDMach.networks.layers.Node._      
+      import BIDMach.networks.layers.Node._   
+      val odim = dim;
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
       val h_on_i = in_h on in_i;
       
-      val lin = linear(h_on_i)(prefix+"LSTM_all", outdim=4*dim, hasBias=hasBias);
+      val lin = linear(h_on_i)(prefix+"LSTM_all", outdim=4*odim, hasBias=hasBias);
       val sp = splitvert(lin, 4);
       
       val in_gate = σ(sp(0));
@@ -172,14 +175,15 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     def constructGraph3 = {
       import BIDMach.networks.layers.Node._
+      val odim = dim;
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
       val h_on_i = in_h on in_i;
       
-      val lin1 = linear(h_on_i)(prefix+"LSTM_in_out", outdim=2*dim, hasBias=hasBias);
+      val lin1 = linear(h_on_i)(prefix+"LSTM_in_out", outdim=2*odim, hasBias=hasBias);
       val sp1 = splitvert(lin1, 2);
-      val lin2 = linear(h_on_i)(prefix+"LSTM_forget_tanh", outdim=2*dim, hasBias=hasBias);
+      val lin2 = linear(h_on_i)(prefix+"LSTM_forget_tanh", outdim=2*odim, hasBias=hasBias);
       val sp2 = splitvert(lin2, 2);
       
       val in_gate = σ(sp1(0));
@@ -207,14 +211,15 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
        // LSTM with 2 linear layers from h and i respectively
     
     def constructGraph4 = {
-     import BIDMach.networks.layers.Node._      
+      import BIDMach.networks.layers.Node._  
+      val odim = dim;
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
       
-      val linh = linear(in_h)(prefix+"LSTM_h", outdim=4*dim, hasBias=hasBias);
+      val linh = linear(in_h)(prefix+"LSTM_h", outdim=4*odim, hasBias=hasBias);
       val sph = splitvert(linh, 4);
-      val lini = linear(in_i)(prefix+"LSTM_i", outdim=4*dim, hasBias=hasBias);
+      val lini = linear(in_i)(prefix+"LSTM_i", outdim=4*odim, hasBias=hasBias);
       val spi = splitvert(lini, 4);
       
       val lin1 = sph(0) + spi(0);
