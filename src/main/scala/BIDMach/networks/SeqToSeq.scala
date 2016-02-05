@@ -52,6 +52,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     dstgridopts.copyFrom(opts);
     dstgridopts.modelName = "dst_level%d";
     dstgridopts.netType = LSTMNode.gridTypeSoftmaxOutput;
+    dstgridopts.outdim = opts.nvocab;
     
     srcNodeGrid = LSTMNode.grid(height, inwidth, srcgridopts);
     dstNodeGrid = LSTMNode.grid(height, outwidth, dstgridopts);
