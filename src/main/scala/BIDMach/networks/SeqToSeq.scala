@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GL
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.mixins._
 import BIDMach.models._
@@ -17,7 +18,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   
   var PADrow:Mat = null;
   var OOVelem:Mat = null;
-  var leftedge:Layer = null;
+  var leftEdge:Layer = null;
   var leftStart:Mat = null;
   var dstxdata:Mat = null;
   var dstxdata0:Mat = null;
@@ -25,8 +26,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var dstGrid:LayerMat = null;
   var srcNodeGrid:NodeMat = null;
   var dstNodeGrid:NodeMat = null;
-  var srcgridopts:LSTMNode.GridOpts = null;
-  var dstgridopts:LSTMNode.GridOpts = null;
+  var srcGridOpts:LSTMNode.GridOpts = null;
+  var dstGridOpts:LSTMNode.GridOpts = null;
   var height = 0;
 //  var fullheight = 0;
   var inwidth = 0;
@@ -41,34 +42,33 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     height = opts.height;
 	  inwidth = opts.inwidth; 
     outwidth = opts.outwidth;
-    leftedge = InputLayer(this);                     // dummy layer, left edge of zeros   
+    leftEdge = InputLayer(this);                     // dummy layer, left edge of zeros   
     
-    srcgridopts = new LSTMNode.GridOpts;
-    srcgridopts.copyFrom(opts);
-    srcgridopts.modelName = "src_level%d";
-    srcgridopts.netType = LSTMNode.gridTypeNoOutput;
+    srcGridOpts = new LSTMNode.GridOpts;
+    srcGridOpts.copyFrom(opts);
+    srcGridOpts.modelName = "src_level%d";
+    srcGridOpts.netType = LSTMNode.gridTypeNoOutput;
     
-    dstgridopts = new LSTMNode.GridOpts;
-    dstgridopts.copyFrom(opts);
-    dstgridopts.modelName = "dst_level%d";
-    dstgridopts.netType = LSTMNode.gridTypeSoftmaxOutput;
-    dstgridopts.outdim = opts.nvocab;
-    
-    srcNodeGrid = LSTMNode.grid(height, inwidth, srcgridopts);
-    dstNodeGrid = LSTMNode.grid(height, outwidth, dstgridopts);
-    
+    srcNodeGrid = LSTMNode.grid(height, inwidth, srcGridOpts);
     srcGrid = LayerMat(srcNodeGrid, this);
-    dstGrid = LayerMat(dstNodeGrid, this);
+    layers = srcGrid.data.filter(_ != null);
+    for (i <- 0 until height) srcGrid(i+preamble_rows, 0).setInputs(leftEdge, leftEdge);
     
-    srcGrid link dstGrid;
-    
-    for (i <- 0 until height) {
-      srcGrid(i+preamble_rows, 0).setInputs(leftedge, leftedge);
-    }
+    if (! opts.embed) {
+    	dstGridOpts = new LSTMNode.GridOpts;
+    	dstGridOpts.copyFrom(opts);
+    	dstGridOpts.modelName = "dst_level%d";
+    	dstGridOpts.netType = LSTMNode.gridTypeSoftmaxOutput;
+    	dstGridOpts.outdim = opts.nvocab;
 
-    layers = srcGrid.data.filter(_ != null) ++ dstGrid.data.filter(_ != null)
-    output_layers = new Array[Layer](outwidth);
-    for (i <- 0 until outwidth) output_layers(i) = dstGrid(dstGrid.nrows-1, i);
+    	dstNodeGrid = LSTMNode.grid(height, outwidth, dstGridOpts);
+    	dstGrid = LayerMat(dstNodeGrid, this);
+
+    	srcGrid link dstGrid;
+    	layers = layers ++ dstGrid.data.filter(_ != null);
+    	output_layers = new Array[Layer](outwidth);
+    	for (i <- 0 until outwidth) output_layers(i) = dstGrid(dstGrid.nrows-1, i);
+    }
   }
   
   def mapOOV(in:Mat) = {
@@ -80,37 +80,39 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) = {
     val src = gmats(0);
-    val dstx = gmats(1);
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows.
-    
-    val dstxn0 = dstx.nnz/dstx.ncols;
-    if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length"); 
-    val dstxdata0 = int(dstx.contents.view(dstxn0, batchSize).t);
-    dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
-    if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
-      leftStart = convertMat(izeros(batchSize, 1));
-    }
-    val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
-    
     mapOOV(srcdata);
-    mapOOV(dstxdata);
     val srcmat = oneHot(srcdata.contents, opts.nvocab);
-    val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
     srcn = math.min(srcn, opts.inwidth);
     if (srcn < inwidth) initPrevCol;
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
       srcGrid(0, inwidth + i - srcn).output = cols;
     }
-    dstxn = math.min(dstxn, opts.outwidth);
-    for (i <- 0 until dstxn) {
-      val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
-      dstGrid(0, i).output = cols;
-    }   
-    if (leftedge.output.asInstanceOf[AnyRef] == null) {
-      leftedge.output = convertMat(zeros(opts.dim \ batchSize));
+    if (leftEdge.output.asInstanceOf[AnyRef] == null) {
+      leftEdge.output = convertMat(zeros(opts.dim \ batchSize));
+    }
+    
+    if (! opts.embed) {
+    	val dstx = gmats(1);
+    	val dstxn0 = dstx.nnz/dstx.ncols;
+    	if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length"); 
+    	val dstxdata0 = int(dstx.contents.view(dstxn0, batchSize).t);
+    	dstxn = dstxn0 + (if (opts.addStart) 1 else 0);
+    	if (opts.addStart && (leftStart.asInstanceOf[AnyRef] == null)) {
+    		leftStart = convertMat(izeros(batchSize, 1));
+    	}
+    	val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
+    	mapOOV(dstxdata);
+    	val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
+
+    	dstxn = math.min(dstxn, opts.outwidth);
+    	for (i <- 0 until dstxn) {
+    		val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
+    		dstGrid(0, i).output = cols;
+    	}   
     }
   }
   
@@ -155,7 +157,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         modelmats(0) ~ modelmats(0) ∘ mask;
       }
       val mincol = inwidth - srcn;
-      val maxcol = dstxn; 
+      val maxcol = dstxn;
       srcGrid.forward(mincol, inwidth-1, opts.debug);
       dstGrid.forward(0, maxcol-1, opts.debug);
  
@@ -174,25 +176,31 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) { 
       assignInputs(gmats, ipass, pos);
-      assignTargets(gmats, ipass, pos);
       if (mask.asInstanceOf[AnyRef] != null) {
         modelmats(0) ~ modelmats(0) ∘ mask;
       }
-      val mincol = inwidth - srcn;
-      val maxcol = dstxn; 
+      val mincol = inwidth - srcn; 
       srcGrid.forward(mincol, inwidth-1, opts.debug);
-      dstGrid.forward(0, maxcol-1, opts.debug);
-      
-      if (putBack >= 0) {
-        output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));
+      if (! opts.embed) {
+      	val maxcol = dstxn;
+      	assignTargets(gmats, ipass, pos);
+      	dstGrid.forward(0, maxcol-1, opts.debug);     
+      	if (putBack >= 0) {
+      		output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));
+      	}
+      	var score = 0f;
+      	var j = 0;
+      	while (j < dstxn-1) {
+      		score += output_layers(j).score.v;
+      		j += 1;
+      	}
+      	row(score/(dstxn-1));
+      } else {
+      	if (ogmats != null) {
+      		ogmats(0) = srcGrid(height+preamble_rows-1, srcGrid.ncols-1).output.asMat;
+      	}
+      	zeros(1,1);
       }
-      var score = 0f
-      var j = 0;
-      while (j < dstxn-1) {
-        score += output_layers(j).score.v;
-        j += 1;
-      }
-      row(score/(dstxn-1))
     } else {
       zeros(1, 1);
     }
@@ -215,6 +223,7 @@ object SeqToSeq {
     var scoreType = 0;   // Score type, 0 = LL, 1 = accuracy, 2 = LL of full Softmax, 3 = accuracy of full Softmax
     var nsamps = 100;    // Number of negative samples
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
+    var embed = false;
   }
   
   class Options extends Opts {}
@@ -303,12 +312,36 @@ object SeqToSeq {
     (nn, opts)
   }
   
-    def load(fname:String):SeqToSeq = {
-      val mm = new SeqToSeq;
-      mm.loadMetaData(fname);
-      mm.load(fname);
-      mm
-    }
+  class FEopts extends Learner.Options with SeqToSeq.Opts with FileSource.Opts with FileSink.Opts
   
+  def embed(model:SeqToSeq, ifname:String, ofname:String):(Learner, FEopts) = {   
+    val opts = new FEopts;
+    opts.fnames = List(FileSource.simpleEnum(ifname,1,0));
+    opts.ofnames = List(FileSource.simpleEnum(ofname,1,0));
+    opts.batchSize = 128;
+    opts.eltsPerSample = 500;
+    opts.embed = true;
+    val newmod = new SeqToSeq(opts);
+    newmod.refresh = false;
+    model.copyTo(newmod);
+    implicit val threads = threadPool(4);
+    val ds = new FileSource(opts)
+  	val nn = new Learner(
+  			new FileSource(opts), 
+  	    newmod, 
+  	    null,
+  	    null,
+  	    new FileSink(opts),
+  	    opts)
+    (nn, opts)
+  }
+  
+  def load(fname:String):SeqToSeq = {
+  	val mm = new SeqToSeq;
+  	mm.loadMetaData(fname);
+  	mm.load(fname);
+  	mm
+  }
+
 }
 
