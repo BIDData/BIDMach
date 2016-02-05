@@ -65,64 +65,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     for (i <- 0 until height) {
       srcGrid(i+preamble_rows, 0).setInputs(leftedge, leftedge);
     }
-    
-//    srcGrid(?,inwidth-1).data.zip(dstGrid(?,0).data).map{case (from:Layer, to:Layer) => {to.input = from; to.setInput(1, from(1));}}
-    
-    // the preamble (bottom) layers
-/*    val lopts1 = new LinNode{modelName = "srcWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
-    val lopts2 = new LinNode{modelName = "dstWordMap"; outdim = opts.dim; aopts = opts.aopts; hasBias=opts.hasBias};
-    for (j <- 0 until width) {
-    	setlayer(0, j, InputLayer(this));
-      if (j < inwidth) {
-    	  setlayer(1, j, LinLayer(this, lopts1).setInput(0, getlayer(0, j)));
-      } else {
-        setlayer(1, j, LinLayer(this, lopts2).setInput(0, getlayer(0, j)));
-      }
-    }
 
-    // the main grid
-    for (i <- 0 until height) {
-    	val loptsSrc = new LSTMNode{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
-      val loptsDst = new LSTMNode{dim = opts.dim; aopts = opts.aopts; kind = opts.kind; hasBias = opts.hasBias};
-    	loptsSrc.prefix = if (opts.bylevel) "SrcLevel_%d" format i; else "Src";
-    	loptsDst.prefix = if (opts.bylevel) "DstLevel_%d" format i; else "Dst";
-    	loptsSrc.constructGraph;
-      loptsDst.constructGraph;
-      for (j <- 0 until width) {
-    	  val layer = LSTMLayer(this, if (j < inwidth) loptsSrc else loptsDst);
-    	  layer.setInput(2, getlayer(i-1+preamble_rows, j));             // input 2 (i) is from layer below
-        if (j > 0) {
-          layer.setInput(0, getlayer(i+preamble_rows, j-1));           // input 0 (prev_h) is layer to the left, output 0 (h)
-          layer.setInput(1, getlayer(i+preamble_rows, j-1)(1));        // input 1 (prev_c) is layer to the left, output 1 (c)
-        } else {
-          layer.setInput(0, leftedge);                                 // in first column, just use dummy (zeros) input
-          layer.setInput(1, leftedge);
-        }
-        setlayer(i+preamble_rows, j, layer);
-      }
-    }
-    
-    // the top layers
-    output_layers = new Array[Layer](outwidth);
-    if (opts.netType == 0) {
-    	val lopts3 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias};
-    	val sopts = new SoftmaxOutputNode{scoreType = opts.scoreType};
-    	for (j <- 0 until outwidth) {
-    		val linlayer = LinLayer(this, lopts3).setInput(0, getlayer(fullheight-1, j+inwidth));
-    		setlayer(fullheight, inwidth + j, linlayer);    	
-    		val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);
-    		setlayer(fullheight+1, inwidth + j, smlayer);
-    		output_layers(j) = smlayer;
-    	}
-    } else {
-      val nsopts = new NegsampOutputNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts; hasBias = opts.hasBias; 
-                                                  scoreType = opts.scoreType; nsamps = opts.nsamps; expt = opts.expt};
-      for (j <- 0 until outwidth) {
-        val nslayer = NegsampOutputLayer(this, nsopts).setInput(0, getlayer(fullheight-1, j+inwidth));
-        setlayer(fullheight, inwidth + j, nslayer);      
-        output_layers(j) = nslayer;
-      }    
-    }*/
     layers = srcGrid.data.filter(_ != null) ++ dstGrid.data.filter(_ != null)
     output_layers = new Array[Layer](outwidth);
     for (i <- 0 until outwidth) output_layers(i) = dstGrid(dstGrid.nrows-1, i);
@@ -159,13 +102,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     if (srcn < inwidth) initPrevCol;
     for (i <- 0 until srcn) {
       val cols = srcmat.colslice(i*batchSize, (i+1)*batchSize);
-//      getlayer(0, inwidth + i - srcn).output = cols;
       srcGrid(0, inwidth + i - srcn).output = cols;
     }
     dstxn = math.min(dstxn, opts.outwidth);
     for (i <- 0 until dstxn) {
       val cols = dstxmat.colslice(i*batchSize, (i+1)*batchSize);
-//      getlayer(0, inwidth + i).output = cols;
       dstGrid(0, i).output = cols;
     }   
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
@@ -175,7 +116,6 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   
   def initPrevCol = {
 	  for (i <- 0 until height) {
-//		  val leftlayer = getlayer(i+preamble_rows, inwidth-srcn-1);
 		  val leftlayer = srcGrid(i+preamble_rows, inwidth-srcn-1);
 		  if (leftlayer.output.asInstanceOf[AnyRef] == null) {
 			  leftlayer.output = convertMat(zeros(opts.dim \ batchSize));
@@ -219,18 +159,12 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       srcGrid.forward(mincol, inwidth-1, opts.debug);
       dstGrid.forward(0, maxcol-1, opts.debug);
  
-      for (j <- 0 until output_layers.length) {
-    	  output_layers(j) match {
-    	  case _:OutputLayer => {}
-    	  case _ => {
-    		  if (output_layers(j).deriv.asInstanceOf[AnyRef] != null) output_layers(j).deriv.set(1);
-    	  }
-    	  }
-      }
-      if (opts.aopts == null) {
-        for (j <- 0 until updatemats.length) updatemats(j).clear;
-      }
-      
+      output_layers.map((layer:Layer) => layer match {
+        case _:OutputLayer => {}
+        case _ => {if (layer.deriv.asInstanceOf[AnyRef] != null) layer.deriv.set(1);}
+      })
+      if (opts.aopts == null) updatemats.map(_.clear);
+
       dstGrid.backward(0, maxcol-1, opts.debug, ipass, pos);
       srcGrid.backward(mincol, inwidth-1, opts.debug, ipass, pos);
     }
