@@ -225,7 +225,8 @@ object SeqToSeq {
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
     var embed = false;
     
-    override def copyFrom(nopts:Opts) = {
+    override def copyFrom(that:Model.Opts) = {
+      val nopts = that.asInstanceOf[SeqToSeq.Opts]
       inwidth = nopts.inwidth;
       outwidth = nopts.outwidth;
       height = nopts.height;
