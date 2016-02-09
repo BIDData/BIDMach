@@ -225,23 +225,6 @@ object SeqToSeq {
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
     var embed = false;
     
-    override def copyFrom(that:Model.Opts) = {
-      val nopts = that.asInstanceOf[SeqToSeq.Opts]
-      inwidth = nopts.inwidth;
-      outwidth = nopts.outwidth;
-      height = nopts.height;
-      nvocab = nopts.nvocab;
-      kind = nopts.kind;
-      bylevel = nopts.bylevel;
-      PADsym = nopts.PADsym;
-      OOVsym = nopts.OOVsym;
-      STARTsym =nopts.STARTsym;
-      addStart = nopts.addStart;
-      scoreType = nopts.scoreType;
-      nsamps = nopts.nsamps;
-      expt = nopts.expt;
-      embed = nopts.embed;
-    }
   }
   
   class Options extends Opts {}
@@ -334,10 +317,9 @@ object SeqToSeq {
   
   def embed(model:SeqToSeq, ifname:String, ofname:String):(Learner, FEopts) = {   
     val opts = new FEopts;
+    opts.copyFrom(model.opts);
     opts.fnames = List(FileSource.simpleEnum(ifname,1,0));
     opts.ofnames = List(FileSource.simpleEnum(ofname,1,0));
-    opts.batchSize = 128;
-    opts.eltsPerSample = 500;
     opts.embed = true;
     val newmod = new SeqToSeq(opts);
     newmod.refresh = false;
