@@ -224,6 +224,23 @@ object SeqToSeq {
     var nsamps = 100;    // Number of negative samples
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
     var embed = false;
+    
+    override def copyFrom(nopts:Opts) = {
+      inwidth = nopts.inwidth;
+      outwidth = nopts.outwidth;
+      height = nopts.height;
+      nvocab = nopts.nvocab;
+      kind = nopts.kind;
+      bylevel = nopts.bylevel;
+      PADsym = nopts.PADsym;
+      OOVsym = nopts.OOVsym;
+      STARTsym =nopts.STARTsym;
+      addStart = nopts.addStart;
+      scoreType = nopts.scoreType;
+      nsamps = nopts.nsamps;
+      expt = nopts.expt;
+      embed = nopts.embed;
+    }
   }
   
   class Options extends Opts {}
