@@ -116,12 +116,12 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     	val in_h = copy;
     	val in_c = copy; 
     	val in_i = copy;
-    	val h_on_i = in_h on in_i;
+    	val h_over_i = in_h over in_i;
 
-    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=odim, hasBias=hasBias);
-    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=odim, hasBias=hasBias);   
-    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=odim, hasBias=hasBias);
-    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=odim, hasBias=hasBias);
+    	val lin1 = linear(h_over_i)(prefix+"LSTM_in_gate", outdim=odim, hasBias=hasBias);
+    	val lin2 = linear(h_over_i)(prefix+"LSTM_out_gate", outdim=odim, hasBias=hasBias);   
+    	val lin3 = linear(h_over_i)(prefix+"LSTM_forget_gate", outdim=odim, hasBias=hasBias);
+    	val lin4 = linear(h_over_i)(prefix+"LSTM_tanh_gate", outdim=odim, hasBias=hasBias);
     	
     	val in_gate = σ(lin1);
     	val out_gate = σ(lin2);
@@ -138,7 +138,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     	grid = in_h    \   lin1   \  in_gate      \  in_prod  \  out_tanh  on
              in_c    \   lin2   \  out_gate     \  f_prod   \  out_h     on
              in_i    \   lin3   \  forget_gate  \  out_c    \  null      on
-             h_on_i  \   lin4   \  in_sat       \  null     \  null;
+             h_over_i  \   lin4   \  in_sat       \  null     \  null;
     	
     	val lopts = grid.data;
     	lopts.map((x:Node) => if (x != null) x.parent = this);
@@ -154,9 +154,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
-      val h_on_i = in_h on in_i;
+      val h_over_i = in_h over in_i;
       
-      val lin = linear(h_on_i)(prefix+"LSTM_all", outdim=4*odim, hasBias=hasBias);
+      val lin = linear(h_over_i)(prefix+"LSTM_all", outdim=4*odim, hasBias=hasBias);
       val sp = splitvert(lin, 4);
       
       val in_gate = σ(sp(0));
@@ -174,7 +174,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       grid = in_h    \   lin    \  in_gate      \  in_prod  \  out_tanh  on
              in_c    \   sp     \  out_gate     \  f_prod   \  out_h     on
              in_i    \   null   \  forget_gate  \  out_c    \  null      on
-             h_on_i  \   null   \  in_sat       \  null     \  null;
+             h_over_i  \   null   \  in_sat       \  null     \  null;
       
       val lopts = grid.data;      
       lopts.map((x:Node) => if (x != null) x.parent = this);
@@ -189,11 +189,11 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
-      val h_on_i = in_h on in_i;
+      val h_over_i = in_h over in_i;
       
-      val lin1 = linear(h_on_i)(prefix+"LSTM_in_out", outdim=2*odim, hasBias=hasBias);
+      val lin1 = linear(h_over_i)(prefix+"LSTM_in_out", outdim=2*odim, hasBias=hasBias);
       val sp1 = splitvert(lin1, 2);
-      val lin2 = linear(h_on_i)(prefix+"LSTM_forget_tanh", outdim=2*odim, hasBias=hasBias);
+      val lin2 = linear(h_over_i)(prefix+"LSTM_forget_tanh", outdim=2*odim, hasBias=hasBias);
       val sp2 = splitvert(lin2, 2);
       
       val in_gate = σ(sp1(0));
@@ -211,7 +211,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       grid = in_h    \   lin1   \  in_gate      \  in_prod  \  out_tanh  on
              in_c    \   sp1    \  out_gate     \  f_prod   \  out_h     on
              in_i    \   lin2   \  forget_gate  \  out_c    \  null      on
-             h_on_i  \   sp2    \  in_sat       \  null     \  null;
+             h_over_i  \   sp2    \  in_sat       \  null     \  null;
       
       val lopts = grid.data;      
       lopts.map((x:Node) => if (x != null) x.parent = this);
