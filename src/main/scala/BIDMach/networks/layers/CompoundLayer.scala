@@ -67,7 +67,14 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNode = new C
 	}
 		
 	override def getModelMats(net:Net) = {
-	  internal_layers.map(_.getModelMats(net));
+		for (i <- 0 until grid.ncols) {
+			for (j <- 0 until grid.nrows) {
+				val layer = grid(j, i);
+				if (layer != null) {
+					layer.getModelMats(net);
+				}
+			}
+		}
 	}
 
 	def construct = {

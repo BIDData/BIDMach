@@ -168,7 +168,7 @@ case class LayerMat(override val nrows:Int, override val ncols:Int, override val
 	}
 	
 	def backward(col1:Int, col2:Int, debug:Int, ipass:Int, ipos:Long) = {
-		for (i <- col2 to col2 by -1) {
+		for (i <- col2 to col1 by -1) {
 			for (j <- (nrows-1) to 0 by -1) {
 				if (debug > 0) {
 					println("  backward (%d,%d) %s" format (j, i, apply(j, i).getClass))
@@ -204,13 +204,16 @@ object LayerMat {
           if (n(j, i) != null) {
             val inputs = n(j, i).inputs;
             for (k <- 0 until inputs.length) {
-              val layer = inputs(k).node.myLayer;
-              val layerTerm = if (inputs(k).term != 0) {
-                new LayerTerm(layer, inputs(k).term)
-              } else {
-                layer;
+              val input = inputs(k);
+              if (input != null) {
+              	val layer = input.node.myLayer;
+              	val layerTerm = if (input.term != 0) {
+              		new LayerTerm(layer, input.term)
+              	} else {
+              		layer;
+              	}
+              	mat(j, i).setInput(k, layerTerm);
               }
-              mat(j, i).setInput(k, layerTerm);
             }
           }
         }

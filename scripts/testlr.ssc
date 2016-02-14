@@ -20,7 +20,7 @@ opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
 opts.aopts = opts;
-opts.useGPU = false
+//opts.useGPU = false
 //Mat.useMKL = false
 
 val model = nn.model.asInstanceOf[GLM]

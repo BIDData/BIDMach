@@ -45,7 +45,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  	modelMap = new HashMap[String,Int];
 	  }
 	  imodel = 0;
-	  layers.map(_.getModelMats(this));
+	  layers.map((x:Layer) => if (x != null)x.getModelMats(this));
 	  if (refresh) {
 	  	setmodelmats(new Array[Mat](imodel + modelMap.size));
 	  }
@@ -413,14 +413,13 @@ object Net  {
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
     val ds = new FileSource(opts)
-    val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
-  	val nn = new Learner(
-  			ds, 
-  	    new Net(opts), 
-  	    null,
-  	    null, 
-  	    null,
-  	    opts)
+    // val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
+  	val nn = new Learner(ds, 
+  	                     new Net(opts), 
+  	                     null,
+  	                     null, 
+  	                     null,
+  	                     opts)
     (nn, opts)
   }
 

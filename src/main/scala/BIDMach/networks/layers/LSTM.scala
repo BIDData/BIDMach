@@ -31,7 +31,17 @@ trait LSTMNodeOpts extends CompoundNodeOpts {
     var kind = 1;
     var hasBias = false;  
     var scoreType = 0;
-    var outDim = 0;
+    var outdim = 0;
+    
+   def copyOpts(opts:LSTMNodeOpts):LSTMNodeOpts = {
+  		super.copyOpts(opts);
+  		opts.dim = dim;
+  		opts.kind = kind;
+  		opts.hasBias = hasBias;
+  		opts.scoreType = scoreType;
+  		opts.outdim = outdim;
+  		opts;
+    }
 }
 
 class LSTMNode extends CompoundNode with LSTMNodeOpts {	
@@ -54,20 +64,21 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  	  
 	  def constructGraph0 = {
     	import BIDMach.networks.layers.Node._
+    	val odim = dim;
     		
     	val in_h = copy;
     	val in_c = copy; 
     	val in_i = copy;
 
-    	val lin1 = linear(in_h)(prefix+"LSTM_h_in_gate", outdim=dim, hasBias=hasBias);
-    	val lin2 = linear(in_h)(prefix+"LSTM_h_out_gate", outdim=dim, hasBias=hasBias);   
-    	val lin3 = linear(in_h)(prefix+"LSTM_h_forget_gate", outdim=dim, hasBias=hasBias);
-    	val lin4 = linear(in_h)(prefix+"LSTM_h_tanh_gate", outdim=dim, hasBias=hasBias);
+    	val lin1 = linear(in_h)(prefix+"LSTM_h_in_gate", outdim=odim, hasBias=hasBias);
+    	val lin2 = linear(in_h)(prefix+"LSTM_h_out_gate", outdim=odim, hasBias=hasBias);   
+    	val lin3 = linear(in_h)(prefix+"LSTM_h_forget_gate", outdim=odim, hasBias=hasBias);
+    	val lin4 = linear(in_h)(prefix+"LSTM_h_tanh_gate", outdim=odim, hasBias=hasBias);
     	
-    	val lin5 = linear(in_i)(prefix+"LSTM_i_in_gate", outdim=dim, hasBias=hasBias);
-    	val lin6 = linear(in_i)(prefix+"LSTM_i_out_gate", outdim=dim, hasBias=hasBias);   
-    	val lin7 = linear(in_i)(prefix+"LSTM_i_forget_gate", outdim=dim, hasBias=hasBias);
-    	val lin8 = linear(in_i)(prefix+"LSTM_i_tanh_gate", outdim=dim, hasBias=hasBias);
+    	val lin5 = linear(in_i)(prefix+"LSTM_i_in_gate", outdim=odim, hasBias=hasBias);
+    	val lin6 = linear(in_i)(prefix+"LSTM_i_out_gate", outdim=odim, hasBias=hasBias);   
+    	val lin7 = linear(in_i)(prefix+"LSTM_i_forget_gate", outdim=odim, hasBias=hasBias);
+    	val lin8 = linear(in_i)(prefix+"LSTM_i_tanh_gate", outdim=odim, hasBias=hasBias);
     	
     	val sum1 = lin1 + lin5;
     	val sum2 = lin2 + lin6;
@@ -92,7 +103,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
                                                 lin4   \  lin8    \   sum4   \   in_sat       \  null     \  null);
     	
     	val lopts = grid.data;
-    	lopts.map(_.parent = this);
+    	lopts.map((x:Node) => if (x != null) x.parent = this);
     	outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));
 	  }
 	     
@@ -100,16 +111,17 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     def constructGraph1 = {
     	import BIDMach.networks.layers.Node._
+    	val odim = dim;
     		
     	val in_h = copy;
     	val in_c = copy; 
     	val in_i = copy;
-    	val h_on_i = in_h on in_i;
+    	val h_over_i = in_h over in_i;
 
-    	val lin1 = linear(h_on_i)(prefix+"LSTM_in_gate", outdim=dim, hasBias=hasBias);
-    	val lin2 = linear(h_on_i)(prefix+"LSTM_out_gate", outdim=dim, hasBias=hasBias);   
-    	val lin3 = linear(h_on_i)(prefix+"LSTM_forget_gate", outdim=dim, hasBias=hasBias);
-    	val lin4 = linear(h_on_i)(prefix+"LSTM_tanh_gate", outdim=dim, hasBias=hasBias);
+    	val lin1 = linear(h_over_i)(prefix+"LSTM_in_gate", outdim=odim, hasBias=hasBias);
+    	val lin2 = linear(h_over_i)(prefix+"LSTM_out_gate", outdim=odim, hasBias=hasBias);   
+    	val lin3 = linear(h_over_i)(prefix+"LSTM_forget_gate", outdim=odim, hasBias=hasBias);
+    	val lin4 = linear(h_over_i)(prefix+"LSTM_tanh_gate", outdim=odim, hasBias=hasBias);
     	
     	val in_gate = σ(lin1);
     	val out_gate = σ(lin2);
@@ -126,10 +138,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     	grid = in_h    \   lin1   \  in_gate      \  in_prod  \  out_tanh  on
              in_c    \   lin2   \  out_gate     \  f_prod   \  out_h     on
              in_i    \   lin3   \  forget_gate  \  out_c    \  null      on
-             h_on_i  \   lin4   \  in_sat       \  null     \  null;
+             h_over_i  \   lin4   \  in_sat       \  null     \  null;
     	
     	val lopts = grid.data;
-    	lopts.map(_.parent = this);
+    	lopts.map((x:Node) => if (x != null) x.parent = this);
     	outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));
     	
     }
@@ -137,13 +149,14 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     // LSTM with 1 linear layer, with h and i stacked as inputs, and all 4 output stacked
     
     def constructGraph2 = {
-     import BIDMach.networks.layers.Node._      
+      import BIDMach.networks.layers.Node._   
+      val odim = dim;
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
-      val h_on_i = in_h on in_i;
+      val h_over_i = in_h over in_i;
       
-      val lin = linear(h_on_i)(prefix+"LSTM_all", outdim=4*dim, hasBias=hasBias);
+      val lin = linear(h_over_i)(prefix+"LSTM_all", outdim=4*odim, hasBias=hasBias);
       val sp = splitvert(lin, 4);
       
       val in_gate = σ(sp(0));
@@ -161,10 +174,10 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       grid = in_h    \   lin    \  in_gate      \  in_prod  \  out_tanh  on
              in_c    \   sp     \  out_gate     \  f_prod   \  out_h     on
              in_i    \   null   \  forget_gate  \  out_c    \  null      on
-             h_on_i  \   null   \  in_sat       \  null     \  null;
+             h_over_i  \   null   \  in_sat       \  null     \  null;
       
       val lopts = grid.data;      
-      lopts.map(_.parent = this);
+      lopts.map((x:Node) => if (x != null) x.parent = this);
       outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));                   // Specifies the output layer numbers (next_h and next_c)
     }
     
@@ -172,14 +185,15 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     
     def constructGraph3 = {
       import BIDMach.networks.layers.Node._
+      val odim = dim;
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
-      val h_on_i = in_h on in_i;
+      val h_over_i = in_h over in_i;
       
-      val lin1 = linear(h_on_i)(prefix+"LSTM_in_out", outdim=2*dim, hasBias=hasBias);
+      val lin1 = linear(h_over_i)(prefix+"LSTM_in_out", outdim=2*odim, hasBias=hasBias);
       val sp1 = splitvert(lin1, 2);
-      val lin2 = linear(h_on_i)(prefix+"LSTM_forget_tanh", outdim=2*dim, hasBias=hasBias);
+      val lin2 = linear(h_over_i)(prefix+"LSTM_forget_tanh", outdim=2*odim, hasBias=hasBias);
       val sp2 = splitvert(lin2, 2);
       
       val in_gate = σ(sp1(0));
@@ -197,24 +211,25 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       grid = in_h    \   lin1   \  in_gate      \  in_prod  \  out_tanh  on
              in_c    \   sp1    \  out_gate     \  f_prod   \  out_h     on
              in_i    \   lin2   \  forget_gate  \  out_c    \  null      on
-             h_on_i  \   sp2    \  in_sat       \  null     \  null;
+             h_over_i  \   sp2    \  in_sat       \  null     \  null;
       
       val lopts = grid.data;      
-      lopts.map(_.parent = this);
+      lopts.map((x:Node) => if (x != null) x.parent = this);
       outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));                   // Specifies the output layer numbers (next_h and next_c)
     }
     
        // LSTM with 2 linear layers from h and i respectively
     
     def constructGraph4 = {
-     import BIDMach.networks.layers.Node._      
+      import BIDMach.networks.layers.Node._  
+      val odim = dim;
       val in_h = copy;
       val in_c = copy;
       val in_i = copy;          
       
-      val linh = linear(in_h)(prefix+"LSTM_h", outdim=4*dim, hasBias=hasBias);
+      val linh = linear(in_h)(prefix+"LSTM_h", outdim=4*odim, hasBias=hasBias);
       val sph = splitvert(linh, 4);
-      val lini = linear(in_i)(prefix+"LSTM_i", outdim=4*dim, hasBias=hasBias);
+      val lini = linear(in_i)(prefix+"LSTM_i", outdim=4*odim, hasBias=hasBias);
       val spi = splitvert(lini, 4);
       
       val lin1 = sph(0) + spi(0);
@@ -240,7 +255,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
                                                  spi    \  lin4   \  in_sat       \  null     \  null);
       
       val lopts = grid.data;      
-      lopts.map(_.parent = this);
+      lopts.map((x:Node) => if (x != null) x.parent = this);
       outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));                   // Specifies the output layer numbers (next_h and next_c)
     }
 	  
@@ -287,10 +302,12 @@ object LSTMNode {
   def grid(nrows:Int, ncols:Int, opts:GridOpts):NodeMat = {
     import BIDMach.networks.layers.Node._
     val nlin = 2;
+    val odim = opts.outdim;
+    val idim = opts.dim;
     val nsoft = opts.netType match {
-      case 0 => 0;
-      case 1 => 1;
-      case 2 => 2;
+      case `gridTypeNoOutput` => 0;
+      case `gridTypeNegsampOutput` => 1;
+      case `gridTypeSoftmaxOutput` => 2;
     }
     val gr = NodeMat(nrows + nlin + nsoft, ncols);
     
@@ -301,7 +318,7 @@ object LSTMNode {
     val modelName = opts.modelName;
     
     for (k <- 0 until ncols) {
-    	gr(1, k) = linear(gr(0, k))((modelName format 0) +"_bottom", outdim=opts.dim, hasBias = opts.hasBias)
+    	gr(1, k) = linear(gr(0, k))((modelName format 0) +"_bottom", outdim=idim, hasBias = opts.hasBias)
     }
     
     for (k <- 0 until ncols) {
@@ -321,13 +338,13 @@ object LSTMNode {
       case `gridTypeNoOutput` => {}
       case `gridTypeSoftmaxOutput` => {
         for (k <- 0 until ncols) {
-        	gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=opts.outDim, hasBias = opts.hasBias)
+        	gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias = opts.hasBias)
           gr(nrows + nlin + 1, k) = softmaxout(gr(nrows + nlin, k))(opts.scoreType);
         }
       }
       case `gridTypeNegsampOutput` => {
         for (k <- 0 until ncols) {
-          gr(nrows + nlin, k) = negsamp(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=opts.outDim, hasBias=opts.hasBias, scoreType=opts.scoreType)
+          gr(nrows + nlin, k) = negsamp(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias=opts.hasBias, scoreType=opts.scoreType)
         }
       }
     }
