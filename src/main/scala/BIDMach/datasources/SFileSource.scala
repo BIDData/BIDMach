@@ -140,7 +140,7 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     	var nrow = rowno
     	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
-    	  while (ready(filex) < fileno) Thread.`yield`
+    	  while (ready(filex) < fileno) Thread.sleep(1); // `yield`
     	} else {
           fetch
         }
@@ -307,7 +307,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options)(
     	var nrow = rowno
     	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
-    	  while (ready(filex) < fileno) Thread.`yield`
+    	  while (ready(filex) < fileno) Thread.sleep(1);// `yield`
     	} else {
     	  fetch
     	}    	

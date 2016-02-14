@@ -89,7 +89,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     mmx(0).clear
     if (ipass == 0) {                     // on first pass, model is random samples, so take a mixed sample
       val m0 = models(0).modelmats(0);
-      val isel = m0.zeros(m0.nrows, 1);
+      val isel = umx(0).zeros(m0.nrows, 1);
       val vsel = min((nmodels-1).toFloat, floor(nmodels*rand(m0.nrows, 1)));
       for (i <- 0 until nmodels) {
         isel <-- (vsel == i.toFloat);
@@ -244,7 +244,7 @@ object KMeans  {
     opts.npasses = 10
     opts.fnames = fnames
     opts.batchSize = 20000;
-    implicit val threads = threadPool(4)
+    implicit val threads = threadPool(12);
   	val nn = new ParLearnerF(
   	    new FileSource(opts), 
   	    opts, mkKMeansModel _, 
