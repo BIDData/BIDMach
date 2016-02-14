@@ -240,7 +240,6 @@ object Net  {
    */
   
   def dnodes(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
-    println("Inside dnodes() method ...")
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of nodes 
     val nodes = new NodeSet(depth);
     var w = width;
