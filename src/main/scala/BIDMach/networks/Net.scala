@@ -240,6 +240,7 @@ object Net  {
    */
   
   def dnodes(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
+    println("Inside dnodes() method ...")
     val depth = (depth0/2)*2 + 1;              // Round up to an odd number of nodes 
     val nodes = new NodeSet(depth);
     var w = width;
@@ -413,14 +414,13 @@ object Net  {
     opts.eltsPerSample = 500;
     implicit val threads = threadPool(4);
     val ds = new FileSource(opts)
-    val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
-  	val nn = new Learner(
-  			ds, 
-  	    new Net(opts), 
-  	    null,
-  	    null, 
-  	    null,
-  	    opts)
+    // val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
+  	val nn = new Learner(ds, 
+  	                     new Net(opts), 
+  	                     null,
+  	                     null, 
+  	                     null,
+  	                     opts)
     (nn, opts)
   }
 
