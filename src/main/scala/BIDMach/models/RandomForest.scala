@@ -1409,6 +1409,7 @@ object RandomForest {
   
   def predictor(model:Model, data:Mat):(Learner, PredOpts) = {
     val opts = new PredOpts;
+    model.opts.asInstanceOf[RandomForest.Opts].training = false;
     opts.copyFrom(model.opts);
     val nn = new Learner(
         new MatSource(Array(data), opts),
