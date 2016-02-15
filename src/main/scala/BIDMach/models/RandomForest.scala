@@ -323,7 +323,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val depth = if (opts.training) ipass else opts.depth
     val data = full(gmats(0));
-    val cats = gmats(1);
+    val cats = if (gmats.length > 1) gmats(1) else null;
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
     val fnodes:FMat = zeros(ntrees, data.ncols);
     data match {
@@ -345,17 +345,25 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     if (opts.regression) {
       var mm = mean(fnodes);
       if (ogmats != null) {
-        val pcats = if (cats.nrows == 1) mm else mm on sqrt(variance(fnodes))
+        val pcats = if (cats.asInstanceOf[AnyRef] == null || cats.nrows == 1) mm else mm on sqrt(variance(fnodes))
         ogmats(0) = pcats;
       }
-      val diff = mm - FMat(cats)
-      if (opts.MAE) -mean(abs(diff)) else -(diff dotr diff)/diff.length
-    } else {
-      val mm = tally(fnodes);
-      if (ogmats != null) {
-        ogmats(0) = mm;
+      if (gmats.length > 1) {
+      	val diff = mm - FMat(cats);
+      	if (opts.MAE) -mean(abs(diff)) else -(diff dotr diff)/diff.length;
+      } else {
+        row(0);
       }
-      -mean(FMat(mm != IMat(cats)));
+    } else {
+    	val mm = tally(fnodes);
+    	if (ogmats != null) {
+    		ogmats(0) = mm;
+    	}
+    	if (gmats.length > 1) {
+    		-mean(FMat(mm != IMat(cats)));
+    	} else {
+    	  row(0);
+    	}
     }
   } 
   
