@@ -186,7 +186,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     nfeats = mats(0).nrows;
     val nc = mats(0).ncols;
     batchSize = nc;
-    val nnz = mats(1).nnz;
     datasource.reset;   
     nnodes = opts.nnodes; 
     ntrees = opts.ntrees;
