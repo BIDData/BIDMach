@@ -420,7 +420,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       vtrees(inodes, itree) = outv(inds);                               // Threshold values
       val reqgain = opts.gain
       val igain = find(vm > reqgain);                                   // find nodes above the impurity gain threshold
-      gains(itree) = mean(vm).v
+      gains(itree) = if (vm.length>0) mean(vm).v else 0;
       igains(itree) = igain.length
       if (igain.length > 0) {
         val inn = inodes(igain);
@@ -862,9 +862,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   } */
 
   def splittableNodes(blockv:SVec):Array[SVec] = { 
-    (0 until ntrees).par.map(i => { 
-      splittableNodes_thread(blockv, i);
-    }).toArray
+    (0 until ntrees).par.map(i => {splittableNodes_thread(blockv, i);}).toArray;
   }
 
   def splittableNodes_thread(blockv:SVec, itree:Int):SVec = {
@@ -900,7 +898,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     val key = keys(istart);
     val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
-    if (itree == ktree) istart else iend;
+    if (itree <= ktree) istart else iend;
   }
 
   // Find boundaries where JFeat or ITree changes
