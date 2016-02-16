@@ -13,12 +13,12 @@ val c = c0(?,ii);
 val ta = loadSMat(dir + "testdocs.smat.lz4")(0->100000,0->23000)
 val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,0->23000)
 
-val opts = new Net.LearnOptions
+val (nn,opts) = Net.learnerX(a,c);
 
 opts.aopts = opts
-opts.batchSize=2000
+opts.batchSize=200
 opts.reg1weight = 0.0001
-opts.npasses = 1
+opts.npasses = 4
 opts.addConstFeat=false;
 opts.links = iones(100,1);
 opts.lrate = 0.4f // best for 6-layer
@@ -27,9 +27,8 @@ opts.texp = 0.4f
 opts.nweight = 1e-4f
 
 val net = Net.dnodes4(7,500,0.5f,100,opts,2);
+opts.nodeset = net
 
-val (nn,opts0) = Net.learnerX(a,c);
-opts0.nodeset = net
 val dnn = nn.model.asInstanceOf[Net]
 
 nn.train
