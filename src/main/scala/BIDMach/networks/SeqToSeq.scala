@@ -178,6 +178,14 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     }
   }
   
+  def log(s:Int,t:Int){
+      if (Logger.tick()!=1)
+        return
+      for(i<-0 to fullheight)
+        for(j<-s until t)
+            Logger.log(i,j,getlayer(i,j))
+  }
+ 
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
@@ -214,6 +222,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         }
         layers(i).backward(ipass, pos);
       }
+      if (Logger.tick()==0)
+        log(inwidth - srcn, inwidth + dstxn)
     }
   }
   
