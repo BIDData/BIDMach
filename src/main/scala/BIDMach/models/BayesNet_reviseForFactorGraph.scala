@@ -909,8 +909,92 @@ object BayesNet {
  * @param statesPerNode, 1-d mat, contains the cardinality of each variable
  * @param n the number of vertices in the graph
  */
-class FactorGraph(val factorSet: Mat, val n, val statesPerNode: Mat) {
+class FactorGraph(val factorSet: Array[Array[Int]], val n, val statesPerNode: Mat) {
+  var mrf: Mat = null
+  var colors: Mat = null
+  var ncolors = 0
+  val maxColor = 100
 
+  /**
+   * Build the dag from the input variables, i.e. re-construct the graph structure matrix.
+   */
+  def buildDag = {
+    var mrf = izeros(n, n)
+    for (i <- 0 until factorSet.length) {
+      if (factorSet(i).length == 1) {
+        dag(factorSet(i)(0), factorSet(i)(0)) = 1
+      } else {
+        for (orign <- 0 until factorSet(i).length) {
+          for (des <- 0 until factorSet(i).length) {
+            if (dag(orign, des) == 0 && orign != des) {
+              dag(orign, des) = 1
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * color the graph by the same method as Graph class below.
+   */
+  def color = {
+    buildDag
+    var colorCount = izeros(maxColor, 1)
+    colors = -1 * iones(n, 1)
+    ncolors = 0
+   
+    // Access nodes sequentially. Find the color map of its neighbors, then find the legal color w/least count
+    val seq = IMat(0 until n)
+    // Can also access nodes randomly
+    // val r = rand(n, 1); val (v, seq) = sort2(r)
+    for (i <- 0 until n) {
+      var node = seq(i)
+      var nbs = find(FMat(mrf(?, node)))
+      var colorMap = iones(ncolors, 1)
+      for (j <- 0 until nbs.length) {
+        if (colors(nbs(j)).dv.toInt > -1) {
+          colorMap(colors(nbs(j))) = 0
+        }
+      }
+      var c = -1
+      var minc = 999999
+      for (k <- 0 until ncolors) {
+        if ((colorMap(k) > 0) && (colorCount(k) < minc)) {
+          c = k
+          minc = colorCount(k)
+        }
+      }
+      if (c == -1) {
+       c = ncolors
+       ncolors = ncolors + 1
+      }
+      colors(node) = c
+      colorCount(c) += 1
+    }
+    colors
+  }
+
+  /**
+   * Function to construct the iproject. It has the row length: num of vertice * num of factors,
+   * and the same column length. Actually, the column length can be just num of vertice, however, we
+   * want to re-use as much as code, and there are some trasnspose during the old code. It's safe to
+   * keep the iproject as a square matrix.
+   */
+   // TODO: Change the iproject.
+   def iproject : SMat = {
+    var res = (pproject.copy).t
+    for (i <- 0 until n) {
+      val parents = find(SMat(pproject(?, i)))
+      var cumRes = 1f
+      val parentsLen = parents.length
+      for (j <- 1 until parentsLen) {
+        cumRes = cumRes * IMat(statesPerNode)(parents(parentsLen - j))
+        res.asInstanceOf[SMat](i, parents(parentsLen - j - 1)) = cumRes
+      }
+    }
+    return SMat(res)
+  }
 }
 
 
