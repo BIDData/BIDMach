@@ -1,0 +1,44 @@
+
+ /**
+  * LSTM training script. 
+  * 
+  */
+import BIDMach.networks.SeqToSeq
+
+val dir = "/data01/livejournal/srcdst/";  // Directory for input data
+val mdir = "/data01/livejournal/models/"
+
+val (nn, opts) = SeqToSeq.learner(dir + "src%04d.smat.lz4", dir + "dst%04d.smat.lz4");
+val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
+
+opts.lrate = 0.1f;                       // Learning rate
+opts.nvocab = 100000;                     // Vocabulary limit
+opts.npasses = 1;                         // Number of passes over the dataset
+opts.height = 2;                          // Height of the network
+opts.dim = 256;                           // Dimension of LSTM units
+opts.batchSize = 128;                     // Batch size
+opts.nstart = 0;                          // File start number
+opts.nend = 1132;                         // File end number
+
+opts.checkPointInterval = 0.1f;            // How often to save in hours
+opts.checkPointFile = mdir+"model256_%02d/"
+opts.kind = 1;                            // LSTM structure
+opts.netType = 0;                         // Net type (softmax=0, or negsampling=1)
+opts.scoreType = 1;                       // Score type (logloss=0, accuracy=1)
+opts.inwidth = 30;                        // Max input sentence length (truncates)
+opts.outwidth = 30;                       // Max output sentence length (truncates)
+opts.hasBias = true;                      // Use bias terms in linear layers
+opts.pstep = 0.0001f;                     // How often to print
+opts.cumScore = 3;                        // Accumulate scores for less-noisy printing
+opts.PADsym = 1;                          // The padding symbol
+opts.OOVsym = 2;                          // The OOV symbol
+opts STARTsym = 0;
+opts.reg1weight = 1e-9f                   // L1 regularization weight
+
+//net.opts.debug = 1
+//opts.useGPU = false
+//Mat.useMKL = false
+
+println(opts.what)
+
+nn.train
