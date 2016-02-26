@@ -43,6 +43,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   var ogmats:Array[Mat] = null;
   
+  var logmats:Array[()=>Array[Mat]] = null;
+  
   var useGPU = false;
   
   var useDouble = false;
@@ -164,6 +166,12 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
     if (useGPU) copyMats(amats, gmats);            		
     dobatch(gmats, ipass, here);
+    if (opts.logFuncs!=null){
+        if (logmats==null)
+            logmats = opts.logFuncs.map(f=>()=>f(this,amats))
+        val res = logmats.map(f=>f())
+    }
+//        opts.logFunc(this,amats)
   }
   
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -229,6 +237,7 @@ object Model {
 	  var doubleScore = false
 	  var dim = 256
 	  var debug = 0;
+  	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
   }
 	
 	class Options extends Opts {} 
