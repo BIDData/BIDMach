@@ -29,7 +29,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
     val hh1 = nstart % 24
     val dd2 = nend / 24
     val hh2 = nend % 24
-    val (dmy, ii) = sort2(rand(dd2-dd1+1+opts.lookahead))
+    val (dmy, ii) = sort2(rand(dd2-dd1+1+opts.lookahead,1))
     (n:Int) => {
     	val dd = n / 24
     	val hh = n % 24
@@ -138,7 +138,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
     	val filex = fileno % math.max(1, opts.lookahead);
 //    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
     	if (opts.putBack < 0 && opts.lookahead > 0) {
-    	  while (ready(filex) < fileno) Thread.`yield`
+    	  while (ready(filex) < fileno) Thread.sleep(1); //`yield`
     	} else {
     	  fetch
     	}
@@ -205,7 +205,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
     val ifilex = ifile % opts.lookahead
   	ready(ifilex) = ifile - opts.lookahead
   	while  (!stop) {
-      while (ready(ifilex) >= fileno && !stop) Thread.`yield`
+      while (ready(ifilex) >= fileno && !stop) Thread.sleep(1); // Thread.`yield`
       if (!stop) {
         val inew = ready(ifilex) + opts.lookahead;
         val pnew = permfn(inew);

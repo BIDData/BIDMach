@@ -4,6 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
 import BIDMat.about
+import BIDMat.MatIOtrait
 import BIDMach.models._
 import BIDMach.updaters._
 import BIDMach.datasources._
@@ -36,6 +37,13 @@ case class Learner(
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
   var lastCheckPoint = 0;
+  var done = false;
+  var ipass = 0;
+  var here = 0L;
+  var lasti = 0;
+  var bytes = 0L;
+  var cacheState = false;
+  var debugMemState = false;
 	
   def setup = {
 	Learner.setupPB(datasource, dopts.putBack, mopts.dim)   
@@ -58,8 +66,6 @@ case class Learner(
   }
     
   def train = {
-    setup
-    init
     retrain
   }
    
@@ -67,69 +73,98 @@ case class Learner(
     flip 
     var cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
-    val debugMemState = Mat.debugMem;
-    var done = false;
-    var ipass = 0;
-    var here = 0L;
-    var lasti = 0;
-    var bytes = 0L;
+    debugMemState = Mat.debugMem;
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
+    firstPass(null);
     while (ipass < opts.npasses && ! done) {
-      if (opts.debugMem && ipass > 0) Mat.debugMem = true;
-    	var lastp = 0f
-      datasource.reset
-      var istep = 0
-      println("pass=%2d" format ipass)
-      while (datasource.hasNext) {
-        val mats = datasource.next;
-        here += datasource.opts.batchSize
-        bytes += mats.map(Learner.numBytes _).reduce(_+_);
-        val dsp = datasource.progress;
-        val gprogress = (ipass + dsp)/opts.npasses;
-        if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
-          if (opts.updateAll) {
-          	model.dobatchg(mats, ipass, here);
-          	if (mixins != null) mixins map (_ compute(mats, here));
-          	if (updater != null) updater.update(ipass, here, gprogress);
-          }
-        	val scores = model.evalbatchg(mats, ipass, here);
-        	if (datasink != null) datasink.put;
-        	reslist.append(scores.newcopy)
-        	samplist.append(here)
-        } else {
-        	model.dobatchg(mats, ipass, here)
-        	if (mixins != null) mixins map (_ compute(mats, here))
-        	if (updater != null) updater.update(ipass, here, gprogress)
-        }  
-        if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
-        istep += 1
-        if (dsp > lastp + opts.pstep && reslist.length > lasti) {
-        	val gf = gflop
-        	lastp = dsp - (dsp % opts.pstep)
-        	print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-        			100f*lastp, 
-        			Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
-        			gf._1,
-        			gf._2, 
-        			bytes*1e-9,
-        			bytes/gf._2*1e-6))  
-        			if (useGPU) {
-        				print(", GPUmem=%3.6f" format GPUmem._1) 
-        			}
-        	println;
-        	lasti = reslist.length;
-        }
-        if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
-          model.save(opts.checkPointFile format lastCheckPoint);
-          lastCheckPoint += 1;          
-        }
-      }
-      if (updater != null) updater.updateM(ipass)
-      ipass += 1
+      nextPass(null);
     }
-    val gf = gflop;
+    wrapUp;
+  }
+  
+  def firstPass(iter:Iterator[(AnyRef, MatIOtrait)]):Unit = {
+  	if (iter != null) {
+  		datasource.asInstanceOf[IteratorSource].opts.iter = iter;
+  	}
+    setup
+    init
+
+    done = false;
+    ipass = 0;
+    here = 0L;
+    lasti = 0;
+    bytes = 0L;
+    if (updater != null) updater.clear;
+    cacheState = Mat.useCache;
+    Mat.useCache = opts.useCache;
+    reslist = new ListBuffer[FMat];
+    samplist = new ListBuffer[Float];
+    flip;
+    nextPass(iter);
+  }
+
+  
+  def nextPass(iter:Iterator[(AnyRef, MatIOtrait)]): Unit = {
+    if (opts.debugMem && ipass > 0) Mat.debugMem = true;
+    var lastp = 0f
+    if (iter != null) {
+      datasource.asInstanceOf[IteratorSource].opts.iter = iter;
+    }
+    datasource.reset
+    var istep = 0
+    println("pass=%2d" format ipass)
+    while (datasource.hasNext) {
+      val mats = datasource.next;
+      here += datasource.opts.batchSize
+      bytes += mats.map(Learner.numBytes _).reduce(_+_);
+      val dsp = datasource.progress;
+      val gprogress = (ipass + dsp)/opts.npasses;
+      if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
+        if (opts.updateAll) {
+          model.dobatchg(mats, ipass, here);
+          if (mixins != null) mixins map (_ compute(mats, here));
+          if (updater != null) updater.update(ipass, here, gprogress);
+        }
+        val scores = model.evalbatchg(mats, ipass, here);
+        if (datasink != null) datasink.put;
+        reslist.append(scores.newcopy)
+        samplist.append(here)
+      } else {
+        model.dobatchg(mats, ipass, here)
+        if (mixins != null) mixins map (_ compute(mats, here))
+        if (updater != null) updater.update(ipass, here, gprogress)
+      }
+      if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
+      istep += 1
+      if (dsp > lastp + opts.pstep && reslist.length > lasti) {
+        val gf = gflop
+        lastp = dsp - (dsp % opts.pstep)
+        print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+          100f*lastp,
+          Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
+          gf._1,
+          gf._2,
+          bytes*1e-9,
+          bytes/gf._2*1e-6))
+        if (useGPU) {
+          print(", GPUmem=%3.6f" format GPUmem._1)
+        }
+        println;
+        lasti = reslist.length;
+      }
+      if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
+        model.save(opts.checkPointFile format lastCheckPoint);
+        lastCheckPoint += 1;
+      }
+    }
+    if (updater != null) updater.updateM(ipass)
+    ipass += 1
+  }
+
+  def wrapUp {
+  	val gf = gflop;
     Mat.useCache = cacheState;
     Mat.debugMem = debugMemState;
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))

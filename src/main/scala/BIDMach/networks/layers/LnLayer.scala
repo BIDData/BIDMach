@@ -23,7 +23,7 @@ class LnLayer(override val net:Net, override val opts:LnNodeOpts = new LnNode) e
 
 	override def forward = {
 			val start = toc;
-			createoutput;
+			createOutput;
 			ln(inputData, output);
 			clearDeriv;
 			forwardtime += toc - start;
@@ -34,6 +34,10 @@ class LnLayer(override val net:Net, override val opts:LnNodeOpts = new LnNode) e
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv/inputData);    
 			backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "ln@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait LnNodeOpts extends NodeOpts {  
@@ -44,6 +48,10 @@ class LnNode extends Node with LnNodeOpts {
 	override def clone:LnNode = {copyTo(new LnNode).asInstanceOf[LnNode];}
 
   override def create(net:Net):LnLayer = {LnLayer(net, this);}
+  
+  override def toString = {
+    "ln@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object LnLayer {  

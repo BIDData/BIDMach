@@ -186,7 +186,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     nfeats = mats(0).nrows;
     val nc = mats(0).ncols;
     batchSize = nc;
-    val nnz = mats(1).nnz;
     datasource.reset;   
     nnodes = opts.nnodes; 
     ntrees = opts.ntrees;
@@ -324,7 +323,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val depth = if (opts.training) ipass else opts.depth
     val data = full(gmats(0));
-    val cats = gmats(1);
+    val cats = if (gmats.length > 1) gmats(1) else null;
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
     val fnodes:FMat = zeros(ntrees, data.ncols);
     data match {
@@ -346,17 +345,25 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     if (opts.regression) {
       var mm = mean(fnodes);
       if (ogmats != null) {
-        val pcats = if (cats.nrows == 1) mm else mm on sqrt(variance(fnodes))
+        val pcats = if (cats.asInstanceOf[AnyRef] == null || cats.nrows == 1) mm else mm on sqrt(variance(fnodes))
         ogmats(0) = pcats;
       }
-      val diff = mm - FMat(cats)
-      if (opts.MAE) -mean(abs(diff)) else -(diff dotr diff)/diff.length
-    } else {
-      val mm = tally(fnodes);
-      if (ogmats != null) {
-        ogmats(0) = mm;
+      if (gmats.length > 1) {
+      	val diff = mm - FMat(cats);
+      	if (opts.MAE) -mean(abs(diff)) else -(diff dotr diff)/diff.length;
+      } else {
+        row(0);
       }
-      -mean(FMat(mm != IMat(cats)));
+    } else {
+    	val mm = tally(fnodes);
+    	if (ogmats != null) {
+    		ogmats(0) = mm;
+    	}
+    	if (gmats.length > 1) {
+    		-mean(FMat(mm != IMat(cats)));
+    	} else {
+    	  row(0);
+    	}
     }
   } 
   
@@ -413,7 +420,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       vtrees(inodes, itree) = outv(inds);                               // Threshold values
       val reqgain = opts.gain
       val igain = find(vm > reqgain);                                   // find nodes above the impurity gain threshold
-      gains(itree) = mean(vm).v
+      gains(itree) = if (vm.length>0) mean(vm).v else 0;
       igains(itree) = igain.length
       if (igain.length > 0) {
         val inn = inodes(igain);
@@ -855,9 +862,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   } */
 
   def splittableNodes(blockv:SVec):Array[SVec] = { 
-    (0 until ntrees).par.map(i => { 
-      splittableNodes_thread(blockv, i);
-    }).toArray
+    (0 until ntrees).par.map(i => {splittableNodes_thread(blockv, i);}).toArray;
   }
 
   def splittableNodes_thread(blockv:SVec, itree:Int):SVec = {
@@ -893,7 +898,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
     val key = keys(istart);
     val ktree = if ((key & lsign) != 0) extractField(ITree, key, fieldshifts, fieldmasks) else ntrees;
-    if (itree == ktree) istart else iend;
+    if (itree <= ktree) istart else iend;
   }
 
   // Find boundaries where JFeat or ITree changes
@@ -1402,6 +1407,7 @@ object RandomForest {
   
   def predictor(model:Model, data:Mat):(Learner, PredOpts) = {
     val opts = new PredOpts;
+    model.opts.asInstanceOf[RandomForest.Opts].training = false;
     opts.copyFrom(model.opts);
     val nn = new Learner(
         new MatSource(Array(data), opts),

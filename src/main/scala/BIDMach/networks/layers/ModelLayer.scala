@@ -46,15 +46,15 @@ trait ModelNodeOpts extends NodeOpts {
     opts.imodel = imodel;
     opts;
   }
-  
-  def copyTo(opts:ModelNodeOpts):ModelNodeOpts = {
-    this.asInstanceOf[NodeOpts].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
 }
     
 class ModelNode extends Node with ModelNodeOpts {
+  
+  def copyTo(opts:ModelNode):ModelNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
     
   override def clone:ModelNode = {
     copyTo(new ModelNode).asInstanceOf[ModelNode];

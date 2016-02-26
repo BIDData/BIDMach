@@ -25,10 +25,10 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 
   override def forward = {
 		  val start = toc;
-      createoutput;
-      output ~ inputData - maxi(inputData)
-      exp(output, output);  // ensures sum(exps) is between 1 and nfeats
-      output ~ output / sum(output);
+      createOutput;
+      output.asMat ~ inputData.asMat - maxi(inputData.asMat)
+      exp(output.asMat, output.asMat);  // ensures sum(exps) is between 1 and nfeats
+      output.asMat ~ output.asMat / sum(output.asMat);
       clearDeriv;
       forwardtime += toc - start;
   }
@@ -38,9 +38,9 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
-        deriv ~ zero - output;
+        deriv.asMat ~ zero - output.asMat;
         val inds = target + coloffsets;
-			  deriv(inds) = deriv(inds) + 1f;               // deriv = target - preds
+			  deriv.asMat(inds) = deriv.asMat(inds) + 1f;               // deriv = target - preds
         inputDeriv ~ inputDeriv + deriv; 
       }
 		  backwardtime += toc - start;
@@ -50,10 +50,14 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
     if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
     val inds = target + coloffsets;
     if (opts.scoreType == 1) {
-      FMat(mean(output(inds) == maxi(output)));
+      FMat(mean(output(inds) == maxi(output.asMat)));
     } else {
     	FMat(mean(ln(output(inds))));   
     }
+  }
+  
+  override def toString = {
+    "softmaxout@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
@@ -65,19 +69,23 @@ trait SoftmaxOutputNodeOpts extends NodeOpts {
 			opts.scoreType = scoreType;
 			opts;
 	}
-	
-	 def copyTo(opts:SoftmaxOutputNodeOpts):SoftmaxOutputNodeOpts = {
-    this.asInstanceOf[NodeOpts].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
 }
 
 class SoftmaxOutputNode extends Node with SoftmaxOutputNodeOpts {
+  
+  def copyTo(opts:SoftmaxOutputNode):SoftmaxOutputNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
 
 	override def clone:SoftmaxOutputNode = {copyTo(new SoftmaxOutputNode).asInstanceOf[SoftmaxOutputNode];}
 
 	override def create(net:Net):SoftmaxOutputLayer = {SoftmaxOutputLayer(net, this);}
+  
+   override def toString = {
+    "softmaxout@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
   
 object SoftmaxOutputLayer { 

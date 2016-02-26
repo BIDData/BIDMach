@@ -45,9 +45,9 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
-    createoutput(mm.nrows, inputData.ncols);
-    output ~ mm * inputData;
-    if (opts.hasBias) output ~ output + modelmats(imodel).colslice(modelcols, modelcols+1);
+    createOutput(mm.nrows \ inputData.ncols);
+    output.asMat ~ mm * inputData.asMat;
+    if (opts.hasBias) output.asMat ~ output.asMat + modelmats(imodel).colslice(modelcols, modelcols+1);
     clearDeriv;
     forwardtime += toc - start;
   }
@@ -57,16 +57,16 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
 	  val modelcols = inputData.nrows;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      mm.madd(deriv, inputDeriv, true, false);
+      mm.madd(deriv.asMat, inputDeriv.asMat, true, false);
     }
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
       val istep = (pos + firststep)/firststep;
-      ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
+      ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
     	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
-    	deriv.madd(inputData, um, false, true);
-      if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv,2)
+    	deriv.asMat.madd(inputData.asMat, um, false, true);
+      if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv.asMat,2)
     }
     backwardtime += toc - start;
   }
@@ -88,6 +88,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     mask = aopts.mask;
     ADAinitialized = true;
   }
+  
+  override def toString = {
+    "linear@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait LinNodeOpts extends ModelNodeOpts {
@@ -102,15 +106,18 @@ trait LinNodeOpts extends ModelNodeOpts {
   		opts.outdim = outdim;
   		opts;
   }
-  
-  def copyTo(opts:LinNodeOpts):LinNodeOpts = {
-    this.asInstanceOf[NodeOpts].copyTo(opts);
-    copyOpts(opts);
-    opts
-  }
 }
     
 class LinNode extends ModelNode with LinNodeOpts {
+  def copyTo(opts:LinNode):LinNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
+  
+  override def toString = {
+    "linear@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
     
   override def clone:LinNode = {
     copyTo(new LinNode).asInstanceOf[LinNode];

@@ -21,12 +21,11 @@ import BIDMach.networks._
 
 class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode) extends Layer(net, opts) { 
   
-  override val _inputs = new Array[Layer](opts.ninputs);
-  override val _inputTerminals = new Array[Int](opts.ninputs);
+  override val _inputs = new Array[LayerTerm](opts.ninputs);
 
 	override def forward = {
       val start = toc;
-			createoutput(inputData.nrows, inputData.ncols);
+			createOutput(inputData.dims);
 			output <-- inputData;
 			(1 until inputlength).map((i:Int) => output ~ output + inputDatas(i));
 			clearDeriv;
@@ -40,25 +39,32 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
 			});
 			backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "add@"+("%04x" format (hashCode % 0x10000));
+  }
 }
 
 trait AddNodeOpts extends NodeOpts {
 	var ninputs = 2;
-	override val inputs:Array[NodeOpts] = new Array[NodeOpts](ninputs);
-	override val inputTerminals:Array[Int] = new Array[Int](ninputs);
-	
-	def copyTo(opts:AddNodeOpts):AddNodeOpts = {
-			super.copyTo(opts);
-			opts.ninputs = ninputs;
-			opts;
-	}
 }
 
 class AddNode extends Node with AddNodeOpts {
+	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
+  
+   def copyTo(opts:AddNode):AddNode = {
+      super.copyTo(opts);
+      opts.ninputs = ninputs;
+      opts;
+  }
 
 	override def clone:AddNode = {copyTo(new AddNode).asInstanceOf[AddNode];}
 
 	override def create(net:Net):AddLayer = {AddLayer(net, this);}
+  
+  override def toString = {
+   "add@"+("%04x" format (hashCode % 0x10000));
+  }
 }
 
 object AddLayer { 

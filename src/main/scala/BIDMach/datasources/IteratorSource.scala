@@ -12,7 +12,7 @@ import java.io._
  *  We assume the iterator returns pairs from a Sequencefile of (StringWritable, MatIO)
  */
 
-class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) extends DataSource(opts) { 
+class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f;
   var blockSize = 0;
   var samplesDone = 0;
@@ -21,7 +21,7 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
   var fprogress:Float = 0
   var inMats:Array[Mat] = null;
   var inFname:Array[String] = null;
-  var iter:Iterator[(AnyRef, AnyRef)] = null;
+  @transient var iter:Iterator[(AnyRef, MatIOtrait)] = null;
   var nblocks = -1;
   var iblock = 0;
   
@@ -42,10 +42,10 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
       val mm = inMats(i);
       val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
       omats(i) = mm match {
-        case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_FMat".##);
-        case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_IMat".##);
-        case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_DMat".##);
-        case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_SMat".##);
+        case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_FMat".##);
+        case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_IMat".##);
+        case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_DMat".##);
+        case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_SMat".##);
       }
     } 
   }
@@ -123,7 +123,7 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
   }
   
   def iterNext() = {
-    inMats = iter.next._2.asInstanceOf[MatIOtrait].get
+    inMats = iter.next._2.get
   }
   
   def lazyTranspose(a:Mat) = {
@@ -140,10 +140,10 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
       out 
     } else {
     	out match {
-    	case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_FMat".##);
-    	case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_IMat".##);
-    	case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_DMat".##);
-    	case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorDS_SMat".##);
+    	case a:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_FMat".##);
+    	case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_IMat".##);
+    	case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_DMat".##);
+    	case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_SMat".##);
     	}
     }
   }
@@ -155,18 +155,18 @@ class IteratorDS(override val opts:IteratorDS.Opts = new IteratorDS.Options) ext
 }
 
 
-object IteratorDS {
+object IteratorSource {
   
-  def apply(opts:IteratorDS.Opts):IteratorDS = {
-    new IteratorDS(opts);
+  def apply(opts:IteratorSource.Opts):IteratorSource = {
+    new IteratorSource(opts);
   } 
  
   trait Opts extends DataSource.Opts {
     var nmats = 1;
     var dorows:Boolean = false
-    var iter:Iterator[Tuple2[AnyRef, MatIOtrait]] = null;
+    @transient var iter:Iterator[Tuple2[AnyRef, MatIOtrait]] = null;
     var eltsPerSample = 10;
-    var throwMissing:Boolean = false
+    var throwMissing:Boolean = false; 
   }
   
   class Options extends Opts {}

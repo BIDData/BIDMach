@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -20,17 +20,16 @@ import BIDMach.networks._
 
 class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode) extends Layer(net, opts) {  
   
-	override val _inputs = new Array[Layer](opts.ninputs);
-	override val _inputTerminals = new Array[Int](opts.ninputs);
+	override val _inputs = new Array[LayerTerm](opts.ninputs);
   val qeps = 1e-40f;
   
-  def guardSmall(a:Mat, eps:Float):Mat = {
+  def guardSmall(a:ND, eps:Float):ND = {
     a + (abs(a) < eps) * (2*eps);
   }
 
 	override def forward = {
     val start = toc;
-	  createoutput(inputData.nrows, inputData.ncols);
+	  createOutput(inputData.dims);
 	  output <-- inputData;
 	  (1 until inputlength).map((i:Int) => output ~ output ∘ inputDatas(i));
 	  clearDeriv;
@@ -50,25 +49,32 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
     }
     backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "mul@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait MulNodeOpts extends NodeOpts {  
 	var ninputs = 2;
-	override val inputs:Array[NodeOpts] = new Array[NodeOpts](ninputs);
-	override val inputTerminals:Array[Int] = new Array[Int](ninputs);
-
-	def copyTo(opts:MulNodeOpts):MulNodeOpts = {
-			super.copyTo(opts);
-			opts.ninputs = ninputs;
-			opts;
-	}
 }
 
 class MulNode extends Node with MulNodeOpts {
+  override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
+  
+  def copyTo(opts:MulNode):MulNode = {
+      super.copyTo(opts);
+      opts.ninputs = ninputs;
+      opts;
+  }
 
 	override def clone:MulNode = {copyTo(new MulNode).asInstanceOf[MulNode];}
 
 	override def create(net:Net):MulLayer = {MulLayer(net, this);}
+  
+  override def toString = {
+    "mul@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
   
 object MulLayer {  

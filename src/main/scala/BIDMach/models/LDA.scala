@@ -267,7 +267,7 @@ object LDA  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
   	opts.resFile = "../results.mat"
-  	implicit val threads = threadPool(4)
+  	implicit val threads = threadPool(12)
   	val nn = new ParLearnerF(
   	    new SFileSource(opts),
   	    opts, mkLDAmodel _, 

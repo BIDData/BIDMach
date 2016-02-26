@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -18,12 +18,12 @@ import BIDMach.networks._
  */
 
 class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode) extends Layer(net, opts) {
-	var vmap:Mat = null;
+	var vmap:ND = null;
 
   override def forward = {
 		  val start = toc;
-		  createoutput(1, inputData.ncols);
-		  output <-- sum(inputData);
+		  createOutput(1 \ inputData.ncols);
+		  output.asMat <-- sum(inputData.asMat);
 		  clearDeriv;
 		  forwardtime += toc - start;
   }
@@ -33,6 +33,10 @@ class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode
 		  if (vmap.asInstanceOf[AnyRef] == null) vmap = deriv.ones(output.nrows, 1);
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (vmap * deriv);  
 		  backwardtime += toc - start;
+  }
+  
+  override def toString = {
+    "sum@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
@@ -44,6 +48,10 @@ class SumNode extends Node with SumNodeOpts {
 	override def clone:SumNode = {copyTo(new SumNode).asInstanceOf[SumNode];}
 
   override def create(net:Net):SumLayer = {SumLayer(net, this);}
+  
+  override def toString = {
+    "sum@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object SumLayer {  
