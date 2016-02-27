@@ -229,6 +229,43 @@ object Net  {
     var nmodelmats = 0;
     var nodeset:NodeSet = null;
   }
+  var lastMap:Mat = null
+  var counter = 0 
+  var interval = 10
+  var modelId = 0
+  
+  def logChange(model:Model,data:Array[Mat]) = {
+        val net = model//.asInstanceOf[NextWord]
+        val vec = net.modelmats(modelId) //InputMap
+        if (counter%interval==0){
+            
+            if (lastMap == null){
+                lastMap = vec.zeros(vec.nrows,vec.ncols)
+            }
+            else{
+                val delta = vec - lastMap
+                val meanChange = mean(delta dot delta).dv
+                
+                val sim = lastMap*^vec
+                val n = sim.nrows
+                val diag = sim(irow(0->n)*(n+1))
+                val meanSelf = mean(diag).dv
+                
+                val (v,i) = maxi2(sim)
+                val id = find(IMat(i-irow(0->n)))
+                val meanShift = if (id.size>0) mean(v(id)).dv else 0
+                println(Console.GREEN+("AvgDiff=%.6f,  AvgNorm=%.2f,  AvgShift=%.2f,  Shifted=%d" format (meanChange,meanSelf,meanShift,id.size))+Console.BLACK)
+                //println(FMat(v).data.take(5).toList)
+                //println(FMat(v(id)).data.toList)
+                //println(id.size)
+                
+            }
+            lastMap<--vec
+        }
+        counter+=1
+        Array(vec)
+    }
+  
   
   class Options extends Opts {}
   
