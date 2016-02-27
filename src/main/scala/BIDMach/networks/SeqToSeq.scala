@@ -24,8 +24,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var dstxdata0:Mat = null;
   var srcGrid:LayerMat = null;
   var dstGrid:LayerMat = null;
-  var srcNodeGrid:NodeMat = null;
-  var dstNodeGrid:NodeMat = null;
+//  var srcNodeGrid:NodeMat = null;
+//  var dstNodeGrid:NodeMat = null;
   var srcGridOpts:LSTMNode.GridOpts = null;
   var dstGridOpts:LSTMNode.GridOpts = null;
   var height = 0;
@@ -49,8 +49,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     srcGridOpts.modelName = "src_level%d";
     srcGridOpts.netType = LSTMNode.gridTypeNoOutput;
     
-    srcNodeGrid = LSTMNode.grid(height, inwidth, srcGridOpts);
-    srcGrid = LayerMat(srcNodeGrid, this);
+//    srcNodeGrid = LSTMNode.grid(height, inwidth, srcGridOpts);
+//    srcGrid = LayerMat(srcNodeGrid, this);
+    srcGrid = LSTMLayer.grid(this, height, inwidth, srcGridOpts);
     layers = srcGrid.data.filter(_ != null);
     for (i <- 0 until height) srcGrid(i+preamble_rows, 0).setInputs(leftEdge, leftEdge);
     
@@ -61,8 +62,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     	dstGridOpts.netType = LSTMNode.gridTypeSoftmaxOutput;
     	dstGridOpts.outdim = opts.nvocab;
 
-    	dstNodeGrid = LSTMNode.grid(height, outwidth, dstGridOpts);
-    	dstGrid = LayerMat(dstNodeGrid, this);
+//    	dstNodeGrid = LSTMNode.grid(height, outwidth, dstGridOpts);
+//    	dstGrid = LayerMat(dstNodeGrid, this);
+    	dstGrid = LSTMLayer.grid(this, height, outwidth, dstGridOpts);
 
     	srcGrid link dstGrid;
     	layers = layers ++ dstGrid.data.filter(_ != null);
