@@ -454,8 +454,12 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     var i = 0;
     while (i < inodes.length) {
       val inode = inodes(i);
-      ctrees(itrees(inode, itree), itree) = left(i) ;
-      ctrees(itrees(inode, itree)+1, itree) = right(i);
+      val itr = itrees(inode, itree);
+      if (itr+1 >= nnodes) {
+        throw new RuntimeException("Tree %d size exceeds the node limit %d, try increasing nnodes or reducing depth" format (itree, nnodes));
+      }
+      ctrees(itr, itree) = left(i) ;
+      ctrees(itr+1, itree) = right(i);
       i += 1;
     }
 
