@@ -113,14 +113,17 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     		layers(i).forward;
     		i += 1;
     	}
-      var j = 0;
+    var j = 0;
       while (j < output_layers.length) {
     	  output_layers(j).deriv.set(1);
     	  j += 1;
       }
+  	
       if (opts.aopts == null) {
-    	  for (j <- 0 until updatemats.length) updatemats(j).clear;
+    	  for (j <- 0 until updatemats.length) 
+    	      updatemats(j).clear;
       }
+    	
     	while (i > 1) {
     		i -= 1;
     		if (opts.debug > 0) {
@@ -236,7 +239,7 @@ object Net  {
   
   def logChange(model:Model,data:Array[Mat]) = {
         val net = model//.asInstanceOf[NextWord]
-        val vec = net.modelmats(modelId) //InputMap
+        val vec = full(net.modelmats(modelId)) //InputMap
         if (counter%interval==0){
             
             if (lastMap == null){

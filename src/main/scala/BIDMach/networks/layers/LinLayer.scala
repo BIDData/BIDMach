@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -32,9 +32,20 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var ADAinitialized = false;
   
   def initModelMat(nr:Int, nc:Int):Mat = {
-    rand(nr, nc) - 0.5f;
+    println(imodel,opts.modelName)
+    if (imodel != -1) 
+        (rand(nr, nc) - 0.5f)*0.15
+    else{
+        val x=Array(0,105,113)
+        val y=Array(0,64,128)
+        val r=y.map(nr-_)
+        val c=Array(x(1),x(2)-x(1),nc-x(2))
+        //TMat(nr,nc,x,y,Array((GMat(rand(nr, nc)) - 0.5f)*0.15));
+        TMat(nr,nc,x,y,Array(0,1,2).map(i=>(GMat(rand(r(i), c(i))) - 0.5f)*0.15))
+    }
   }
-
+  
+    var tot=0
   override def forward = {
     val start = toc;
     val modelcols = inputData.nrows;
@@ -42,11 +53,14 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
       modelmats(imodel) = convertMat(initModelMat(outdim, modelcols + (if (opts.hasBias) 1 else 0)));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
+      updatemats(imodel).clear
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     createOutput(mm.nrows \ inputData.ncols);
+    //println("!")
     output.asMat ~ mm * inputData.asMat;
+    //println("@@")
     if (opts.hasBias) output.asMat ~ output.asMat + modelmats(imodel).colslice(modelcols, modelcols+1);
     clearDeriv;
     forwardtime += toc - start;
@@ -64,7 +78,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       val istep = (pos + firststep)/firststep;
       ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
-    	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
+        val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
     	deriv.asMat.madd(inputData.asMat, um, false, true);
       if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv.asMat,2)
     }

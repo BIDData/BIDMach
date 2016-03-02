@@ -149,7 +149,7 @@ object NextWord {
   	val nn = new Learner(
   	    new MatSource(Array(mat0), opts), 
   	    new NextWord(opts), 
-  	    Array(new L1Regularizer(opts)),
+  	    null,//Array(new L1Regularizer(opts)),
   	    new ADAGrad(opts), 
   	    null,
   	    opts)
