@@ -1,0 +1,137 @@
+import BIDMach.networks._
+import scala.io.Source
+import BIDMach.datasources._
+import scala.util.Random
+import BIDMach._
+import BIDMach.updaters._
+import BIDMach.mixins._
+import BIDMat.TMat
+
+//val a=IMat(rand(1,10000)*10)
+      class LearnOptions extends Learner.Options with NextWord.Opts with MatSource.Opts with ADAGrad.Opts with L2Regularizer.Opts
+      def getLearner(mat0:Mat) = {
+        val opts = new LearnOptions;
+        opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
+      	val nn = new Learner(
+      	    new MatSource(Array(mat0), opts), 
+      	    new NextWord(opts), 
+      	    Array(new L2Regularizer(opts)),
+      	    new ADAGrad(opts), 
+      	    null,
+      	    opts)
+        (nn, opts)
+      }
+    
+    def getSample(p:FMat) : Int = {
+        val v = Random.nextFloat
+        var cur = 0f
+        //println(sum(p).dv)
+        for(i<-0 until p.size) {
+            cur+=p.data(i) 
+            if (cur>=v)
+                return i
+        }
+        0
+    }
+    
+    def sample(model:NextWord, N: Int,s:Array[Int]) = {
+        val width = model.opts.width
+        val batchSize = model.datasource.opts.batchSize
+        val tmp = irow(s)
+        model.gmats(0)<--tmp//IMat(1,batchSize)
+        model.ogmats=new Array[Mat](width)
+        val res = new Array[Int](N)
+        for(i<-0 until N){
+            model.evalbatch(model.gmats,0,0)
+            val p:FMat = FMat(model.ogmats(width-1)(?,0))
+            val (v,id)=maxi2(p)
+            res(i) = getSample(p)
+            for(j<-0 until width-1)
+                tmp(j)=tmp(j+1)
+            tmp(width-1) = res(i)
+            model.gmats(0)<--tmp
+        }
+        println(res.map(_.toChar).mkString)
+        //res//.map(_.toChar).mkString
+        /*println(model.evalbatch(model.mats,0,0).data.toList)
+        println(model.ogmats(0).nrows,model.ogmats(0).ncols)
+        val (v,i) = maxi2(model.ogmats(0))
+        println(v)
+        println(i)*/
+    }
+    
+    def sample2(model:NextWord, N: Int,s:Array[Int]) = {
+        val width = model.opts.width
+        val batchSize = model.datasource.opts.batchSize
+        //for(i<-0 until s.length)
+          //  s(i)=s(i%width)
+        model.gmats(0)<--irow(s)//IMat(1,batchSize)
+        model.ogmats=new Array[Mat](width)
+        val res = new Array[Int](N)
+        val scores=model.evalbatch(model.gmats,0,0)
+        for(i<-0 until N){
+            val p:FMat = FMat(model.ogmats(i%width)(?,i/width))
+            val (v,id)=maxi2(p)
+            res(i) = id(0)//getSample(p)
+        }
+        //println(scores.data.toList)
+        //println(res.map(_.toChar).mkString)
+        println(sum(irow(s.tail.take(N))==irow(res)))
+        //println(s.take(100).toList)
+        //println(s.take(100).)
+        println(res.map(_.toChar).mkString)
+        //.map(_.toChar).mkString
+        /*println(model.evalbatch(model.mats,0,0).data.toList)
+        println(model.ogmats(0).nrows,model.ogmats(0).ncols)
+        val (v,i) = maxi2(model.ogmats(0))
+        println(v)
+        println(i)*/
+    }
+    
+    def getWords(len:Int, n:Int) = {
+        val data = Array.fill(n)(32)
+        val words = Source.fromFile("/home/byeah/data/char-rnn/wordsEn.txt").getLines.filter(_.length<=len)
+                    .toArray
+        val m = 1000    //words.size//100
+        for(i<-0 until n/len) {
+            val s = words(50000+i%m)
+            for(j<-0 until s.size)
+                data(i*len+j) = s(j).toInt
+        }
+        data
+    }
+    
+val prefix="/home/byeah/data/char-rnn/";
+val filename=prefix+"shakespeare_input.txt";
+val data = getWords(10,200000)
+//val data = Source.fromFile(filename).filter(c=>c.toInt>0&&c.toInt<130).map(_.toInt).toArray;
+println("Length: "+data.length);
+println(data.toList.take(30));
+val split = 4000000
+val (l,o)=NextWord.learner(irow(data.take(split)));
+//val (l,o)=getLearner(irow(data.take(4000000)));
+o.nvocab=130;
+o.npasses=10;
+o.lrate=0.2;
+o.height=1;
+o.width = 10
+o.batchSize=5000;
+o.autoReset=false;
+o.dim=256
+o.kind=4
+//o.debug=1
+//o.reg2weight=0f//.0001f
+Net.interval = 10
+o.logFuncs=Array(Net.logChange)
+l.train
+//l.model.layers(0).ge
+//sample(l.model.asInstanceOf[NextWord], 100,97,null)//data.take(10000))
+//sample2(l.model.asInstanceOf[NextWord], 1000,data.slice(split,split+o.batchSize+1))
+//sample(l.model.asInstanceOf[NextWord], 1000,data.slice(split,split+o.batchSize+1))
+//sample(l.model.asInstanceOf[NextWord], 1000,data.take(o.batchSize))
+ //sample2(l.model.asInstanceOf[NextWord], 1000,data.take(o.batchSize))
+ 
+//println(data.take(100).tail.map(_.toChar).mkString)
+
+
+
