@@ -1,5 +1,5 @@
 package BIDMach.models
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -244,6 +244,7 @@ object Model {
   
   def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {	
 	   a match {
+	   case t:TMat=>t
       case f:FMat =>
       if (useGPU) {
       	if (useDouble) {
