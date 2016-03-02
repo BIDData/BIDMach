@@ -23,6 +23,7 @@ import scala.collection.mutable._
 class BayesNet(val dag:Mat, 
                val states:Mat, 
                val equivClasses:Mat,
+               val isFactorModel:Boolean,
                override val opts:BayesNet.Opts = new BayesNet.Options) extends Model(opts) {
 
   // Miscellaneous, we might want to keep these recorded
@@ -94,7 +95,12 @@ class BayesNet(val dag:Mat,
     // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
     statesPerNode = IMat(states)
     statesPerNodeSAME = kron(onesSAMEvector, IMat(statesPerNode))
-    graph = new Graph(dag, opts.dim, statesPerNode)
+    if (isFactorModel) {
+      graph = new FactorGraph(dag, opts.dim, statesPerNode)
+    } else {
+      graph = new Graph(dag, opts.dim, statesPerNode)
+    }
+    
     graph.color
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
@@ -102,8 +108,8 @@ class BayesNet(val dag:Mat,
    
     // Build the CPT. To avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
-    cptOffset = izeros(graph.n, 1)
-    cptOffset(1 until graph.n) = cumsum(numSlotsInCpt)(0 until graph.n-1)
+    cptOffset = izeros(graph.nFactor, 1)
+    cptOffset(1 until graph.nFactor) = cumsum(numSlotsInCpt)(0 until graph.nFactor-1) // here should be graph.nFactor
     cptOffset = convertMat(cptOffset)
     cptOffsetSAME = kron(onesSAMEvector,cptOffset)
     val lengthCPT = sum(numSlotsInCpt).dv.toInt
@@ -413,9 +419,10 @@ class BayesNet(val dag:Mat,
     for (i <- 1 until opts.copiesForSAME) {
       // Unlike other things where we could use kron, here we change indices b/c we use this
       // for matrix indexing when "clearing out columns" in usertrans when sampling.
-      cg.idsInColorSAME = cg.idsInColorSAME on (cg.idsInColor + i*graph.n)
+      cg.idsInColorSAME = cg.idsInColorSAME on (cg.idsInColor + i*graph.n)    // TODO: should check with Daniel, safe
+      // I think here should be n... not nFactor.
     }
-    cg.numNodesCh = cg.chIdsInColor.length
+    cg.numNodesCh = cg.chIdsInColor.length        // In factor graph case, here will be the num of the correponding factors
     cg.iprojectSliced = SMat(iproject)(?,cg.chIdsInColor)
     cg.iprojectSlicedSAME = createBlockedDiagonal(cg.iprojectSliced)
     cg.globalOffsetVector = convertMat(FMat(cptOffset(cg.chIdsInColor))) // Need FMat to avoid GMat+GIMat
@@ -499,7 +506,7 @@ class BayesNet(val dag:Mat,
     // incremented by graph.n just in case we have a color group with just one node.
     cg.keysSAME = keys
     for (i <- 1 until opts.copiesForSAME) {
-      cg.keysSAME = cg.keysSAME \ (keys + i*graph.n)
+      cg.keysSAME = cg.keysSAME \ (keys + i*graph.n)    // TODO: Check with daniel
     }
     cg.keysSAME = convertMat(cg.keysSAME)
     cg.bkeysSAME = cg.bkeys
@@ -604,6 +611,7 @@ class BayesNet(val dag:Mat,
    * Alternatively, one could avoid those two transposes by making CPT a row vector, but since the
    * code assumes it's a column vector, it makes sense to maintain that convention.
    */
+   // TODO: come to here.
   def getNormConstMatrix(cptLength : Int) : Mat = {
     var ii = izeros(1,1)
     var jj = izeros(1,1)
@@ -878,11 +886,11 @@ object BayesNet {
    * 
    * New: we're adding in an eClass, but we can set that to be null if needed.
    */
-  def learner(statesPerNode:Mat, dag:Mat, eClasses:Mat, data:Mat) = {
+  def learner(statesPerNode:Mat, dag:Mat, eClasses:Mat, isFactorModel:Boolean, factorSet:Array[Array[Int]], data:Mat) = {
 
     class xopts extends Learner.Options with BayesNet.Opts with MatSource.Opts with IncNorm.Opts 
     val opts = new xopts
-    opts.dim = dag.ncols
+    opts.dim = dag.nrows
     opts.batchSize = math.min(100000, data.ncols/50 + 1)
     opts.useGPU = false
     opts.npasses = 2 
@@ -893,7 +901,7 @@ object BayesNet {
 
     val nn = new Learner(
         new MatSource(Array(data:Mat, secondMatrix), opts),
-        new BayesNet(SMat(dag), statesPerNode, eClasses, opts),
+        new BayesNet(SMat(dag), statesPerNode, eClasses, isFactorModel, opts),
         null,
         new IncNorm(opts),
         null,
@@ -909,25 +917,28 @@ object BayesNet {
  * @param statesPerNode, 1-d mat, contains the cardinality of each variable
  * @param n the number of vertices in the graph
  */
-class FactorGraph(val factorSet: Array[Array[Int]], val n, val statesPerNode: Mat) {
-  var mrf: Mat = null
-  var colors: Mat = null
-  var ncolors = 0
-  val maxColor = 100
+class FactorGraph(val factorSet: Mat, val n, val statesPerNode: Mat) extends Graph(factorSet, n, statesPerNode){
+  // var mrf: Mat = null
+  // var colors: Mat = null
+  // var ncolors = 0
+  // val maxColor = 100
+  override var nFactor = factorSet.ncols  // revised by Haoyu, this is the column of the pproject, for Bayes net, nFactor == n
 
   /**
    * Build the dag from the input variables, i.e. re-construct the graph structure matrix.
+   * If there is a self-edge (caused by factor only contains one vertex), we ignore this
+   * self-edge for mrf.
    */
-  def buildDag = {
+  override def moralize = {
     var mrf = izeros(n, n)
-    for (i <- 0 until factorSet.length) {
-      if (factorSet(i).length == 1) {
-        dag(factorSet(i)(0), factorSet(i)(0)) = 1
-      } else {
-        for (orign <- 0 until factorSet(i).length) {
-          for (des <- 0 until factorSet(i).length) {
-            if (dag(orign, des) == 0 && orign != des) {
-              dag(orign, des) = 1
+    for (i <- 0 until factorSet.ncols) {
+      val factors = find(SMat(factorSet(?, i)))
+      if (factors.length > 1) {
+        // we ignore the self-edge here
+        for (orign <- factors.data) {
+          for (des <- factors.data) {
+            if (mrf(orign, des) == 0 && orign != des) {
+              mrf(orign, des) = 1
             }
           }
         }
@@ -936,64 +947,32 @@ class FactorGraph(val factorSet: Array[Array[Int]], val n, val statesPerNode: Ma
   }
 
   /**
-   * color the graph by the same method as Graph class below.
+   * Function to construct the iproject. It has the shape: num of factors * n.
+   * (x1, x2,..., xn) * iproject.t -> local index for corresponding probability value in cpt.
    */
-  def color = {
-    buildDag
-    var colorCount = izeros(maxColor, 1)
-    colors = -1 * iones(n, 1)
-    ncolors = 0
-   
-    // Access nodes sequentially. Find the color map of its neighbors, then find the legal color w/least count
-    val seq = IMat(0 until n)
-    // Can also access nodes randomly
-    // val r = rand(n, 1); val (v, seq) = sort2(r)
-    for (i <- 0 until n) {
-      var node = seq(i)
-      var nbs = find(FMat(mrf(?, node)))
-      var colorMap = iones(ncolors, 1)
-      for (j <- 0 until nbs.length) {
-        if (colors(nbs(j)).dv.toInt > -1) {
-          colorMap(colors(nbs(j))) = 0
-        }
-      }
-      var c = -1
-      var minc = 999999
-      for (k <- 0 until ncolors) {
-        if ((colorMap(k) > 0) && (colorCount(k) < minc)) {
-          c = k
-          minc = colorCount(k)
-        }
-      }
-      if (c == -1) {
-       c = ncolors
-       ncolors = ncolors + 1
-      }
-      colors(node) = c
-      colorCount(c) += 1
-    }
-    colors
-  }
-
-  /**
-   * Function to construct the iproject. It has the row length: num of vertice * num of factors,
-   * and the same column length. Actually, the column length can be just num of vertice, however, we
-   * want to re-use as much as code, and there are some trasnspose during the old code. It's safe to
-   * keep the iproject as a square matrix.
-   */
-   // TODO: Change the iproject.
-   def iproject : SMat = {
-    var res = (pproject.copy).t
-    for (i <- 0 until n) {
-      val parents = find(SMat(pproject(?, i)))
+  override def iproject : SMat = {
+    var res = zeros(nFactor, n)
+    for (i <- 0 until nFactor) {
+      val parents = find(factorSet(?, i))
       var cumRes = 1f
       val parentsLen = parents.length
-      for (j <- 1 until parentsLen) {
-        cumRes = cumRes * IMat(statesPerNode)(parents(parentsLen - j))
+      for (j <- 0 until parentsLen) {
+        if (j > 0) {
+          cumRes = cumRes * IMat(statesPerNode)(parents(parentsLen - j))
+        }
         res.asInstanceOf[SMat](i, parents(parentsLen - j - 1)) = cumRes
       }
-    }
+    }  
     return SMat(res)
+  }  
+
+  /**
+   * Function to derive pproject matrix. The pproject represent the responding relationship
+   * between vertice id and factor. Its each column represents one factor. The row is the 
+   * binary indicator whether we have this vertex in the factor group.
+   **/
+  override def pproject : SMat = {
+    return SMat(factorSet)
   }
 }
 
@@ -1014,6 +993,7 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
   var colors: Mat = null
   var ncolors = 0
   val maxColor = 100
+  var nFactor = n   // revised by Haoyu, this is the column of the pproject, for Bayes net, nFactor == n
    
   /**
    * Connects the parents of a certain node, a single step in the process of moralizing the graph.
