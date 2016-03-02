@@ -1,0 +1,120 @@
+import BIDMach.networks._
+import scala.io.Source
+import BIDMach.datasources._
+import scala.util.Random
+
+    def getSample(p:FMat) : Int = {
+        val v = Random.nextFloat
+        var cur = 0f
+        //println(sum(p).dv)
+        for(i<-0 until p.size) {
+            cur+=p.data(i) 
+            if (cur>=v)
+                return i
+        }
+        0
+    }
+    
+    def sample(model:NextWord, N: Int,s:Array[Int]) = {
+        val width = model.opts.width
+        val batchSize = model.datasource.opts.batchSize
+        val tmp = irow(s)
+        model.gmats(0)<--tmp//IMat(1,batchSize)
+        model.ogmats=new Array[Mat](width)
+        val res = new Array[Int](N)
+        for(i<-0 until N){
+            model.evalbatch(model.gmats,0,0)
+            val p:FMat = FMat(model.ogmats(width-1)(?,0))
+            val (v,id)=maxi2(p)
+            res(i) = getSample(p)
+            for(j<-0 until width-1)
+                tmp(j)=tmp(j+1)
+            tmp(width-1) = res(i)
+            model.gmats(0)<--tmp
+        }
+        println(res.map(_.toChar).mkString)
+        //res//.map(_.toChar).mkString
+        /*println(model.evalbatch(model.mats,0,0).data.toList)
+        println(model.ogmats(0).nrows,model.ogmats(0).ncols)
+        val (v,i) = maxi2(model.ogmats(0))
+        println(v)
+        println(i)*/
+    }
+    
+    def sample2(model:NextWord, N: Int,s:Array[Int]) = {
+        val width = model.opts.width
+        val batchSize = model.datasource.opts.batchSize
+        //for(i<-0 until s.length)
+          //  s(i)=s(i%width)
+        model.gmats(0)<--irow(s)//IMat(1,batchSize)
+        model.ogmats=new Array[Mat](width)
+        val res = new Array[Int](N)
+        val scores=model.evalbatch(model.gmats,0,0)
+        for(i<-0 until N){
+            val p:FMat = FMat(model.ogmats(i%width)(?,i/width))
+            val (v,id)=maxi2(p)
+            res(i) = id(0)//getSample(p)
+        }
+        //println(scores.data.toList)
+        //println(res.map(_.toChar).mkString)
+        println(sum(irow(s.tail.take(100))==irow(res)))
+        //println(s.take(100).toList)
+        //println(s.take(100).)
+        println(res.map(_.toChar).mkString)
+        //.map(_.toChar).mkString
+        /*println(model.evalbatch(model.mats,0,0).data.toList)
+        println(model.ogmats(0).nrows,model.ogmats(0).ncols)
+        val (v,i) = maxi2(model.ogmats(0))
+        println(v)
+        println(i)*/
+    }
+    
+    def generate() = {
+        val n = 20000
+        val data = new Array[Int](n)
+        val width = 10 
+        val w=150
+        for (i<-0 until (n/width))
+            if (i<w){
+                val l = width/2+Random.nextInt(width/2)
+                for(j<-0 until l)
+                    data(i*width+j) = Random.nextInt(26)+1
+            }
+            else
+            {
+                val k = Random.nextInt(w)
+                for(j<-0 until width)
+                    data(i*width+j) = data(k*width+j)
+            }
+        data
+    }
+    
+val prefix="/home/byeah/data/char-rnn/";
+val filename=prefix+"shakespeare_input.txt";
+val data = generate()
+//val data = Source.fromFile(filename).filter(c=>c.toInt>0&&c.toInt<130).map(_.toInt).toArray;
+println("Length: "+data.length);
+println(data.toList.take(10));
+val split = 100000
+val (l,o)=NextWord.learner(irow(data.take(split)));
+o.nvocab=130;
+o.npasses=10;
+o.lrate=0.05;
+o.height=1;
+o.dim=512
+o.kind = 4
+o.width = 50
+o.batchSize=10000;
+o.useGPU=true
+o.autoReset=false
+Net.interval = 10
+o.logFuncs=Array(Net.logChange)
+l.train
+//sample(l.model.asInstanceOf[NextWord], 100,97,null)//data.take(10000))
+//
+/*sample2(l.model.asInstanceOf[NextWord], 100,data.slice(split,split+o.batchSize+1))
+println(data.slice(split,split+o.batchSize+1).take(100).map(_.toChar).mkString)
+val split = 30000
+sample2(l.model.asInstanceOf[NextWord], 100,data.slice(split,split+o.batchSize+1))
+println(data.slice(split,split+o.batchSize+1).take(100).map(_.toChar).mkString)
+*/
