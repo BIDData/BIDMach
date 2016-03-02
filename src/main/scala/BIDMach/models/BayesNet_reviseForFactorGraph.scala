@@ -917,7 +917,7 @@ object BayesNet {
  * @param statesPerNode, 1-d mat, contains the cardinality of each variable
  * @param n the number of vertices in the graph
  */
-class FactorGraph(val factorSet: Mat, val n, val statesPerNode: Mat) extends Graph(factorSet, n, statesPerNode){
+class FactorGraph(val factorSet: Mat, val n: Int, val statesPerNode: Mat) extends Graph(factorSet, n, statesPerNode){
   // var mrf: Mat = null
   // var colors: Mat = null
   // var ncolors = 0
