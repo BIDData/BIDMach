@@ -251,6 +251,7 @@ class BayesNet(val dag:Mat,
         val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrixSAME) + colorInfo(c).strideVectorSAME
         val logProbs = ln(mm(replicatedOffsetMatrix))
         val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrixSAME).t
+        // TODO: Haoyu, Do the log -max log of each col so that to escape from over flow
       	val t4 = toc;  
         runtimes(2) += t4 - t3;
         // Establish matrices needed for the multinomial sampling
@@ -738,6 +739,7 @@ class BayesNet(val dag:Mat,
   }
   
   /** KL divergence. We assume our mm is normalized. */
+  // TODO: Need to update this method to enable the KL divergence of graphic model
   def computeKL(ipass:Int, here:Long, comparisonCPT:Mat) {
     var klDivergence = convertMat(float(0))
     var numDistributions = 0
