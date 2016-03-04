@@ -142,5 +142,16 @@ object Grad {
       frac * segments(i,1) + (1-frac) * segments(i-1,1);
     }
   }
+  
+   def PWexp(segments:FMat):(Float, Float) => Float = {
+    (nsteps:Float, gprogress:Float) => {
+      var i = 1;
+      while (i < segments.nrows && gprogress > segments(i, 0)) {
+        i += 1;
+      }
+      val frac = (gprogress - segments(i-1,0)) / (segments(i,0) - segments(i-1,0));
+      math.exp(frac * math.log(segments(i,1)) + (1-frac) * math.log(segments(i-1,1))).toFloat;
+    }
+  }
 }
 
