@@ -362,5 +362,8 @@ object LSTMLayer {
     x;
   }
   
-
+  def grid(net:Net, nrows:Int, ncols:Int, opts:LSTMNode.GridOpts):LayerMat = {
+    val nodeGrid = LSTMNode.grid(nrows, ncols, opts);
+    LayerMat(nodeGrid, net);
+  }
 }

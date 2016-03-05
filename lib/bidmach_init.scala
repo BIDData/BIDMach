@@ -9,7 +9,7 @@ import BIDMach.networks.{DNN}
 import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
 import BIDMach.datasinks.{DataSink,MatSink}
 import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
-import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,IncMult,IncNorm,Telescoping}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
 import BIDMach.causal.{IPTW}
 
 Mat.checkMKL(false)
