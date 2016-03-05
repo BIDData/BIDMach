@@ -195,7 +195,7 @@ else
              -lpthread -lm"
 	else 
 	    CPU_LIBS="-L$JAVA_HOME/lib -L${BIDMACH_ROOT}/lib \
-o             -liomp5 -ldl -lpthread -lm"
+             -liomp5 -ldl -lpthread -lm"
 	fi
 	if [ "$ARCH" = "x86" ] ; then
             CULIB="lib"
