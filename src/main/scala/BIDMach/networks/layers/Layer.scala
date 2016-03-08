@@ -98,6 +98,8 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def setOutput(i:Int, v:ND):Layer = {_outputs(i) = v; this}
   def setDeriv(i:Int, v:ND):Layer = {_derivs(i) = v; this}
   def setInput(i:Int, v:LayerTerm) = {_inputs(i) = v; this}
+  def setInputs(v0:LayerTerm, v1:LayerTerm) = {setInput(0, v0); setInput(1, v1); this}
+  def setInputs(v0:LayerTerm, v1:LayerTerm, v2:LayerTerm) = {setInput(0, v0); setInput(1, v1); setInput(2, v2); this}
   
   // Setters and getters for the first input or output
   def input = _inputs(0);
@@ -161,10 +163,101 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
 
 
 object Layer {  
+  def copy(a:LayerTerm) = new CopyLayer(null){inputs(0) = a;}
+
+  def copy = new CopyNode
+  
+  def dropout(a:LayerTerm, dfrac:Float) = new DropoutLayer(null, new DropoutNode{frac = dfrac}){inputs(0) = a}
+  
+  def exp(a:LayerTerm) = new ExpLayer(null){inputs(0) = a;};
+  
+  def GLM(a:LayerTerm)(implicit opts:GLMNodeOpts) = new GLMLayer(null, opts){inputs(0) = a};
+  
+  def input(a:LayerTerm) = new InputLayer(null){inputs(0) = a;};
+  
+  def input = new InputLayer(null);
+  
+    
+  def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null) = {
+    val odim = outdim;
+    val hBias = hasBias;
+    val aaopts = aopts;
+    val mname = name;
+    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts}){inputs(0)=a;};
+  }
+  
+  def linear_(a:LayerTerm)(implicit net:Net, opts:LinNodeOpts) = {
+    new LinLayer(net, opts){inputs(0) = a;}
+  }
+  
+  def ln(a:LayerTerm) = new LnLayer(null){inputs(0) = a};
+  
+  def negsamp(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
+    val odim = outdim;
+    val hBias = hasBias;
+    val aaopts = aopts;
+    val nnsamps = nsamps;
+    val eexpt = expt;
+    val dcr = doCorrect;
+    val sct = scoreType;
+    val mname = name;
+    new NegsampOutputLayer(net, new NegsampOutputNode{modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr}){inputs(0)=a;};
+  }
+    
+  def negsamp_(a:LayerTerm)(implicit net:Net, opts:NegsampOutputNodeOpts) = {
+    new NegsampOutputLayer(net, opts){inputs(0) = a}
+  }
+  
+  def norm(a:LayerTerm)(implicit opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
+  
+  def oneHot(a:LayerTerm) = new OnehotLayer(null){inputs(0) = a};
+  
+  def rect(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
+  
+  def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
+  
+  def σ(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
+
+  def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a};
+  
+  def softmaxout(a:LayerTerm)(scoreTyp:Int=0) =  new SoftmaxOutputLayer(null, new SoftmaxOutputNode{scoreType=scoreTyp}){inputs(0) = a}
+  
+  def softplus(a:LayerTerm) = new SoftplusLayer(null){inputs(0) = a};
+  
+  def splithoriz(a:LayerTerm, np:Int) = new SplitHorizLayer(null, new SplitHorizNode{nparts = np}){inputs(0) = a};
+  
+  def splitvert(a:LayerTerm, np:Int) = new SplitVertLayer(null, new SplitVertNode{nparts = np}){inputs(0) = a};
+  
+  def tanh(a:LayerTerm) = new TanhLayer(null){inputs(0) = a};
+  
+  def lstm(h:LayerTerm, c:LayerTerm, i:LayerTerm, m:String)(net:Net, opts:LSTMNodeOpts) = {
+    val node = new LSTMNode;
+    opts.copyOpts(node);
+    node.modelName = m;
+    node.constructGraph;
+    val n = new LSTMLayer(net, node);
+    n.setInput(0, h);
+    n.setInput(1, c);
+    n.setInput(2, i);
+    n
+  }
+  
+  def lstm_(h:LayerTerm, c:LayerTerm, i:LayerTerm, m:String)(implicit net:Net, opts:LSTMNodeOpts) = {
+    lstm(h, c, i, m)(net, opts);
+  }
+  
 }
 
 class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
   def layer = _layer;
+  
+  def + (a:LayerTerm) = {val n=this; new AddLayer(null){inputs(0)=n; inputs(1)=a}};
+
+  def *@ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+    
+  def ∘ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+        
+  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
 }
 
 trait OutputLayer {}

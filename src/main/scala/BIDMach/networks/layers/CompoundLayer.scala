@@ -23,64 +23,89 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNode = new C
     this
   }
 	
-	var internal_layers:Array[Layer] = null;
-	
 	var grid:LayerMat = null;
+	
+	def internal_layers:Array[Layer] = grid.data;
 	
 	override def forward = {
 			val start = toc;
-			if (net.opts.debug == 0) {
-				internal_layers.map(_.forward);
-			} else {
-				for (i <- 0 until internal_layers.length) {
-					if (net.opts.debug > 0) println("  compound layer forward %d %s" format (i, internal_layers(i).getClass));
-					internal_layers(i).forward;
-				}
+			for (i <- 0 until grid.ncols) {
+			  for (j <- 0 until grid.nrows) {
+			  	val layer = grid(j, i);
+			    if (layer != null) {
+			    	if (net.opts.debug != 0) {
+			    		println("  compound layer forward (%d,%d) %s" format (j, i, layer.getClass));
+			    	}
+			      layer.forward;
+			    }
+			  }
 			}
+
 			for (i <- 0 until opts.outputNumbers.length) {
-				_outputs(i) = internal_layers(opts.outputNumbers(i)).output
-						if (_derivs(i).asInstanceOf[AnyRef] == null){
-							_derivs(i) = internal_layers(opts.outputNumbers(i)).deriv;
-						}
+				_outputs(i) = grid(opts.outputNumbers(i)).output;
+				if (_derivs(i).asInstanceOf[AnyRef] == null){
+					_derivs(i) = grid(opts.outputNumbers(i)).deriv;
+				}
 			}
 			forwardtime += toc - start;
 	}
 	
 	override def backward(ipass:Int, pos:Long) = {
 		val start = toc;
-		if (net.opts.debug == 0) {
-	  internal_layers.reverse.map(_.backward(ipass, pos));
-		} else {
-	    for (i <- internal_layers.length until 1 by -1) {
-	      if (net.opts.debug > 0) println("  compound layer backward %d" format (i-1, internal_layers(i-1).getClass));
-	      internal_layers(i-1).backward(ipass, pos);
-	    }
-	  }
+		for (i <- (grid.ncols - 1) to 0 by -1) {
+		  for (j <- (grid.nrows -1) to 0 by -1) {
+		  	val layer = grid(j, i);
+		  	if (layer != null) {
+		  		if (net.opts.debug != 0) {
+		  			println("  compound layer backward (%d,%d) %s" format (j, i, layer.getClass));
+		  		}
+		  		layer.backward(ipass, pos);
+		  	}
+			}
+		}
     backwardtime += toc - start;
 	}
 		
 	override def getModelMats(net:Net) = {
-	  internal_layers.map(_.getModelMats(net));
+		for (i <- 0 until grid.ncols) {
+			for (j <- 0 until grid.nrows) {
+				val layer = grid(j, i);
+				if (layer != null) {
+					layer.getModelMats(net);
+				}
+			}
+		}
 	}
 
 	def construct = {
-		internal_layers = new Array[Layer](opts.lopts.length);
-	  for (i <- 0 until internal_layers.length) {
-	  	internal_layers(i) = opts.lopts(i).create(net);
-	  	opts.lopts(i).myLayer = internal_layers(i);
-	  	internal_layers(i).parent = this;
-	  }
-	  for (i <- 0 until internal_layers.length) {
-	  	for (j <- 0 until opts.lopts(i).inputs.length) {
-    		if (opts.lopts(i).inputs(j) != null) {
-          val nodeTerm = opts.lopts(i).inputs(j);      
-          internal_layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
-        }
-    	}
-      internal_layers(i) match {
-        case aa:LinLayer => aa.opts.aopts = opts.aopts;
-        case _ =>
-      }
+//		internal_layers = new Array[Layer](opts.lopts.length);
+		grid = LayerMat(opts.grid.nrows, opts.grid.ncols);
+		for (i <- 0 until grid.ncols) {
+		  for (j <- 0 until grid.nrows) {
+		  	val node = opts.grid(j, i);
+		    if (node != null) {
+		    	grid(j, i) = node.create(net);
+		    	node.myLayer = grid(j, i);
+		    	grid(j, i).parent = this;
+		    }
+		  }
+		}
+		for (i <- 0 until grid.ncols) {
+			for (j <- 0 until grid.nrows) {
+			  val node = opts.grid(j, i);
+			  if (node != null) {
+			  	for (k <- 0 until node.inputs.length) {
+			  		if (node.inputs(k) != null) {
+			  			val nodeTerm = node.inputs(k);      
+			  			grid(j, i).setInput(k, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+			  		}
+			  	}
+			  	grid(j, i) match {
+			  	case aa:LinLayer => aa.opts.aopts = opts.aopts;
+			  	case _ =>
+			  	}
+			  }
+			}
 	  }
 	}
   
@@ -96,7 +121,7 @@ trait CompoundNodeOpts extends ModelNodeOpts {
 
 class CompoundNode extends ModelNode with CompoundNodeOpts {
 	var grid:NodeMat = null;
-  var lopts:Array[Node] = null;
+//  var lopts:Array[Node] = null;
   
   override def toString = {
     "compound@"+Integer.toHexString(hashCode % 0x10000).toString

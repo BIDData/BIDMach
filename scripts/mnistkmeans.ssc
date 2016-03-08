@@ -6,10 +6,10 @@ val testdata = test.copy;
 testdata(0->10, ?) = 0;
 val (vbest, ibest) = maxi2(test);
 
-opts.dim = 1000
+opts.dim = 256
 opts.nend = 20;
 opts.batchSize = 20000;
-opts.npasses = 8;
+opts.npasses = 20;
 
 nn.train
 val centroids = FMat(nn.modelmats(0));

@@ -656,3 +656,101 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_applyderiv
   (*env)->ReleasePrimitiveArrayCritical(env, jB, B, 0);
   (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
 }
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_multADAGrad
+(JNIEnv *env, jobject obj, jint nrows, jint ncols, jint nnz, jfloatArray jA, jfloatArray jBdata, jintArray jBir, jintArray jBjc, 
+ jfloatArray jMM, jfloatArray jSumsq, jfloatArray jMask, int maskrows, jfloatArray jlrate, jint lrlen,
+ jfloatArray jvexp, jint vexplen, jfloatArray jtexp, jint texplen, jfloat istep, jint addgrad, jfloat epsilon)
+{
+  float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
+  float * Bdata = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jBdata, JNI_FALSE));
+  int * Bir = (jint *)((*env)->GetPrimitiveArrayCritical(env, jBir, JNI_FALSE));
+  int * Bjc = (jint *)((*env)->GetPrimitiveArrayCritical(env, jBjc, JNI_FALSE));
+  float * MM = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jMM, JNI_FALSE));
+  float * Sumsq = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jSumsq, JNI_FALSE));
+  float * lrate = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jlrate, JNI_FALSE));
+  float * vexp = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jvexp, JNI_FALSE));
+  float * texp = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jtexp, JNI_FALSE));
+  float * Mask = NULL;
+  int i;
+  int ioff = Bjc[0];
+  if (jMask != NULL) Mask = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jMask, JNI_FALSE));
+
+#pragma omp parallel for
+  for (i = 0; i < ncols; i++) {
+    int jstart = Bjc[i] - ioff;
+    int jend = Bjc[i+1] - ioff;
+    int j;
+    if (Mask != NULL || lrlen > 1 || vexplen > 1 || texplen > 1) {
+      for (j = jstart; j < jend ; j++) {
+        float bval = Bdata[j];
+        int ival = Bir[j] - ioff;
+        int k;
+        for (k = 0; k < nrows; k++) {
+          float lr, ve, te, pve, ste, ngrad;
+          float grad = A[k+i*nrows]*bval;
+          int ihere = k+ival*nrows;
+          Sumsq[ihere] += grad*grad + epsilon;
+          if (addgrad) {
+            lr =  (lrlen > 1) ? lrate[k] : lrate[0];
+            ve =  (vexplen > 1) ? vexp[k] : vexp[0];
+            te =  (texplen > 1) ? texp[k] : texp[0];
+            pve = (ve == 0) ? 1.0f : pow(Sumsq[ihere] * istep, ve);
+            ste = pow(istep, te);
+            ngrad = grad * lr * ste / pve;
+            MM[ihere] += ngrad;
+          }
+          if (Mask != NULL) {
+            if (maskrows > 1) {
+              if (Mask[ihere] == 0) MM[ihere] = 0;
+            } else {
+              if (Mask[ival] == 0) MM[ihere] = 0;
+            }
+          }
+        }
+      }
+    } else {
+      float lr, ve, te, pve, ste, ngrad;
+      lr =  lrate[0];
+      ve =  vexp[0];
+      te =  texp[0];
+      for (j = jstart; j < jend ; j++) {
+        float bval = Bdata[j];
+        int ival = Bir[j] - ioff;
+        int k;
+        if (addgrad && ve == 0.5f && te == 0.5f) {
+          for (k = 0; k < nrows; k++) {
+            float grad = A[k+i*nrows]*bval;
+            int ihere = k+ival*nrows;
+            Sumsq[ihere] += grad*grad + epsilon;
+            pve = sqrt(Sumsq[ihere]);
+            ngrad = grad * lr / pve;
+            MM[ihere] += ngrad;
+          }
+        } else {
+          for (k = 0; k < nrows; k++) {
+            float grad = A[k+i*nrows]*bval;
+            int ihere = k+ival*nrows;
+            Sumsq[ihere] += grad*grad + epsilon;
+            if (addgrad) {
+              pve = (ve == 0) ? 1.0f : pow(Sumsq[ihere] * istep, ve);
+              ste = pow(istep, te);
+              ngrad = grad * lr * ste / pve;
+              MM[ihere] += ngrad;
+            }
+          }
+        }
+      }
+    }
+  }
+  if (Mask != NULL) (*env)->ReleasePrimitiveArrayCritical(env, jMask, Mask, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jtexp, texp, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jvexp, vexp, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jlrate, lrate, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jSumsq, Sumsq, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jMM, MM, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jBjc, Bjc, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jBir, Bir, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jBdata, Bdata, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
+}

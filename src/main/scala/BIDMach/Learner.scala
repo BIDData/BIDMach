@@ -46,7 +46,7 @@ case class Learner(
   var debugMemState = false;
 	
   def setup = {
-	Learner.setupPB(datasource, dopts.putBack, mopts.dim)   
+	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)   
   }
   
   def init = {
