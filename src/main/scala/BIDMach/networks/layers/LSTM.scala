@@ -108,6 +108,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  }
 	     
 	  // LSTM with 4 linear layers, with h and i stacked as inputs
+    //
+    //  | Wh_in Wi_in | | h |   +  | Wh_out Wi_out | | h |   +  | Wh_forget Wi_forget | | h |   +  | Wh_g Wi_g | | h |
+    //                  | i |                        | i |                              | i |                    | i |
     
     def constructGraph1 = {
     	import BIDMach.networks.layers.Node._
@@ -147,6 +150,12 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     }
     
     // LSTM with 1 linear layer, with h and i stacked as inputs, and all 4 output stacked
+    // Observed not very stable to train
+    // 
+    //  | Wh_in     Wi_in     |
+    //  | Wh_out    Wi_out    | | h |
+    //  | Wh_forget Wi_forget | | i |
+    //  | Wh_g      Wi_g      |
     
     def constructGraph2 = {
       import BIDMach.networks.layers.Node._   
@@ -182,6 +191,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
     }
     
     // LSTM with two sets of layers, paired outputs. More stable to train than the single linlayer network
+    //
+    //  | Wh_in  Wi_in  | | h |   +  | Wh_forget Wi_forget | | h |
+    //  | Wh_out Wi_out | | i |      | Wh_g      Wi_g      | | i |
     
     def constructGraph3 = {
       import BIDMach.networks.layers.Node._
