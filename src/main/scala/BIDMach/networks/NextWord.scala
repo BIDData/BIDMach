@@ -69,7 +69,7 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
     
     // the top layers
     val lopts2 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
-    val sopts = new SoftmaxOutputNode{scoreType=1};
+    val sopts = new SoftmaxOutputNode{scoreType=opts.scoreType};
     if (opts.allout) {
     	output_layers = new Array[Layer](width);
     	for (j <- 0 until width) {
@@ -124,6 +124,7 @@ object NextWord {
     var kind = 0;
     var allout = true;
     var bylevel = true;
+    var scoreType = 1;
   }
   
   

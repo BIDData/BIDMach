@@ -118,8 +118,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	  output_layers(j).deriv.set(1);
     	  j += 1;
       }
-  	
-      if (opts.aopts == null) {
+  	  if (opts.aopts == null) {
     	  for (j <- 0 until updatemats.length) 
     	      updatemats(j).clear;
       }
@@ -135,6 +134,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     		updatemats(0) ~ updatemats(0) ∘ mask;
     	}
     }
+
   }
   
   def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  

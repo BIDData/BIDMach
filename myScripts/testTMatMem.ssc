@@ -1,0 +1,90 @@
+import BIDMat.{Mat,TMat}
+import edu.berkeley.bid.CUMAT
+
+Mat.useCache=true
+
+val n=4
+//val a=TMat(n,n,Array(0),Array(0),Array(grand(n,n)))
+val a=TMat(n,n,Array(0,2),Array(0,2),Array(grand(n-1,2),grand(2,2)))
+val c=full(a)
+val g=grand(n,n)
+val gg=grand(n,n)
+//gg(0,0)=1f
+gg+(c^*g)
+a.madd(g,gg,true,false)
+//gg
+
+
+/*val n = 4
+val a=TMat(n,n,Array(0,2),Array(0,0),Array(grand(n-1,2),grand(n,2)))
+val c=full(a)
+val g=grand(n,n)
+val s=SMat(rand(n,n)) 
+val gs=GSMat(s)
+c+g*GSMat(gs.toSMat().t)
+//c+g*gs
+//g.madd(gs,a,false,false)
+  g.madd(gs,a,false,true)
+//g.madd(gs,c,false,true)
+//val c=a
+full(a)
+*/
+
+/*val a=TMat(5,3,Array(0),Array(0),Array(grand(3,3)))
+val c=full(a)
+val g=grand(5,4)
+val s=SMat(rand(3,4))
+val gs=GSMat(s)
+c+g*GSMat(gs.toSMat().t)
+g.madd(gs,a,false,true)
+full(a)*/
+
+/*val g=grand(4,4)
+val s=GSMat(SMat(rand(4,4)))
+val c1=GMat.zeros(3,3);
+val c2=GMat.zeros(3,3)
+g.tileMultT(3,3,4,0,0,s,0,0,c1,0,0)
+g.tileMultT(3,3,4,0,0,full(s),0,0,c2,0,0)
+g*GSMat(s.toSMat().t)*/
+
+
+//val d=TMat(n,n,Array(0),Array(0),Array(grand(n,n)))
+/*val b:Mat=a.zeros(n,n)
+val c:Mat=a
+val g:Mat=GMat(2f)
+val gg=grand(n,n)
+val ff=grand(n,n)
+val dd=grand(n/2,n/2)
+var y=Array(0,1,2,3)*/
+
+/*val n = 1000
+val g=grand(n,n)
+val s=sprand(n,n,0.1)//SMat(rand(n,n)) 
+val gs=GSMat(s)*/
+for(i<-1 to 10){
+    //val gst=gs.colslice(i,500+i)//GSMat(gs.toSMat().t)
+    //val gg=g(irow(0 to 500),new BIDMat.IMatWildcard)
+    //val d=c*@g
+    //d~c/(a+g)
+    //d~a+(d*gg+2f)
+    //d~d+g
+    //val c=full(a);
+    //val c=a.full()
+    //val m= 100000
+    //val i1=IMat(m,1,(0 until m).toArray)
+    //val ii=GIMat(irow(0 to m))
+    //val ii=IMat(n/2,1,(10 to (9+n/2)).toArray)
+    //ff(GIMat(ii),GIMat(ii))=dd
+    //ff.madd(gg,a,false,true)
+    //ff~a*gg
+    /*c~b*@g
+    c~b+b
+    c~b*@b
+    c~c/(a*@g)*/
+    //bb~aa(1 to 2,?)*@aa(1 to 2,?)
+    //val b=a*@g
+    //bb~aa*aa
+     //b.madd(c,a)
+    //a.full()
+    //println(GPUmem)
+}

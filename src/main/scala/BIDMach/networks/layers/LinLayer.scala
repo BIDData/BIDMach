@@ -33,20 +33,40 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   
   def initModelMat(nr:Int, nc:Int):Mat = {
     println(imodel,opts.modelName)
-    if (imodel != -1) 
+    //if (imodel != 0 && imodel<5) 
+    //if (imodel != 0 && imodel<3) 
+    if (true)
         (rand(nr, nc) - 0.5f)*0.15
     else{
-        val x=Array(0,105,113)
-        val y=Array(0,64,128)
-        val r=y.map(nr-_)
-        val c=Array(x(1),x(2)-x(1),nc-x(2))
+        //val x=Array(0,105,113)
+        //println("Create",nr,nc)
+        ///println(GPUmem._1)
+        val n = 4
+        //val x=(0 until n).toArray.map(nc*_/n)//Array(0,nc/3,nc/3*2)
+        val x=Array(0,20000,40000,60000)
+        val ratio = 4
+        //val y=Array(nr/2,nr/4,0)//nr/2)
+        //val y=(0 until n).toArray.map((nr-nr/ratio)*_/(n-1))
+        val y=Array(0,64,128,224)
+        //val r=Array(nr/4*3,nr/4*3,nr/4*3)
+        val nnr=if (nr<nc)nr else nc
+        val nnc=if (nr<nc)nc else nr
+        val r=y.map(nnr-_)
+        val c=(0 until n).toArray.map(i=>(if (i!=n-1) x(i+1) else nnc)-x(i))
         //TMat(nr,nc,x,y,Array((GMat(rand(nr, nc)) - 0.5f)*0.15));
-        TMat(nr,nc,x,y,Array(0,1,2).map(i=>(GMat(rand(r(i), c(i))) - 0.5f)*0.15))
+        val res = if (nr<nc)
+                    TMat(nr,nc,x,y,(0 until n).toArray.map(i=>(GMat(rand(r(i), c(i))) - 0.5f)*0.15))
+                  else
+                    TMat(nr,nc,y,x,(0 until n).toArray.map(i=>(GMat(rand(c(i), r(i))) - 0.5f)*0.15))
+        //println(GPUmem._1)
+        res
     }
   }
   
     var tot=0
   override def forward = {
+      //println(opts.modelName,GPUmem._1)
+    
     val start = toc;
     val modelcols = inputData.nrows;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
@@ -57,16 +77,23 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
+    ///if (imodel ==6)println("In f0",GPUmem._1)
     createOutput(mm.nrows \ inputData.ncols);
     //println("!")
+    //if (imodel ==6)println("In f1",GPUmem._1)
     output.asMat ~ mm * inputData.asMat;
     //println("@@")
+    //if (imodel ==6)println("In f2",GPUmem._1)
     if (opts.hasBias) output.asMat ~ output.asMat + modelmats(imodel).colslice(modelcols, modelcols+1);
     clearDeriv;
     forwardtime += toc - start;
+    //if (imodel ==6)println("Out f",GPUmem._1)
+    //println(opts.modelName,GPUmem._1)
+    
   }
 
   override def backward(ipass:Int, pos:Long) = {
+
     val start = toc;
 	  val modelcols = inputData.nrows;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
@@ -79,10 +106,11 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
     } else {
         val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
-    	deriv.asMat.madd(inputData.asMat, um, false, true);
+        deriv.asMat.madd(inputData.asMat, um, false, true);
       if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv.asMat,2)
     }
     backwardtime += toc - start;
+
   }
 
 
