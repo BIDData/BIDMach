@@ -41,6 +41,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
         deriv.asMat ~ zero - output.asMat;
         val inds = target + coloffsets;
 			  deriv.asMat(inds) = deriv.asMat(inds) + 1f;               // deriv = target - preds
+	    //deriv.asMat~deriv.asMat/max(output.asMat(inds),0.1f)
         inputDeriv ~ inputDeriv + deriv; 
       }
 		  backwardtime += toc - start;
@@ -51,7 +52,11 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
     val inds = target + coloffsets;
     if (opts.scoreType == 1) {
       FMat(mean(output(inds) == maxi(output.asMat)));
-    } else {
+    } else 
+    if (opts.scoreType == 2) {
+      FMat(mean(output(inds) >= (sortdown(output.asMat)(4,?))));
+        }
+    else {
     	FMat(mean(ln(output(inds))));   
     }
   }
