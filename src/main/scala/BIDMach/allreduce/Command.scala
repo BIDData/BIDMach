@@ -30,112 +30,28 @@ class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
   def encode()
   def decode()
   
+  override def toString():String = {
+    "Command %s, length %d bytes" format (Command.names(ctype), clen);
+  }
+  
 }
 
 object Command {
 	val magic = 0xa6b38734;
-	val configCtype = 1;
-	val permuteCtype = 2;
-	val allreduceCtype = 3;
-}
-
-class CommandWriter(val me:Master, dest:String, socketnum:Int, command:Command) extends Runnable {
-
-	def run() {
-		var socket:Socket = null;
-		//			log(String.format("M %d W %d Running writer %s\n", imachine, dest, this.toString()));
-		try {
-			socket = new Socket();
-			socket.connect(new InetSocketAddress(dest, socketnum), me.sendTimeout);
-			if (socket.isConnected()) {
-				val ostr = new DataOutputStream(socket.getOutputStream());
-				ostr.writeInt(command.magic)
-				ostr.writeInt(command.ctype);
-				ostr.writeInt(command.clen);
-				ostr.write(command.bytes, 0, command.clen*4);		
-			}
-		}	catch {
-		case e:Exception =>
-		if (me.trace > 0) me.log("Master problem sending command %s\n" format command.toString);
-		} finally {
-			try { if (socket != null) socket.close(); } catch {
-		case e:Exception =>
-		if (me.trace > 0) me.log("Master problem closing socket\n");			  
-		}
-		}
-	}
-}
-
-class CommandReader(val me:Worker, socket:Socket) extends Runnable {
-	def run() {
-		try {
-			val istr = new DataInputStream(socket.getInputStream());
-			val magic = istr.readInt();
-			val ctype = istr.readInt();
-			val clen = istr.readInt();
-			val cmd = new Command(ctype, clen, new Array[Byte](clen*4));
-			if (me.trace > 2) me.log("Worker %d got packet %s\n" format (me.imach, cmd.toString));
-			var waiting = 0;
-			while (waiting < me.cmdTimeout) {
-				Thread.sleep(10);
-				waiting += 10;
-			}
-			istr.readFully(cmd.bytes, 0, clen*4);
-			me.handleCMD(cmd);
-		} catch {
-		  case e:Exception =>	if (me.trace > 0) me.log("Worker %d Problem reading socket "+e.toString()+"\n" format (me.imach));
-		} finally {
-			try {
-			  socket.close();
-			} catch {
-			  case e:IOException => {}
-			}
-		}
-  }
-}
-
-class CommandListener(val me:Worker, val socketnum:Int) extends Runnable {
-	var stop = false;
-	var ss:ServerSocket = null;
-
-	def start() {
-		try {
-			ss = new ServerSocket(socketnum);
-		} catch {
-		case e:Exception => {}
-		}
-	}
-
-	def run() {
-		start();
-		while (!stop) {
-			try {
-				val scs = new CommandReader(me, ss.accept());
-				val fut = me.machExecutor.submit(scs);
-			} catch {
-			case e:SocketException => {
-			}
-			// This is probably due to the server shutting to. Don't do anything.
-			case e:Exception => {
-				if (me.trace > 0) me.log("Machine %d Command listener had a problem "+e format me.imach);
-			}
-			}
-		}
-	}
-
-	def stop(force:Boolean) {
-		stop = true;
-		if (force) {
-			try {
-				stop = true;
-				ss.close();
-			} catch {
-			case e:Exception => {
-				if (me.trace > 0) me.log("Machine %d trouble closing command listener" format me.imach);
-			}
-			}			
-		}
-	}
+	final val configCtype = 1;
+	final val permuteCtype = 2;
+	final val allreduceCtype = 3;
+	final val permuteAllreduceCtype = 4;
+	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce");
+	
+	  
+  def toAddress(v:Int):String = {
+    val p0 = (v >> 24) & 255;
+    val p1 = (v >> 16) & 255;
+    val p2 = (v >> 8) & 255;
+    val p3 = v & 255;
+    "%d.%d.%d.%d" format(p0,p1,p2,p3);
+   }
 }
 
 class ConfigCommand(clen:Int) extends Command(Command.configCtype, clen, new Array[Byte](clen*4)) {
@@ -175,6 +91,24 @@ class ConfigCommand(clen:Int) extends Command(Command.configCtype, clen, new Arr
     workerIPs = izeros(lwips, 1);
     intData.get(workerIPs.data, 0, lwips);    
   }
+  
+  override def toString():String = {
+    var ostring = new StringBuilder("Command %s, length %d bytes" format (Command.names(ctype), clen));
+    ostring.append("\nGroups:\n")
+    for (i <- 0 until gmods.length) {
+      ostring.append("%d " format gmods(i));
+    }
+    ostring.append("\nGridmachines:\n");
+    for (i <- 0 until math.min(20, gridmachines.length)) {
+      ostring.append("%d " format gridmachines(i));
+    }
+    ostring.append("\nWorkerIPs:\n");
+    for (i <- 0 until math.min(20, gridmachines.length)) {
+      ostring.append("%s " format Command.toAddress(workerIPs(i)));
+    }
+    ostring.append("\n")
+    ostring.toString;
+  }
 }
 
 class PermuteCommand() extends Command(Command.permuteCtype, 2, new Array[Byte](2*4)) {
@@ -193,6 +127,10 @@ class PermuteCommand() extends Command(Command.permuteCtype, 2, new Array[Byte](
   override def decode():Unit = {
   	longData.rewind();
     seed = longData.get();    
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d bytes, seed %d" format (Command.names(ctype), clen, seed);
   }
 }
 
@@ -217,9 +155,13 @@ class AllreduceCommand() extends Command(Command.allreduceCtype, 4, new Array[By
   	round = longData.get().toInt;
     limit = longData.get();    
   }
+  
+  override def toString():String = {
+     "Command %s, length %d bytes, round %d limit %d" format (Command.names(ctype), clen, round, limit);
+  }
 }
 
-class PermuteAllreduceCommand() extends Command(Command.allreduceCtype, 6, new Array[Byte](6*4)) {
+class PermuteAllreduceCommand() extends Command(Command.permuteAllreduceCtype, 6, new Array[Byte](6*4)) {
   
   var seed:Long = 0;
   var round:Int = 0;
@@ -243,6 +185,10 @@ class PermuteAllreduceCommand() extends Command(Command.allreduceCtype, 6, new A
   	round = longData.get().toInt;
   	seed = longData.get();
     limit = longData.get();    
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d bytes, round %d seed %d limit %d" format (Command.names(ctype), clen, round, seed, limit);
   }
 }
 

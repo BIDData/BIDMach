@@ -78,14 +78,6 @@ class Master(val opts:Master.Opts) extends Serializable {
   def log(msg:String) {
 		print(msg);	
 	}
-  
-  def toAddress(v:Int):String = {
-    val p0 = (v >> 24) & 255;
-    val p1 = (v >> 16) & 255;
-    val p2 = (v >> 8) & 255;
-    val p3 = v & 255;
-    "%d.%d.%d.%d" format(p0,p1,p2,p3);
-   }
     
   def broadcastCommand(cmd:Command) {
 	  for (imach <- 0 until M) {
@@ -96,7 +88,7 @@ class Master(val opts:Master.Opts) extends Serializable {
 	}
   
   def send(cmd:Command, address:Int) = {
-    val cw = new CommandWriter(this, toAddress(address), socketNum, cmd);
+    val cw = new CommandWriter(this, Command.toAddress(address), socketNum, cmd);
     val fut = executor.submit(cw);
   }
 }
@@ -106,6 +98,7 @@ object Master {
 		var limit = 0;
 		var limitFctn:(Int,Int)=>Int = null;
 		var intervalMsec = 100;
+		var timeScaleMsec = 1e-5f;
 		var permuteAlways = true;
   }
 	
