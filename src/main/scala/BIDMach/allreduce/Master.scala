@@ -10,8 +10,10 @@ import java.util.concurrent.Executors;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.InetSocketAddress;
 import java.io.DataInputStream;
 import java.io.IOException;
+
 
 class Master() extends Serializable {
   
@@ -22,6 +24,8 @@ class Master() extends Serializable {
 	var gmods:IMat = null;
 	var gridmachines:IMat = null;
 	var workerIPs:IMat = null;
+	var socketNum = 50050;
+	var executor:ExecutorService = null;
   
   def configNodes(gmods0:IMat, gridmachines0:IMat, machineIPs:IMat) {
     gmods = gmods0;
@@ -56,8 +60,17 @@ class Master() extends Serializable {
 		print(msg);	
 	}
   
+  def toAddress(v:Int):String = {
+    val p0 = (v >> 24) & 255;
+    val p1 = (v >> 16) & 255;
+    val p2 = (v >> 8) & 255;
+    val p3 = v & 255;
+    "%d.%d.%d.%d" format(p0,p1,p2,p3);
+   }
+  
   def send(cmd:Command, address:Int) = {
-    
+    val cw = new CommandWriter(this, toAddress(address), socketNum, cmd);
+    val fut = executor.submit(cw);
   }
 }
 
