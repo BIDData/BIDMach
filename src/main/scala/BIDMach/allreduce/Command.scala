@@ -25,12 +25,18 @@ class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
   val intData = byteData.asIntBuffer;
   val floatData = byteData.asFloatBuffer;
   val longData = byteData.asLongBuffer;
+  var imach = 0;
+  
+  def encode()
+  def decode()
   
 }
 
 object Command {
 	val magic = 0xa6b38734;
 	val configCtype = 1;
+	val permuteCtype = 2;
+	val allreduceCtype = 3;
 }
 
 class CommandWriter(val me:Master, dest:String, socketnum:Int, command:Command) extends Runnable {
@@ -132,14 +138,20 @@ class CommandListener(val me:Worker, val socketnum:Int) extends Runnable {
 	}
 }
 
-class ConfigCommand(clen:Int, buff:Array[Byte]) extends Command(Command.configCtype, clen, buff) {
+class ConfigCommand(clen:Int) extends Command(Command.configCtype, clen, new Array[Byte](clen*4)) {
   
-  var imach:Int = 0;
   var gmods:IMat = null;
   var gridmachines:IMat = null;
   var workerIPs:IMat = null;
   
-  def encode () = {
+  def setFields(imach0:Int, gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat) {
+    imach = imach0;
+    gmods = gmods;
+    gridmachines = gridmachines0;
+    workerIPs = workerIPs0;
+  }
+  
+  override def encode ():Unit = {
   	intData.rewind();
   	intData.put(imach);
   	intData.put(gmods.length);
@@ -150,7 +162,7 @@ class ConfigCommand(clen:Int, buff:Array[Byte]) extends Command(Command.configCt
   	intData.put(workerIPs.data, 0, workerIPs.length);
   }
   
-  def decode() = {
+  override def decode():Unit = {
   	intData.rewind();
     imach = intData.get();
     val lgmods = intData.get();
@@ -165,6 +177,74 @@ class ConfigCommand(clen:Int, buff:Array[Byte]) extends Command(Command.configCt
   }
 }
 
+class PermuteCommand() extends Command(Command.permuteCtype, 2, new Array[Byte](2*4)) {
+  
+  var seed:Long = 0;
+  
+  def setFields(seed0:Long) {
+    seed = seed0;
+  }
+  
+  override def encode ():Unit = {
+  	longData.rewind();
+  	longData.put(seed);
+  }
+  
+  override def decode():Unit = {
+  	longData.rewind();
+    seed = longData.get();    
+  }
+}
+
+class AllreduceCommand() extends Command(Command.allreduceCtype, 4, new Array[Byte](4*4)) {
+  
+  var round:Int = 0;
+  var limit:Long = 0;
+  
+  def setFields(round0:Int, limit0:Long) {
+    round = round0;
+    limit = limit0;
+  }
+  
+  override def encode():Unit = {
+  	longData.rewind();
+  	longData.put(round);
+  	longData.put(limit);
+  }
+  
+  override def decode():Unit = {
+  	longData.rewind();
+  	round = longData.get().toInt;
+    limit = longData.get();    
+  }
+}
+
+class PermuteAllreduceCommand() extends Command(Command.allreduceCtype, 6, new Array[Byte](6*4)) {
+  
+  var seed:Long = 0;
+  var round:Int = 0;
+  var limit:Long = 0;
+  
+  def setFields(round0:Int, seed0:Long, limit0:Long) {
+    round = round0;
+    seed = seed0;
+    limit = limit0;
+  }
+  
+  override def encode():Unit = {
+  	longData.rewind();
+  	longData.put(round);
+  	longData.put(seed);
+  	longData.put(limit);
+  }
+  
+  override def decode():Unit = {
+  	longData.rewind();
+  	round = longData.get().toInt;
+  	seed = longData.get();
+    limit = longData.get();    
+  }
+}
 
 
 
