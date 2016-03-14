@@ -51,9 +51,7 @@ else
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
     DJAVA_NATIVE="-Djava.library.path=${JAVA_NATIVE}"
 fi
-if [ ! `uname` = "Darwin" ]; then
-    export JAVA_OPTS="${DJAVA_NATIVE} ${JAVA_OPTS}"
-fi
+export JAVA_OPTS="${DJAVA_NATIVE} ${JAVA_OPTS}"
 
 if [ "$1" = "notebook" ]; then
     shift 1
