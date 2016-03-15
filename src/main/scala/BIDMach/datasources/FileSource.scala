@@ -104,9 +104,11 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     rowno = 0;
     fileno = nstart;
     for (i <- 0 until math.max(1,opts.lookahead)) {
-      val ifile = nstart + i
-      val ifilex = ifile % math.max(opts.lookahead, 1)
-      ready(ifilex) = ifile - math.max(1, opts.lookahead)
+      val ifile = nstart + i;
+      val ifilex = ifile % math.max(opts.lookahead, 1);
+      ready.synchronized { 
+      	ready(ifilex) = ifile - math.max(1, opts.lookahead);
+      }
     } 
     totalSize = nend - nstart;
     lastMat = new Array[Mat](fnames.size);
@@ -209,7 +211,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     }
   }
   
-  class Prefetcher(ifile:Int) extends Runnable {
+  class Prefetcher(val ifile:Int) extends Runnable {
 
   	def run() = {
   		val ifilex = ifile % opts.lookahead;
@@ -225,7 +227,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   				for (i <- 0 until fnames.size) {
   					if (fexists) {
   					  val fname = fnames(i)(pnew);
-  					  println("loading %s" format fname);
+  					  println("loading %d %d %d %s" format (inew, pnew, i, fname));
   					  var oldmat:Mat = null;
   					  matqueue.synchronized {
   					    oldmat = matqueue(ifilex)(i);
