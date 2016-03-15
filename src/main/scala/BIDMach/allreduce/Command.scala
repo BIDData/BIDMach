@@ -19,7 +19,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 
-abstract class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
+class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
   val magic = Command.magic;
   val byteData = ByteBuffer.wrap(bytes);
   val intData = byteData.asIntBuffer;
@@ -27,8 +27,8 @@ abstract class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
   val longData = byteData.asLongBuffer;
   var imach = 0;
   
-  def encode()
-  def decode()
+  def encode() = {}
+  def decode() = {}
   
   override def toString():String = {
     "Command %s, length %d bytes" format (Command.names(ctype), clen);
