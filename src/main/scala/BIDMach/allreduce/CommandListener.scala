@@ -18,7 +18,6 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
-
 class CommandListener(val me:Worker, val socketnum:Int) extends Runnable {
 	var stop = false;
 	var ss:ServerSocket = null;
@@ -36,7 +35,7 @@ class CommandListener(val me:Worker, val socketnum:Int) extends Runnable {
 		while (!stop) {
 			try {
 				val scs = new CommandReader(me, ss.accept());
-				val fut = me.machExecutor.submit(scs);
+				val fut = me.executor.submit(scs);
 			} catch {
 			case e:SocketException => {
 			}
@@ -62,7 +61,6 @@ class CommandListener(val me:Worker, val socketnum:Int) extends Runnable {
 		}
 	}
 }
-
 
 class CommandWriter(val me:Master, dest:String, socketnum:Int, command:Command) extends Runnable {
 
@@ -119,3 +117,5 @@ class CommandReader(val me:Worker, socket:Socket) extends Runnable {
 		}
   }
 }
+
+

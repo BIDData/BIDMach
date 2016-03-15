@@ -37,12 +37,12 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   var updatemats:Array[Mat] = null;
   
   // For Allreduce: the local indices
-  var indexmats:Array[Mat] = null;
+  var indexmat:Mat = null;
   
   // For Allreduce: cached local matrices:
-  var sendmats:Array[Mat] = null;
+  var sendmat:Mat = null;
   
-  var recvmats:Array[Mat] = null;
+  var recvmat:Mat = null;
   
   var mats:Array[Mat] = null;
   
@@ -187,47 +187,41 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   }
   
   def snapshot(len:Int, avg:Boolean) = {
-    for (i <- 0 until modelmats.length) {
-      val len0 = math.min(len, modelmats(i).ncols);
-      modelmats(i).synchronized {
-      	sendmats(i) = cpu(modelmats(i).colslice(0, len0));
-      }
-      if (avg) {
-        sendmats(i) = ones(1, len0) on sendmats(i);
-      }      
-    }
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	modelmats(0).synchronized {
+  		sendmat = cpu(modelmats(0).colslice(0, len0));
+  	}
+  	if (avg) {
+  		sendmat = ones(1, len0) on sendmat;
+  	}      
   }
   
   def addStep(len:Int, avg:Boolean) = {
-    for (i <- 0 until modelmats.length) {
-      val len0 = math.min(len, modelmats(i).ncols);
-      if (avg) recvmats(i) = recvmats(i) / max(recvmats(i)(0,?), 1f);
-      recvmats(i) = recvmats(i) - sendmats(i);
-      val nr = modelmats(i).nrows;
-      modelmats(i).synchronized {
-        val head = modelmats(i).view(nr, len0);
-        val chead = sendmats(i).view(nr, len0);
-        chead <-- head;
-        chead ~ chead + (if (avg) recvmats(i)(1 -> (nr+1), ?) else recvmats(i));
-        head <-- chead;
-      }      
-    }
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
+  	recvmat = recvmat - sendmat;
+  	val nr = modelmats(0).nrows;
+  	modelmats(0).synchronized {
+  		val head = modelmats(0).view(nr, len0);
+  		val chead = sendmat.view(nr, len0);
+  		chead <-- head;
+  		chead ~ chead + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat);
+  		head <-- chead;
+  	}      
   }
   
   def elasticStep(len:Int, avg:Boolean, ee:Float) = {
-    for (i <- 0 until modelmats.length) {
-      val len0 = math.min(len, modelmats(i).ncols);
-      if (avg) recvmats(i) = recvmats(i) / max(recvmats(i)(0,?), 1f);
-      recvmats(i) = recvmats(i) - sendmats(i);
-      val nr = modelmats(i).nrows;
-      modelmats(i).synchronized {
-        val head = modelmats(i).view(nr, len0);
-        val chead = sendmats(i).view(nr, len0);
-        chead <-- head;
-        chead ~ chead * (1 - ee) + (if (avg) recvmats(i)(1 -> (nr+1), ?) else recvmats(i)) * ee;
-        head <-- chead;
-      }      
-    }
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
+  	recvmat = recvmat - sendmat;
+  	val nr = modelmats(0).nrows;
+  	modelmats(0).synchronized {
+  		val head = modelmats(0).view(nr, len0);
+  		val chead = sendmat.view(nr, len0);
+  		chead <-- head;
+  		chead ~ chead * (1 - ee) + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat) * ee;
+  		head <-- chead;
+  	}      
   }
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {

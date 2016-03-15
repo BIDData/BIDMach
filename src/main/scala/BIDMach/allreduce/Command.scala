@@ -19,7 +19,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 
-class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
+abstract class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
   val magic = Command.magic;
   val byteData = ByteBuffer.wrap(bytes);
   val intData = byteData.asIntBuffer;
