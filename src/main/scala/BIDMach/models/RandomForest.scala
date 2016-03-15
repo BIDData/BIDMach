@@ -264,7 +264,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
     val data = full(gmats(0));
     val cats = gmats(1);
-    val xcats = IMat(cats);println("trace data %s  %f" format (xcats(0,0->10).toString, sum(data(120,?)).dv));
+//    val xcats = IMat(cats);println("trace data %s  %f" format (xcats(0,0->10).toString, sum(data(120,?)).dv));
 
     val t0 = toc;
 //    var blockv0:SVec = null;
