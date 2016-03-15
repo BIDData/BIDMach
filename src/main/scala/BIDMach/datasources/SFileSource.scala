@@ -15,7 +15,7 @@ import java.io._
  * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
-class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options)(override implicit val ec:ExecutionContextExecutor) extends FileSource(opts) {
+class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options) extends FileSource(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null
@@ -183,7 +183,7 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
  * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
-class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options)(override implicit val ec:ExecutionContextExecutor) extends FileSource(opts) {
+class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) extends FileSource(opts) {
   
   var inptrs:IMat = null
   var offsets:IMat = null

@@ -2,11 +2,12 @@ package BIDMach.datasources
 import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContextExecutor
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.io._
 
-class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(implicit val ec:ExecutionContextExecutor) extends DataSource(opts) { 
+class FileSource(override val opts:FileSource.Opts = new FileSource.Options) extends DataSource(opts) { 
   var sizeMargin = 0f
   var blockSize = 0 
   @volatile var fileno = 0
@@ -23,6 +24,9 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
   var fprogress:Float = 0
   var lastMat:Array[Mat] = null;
   var lastFname:Array[String] = null;
+  var executor:ExecutorService = null;
+	var prefetchTasks:Array[Future[_]] = null;
+	var prefetchers:Array[Prefetcher] = null
   
   def softperm(nstart:Int, nend:Int) = {
     val dd1 = nstart / 24
@@ -53,6 +57,11 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
   }
   
   def initbase = {
+    if (opts.lookahead > 0) {
+    	executor = Executors.newFixedThreadPool(opts.lookahead + 2);
+    	prefetchers = new Array[Prefetcher](opts.lookahead);
+    	prefetchTasks = new Array[Future[_]](opts.lookahead);
+    }
     ready = -iones(math.max(opts.lookahead,1), 1)                              // Numbers of files currently loaded in queue
     reset    
     rowno = 0;
@@ -63,9 +72,8 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
     }
     if (opts.putBack < 0) {
     	for (i <- 0 until opts.lookahead) {
-    		Future {
-    			prefetch(nstart + i);
-    		}
+    		prefetchers(i) = new Prefetcher(nstart + i);
+    		prefetchTasks(i) = executor.submit(prefetchers(i));
     	}
     }
   }
@@ -201,28 +209,46 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
     }
   }
   
-  def prefetch(ifile:Int) = {
-    val ifilex = ifile % opts.lookahead
-  	ready(ifilex) = ifile - opts.lookahead
-  	while  (!stop) {
-      while (ready(ifilex) >= fileno && !stop) Thread.sleep(1); // Thread.`yield`
-      if (!stop) {
-        val inew = ready(ifilex) + opts.lookahead;
-        val pnew = permfn(inew);
-        val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
-        for (i <- 0 until fnames.size) {
-          matqueue(ifilex)(i) = if (fexists) {
-            HMat.loadMat(fnames(i)(pnew), matqueue(ifilex)(i));	
-          } else {
-            if (opts.throwMissing && inew < nend) {
-              throw new RuntimeException("Missing file "+fnames(i)(pnew));
-            }
-            null;  	
-          }
-          //  			println("%d" format inew)
-        }
-        ready(ifilex) = inew;
-      }
+  class Prefetcher(ifile:Int) extends Runnable {
+
+  	def run() = {
+  		val ifilex = ifile % opts.lookahead;
+  		ready.synchronized {
+  			ready(ifilex) = ifile - opts.lookahead;
+  		}
+  		while  (!stop) {
+  			while (ready(ifilex) >= fileno && !stop) Thread.sleep(1); // Thread.`yield`
+  			if (!stop) {
+  				val inew = ready(ifilex) + opts.lookahead;
+  				val pnew = permfn(inew);
+  				val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
+  				for (i <- 0 until fnames.size) {
+  					if (fexists) {
+  					  val fname = fnames(i)(pnew);
+  					  println("loading %s" format fname);
+  					  var oldmat:Mat = null;
+  					  matqueue.synchronized {
+  					    oldmat = matqueue(ifilex)(i);
+  					  } 					 
+  						val newmat = HMat.loadMat(fname, oldmat);	
+  						matqueue.synchronized {
+  					    matqueue(ifilex)(i) = newmat;
+  					  }
+  					} else {
+  						if (opts.throwMissing && inew < nend) {
+  							throw new RuntimeException("Missing file "+fnames(i)(pnew));
+  						}
+  						matqueue.synchronized {
+  							matqueue(ifilex)(i) = null;
+  						}  	
+  					}
+  					//  			println("%d" format inew)
+  				}
+  				ready.synchronized {
+  					ready(ifilex) = inew;
+  				}
+  			}
+  		}
   	}
   }
   
@@ -269,7 +295,11 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options)(imp
   }
 
   override def close = {
-//    stop = true
+    stop = true
+    for (i <- 0 until opts.lookahead) {
+      prefetchTasks(i).cancel(true);
+    }
+    executor.shutdown();
   }
 }
 

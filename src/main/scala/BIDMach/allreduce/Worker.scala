@@ -193,6 +193,22 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 			}
 		}
 	}
+	
+	class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {		
+		def run() {
+			try {
+				Thread.sleep(mtime);
+				for (i <- 0 until futures.length) {
+					if (futures(i) != null) {
+						if (opts.trace > 0) log("Worker cancelling thread %d" format i);
+						futures(i).cancel(true);
+					}
+				}
+			} catch {
+			case e:InterruptedException => if (opts.trace > 2) log("Worker interrupted timeout thread");
+			}
+		}
+	}
   
   def log(ss:String) = {
     machine.log(ss);
