@@ -14,19 +14,20 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   var rowno = 0
   var nstart = 0
   var nend = 0
-  var fnames:List[(Int)=>String] = null
-  omats = null
-  var matqueue:Array[Array[Mat]] = null
-  var ready:IMat = null
-  var stop:Boolean = false
-  var permfn:(Int)=>Int = null
-  var totalSize = 0
-  var fprogress:Float = 0
+  var fnames:List[(Int)=>String] = null;
+  omats = null;
+  var matqueue:Array[Array[Mat]] = null;
+  var ready:IMat = null;
+  var stop:Boolean = false;
+  var pause:Boolean = true;
+  var permfn:(Int)=>Int = null;
+  var totalSize = 0;
+  var fprogress:Float = 0;
   var lastMat:Array[Mat] = null;
   var lastFname:Array[String] = null;
   var executor:ExecutorService = null;
 	var prefetchTasks:Array[Future[_]] = null;
-	var prefetchers:Array[Prefetcher] = null
+	var prefetchers:Array[Prefetcher] = null;
   
   def softperm(nstart:Int, nend:Int) = {
     val dd1 = nstart / 24
@@ -57,6 +58,8 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   }
   
   def initbase = {
+    stop = false;
+    pause = true;
     if (opts.lookahead > 0) {
     	executor = Executors.newFixedThreadPool(opts.lookahead + 2);
     	prefetchers = new Array[Prefetcher](opts.lookahead);
@@ -76,6 +79,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     		prefetchTasks(i) = executor.submit(prefetchers(i));
     	}
     }
+    pause = false;
   }
   
   def reset = {
@@ -219,7 +223,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   			ready(ifilex) = ifile - opts.lookahead;
   		}
   		while  (!stop) {
-  			while (ready(ifilex) >= fileno && !stop) Thread.sleep(1); // Thread.`yield`
+  			while (pause || (ready(ifilex) >= fileno && !stop)) Thread.sleep(1); // Thread.`yield`
   			if (!stop) {
   				val inew = ready(ifilex) + opts.lookahead;
   				val pnew = permfn(inew);
@@ -227,7 +231,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   				for (i <- 0 until fnames.size) {
   					if (fexists) {
   					  val fname = fnames(i)(pnew);
-  					  println("loading %d %d %d %s" format (inew, pnew, i, fname));
+//  					  println("loading %d %d %d %s" format (inew, pnew, i, fname));
   					  var oldmat:Mat = null;
   					  matqueue.synchronized {
   					    oldmat = matqueue(ifilex)(i);
