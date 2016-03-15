@@ -998,7 +998,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       val nthreads = 1 + (Mat.numThreads - 1)/2;
       val fm = new Array[FMat](nthreads);
       val impure = DMat(1, nthreads);
-      (0 until nthreads).par.map(i => {
+      (0 until nthreads).par.foreach(i => {
         val (f, im) = minImpurity_thread(keys, cnts, outv, outf, outn, outg, outc, outleft, outright, jc, jtree, itree, fnum, regression, i, nthreads);
         fm(i) = f;
         impure(i) = im;
@@ -1192,7 +1192,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
 
   def addSVecs(a:Array[SVec], totals:Array[SVTree]) { 
-    (0 until ntrees).par.map(i => {totals(i).addSVec(a(i));});
+    (0 until ntrees).par.foreach(i => {totals(i).addSVec(a(i));});
   }
 
   def getSum(totals:Array[SVTree]):Array[SVec] = { 

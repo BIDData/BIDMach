@@ -13,16 +13,13 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.InetSocketAddress;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 
 
 class Master(val opts:Master.Opts) extends Serializable {
   
   var M = 0;
-  var sendTimeout = 1000;
-	var recvTimeout = 1000;
-	var trace = 0;
-	var socketNum = 50050;
 	var gmods:IMat = null;
 	var gridmachines:IMat = null;
 	var workerIPs:IMat = null
@@ -32,7 +29,7 @@ class Master(val opts:Master.Opts) extends Serializable {
 
 	
 	def init() {
-	  executor = Executors.newFixedThreadPool(4);
+	  executor = Executors.newFixedThreadPool(opts.numThreads);
 	}
 	
 	def readConfig(configDir:String) {
@@ -66,7 +63,7 @@ class Master(val opts:Master.Opts) extends Serializable {
   }
   
   def startUpdates() {
-    reducer = new Reducer(this);
+    reducer = new Reducer();
     reduceTask = executor.submit(reducer);
   }
   
@@ -80,16 +77,75 @@ class Master(val opts:Master.Opts) extends Serializable {
 	}
     
   def broadcastCommand(cmd:Command) {
-	  for (imach <- 0 until M) {
-      cmd.imach = imach;
-      cmd.encode;
-      send(cmd, workerIPs(imach));      
-    }
+  	cmd.encode;
+  	val futures = (0 until M).toArray.map(imach => {
+  	  val newcmd = new Command(cmd.ctype, cmd.clen, cmd.bytes);
+      newcmd.imach = imach;
+      send(newcmd, workerIPs(imach));    
+	  });
 	}
   
-  def send(cmd:Command, address:Int) = {
-    val cw = new CommandWriter(this, Command.toAddress(address), socketNum, cmd);
-    val fut = executor.submit(cw);
+  def send(cmd:Command, address:Int):Future[_] = {
+    val cw = new CommandWriter(Command.toAddress(address), opts.socketNum, cmd);
+    executor.submit(cw);
+  }
+  
+  class CommandWriter(dest:String, socketnum:Int, command:Command) extends Runnable {
+
+  	def run() {
+  		var socket:Socket = null;
+  	  try {
+  	  	socket = new Socket();
+  	  	socket.connect(new InetSocketAddress(dest, socketnum), opts.sendTimeout);
+  	  	if (socket.isConnected()) {
+  	  		val ostr = new DataOutputStream(socket.getOutputStream());
+  	  		ostr.writeInt(command.magic)
+  	  		ostr.writeInt(command.ctype);
+  	  		ostr.writeInt(command.clen);
+  	  		ostr.write(command.bytes, 0, command.clen*4);		
+  	  	}
+  	  }	catch {
+  	  case e:Exception =>
+  	  if (opts.trace > 0) log("Master problem sending command %s\n" format command.toString);
+  	  } finally {
+  	  	try { if (socket != null) socket.close(); } catch {
+  	  	case e:Exception =>
+  	  	if (opts.trace > 0) log("Master problem closing socket\n");			  
+  	  	}
+  	  }
+  	}
+  }
+  
+  class Reducer() extends Runnable {
+  	var stop = false;
+
+  	def run() {
+  		var round = 0;
+  		var limit = 0;
+  		while (!stop) {
+  			Thread.sleep(opts.intervalMsec);
+  			val newlimit0 = if (opts.limitFctn != null) {
+  				opts.limitFctn(round, opts.limit);
+  			} else {
+  				opts.limit;
+  			}
+  			val newlimit = if (newlimit0 < 0) 2000000000 else newlimit0;
+  		}
+  		val cmd = if (opts.permuteAlways) {
+  			val cmd0 = new PermuteAllreduceCommand();
+  			cmd0.round = round;
+  			cmd0.seed = round;
+  			cmd0.limit = limit;
+  			cmd0;
+  		} else {
+  			val cmd0 = new AllreduceCommand();
+  			cmd0.round = round;
+  			cmd0.limit = limit;
+  			cmd0;
+  		}
+  		broadcastCommand(cmd);
+  		round += 1;
+  	}
   }
 }
 
@@ -100,6 +156,11 @@ object Master {
 		var intervalMsec = 100;
 		var timeScaleMsec = 1e-5f;
 		var permuteAlways = true;
+		var sendTimeout = 1000;
+		var recvTimeout = 1000;
+		var trace = 0;
+		var socketNum = 50051;
+		var numThreads = 16;
   }
 	
 	class Options extends Opts {} 
@@ -121,39 +182,5 @@ object Master {
 	def powerLimit(round:Int, limit:Int):Int = powerLimit(round, limit, 1f);
 	
 	var powerLimitFctn = powerLimit(_:Int,_:Int);
-}
-
-class Reducer(val me:Master) extends Runnable {
-  var stop = false;
-  
-  def run() {
-    val opts = me.opts;
-    var round = 0;
-    var limit = 0;
-    while (!stop) {
-      Thread.sleep(opts.intervalMsec);
-      val newlimit0 = if (opts.limitFctn != null) {
-        opts.limitFctn(round, opts.limit);
-      } else {
-        opts.limit;
-      }
-      val newlimit = if (newlimit0 < 0) 2000000000 else newlimit0;
-    }
-    val cmd = if (opts.permuteAlways) {
-      val cmd0 = new PermuteAllreduceCommand();
-      cmd0.round = round;
-      cmd0.seed = round;
-      cmd0.limit = limit;
-      cmd0;
-    } else {
-      val cmd0 = new AllreduceCommand();
-      cmd0.round = round;
-      cmd0.limit = limit;
-      cmd0;
-    }
-    me.broadcastCommand(cmd);
-    round += 1;
-  }
-  
 }
 

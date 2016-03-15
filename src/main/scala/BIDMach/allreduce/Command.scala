@@ -30,6 +30,8 @@ class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
   def encode() = {}
   def decode() = {}
   
+  def this(ctype:Int, clen:Int) = this(ctype, clen, new Array[Byte](4*clen));
+  
   override def toString():String = {
     "Command %s, length %d bytes" format (Command.names(ctype), clen);
   }
@@ -54,11 +56,13 @@ object Command {
    }
 }
 
-class ConfigCommand(clen:Int) extends Command(Command.configCtype, clen, new Array[Byte](clen*4)) {
+class ConfigCommand(clen:Int, bytes:Array[Byte]) extends Command(Command.configCtype, clen, bytes) {
   
   var gmods:IMat = null;
   var gridmachines:IMat = null;
   var workerIPs:IMat = null;
+  
+  def this(clen:Int) = this(clen, new Array[Byte](clen*4));
   
   def setFields(imach0:Int, gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat) {
     imach = imach0;
@@ -111,9 +115,11 @@ class ConfigCommand(clen:Int) extends Command(Command.configCtype, clen, new Arr
   }
 }
 
-class PermuteCommand() extends Command(Command.permuteCtype, 2, new Array[Byte](2*4)) {
+class PermuteCommand(bytes:Array[Byte]) extends Command(Command.permuteCtype, 2, bytes) {
   
   var seed:Long = 0;
+  
+  def this() = this(new Array[Byte](2*4));
   
   def setFields(seed0:Long) {
     seed = seed0;
@@ -134,10 +140,12 @@ class PermuteCommand() extends Command(Command.permuteCtype, 2, new Array[Byte](
   }
 }
 
-class AllreduceCommand() extends Command(Command.allreduceCtype, 4, new Array[Byte](4*4)) {
+class AllreduceCommand(bytes:Array[Byte]) extends Command(Command.allreduceCtype, 4, bytes) {
   
   var round:Int = 0;
   var limit:Long = 0;
+  
+  def this() = this(new Array[Byte](4*4));
   
   def setFields(round0:Int, limit0:Long) {
     round = round0;
@@ -161,7 +169,9 @@ class AllreduceCommand() extends Command(Command.allreduceCtype, 4, new Array[By
   }
 }
 
-class PermuteAllreduceCommand() extends Command(Command.permuteAllreduceCtype, 6, new Array[Byte](6*4)) {
+class PermuteAllreduceCommand(bytes:Array[Byte]) extends Command(Command.permuteAllreduceCtype, 6, bytes) {
+  
+  def this() = this(new Array[Byte](6*4));
   
   var seed:Long = 0;
   var round:Int = 0;
