@@ -366,6 +366,8 @@ object FileSource {
     }    
   }
  
+  def simpleEnum(fname:String):(Int)=>String = simpleEnum(fname,1,0);
+  
   trait Opts extends DataSource.Opts {
   	val localDir:String = ""
   	var fnames:List[(Int)=>String] = null

@@ -1391,7 +1391,7 @@ object RandomForest {
   
   class FsOpts extends Learner.Options with RandomForest.Opts with FileSource.Opts with Batch.Opts
     
-  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(datafile, 0, 1), FileSource.simpleEnum(labelfile, 0, 1)))
+  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(datafile, 1, 0), FileSource.simpleEnum(labelfile, 1, 0)))
   
   def learner(fnames:List[(Int)=>String]) = {
     val opts = new FsOpts;
