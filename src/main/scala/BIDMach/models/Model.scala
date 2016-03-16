@@ -231,6 +231,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
          	to(i) = from(i) match {
         	case aa:FMat => GDMat(aa)
         	case aa:IMat => GIMat(aa)
+        	case aa:DMat => GDMat(aa)
         	case aa:SMat => GSDMat(aa)
         	case aa:GDMat => aa
         	case aa:GMat => GDMat(aa)
@@ -238,7 +239,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         } else {
         	to(i) = from(i) match {
         	case aa:FMat => GMat(aa)
-        	case aa:DMat => GDMat(aa)
+        	case aa:DMat => GMat(aa)
         	case aa:IMat => GIMat(aa)        	
         	case aa:SMat => GSMat(aa)
         	case aa:GMat => aa
