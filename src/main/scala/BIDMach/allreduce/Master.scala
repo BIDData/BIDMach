@@ -17,7 +17,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 
-class Master(val opts:Master.Opts) extends Serializable {
+class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   
   var M = 0;
 	var gmods:IMat = null;
@@ -78,6 +78,7 @@ class Master(val opts:Master.Opts) extends Serializable {
     
   def broadcastCommand(cmd:Command) {
   	cmd.encode;
+  	if (opts.trace > 2) log("Broadcasting cmd %s" format cmd);
   	val futures = (0 until M).toArray.map(imach => {
   	  val newcmd = new Command(cmd.ctype, cmd.clen, cmd.bytes);
       newcmd.imach = imach;
@@ -106,11 +107,13 @@ class Master(val opts:Master.Opts) extends Serializable {
   	  	}
   	  }	catch {
   	  case e:Exception =>
-  	  if (opts.trace > 0) log("Master problem sending command %s\n" format command.toString);
+  	  if (opts.trace > 0) {
+  	    log("Master problem sending command %s\n%s" format (command.toString, Command.printStackTrace(e)));
+  	  }
   	  } finally {
   	  	try { if (socket != null) socket.close(); } catch {
   	  	case e:Exception =>
-  	  	if (opts.trace > 0) log("Master problem closing socket\n");			  
+  	  	if (opts.trace > 0) log("Master problem closing socket\n%s" format Command.printStackTrace(e));			  
   	  	}
   	  }
   	}

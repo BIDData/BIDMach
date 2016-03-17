@@ -16,7 +16,7 @@ import java.net.SocketException;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-class Worker(val opts:Worker.Opts) extends Serializable {
+class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 
   var M = 0;
   var imach = 0;
@@ -24,7 +24,6 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 	var gridmachines:IMat = null;  
 	var machineIPs:Array[String] = null;
 	var groups:Groups = null;
-	var socketNum = 50051;
 
 	var executor:ExecutorService = null;
 	var listener:CommandListener = null;
@@ -35,9 +34,9 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 	
 	def start(learner0:Learner) = {
 	  learner = learner0;
-	  model = learner.model;
-	  executor = Executors.newFixedThreadPool(4);
-	  listener = new CommandListener(socketNum);
+	  model = if (learner != null) learner.model else null;
+	  executor = Executors.newFixedThreadPool(8);
+	  listener = new CommandListener(opts.socketNum);
 	  listenerTask = executor.submit(listener);
 	}
   
@@ -61,28 +60,32 @@ class Worker(val opts:Worker.Opts) extends Serializable {
   }
   
   def allReduce(round:Int, limit:Long) = {
-    model.snapshot(limit.toInt, opts.doAvg);
-    val sendmat = model.sendmat;
-    val recvmat = model.recvmat;
-    val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
-      model.indexmat
-    } else {
-      irow(0 -> sendmat.ncols)
-    }
+    if (model != null) {
+    	model.snapshot(limit.toInt, opts.doAvg);
+    	val sendmat = model.sendmat;
+    	val recvmat = model.recvmat;
+    	val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
+    		model.indexmat
+    	} else {
+    		irow(0 -> sendmat.ncols)
+    	}
 
-    val result = if (opts.fuseConfigReduce) {
-    	(indexmat, sendmat) match {
-    	case (lmat:LMat, fsendmat:FMat) =>  machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
-    	case (imat:IMat, fsendmat:FMat) =>  machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
+    	val result = if (opts.fuseConfigReduce) {
+    		(indexmat, sendmat) match {
+    		case (lmat:LMat, fsendmat:FMat) =>  machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
+    		case (imat:IMat, fsendmat:FMat) =>  machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
+    		}
+    	} else {
+    		(indexmat, sendmat) match {
+    		case (lmat:LMat, fsendmat:FMat) =>  machine.config(lmat.data, lmat.data, round);
+    		case (imat:IMat, fsendmat:FMat) =>  machine.config(imat.data, imat.data, round);
+    		}
+    		machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
     	}
+    	model.addStep(limit.toInt, opts.doAvg);
     } else {
-    	(indexmat, sendmat) match {
-    	case (lmat:LMat, fsendmat:FMat) =>  machine.config(lmat.data, lmat.data, round);
-    	case (imat:IMat, fsendmat:FMat) =>  machine.config(imat.data, imat.data, round);
-    	}
-    	machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
+      if (opts.trace > 2) log("Allreduce model is null")
     }
-    model.addStep(limit.toInt, opts.doAvg)
 	}
   
   def stop = {
@@ -101,21 +104,25 @@ class Worker(val opts:Worker.Opts) extends Serializable {
       case Command.configCtype => {
         val newcmd = new ConfigCommand(cmd.clen, cmd.bytes);
         newcmd.decode;
+        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
         config(newcmd.imach, newcmd.gmods, newcmd.gridmachines, newcmd.workerIPs);
       }
       case Command.permuteCtype => {
         val newcmd = new PermuteCommand(cmd.bytes);
         newcmd.decode;
+        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
         permute(newcmd.seed);
       }
       case Command.allreduceCtype => {
         val newcmd = new AllreduceCommand(cmd.bytes);
         newcmd.decode;
+        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
         allReduce(newcmd.round, newcmd.limit);
       }
       case Command.permuteAllreduceCtype => {
         val newcmd = new PermuteAllreduceCommand(cmd.bytes);
         newcmd.decode;
+        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
         permute(newcmd.seed);
         allReduce(newcmd.round, newcmd.limit);
       }
@@ -130,7 +137,7 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 			try {
 				ss = new ServerSocket(socketnum);
 			} catch {
-			case e:Exception => {}
+			case e:Exception => {if (opts.trace > 0) log("Problem in CommandListener\n%s" format Command.printStackTrace(e));}
 			}
 		}
 
@@ -139,9 +146,11 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 			while (!stop) {
 				try {
 					val scs = new CommandReader(ss.accept());
+					if (opts.trace > 2) log("Command Listener got a message\n");
 					val fut = executor.submit(scs);
 				} catch {
 				case e:SocketException => {
+				  if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Command.printStackTrace(e));
 				}
 				// This is probably due to the server shutting to. Don't do anything.
 				case e:Exception => {
@@ -159,7 +168,7 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 					ss.close();
 				} catch {
 				case e:Exception => {
-					if (opts.trace > 0) log("Machine %d trouble closing command listener" format imach);
+					if (opts.trace > 0) log("Machine %d trouble closing command listener\n%s" format (imach, Command.printStackTrace(e)));
 				}
 				}			
 			}
@@ -188,7 +197,7 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 				try {
 					socket.close();
 				} catch {
-				case e:IOException => {}
+				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+e.toString()+"\n" format (imach))}
 				}
 			}
 		}
@@ -210,9 +219,9 @@ class Worker(val opts:Worker.Opts) extends Serializable {
 		}
 	}
   
-  def log(ss:String) = {
-    machine.log(ss);
-  }
+  def log(msg:String) {
+		print(msg);	
+	}
 }
 
 object Worker {
@@ -222,6 +231,7 @@ object Worker {
 		var sendTimeout = 1000;
 		var recvTimeout = 1000;
 		var cmdTimeout = 1000;
+		var socketNum = 50051;
 		var fuseConfigReduce = false;
 		var doAvg = true;
 		var useLong = false;

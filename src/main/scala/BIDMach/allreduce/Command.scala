@@ -13,6 +13,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -54,6 +56,19 @@ object Command {
     val p3 = v & 255;
     "%d.%d.%d.%d" format(p0,p1,p2,p3);
    }
+  
+  def address(a:Int, b:Int, c:Int, d:Int):Int = {
+    d + ((c + ((b + (a << 8)) << 8)) << 8);
+  }
+  
+  def printStackTrace(e:Exception):String = {
+    val baos = new ByteArrayOutputStream();
+    val ps = new PrintStream(baos);
+    e.printStackTrace(ps);
+    val str = baos.toString();
+    ps.close();
+    str;
+  }
 }
 
 class ConfigCommand(clen:Int, bytes:Array[Byte]) extends Command(Command.configCtype, clen, bytes) {
@@ -98,15 +113,15 @@ class ConfigCommand(clen:Int, bytes:Array[Byte]) extends Command(Command.configC
   
   override def toString():String = {
     var ostring = new StringBuilder("Command %s, length %d bytes" format (Command.names(ctype), clen));
-    ostring.append("\nGroups:\n")
+    ostring.append("\nGroups: ")
     for (i <- 0 until gmods.length) {
       ostring.append("%d " format gmods(i));
     }
-    ostring.append("\nGridmachines:\n");
+    ostring.append("\nGridmachines: ");
     for (i <- 0 until math.min(20, gridmachines.length)) {
       ostring.append("%d " format gridmachines(i));
     }
-    ostring.append("\nWorkerIPs:\n");
+    ostring.append("\nWorkerIPs: ");
     for (i <- 0 until math.min(20, gridmachines.length)) {
       ostring.append("%s " format Command.toAddress(workerIPs(i)));
     }
