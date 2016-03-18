@@ -35,7 +35,7 @@ class Command(val ctype:Int, val dest0:Int, val clen:Int, val bytes:Array[Byte])
   def this(ctype0:Int, dest0:Int, clen0:Int) = this(ctype0, dest0, clen0, new Array[Byte](4*clen0));
   
   override def toString():String = {
-    "Command %s, length %d bytes" format (Command.names(ctype), clen);
+    "Command %s, length %d bytes" format (Command.names(ctype), clen*4);
   }
   
 }
