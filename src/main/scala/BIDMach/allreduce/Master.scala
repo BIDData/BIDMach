@@ -47,17 +47,17 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     M = workerIPs.length;
   }
   
-  def sendConfig() {
-    val clen = 4 + gmods.length + gridmachines.length + workerIPs.length;
-    val cmd = new ConfigCommand(clen);
+  def sendConfig(dest:Int) {
+    val clen = 3 + gmods.length + gridmachines.length + workerIPs.length;
+    val cmd = new ConfigCommand(clen, dest);
     cmd.gmods = gmods;
     cmd.gridmachines = gridmachines;
     cmd.workerIPs = workerIPs;
     broadcastCommand(cmd);
   }
   
-  def permuteNodes(seed:Long) {
-    val cmd = new PermuteCommand();
+  def permuteNodes(dest:Int, seed:Long) {
+    val cmd = new PermuteCommand(dest);
     cmd.seed = seed;
     broadcastCommand(cmd);
   }
@@ -80,9 +80,8 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	cmd.encode;
   	if (opts.trace > 2) log("Broadcasting cmd %s" format cmd);
   	val futures = (0 until M).toArray.map(imach => {
-  	  val newcmd = new Command(cmd.ctype, cmd.clen, cmd.bytes);
-      newcmd.imach = imach;
-      send(newcmd, workerIPs(imach));    
+  	  cmd.dest = imach;
+      send(cmd, workerIPs(imach));    
 	  });
 	}
   
@@ -102,6 +101,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	  		val ostr = new DataOutputStream(socket.getOutputStream());
   	  		ostr.writeInt(command.magic)
   	  		ostr.writeInt(command.ctype);
+  	  		ostr.writeInt(command.dest);
   	  		ostr.writeInt(command.clen);
   	  		ostr.write(command.bytes, 0, command.clen*4);		
   	  	}
@@ -135,13 +135,13 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   			val newlimit = if (newlimit0 < 0) 2000000000 else newlimit0;
   		}
   		val cmd = if (opts.permuteAlways) {
-  			val cmd0 = new PermuteAllreduceCommand();
+  			val cmd0 = new PermuteAllreduceCommand(0);
   			cmd0.round = round;
   			cmd0.seed = round;
   			cmd0.limit = limit;
   			cmd0;
   		} else {
-  			val cmd0 = new AllreduceCommand();
+  			val cmd0 = new AllreduceCommand(0);
   			cmd0.round = round;
   			cmd0.limit = limit;
   			cmd0;

@@ -21,18 +21,18 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 
-class Command(val ctype:Int, val clen:Int, val bytes:Array[Byte]) {
+class Command(val ctype:Int, val dest0:Int, val clen:Int, val bytes:Array[Byte]) {
   val magic = Command.magic;
+  var dest = dest0;
   val byteData = ByteBuffer.wrap(bytes);
   val intData = byteData.asIntBuffer;
   val floatData = byteData.asFloatBuffer;
   val longData = byteData.asLongBuffer;
-  var imach = 0;
   
   def encode() = {}
   def decode() = {}
   
-  def this(ctype:Int, clen:Int) = this(ctype, clen, new Array[Byte](4*clen));
+  def this(ctype0:Int, dest0:Int, clen0:Int) = this(ctype0, dest0, clen0, new Array[Byte](4*clen0));
   
   override def toString():String = {
     "Command %s, length %d bytes" format (Command.names(ctype), clen);
@@ -71,16 +71,16 @@ object Command {
   }
 }
 
-class ConfigCommand(clen:Int, bytes:Array[Byte]) extends Command(Command.configCtype, clen, bytes) {
+class ConfigCommand(clen:Int, dest0:Int, bytes:Array[Byte]) extends Command(Command.configCtype, dest0, clen, bytes) {
   
   var gmods:IMat = null;
   var gridmachines:IMat = null;
   var workerIPs:IMat = null;
   
-  def this(clen:Int) = this(clen, new Array[Byte](clen*4));
+  def this(clen0:Int, dest0:Int) = this(clen0, dest0, new Array[Byte](clen0*4));
   
   def setFields(imach0:Int, gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat) {
-    imach = imach0;
+    dest = imach0;
     gmods = gmods;
     gridmachines = gridmachines0;
     workerIPs = workerIPs0;
@@ -88,7 +88,6 @@ class ConfigCommand(clen:Int, bytes:Array[Byte]) extends Command(Command.configC
   
   override def encode ():Unit = {
   	intData.rewind();
-  	intData.put(imach);
   	intData.put(gmods.length);
   	intData.put(gmods.data, 0, gmods.length);
   	intData.put(gridmachines.length);
@@ -99,7 +98,6 @@ class ConfigCommand(clen:Int, bytes:Array[Byte]) extends Command(Command.configC
   
   override def decode():Unit = {
   	intData.rewind();
-    imach = intData.get();
     val lgmods = intData.get();
     gmods = izeros(lgmods,1);
     intData.get(gmods.data, 0, lgmods);
@@ -130,11 +128,11 @@ class ConfigCommand(clen:Int, bytes:Array[Byte]) extends Command(Command.configC
   }
 }
 
-class PermuteCommand(bytes:Array[Byte]) extends Command(Command.permuteCtype, 2, bytes) {
+class PermuteCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.permuteCtype, dest0, 2, bytes) {
   
   var seed:Long = 0;
   
-  def this() = this(new Array[Byte](2*4));
+  def this(dest0:Int) = this(dest0, new Array[Byte](2*4));
   
   def setFields(seed0:Long) {
     seed = seed0;
@@ -155,12 +153,12 @@ class PermuteCommand(bytes:Array[Byte]) extends Command(Command.permuteCtype, 2,
   }
 }
 
-class AllreduceCommand(bytes:Array[Byte]) extends Command(Command.allreduceCtype, 4, bytes) {
+class AllreduceCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.allreduceCtype, dest0, 4, bytes) {
   
   var round:Int = 0;
   var limit:Long = 0;
   
-  def this() = this(new Array[Byte](4*4));
+  def this(dest0:Int) = this(dest0, new Array[Byte](4*4));
   
   def setFields(round0:Int, limit0:Long) {
     round = round0;
@@ -184,9 +182,9 @@ class AllreduceCommand(bytes:Array[Byte]) extends Command(Command.allreduceCtype
   }
 }
 
-class PermuteAllreduceCommand(bytes:Array[Byte]) extends Command(Command.permuteAllreduceCtype, 6, bytes) {
+class PermuteAllreduceCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.permuteAllreduceCtype, dest0, 6, bytes) {
   
-  def this() = this(new Array[Byte](6*4));
+	def this(dest0:Int) = this(dest0, new Array[Byte](6*4));
   
   var seed:Long = 0;
   var round:Int = 0;

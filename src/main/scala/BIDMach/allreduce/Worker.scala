@@ -100,32 +100,38 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
   }
   
   def handleCMD(cmd:Command) = {
-    cmd.ctype match {
-      case Command.configCtype => {
-        val newcmd = new ConfigCommand(cmd.clen, cmd.bytes);
-        newcmd.decode;
-        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-        config(newcmd.imach, newcmd.gmods, newcmd.gridmachines, newcmd.workerIPs);
-      }
-      case Command.permuteCtype => {
-        val newcmd = new PermuteCommand(cmd.bytes);
-        newcmd.decode;
-        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-        permute(newcmd.seed);
-      }
-      case Command.allreduceCtype => {
-        val newcmd = new AllreduceCommand(cmd.bytes);
-        newcmd.decode;
-        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-        allReduce(newcmd.round, newcmd.limit);
-      }
-      case Command.permuteAllreduceCtype => {
-        val newcmd = new PermuteAllreduceCommand(cmd.bytes);
-        newcmd.decode;
-        if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-        permute(newcmd.seed);
-        allReduce(newcmd.round, newcmd.limit);
-      }
+    if (cmd.magic != Command.magic) {
+      if (opts.trace > 0) log("Machine %d got message with bad magic number %d" format (imach, cmd.magic));
+    }  else if (cmd.dest != imach) {
+    	if (opts.trace > 0) log("Machine %d got message with bad destination %d" format (imach, cmd.dest));
+    } else {
+    	cmd.ctype match {
+    	case Command.configCtype => {
+    		val newcmd = new ConfigCommand(cmd.clen, imach, cmd.bytes);
+    		newcmd.decode;
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines, newcmd.workerIPs);
+    	}
+    	case Command.permuteCtype => {
+    		val newcmd = new PermuteCommand(cmd.dest, cmd.bytes);
+    		newcmd.decode;
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		permute(newcmd.seed);
+    	}
+    	case Command.allreduceCtype => {
+    		val newcmd = new AllreduceCommand(cmd.dest, cmd.bytes);
+    		newcmd.decode;
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		allReduce(newcmd.round, newcmd.limit);
+    	}
+    	case Command.permuteAllreduceCtype => {
+    		val newcmd = new PermuteAllreduceCommand(cmd.dest, cmd.bytes);
+    		newcmd.decode;
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		permute(newcmd.seed);
+    		allReduce(newcmd.round, newcmd.limit);
+    	}
+    	}
     }
   }
 
@@ -181,8 +187,9 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 				val istr = new DataInputStream(socket.getInputStream());
 				val magic = istr.readInt();
 				val ctype = istr.readInt();
+				val dest = istr.readInt();
 				val clen = istr.readInt();
-				val cmd = new Command(ctype, clen, new Array[Byte](clen*4));
+				val cmd = new Command(ctype, dest, clen, new Array[Byte](clen*4));
 				if (opts.trace > 2) log("Worker %d got packet %s\n" format (imach, cmd.toString));
 				var waiting = 0;
 				while (waiting < opts.cmdTimeout) {
