@@ -79,11 +79,24 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   def broadcastCommand(cmd:Command) {
   	cmd.encode;
   	if (opts.trace > 2) log("Broadcasting cmd %s" format cmd);
-  	val futures = (0 until M).toArray.map(imach => {
-  	  cmd.dest = imach;
-      send(cmd, workerIPs(imach));    
-	  });
-	}
+  	val futures = new Array[Future[_]](M);
+  	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
+  	for (imach <- 0 until M) {
+  		cmd.dest = imach;
+  		futures(imach) = send(cmd, workerIPs(imach));   
+  	}
+  	for (imach <- 0 until M) {
+  		try {
+  			futures(imach).get() 
+  		} catch {
+  		case e:Exception => {}
+  		}
+  		if (futures(imach).isCancelled()) {
+  			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd %s" format (imach, cmd));
+  		}
+  	}
+  	timeout.cancel(true);
+  }
   
   def send(cmd:Command, address:Int):Future[_] = {
     val cw = new CommandWriter(Command.toAddress(address), opts.socketNum, cmd);
