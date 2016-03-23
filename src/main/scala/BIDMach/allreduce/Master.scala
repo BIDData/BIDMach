@@ -73,6 +73,11 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     reduceTask.cancel(true);    
   }
   
+  def startLearners() {
+    val cmd = new StartLearnerCommand(0);
+    broadcastCommand(cmd);
+  }
+  
   def log(msg:String) {
 		print(msg);	
 	}
@@ -173,22 +178,22 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   			} else {
   				opts.limit;
   			}
-  			val newlimit = if (newlimit0 < 0) 2000000000 else newlimit0;
+  			val newlimit = if (newlimit0 <= 0) 2000000000 else newlimit0;
+  			val cmd = if (opts.permuteAlways) {
+  				val cmd0 = new PermuteAllreduceCommand(0);
+  				cmd0.round = round;
+  				cmd0.seed = round;
+  				cmd0.limit = limit;
+  				cmd0;
+  			} else {
+  				val cmd0 = new AllreduceCommand(0);
+  				cmd0.round = round;
+  				cmd0.limit = limit;
+  				cmd0;
+  			}
+  			broadcastCommand(cmd);
+  			round += 1;
   		}
-  		val cmd = if (opts.permuteAlways) {
-  			val cmd0 = new PermuteAllreduceCommand(0);
-  			cmd0.round = round;
-  			cmd0.seed = round;
-  			cmd0.limit = limit;
-  			cmd0;
-  		} else {
-  			val cmd0 = new AllreduceCommand(0);
-  			cmd0.round = round;
-  			cmd0.limit = limit;
-  			cmd0;
-  		}
-  		broadcastCommand(cmd);
-  		round += 1;
   	}
   }
   
@@ -215,7 +220,7 @@ object Master {
 	trait Opts extends BIDMat.Opts{
 		var limit = 0;
 		var limitFctn:(Int,Int)=>Int = null;
-		var intervalMsec = 100;
+		var intervalMsec = 1000;
 		var timeScaleMsec = 1e-5f;
 		var permuteAlways = true;
 		var sendTimeout = 1000;

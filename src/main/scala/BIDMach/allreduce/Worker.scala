@@ -34,7 +34,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 	
 	def start(learner0:Learner) = {
 	  learner = learner0;
-	  model = if (learner != null) learner.model else null;
+	  if (model == null && learner != null) model = learner.model;
 	  executor = Executors.newFixedThreadPool(8);
 	  listener = new CommandListener(opts.commandSocketNum);
 	  listenerTask = executor.submit(listener);
@@ -87,7 +87,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     	}
     	model.addStep(limit.toInt, opts.doAvg);
     } else {
-      if (opts.trace > 2) log("Allreduce model is null")
+      if (opts.trace > 2) log("Allreduce model is null\n")
     }
 	}
   
@@ -104,9 +104,9 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
   
   def handleCMD(cmd:Command) = {
     if (cmd.magic != Command.magic) {
-      if (opts.trace > 0) log("Machine %d got message with bad magic number %d" format (imach, cmd.magic));
+      if (opts.trace > 0) log("Machine %d got message with bad magic number %d\n" format (imach, cmd.magic));
     }  else if (cmd.dest != imach) {
-      	if (opts.trace > 0) log("Machine %d got message with bad destination %d" format (imach, cmd.dest));
+      	if (opts.trace > 0) log("Machine %d got message with bad destination %d\n" format (imach, cmd.dest));
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
@@ -139,6 +139,14 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		imach = newcmd.dest;
+    	}
+    	case Command.startLearnerCtype => {
+    		val newcmd = new StartLearnerCommand(cmd.dest, cmd.bytes);
+    		newcmd.decode;
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		if (learner != null) {
+    		  learner.paused = false;
+    		}
     	}
     	}
     }
@@ -201,11 +209,11 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 				val cmd = new Command(ctype, dest, clen, new Array[Byte](clen*4));
 				if (opts.trace > 2) log("Worker %d got packet %s\n" format (imach, cmd.toString));
 				istr.readFully(cmd.bytes, 0, clen*4);
-/*				try {
-					socket.close();
+				try {
+  				socket.close();
 				} catch {
 				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+e.toString()+"\n" format (imach))}
-				}*/
+				}
 				handleCMD(cmd);
 			} catch {
 			case e:Exception =>	if (opts.trace > 0) log("Worker %d Problem reading socket "+e.toString()+"\n" format (imach));

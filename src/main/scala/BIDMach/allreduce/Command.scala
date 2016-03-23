@@ -47,7 +47,8 @@ object Command {
 	final val allreduceCtype = 3;
 	final val permuteAllreduceCtype = 4;
 	final val setMachineCtype = 5;
-	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine");
+	final val startLearnerCtype = 6;
+	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner");
 	
 	  
   def toAddress(v:Int):String = {
@@ -171,7 +172,26 @@ class SetMachineCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.se
   }
   
   override def toString():String = {
-     "Command %s, length %d words, seed %d" format (Command.names(ctype), clen, dest);
+     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
+  }
+}
+
+class StartLearnerCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.startLearnerCtype, dest0, 1, bytes) {
+  
+  dest = dest0;
+  
+  def this(dest0:Int) = this(dest0, new Array[Byte](1*4));
+  
+  override def encode ():Unit = {
+  	intData.rewind();
+  	intData.put(dest);
+  }
+  
+  override def decode():Unit = {    
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
   }
 }
 
