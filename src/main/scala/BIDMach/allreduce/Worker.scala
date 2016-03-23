@@ -36,7 +36,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 	  learner = learner0;
 	  model = if (learner != null) learner.model else null;
 	  executor = Executors.newFixedThreadPool(8);
-	  listener = new CommandListener(opts.socketNum);
+	  listener = new CommandListener(opts.commandSocketNum);
 	  listenerTask = executor.submit(listener);
 	}
   
@@ -47,12 +47,15 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     M = gridmachines.length;
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
     machineIPs = machineIPs0.data.map(Command.toAddress(_));
-
+    if (machine != null) machine.stop;
     machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.trace, opts.replicate, machineIPs);
     machine.configTimeout = opts.configTimeout;
     machine.reduceTimeout = opts.reduceTimeout;
     machine.sendTimeout = opts.sendTimeout;
     machine.recvTimeout = opts.recvTimeout;
+    machine.sockBase = opts.peerSocketNum;
+    machine.sockOffset = 0;
+    machine.start(machine.maxk);
   }
   
   def permute(seed:Long) = {
@@ -103,7 +106,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     if (cmd.magic != Command.magic) {
       if (opts.trace > 0) log("Machine %d got message with bad magic number %d" format (imach, cmd.magic));
     }  else if (cmd.dest != imach) {
-    	if (opts.trace > 0) log("Machine %d got message with bad destination %d" format (imach, cmd.dest));
+      	if (opts.trace > 0) log("Machine %d got message with bad destination %d" format (imach, cmd.dest));
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
@@ -130,6 +133,12 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);
     		allReduce(newcmd.round, newcmd.limit);
+    	}
+    	case Command.setMachineCtype => {
+    		val newcmd = new SetMachineCommand(cmd.dest, cmd.bytes);
+    		newcmd.decode;
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		imach = newcmd.dest;
     	}
     	}
     }
@@ -191,20 +200,20 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 				val clen = istr.readInt();
 				val cmd = new Command(ctype, dest, clen, new Array[Byte](clen*4));
 				if (opts.trace > 2) log("Worker %d got packet %s\n" format (imach, cmd.toString));
-				var waiting = 0;
-				while (waiting < opts.cmdTimeout) {
-					Thread.sleep(10);
-					waiting += 10;
-				}
 				istr.readFully(cmd.bytes, 0, clen*4);
+/*				try {
+					socket.close();
+				} catch {
+				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+e.toString()+"\n" format (imach))}
+				}*/
 				handleCMD(cmd);
 			} catch {
 			case e:Exception =>	if (opts.trace > 0) log("Worker %d Problem reading socket "+e.toString()+"\n" format (imach));
 			} finally {
 				try {
-					socket.close();
+					if (!socket.isClosed) socket.close();
 				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+e.toString()+"\n" format (imach))}
+				case e:IOException => {if (opts.trace > 0) log("Worker %d Final Problem closing socket "+e.toString()+"\n" format (imach))}
 				}
 			}
 		}
@@ -238,7 +247,8 @@ object Worker {
 		var sendTimeout = 1000;
 		var recvTimeout = 1000;
 		var cmdTimeout = 1000;
-		var socketNum = 50051;
+		var commandSocketNum = 50050;
+		var peerSocketNum = 50051;
 		var fuseConfigReduce = false;
 		var doAvg = true;
 		var useLong = false;

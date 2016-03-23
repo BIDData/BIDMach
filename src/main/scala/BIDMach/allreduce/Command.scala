@@ -46,7 +46,8 @@ object Command {
 	final val permuteCtype = 2;
 	final val allreduceCtype = 3;
 	final val permuteAllreduceCtype = 4;
-	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce");
+	final val setMachineCtype = 5;
+	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine");
 	
 	  
   def toAddress(v:Int):String = {
@@ -110,7 +111,7 @@ class ConfigCommand(clen:Int, dest0:Int, bytes:Array[Byte]) extends Command(Comm
   }
   
   override def toString():String = {
-    var ostring = new StringBuilder("Command %s, length %d bytes" format (Command.names(ctype), clen));
+    var ostring = new StringBuilder("Command %s, length %d words" format (Command.names(ctype), clen));
     ostring.append("\nGroups: ")
     for (i <- 0 until gmods.length) {
       ostring.append("%d " format gmods(i));
@@ -149,7 +150,28 @@ class PermuteCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.permu
   }
   
   override def toString():String = {
-     "Command %s, length %d bytes, seed %d" format (Command.names(ctype), clen, seed);
+     "Command %s, length %d words, seed %d" format (Command.names(ctype), clen, seed);
+  }
+}
+
+class SetMachineCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.setMachineCtype, dest0, 1, bytes) {
+  
+  dest = dest0;
+  
+  def this(dest0:Int) = this(dest0, new Array[Byte](1*4));
+  
+  override def encode ():Unit = {
+  	intData.rewind();
+  	intData.put(dest);
+  }
+  
+  override def decode():Unit = {
+  	intData.rewind();
+    dest = intData.get();    
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d words, seed %d" format (Command.names(ctype), clen, dest);
   }
 }
 
@@ -178,7 +200,7 @@ class AllreduceCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.all
   }
   
   override def toString():String = {
-     "Command %s, length %d bytes, round %d limit %d" format (Command.names(ctype), clen, round, limit);
+     "Command %s, length %d words, round %d limit %d" format (Command.names(ctype), clen, round, limit);
   }
 }
 
@@ -211,7 +233,7 @@ class PermuteAllreduceCommand(dest0:Int, bytes:Array[Byte]) extends Command(Comm
   }
   
   override def toString():String = {
-     "Command %s, length %d bytes, round %d seed %d limit %d" format (Command.names(ctype), clen, round, seed, limit);
+     "Command %s, length %d words, round %d seed %d limit %d" format (Command.names(ctype), clen, round, seed, limit);
   }
 }
 

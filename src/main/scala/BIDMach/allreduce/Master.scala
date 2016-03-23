@@ -26,6 +26,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	var executor:ExecutorService = null;
 	var reduceTask:Future[_] = null;
 	var reducer:Reducer = null
+	var sendTiming = false
 
 	
 	def init() {
@@ -47,17 +48,17 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     M = workerIPs.length;
   }
   
-  def sendConfig(dest:Int) {
+  def sendConfig() {
     val clen = 3 + gmods.length + gridmachines.length + workerIPs.length;
-    val cmd = new ConfigCommand(clen, dest);
+    val cmd = new ConfigCommand(clen, 0);
     cmd.gmods = gmods;
     cmd.gridmachines = gridmachines;
     cmd.workerIPs = workerIPs;
     broadcastCommand(cmd);
   }
   
-  def permuteNodes(dest:Int, seed:Long) {
-    val cmd = new PermuteCommand(dest);
+  def permuteNodes(seed:Long) {
+    val cmd = new PermuteCommand(0);
     cmd.seed = seed;
     broadcastCommand(cmd);
   }
@@ -78,11 +79,36 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     
   def broadcastCommand(cmd:Command) {
   	cmd.encode;
-  	if (opts.trace > 2) log("Broadcasting cmd %s" format cmd);
+  	if (opts.trace > 2) log("Broadcasting cmd %s\n" format cmd);
   	val futures = new Array[Future[_]](M);
+  	sendTiming = true;
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
-  		cmd.dest = imach;
+  	  val newcmd = new Command(cmd.ctype, imach, cmd.clen, cmd.bytes);
+  		futures(imach) = send(newcmd, workerIPs(imach));   
+  	}
+  	for (imach <- 0 until M) {
+  		try {
+  			futures(imach).get() 
+  		} catch {
+  		case e:Exception => {}
+  		}
+  		if (futures(imach).isCancelled()) {
+  			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd %s\n" format (imach, cmd));
+  		}
+  	}
+  	sendTiming = false;
+  	timeout.cancel(true);
+  }
+  
+  def setMachineNumbers {
+  	if (opts.trace > 2) log("Broadcasting setMachineNumbers\n");
+  	val futures = new Array[Future[_]](M);
+  	sendTiming = true;
+  	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
+  	for (imach <- 0 until M) {
+  	  val cmd = new SetMachineCommand(0);
+  	  cmd.dest = imach;
   		futures(imach) = send(cmd, workerIPs(imach));   
   	}
   	for (imach <- 0 until M) {
@@ -92,14 +118,15 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   		case e:Exception => {}
   		}
   		if (futures(imach).isCancelled()) {
-  			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd %s" format (imach, cmd));
+  			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd setMachineNumbers\n" format (imach));
   		}
   	}
+  	sendTiming = false;
   	timeout.cancel(true);
   }
   
   def send(cmd:Command, address:Int):Future[_] = {
-    val cw = new CommandWriter(Command.toAddress(address), opts.socketNum, cmd);
+    val cw = new CommandWriter(Command.toAddress(address), opts.commandSocketNum, cmd);
     executor.submit(cw);
   }
   
@@ -109,6 +136,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   		var socket:Socket = null;
   	  try {
   	  	socket = new Socket();
+  	  	socket.setReuseAddress(true);
   	  	socket.connect(new InetSocketAddress(dest, socketnum), opts.sendTimeout);
   	  	if (socket.isConnected()) {
   	  		val ostr = new DataOutputStream(socket.getOutputStream());
@@ -121,12 +149,12 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	  }	catch {
   	  case e:Exception =>
   	  if (opts.trace > 0) {
-  	    log("Master problem sending command %s\n%s" format (command.toString, Command.printStackTrace(e)));
+  	    log("Master problem sending command %s\n%s\n" format (command.toString, Command.printStackTrace(e)));
   	  }
   	  } finally {
   	  	try { if (socket != null) socket.close(); } catch {
   	  	case e:Exception =>
-  	  	if (opts.trace > 0) log("Master problem closing socket\n%s" format Command.printStackTrace(e));			  
+  	  	if (opts.trace > 0) log("Master problem closing socket\n%s\n" format Command.printStackTrace(e));			  
   	  	}
   	  }
   	}
@@ -168,14 +196,16 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 		def run() {
 			try {
 				Thread.sleep(mtime);
-				for (i <- 0 until futures.length) {
-					if (futures(i) != null) {
-						if (opts.trace > 0) log("Master cancelling thread %d" format i);
-						futures(i).cancel(true);
+				if (sendTiming) {
+					for (i <- 0 until futures.length) {
+						if (futures(i) != null) {
+							if (opts.trace > 0) log("Master cancelling thread %d\n" format i);
+							futures(i).cancel(true);
+						}
 					}
 				}
 			} catch {
-			  case e:InterruptedException => if (opts.trace > 2) log("Master interrupted timeout thread");
+			  case e:InterruptedException => if (opts.trace > 3) log("Master interrupted timeout thread %s\n" format Command.printStackTrace(e));
 			}
 		}
   }
@@ -191,7 +221,7 @@ object Master {
 		var sendTimeout = 1000;
 		var recvTimeout = 1000;
 		var trace = 0;
-		var socketNum = 50051;
+		var commandSocketNum = 50050;
 		var numThreads = 16;
   }
 	
