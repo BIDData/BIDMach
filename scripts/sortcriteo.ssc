@@ -1,38 +1,44 @@
 val ntrain = 92
 val ntest = 13
-val dir = "d:/criteo/parts/";
+val ndense = 2*ntest+1;
+val dir = "../data/criteo/parts/";
  
-val nfeats = 37474412;
+val x= loadSMat(dir+"train00.smat.lz4");
+val nfeats = x.nrows;
 val counts = dzeros(nfeats,1);
 val counts2 = dzeros(nfeats,1);
-
-for (i <- 0 to (ntrain+ntest)) {
-  val a = if (i < ntrain) { 
-    loadSMat(dir+("train%02d.smat.lz4" format i));
-  } else { 
-    loadSMat(dir+("test%02d.smat.lz4" format i-77));
-  }
-  counts ~ counts + DMat(sum(a,2));
-  print(".")
-}
-
-println("\nSorting");
-val (vv, ii0) = sortdown2(counts(13->counts.length,0));
-println("\nMapping");
-
-val ii = icol(0->13) on (ii0 + 13);
 
 for (i <- 0 until (ntrain+ntest)) {
   val a = if (i < ntrain) { 
     loadSMat(dir+("train%02d.smat.lz4" format i));
   } else { 
-    loadSMat(dir+("test%02d.smat.lz4" format i-77));
+    loadSMat(dir+("test%02d.smat.lz4" format i-ntrain));
+  }
+  counts ~ counts + DMat(sum(a,2));
+  print(".")
+}
+
+val cmeans = counts / counts(0);
+val cscale = FMat(cmeans);
+cscale(ndense->nfeats) = 1f;
+
+println("\nSorting");
+val (vv, ii0) = sortdown2(counts(ndense->counts.length,0));
+println("\nMapping");
+
+val ii = icol(0->ndense) on (ii0 + ndense);
+
+for (i <- 0 until (ntrain+ntest)) {
+  val a = if (i < ntrain) { 
+    loadSMat(dir+("train%02d.smat.lz4" format i));
+  } else { 
+    loadSMat(dir+("test%02d.smat.lz4" format i-ntrain));
   }
   val b = a(ii,?);
   if (i < ntrain) { 
-    saveSMat(dir+("trainsorted%02d.smat.lz4" format i), b);
+    saveSMat(dir+("trainsorted%02d.smat.lz4" format i), b/cscale);
   } else { 
-    saveSMat(dir+("testsorted%02d.smat.lz4" format i-77), b);
+    saveSMat(dir+("testsorted%02d.smat.lz4" format i-ntrain), b/cscale);
   }
   counts2 ~ counts2 + DMat(sum(b,2));
   print(".")
