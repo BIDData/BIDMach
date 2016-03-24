@@ -18,7 +18,8 @@ def readcritfile(fname:String, haslabel:Int):(FMat, IMat, IMat) = {
   var iline = 0;
   while (iline < nlines) {
     val parts = line.split("\t");
-    val nparts = parts.length
+    val nparts = parts.length;
+    if (nparts != 40) println("line %d has length %d\n" format (iline, nparts));
     if (haslabel > 0) labels(iline) = parts(0).toInt;
     var i = 0;
     while (i < 13 && i+haslabel < nparts) {
