@@ -1,6 +1,13 @@
 
 import BIDMach.allreduce.{Master,Worker,Command}
 
+def stringAddrToInt(s:String) = {
+    val parts = s.split(".").map(_.toInt);
+    ((((((parts(0) << 8) + parts(1)) << 8) + parts(2)) << 8) + parts(3));
+}
+    
+val addresses = scala.io.Source.fromFile("/opt/BIDMach/scripts/hosts.txt").getLines.map(stringAddrToInt(_))
+
 val a = new Master();
 val opts = a.opts;
 opts.trace = 3;
