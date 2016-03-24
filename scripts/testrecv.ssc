@@ -1,0 +1,8 @@
+
+import BIDMach.allreduce.{Master,Worker,Command}
+
+val a = new Worker();
+val opts = a.opts;
+opts.trace = 3;
+
+a.start(null)

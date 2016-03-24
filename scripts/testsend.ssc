@@ -1,0 +1,17 @@
+
+import BIDMach.allreduce.{Master,Worker,Command}
+
+val a = new Master();
+val opts = a.opts;
+opts.trace = 3;
+opts.intervalMsec = 1000;
+
+val addr1 = Command.address(128,32,168,223);
+val addr2 = Command.address(128,32,168,212);
+val gmods = irow(2);
+val gmachines = irow(0,1);
+val workerIPs = irow(addr1,addr2);
+
+a.init
+a.config(gmods, gmachines, workerIPs)
+a.sendConfig
