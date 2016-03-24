@@ -1,0 +1,39 @@
+val ntrain = 92
+val ntest = 13
+val dir = "d:/criteo/parts/";
+ 
+val nfeats = 37474412;
+val counts = dzeros(nfeats,1);
+val counts2 = dzeros(nfeats,1);
+
+for (i <- 0 to (ntrain+ntest)) {
+  val a = if (i < ntrain) { 
+    loadSMat(dir+("train%02d.smat.lz4" format i));
+  } else { 
+    loadSMat(dir+("test%02d.smat.lz4" format i-77));
+  }
+  counts ~ counts + DMat(sum(a,2));
+  print(".")
+}
+
+println("\nSorting");
+val (vv, ii0) = sortdown2(counts(13->counts.length,0));
+println("\nMapping");
+
+val ii = icol(0->13) on (ii0 + 13);
+
+for (i <- 0 until (ntrain+ntest)) {
+  val a = if (i < ntrain) { 
+    loadSMat(dir+("train%02d.smat.lz4" format i));
+  } else { 
+    loadSMat(dir+("test%02d.smat.lz4" format i-77));
+  }
+  val b = a(ii,?);
+  if (i < ntrain) { 
+    saveSMat(dir+("trainsorted%02d.smat.lz4" format i), b);
+  } else { 
+    saveSMat(dir+("testsorted%02d.smat.lz4" format i-77), b);
+  }
+  counts2 ~ counts2 + DMat(sum(b,2));
+  print(".")
+}
