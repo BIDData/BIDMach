@@ -1,5 +1,5 @@
 
-val dir = "d:/criteo/parts/";
+val dir = "../data/criteo/parts/";
 val ivals = new Array[IMat](26);
 val mvals = new Array[IMat](26);
 println("Building feature lookup tables")
@@ -77,4 +77,8 @@ for (i <- 0 to 87) {
   }
   print(".")
 }
+println("\nSaving dicts\n");
 
+for (i <- 0 until 26) {
+  saveIMat(dir+"dict%02d.imat.lz4", dicts(i).grams);
+}
