@@ -12,6 +12,8 @@ The main project page is <b><a href="http://bid2.berkeley.edu/bid-data-project/"
 
 Documentation is <b><a href="https://github.com/BIDData/BIDMach/wiki">here in the wiki</a></b>
 
+<b>New</b> BIDMach has a <b><a href="https://groups.google.com/forum/#!forum/bidmach-users-group">discussion group</a></b> on Google Groups.
+
 BIDMach is a sister project of BIDMat, a matrix library, which is 
 <b><a href="https://github.com/BIDData/BIDMat">also on github</a></b>
 
