@@ -32,7 +32,8 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   	val nfeats = mats(0).nrows;
   	if (refresh) {
   		Q = normrnd(0, 1, nfeats, opts.dim);                 // Randomly initialize Q
-  		QRdecompt(Q, Q, null);                               // Orthonormalize it
+//  		QRdecompt(Q, Q, null);                               // Orthonormalize it
+		Q ~ Q / sqrt(Q dot Q);
   		SV = Q.zeros(1, opts.dim);                           // Holder for Singular values
   	} else {
   	  Q = modelmats(0);
@@ -52,7 +53,9 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     val PP = (Q.t * M *^ M).t                              // Compute P = M * M^t * Q efficiently
     if (ipass < opts.miniBatchPasses) {
       P = PP;
-      subspaceIter;                                        // Do minibatch subspace iterations 
+      if (ipass > opts.powerWait) {
+        subspaceIter;                                        // Do minibatch subspace iterations 
+      }	
     } else {
       P ~ P + PP;                                          // Else accumulate P over the dataset
     }
@@ -90,13 +93,14 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   }
   
   def subspaceIter = {
-	  QRdecompt(P, Q, null);
+    QRdecompt(P, Q, null);
   }
 }
 
 object SVD  {
   trait Opts extends Model.Opts {
     var miniBatchPasses = 1;
+    var powerWait = 10;
   }
   
   class Options extends Opts {}
