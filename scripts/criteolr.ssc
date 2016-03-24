@@ -1,6 +1,6 @@
 :silent
 
-val mdir = "../data/criteo/"
+val mdir = "../data/criteo/parts/"
 
 val (nn,opts) = GLM.learnerX(List(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4"));
 opts.nend = 64;
