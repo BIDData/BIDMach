@@ -112,8 +112,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	sendTiming = true;
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
-  	  val cmd = new SetMachineCommand(imach);
-  	  cmd.dest = 0;
+  	  val cmd = new SetMachineCommand(0, imach);
   		futures(imach) = send(cmd, workerIPs(imach));   
   	}
   	for (imach <- 0 until M) {

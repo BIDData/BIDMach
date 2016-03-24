@@ -135,10 +135,10 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     		allReduce(newcmd.round, newcmd.limit);
     	}
     	case Command.setMachineCtype => {
-    		val newcmd = new SetMachineCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new SetMachineCommand(cmd.dest, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-    		imach = newcmd.dest;
+    		imach = newcmd.newdest;
     	}
     	case Command.startLearnerCtype => {
     		val newcmd = new StartLearnerCommand(cmd.dest, cmd.bytes);

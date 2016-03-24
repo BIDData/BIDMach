@@ -155,24 +155,25 @@ class PermuteCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.permu
   }
 }
 
-class SetMachineCommand(dest0:Int, bytes:Array[Byte]) extends Command(Command.setMachineCtype, dest0, 1, bytes) {
+class SetMachineCommand(dest0:Int, newdest0:Int, bytes:Array[Byte]) extends Command(Command.setMachineCtype, dest0, 1, bytes) {
   
   dest = dest0;
+  var newdest = newdest0;
   
-  def this(dest0:Int) = this(dest0, new Array[Byte](1*4));
+  def this(dest0:Int, newdest0:Int) = this(dest0, newdest0, new Array[Byte](1*4));
   
   override def encode ():Unit = {
   	intData.rewind();
-  	intData.put(dest);
+  	intData.put(newdest);
   }
   
   override def decode():Unit = {
   	intData.rewind();
-    dest = intData.get();    
+    newdest = intData.get();    
   }
   
   override def toString():String = {
-     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
+     "Command %s, length %d words, machine %d newdest %d" format (Command.names(ctype), clen, dest, newdest);
   }
 }
 
