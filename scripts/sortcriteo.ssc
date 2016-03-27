@@ -3,6 +3,7 @@ val ntest = 13
 val ndense = 2*ntest+1;
 val dir = "../data/criteo/parts/";
  
+println("\nCounting features");
 val x= loadSMat(dir+"train00.smat.lz4");
 val nfeats = x.nrows;
 val counts = dzeros(nfeats,1);
@@ -26,7 +27,9 @@ println("\nSorting");
 val (vv, ii0) = sortdown2(counts(ndense->counts.length,0));
 println("\nMapping");
 
-val ii = icol(0->ndense) on (ii0 + ndense);
+val iperm = icol(0->ndense) on (ii0 + ndense);
+saveIMat(dir+"permutation.imat.lz4", iperm);
+val uperm = invperm(iperm);
 
 for (i <- 0 until (ntrain+ntest)) {
   val a = if (i < ntrain) { 
@@ -34,7 +37,10 @@ for (i <- 0 until (ntrain+ntest)) {
   } else { 
     loadSMat(dir+("test%02d.smat.lz4" format i-ntrain));
   }
-  val b = a(ii,?);
+  val (ii, jj, vv) = find3(a);
+  val newii = uperm(ii);
+  val b = sparse(newii, jj, vv / cscale(newii), a.nrows, a.ncols);
+  b.check;
   if (i < ntrain) { 
     saveSMat(dir+("trainsorted%02d.smat.lz4" format i), b/cscale);
   } else { 
@@ -43,3 +49,4 @@ for (i <- 0 until (ntrain+ntest)) {
   counts2 ~ counts2 + DMat(sum(b,2));
   print(".")
 }
+saveDMat(dir+"sortedfeaturecounts.dmat.lz4", counts2)
