@@ -88,3 +88,9 @@ int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *mome
 
 int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr,
 	     float nw, float *ve, int nve, float *ts, int nts, float *lrate, int nlrate, float langevin, float eps, int doupdate);
+
+int lstm_fwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, float *outC, float *outH, int n);
+
+int lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, float *doutC, float *doutH, 
+             float *dinC, float *dLIN1, float *dLIN2, float *dLIN3, float *dLIN4, int n);
+

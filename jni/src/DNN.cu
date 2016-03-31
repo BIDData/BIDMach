@@ -174,7 +174,7 @@ __global__ void __lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, fl
     dout_tanh = dout_h * out_gate;
 
     //    out_tanh = tanh(out_c);
-    dout_c += inline_deriv_tanh(out_c, dout_tanh);
+    dout_c += inline_deriv_tanh(out_tanh, dout_tanh);
 
     //    out_c = in_prod + f_prod;
     din_prod = dout_c;
@@ -193,10 +193,10 @@ __global__ void __lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, fl
     //    forget_gate = forward_sigmoid(lin3);
     //    in_sat = tanh(lin4);
 
-    dlin4 = inline_deriv_tanh(lin4, din_sat);
-    dlin3 = inline_deriv_sigmoid(lin3, dforget_gate);
-    dlin2 = inline_deriv_sigmoid(lin2, dout_gate);
-    dlin1 = inline_deriv_sigmoid(lin1, din_gate);
+    dlin4 = inline_deriv_tanh(in_sat, din_sat);
+    dlin3 = inline_deriv_sigmoid(forget_gate, dforget_gate);
+    dlin2 = inline_deriv_sigmoid(out_gate, dout_gate);
+    dlin1 = inline_deriv_sigmoid(in_gate, din_gate);
 
     atomicAdd(&dLIN4[i], dlin4);
     atomicAdd(&dLIN3[i], dlin3);
