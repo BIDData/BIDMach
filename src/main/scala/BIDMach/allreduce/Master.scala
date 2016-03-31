@@ -78,6 +78,14 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     broadcastCommand(cmd);
   }
   
+  def permuteAllreduce(round:Int, limit:Int) {
+  	val cmd = new PermuteAllreduceCommand(0);
+  	cmd.round = round;
+  	cmd.seed = round;
+  	cmd.limit = limit;
+  	broadcastCommand(cmd);
+  }
+  
   def log(msg:String) {
 		print(msg);	
 	}
@@ -113,6 +121,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
   	  val cmd = new SetMachineCommand(0, imach);
+  	  cmd.encode
   		futures(imach) = send(cmd, workerIPs(imach));   
   	}
   	for (imach <- 0 until M) {
@@ -171,13 +180,12 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   		var round = 0;
   		var limit = 0;
   		while (!stop) {
-  			Thread.sleep(opts.intervalMsec);
   			val newlimit0 = if (opts.limitFctn != null) {
   				opts.limitFctn(round, opts.limit);
   			} else {
   				opts.limit;
   			}
-  			val newlimit = if (newlimit0 <= 0) 2000000000 else newlimit0;
+  			limit = if (newlimit0 <= 0) 2000000000 else newlimit0;
   			val cmd = if (opts.permuteAlways) {
   				val cmd0 = new PermuteAllreduceCommand(0);
   				cmd0.round = round;
@@ -191,6 +199,9 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   				cmd0;
   			}
   			broadcastCommand(cmd);
+  			val timems = opts.intervalMsec + (limit * opts.timeScaleMsec).toInt;
+  			if (opts.trace > 2) log("Sleeping for %d msec\n" format timems);
+  			Thread.sleep(timems);
   			round += 1;
   		}
   	}
@@ -220,7 +231,7 @@ object Master {
 		var limit = 0;
 		var limitFctn:(Int,Int)=>Int = null;
 		var intervalMsec = 1000;
-		var timeScaleMsec = 1e-5f;
+		var timeScaleMsec = 1e-4f;
 		var permuteAlways = true;
 		var sendTimeout = 1000;
 		var recvTimeout = 1000;

@@ -40,7 +40,8 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 	  listenerTask = executor.submit(listener);
 	}
   
-  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, machineIPs0:IMat) = {    
+  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, machineIPs0:IMat) = {
+    val t1 = toc;
     imach = imach0;
     gmods = gmods0;
     gridmachines = gridmachines0;
@@ -48,7 +49,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
     machineIPs = machineIPs0.data.map(Command.toAddress(_));
     if (machine != null) machine.stop;
-    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.trace, opts.replicate, machineIPs);
+    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, machineIPs);
     machine.configTimeout = opts.configTimeout;
     machine.reduceTimeout = opts.reduceTimeout;
     machine.sendTimeout = opts.sendTimeout;
@@ -56,6 +57,8 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     machine.sockBase = opts.peerSocketNum;
     machine.sockOffset = 0;
     machine.start(machine.maxk);
+    val t2 = toc
+    if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
   }
   
   def permute(seed:Long) = {
@@ -64,9 +67,9 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
   
   def allReduce(round:Int, limit:Long) = {
     if (model != null) {
+      val t1=toc;
     	model.snapshot(limit.toInt, opts.doAvg);
     	val sendmat = model.sendmat;
-    	val recvmat = model.recvmat;
     	val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
     		model.indexmat
     	} else {
@@ -85,7 +88,14 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     		}
     		machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
     	}
+    	model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
     	model.addStep(limit.toInt, opts.doAvg);
+    	val t2 = toc;
+    	val nbytes = indexmat match {
+    	  case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;
+    	  case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f;
+    	}	
+    	if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
     } else {
       if (opts.trace > 2) log("Allreduce model is null\n")
     }
@@ -212,16 +222,16 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 				try {
   				socket.close();
 				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+e.toString()+"\n" format (imach))}
+				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+Command.printStackTrace(e)+"\n" format (imach))}
 				}
 				handleCMD(cmd);
 			} catch {
-			case e:Exception =>	if (opts.trace > 0) log("Worker %d Problem reading socket "+e.toString()+"\n" format (imach));
+			case e:Exception =>	if (opts.trace > 0) log("Worker %d Problem reading socket "+Command.printStackTrace(e)+"\n" format (imach));
 			} finally {
 				try {
 					if (!socket.isClosed) socket.close();
 				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Worker %d Final Problem closing socket "+e.toString()+"\n" format (imach))}
+				case e:IOException => {if (opts.trace > 0) log("Worker %d Final Problem closing socket "+Command.printStackTrace(e)+"\n" format (imach))}
 				}
 			}
 		}
@@ -261,6 +271,7 @@ object Worker {
 		var doAvg = true;
 		var useLong = false;
 		var trace = 0;
+		var machineTrace = 0;
 		var replicate = 1;
 		var bufsize = 10*1000000;
   }
