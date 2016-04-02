@@ -919,12 +919,12 @@ object BayesNet {
  * @param statesPerNode, 1-d mat, contains the cardinality of each variable
  * @param n the number of vertices in the graph
  */
-class FactorGraph(val factorSet: Mat, val n: Int, val statesPerNode: Mat) extends Graph(factorSet, n, statesPerNode){
+class FactorGraph(val factorSet: Mat, override val n: Int, override val statesPerNode: Mat) extends Graph(factorSet, n, statesPerNode){
   // var mrf: Mat = null
   // var colors: Mat = null
   // var ncolors = 0
   // val maxColor = 100
-  override var nFactor = factorSet.ncols  // revised by Haoyu, this is the column of the pproject, for Bayes net, nFactor == n
+  nFactor = factorSet.ncols  // revised by Haoyu, this is the column of the pproject, for Bayes net, nFactor == n
 
   /**
    * Build the dag from the input variables, i.e. re-construct the graph structure matrix.
@@ -955,7 +955,7 @@ class FactorGraph(val factorSet: Mat, val n: Int, val statesPerNode: Mat) extend
   override def iproject : SMat = {
     var res = zeros(nFactor, n)
     for (i <- 0 until nFactor) {
-      val parents = find(factorSet(?, i))
+      val parents = find(SMat(factorSet(?, i)))
       var cumRes = 1f
       val parentsLen = parents.length
       for (j <- 0 until parentsLen) {
