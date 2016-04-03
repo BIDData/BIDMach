@@ -1,0 +1,34 @@
+val dir = "../data/uci/Higgs/parts/"
+
+val (nn, opts) = RandomForest.learner(dir+"data%03d.fmat.lz4", dir+"label%03d.imat.lz4")
+
+opts.nend = 10
+opts.batchSize = 20000
+opts.depth =  30
+opts.ntrees = 128
+opts.nsamps = 8
+opts.nnodes = 400000
+opts.nbits = 16
+opts.ncats = 2;
+opts.regression = true;
+opts.gain = 0.001f
+
+val rf = nn.model.asInstanceOf[RandomForest]
+
+nn.train
+
+val ta = loadFMat(dir + "data%03d.fmat.lz4" format 10);
+val tc = loadIMat(dir + "label%03d.imat.lz4" format 10);
+
+val (mm,mopts) = RandomForest.predictor(rf, ta);
+
+mopts.batchSize=1000
+
+mm.predict
+
+val pc = FMat(mm.preds(0))
+
+val rc = roc(pc, tc, 1-tc, 1000);
+
+mean(rc)
+
