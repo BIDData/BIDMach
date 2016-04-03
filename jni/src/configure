@@ -107,7 +107,8 @@ if [ "$OS" = "apple" ] ; then
             $BLAS_ROOT/lib/libmkl_core.a \
             $BLAS_ROOT/lib/libmkl_intel${PTYPE}.a $BLAS_ROOT/lib/libmkl_intel_thread.a \
             $BLAS_ROOT/lib/libmkl_core.a \
-            -liomp5 -lpthread -lm  -framework JavaVM"
+            ${BIDMACH_ROOT}/lib/libiomp5.a \
+            -lpthread -lm  -framework JavaVM"
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="-L${CUDA_HOME}/lib -L${INSTALL_DIR} -lcudart"
