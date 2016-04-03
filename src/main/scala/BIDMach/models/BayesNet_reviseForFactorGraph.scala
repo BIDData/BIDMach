@@ -105,7 +105,7 @@ class BayesNet(val dag:Mat,
     iproject = if (useGPUnow) GSMat((graph.iproject).t) else (graph.iproject).t
     pproject = if (useGPUnow) GSMat(graph.pproject) else graph.pproject
     iprojectBlockedSAME = createBlockedDiagonal(iproject)
-   
+    
     // Build the CPT. To avoid div-by-zero errors, initialize randomly.
     val numSlotsInCpt = IMat(exp(ln(FMat(statesPerNode).t) * SMat(pproject)) + 1e-4)
     cptOffset = izeros(graph.nFactor, 1)
@@ -124,8 +124,10 @@ class BayesNet(val dag:Mat,
     //} 
    
     // To finish building CPT, we normalize it using the normalizing constant matrix.
-    normConstMatrix = getNormConstMatrix(lengthCPT)
-    cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
+    if (!isFactorModel) {
+      normConstMatrix = getNormConstMatrix(lengthCPT)
+      cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
+    }
     setmodelmats(new Array[Mat](1))
     modelmats(0) = cpt
     mm = modelmats(0)
@@ -148,6 +150,7 @@ class BayesNet(val dag:Mat,
     dirichletScale = mm.ones(mm.length, 1)
     statesPerNode = convertMat(statesPerNode) 
     batchSize = -1
+    println("finish init");
   } 
    
   /**
@@ -343,8 +346,13 @@ class BayesNet(val dag:Mat,
     //  counts2 <-- (counts2 *@ equivClassVector)
     //  counts2 <-- (counts2.t * equivClassCountMap).t
     //}
-
-    updatemats(0) <-- (counts3 / (counts3.t * normConstMatrix).t);
+    // for the factor model, the norm is not necessary
+    if (!isFactorModel) {
+      updatemats(0) <-- (counts3 / (counts3.t * normConstMatrix).t);
+    } else {
+      updatemats(0) <-- counts3;
+    }
+    println("finished updates");
     val t14 = toc;
     runtimes(9) += t14 - t13;
   }
@@ -888,7 +896,7 @@ object BayesNet {
    * 
    * New: we're adding in an eClass, but we can set that to be null if needed.
    */
-  def learner(statesPerNode:Mat, dag:Mat, eClasses:Mat, isFactorModel:Boolean, factorSet:Array[Array[Int]], data:Mat) = {
+  def learner(statesPerNode:Mat, dag:Mat, eClasses:Mat, isFactorModel:Boolean, data:Mat) = {
 
     class xopts extends Learner.Options with BayesNet.Opts with MatSource.Opts with IncNorm.Opts 
     val opts = new xopts
@@ -902,12 +910,12 @@ object BayesNet {
     val secondMatrix = data.zeros(opts.copiesForSAME*data.nrows,data.ncols)
 
     val nn = new Learner(
-        new MatSource(Array(data:Mat, secondMatrix), opts),
-        new BayesNet(SMat(dag), statesPerNode, eClasses, isFactorModel, opts),
-        null,
-        new IncNorm(opts),
-        null,
-        opts)
+      new MatSource(Array(data:Mat, secondMatrix), opts),
+      new BayesNet(SMat(dag), statesPerNode, eClasses, isFactorModel, opts),
+      null,
+      new IncNorm(opts),
+      null,
+      opts)
     (nn, opts)
   }
 }
@@ -919,11 +927,8 @@ object BayesNet {
  * @param statesPerNode, 1-d mat, contains the cardinality of each variable
  * @param n the number of vertices in the graph
  */
-class FactorGraph(val factorSet: Mat, override val n: Int, override val statesPerNode: Mat) extends Graph(factorSet, n, statesPerNode){
-  // var mrf: Mat = null
-  // var colors: Mat = null
-  // var ncolors = 0
-  // val maxColor = 100
+class FactorGraph(val factorSet: Mat, override val n: Int, override val statesPerNode: Mat) extends Graph(factorSet, n, statesPerNode) {
+  
   nFactor = factorSet.ncols  // revised by Haoyu, this is the column of the pproject, for Bayes net, nFactor == n
 
   /**
@@ -932,14 +937,14 @@ class FactorGraph(val factorSet: Mat, override val n: Int, override val statesPe
    * self-edge for mrf.
    */
   override def moralize = {
-    var mrf = izeros(n, n)
+    mrf = izeros(n, n)
     for (i <- 0 until factorSet.ncols) {
       val factors = find(SMat(factorSet(?, i)))
       if (factors.length > 1) {
         // we ignore the self-edge here
         for (orign <- factors.data) {
           for (des <- factors.data) {
-            if (mrf(orign, des) == 0 && orign != des) {
+            if (orign != des) {
               mrf(orign, des) = 1
             }
           }
@@ -962,10 +967,10 @@ class FactorGraph(val factorSet: Mat, override val n: Int, override val statesPe
         if (j > 0) {
           cumRes = cumRes * IMat(statesPerNode)(parents(parentsLen - j))
         }
-        res.asInstanceOf[SMat](i, parents(parentsLen - j - 1)) = cumRes
+        res(i, parents(parentsLen - j - 1)) = cumRes
       }
     }  
-    return SMat(res)
+    return sparse(res)
   }  
 
   /**
@@ -976,6 +981,7 @@ class FactorGraph(val factorSet: Mat, override val n: Int, override val statesPe
   override def pproject : SMat = {
     return SMat(factorSet)
   }
+
 }
 
 
@@ -1070,7 +1076,7 @@ class Graph(val dag: Mat, val n: Int, val statesPerNode: Mat) {
     var colorCount = izeros(maxColor, 1)
     colors = -1 * iones(n, 1)
     ncolors = 0
-   
+
     // Access nodes sequentially. Find the color map of its neighbors, then find the legal color w/least count
     val seq = IMat(0 until n)
     // Can also access nodes randomly
