@@ -262,9 +262,11 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
 
 trait OutputLayer {}
 
-class NodeSet(val nnodes:Int) extends Serializable {
+class NodeSet(val nnodes:Int, val nodes:Array[Node]) extends Serializable {
   
-  val nodes = new Array[Node](nnodes);
+  def this(nnodes:Int) = this(nnodes, new Array[Node](nnodes));
+  
+  def this(nodes:Array[Node]) = this(nodes.length, nodes);
   
   def apply(i:Int):Node = nodes(i);
   

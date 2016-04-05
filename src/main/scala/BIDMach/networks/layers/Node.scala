@@ -79,7 +79,9 @@ object Node {
   
   def exp(a:NodeTerm) = new ExpNode{inputs(0) = a;};
   
-  def GLM(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
+  def glm_(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
+  
+  def glm(a:NodeTerm)(links:IMat) = {val ilinks = links; new GLMNode{inputs(0) = a; links = ilinks}};
   
   def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
   
@@ -119,10 +121,16 @@ object Node {
     n
   }
   
-  def norm(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
+  def norm_(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
     val n = new NormNode{inputs(0) = a;}
     opts.copyOpts(n);
     n
+  }
+  
+  def norm(a:NodeTerm)(targetNorm:Float = 1f, weight:Float = 1f) =  {
+    val tnorm = targetNorm;
+    val nweight = weight;
+    new NormNode{inputs(0) = a; targetNorm = tnorm; weight = nweight}
   }
   
   def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a};
