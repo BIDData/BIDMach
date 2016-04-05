@@ -5,7 +5,7 @@ public final class CPUMACH {
   private CPUMACH() {}
 
   static {
-      LibUtils.loadLibrary("bidmachcpu");
+      LibUtils.loadLibrary("bidmachcpu", true);
   } 
  
   
