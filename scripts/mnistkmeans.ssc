@@ -7,7 +7,7 @@ testdata(0->10, ?) = 0;
 val (vbest, ibest) = maxi2(test);
 
 opts.dim = 256
-opts.nend = 80;
+opts.nend = 10;
 opts.batchSize = 20000;
 opts.npasses = 10;
 
