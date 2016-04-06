@@ -5,7 +5,7 @@ public final class CPUMACH {
   private CPUMACH() {}
 
   static {
-      LibUtils.loadLibrary("bidmachcpu");
+      LibUtils.loadLibrary("bidmachcpu", true);
   } 
  
   
@@ -32,5 +32,9 @@ public final class CPUMACH {
   public static native int applyfwd(float [] A, float [] B, int ifn, int n, int nthreads);
   
   public static native int applyderiv(float [] A, float [] B, float [] C, int ifn, int n, int nthreads);
+  
+  public static native void multADAGrad(int nrows, int ncols, int nnz, float [] A, float [] Bdata, int [] Bir, int [] Bjc, 
+  		float [] MM, float [] Sumsq, float [] Mask, int maskrows, float [] lrate, int lrlen,
+  		float [] vexp, int vexplen, float [] jtexp, int texplen, float istep, int addgrad, float epsilon);
 }
 

@@ -65,7 +65,8 @@ BIDMACH_ROOT=`cd "$BIDMACH_ROOT/../..";pwd`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
 
 if [ "$OS" = "apple" ] ; then
-    BLAS_ROOT="/opt/intel/mkl"
+    ICC_ROOT="/opt/intel/compilers_and_libraries/mac"
+    BLAS_ROOT="${ICC_ROOT}/mkl"
     if [ "$JAVA_HOME" = "" ]; then
 	JAVA_HOME=`/usr/libexec/java_home`
     fi
@@ -107,7 +108,8 @@ if [ "$OS" = "apple" ] ; then
             $BLAS_ROOT/lib/libmkl_core.a \
             $BLAS_ROOT/lib/libmkl_intel${PTYPE}.a $BLAS_ROOT/lib/libmkl_intel_thread.a \
             $BLAS_ROOT/lib/libmkl_core.a \
-            -liomp5 -lpthread -lm  -framework JavaVM"
+            $ICC_ROOT/lib/libiomp5.a \
+            -lpthread -lm  -framework JavaVM"
     fi
     INSTALL_DIR="${BIDMACH_ROOT}/lib"
     CUDA_LIBS="-L${CUDA_HOME}/lib -L${INSTALL_DIR} -lcudart"
@@ -195,7 +197,7 @@ else
              -lpthread -lm"
 	else 
 	    CPU_LIBS="-L$JAVA_HOME/lib -L${BIDMACH_ROOT}/lib \
-o             -liomp5 -ldl -lpthread -lm"
+             -liomp5 -ldl -lpthread -lm"
 	fi
 	if [ "$ARCH" = "x86" ] ; then
             CULIB="lib"

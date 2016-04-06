@@ -5,12 +5,15 @@
   */
 import BIDMach.networks.SeqToSeq
 
-val dir = "/data01/livejournal/srcdst/";  // Directory for input data
-val mdir = "/data01/livejournal/model/"
+val dir = "/data/livejournal/srcdst/";  // Directory for input data
+val mdir = "/data/livejournal/models/"
+val odir = "/data/livejournal/preds/";  // Directory for input data
 
-val model = SeqToSeq.load(mdir+"model256_02/")
-val (nn,opts) = SeqToSeq.embed(model, dir+  "src%04d.smat.lz4", dir + "pred%04d.fmat.lz4")
+val model = SeqToSeq.load(mdir+"model256_01/")
+val (nn,opts) = SeqToSeq.embed(model, dir+  "src%04d.smat.lz4", odir + "pred%04d.fmat.lz4")
 
-opts.nend = 100
+opts.nend = 1132
 opts.batchSize = 128
 opts.ofcols = 128000
+
+nn.predict

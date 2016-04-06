@@ -1,0 +1,12 @@
+
+val dir = "../data/uci/Higgs/parts/"
+
+for (i <- 0 until 110) {
+  val a = HMat.loadFMatTxt(dir+"data%03d" format i, null, 0);
+  val targ = a(?,0);
+  val data = a(?,1->a.ncols);
+  saveFMat(dir + "data%03d.fmat.lz4" format i, data.t);
+  saveIMat(dir + "label%03d.imat.lz4" format i, int(targ.t));
+  saveFMat(dir + "label%03d.fmat.lz4" format i, targ.t);
+  print(".");
+}

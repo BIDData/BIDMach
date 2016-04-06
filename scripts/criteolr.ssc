@@ -1,48 +1,29 @@
 :silent
-class xopts extends Learner.Options with FileSource.Opts with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts
-val opts = new xopts
 
-val mdir = "d:/criteo/parts/"
-opts.fnames = List(FileSource.simpleEnum(mdir+"train%02d.smat.lz4", 1, 0),  
-                   FileSource.simpleEnum(mdir+"trainlabel%02d.fmat.lz4", 1, 0));
-opts.nend = 67;
+val mdir = "../data/criteo/parts/"
+
+val (nn,opts) = GLM.learnerX(List(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4"));
+opts.nend = 64;
 opts.lrate = 0.0001f;
-opts.reg1weight = 0.001f;
-opts.batchSize=2000;
-opts.npasses=20;
-//opts.npasses=1;
-opts.eltsPerSample=60;
-opts.links = icol(1);
+opts.reg1weight = 0.0001f;
+opts.batchSize=1000;
+opts.npasses=2;
+opts.links = irow(1);
 //opts.pstep = 0.001f;
-opts.lim = 8f;
 opts.aopts = opts;
-
-val ds = {
-  implicit val ec = threadPool(4) // make sure there are enough threads (more than the lookahead count)
-  new FileSource(opts)               // the datasource
-}
-
-
-val nn = new Learner(                  // make a learner instance
-    ds,                                // datasource
-    new GLM(opts),                     // the model 
-    Array(new L1Regularizer(opts)),    // list of mixins or regularizers
-//    new ADAGrad(opts),                 // the optimization class to use
-    null,
-    null,
-    opts)                              // pass the options to the learner as well
-
+opts.texp = 0.4f;
 
 nn.train
 
-val mm = FMat(nn.model.modelmats(0));
+val model = nn.model.asInstanceOf[GLM];
+val mm = FMat(model.modelmats(0))
 
-val filesize = 600000;
+val filesize = 500000;
 val tscores = dzeros(filesize*10, 1);
 val tcats = dzeros(filesize*10, 1);
 var len = 0;
 for (i <- 0 until 10) {
-  val a = loadSMat(mdir + "train%02d.smat.lz4" format i + 67);
+  val a = loadSMat(mdir + "trainsorted%02d.smat.lz4" format i + 67);
   val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + 67);
   val sc = mm * a;
   tscores(i * filesize -> (i * filesize + sc.length), 0) = DMat(sc.t);
@@ -60,7 +41,7 @@ mean(rr)
 val bounds = 7.0
 val bscores = min(max(scores, drow(-bounds)), drow(bounds));
 val probs = 1/(1 + exp(-bscores));
-val lln = ((cats dot ln(probs)) + ((1-cats) dot ln(1-probs)))/probs.length
+val lln = ((cats dot ln(probs)) + ((1-cats) dot ln(1-probs)))/probs.length.toDouble
 
 println("roc area = %5.4f, ll = %5.4f" format (mean(rr).v, lln.v))
 :silent

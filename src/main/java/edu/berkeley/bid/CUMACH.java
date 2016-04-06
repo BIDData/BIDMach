@@ -104,5 +104,10 @@ public final class CUMACH {
     
     public static native int ADAGradn(int nrows, int ncols, Pointer mm, Pointer um, Pointer ssq, Pointer momentum, float mu, Pointer mask, int maskr, float nw, Pointer ve, int nve,
             Pointer ts, int nts, Pointer lrate, int nlrate, float langevin, float eps, int doupdate);
+    
+    public static native int LSTMfwd(Pointer inC, Pointer LIN1, Pointer LIN2, Pointer LIN3, Pointer LIN4, Pointer outC, Pointer outH, int n);
+    
+    public static native int LSTMbwd(Pointer inC, Pointer LIN1, Pointer LIN2, Pointer LIN3, Pointer LIN4, Pointer doutC, Pointer doutH, 
+    		Pointer dinC, Pointer dLIN1, Pointer dLIN2, Pointer dLIN3, Pointer dLIN4, int n);
 
 }

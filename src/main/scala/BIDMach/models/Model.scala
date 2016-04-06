@@ -1,4 +1,5 @@
 package BIDMach.models
+
 import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
@@ -34,6 +35,14 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   }
   
   var updatemats:Array[Mat] = null;
+  
+  // For Allreduce: the local indices
+  var indexmat:Mat = null;
+  
+  // For Allreduce: cached local matrices:
+  var sendmat:Mat = null;
+  
+  var recvmat:Mat = null;
   
   var mats:Array[Mat] = null;
   
@@ -176,6 +185,44 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
 	v
   }
+  
+  def snapshot(len:Int, avg:Boolean) = {
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	modelmats(0).synchronized {
+  		sendmat = cpu(modelmats(0).colslice(0, len0));
+  	}
+  	if (avg) {
+  		sendmat = ones(1, len0) on sendmat;
+  	}      
+  }
+  
+  def addStep(len:Int, avg:Boolean) = {
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
+  	recvmat = recvmat - sendmat;
+  	val nr = modelmats(0).nrows;
+  	modelmats(0).synchronized {
+  		val head = modelmats(0).view(nr, len0);
+  		val chead = sendmat.view(nr, len0);
+  		chead <-- head;
+  		chead ~ chead + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat);
+  		head <-- chead;
+  	}      
+  }
+  
+  def elasticStep(len:Int, avg:Boolean, ee:Float) = {
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
+  	recvmat = recvmat - sendmat;
+  	val nr = modelmats(0).nrows;
+  	modelmats(0).synchronized {
+  		val head = modelmats(0).view(nr, len0);
+  		val chead = sendmat.view(nr, len0);
+  		chead <-- head;
+  		chead ~ chead * (1 - ee) + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat) * ee;
+  		head <-- chead;
+  	}      
+  }
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
     for (i <- 0 until from.length) {
@@ -184,6 +231,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
          	to(i) = from(i) match {
         	case aa:FMat => GDMat(aa)
         	case aa:IMat => GIMat(aa)
+        	case aa:DMat => GDMat(aa)
         	case aa:SMat => GSDMat(aa)
         	case aa:GDMat => aa
         	case aa:GMat => GDMat(aa)
@@ -191,6 +239,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         } else {
         	to(i) = from(i) match {
         	case aa:FMat => GMat(aa)
+        	case aa:DMat => GMat(aa)
         	case aa:IMat => GIMat(aa)        	
         	case aa:SMat => GSMat(aa)
         	case aa:GMat => aa
@@ -229,6 +278,7 @@ object Model {
 	  var doubleScore = false
 	  var dim = 256
 	  var debug = 0;
+	  var doAllReduce = false;
   }
 	
 	class Options extends Opts {} 

@@ -547,4 +547,37 @@ extern "C" {
     return ADAGradn(nrows, ncols, mm, um, ssq, mom, mu, mask, maskr, nw, ve, nve, ts, nts, lr, nlr, langevin, eps, doupdate);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_LSTMfwd
+  (JNIEnv *env, jobject obj, jobject jinC, jobject jLIN1, jobject jLIN2, jobject jLIN3, jobject jLIN4, jobject joutC, jobject joutH, jint n)
+  {
+    float *inC = (float*)getPointer(env, jinC);
+    float *LIN1 = (float*)getPointer(env, jLIN1);
+    float *LIN2 = (float*)getPointer(env, jLIN2);
+    float *LIN3 = (float*)getPointer(env, jLIN3);
+    float *LIN4 = (float*)getPointer(env, jLIN4);
+    float *outC = (float*)getPointer(env, joutC);
+    float *outH = (float*)getPointer(env, joutH);
+
+    return lstm_fwd(inC, LIN1, LIN2, LIN3, LIN4, outC, outH, n);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_LSTMbwd
+  (JNIEnv *env, jobject obj, jobject jinC, jobject jLIN1, jobject jLIN2, jobject jLIN3, jobject jLIN4, jobject jdoutC, jobject jdoutH, 
+   jobject jdinC, jobject jdLIN1, jobject jdLIN2, jobject jdLIN3, jobject jdLIN4, jint n)
+  {
+    float *inC = (float*)getPointer(env, jinC);
+    float *LIN1 = (float*)getPointer(env, jLIN1);
+    float *LIN2 = (float*)getPointer(env, jLIN2);
+    float *LIN3 = (float*)getPointer(env, jLIN3);
+    float *LIN4 = (float*)getPointer(env, jLIN4);
+    float *doutC = (float*)getPointer(env, jdoutC);
+    float *doutH = (float*)getPointer(env, jdoutH);
+    float *dinC = (float*)getPointer(env, jdinC);
+    float *dLIN1 = (float*)getPointer(env, jdLIN1);
+    float *dLIN2 = (float*)getPointer(env, jdLIN2);
+    float *dLIN3 = (float*)getPointer(env, jdLIN3);
+    float *dLIN4 = (float*)getPointer(env, jdLIN4);
+
+    return lstm_bwd(inC, LIN1, LIN2, LIN3, LIN4, doutC, doutH, dinC, dLIN1, dLIN2, dLIN3, dLIN4, n);
+  }
 }

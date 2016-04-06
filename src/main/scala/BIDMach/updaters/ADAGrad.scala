@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 import edu.berkeley.bid.CUMACH
+import edu.berkeley.bid.CPUMACH
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -259,18 +260,23 @@ object ADAGrad {
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
     val nc = b.ncols;
-    Mat.nflops += 2L * nr * b.nnz;
     (a, b, mm, sumSq, lrate, texp, vexp) match {
       case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
+      	Mat.nflops += 2L * nr * b.nnz;
         val fmask = mask.asInstanceOf[FMat];
-      	if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
+        val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
+        CPUMACH.multADAGrad(nr, nc, b.nnz, fa.data, sb.data, sb.ir, sb.jc, fmm.data, fssq.data, if (fmask != null) fmask.data else null, masknr, 
+            flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps);
+
+/*        if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
     			(0 until Mat.numThreads).par.map((ithread:Int) => 
     			  multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, ithread, Mat.numThreads));
     		} else {
     			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, 0, 1);
-    		}
+    		} */
       }
       case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+      	Mat.nflops += 2L * nr * b.nnz;
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;

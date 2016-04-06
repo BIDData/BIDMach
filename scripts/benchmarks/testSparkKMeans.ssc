@@ -3,7 +3,7 @@ import org.apache.spark.mllib.clustering.KMeans
 import org.apache.spark.mllib.linalg.Vectors
 import scala.compat.Platform._
 
-val nnodes = 32
+val nnodes = 16
 
 // Load and parse the data
 val t0 = currentTime
@@ -12,15 +12,16 @@ val parsedData = data.map(s => Vectors.dense(s.split('\t').map(_.toDouble)))
 val cc = parsedData.cache.count  // force the parse to execute, result in memory
 
 // Cluster the data into classes using KMeans
-val numClusters = 4096
-val numIterations = 6
+val numClusters = 4
+val numIterations = 10
 val t1 = currentTime
 val clusters = KMeans.train(parsedData, numClusters, numIterations, 1, "random")
 val t2 = currentTime
 
 // Evaluate clustering by computing Within Set Sum of Squared Errors
 val WSSSE = clusters.computeCost(parsedData)
+val t3 = currentTime
 println("Within Set Sum of Squared Errors = " + WSSSE)
-println("Load Time = %f secs, Compute Time = %f" format ((t1-t0)/1000f, (t2-t1)/1000f))
+println("Load Time = %f secs, Compute Time = %f, Eval Time =%f" format ((t1-t0)/1000f, (t2-t1)/1000f, (t3-t2)/1000f))
 
 

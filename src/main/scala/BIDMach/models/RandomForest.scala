@@ -264,6 +264,8 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
     val data = full(gmats(0));
     val cats = gmats(1);
+//    val xcats = IMat(cats);println("trace data %s  %f" format (xcats(0,0->10).toString, sum(data(120,?)).dv));
+
     val t0 = toc;
 //    var blockv0:SVec = null;
     data match {
@@ -998,7 +1000,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       val nthreads = 1 + (Mat.numThreads - 1)/2;
       val fm = new Array[FMat](nthreads);
       val impure = DMat(1, nthreads);
-      (0 until nthreads).par.map(i => {
+      (0 until nthreads).par.foreach(i => {
         val (f, im) = minImpurity_thread(keys, cnts, outv, outf, outn, outg, outc, outleft, outright, jc, jtree, itree, fnum, regression, i, nthreads);
         fm(i) = f;
         impure(i) = im;
@@ -1192,7 +1194,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
   }
 
   def addSVecs(a:Array[SVec], totals:Array[SVTree]) { 
-    (0 until ntrees).par.map(i => {totals(i).addSVec(a(i));});
+    (0 until ntrees).par.foreach(i => {totals(i).addSVec(a(i));});
   }
 
   def getSum(totals:Array[SVTree]):Array[SVec] = { 
@@ -1389,7 +1391,7 @@ object RandomForest {
   
   class FsOpts extends Learner.Options with RandomForest.Opts with FileSource.Opts with Batch.Opts
     
-  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(datafile, 0, 1), FileSource.simpleEnum(labelfile, 0, 1)))
+  def learner(datafile:String, labelfile:String):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(datafile, 1, 0), FileSource.simpleEnum(labelfile, 1, 0)))
   
   def learner(fnames:List[(Int)=>String]) = {
     val opts = new FsOpts;
