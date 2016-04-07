@@ -31,23 +31,29 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var epsilon = 0f;
   var ADAinitialized = false;
   
-  def initModelMat(nr:Int, nc:Int):Mat = {
+  def initModelMat(nr:Int, nc2:Int):Mat = {
     println(imodel,opts.modelName)
-    //if (imodel != 0 && imodel<5) 
+    if (imodel != 0 && imodel<9) {
     //if (imodel != 0 && imodel<3) 
-    if (true)
+    //if (true)
+        val nc = nc2
         (rand(nr, nc) - 0.5f)*0.15
+    }
     else{
+        val nc = nc2 - 1
+        opts.hasBias = false
         //val x=Array(0,105,113)
         //println("Create",nr,nc)
         ///println(GPUmem._1)
         val n = 4
         //val x=(0 until n).toArray.map(nc*_/n)//Array(0,nc/3,nc/3*2)
-        val x=Array(0,20000,40000,60000)
+        //val x=Array(0,20000,40000,60000)
+        val x=Array(0,1000,10000,20000)
         val ratio = 4
         //val y=Array(nr/2,nr/4,0)//nr/2)
         //val y=(0 until n).toArray.map((nr-nr/ratio)*_/(n-1))
-        val y=Array(0,64,128,224)
+        //val y=Array(0,64,128,224)
+        val y=Array(0,1024,1024+512,1024+512+256)
         //val r=Array(nr/4*3,nr/4*3,nr/4*3)
         val nnr=if (nr<nc)nr else nc
         val nnc=if (nr<nc)nc else nr
@@ -65,7 +71,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   
     var tot=0
   override def forward = {
-      //println(opts.modelName,GPUmem._1)
+     // println(opts.modelName,GPUmem._1)
     
     val start = toc;
     val modelcols = inputData.nrows;
@@ -74,7 +80,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       modelmats(imodel) = convertMat(initModelMat(outdim, modelcols + (if (opts.hasBias) 1 else 0)));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
       updatemats(imodel).clear
-    }
+    }else
+    if (modelmats(imodel).isInstanceOf[TMat])
+        opts.hasBias = false
+    
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     ///if (imodel ==6)println("In f0",GPUmem._1)
@@ -88,7 +97,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     clearDeriv;
     forwardtime += toc - start;
     //if (imodel ==6)println("Out f",GPUmem._1)
-    //println(opts.modelName,GPUmem._1)
+    ///println(opts.modelName,GPUmem._1)
     
   }
 
