@@ -26,7 +26,7 @@ elif [ "$OS" = "Windows_NT" ]; then
     subdir="win"
     curl -o liblist.txt ${source}/lib/liblist_win.txt
 else
-    if [[ "${ARCH}" == arm* ]]; then
+    if [[ "${ARCH}" == arm* || "${ARCH}" == aarch* ]]; then
         subdir="linux_arm"
         curl -o liblist.txt ${source}/lib/liblist_linux_arm.txt
     else

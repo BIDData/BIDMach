@@ -101,6 +101,16 @@ object Node {
     n
   }
   
+  def lstm_fused(inc:NodeTerm, lin1:NodeTerm, lin2:NodeTerm, lin3:NodeTerm, lin4:NodeTerm) = {
+    new LSTMfusedNode{
+      inputs(0) = inc;
+      inputs(1) = lin1;
+      inputs(2) = lin2;
+      inputs(3) = lin3;
+      inputs(4) = lin4;
+    }
+  }
+  
   def ln(a:NodeTerm) = new LnNode{inputs(0) = a};
   
   def negsamp(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
