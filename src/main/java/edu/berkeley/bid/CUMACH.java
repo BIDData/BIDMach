@@ -6,7 +6,7 @@ public final class CUMACH {
     private CUMACH() {}
 
     static {
-        jcuda.LibUtils.loadLibrary("bidmachcuda");
+        LibUtils.loadLibrary("bidmachcuda");
     } 
     
     public static native int applylinks(Pointer A, Pointer L, Pointer C, int nrows, int ncols);

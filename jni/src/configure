@@ -111,8 +111,9 @@ if [ "$OS" = "apple" ] ; then
             $ICC_ROOT/lib/libiomp5.a \
             -lpthread -lm  -framework JavaVM"
     fi
-    INSTALL_DIR="${BIDMACH_ROOT}/lib"
-    CUDA_LIBS="-L${CUDA_HOME}/lib -L${INSTALL_DIR} -lcudart"
+    LIBDIR="${BIDMACH_ROOT}/lib"
+    INSTALL_DIR="${BIDMACH_ROOT}/src/main/resources/lib"
+    CUDA_LIBS="-L${CUDA_HOME}/lib -L${LIBDIR} -lcudart -lcublas"
 elif [ "$OS" = "linux" ] ; then
     if [ "$ARCH" = "arm" ] ; then
 	RANDSRC="RAND"
@@ -160,8 +161,9 @@ elif [ "$OS" = "linux" ] ; then
 	else
             CULIB="lib64"
 	fi
-	INSTALL_DIR="${BIDMACH_ROOT}/lib"
-	CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${INSTALL_DIR} -lcudart -lcublas"
+	LIBDIR="${BIDMACH_ROOT}/lib"
+	INSTALL_DIR="${BIDMACH_ROOT}/src/main/resources/lib"
+	CUDA_LIBS="-L${CUDA_HOME}/lib -L${LIBDIR} -lcudart -lcublas"
 else
 	BLAS_ROOT="/opt/intel/mkl"
 	if [ "$JAVA_HOME" = "" ]; then
@@ -204,8 +206,9 @@ else
 	else
             CULIB="lib64"
 	fi
-	INSTALL_DIR="${BIDMACH_ROOT}/lib"
-	CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${INSTALL_DIR} -lcudart"
+	LIBDIR="${BIDMACH_ROOT}/lib"
+	INSTALL_DIR="${BIDMACH_ROOT}/src/main/resources/lib"
+	CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${LIBDIR} -lcudart -lcublas"
     fi
 elif [ "$OS" = "windows" ] ; then
     CUDA_HOME="$CUDA_PATH"
@@ -248,9 +251,10 @@ elif [ "$OS" = "windows" ] ; then
     else
 	    CPU_LIBS="libiomp5md.lib"
     fi
-    INSTALL_DIR="${BIDMACH_ROOT}/lib"
+    LIBDIR="${BIDMACH_ROOT}/lib"
+    INSTALL_DIR="${BIDMACH_ROOT}/src/main/resources/lib"
     CUDA_LIBS="cudart.lib"
-    LIB="$BLAS_ROOT/lib/${ARCHD};$JAVA_HOME/lib;$CUDA_HOME/lib/${CULIB};${INSTALL_DIR};$LIB"
+    LIB="$BLAS_ROOT/lib/${ARCHD};$JAVA_HOME/lib;$CUDA_HOME/lib/${CULIB};${LIBDIR};$LIB"
     INCLUDE="$JAVA_HOME/include;$JAVA_HOME/include/win32;$BLAS_ROOT/include;${BIDMACH_ROOT}/jni/include;$CUDA_HOME/include;$INCLUDE"
 else
     echo "OS not supported"
