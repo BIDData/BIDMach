@@ -59,13 +59,17 @@ chmod 755 ${BIDMACH_ROOT}/cbin/*
 
 mv ${BIDMACH_ROOT}/lib/BIDMach.jar ${BIDMACH_ROOT}
 
-cp ${BIDMACH_ROOT}/lib/*bidmat*.${suffix} ${BIDMACH_ROOT}/src/main/resources/lib
-cp ${BIDMACH_ROOT}/lib/*iomp5*.${suffix} ${BIDMACH_ROOT}/src/main/resources/lib
+cd ${BIDMACH_ROOT}
+libs=`echo lib/*bidmat*.${suffix} lib/*iomp5*.${suffix}`
+echo "Packing native libraries in the BIDMat jar"
+jar uvf lib/BIDMat.jar $libs
 
+cp ${BIDMACH_ROOT}/lib/*bidmach*.${suffix} ${BIDMACH_ROOT}/src/main/resources/lib
+cp ${BIDMACH_ROOT}/lib/*iomp5*.${suffix} ${BIDMACH_ROOT}/src/main/resources/lib
 cd ${BIDMACH_ROOT}/src/main/resources
 libs=`echo lib/*`
-
 cd ${BIDMACH_ROOT}
 echo "Packing native libraries in the BIDMach jar"
-jar uvf BIDMach.jar -C src/main/resources $libs
+jar uvf BIDMach.jar $libs
+
 
