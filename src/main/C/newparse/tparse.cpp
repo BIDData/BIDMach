@@ -308,10 +308,12 @@ int parseLine(char * line, int membuf, int lineno, const char * delim1, ivector 
     if (next && *next) *(next++) = 0;
     switch (tvec[i]) {
     case ftype_int:
+      ival = 0;
       sscanf(here, "%d", &ival);
       out[i].iv.push_back(ival);
       break;
     case ftype_dint:
+      dival = 0;
       sscanf(here, "%lld", &dival);
       out[i].div.push_back(dival);
       break;
@@ -563,7 +565,7 @@ int main(int argc, char ** argv) {
       ftv[i].writeInts(ofname + dnames[i] + ".imat" + suffix);
       break;
     case ftype_dint:
-      ftv[i].writeDInts(ofname + dnames[i] + ".dimat" + suffix);
+      ftv[i].writeDInts(ofname + dnames[i] + ".lmat" + suffix);
       break;
     case ftype_qhex:
       ftv[i].writeQInts(ofname + dnames[i] + ".imat" + suffix);
