@@ -21,16 +21,20 @@ cd ${BIDMACH_ROOT}/lib
 
 if [ `uname` = "Darwin" ]; then
     subdir="osx"
+    suffix="dylib"
     curl -o liblist.txt ${source}/lib/liblist_osx.txt 
 elif [ "$OS" = "Windows_NT" ]; then
     subdir="win"
+    suffix="dll"
     curl -o liblist.txt ${source}/lib/liblist_win.txt
 else
     if [[ "${ARCH}" == arm* || "${ARCH}" == aarch* ]]; then
         subdir="linux_arm"
+	suffix="so"
         curl -o liblist.txt ${source}/lib/liblist_linux_arm.txt
     else
         subdir="linux"
+	suffix="so"
         curl -o liblist.txt ${source}/lib/liblist_linux.txt
     fi
 fi
@@ -54,4 +58,14 @@ done < exelist.txt
 chmod 755 ${BIDMACH_ROOT}/cbin/*
 
 mv ${BIDMACH_ROOT}/lib/BIDMach.jar ${BIDMACH_ROOT}
+
+cp ${BIDMACH_ROOT}/lib/*bidmat*.${suffix} ${BIDMACH_ROOT}/src/main/resources/lib
+cp ${BIDMACH_ROOT}/lib/*iomp5*.${suffix} ${BIDMACH_ROOT}/src/main/resources/lib
+
+cd ${BIDMACH_ROOT}/src/main/resources
+libs=`echo lib/*`
+
+cd ${BIDMACH_ROOT}
+echo "Packing native libraries in the BIDMach jar"
+jar uvf BIDMach.jar -C src/main/resources $libs
 
