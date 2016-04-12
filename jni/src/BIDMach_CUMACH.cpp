@@ -347,7 +347,7 @@ extern "C" {
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_multADAGrad
   (JNIEnv *env, jobject obj, jint nrows, jint ncols, int nnz, jobject jA, jobject jBdata, jobject jBir, jobject jBic,
    jobject jMM, jobject jSumsq, jobject jMask, int maskrows, jobject jlrate, jint lrlen, jobject jvexp, jint vexplen,
-   jobject jtexp, jint texplen, float istep, jint addgrad, float epsilon)
+   jobject jtexp, jint texplen, float istep, jint addgrad, float epsilon, jint biasv, jint nbr)
   {
     float *A = (float*)getPointer(env, jA);
     float *Bdata = (float*)getPointer(env, jBdata);
@@ -361,7 +361,7 @@ extern "C" {
     float *texp = (float*)getPointer(env, jtexp);
 
     return multADAGrad(nrows, ncols, nnz, A, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
-                       vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+                       vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashmultADAGrad

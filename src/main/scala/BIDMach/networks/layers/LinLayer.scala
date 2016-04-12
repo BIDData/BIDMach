@@ -62,7 +62,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
       val istep = (pos + firststep)/firststep;
-      ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps);
+      ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, texp, vexp, epsilon, istep, waitsteps, opts.hasBias);
     } else {
     	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
     	deriv.asMat.madd(inputData.asMat, um, false, true);

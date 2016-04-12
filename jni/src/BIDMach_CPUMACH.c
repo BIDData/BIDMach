@@ -660,7 +660,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_applyderiv
 JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_multADAGrad
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint nnz, jfloatArray jA, jfloatArray jBdata, jintArray jBir, jintArray jBjc, 
  jfloatArray jMM, jfloatArray jSumsq, jfloatArray jMask, int maskrows, jfloatArray jlrate, jint lrlen,
- jfloatArray jvexp, jint vexplen, jfloatArray jtexp, jint texplen, jfloat istep, jint addgrad, jfloat epsilon)
+ jfloatArray jvexp, jint vexplen, jfloatArray jtexp, jint texplen, jfloat istep, jint addgrad, jfloat epsilon, jint biasv, jint nbr)
 {
   float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
   float * Bdata = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jBdata, JNI_FALSE));
@@ -709,6 +709,32 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_multADAGrad
           }
         }
       }
+      if (biasv > 0) {
+        int ival = nbr;
+        int k;
+        for (k = 0; k < nrows; k++) {
+          float lr, ve, te, pve, ste, ngrad;
+          float grad = A[k+i*nrows];
+          int ihere = k+ival*nrows;
+          Sumsq[ihere] += grad*grad + epsilon;
+          if (addgrad) {
+            lr =  (lrlen > 1) ? lrate[k] : lrate[0];
+            ve =  (vexplen > 1) ? vexp[k] : vexp[0];
+            te =  (texplen > 1) ? texp[k] : texp[0];
+            pve = (ve == 0) ? 1.0f : pow(Sumsq[ihere] * istep, ve);
+            ste = pow(istep, te);
+            ngrad = grad * lr * ste / pve;
+            MM[ihere] += ngrad;
+          }
+          if (Mask != NULL) {
+            if (maskrows > 1) {
+              if (Mask[ihere] == 0) MM[ihere] = 0;
+            } else {
+              if (Mask[ival] == 0) MM[ihere] = 0;
+            }
+          }
+        }
+      }
     } else {
       float lr, ve, te, pve, ste, ngrad;
       lr =  lrate[0];
@@ -730,6 +756,32 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_multADAGrad
         } else {
           for (k = 0; k < nrows; k++) {
             float grad = A[k+i*nrows]*bval;
+            int ihere = k+ival*nrows;
+            Sumsq[ihere] += grad*grad + epsilon;
+            if (addgrad) {
+              pve = (ve == 0) ? 1.0f : pow(Sumsq[ihere] * istep, ve);
+              ste = pow(istep, te);
+              ngrad = grad * lr * ste / pve;
+              MM[ihere] += ngrad;
+            }
+          }
+        }
+      }
+      if (biasv > 0) {
+        int ival = nbr;
+        int k;
+        if (addgrad && ve == 0.5f && te == 0.5f) {
+          for (k = 0; k < nrows; k++) {
+            float grad = A[k+i*nrows];
+            int ihere = k+ival*nrows;
+            Sumsq[ihere] += grad*grad + epsilon;
+            pve = sqrt(Sumsq[ihere]);
+            ngrad = grad * lr / pve;
+            MM[ihere] += ngrad;
+          }
+        } else {
+          for (k = 0; k < nrows; k++) {
+            float grad = A[k+i*nrows];
             int ihere = k+ival*nrows;
             Sumsq[ihere] += grad*grad + epsilon;
             if (addgrad) {
