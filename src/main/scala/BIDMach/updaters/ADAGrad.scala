@@ -268,7 +268,7 @@ object ADAGrad {
     val biasv = if (hasBias) 1 else 0;
     (a, b, mm, sumSq, lrate, texp, vexp) match {
       case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
-      	Mat.nflops += 2L * nr * b.nnz;
+      	Mat.nflops += 20L * nr * b.nnz;
         val fmask = mask.asInstanceOf[FMat];
         val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
         CPUMACH.multADAGrad(nr, nc, b.nnz, fa.data, sb.data, sb.ir, sb.jc, fmm.data, fssq.data, if (fmask != null) fmask.data else null, masknr, 
@@ -282,7 +282,7 @@ object ADAGrad {
     		} */
       }
       case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
-      	Mat.nflops += 2L * nr * b.nnz;
+      	Mat.nflops += 20L * nr * b.nnz;
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;

@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -32,7 +32,14 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var ADAinitialized = false;
   
   def initModelMat(nr:Int, nc:Int):Mat = {
-    rand(nr, nc) - 0.5f;
+    if (opts.tmatShape != null) {
+      val (y, x, h, w) = opts.tmatShape(nr, nc);
+      val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
+      out.tiles.foreach((x:Mat) => {rand(x); x ~ x - 0.5f})
+      out;
+    } else {
+    	rand(nr, nc) - 0.5f;
+    }
   }
 
   override def forward = {
@@ -98,6 +105,7 @@ trait LinNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = false;
   var aopts:ADAGrad.Opts = null;
   var outdim = 0;
+  var tmatShape:(Int, Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
   
   def copyOpts(opts:LinNodeOpts):LinNodeOpts = {
   		super.copyOpts(opts);
