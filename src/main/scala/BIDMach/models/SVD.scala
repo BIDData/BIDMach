@@ -29,9 +29,11 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   var R:Mat = null;
   var batchCount = 0;
   var batchStep = 0;
+  var batchSize = 0;
   
   def init() = {
   	val nfeats = mats(0).nrows;
+  	batchSize = mats(0).ncols;
   	if (refresh) {
   		Q = normrnd(0, 1, nfeats, opts.dim);                 // Randomly initialize Q
 //  		QRdecompt(Q, Q, null);                               // Orthonormalize it
@@ -80,8 +82,8 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  } else {
 	  	(P / SV)  - Q;      
 	  }
-    row(-(math.sqrt(norm(diff) / diff.length / batchCount)));           // return the norm of the residual
-  }
+    row(-(math.sqrt(norm(diff) / (1L * diff.length * batchSize * batchCount))));           // return the norm of the residual
+  } 
   
   override def updatePass(ipass:Int) = {
     if (ipass >= opts.miniBatchPasses) {
