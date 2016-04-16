@@ -26,7 +26,8 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   var Q:Mat = null;                                        // (Left) Singular vectors
   var SV:Mat = null;                                       // Singular values
   var P:Mat = null;
-  var R:Mat = null
+  var R:Mat = null;
+  var batchCount = 0;
   
   def init() = {
   	val nfeats = mats(0).nrows;
@@ -46,19 +47,22 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     R = Q.zeros(opts.dim, opts.dim)
                       
   	updatemats = Array(P);
+    batchCount = 0;
   }
   
   def dobatch(mats:Array[Mat], ipass:Int, pos:Long):Unit = {
     val M = mats(0);
     val PP = (Q.t * M *^ M).t                              // Compute P = M * M^t * Q efficiently
+    P ~ P + PP;
     if (ipass < opts.miniBatchPasses) {
-      P = PP;
-      if (ipass > opts.powerWait) {
+      if (batchCount > opts.batchesPerUpdate) {
         subspaceIter;                                        // Do minibatch subspace iterations 
-      }	
-    } else {
-      P ~ P + PP;                                          // Else accumulate P over the dataset
-    }
+        batchCount = 0;
+        P.clear;
+      } else {
+      	batchCount += 1;
+      }
+    } 
   }
   
   def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
@@ -100,7 +104,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 object SVD  {
   trait Opts extends Model.Opts {
     var miniBatchPasses = 1;
-    var powerWait = 10;
+    var batchesPerUpdate = 10;
   }
   
   class Options extends Opts {}
