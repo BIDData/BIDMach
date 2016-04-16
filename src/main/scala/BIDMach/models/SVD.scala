@@ -71,9 +71,13 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	    ogmats(0) = Q.t * M;                                 // Save right singular vectors
 	    P <-- (ogmats(0) *^ M).t
 	  }
-	  SV ~ P ∙ Q;                                          // Estimate the singular values
+	  SV ~ P ∙ Q;                                            // Estimate the singular values
 	  max(SV, 1e-6f, SV);
-    val diff = (P / SV)  - Q;                              // residual
+	  val diff = if (opts.evalType == 0) {
+	    P - (SV ∘ Q);	                                       // residual
+	  } else {
+	  	(P / SV)  - Q;      
+	  }
     row(-(math.sqrt(norm(diff) / diff.length)));           // return the norm of the residual
   }
   
@@ -105,6 +109,7 @@ object SVD  {
   trait Opts extends Model.Opts {
     var miniBatchPasses = 1;
     var batchesPerUpdate = 10;
+    var evalType = 0;
   }
   
   class Options extends Opts {}
