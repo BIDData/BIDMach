@@ -53,16 +53,18 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   def dobatch(mats:Array[Mat], ipass:Int, pos:Long):Unit = {
     val M = mats(0);
     val PP = (Q.t * M *^ M).t                              // Compute P = M * M^t * Q efficiently
-    P ~ P + PP;
     if (ipass < opts.miniBatchPasses) {
-      if (batchCount > opts.batchesPerUpdate) {
+      if (batchCount >= opts.batchesPerUpdate) {
         subspaceIter;                                        // Do minibatch subspace iterations 
-        batchCount = 0;
-        P.clear;
+        batchCount = 1;
+        P <-- PP;
       } else {
+      	P ~ P + PP;
       	batchCount += 1;
       }
-    } 
+    } else {
+    	P ~ P + PP;
+    }
   }
   
   def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
@@ -78,7 +80,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  } else {
 	  	(P / SV)  - Q;      
 	  }
-    row(-(math.sqrt(norm(diff) / diff.length)));           // return the norm of the residual
+    row(-(math.sqrt(norm(diff) / diff.length / batchCount)));           // return the norm of the residual
   }
   
   override def updatePass(ipass:Int) = {
