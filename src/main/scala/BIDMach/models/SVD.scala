@@ -28,6 +28,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   var P:Mat = null;
   var R:Mat = null;
   var batchCount = 0;
+  var batchStep = 0;
   
   def init() = {
   	val nfeats = mats(0).nrows;
@@ -48,15 +49,17 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
                       
   	updatemats = Array(P);
     batchCount = 0;
+    batchStep = opts.batchesPerUpdate
   }
   
   def dobatch(mats:Array[Mat], ipass:Int, pos:Long):Unit = {
     val M = mats(0);
     val PP = (Q.t * M *^ M).t                              // Compute P = M * M^t * Q efficiently
     if (ipass < opts.miniBatchPasses) {
-      if (batchCount >= opts.batchesPerUpdate) {
+      if (batchCount >= batchStep) {
         subspaceIter;                                        // Do minibatch subspace iterations 
         batchCount = 0;
+        batchStep *= 2;
         P.clear;
       }
     }
@@ -89,6 +92,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     }
     P.clear;
     batchCount = 0;
+    batchStep = opts.batchesPerUpdate;
   }
 
 
