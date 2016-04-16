@@ -56,15 +56,12 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     if (ipass < opts.miniBatchPasses) {
       if (batchCount >= opts.batchesPerUpdate) {
         subspaceIter;                                        // Do minibatch subspace iterations 
-        batchCount = 1;
-        P <-- PP;
-      } else {
-      	P ~ P + PP;
-      	batchCount += 1;
+        batchCount = 0;
+        P.clear;
       }
-    } else {
-    	P ~ P + PP;
     }
+    P ~ P + PP;
+    batchCount += 1;
   }
   
   def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
@@ -91,6 +88,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
         subspaceIter;
     }
     P.clear;
+    batchCount = 0;
   }
 
 
