@@ -242,8 +242,10 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   					  var oldmat:Mat = null;
   					  matqueue.synchronized {
   					    oldmat = matqueue(ifilex)(i);
-  					  } 					 
+  					  } 	
+  					  if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d reading %d" format (ifilex, fileno, pnew, i));
   						val newmat = HMat.loadMat(fname, oldmat);	
+  						if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d read %d" format (ifilex, fileno, pnew, i));
   						matqueue.synchronized {
   					    matqueue(ifilex)(i) = newmat;
   					  }
