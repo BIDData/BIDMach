@@ -152,7 +152,10 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     	val filex = fileno % math.max(1, opts.lookahead);
 //    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
     	if (opts.putBack < 0 && opts.lookahead > 0) {
-    	  while (ready(filex) < fileno) Thread.sleep(1); //`yield`
+    	  while (ready(filex) < fileno) {
+    	    println("ready %d %d %s" format (fileno, filex, ready.t.toString))
+    	    Thread.sleep(1); //`yield`
+    	  }
     	} else {
     	  fetch
     	}
@@ -383,6 +386,7 @@ object FileSource {
     var order:Int = 0                          // 0 = sequential order, 1 = random
     var eltsPerSample = 10;
     var throwMissing:Boolean = false
+    var traceFileSource = false
   }
   
   class Options extends Opts {}
