@@ -126,7 +126,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	    val diff = diff0 - sum(QtM ∙ QtM);
 	  	println("t5 %s %d %d %f" format (diff.mytype, diff.nrows, diff.ncols, diff.dv));
 	    if (opts.subMean) diff ~ diff + ((Mean ∙ Mean) * M.ncols - (Mean ∙ sum(M, 2)) * 2.0);
-	    println("t6 %d %d" format (diff.nrows, diff.ncols))
+	    println("t6 %d %d %f" format (diff.nrows, diff.ncols, diff.dv))
 	    math.sqrt(diff.dv);
 	  }
 	  }
