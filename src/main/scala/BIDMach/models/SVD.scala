@@ -87,7 +87,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   
   override def updatePass(ipass:Int) = {
     if (ipass >= opts.miniBatchPasses) {
-      if (ipass % 2 == 1)
+      if (opts.doRayleighRitz && ipass % 2 == 1)
       	RayleighRitz;
       else
         subspaceIter;
@@ -116,6 +116,7 @@ object SVD  {
     var miniBatchPasses = 1;
     var batchesPerUpdate = 10;
     var evalType = 0;
+    var doRayleighRitz = true;
   }
   
   class Options extends Opts {}
