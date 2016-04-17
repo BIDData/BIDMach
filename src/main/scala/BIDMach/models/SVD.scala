@@ -105,13 +105,24 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	    batchCount = 1;
 	  }
 	  SV ~ P ∙ Q;                                            // Estimate the singular values
-	  val diff = if (opts.evalType == 0) {
-	    P - (SV ∘ Q);	                                       // residual
-	  } else {
+	  val ndiff = opts.evalType match {
+	  case 0 =>  {
+	  	norm(P - (SV ∘ Q));	                                       // residual
+	  } 
+	  case 1 => {
 	  	max(SV, 1e-6f, SV);
-	  	(P / SV)  - Q;      
+	  	norm((P / SV)  - Q);      
 	  }
-    row(-(math.sqrt(norm(diff) / (1L * diff.length * batchSize * batchCount))));           // return the norm of the residual
+	  case 2 => {
+	  	val Qt = Q.t; 
+	  	val QtM = Qt * M;
+	  	if (opts.subMean) QtM ~ QtM - Qt * Mean;
+	    val diff = (M.contents ∙ M.contents) - sum(QtM ∙ QtM);
+	    if (opts.subMean) diff ~ diff + ((Mean ∙ Mean) * M.ncols - sum(Mean.t * 2 * M));
+	    math.sqrt(diff.dv);
+	  }
+	  }
+    row(-(ndiff / math.sqrt(1L * P.length * batchCount)));           // return the norm of the residual
   } 
   
   override def updatePass(ipass:Int) = {
