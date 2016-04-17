@@ -76,9 +76,9 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     }
     val Qt = Q.t;                                           // Compute P = M * M^t * Q efficiently
     val QtM = Qt * M;
-    if (opts.subMean) QtM ~ QtM - Qt * Mean;
+    if (opts.subMean) QtM ~ QtM - (Qt * Mean);
     val PPt = QtM *^ M;
-    if (opts.subMean) PPt ~ PPt - QtM *^ Mean;
+    if (opts.subMean) PPt ~ PPt - (sum(QtM,2) *^ Mean);
     val PP = PPt.t                    
     if (ipass < opts.miniBatchPasses) {
       if (batchCount >= batchStep) {
