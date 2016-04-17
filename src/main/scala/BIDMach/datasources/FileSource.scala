@@ -153,7 +153,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 //    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
     	if (opts.putBack < 0 && opts.lookahead > 0) {
     	  while (ready(filex) < fileno) {
-    	    println("ready %d %d %s" format (fileno, filex, ready.t.toString))
+    	    if (opts.traceFileSource > 0) println("next %d %d %s" format (fileno, filex, ready.t.toString));
     	    Thread.sleep(1); //`yield`
     	  }
     	} else {
@@ -226,7 +226,10 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   			ready(ifilex) = ifile - opts.lookahead;
   		}
   		while  (!stop) {
-  			while (pause || (ready(ifilex) >= fileno && !stop)) Thread.sleep(1); // Thread.`yield`
+  			while (pause || (ready(ifilex) >= fileno && !stop)) {
+  				if (opts.traceFileSource > 0) println("prefetch %d %d %s" format (fileno, filex, ready.t.toString));
+  			  Thread.sleep(1); // Thread.`yield`
+  			}
   			if (!stop) {
   				val inew = ready(ifilex) + opts.lookahead;
   				val pnew = permfn(inew);
@@ -386,7 +389,7 @@ object FileSource {
     var order:Int = 0                          // 0 = sequential order, 1 = random
     var eltsPerSample = 10;
     var throwMissing:Boolean = false
-    var traceFileSource = false
+    var traceFileSource = 0;
   }
   
   class Options extends Opts {}
