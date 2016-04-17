@@ -121,7 +121,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	    	    	    println("t3")
 	  	if (opts.subMean) QtM ~ QtM - (Qt * Mean);
 	    	    	    	    println("t4")
-	    val diff0 = (M.contents ∙ M.contents);
+	    val diff0 = snorm(M);
 	    	    	    	    println("t4.5")
 	    val diff = diff0 - sum(QtM ∙ QtM);
 	    	    	    	    	    println("t5")
