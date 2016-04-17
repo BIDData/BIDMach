@@ -104,7 +104,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	    P <-- PPt.t
 	    batchCount = 1;
 	  }
-	  SV ~ (P ∙ Q);                                          // Estimate the singular values
+	  SV ~ P ∙ Q;                                            // Estimate the singular values
 	  val diff = if (opts.evalType == 0) {
 	    P - (SV ∘ Q);	                                       // residual
 	  } else {
