@@ -234,6 +234,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   				val inew = ready(ifilex) + opts.lookahead;
   				val pnew = permfn(inew);
   				val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
+  				if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d %b" format (ifilex, fileno, pnew, fexists));
   				for (i <- 0 until fnames.size) {
   					if (fexists) {
   					  val fname = fnames(i)(pnew);
