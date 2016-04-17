@@ -93,7 +93,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   }
   
   def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
-	  val M = mats(0);
+	  val M = mat(0);
 	  if (ogmats != null) {
 	  	val Qt = Q.t; 
 	  	val QtM = Qt * M;
