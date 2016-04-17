@@ -227,7 +227,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   		}
   		while  (!stop) {
   			while (pause || (ready(ifilex) >= fileno && !stop)) {
-  				if (opts.traceFileSource > 0) println("prefetch %d %d %s" format (fileno, filex, ready.t.toString));
+  				if (opts.traceFileSource > 0) println("prefetch %d %d %s" format (fileno, ifilex, ready.t.toString));
   			  Thread.sleep(1); // Thread.`yield`
   			}
   			if (!stop) {
