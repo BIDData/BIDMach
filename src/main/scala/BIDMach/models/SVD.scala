@@ -114,14 +114,16 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  	norm((P / SV)  - Q).dv / math.sqrt(batchCount);      
 	  }
 	  case 2 => {
-	    println("t1")
+	    println("t1 %s" format M.mytype)
 	  	val Qt = Q.t;
 	    	    println("t2")
 	  	val QtM = Qt * M;
 	    	    	    println("t3")
 	  	if (opts.subMean) QtM ~ QtM - (Qt * Mean);
 	    	    	    	    println("t4")
-	    val diff = (M.contents ∙ M.contents) - sum(QtM ∙ QtM);
+	    val diff0 = (M.contents ∙ M.contents);
+	    	    	    	    println("t4.5")
+	    val diff = diff0 - sum(QtM ∙ QtM);
 	    	    	    	    	    println("t5")
 	    if (opts.subMean) diff ~ diff + ((Mean ∙ Mean) * M.ncols - 2 * (Mean ∙ sum(M, 2)));
 	    	    	    	    	    	    println("t6")
