@@ -151,11 +151,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	  putBack = datasource.opts.putBack;
 	  useGPU = opts.useGPU && Mat.hasCUDA > 0;
 	  useDouble = opts.useDouble;
-	  if (useGPU || useDouble) {
-	  	gmats = new Array[Mat](mats.length);
-	  } else {
-	  	gmats = mats;
-	  }
+	  gmats = new Array[Mat](mats.length);
   }
   
   def bind(ds:DataSink):Unit = {
@@ -171,12 +167,12 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
   
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
-    if (useGPU) copyMats(amats, gmats);            		
+    copyMats(amats, gmats);            		
     dobatch(gmats, ipass, here);
   }
   
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
-    if (useGPU) copyMats(amats, gmats)
+    copyMats(amats, gmats)
     val v = evalbatch(gmats, ipass, here)
     if (omats != null) {
       for (i <- 0 until omats.length) {
