@@ -102,12 +102,13 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	    val PPt = QtM *^ M;
 	    if (opts.subMean) PPt ~ PPt - QtM *^ Mean;
 	    P <-- PPt.t
+	    batchCount = 1;
 	  }
-	  SV ~ (P ∙ Q) / P.nrows;                                // Estimate the singular values
-	  max(SV, 1e-6f, SV);
+	  SV ~ (P ∙ Q);                                          // Estimate the singular values
 	  val diff = if (opts.evalType == 0) {
 	    P - (SV ∘ Q);	                                       // residual
 	  } else {
+	  	max(SV, 1e-6f, SV);
 	  	(P / SV)  - Q;      
 	  }
     row(-(math.sqrt(norm(diff) / (1L * diff.length * batchSize * batchCount))));           // return the norm of the residual
