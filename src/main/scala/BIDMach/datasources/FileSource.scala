@@ -248,7 +248,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   						  HMat.loadMat(fname, oldmat);	
   						} catch {
   						  case e:Exception => {println(stackTraceString(e)); null}
-  						  case _ => null
+  						  case _:Throwable => null
   						}
   						if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d read %d %s " format (ifilex, fileno, pnew, i, fname));
   						matqueue.synchronized {

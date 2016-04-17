@@ -103,7 +103,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	    if (opts.subMean) PPt ~ PPt - QtM *^ Mean;
 	    P <-- PPt.t
 	  }
-	  SV ~ (P ∙ Q) / P.nrows;                                            // Estimate the singular values
+	  SV ~ (P ∙ Q) / P.nrows;                                // Estimate the singular values
 	  max(SV, 1e-6f, SV);
 	  val diff = if (opts.evalType == 0) {
 	    P - (SV ∘ Q);	                                       // residual
