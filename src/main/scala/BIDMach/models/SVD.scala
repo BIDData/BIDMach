@@ -86,15 +86,17 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   } 
   
   override def updatePass(ipass:Int) = {
-    if (ipass >= opts.miniBatchPasses) {
-      if (opts.doRayleighRitz && ipass % 2 == 1)
-      	RayleighRitz;
-      else
-        subspaceIter;
+    if (ipass < opts.asInstanceOf[Learner.Options].npasses) {
+    	if (ipass >= opts.miniBatchPasses) {
+    		if (opts.doRayleighRitz && ipass % 2 == 1)
+    			RayleighRitz;
+    		else
+    			subspaceIter;
+    	}
+    	P.clear;
+    	batchCount = 0;
+    	batchStep = opts.batchesPerUpdate;
     }
-    P.clear;
-    batchCount = 0;
-    batchStep = opts.batchesPerUpdate;
   }
 
 
