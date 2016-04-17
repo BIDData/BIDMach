@@ -27,9 +27,12 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   var SV:Mat = null;                                       // Singular values
   var P:Mat = null;
   var R:Mat = null;
+  var Mean:Mat = null;
   var batchCount = 0;
   var batchStep = 0;
   var batchSize = 0;
+  var meanCount = 0;
+  var alpha:Mat = null;
   
   def init() = {
   	val nfeats = mats(0).nrows;
@@ -39,24 +42,44 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 //  		QRdecompt(Q, Q, null);                               // Orthonormalize it
 		Q ~ Q / sqrt(Q dot Q);
   		SV = Q.zeros(1, opts.dim);                           // Holder for Singular values
+  		if (opts.subMean) Mean = Q.zeros(nfeats, 1)
   	} else {
   	  Q = modelmats(0);
   	  SV = modelmats(1);
+  	  if (opts.subMean) Mean = modelmats(2);
   	}
   	Q = convertMat(Q);                                     // Move to GPU or double if needed
   	SV = convertMat(SV);
-  	setmodelmats(Array(Q, SV));
+  	if (opts.subMean) {
+  		Mean = convertMat(Mean);
+  	  setmodelmats(Array(Q, SV, Mean));
+  	} else {
+  	  setmodelmats(Array(Q, SV));
+  	}
+  	Mean.clear;
   	P = Q.zeros(Q.nrows, Q.ncols);                         // Zero P
-    R = Q.zeros(opts.dim, opts.dim)
+    R = Q.zeros(opts.dim, opts.dim);
+    alpha = Q.zeros(1,1);
                       
   	updatemats = Array(P);
     batchCount = 0;
-    batchStep = opts.batchesPerUpdate
+    batchStep = opts.batchesPerUpdate;
   }
   
   def dobatch(mats:Array[Mat], ipass:Int, pos:Long):Unit = {
     val M = mats(0);
-    val PP = (Q.t * M *^ M).t                              // Compute P = M * M^t * Q efficiently
+    if (opts.subMean && ipass == 0) {
+      meanCount += 1;
+      alpha.set(1f/meanCount);
+      val mn = mean(M, 2);
+      Mean ~ Mean + alpha * (mn - Mean);      
+    }
+    val Qt = Q.t;                                           // Compute P = M * M^t * Q efficiently
+    val QtM = Qt * M;
+    if (opts.subMean) QtM ~ QtM - Qt * Mean;
+    val PPt = QtM *^ M;
+    if (opts.subMean) PPt ~ PPt - QtM *^ Mean;
+    val PP = PPt.t                    
     if (ipass < opts.miniBatchPasses) {
       if (batchCount >= batchStep) {
         subspaceIter;                                        // Do minibatch subspace iterations 
@@ -72,8 +95,13 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
 	  val M = mats(0);
 	  if (ogmats != null) {
-	    ogmats(0) = Q.t * M;                                 // Save right singular vectors
-	    P <-- (ogmats(0) *^ M).t
+	  	val Qt = Q.t; 
+	  	val QtM = Qt * M;
+	  	if (opts.subMean) QtM ~ QtM - Qt * Mean;
+	    ogmats(0) = QtM;                                     // Save right singular vectors
+	    val PPt = QtM *^ M;
+	    if (opts.subMean) PPt ~ PPt - QtM *^ Mean;
+	    P <-- PPt.t
 	  }
 	  SV ~ P ∙ Q;                                            // Estimate the singular values
 	  max(SV, 1e-6f, SV);
@@ -119,6 +147,7 @@ object SVD  {
     var batchesPerUpdate = 10;
     var evalType = 0;
     var doRayleighRitz = true;
+    var subMean = true;
   }
   
   class Options extends Opts {}
