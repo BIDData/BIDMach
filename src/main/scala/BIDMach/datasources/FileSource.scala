@@ -244,7 +244,12 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   					    oldmat = matqueue(ifilex)(i);
   					  } 	
   					  if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d reading %d %s" format (ifilex, fileno, pnew, i, fname));
-  						val newmat = HMat.loadMat(fname, oldmat);	
+  						val newmat:Mat = try {
+  						  HMat.loadMat(fname, oldmat);	
+  						} catch {
+  						  case e:Exception => {println(stackTraceString(e)); null}
+  						  case _ => null
+  						}
   						if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d read %d %s " format (ifilex, fileno, pnew, i, fname));
   						matqueue.synchronized {
   					    matqueue(ifilex)(i) = newmat;
@@ -302,6 +307,12 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
       }
       ready(0) = fileno;
     }
+  }
+  
+  def stackTraceString(e:Exception):String = {
+  	val sw = new StringWriter;
+  	e.printStackTrace(new PrintWriter(sw));
+  	sw.toString;
   }
 
   
