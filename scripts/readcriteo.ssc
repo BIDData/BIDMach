@@ -60,3 +60,5 @@ for (i <- 0 to 12) {
   saveIMat(dir+("testnz%02d.imat.lz4" format i), c);
   print(".")
 }
+
+System.exit(0)
