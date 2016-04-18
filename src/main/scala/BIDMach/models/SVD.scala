@@ -53,10 +53,10 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   	if (opts.subMean) {
   		Mean = convertMat(Mean);
   	  setmodelmats(Array(Q, SV, Mean));
+  	  Mean.clear;
   	} else {
   	  setmodelmats(Array(Q, SV));
   	}
-  	Mean.clear;
   	P = Q.zeros(Q.nrows, Q.ncols);                         // Zero P
     R = Q.zeros(opts.dim, opts.dim);
     alpha = Q.zeros(1,1);
