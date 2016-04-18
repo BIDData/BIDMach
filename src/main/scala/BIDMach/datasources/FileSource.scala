@@ -291,7 +291,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
       val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
       for (i <- 0 until fnames.size) {
         if (fexists && lastMat(i).asInstanceOf[AnyRef] != null) {
-          HMat.saveMat(lastFname(i), lastMat(i));
+//          HMat.saveMat(lastFname(i), lastMat(i));
         }
         matqueue(0)(i) = if (fexists) {
           val tmp = HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));
