@@ -133,6 +133,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     		else
     			subspaceIter;
     	}
+    	SV ~ P ∙ Q;
     	P.clear;
     	batchCount = 0;
     	batchStep = opts.batchesPerUpdate;
