@@ -109,7 +109,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  case 0 =>  {
 	    val x0 = norm(P - (SV ∘ Q)).dv;
 	  	val y0 = x0 / (math.sqrt(P.length)*M.ncols*batchCount);          // residual
-//	  	println("vals %d %f %f" format (batchCount, x0, y0));
+	  	println("vals %f %f %f %f" format (x0, norm(P).dv, norm(Q).dv, norm(SV).dv));
 	  	y0;
 	  } 
 	  case 1 => {
@@ -139,8 +139,9 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     	P.clear;
     	batchCount = 0;
     	batchStep = opts.batchesPerUpdate;
+    } else {
+    	SV ~ P ∙ Q;
     }
-    SV ~ P ∙ Q;
   }
 
 
