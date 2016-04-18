@@ -107,7 +107,10 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  SV ~ P ∙ Q;                                            // Estimate the singular values
 	  val ndiff = opts.evalType match {
 	  case 0 =>  {
-	  	norm(P - (SV ∘ Q)).dv / math.sqrt(1L*P.length*batchCount);          // residual
+	    val x0 = norm(P - (SV ∘ Q)).dv;
+	  	val y0 = x0 / math.sqrt(1L*P.length*batchCount);          // residual
+	  	println("vals %f %f" format (x0, y0));
+	  	y0;
 	  } 
 	  case 1 => {
 	  	max(SV, 1e-6f, SV);
