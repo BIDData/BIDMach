@@ -107,11 +107,11 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  SV ~ P ∙ Q;                                            // Estimate the singular values
 	  val ndiff = opts.evalType match {
 	  case 0 =>  {
-	  	norm(P - (SV ∘ Q)).dv / math.sqrt(batchCount);          // residual
+	  	norm(P - (SV ∘ Q)).dv / math.sqrt(1L*P.length*batchCount);          // residual
 	  } 
 	  case 1 => {
 	  	max(SV, 1e-6f, SV);
-	  	norm((P / SV)  - Q).dv / math.sqrt(batchCount);      
+	  	norm((P / SV)  - Q).dv / math.sqrt(P.length);      
 	  }
 	  case 2 => {
 	  	val Qt = Q.t;
@@ -119,10 +119,10 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  	if (opts.subMean) QtM ~ QtM - (Qt * Mean);
 	    val diff = sum(snorm(M)) - sum(QtM ∙ QtM); 
 	    if (opts.subMean) diff ~ diff + ((Mean ∙ Mean) * M.ncols - (Mean ∙ sum(M, 2)) * 2.0);
-	    math.sqrt(diff.dv);
+	    math.sqrt(diff.dv) / math.sqrt(M.length);
 	  }
 	  }
-    row(-(ndiff / math.sqrt(P.length)));           // return the norm of the residual
+    row(-ndiff);           // return the norm of the residual
   } 
   
   override def updatePass(ipass:Int) = {
