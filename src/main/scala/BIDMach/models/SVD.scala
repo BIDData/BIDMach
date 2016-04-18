@@ -108,8 +108,8 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
 	  val ndiff = opts.evalType match {
 	  case 0 =>  {
 	    val x0 = norm(P - (SV ∘ Q)).dv;
-	  	val y0 = x0 / math.sqrt(1L*P.length*batchCount);          // residual
-	  	println("vals %d %f %f" format (batchCount, x0, y0));
+	  	val y0 = x0 / (batchCount*math.sqrt(P.length));          // residual
+//	  	println("vals %d %f %f" format (batchCount, x0, y0));
 	  	y0;
 	  } 
 	  case 1 => {
