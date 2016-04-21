@@ -11,7 +11,7 @@ import java.text.NumberFormat
 import edu.berkeley.bid.CUMACH._
 import scala.collection.mutable._
 
-class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTest.opts = new MHTest.Options) extends Model(opts) {
+class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTest.Opts = new MHTest.Options) extends Model(opts) {
 
 	parent_model = objective
 	// TODO: init the MHTest, estimate the variance of
@@ -33,7 +33,7 @@ class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTes
 		// Notice: this is not the deep copy, we just
 		// change the reference of the parent_model
 		parent_model._modelmats = modelmats
-		parent_model(mats, ipass, here)
+		parent_model.evalbatch(mats, ipass, here)
 	}
 
 	// help methods
@@ -55,7 +55,7 @@ class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTes
 
 	// compute the value of the delta
 	def delta:Double = {
-		
+		0.0f
 	}
 	
 }
@@ -68,14 +68,14 @@ object MHTest {
 
 	class Options extends Opts {}
 
-	def learner(data:Mat) = {
+	def learner(data:Mat, model:Model, proposer:Proposer) = {
 		class xopts extends Learner.Options with MHTest.Opts with MatSource.Opts with IncNorm.Opts 
 	    val opts = new xopts
 	    // TODO: define the parameters for the opts
 
 	    val nn = new Learner(
 	      new MatSource(Array(data:Mat), opts),
-	      new MHTest(opts),
+	      new MHTest(model, proposer, opts),
 	      null,
 	      new IncNorm(opts),
 	      null,
@@ -92,8 +92,12 @@ abstract class Proposer() {
 	}
 
 	// Function to compute the Pr(theta' | theta_t)
-	def proposeProb(): Double = {}
+	def proposeProb(): Double = {
+		1.0f
+	}
 
 	// Function to propose the next parameter, i.e. theta'
-	def proposeNext():Array[Mat] = {}
+	def proposeNext():Array[Mat] = {
+		null
+	}
 }
