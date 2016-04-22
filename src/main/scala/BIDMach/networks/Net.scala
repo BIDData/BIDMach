@@ -241,7 +241,7 @@ object Net  {
    */
   
   def dnodes2(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
-    val widths = (width * int(taper ^ row(0 -> (nslabs-1)))) \ ntargs;
+    val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
     powerNet(widths, opts, 0, nonlin);
   }
   
@@ -252,7 +252,7 @@ object Net  {
    */
   
   def dnodes3(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
-    val widths = (width * int(taper ^ row(0 -> (nslabs-1)))) \ ntargs;
+    val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
     powerNet(widths, opts, 1, nonlin);
   }
   
@@ -263,7 +263,7 @@ object Net  {
    */
   
   def dnodes4(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
-    val widths = (width * int(taper ^ row(0 -> (nslabs-1)))) \ ntargs;
+    val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
     powerNet(widths, opts, 2, nonlin);
   }
   
