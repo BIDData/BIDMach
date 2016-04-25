@@ -94,9 +94,6 @@ class BayesNet(val dag:Mat,
         
         // To finish building CPT, we normalize it using the normalizing constant matrix.
         normConstMatrix = getNormConstMatrix(lengthCPT)
-
-        printMatrix(full(normConstMatrix))
-
         cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
         setmodelmats(new Array[Mat](1))
         modelmats(0) = cpt
@@ -487,44 +484,88 @@ class BayesNet(val dag:Mat,
     }
   }
  
-  /**
-   * Creates normalizing matrix N that we can then multiply with the CPT to get a column vector
-   * of the same length as the CPT but such that it has normalized probabilties, not counts.
-   * 
-   * Specific usage: our CPT is a column vector of counts. To normalize and get probabilities, use
-   *   CPT / (CPT.t * N).t
-   *   
-   * Alternatively, one could avoid those two transposes by making CPT a row vector, but since the
-   * code assumes it's a column vector, it makes sense to maintain that convention.
-   */
-  def getNormConstMatrix(cptLength : Int) : Mat = {
-    var ii = izeros(1,1)
-    var jj = izeros(1,1)
-    for (i <- 0 until graph.n-1) {
-      var offset = IMat(cptOffset)(i)
-      val endOffset = IMat(cptOffset)(i+1)
-      val ns = statesPerNode(i).dv.toInt
-      var indices = find2(ones(ns,ns))
-      while (offset < endOffset) {
-        ii = ii on (indices._1 + offset)
-        jj = jj on (indices._2 + offset)
-        offset = offset + ns
-      }
+    /**
+     * UPDATE 04/25/16: I have code ready to compute the 'P' matrix below, but I can't do P *^ P.
+     *
+     * Creates matrix P such that, if our cpt is a ROW vector of COUNTS, then we NORMALIZE it by:
+     *
+     * cpt <-- (cpt / (cpt * P *^ P))
+     *
+     * If we use a column vector, it has to be "cpt <-- (cpt / (cpt.t * P *^ P).t)." Previously, we
+     * had a single matrix, but P *^ P will work better as it saves more space.
+     * 
+     * P is structured so that columns represent a single distribution, and rows indicate the CPT
+     * components contributing to the distribution's normalizing constant.  P *^ P will result in a
+     * matrix that has blocks of "1"s across the diagonal, with sizes varying due to the cardinality
+     * of variables. The cpt gets multiplied to sum up the components to get the normalizing
+     * constants (we normalize via the component-wise vector division). Finally, P is independent of
+     * the SAME parameter as it is only based on CPT length.
+     *   
+     * @param cptLength The number of components in the CPT.
+     */
+    def getNormConstMatrix(cptLength : Int) : Mat = {
+
+        // I WANT to use the following:
+        /*
+         * var numDistributions = 0
+         * var jj = izeros(1,1)
+         *
+         * for (k <- 0 until graph.n) {
+         *     var offset = cptOffset(k).dv.toInt
+         *     val numStates = statesPerNode(k).dv.toInt
+         *     val parentIndices = find(SMat(graph.dag)(?,k))
+         *
+         *     // Split based on no parents (one distribution) or >0 parents (>=2 distributions)
+         *     if (parentIndices.length == 0) {
+         *         jj = jj on ( iones(numStates,1) * numDistributions )
+         *         numDistributions += 1
+         *     } else {
+         *         val totalParentSlots = prod(IMat(statesPerNode)(parentIndices)).dv.toInt
+         *         for (i <- 0 until totalParentSlots) {
+         *             jj = jj on ( iones(numStates,1) * numDistributions )
+         *             numDistributions += 1
+         *         }
+         *     }
+         * }
+         *
+         * 
+         * // Form our matrix using the standard 'sparse' method and return depending on GPU usage.
+         * val P = sparse( (0 until cptLength) , jj(1 until jj.length) , ones(jj.length-1, 1) , cptLength, numDistributions)
+         * if (useGPUnow) { 
+         *     return GSMat(P) 
+         * } else {
+         *     return P
+         * }
+         */
+
+        // But I have to use this instead:
+        var ii = izeros(1,1)
+        var jj = izeros(1,1)
+        for (i <- 0 until graph.n-1) {
+          var offset = IMat(cptOffset)(i)
+          val endOffset = IMat(cptOffset)(i+1)
+          val ns = statesPerNode(i).dv.toInt
+          var indices = find2(ones(ns,ns))
+          while (offset < endOffset) {
+            ii = ii on (indices._1 + offset)
+            jj = jj on (indices._2 + offset)
+            offset = offset + ns
+          }
+        }
+        var offsetLast = IMat(cptOffset)(graph.n-1)
+        var indices = find2(ones(statesPerNode.asInstanceOf[IMat](graph.n-1), statesPerNode.asInstanceOf[IMat](graph.n-1)))
+        while (offsetLast < cptLength) {
+          ii = ii on (indices._1 + offsetLast)
+          jj = jj on (indices._2 + offsetLast)
+          offsetLast = offsetLast + statesPerNode.asInstanceOf[IMat](graph.n-1)
+        }
+        val res = sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1,1), cptLength, cptLength)
+        if (useGPUnow) { // Note that here we have to transpose!
+          return GSMat(res.t) 
+        } else {
+          return res.t
+        }
     }
-    var offsetLast = IMat(cptOffset)(graph.n-1)
-    var indices = find2(ones(statesPerNode.asInstanceOf[IMat](graph.n-1), statesPerNode.asInstanceOf[IMat](graph.n-1)))
-    while (offsetLast < cptLength) {
-      ii = ii on (indices._1 + offsetLast)
-      jj = jj on (indices._2 + offsetLast)
-      offsetLast = offsetLast + statesPerNode.asInstanceOf[IMat](graph.n-1)
-    }
-    val res = sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1,1), cptLength, cptLength)
-    if (useGPUnow) { // Note that here we have to transpose!
-      return GSMat(res.t) 
-    } else {
-      return res.t
-    }
-  }
    
   /**
    * Given a matrix as input, we form a diagonal, blocked version of it. So if a is a (sparse) mat, it is
