@@ -1,11 +1,11 @@
 // Script to test out BayesNet.scala for the general case.
 
-val data = loadFMat("gibbs_data/koller_data_1m_100perc.lz4")
+val data = loadFMat("gibbs_data/koller_data_1m_050perc.lz4")
 val dag = loadSMat("gibbs_data/koller_dag.lz4")
 val states = loadIMat("gibbs_data/koller_states.lz4")
 
 val (nn , opts) = BIDMach.models.BayesNet.learner(states , dag , data)
-opts.npasses = 10
+opts.npasses = 100
 opts.useGPU = false
 opts.batchSize = 10000
 //opts.updateAll = true

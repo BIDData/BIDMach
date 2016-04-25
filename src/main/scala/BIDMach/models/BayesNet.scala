@@ -51,8 +51,8 @@ class BayesNet(val dag:Mat,
     var onesSAMEvector:Mat = null             // This the (g)iones(opts.copiesForSAME,1), for certain special uses.
     
     // Extra debugging/info gathering for the Koller data only!
-    val real1 = .6 on .4 on .7 on .3  on .3  on .4 on .3 on .05 on .25 on .7 on .9 on .08 on .02
-    val real2 = .5 on .3 on .2 on .95 on .05 on .2 on .8 on .1  on .9  on .4 on .6 on .99 on .01     
+    val real1 = .6 on .4 on .7 on .3  on .3  on .4 on .3 on .9 on .08 on .02 on .05 on .25 on .7 
+    val real2 = .5 on .3 on .2 on .95 on .05 on .2 on .8 on .1 on .9  on .4  on .6  on .99 on .01     
     val real = real1 on real2
     
     /**
@@ -68,6 +68,7 @@ class BayesNet(val dag:Mat,
         // Some stuff for experiments and predictions...
         setseed(randSeed);
         println("randSeed = " + randSeed);
+        runtimes = zeros(1,10);
 
         // Now back to normal stuff.
         useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
@@ -93,6 +94,9 @@ class BayesNet(val dag:Mat,
         
         // To finish building CPT, we normalize it using the normalizing constant matrix.
         normConstMatrix = getNormConstMatrix(lengthCPT)
+
+        printMatrix(full(normConstMatrix))
+
         cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
         setmodelmats(new Array[Mat](1))
         modelmats(0) = cpt
@@ -125,13 +129,10 @@ class BayesNet(val dag:Mat,
      * debugCpt(ipass, here)
      * computeNormDifference(ipass,here)
      * computeKL(ipass, here, real) // Only for Koller data, of course ..
-     * 
-     * New (Nov. 2015): if we reach some iteration where we want to do foward sampling to generate data,
-     * then do that here after saving the CPT. Then we run this with that generated data.
+     *
+     * Though to reduce frequency of printing, I could do those in evalbatch().
      */
     override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-        //computeKL(ipass, here, real)
-        debugCpt(ipass, here)
   
         // Compute counts that we SUBTRACT away later! Call now b/c later, gmats(1)=user gets overrided.
         if (ipass > 0) {
@@ -146,8 +147,9 @@ class BayesNet(val dag:Mat,
   
     /** Calls a uupdate/evalfun sequence. Known data is in gmats(0), sampled data is in gmats(1). */
     override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
-        //uupdate(gmats(0), gmats(1), ipass) // For evaluation w/gflops, we don't really need this?
-        evalfun(gmats(0), gmats(1)) // We don't really need this right now ...
+        //computeKL(ipass, here, real) // Only for Koller data, of course ..
+        println("runtimes: " + runtimes)
+        return FMat(0); // I'm not sure what to return.
     }
  
     /**
@@ -170,24 +172,32 @@ class BayesNet(val dag:Mat,
         val select = stackedData > 0
 
         // For the first pass, we need to create a lot of matrices that rely on knowledge of the batch size.
+        val t0 = toc;
         if (ipass == 0) {
-          establishMatrices(sdata.ncols)
-          val state = convertMat(rand(sdata.nrows * opts.copiesForSAME, sdata.ncols))
-          state <-- float( min( int(statesPerNodeSAME ∘ state), int(statesPerNodeSAME-1) ) )
-          user ~ (select ∘ (stackedData-1)) + ((1-select) ∘ state)
+            establishMatrices(sdata.ncols)
+            val state = convertMat(rand(sdata.nrows * opts.copiesForSAME, sdata.ncols))
+            state <-- float( min( int(statesPerNodeSAME ∘ state), int(statesPerNodeSAME-1) ) )
+            user ~ (select ∘ (stackedData-1)) + ((1-select) ∘ state)
         }
-      
+        val t1 = toc;
+        runtimes(0) += t1 - t0;
+
         // Now back to normal from prediction accuracy; usertrans is still user.t.
         val usertrans = user.t;
+        val t2 = toc;
+        runtimes(1) += t2 - t1;
 
         for (c <- 0 until graph.ncolors) {
 
             // Prepare data by establishing appropriate offset matrices for various CPT blocks. First, clear out usertrans.
+            val t3 = toc;
             usertrans(?, colorInfo(c).idsInColorSAME) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes*opts.copiesForSAME) ) 
             val offsetMatrix = usertrans * colorInfo(c).iprojectSlicedSAME + (colorInfo(c).globalOffsetVectorSAME).t
             val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrixSAME) + colorInfo(c).strideVectorSAME
             val logProbs = ln(mm(replicatedOffsetMatrix))
             val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrixSAME).t
+            val t4 = toc;
+            runtimes(2) += t4 - t3;
 
             // Establish matrices needed for the multinomial sampling
             val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
@@ -199,10 +209,13 @@ class BayesNet(val dag:Mat,
             // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
             //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
             //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
+            val t5 = toc;
             val probs = exp(nonExponentiatedProbs)
             probs <-- (probs + 1e-30f) // Had to add this for the DLM MOOC data to prevent 0/(0+0) problems.
             val cumprobs = cumsumByKey(probs, keys)
             val normedProbs = cumprobs / cumprobs(bkeys)    
+            val t6 = toc;
+            runtimes(3) += t6 - t5;
 
             // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
             val randMatrix = randMap( (colorInfo(c).numNodes*opts.copiesForSAME, usertrans.nrows) )
@@ -211,12 +224,19 @@ class BayesNet(val dag:Mat,
             val lessThan = normedProbs < randMatrix(randIndices)
             val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
             usertrans(?, colorInfo(c).idsInColorSAME) = sampleIDs.t // Note the SAME now...
+            val t7 = toc;
+            runtimes(4) += t7 - t6;
 
             // After sampling with this color group over all copies (from SAME), we override the known values.
             usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t;
+            val t8 = toc;
+            runtimes(5) += t8 - t7;
         }
 
+        val t9 = toc;
         user <-- usertrans.t;
+        val t10 = toc;
+        runtimes(6) += t10 - t9;
     }
 
     /**
@@ -232,18 +252,27 @@ class BayesNet(val dag:Mat,
      * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
      */
     def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
+        val t11 = toc;
         val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
         val linearIndices = index(?)
 
         // Drop the corresponding previous mini-batch
-        if (ipass > 0) {
+        if (ipass > 0)
             counts1 ~ counts1 - counts2
-        }
 
         // Accumulate w/current mini-batch
         counts1 ~ counts1 + float(accum(linearIndices, 1, counts1.length, 1)) 
+        val t12 = toc;
+        runtimes(7) += t12 - t11;
+
         gamrnd(counts1 + dirichletPrior, dirichletScale, counts3)
+        val t13 = toc;
+        runtimes(8) += t13 - t12;
+
         updatemats(0) <-- (counts3 / (counts3.t * normConstMatrix).t);
+        val t14 = toc;
+        runtimes(9) += t14 - t13;
+
     }
  
     /**
@@ -545,6 +574,11 @@ class BayesNet(val dag:Mat,
   
   /** KL divergence. We assume our mm is normalized. */
   def computeKL(ipass:Int, here:Long, comparisonCPT:Mat) {
+
+    // EDIT: let's just make a copy of the cpt here
+    val cptCopy = mm + 0
+    cptCopy <-- (cptCopy / (cptCopy.t * normConstMatrix).t);
+
     var klDivergence = convertMat(float(0))
     var numDistributions = 0
  
@@ -557,7 +591,7 @@ class BayesNet(val dag:Mat,
       if (parentIndices.length == 0) {
         var thisKL = convertMat(float(0))
         for (j <- 0 until numStates) {
-          thisKL = thisKL + (comparisonCPT(offset+j) * ln( comparisonCPT(offset+j) / mm(offset+j) ))
+          thisKL = thisKL + (comparisonCPT(offset+j) * ln( comparisonCPT(offset+j) / cptCopy(offset+j) ))
         }
         klDivergence = klDivergence + thisKL
         numDistributions += 1
@@ -567,7 +601,7 @@ class BayesNet(val dag:Mat,
         for (i <- 0 until totalParentSlots) {       
           var thisKL = convertMat(float(0))
           for (j <- 0 until numStates) {
-            thisKL = thisKL + ( comparisonCPT(offset+j) * ln( comparisonCPT(offset+j) / mm(offset+j) ))
+            thisKL = thisKL + ( comparisonCPT(offset+j) * ln( comparisonCPT(offset+j) / cptCopy(offset+j) ))
           }  
           klDivergence = klDivergence + thisKL
           offset += numStates
