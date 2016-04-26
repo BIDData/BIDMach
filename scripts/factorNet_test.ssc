@@ -1,0 +1,25 @@
+// Script to test out BayesNet.scala for the general case.
+
+//val data = loadSMat("data/official_dlm_data/all_dlm_data_random.lz4")
+//val data = loadFMat("data/ICLR_2016_MOOC_Extras/synthMOOCdata_500pass_1seed_25perck.txt")
+val data = loadFMat("data/factorNet/data.txt")
+val dagDense = loadIMat("data/factorNet/factorSet.txt")
+val states = loadIMat("data/factorNet/statePerNode.txt")
+
+// convert the dag to sparse
+val dag = sparse(dagDense)
+
+//val data = loadFMat("data/official_student_data/data_student_50perc.lz4")
+//val data_50k = data(? , 0 until 50000)
+//val dag = loadSMat("data/official_student_data/dagStudent.lz4")
+//val states = loadIMat("data/official_student_data/statesStudent.lz4")
+
+val (nn , opts) = BIDMach.models.BayesNet.learner(states , dag , null , true, data)
+opts.npasses = 2
+opts.useGPU = false
+opts.batchSize = 2
+opts.updateAll = true
+opts.what
+nn.train
+nn.modelmats(0).t
+//sys.exit

@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 import edu.berkeley.bid.CUMACH
+import edu.berkeley.bid.CPUMACH
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -254,31 +255,43 @@ object ADAGrad {
    * Integrate the last stage of a gradient update (sparse, transposed multiply) with ADAGRAD. 
    * Supports both CPU and GPU implementation.
    */
-  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int) = {
+  
+  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int):Unit = 
+    multUpdate(a, b, mm, sumSq, mask, lrate, texp, vexp, eps, step, waitsteps, false);
+  
+  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
     val nc = b.ncols;
-    Mat.nflops += 2L * nr * b.nnz;
+    val nbr = b.nrows;
+    val biasv = if (hasBias) 1 else 0;
     (a, b, mm, sumSq, lrate, texp, vexp) match {
       case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
+      	Mat.nflops += 20L * nr * b.nnz;
         val fmask = mask.asInstanceOf[FMat];
-      	if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
+        val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
+        CPUMACH.multADAGrad(nr, nc, b.nnz, fa.data, sb.data, sb.ir, sb.jc, fmm.data, fssq.data, if (fmask != null) fmask.data else null, masknr, 
+            flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
+
+/*        if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
     			(0 until Mat.numThreads).par.map((ithread:Int) => 
     			  multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, ithread, Mat.numThreads));
     		} else {
     			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, 0, 1);
-    		}
+    		} */
       }
       case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+      	Mat.nflops += 20L * nr * b.nnz;
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
         CUMACH.multADAGrad(nr, nc, b.nnz, ga.data, gsb.data, gsb.ir, gsb.ic, gmm.data, gssq.data, gmaskdata, masknr,
-            glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps)
+            glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr)
       }
       case _ => {
-        val grad = a *^ b;
+        val grad0 = a *^ b;
+        val grad = if (hasBias) grad0 \ sum(a,2) else grad0;
         sumSq ~ sumSq + (grad ∘ grad);
         sumSq ~ sumSq + eps;
         val ssq = sumSq + 0f;

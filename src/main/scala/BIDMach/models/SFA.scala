@@ -370,7 +370,7 @@ object SFA  {
     val model = model0.asInstanceOf[SFA]
     val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 1
+    nopts.putBack = -1
     val newmod = new SFA(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);
@@ -384,8 +384,9 @@ object SFA  {
     nopts.regumean = mopts.regumean;
     nopts.doUsers = mopts.doUsers;
     nopts.weightByUser = mopts.weightByUser;
+    nopts.nmats = 2;
     val nn = new Learner(
-        new MatSource(Array(mat1, preds), nopts), 
+        new MatSource(Array(mat1, zeros(mopts.dim, mat1.ncols), preds), nopts), 
         newmod, 
         null,
         null,
@@ -398,7 +399,7 @@ object SFA  {
     val model = model0.asInstanceOf[SFA]
     val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 2
+    nopts.putBack = -1
     val newmod = new SFA(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);

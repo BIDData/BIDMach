@@ -1,0 +1,36 @@
+val dir = "../data/uci/Higgs/parts/"
+
+val (nn, opts) = Net.learner(dir+"data%03d.fmat.lz4", dir+"label%03d.fmat.lz4")
+
+opts.nend = 10
+opts.npasses = 50
+opts.batchSize = 200
+opts.reg1weight = 0.0001;
+opts.hasBias = true;
+opts.links = iones(1,1);
+opts.lrate = 0.01f;
+opts.texp = 0.4f;
+opts.evalStep = 311;
+opts.nweight = 1e-4f
+val net = Net.dnodes3(12, 500, 0.6f, 1, opts, 2);
+opts.nodeset = net
+
+val model = nn.model.asInstanceOf[Net]
+
+nn.train
+
+val ta = loadFMat(dir + "data%03d.fmat.lz4" format 10);
+val tc = loadFMat(dir + "label%03d.fmat.lz4" format 10);
+
+val (mm,mopts) = Net.predictor(model, ta);
+
+mopts.batchSize=1000
+
+mm.predict
+
+val pc = FMat(mm.preds(0))
+
+val rc = roc(pc, tc, 1-tc, 1000);
+
+mean(rc)
+

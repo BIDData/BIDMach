@@ -28,10 +28,10 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 				  colranges(i) = convertMat(irow(orows -> (orows + thisrow)));
 				  orows += thisrow;
 			  }
-			  output = convertMat(zeros(orows, inputData.ncols));
+			  output = convertMat(zeros(orows \ inputData.ncols));
 		  }
 		  for (i <- 0 until opts.ninputs) {
-			  output(colranges(i), ?) = inputDatas(i);
+			  output.asMat(colranges(i), ?) = inputDatas(i).asMat;
 		  }
 		  clearDeriv;
 		  forwardtime += toc - start;
@@ -41,10 +41,14 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  val start = toc;
 		  for (i <- 0 until opts.ninputs) {
 			  if (inputDerivs(i).asInstanceOf[AnyRef] != null) {
-				  inputDerivs(i) <-- deriv(colranges(i), ?)
+				  inputDerivs(i) <-- deriv.asMat(colranges(i), ?)
 			  }
 		  }  
 		  backwardtime += toc - start;
+  }
+  
+  override def toString = {
+    "stack@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
@@ -59,6 +63,10 @@ class StackNode extends Node with StackNodeOpts {
 	override def clone:StackNode = {copyTo(new StackNode).asInstanceOf[StackNode];}
 
   override def create(net:Net):StackLayer = {StackLayer(net, this);}
+  
+  override def toString = {
+    "stack@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object StackLayer {  

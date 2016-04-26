@@ -6,7 +6,7 @@ public final class CUMACH {
     private CUMACH() {}
 
     static {
-        jcuda.LibUtils.loadLibrary("bidmachcuda");
+        LibUtils.loadLibrary("bidmachcuda");
     } 
     
     public static native int applylinks(Pointer A, Pointer L, Pointer C, int nrows, int ncols);
@@ -72,8 +72,11 @@ public final class CUMACH {
     
     public static native int multinomial2(int nrows, int ncols, Pointer jA, Pointer jB, int nvals);
   
+//    public static native int multADAGrad(int nrows, int ncols, int nnz, Pointer A, Pointer Bdata, Pointer Bir, Pointer Bic, Pointer MM, Pointer Sumsq, 
+//    		Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon);
+    
     public static native int multADAGrad(int nrows, int ncols, int nnz, Pointer A, Pointer Bdata, Pointer Bir, Pointer Bic, Pointer MM, Pointer Sumsq, 
-    		Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon);
+    		Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon, int biasv, int nbr);
 
     public static native int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, Pointer A, Pointer Bdata, Pointer Bir, Pointer Bjc, int transpose,
     		Pointer MM, Pointer Sumsq, Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, float istep, int addgrad, float epsilon);   
@@ -104,5 +107,10 @@ public final class CUMACH {
     
     public static native int ADAGradn(int nrows, int ncols, Pointer mm, Pointer um, Pointer ssq, Pointer momentum, float mu, Pointer mask, int maskr, float nw, Pointer ve, int nve,
             Pointer ts, int nts, Pointer lrate, int nlrate, float langevin, float eps, int doupdate);
+    
+    public static native int LSTMfwd(Pointer inC, Pointer LIN1, Pointer LIN2, Pointer LIN3, Pointer LIN4, Pointer outC, Pointer outH, int n);
+    
+    public static native int LSTMbwd(Pointer inC, Pointer LIN1, Pointer LIN2, Pointer LIN3, Pointer LIN4, Pointer doutC, Pointer doutH, 
+    		Pointer dinC, Pointer dLIN1, Pointer dLIN2, Pointer dLIN3, Pointer dLIN4, int n);
 
 }

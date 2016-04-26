@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -20,7 +20,7 @@ import BIDMach.networks._
  */
 
 class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new DropoutNode) extends Layer(net, opts) {  
-	var randmat:Mat = null;
+	var randmat:ND = null;
 
   override def forward = {
     val start = toc;
@@ -29,11 +29,7 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 		if (nopts.predict) {
 			output ~ inputData * opts.frac;
 		} else {
-			if (useGPU) {
-				grand(randmat.asInstanceOf[GMat]); 
-			} else {
-				rand(randmat.asInstanceOf[FMat]);
-			}
+			rand(randmat);
 			randmat ~ randmat < opts.frac
 			output ~ inputData ∘ randmat;
 		}
@@ -46,6 +42,10 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ randmat);
 		backwardtime += toc - start;
   }
+  
+  override def toString = {
+    "dropout@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 trait DropoutNodeOpts extends NodeOpts {
@@ -54,16 +54,20 @@ trait DropoutNodeOpts extends NodeOpts {
     
     
 class DropoutNode extends Node with DropoutNodeOpts { 
-    def copyTo(opts:DropoutNode):DropoutNode = {
-  		super.copyTo(opts);
-  		opts.frac = frac;
-  		opts;
-    }
-    
-    override def clone:DropoutNode = {copyTo(new DropoutNode);}
-    
-    override def create(net:Net):DropoutLayer = {DropoutLayer(net, this);}
-  }
+	def copyTo(opts:DropoutNode):DropoutNode = {
+			super.copyTo(opts);
+			opts.frac = frac;
+			opts;
+	}
+
+	override def clone:DropoutNode = {copyTo(new DropoutNode);}
+
+	override def create(net:Net):DropoutLayer = {DropoutLayer(net, this);}
+
+	override def toString = {
+			"dropout@"+Integer.toHexString(hashCode % 0x10000).toString
+	}
+}
   
 object DropoutLayer { 
   

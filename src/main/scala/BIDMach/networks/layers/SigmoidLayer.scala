@@ -30,10 +30,14 @@ class SigmoidLayer(override val net:Net, override val opts:SigmoidNodeOpts = new
 }
 
   override def backward = {
-		  val start = toc;
-		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.SIGMOIDFN);
-		  backwardtime += toc - start;
-}
+		val start = toc;
+		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.SIGMOIDFN);
+		backwardtime += toc - start;
+  }
+  
+  override def toString = {
+    "sigmoid@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 
@@ -45,6 +49,10 @@ class SigmoidNode extends Node with SigmoidNodeOpts {
 	override def clone:SigmoidNode = {copyTo(new SigmoidNode).asInstanceOf[SigmoidNode];}
 
   override def create(net:Net):SigmoidLayer = {SigmoidLayer(net, this);}
+  
+  override def toString = {
+    "sigmoid@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
 
 object SigmoidLayer {  

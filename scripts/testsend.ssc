@@ -1,0 +1,35 @@
+
+import BIDMach.allreduce.{Master,Worker,Command}
+
+def stringAddrToInt(s:String) = {
+    val parts = s.split("\\.").map(_.toInt);
+    ((((((parts(0) << 8) + parts(1)) << 8) + parts(2)) << 8) + parts(3));
+}
+    
+val addresses = scala.io.Source.fromFile("/opt/BIDMach/scripts/hosts.txt").getLines.map(stringAddrToInt(_)).toArray
+
+val a = new Master();
+val opts = a.opts;
+opts.trace = 3;
+opts.intervalMsec = 2000;
+//opts.limitFctn = Master.powerLimitFctn
+opts.limit = 1000000
+opts.timeScaleMsec = 2e-3f
+val nmachines = addresses.length;
+
+val gmods = irow(nmachines);
+val gmachines = irow(0->nmachines);
+val workerIPs = new IMat(1, nmachines, addresses);
+
+a.init
+//a.setMachineNumbers
+
+
+a.config(gmods, gmachines, workerIPs)
+//a.sendConfig
+
+//a.startLearners
+
+//a.startUpdates
+
+//a.permuteAllreduce(0,1000000)

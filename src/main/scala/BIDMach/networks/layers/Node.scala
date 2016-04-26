@@ -17,7 +17,7 @@ import BIDMach.networks._
 
 
 @SerialVersionUID(100L)
-trait NodeOpts extends Serializable {
+trait NodeOpts extends BIDMat.Opts {
   var name = "";  
   
   def copyOpts(opts:NodeOpts):NodeOpts = {
@@ -41,6 +41,10 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
     myGhost = opts;
     opts;
   }
+  
+  override def toString = {
+    "node@"+(hashCode % 0x10000).toString
+  }
 
   override def clone:Node = {
 		copyTo(new Node).asInstanceOf[Node];
@@ -62,7 +66,7 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
     
   def ∘ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
         
-  def on (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
+  def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
 }
 
 object Node {
@@ -75,7 +79,9 @@ object Node {
   
   def exp(a:NodeTerm) = new ExpNode{inputs(0) = a;};
   
-  def GLM(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
+  def glm_(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
+  
+  def glm(a:NodeTerm)(links:IMat) = {val ilinks = links; new GLMNode{inputs(0) = a; links = ilinks}};
   
   def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
   
@@ -93,6 +99,16 @@ object Node {
     val n = new LinNode{inputs(0) = a;}
     opts.copyOpts(n);
     n
+  }
+  
+  def lstm_fused(inc:NodeTerm, lin1:NodeTerm, lin2:NodeTerm, lin3:NodeTerm, lin4:NodeTerm) = {
+    new LSTMfusedNode{
+      inputs(0) = inc;
+      inputs(1) = lin1;
+      inputs(2) = lin2;
+      inputs(3) = lin3;
+      inputs(4) = lin4;
+    }
   }
   
   def ln(a:NodeTerm) = new LnNode{inputs(0) = a};
@@ -115,10 +131,16 @@ object Node {
     n
   }
   
-  def norm(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
+  def norm_(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
     val n = new NormNode{inputs(0) = a;}
     opts.copyOpts(n);
     n
+  }
+  
+  def norm(a:NodeTerm)(targetNorm:Float = 1f, weight:Float = 1f) =  {
+    val tnorm = targetNorm;
+    val nweight = weight;
+    new NormNode{inputs(0) = a; targetNorm = tnorm; weight = nweight}
   }
   
   def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a};
@@ -141,9 +163,10 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
-  def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm)(opts:LSTMNodeOpts) = {
+  def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm, m:String)(opts:LSTMNodeOpts) = {
     val n = new LSTMNode;
     opts.copyOpts(n);
+    n.modelName = m;
     n.constructGraph;
     n.inputs(0) = h;
     n.inputs(1) = c;

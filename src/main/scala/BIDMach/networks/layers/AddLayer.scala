@@ -25,7 +25,7 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
 
 	override def forward = {
       val start = toc;
-			createOutput(inputData.nrows, inputData.ncols);
+			createOutput(inputData.dims);
 			output <-- inputData;
 			(1 until inputlength).map((i:Int) => output ~ output + inputDatas(i));
 			clearDeriv;
@@ -39,6 +39,10 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
 			});
 			backwardtime += toc - start;
 	}
+  
+  override def toString = {
+    "add@"+("%04x" format (hashCode % 0x10000));
+  }
 }
 
 trait AddNodeOpts extends NodeOpts {
@@ -57,6 +61,10 @@ class AddNode extends Node with AddNodeOpts {
 	override def clone:AddNode = {copyTo(new AddNode).asInstanceOf[AddNode];}
 
 	override def create(net:Net):AddLayer = {AddLayer(net, this);}
+  
+  override def toString = {
+   "add@"+("%04x" format (hashCode % 0x10000));
+  }
 }
 
 object AddLayer { 

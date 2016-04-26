@@ -5,8 +5,6 @@ import BIDMat.DenseMat
 import scala.collection.mutable.HashMap;
 
 case class NodeMat(override val nrows:Int, override val ncols:Int, override val data:Array[Node]) extends DenseMat[Node](nrows, ncols, data) {	
-    
-	def size() = length;
   
   var nodeMap:HashMap[Node,Int] = null;
 	
@@ -98,38 +96,45 @@ case class NodeMat(override val nrows:Int, override val ncols:Int, override val 
   }
   
   def alphaCoords(nodeTerm:NodeTerm) = {
-    val node = nodeTerm.node;
-    val term = nodeTerm.term;
-    if (nodeMap == null) {
-      rebuildMap;
-    }
-    val i = nodeMap(node);
-    if (data(i) != node) rebuildMap;
-    val coli = i / nrows;
-    val rowi = i - coli * nrows;
-    val v:Int = 'A';
-    val coli0 = coli % 26;
-    val ch0 = Character.toChars(v + coli0)(0).toString;
-    val ch = if (coli < 26) {
-    	ch0;
-    } else {
-      val ch1 = Character.toChars(v + coli0/26)(0).toString;
-      ch1 + ch0;
-    } 
-    val ostr = ch + rowi.toString;  
-    if (term == 0) {
-      ostr;
-    } else {
-      ostr + "[" + term.toString + "]";
+		if (nodeTerm == null) {
+			"null"
+		} else {
+			val node = nodeTerm.node;
+			val term = nodeTerm.term;
+			if (nodeMap == null) {
+				rebuildMap;
+			}
+      if (nodeMap.contains(node)) {
+    	  val i = nodeMap(node);
+    	  if (data(i) != node) rebuildMap;
+    	  val coli = i / nrows;
+    	  val rowi = i - coli * nrows;
+    	  val v:Int = 'A';
+    	  val coli0 = coli % 26;
+    	  val ch0 = Character.toChars(v + coli0)(0).toString;
+    	  val ch = if (coli < 26) {
+    		  ch0;
+    	  } else {
+    		  val ch1 = Character.toChars(v + coli0/26)(0).toString;
+    		  ch1 + ch0;
+    	  } 
+    	  val ostr = ch + rowi.toString;  
+    	  if (term == 0) {
+    		  ostr;
+    	  } else {
+    		  ostr + "[" + term.toString + "]";
+    	  }
+      } else {
+        "<==="
+      }
     }
   }
 	
 	override def printOne(i:Int):String = {
 	  val v = data(i)
 	  if (v != null) {
-		  var ns = v.toString();
-      val ostring = v.inputs.map((x:NodeTerm) => if (x != null) alphaCoords(x) else "null").reduce(_+","+_);
-      ns + "(" + ostring +")";
+      val ostring = v.inputs.map(alphaCoords(_)).reduce(_+","+_);
+      v.toString() + "(" + ostring +")";
     }
 		else	
 		  ""

@@ -6,6 +6,8 @@ import h5py
 from sklearn.datasets import load_svmlight_file
 from sklearn.cluster import KMeans
 
+print("reading")
+
 f = h5py.File('/code/BIDMach/data/MNIST8M/all.mat','r')
 
 t0 = time.time()
