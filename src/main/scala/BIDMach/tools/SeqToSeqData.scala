@@ -100,10 +100,10 @@ object SeqToSeqDict {
     val out = SeqToSeqDict(sbmatfpath);
     if (imatfpath != null) {
       val dictcnt = loadIMat(imatfpath);
-      out.counts = if (dictcnt(0)==Double.MaxValue) {     // Already SeqToSeqDict?
+      out.counts = if (dictcnt(0)==Int.MaxValue) {     // Already SeqToSeqDict?
         DMat(dictcnt);
       } else {
-        Double.MaxValue*ones(numspecialsyms,1) on DMat(dictcnt); // TODO correct MaxValue?
+        Int.MaxValue*ones(numspecialsyms,1) on DMat(dictcnt); // TODO correct MaxValue?
       }
     }
     return out;
@@ -117,7 +117,7 @@ object SeqToSeqDict {
     val ii2 = ii((ii.length-1) to (ii.length-maxsize) by -1);                    // Take the top maxsize counts.  Reverse order for convenience when inspecting.
     ii2 ~ ii2 + numspecialsyms;                                                  // Offset those indices to again count for special symbols.
     val cstr = specialsyms on dict.cstr(ii2.t);                                  // Recreate the cstr
-    val cnt = Double.MaxValue*ones(numspecialsyms,1) on dict.counts(ii2.t);      // Recreate the counts
+    val cnt = Int.MaxValue*ones(numspecialsyms,1) on dict.counts(ii2.t);      // Recreate the counts
     Dict(cstr, cnt)
   }
 }
@@ -165,8 +165,8 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
   var dictinitialized:Boolean=false; 
   var srcdict:Dict=null;
   var dstdict:Dict=null;
-  var srctrimmapping:IMat=null;
-  var dsttrimmapping:IMat=null;
+  var srcindexmapping:IMat=null;
+  var dstindexmapping:IMat=null;
   
   def getStartsAndLens(parsedSents:IMat):(IMat,IMat) = {
     /*
@@ -239,7 +239,7 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
   }  
 
 
-  def loadDict(dictfpaths:(String,String), outputdir:String=null, vocabmaxsize:Int=0, vocabmincount:Int=0):(Dict,IMat) = {
+  def loadDict(origdictfpaths:(String,String), outputdir:String=null, vocabmaxsize:Int=0, vocabmincount:Int=0):(Dict,IMat) = {
     /* 
      * Given a tuple of paths to dict sbmat and (optionally) imat of counts,
      * 1) load the dictionary
@@ -248,12 +248,12 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
      * 4) return the dictionary and optionally (based on (2)), the mapping from the original indices
      *    to the trimmed indices  
      */
-    if (dictfpaths._1 == null) {
+    if (origdictfpaths._1 == null) {
       assert(vocabmaxsize <= 0, "If vocabmaxsize > 0, you must provide a dict and counts");
       assert(vocabmincount <= 1, "If vocabmincount > 1, you must provide a dict and counts");
       return (null,null);
     } else {
-      var origDict = SeqToSeqDict(dictfpaths);
+      var origDict = SeqToSeqDict(origdictfpaths);
       var needmap = false;
       var dict:Dict = origDict;
       if (vocabmincount > 1) {
@@ -264,41 +264,57 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
         needmap = true;
         dict = SeqToSeqDict.top(dict, vocabmaxsize);
       }
-      val trimmapping = if (needmap) {
+      val indexmapping = if (needmap) {
         origDict --> dict;
       } else {
         null;
       }
       // Save dict to outputdir (with same filenames)
       if (outputdir!=null) {
-        val sbmatfname = (new File(dictfpaths._1)).getName;
-        val imatfname = (new File(dictfpaths._2)).getName;
+        val sbmatfname = (new File(origdictfpaths._1)).getName;
+        val imatfname = (new File(origdictfpaths._2)).getName;
         val sbmatfpath = outputdir+"/"+sbmatfname;
         val imatfpath = outputdir+"/"+imatfname;
         println("Saving dicts to %s and %s" format (sbmatfpath,imatfpath));
         saveSBMat(sbmatfpath, SBMat(dict.cstr));
         saveIMat(imatfpath, IMat(dict.counts));
       }
-      return (dict,trimmapping)
+      return (dict,indexmapping)
     }
   }
 
-  def loadData(fpath:String, trimmapping:IMat=null):IMat = {
+  def loadData(fpath:String, indexmapping:IMat=null):IMat = {
     /*
      * 1) Load the (imat) data from fpath
-     * 2) If trimmapping provided, map the indices due to trimming and fill in oovsym
+     * 2) If indexmapping provided, map the indices and fill in oovsym
      * 3) Offset to make room for special characters
      */
     val parsedSents = loadIMat(fpath);
     parsedSents(?,opts.wordcol) += SeqToSeqDict.numspecialsyms - 1;
-    if (trimmapping!=null) {  // trimming
-      parsedSents(?,opts.wordcol) = trimmapping(parsedSents(?,opts.wordcol));
+    if (indexmapping!=null) {  // trimming
+      parsedSents(?,opts.wordcol) = indexmapping(parsedSents(?,opts.wordcol));
       val ii = find(parsedSents(?,opts.wordcol)<0);
       parsedSents(ii,opts.wordcol) = SeqToSeqDict.oovsym;
     }
     return parsedSents;
   }
 
+  
+  /*
+   * prepSeqToSeqDataWildcard
+   * 
+   *   fnamepatterns: a tuple of 2 strings (1 for src pattern, 1 for dstpattern) with single asterisk
+   *                  denoting wildcard.
+   *                
+   *   Example:
+   *       prepSeqToSeqDataWildcard("/path/to/indir", ("data-*.src","data-*.dst"), "/path/to/indir");
+   *
+   *           will call prepSeqToSeqData() on "/path/to/indir/data-01.src", "/path/to/indir/data-01.dst"
+   *                                           "/path/to/indir/data-02.src", "/path/to/indir/data-02.dst"
+   *                                           "/path/to/indir/data-03.src", "/path/to/indir/data-03.dst"
+   *                                           ...
+   *   
+   */  
   def prepSeqToSeqDataWildcard(inputdir:String, fnamepatterns:(String,String)):Unit = {
     prepSeqToSeqDataWildcard(inputdir, fnamepatterns, ((null,null),(null,null)), null);
   }
@@ -307,14 +323,22 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
                                outputdir0:String):Unit = {
     prepSeqToSeqDataWildcard(inputdir, fnamepatterns, ((null,null),(null,null)), outputdir0);
   }
+
+  def prepSeqToSeqDataWildcard(inputdir:String, fnamepatterns:(String,String),
+                               origdictfnames:((String,String),(String,String))):Unit = {
+    prepSeqToSeqDataWildcard(inputdir, fnamepatterns, origdictfnames, ((null,null),(null,null)), null);
+  }  
   
   def prepSeqToSeqDataWildcard(inputdir:String, fnamepatterns:(String,String),
-                               dictfnames:((String,String),(String,String))=((null,null),(null,null)),
-                               outputdir0:String=null):Unit = {
-    /*
-     * patterns: a tuple of 2 strings (1 for src pattern, 1 for dstpattern) with single asterisk
-     *           denoting wildcard.
-     */    
+                               origdictfnames:((String,String),(String,String)),
+                               outputdir0:String):Unit = {
+    prepSeqToSeqDataWildcard(inputdir, fnamepatterns, origdictfnames, ((null,null),(null,null)), outputdir0);
+  }
+  
+  def prepSeqToSeqDataWildcard(inputdir:String, fnamepatterns:(String,String),
+                               origdictfnames:((String,String),(String,String))=((null,null),(null,null)),
+                               targetdictfnames:((String,String),(String,String))=((null,null),(null,null)),
+                               outputdir0:String=null):Unit = {    
     val files = new File(inputdir).listFiles;
     assert(files!=null,"No directory %s" format inputdir)
     val allfnames = files.map(_.getName).sorted;
@@ -337,7 +361,8 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
         val srcfname = srcfiles(ifile);
         val dstfname = dstfiles(ifile);
         println("Processing %s <--> %s" format (srcfname,dstfname));
-        val (srcmat,dstmat) = prepSeqToSeqData(inputdir, (srcfname, dstfname), dictfnames, outputdir);
+        val (srcmat,dstmat) = prepSeqToSeqData(inputdir, (srcfname, dstfname), 
+                                               origdictfnames, targetdictfnames, outputdir);
         // Save
         saveSMat(outputdir + "/src%04d.smat.lz4" format ifile, srcmat);
         saveSMat(outputdir + "/dst%04d.smat.lz4" format ifile, dstmat);
@@ -349,6 +374,16 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
     }
   }
 
+  /*
+   * prepSeqToSeqData
+   * 
+   *   origdictfnames:    Filename of the dicts used to create the parsed data
+   *                      There are two reasons to provide this:
+   *                         1) To prune the vocabulary (opts.srcvocabmaxsize and opts.dstvocabmaxsize)
+   *                         2) To map to another dict, targetorigdictfnames
+   *   targetdictfnames:  Provide if you want to match the indices of another dictionary
+   *   
+   */  
   def prepSeqToSeqData(inputdir:String, fnames:(String,String)):(SMat,SMat) = {
     prepSeqToSeqData(inputdir, fnames, ((null,null),(null,null)), null)
   }  
@@ -356,30 +391,78 @@ class SeqToSeqData(val opts:SeqToSeqData.Opts = new SeqToSeqData.Options) {
   def prepSeqToSeqData(inputdir:String, fnames:(String,String), outputdir0:String):(SMat,SMat) = {
     prepSeqToSeqData(inputdir, fnames, ((null,null),(null,null)), outputdir0)
   }
-  
-  def prepSeqToSeqData(inputdir:String, fnames:(String,String), dictfnames:((String,String),(String,String)),
-                       outputdir0:String=null):(SMat,SMat) = {
-    val srcpath:String = inputdir+"/"+fnames._1;
-    val dstpath:String = inputdir+"/"+fnames._2;
-    val srcdictfpath:String = if (dictfnames._1._1==null) null else inputdir+"/"+dictfnames._1._1;
-    val srcdictcntfpath:String = if (dictfnames._1._2==null) null else inputdir+"/"+dictfnames._1._2;
-    val dstdictfpath:String = if (dictfnames._2._1==null) null else inputdir+"/"+dictfnames._2._1;
-    val dstdictcntfpath:String = if (dictfnames._2._2==null) null else inputdir+"/"+dictfnames._2._2;
-    val outputdir = getoutputdir(inputdir,outputdir0);
-    prepSeqToSeqData((srcpath,dstpath), ((srcdictfpath,srcdictcntfpath),(dstdictfpath,dstdictcntfpath)), outputdir);
+
+  def prepSeqToSeqData(inputdir:String, fnames:(String,String), origdictfnames:((String,String),(String,String))):(SMat,SMat) = {
+    prepSeqToSeqData(inputdir, fnames, origdictfnames, ((null,null),(null,null)), null)
+  }
+    
+  def prepSeqToSeqData(inputdir:String, fnames:(String,String), origdictfnames:((String,String),(String,String)),
+                       outputdir0:String):(SMat,SMat) = {
+    prepSeqToSeqData(inputdir, fnames, origdictfnames, ((null,null),(null,null)), outputdir0)
   }
   
-  def prepSeqToSeqData(fpaths:(String,String), dictfpaths:((String,String),(String,String)),
+  def prepSeqToSeqData(inputdir:String, fnames:(String,String), origdictfnames:((String,String),(String,String)),
+                       targetdictfnames:((String,String),(String,String)),
+                       outputdir0:String=null):(SMat,SMat) = {    
+    val srcpath:String = inputdir+"/"+fnames._1;
+    val dstpath:String = inputdir+"/"+fnames._2;
+    val origsrcdictfpath:String = if (origdictfnames._1._1==null) null else inputdir+"/"+origdictfnames._1._1;
+    val origsrcdictcntfpath:String = if (origdictfnames._1._2==null) null else inputdir+"/"+origdictfnames._1._2;
+    val origdstdictfpath:String = if (origdictfnames._2._1==null) null else inputdir+"/"+origdictfnames._2._1;
+    val origdstdictcntfpath:String = if (origdictfnames._2._2==null) null else inputdir+"/"+origdictfnames._2._2;
+    val targetsrcdictfpath:String = if (targetdictfnames._1._1==null) null else inputdir+"/"+targetdictfnames._1._1;
+    val targetsrcdictcntfpath:String = if (targetdictfnames._1._2==null) null else inputdir+"/"+targetdictfnames._1._2;
+    val targetdstdictfpath:String = if (targetdictfnames._2._1==null) null else inputdir+"/"+targetdictfnames._2._1;
+    val targetdstdictcntfpath:String = if (targetdictfnames._2._2==null) null else inputdir+"/"+targetdictfnames._2._2;
+    val outputdir = getoutputdir(inputdir,outputdir0);
+    prepSeqToSeqData((srcpath,dstpath),
+                     ((origsrcdictfpath,origsrcdictcntfpath),(origdstdictfpath,origdstdictcntfpath)),
+                     ((targetsrcdictfpath,targetsrcdictcntfpath),(targetdstdictfpath,targetdstdictcntfpath)),
+                     outputdir);
+  }
+  
+  def prepSeqToSeqData(fpaths:(String,String), origdictfpaths:((String,String),(String,String)),
                        outputdir:String):(SMat,SMat) = {   
-    if (!dictinitialized) {
-      val res1 = loadDict(dictfpaths._1, outputdir, opts.srcvocabmaxsize, opts.srcvocabmincount);
-      srcdict = res1._1;  srctrimmapping = res1._2;
-      val res2 = loadDict(dictfpaths._2, outputdir, opts.dstvocabmaxsize, opts.dstvocabmincount);
-      dstdict = res2._1;  dsttrimmapping = res2._2;
-      dictinitialized=true;
+    prepSeqToSeqData(fpaths, origdictfpaths,((null,null),(null,null)),outputdir);
+  }
+
+  def prepSeqToSeqData(fpaths:(String,String), origdictfpaths:((String,String),(String,String)),
+                       targetdictfpaths:((String,String),(String,String))):(SMat,SMat) = {    
+    prepSeqToSeqData(fpaths, origdictfpaths,targetdictfpaths,null); 
+  }
+  
+  def prepSeqToSeqData(fpaths:(String,String), origdictfpaths:((String,String),(String,String)),
+                       targetdictfpaths:((String,String),(String,String)),
+                       outputdir:String):(SMat,SMat) = {    
+    // Make outputdir if necessary
+    val outputdirFile = new File(outputdir);
+    if (!outputdirFile.exists()) {
+      val successful = outputdirFile.mkdirs();
+      assert(successful, "Failed to make outputdir at %s" format outputdir);
     }
-    val srcsents:IMat = loadData(fpaths._1,srctrimmapping);
-    val dstsents:IMat = loadData(fpaths._2,dsttrimmapping);
+
+    // Prepare dicts and indexmappings
+    if (!dictinitialized) {
+      if (targetdictfpaths._1._1 != null) {
+        if ((opts.srcvocabmaxsize > 0) || (opts.dstvocabmaxsize > 0))
+          print(s"Warning: opts.srcvocabmaxsize & opts.dstvocabmaxsize will be ignored (using whatever used in ${targetdictfpaths._1._1} and ${targetdictfpaths._2._1})");
+        val srcdict = loadDict(origdictfpaths._1)._1;  // Don't save these
+        val dstdict = loadDict(origdictfpaths._2)._1;  // Don't save these
+        val targetsrcdict = loadDict(targetdictfpaths._1, outputdir)._1;
+        val targetdstdict = loadDict(targetdictfpaths._2, outputdir)._1;
+        srcindexmapping = srcdict --> targetsrcdict;
+        dstindexmapping = dstdict --> targetdstdict;
+        dictinitialized=true;      
+      } else {
+        val res1 = loadDict(origdictfpaths._1, outputdir, opts.srcvocabmaxsize, opts.srcvocabmincount);
+        srcdict = res1._1;  srcindexmapping = res1._2;
+        val res2 = loadDict(origdictfpaths._2, outputdir, opts.dstvocabmaxsize, opts.dstvocabmincount);
+        dstdict = res2._1;  dstindexmapping = res2._2;
+        dictinitialized=true;
+      }
+    }
+    val srcsents:IMat = loadData(fpaths._1,srcindexmapping);
+    val dstsents:IMat = loadData(fpaths._2,dstindexmapping);
     
     val (srcstartsAll,srclensAll) = getStartsAndLens(srcsents);
     val (dststartsAll,dstlensAll) = getStartsAndLens(dstsents);
