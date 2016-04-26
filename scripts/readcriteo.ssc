@@ -17,8 +17,9 @@ def readcritfile(fname:String, haslabel:Int):(FMat, IMat, IMat) = {
   line = din.readLine();
   var iline = 0;
   while (iline < nlines) {
-    val parts = line.split("\t");
-    val nparts = parts.length
+    val parts = line.split("\t",-1);
+    val nparts = parts.length;
+    if (nparts != 39 + haslabel) println("file %s line %d has length %d\n" format (fname, iline, nparts));
     if (haslabel > 0) labels(iline) = parts(0).toInt;
     var i = 0;
     while (i < 13 && i+haslabel < nparts) {
@@ -45,18 +46,19 @@ def readcritfile(fname:String, haslabel:Int):(FMat, IMat, IMat) = {
 val dir = "../data/criteo/parts/"
 println("reading and converting training data")
 for (i <- 0 to 91) { 
-  val (a,b,c) = readcritfile(dir+("train%03d" format i), 1);
-  saveFMat(dir+("trainlabel%03d.fmat.lz4" format i), a);
-  saveIMat(dir+("traindata%03d.imat.lz4" format i), b);
-  saveIMat(dir+("trainnz%03d.imat.lz4" format i), c);
+  val (a,b,c) = readcritfile(dir+("train%02d" format i), 1);
+  saveFMat(dir+("trainlabel%02d.fmat.lz4" format i), a);
+  saveIMat(dir+("traindata%02d.imat.lz4" format i), b);
+  saveIMat(dir+("trainnz%02d.imat.lz4" format i), c);
   print(".")
 }
 
 println("\nreading and converting test data")
 for (i <- 0 to 12) { 
-  val (a,b,c) = readcritfile(dir+("test%03d" format i), 0);
-  saveFMat(dir+("testlabel%03d.fmat.lz4" format i), b);
-  saveIMat(dir+("testdata%03d.imat.lz4" format i), b);
-  saveIMat(dir+("testnz%03d.imat.lz4" format i), c);
+  val (a,b,c) = readcritfile(dir+("test%02d" format i), 0);
+  saveIMat(dir+("testdata%02d.imat.lz4" format i), b);
+  saveIMat(dir+("testnz%02d.imat.lz4" format i), c);
   print(".")
 }
+
+System.exit(0)

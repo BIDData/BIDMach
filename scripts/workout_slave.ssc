@@ -105,7 +105,7 @@ opts11.useGPU = useGPU
 opts11.nend = 10
 
 opts11.nsamps = 32
-opts11.nnodes = 50000
+opts11.nnodes = 80000
 opts11.nbits = 16
 mm11.train
 } 

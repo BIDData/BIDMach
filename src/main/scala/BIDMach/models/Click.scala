@@ -201,7 +201,7 @@ object Click  {
   
   class FsOpts extends Learner.Options with Click.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(fpattern, 0, 1)), d)
+  def learner(fpattern:String, d:Int):(Learner, FsOpts) = learner(List(FileSource.simpleEnum(fpattern, 1, 0)), d)
   
   /** Online Variational Bayes Click algorithm with a files dataSource. */
   def learner(fnames:List[(Int)=>String], d:Int):(Learner, FsOpts) = { 
@@ -276,7 +276,7 @@ object Click  {
   
   class SFDSopts extends ParLearner.Options with Click.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 0, 1)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 1, 0)), d);
   
   /** Parallel online Click algorithm with one file datasource. */
   def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {

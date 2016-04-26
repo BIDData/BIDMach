@@ -175,7 +175,7 @@ object LDA  {
   
   def learner(fpattern:String):(Learner, FileOpts) = learner(fpattern, 256)
   
-  def learner(fpattern:String, d:Int):(Learner, FileOpts) = learner(List(FileSource.simpleEnum(fpattern, 0, 1)), d)
+  def learner(fpattern:String, d:Int):(Learner, FileOpts) = learner(List(FileSource.simpleEnum(fpattern, 1, 0)), d)
   
   /** Online Variational Bayes LDA algorithm with a files dataSource. */
   def learner(fnames:List[(Int)=>String], d:Int):(Learner, FileOpts) = { 
@@ -256,7 +256,7 @@ object LDA  {
   
   class SFDSopts extends ParLearner.Options with LDA.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 0, 1)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 1, 0)), d);
   
   /** Parallel online LDA algorithm with one file datasource. */
   def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {

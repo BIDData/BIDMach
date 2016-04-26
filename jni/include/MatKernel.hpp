@@ -54,9 +54,9 @@ int multinomial(int nrows, int ncols, float *A, int *B, float *Norm, int nvals);
 
 int multinomial2(int nrows, int ncols, float *A, int *B, int nvals);
 
-int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, 
-                float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
-                float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);
+int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, float *MM, float *Sumsq, 
+                float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen, float *texp, int texplen, 
+                float istep, int addgrad, float epsilon, int biasv, int nbr);
 
 int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose, 
                     float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
@@ -88,3 +88,9 @@ int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *mome
 
 int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr,
 	     float nw, float *ve, int nve, float *ts, int nts, float *lrate, int nlrate, float langevin, float eps, int doupdate);
+
+int lstm_fwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, float *outC, float *outH, int n);
+
+int lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, float *doutC, float *doutH, 
+             float *dinC, float *dLIN1, float *dLIN2, float *dLIN3, float *dLIN4, int n);
+

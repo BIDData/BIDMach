@@ -749,8 +749,7 @@ object GLM {
     mopts.lrate = 1f;
     val model = new GLM(mopts);
     mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
-    implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FileSource(mopts)(ec);    
+    val ds = new FileSource(mopts);    
     val mm = new Learner(
         ds, 
         model, 
@@ -768,8 +767,7 @@ object GLM {
     mopts.aopts = mopts;
     val model = new GLM(mopts);
     mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
-    implicit val ec = threadPool(fnames.length + 2);
-    val ds = new FileSource(mopts)(ec);    
+    val ds = new FileSource(mopts);    
     val mm = new Learner(
         ds, 
         model, 

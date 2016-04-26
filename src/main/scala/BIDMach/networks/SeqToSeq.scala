@@ -190,7 +190,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       	row(score/(dstxn-1));
       } else {
       	if (ogmats != null) {
-      		ogmats(0) = srcGrid(height+preamble_rows-1, srcGrid.ncols-1).output.asMat;
+      	  var embedding = srcGrid(height+preamble_rows-1, srcGrid.ncols-1).output.asMat;
+      	  for (j <- 1 until opts.nembed) {
+      	    embedding = embedding on srcGrid(height-j+preamble_rows-1, srcGrid.ncols-1).output.asMat;
+      	  }
+      		ogmats(0) = embedding;
       	}
       	zeros(1,1);
       }
@@ -216,7 +220,8 @@ object SeqToSeq {
     var scoreType = 0;   // Score type, 0 = LL, 1 = accuracy, 2 = LL of full Softmax, 3 = accuracy of full Softmax
     var nsamps = 100;    // Number of negative samples
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
-    var embed = false;
+    var embed = false;   // Whether to compute an embedding (vs. a model)
+    var nembed = 1;      // number of layers (counted from the top) to use for the embedding
     
   }
   

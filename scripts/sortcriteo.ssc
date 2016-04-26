@@ -1,0 +1,52 @@
+val ntrain = 92
+val ntest = 13
+val ndense = 2*ntest+1;
+val dir = "../data/criteo/parts/";
+ 
+println("\nCounting features");
+val x= loadSMat(dir+"train00.smat.lz4");
+val nfeats = x.nrows;
+val counts = dzeros(nfeats,1);
+val counts2 = dzeros(nfeats,1);
+
+for (i <- 0 until (ntrain+ntest)) {
+  val a = if (i < ntrain) { 
+    loadSMat(dir+("train%02d.smat.lz4" format i));
+  } else { 
+    loadSMat(dir+("test%02d.smat.lz4" format i-ntrain));
+  }
+  counts ~ counts + DMat(sum(a,2));
+  print(".")
+}
+
+val cmeans = counts / counts(0);
+val cscale = FMat(cmeans);
+cscale(ndense->nfeats) = 1f;
+
+println("\nSorting");
+val (vv, ii0) = sortdown2(counts(ndense->counts.length,0));
+println("\nMapping");
+
+val iperm = icol(0->ndense) on (ii0 + ndense);
+saveIMat(dir+"permutation.imat.lz4", iperm);
+val uperm = invperm(iperm);
+
+for (i <- 0 until (ntrain+ntest)) {
+  val a = if (i < ntrain) { 
+    loadSMat(dir+("train%02d.smat.lz4" format i));
+  } else { 
+    loadSMat(dir+("test%02d.smat.lz4" format i-ntrain));
+  }
+  val (ii, jj, vv) = find3(a);
+  val newii = uperm(ii);
+  val b = sparse(newii, jj, vv / cscale(newii), a.nrows, a.ncols);
+  b.check;
+  if (i < ntrain) { 
+    saveSMat(dir+("trainsorted%02d.smat.lz4" format i), b/cscale);
+  } else { 
+    saveSMat(dir+("testsorted%02d.smat.lz4" format i-ntrain), b/cscale);
+  }
+  counts2 ~ counts2 + DMat(sum(b,2));
+  print(".")
+}
+saveDMat(dir+"sortedfeaturecounts.dmat.lz4", counts2)
