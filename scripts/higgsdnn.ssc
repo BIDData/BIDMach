@@ -12,7 +12,7 @@ opts.lrate = 0.01f;
 opts.texp = 0.4f;
 opts.evalStep = 311;
 opts.nweight = 1e-4f
-val net = Net.dnodes3(12, 500, 0.6f, 1, opts, 2);
+val net = Net.dnodes3(4, 500, 0.6f, 1, opts, 2);
 opts.nodeset = net
 
 val model = nn.model.asInstanceOf[Net]
