@@ -48,10 +48,6 @@ class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTes
 		1.0f
 	}
 
-	// generate the random X_corr
-	def generateRandomXcorr:Double = {
-		0.0f
-	}
 
 	// compute the value of the delta
 	def delta:Double = {
@@ -82,6 +78,11 @@ object MHTest {
 	      opts)
 	    (nn, opts)
 	}
+
+	def Ecdf(x: FMat, ecdfmat: FMat, hash:FMat) = {
+		val ecdf = new Ecdf(x, ecdfmat, hash)
+		ecdf
+	}
 }
 
 abstract class Proposer() {
@@ -101,3 +102,48 @@ abstract class Proposer() {
 		null
 	}
 }
+
+// Class of the emprical cdf of X_corr, there should be three
+// matrix to hold the data computed from the matlab
+// there are pre-computed txt file at /data/EcdfForMHtest
+
+class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
+	var sd:Double = 1.0f
+	var ratio:Double = 0.995f
+	var f:FMat = null
+	
+	def init(sd:Double, ratio:Double=0.995) = {
+		// looking for the closest index in the hash
+		var index:Int = (ratio * hash.ncols.toDouble).toInt;
+		if (index >= hash.ncols) {
+			index = hash.ncols - 1
+		}
+		f = ecdfmat(?,index)
+	}
+
+	def generateXcorr : Double = {
+		var u:Float = rand(1,1)(0,0)
+		//println(u)
+		binarySearch(u)
+	}
+
+	def binarySearch(u:Float) : Double = {
+		var start : Int = 0
+		var end : Int = f.nrows - 1
+		var mid : Int = 0
+		while (end > start + 1) {
+			mid = (start + end) / 2
+			//println("start: " + start + ", end: "+ end + ", mid: " + mid + " val:"+ f(mid))
+			if (u < f(mid)) {
+				end = mid;
+			} else if (u > f(mid)) {
+				start = mid;
+			} else {
+				return x(mid) * sd
+			}
+		}
+		//println("start: " + start + ", end: "+ end)
+		(x(start) + x(end))/2 * sd
+	}
+}
+
