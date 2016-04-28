@@ -103,6 +103,35 @@ abstract class Proposer() {
 	}
 }
 
+class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer() {
+	var step:Float = 1.0f
+	var candidate:Array[Mat] = null
+	def init() = {
+		// init the candidate container
+		// the candidate should have the same shape of the model.modelmats
+		// here assume the model.modelmats are already initalized
+		candidate = new Array[Mat](model.modelmats.length);
+		for (i <- 0 until candidate.length) {
+			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+		}
+	}
+	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long) {
+		// shadow copy the parameter value to the model's mat
+		model.setmodelmats(modelmats);
+
+		// compute the gradient
+		model.dobatch(gmats, ipass, pos)
+		// sample the new model parameters by the gradient and the stepsize
+		// and store the sample results into the candidate array
+		
+	}
+
+	override def proposeProb(old_modelmats:Array[Mat], new_modelmats:Array[Mat]) {
+
+	}
+}
+
+
 // Class of the emprical cdf of X_corr, there should be three
 // matrix to hold the data computed from the matlab
 // there are pre-computed txt file at /data/EcdfForMHtest
