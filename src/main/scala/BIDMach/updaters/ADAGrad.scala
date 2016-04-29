@@ -321,7 +321,8 @@ object ADAGrad {
         }
       }
       case _ => {
-        val grad0 = a *^ b;
+        val grad0 = mm + 0;
+        a.madd(b, grad0, false, true);
         val grad = if (hasBias) grad0 \ sum(a,2) else grad0;
         sumSq ~ sumSq + (grad ∘ grad);
         sumSq ~ sumSq + eps;
