@@ -309,6 +309,28 @@ __forceinline__ __device__ void __gupdate(float grad, int i, int ihere, int jher
   }
 }
 
+__forceinline__ __device__ void __gupdateTile(float grad, int i, int ihere, int jhere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                                              float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon, int x) {
+  float lr, ve, te, pve, ste, ngrad;
+  Sumsq[ihere] += grad * grad + epsilon;
+  if (addgrad) {
+    lr =  (lrlen > 1) ? lrate[i+x] : lrate[0];
+    ve =  (vexplen > 1) ? vexp[i+x] : vexp[0];
+    te =  (texplen > 1) ? texp[i+x] : texp[0];
+    pve = (ve == 0) ? 1.0f : pow(Sumsq[ihere] * istep, ve);
+    ste = pow(istep, te);
+    ngrad = grad * lr * ste / pve;
+    atomicAdd(&MM[ihere], ngrad);
+  }
+  if (Mask != NULL) {
+    if (maskrows > 1) {
+      if (Mask[ihere] == 0) MM[ihere] = 0;
+    } else {
+      if (Mask[jhere] == 0) MM[ihere] = 0;
+    }
+  }
+}
+
 
 __global__ void __multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, float *MM, 
                               float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen, 
@@ -421,16 +443,18 @@ __global__ void __multADAGradTile(int nrows, int ncols, int y, int x, int nnz, f
       aval = 0;
       for (j = jstart; j < jend ; j++) {
         if (j == jstart || Bic[j-1] != Bic[j]) {
-          aval = A[i + nrows * Bic[j]];
+          aval = A[i + y + lda * Bic[j]];
           grad = aval;
           ihere = i + nrows * nbr;
           jhere = nbr;
-          __gupdate(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+          __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
         }
         grad = aval * Bdata[j];
-        ihere = i + nrows * Bir[j];
-        jhere = Bir[j];
-        __gupdate(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+        jhere = Bir[j] - x;
+        if (jhere >= 0 && jhere < ncols) {
+          ihere = i + nrows * jhere;
+          __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+        }
       }
     } 
   } else {
@@ -438,12 +462,14 @@ __global__ void __multADAGradTile(int nrows, int ncols, int y, int x, int nnz, f
       aval = 0;
       for (j = jstart; j < jend ; j++) {
         if (j == jstart || Bic[j-1] != Bic[j]) {
-          aval = A[i + nrows * Bic[j]];
+          aval = A[i + y + lda * Bic[j]];
         }
         grad = aval * Bdata[j];
-        ihere = i + nrows * Bir[j];
-        jhere = Bir[j];
-        __gupdate(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+        jhere = Bir[j] - x;
+        if (jhere >= 0 && jhere < ncols) {
+          ihere = i + nrows * jhere;
+          __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+        }
       }
     } 
   }
@@ -463,16 +489,18 @@ __global__ void __multADAGradxTile(int nrows, int ncols, int y, int x, int nnz, 
   if (biasv > 0) {
     for (j = jstart; j < jend ; j++) {
       if (j == jstart || Bic[j-1] != Bic[j]) {
-        aval = A[i + nrows * Bic[j]];
+        aval = A[i + y + lda * Bic[j]];
         grad = aval;
-        ihere = i + nrows * nbr;
-        jhere = nbr;
-        __gupdate(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+        jhere = nbr - x;
+        ihere = i + nrows * jhere;
+        __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
       }
       grad = aval * Bdata[j];
-      ihere = i + nrows * Bir[j];
-      jhere = Bir[j];
-      __gupdate(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+      jhere = Bir[j] - x;
+      if (jhere >= 0 && jhere < ncols) {
+        ihere = i + nrows * jhere;
+        __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+      }
     }
   } else {
     for (j = jstart; j < jend ; j++) {
@@ -480,9 +508,11 @@ __global__ void __multADAGradxTile(int nrows, int ncols, int y, int x, int nnz, 
         aval = A[i + nrows * Bic[j]];
       }
       grad = aval * Bdata[j];
-      ihere = i + nrows * Bir[j];
-      jhere = Bir[j];
-      __gupdate(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+      jhere = Bir[j] - x;
+      if (jhere >= 0 && jhere < ncols) {
+        ihere = i + nrows * jhere;
+        __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+      }
     }
   }
 }
