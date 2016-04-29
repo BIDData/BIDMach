@@ -79,26 +79,37 @@ object MHTest {
 	    (nn, opts)
 	}
 
+	// just for testing
 	def Ecdf(x: FMat, ecdfmat: FMat, hash:FMat) = {
 		val ecdf = new Ecdf(x, ecdfmat, hash)
 		ecdf
 	}
+
+	// for testing
+	def Langevin_Proposer(init_step:Float, model:Model) = {
+		val lp = new Langevin_Proposer(init_step, model)
+		lp
+	}
+
+	// create a fully connected nn model, just model,
+	// not learner
+	// TODO: We need to write this function so that it can generate a model, 
+	// which we can use to compute the jump prob and loss.
+	def constructNNModel(nslabs:Int, width:Int, taper:Float, ntargs:Int, nonlin:Int = 1):Model = {
+		null
+	}
+
 }
 
 abstract class Proposer() {
 
 	// init the proposer class.
-	def init() = {
+	def init():Unit = {
 
 	}
 
-	// Function to compute the Pr(theta' | theta_t)
-	def proposeProb(): Double = {
-		1.0f
-	}
-
-	// Function to propose the next parameter, i.e. theta'
-	def proposeNext():Array[Mat] = {
+	// Function to propose the next parameter, i.e. theta' and the delta
+	def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		null
 	}
 }
@@ -106,7 +117,9 @@ abstract class Proposer() {
 class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer() {
 	var step:Float = 1.0f
 	var candidate:Array[Mat] = null
-	def init() = {
+	var learning_rate:Float = 0.75f
+
+	override def init():Unit = {
 		// init the candidate container
 		// the candidate should have the same shape of the model.modelmats
 		// here assume the model.modelmats are already initalized
@@ -115,7 +128,7 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
 		}
 	}
-	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long) {
+	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		// shadow copy the parameter value to the model's mat
 		model.setmodelmats(modelmats);
 
@@ -123,12 +136,39 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		model.dobatch(gmats, ipass, pos)
 		// sample the new model parameters by the gradient and the stepsize
 		// and store the sample results into the candidate array
+		val stepi = init_step / step ^ learning_rate;
+		for (i <- 0 until candidate.length) {
+			candidate(i) ~ modelmats(i) - stepi / 2 * model.updatemats(i) + dnormrnd(0, (stepi ^ 0.5)(0,0), modelmats(i).nrows, modelmats(i).ncols)
+		}
+		step += 1.0f
 		
+		// compute the delta
+		// loss_mat is a (ouput_layer.length, 1) matrix
+		var loss_mat_prev = model.evalbatch(gmats, ipass, pos)
+		val loss_prev:Float = ln(sum(loss_mat_prev))(0,0)
+		// compute the log likelihood of the proposal prob
+		// here I ignore the constants
+
+		var loglik_prev_to_new = 0.0
+		var loglik_new_to_prev = 0.0
+		for (i <- 0 until candidate.length) {
+			loglik_prev_to_new += (-1.0*sum(sum((candidate(i) - (modelmats(i) - stepi / 2.0 * model.updatemats(i)))^2)) / 2 / stepi).dv
+		}
+
+		// jump from the candidate for one more step
+		model.setmodelmats(candidate)
+		model.dobatch(gmats, ipass, pos)
+		loss_mat_prev = model.evalbatch(gmats, ipass, pos)
+		val loss_new:Float = ln(sum(loss_mat_prev))(0,0)
+
+		for (i <- 0 until candidate.length) {
+			loglik_new_to_prev += + (-1.0*sum(sum((modelmats(i) - (candidate(i) - stepi / 2.0 * model.updatemats(i)))^2)) / 2 / stepi).dv
+		}
+		val delta = (-loss_new) - (-loss_prev) + loglik_new_to_prev - loglik_prev_to_new
+		(candidate, delta)
 	}
 
-	override def proposeProb(old_modelmats:Array[Mat], new_modelmats:Array[Mat]) {
 
-	}
 }
 
 
