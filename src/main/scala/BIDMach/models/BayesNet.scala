@@ -38,7 +38,7 @@ class BayesNet(val dag:Mat,
     var colorInfo:Array[ColorGroup] = null    // Gives us, for each color, a colorStuff class (of arrays).
     var zeroMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a zero matrix (to avoid allocation).
     var randMap:HashMap[(Int,Int),Mat] = null // Map from (nr,nc) -> a rand matrix (to avoid allocation).
-    var normConstMatrix:Mat = null            // Normalizes the cpt. Do cpt / (cpt.t * nConstMat).t.
+    var normMat:Mat = null                    // Normalizes a counts vector K by doing K / (K.t * normMat *^ normMat).t.
     var useGPUnow:Boolean = false             // Checks (during initialization only) if we're using GPUs or not.
     var batchSize:Int = -1                    // Holds the batchSize, which we use for some colorInfo matrices.
     
@@ -92,9 +92,9 @@ class BayesNet(val dag:Mat,
         val lengthCPT = sum(numSlotsInCpt).dv.toInt
         val cpt = convertMat(rand(lengthCPT,1) + opts.initSmoothFactor)
         
-        // To finish building CPT, we normalize it using the normalizing constant matrix.
-        normConstMatrix = getNormConstMatrix(lengthCPT)
-        cpt <-- ( cpt / (cpt.t * normConstMatrix).t )
+        // To finish CPT/counts, we normalize using a "factored form" of normalizing.
+        normMat = getNormConstMatrix(lengthCPT)
+        cpt <-- ( cpt / (cpt.t * normMat *^ normMat).t )
         setmodelmats(new Array[Mat](1))
         modelmats(0) = cpt
         mm = modelmats(0)
@@ -266,7 +266,7 @@ class BayesNet(val dag:Mat,
         val t13 = toc;
         runtimes(8) += t13 - t12;
 
-        updatemats(0) <-- (counts3 / (counts3.t * normConstMatrix).t);
+        updatemats(0) <-- (counts3 / (counts3.t * normMat *^ normMat).t);
         val t14 = toc;
         runtimes(9) += t14 - t13;
 
@@ -485,9 +485,7 @@ class BayesNet(val dag:Mat,
   }
  
     /**
-     * UPDATE 04/25/16: I have code ready to compute the 'P' matrix below, but I can't do P *^ P.
-     *
-     * Creates matrix P such that, if our cpt is a ROW vector of COUNTS, then we NORMALIZE it by:
+     * Creates a matrix P such that, if our cpt is a ROW vector of COUNTS, then we NORMALIZE it by:
      *
      * cpt <-- (cpt / (cpt * P *^ P))
      *
@@ -504,66 +502,33 @@ class BayesNet(val dag:Mat,
      * @param cptLength The number of components in the CPT.
      */
     def getNormConstMatrix(cptLength : Int) : Mat = {
-
-        // I WANT to use the following:
-        /*
-         * var numDistributions = 0
-         * var jj = izeros(1,1)
-         *
-         * for (k <- 0 until graph.n) {
-         *     var offset = cptOffset(k).dv.toInt
-         *     val numStates = statesPerNode(k).dv.toInt
-         *     val parentIndices = find(SMat(graph.dag)(?,k))
-         *
-         *     // Split based on no parents (one distribution) or >0 parents (>=2 distributions)
-         *     if (parentIndices.length == 0) {
-         *         jj = jj on ( iones(numStates,1) * numDistributions )
-         *         numDistributions += 1
-         *     } else {
-         *         val totalParentSlots = prod(IMat(statesPerNode)(parentIndices)).dv.toInt
-         *         for (i <- 0 until totalParentSlots) {
-         *             jj = jj on ( iones(numStates,1) * numDistributions )
-         *             numDistributions += 1
-         *         }
-         *     }
-         * }
-         *
-         * 
-         * // Form our matrix using the standard 'sparse' method and return depending on GPU usage.
-         * val P = sparse( (0 until cptLength) , jj(1 until jj.length) , ones(jj.length-1, 1) , cptLength, numDistributions)
-         * if (useGPUnow) { 
-         *     return GSMat(P) 
-         * } else {
-         *     return P
-         * }
-         */
-
-        // But I have to use this instead:
-        var ii = izeros(1,1)
+        var numDistributions = 0
         var jj = izeros(1,1)
-        for (i <- 0 until graph.n-1) {
-          var offset = IMat(cptOffset)(i)
-          val endOffset = IMat(cptOffset)(i+1)
-          val ns = statesPerNode(i).dv.toInt
-          var indices = find2(ones(ns,ns))
-          while (offset < endOffset) {
-            ii = ii on (indices._1 + offset)
-            jj = jj on (indices._2 + offset)
-            offset = offset + ns
-          }
+        
+        for (k <- 0 until graph.n) {
+            var offset = cptOffset(k).dv.toInt
+            val numStates = statesPerNode(k).dv.toInt
+            val parentIndices = find(SMat(graph.dag)(?,k))
+        
+            // Split based on no parents (one distribution) or >0 parents (>=2 distributions)
+            if (parentIndices.length == 0) {
+                jj = jj on ( iones(numStates,1) * numDistributions )
+                numDistributions += 1
+            } else {
+                val totalParentSlots = prod(IMat(statesPerNode)(parentIndices)).dv.toInt
+                for (i <- 0 until totalParentSlots) {
+                    jj = jj on ( iones(numStates,1) * numDistributions )
+                    numDistributions += 1
+                }
+            }
         }
-        var offsetLast = IMat(cptOffset)(graph.n-1)
-        var indices = find2(ones(statesPerNode.asInstanceOf[IMat](graph.n-1), statesPerNode.asInstanceOf[IMat](graph.n-1)))
-        while (offsetLast < cptLength) {
-          ii = ii on (indices._1 + offsetLast)
-          jj = jj on (indices._2 + offsetLast)
-          offsetLast = offsetLast + statesPerNode.asInstanceOf[IMat](graph.n-1)
-        }
-        val res = sparse(ii(1 until ii.length), jj(1 until jj.length), ones(ii.length-1,1), cptLength, cptLength)
-        if (useGPUnow) { // Note that here we have to transpose!
-          return GSMat(res.t) 
+        
+        // Form our matrix using the standard 'sparse' method and return depending on GPU usage.
+        val P = sparse( (0 until cptLength) , jj(1 until jj.length) , ones(jj.length-1, 1) , cptLength, numDistributions)
+        if (useGPUnow) { 
+            return GSMat(P) 
         } else {
-          return res.t
+            return P
         }
     }
    
@@ -618,7 +583,7 @@ class BayesNet(val dag:Mat,
 
     // EDIT: let's just make a copy of the cpt here
     val cptCopy = mm + 0
-    cptCopy <-- (cptCopy / (cptCopy.t * normConstMatrix).t);
+    cptCopy <-- (cptCopy / (cptCopy.t * normMat *^ normMat).t);
 
     var klDivergence = convertMat(float(0))
     var numDistributions = 0
@@ -668,7 +633,7 @@ class BayesNet(val dag:Mat,
     println("\nCPT for node indexed at " + nodeID)
     val startingOffset = cptOffset(nodeID)
     val numStates = statesPerNode(nodeID).dv.toInt
-    val normalizedCPT = ( mm / (mm.t * normConstMatrix).t )
+    val normalizedCPT = ( mm / (mm.t * normMat *^ normMat).t )
     val parentIndices = find(SMat(graph.dag)(?,nodeID))
     println("Parents: " + parentIndices.t)
     
