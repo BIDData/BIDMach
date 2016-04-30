@@ -62,6 +62,9 @@ int multADAGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int l
                     float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen, 
                     float *texp, int texplen, float istep, int addgrad, float epsilon, int biasv, int nbr);
 
+int multGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda, float *Bdata, int *Bir, int *Bic, float *MM, 
+                 float *Mask, int maskrows, float *lrate, int lrlen, float limit, int biasv, int nbr);
+
 int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose, 
                     float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                     float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);
