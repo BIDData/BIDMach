@@ -1,9 +1,10 @@
 package BIDMach.updaters
  
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
+import edu.berkeley.bid.CUMACH
 
 class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   
@@ -132,6 +133,50 @@ object Grad {
   
   class Options extends Opts {}
   
+  
+  def multUpdate(a:Mat, b:Mat, mm:Mat, mask:Mat, lrate:Mat, texp:Mat, step:Float, limit:Float):Unit = 
+    multUpdate(a, b, mm, mask, lrate, texp, step, limit, false);
+  
+  def multUpdate(a:Mat, b:Mat, mm:Mat, mask:Mat, lrate:Mat, texp:Mat, step:Float, limit:Float, hasBias:Boolean):Unit = {
+  		val istep = 1f/step;
+  		val nr = a.nrows;
+  		val nc = b.ncols;
+  		val nbr = b.nrows;
+  		val biasv = if (hasBias) 1 else 0;
+  		val te = texp + 0f;
+  		te.set(istep);
+  		te ~ te ^ texp;
+  		val lr = lrate ∘ te;
+  		(a, b, mm, lr) match {
+  		case (ga:GMat, gb:GSMat, gmm:GMat, glr:GMat) => {
+  			val maskdata = if (mask != null) mask.asInstanceOf[GMat].data else null;
+  			val masklen = if (mask != null) mask.length else 0; 
+  			CUMACH.multGradTile(nr, nc, 0, 0, b.nnz, ga.data, a.nrows, gb.data, gb.ir, gb.ic, 
+  			    gmm.data, maskdata, masklen, glr.data, lr.length, limit, biasv, nbr);
+  		}
+  		case (ga:GMat, gb:GSMat, tmm:TMat, glr:GMat) => {
+  			val maskdata = if (mask != null) mask.asInstanceOf[GMat].data else null;
+  			val masklen = if (mask != null) mask.length else 0; 
+  			for (i <- 0 until tmm.tiles.length) {
+  				val tile = tmm.tiles(i).asInstanceOf[GMat];
+  				CUMACH.multGradTile(tile.nrows, tile.ncols, tmm.y(i), tmm.x(i), b.nnz, ga.data, a.nrows, gb.data, gb.ir, gb.ic, 
+  						tile.data, maskdata, masklen, glr.data, lr.length, limit, biasv, nbr);
+  			}
+  		}
+  		case _ => {
+  			val grad0 = mm + 0;
+  			a.madd(b, grad0, false, true);
+  			val grad = if (hasBias) grad0 \ sum(a,2) else grad0;
+  			if (limit > 0) {
+  			  min(grad, limit, grad);
+  			  max(grad, -limit, grad);
+  			}
+  			grad ~ grad ∘ lr;
+  			mm ~ mm + grad;
+  		}
+  		}
+  }
+ 
   def PWlinear(segments:FMat):(Float, Float) => Float = {
     (nsteps:Float, gprogress:Float) => {
       var i = 1;
