@@ -150,17 +150,18 @@ object Grad {
   		(a, b, mm, lr) match {
   		case (ga:GMat, gb:GSMat, gmm:GMat, glr:GMat) => {
   			val maskdata = if (mask != null) mask.asInstanceOf[GMat].data else null;
-  			val masklen = if (mask != null) mask.length else 0; 
+  			val masknr = if (mask != null) mask.nrows else 0; 
   			CUMACH.multGradTile(nr, nc, 0, 0, b.nnz, ga.data, a.nrows, gb.data, gb.ir, gb.ic, 
-  			    gmm.data, maskdata, masklen, glr.data, lr.length, limit, biasv, nbr);
+  			    gmm.data, maskdata, masknr, glr.data, lr.length, limit, biasv, nbr);
   		}
   		case (ga:GMat, gb:GSMat, tmm:TMat, glr:GMat) => {
-  			val maskdata = if (mask != null) mask.asInstanceOf[GMat].data else null;
-  			val masklen = if (mask != null) mask.length else 0; 
   			for (i <- 0 until tmm.tiles.length) {
   				val tile = tmm.tiles(i).asInstanceOf[GMat];
+  				val maskmat = if (mask != null) mask.asInstanceOf[TMat].tiles(i).asInstanceOf[GMat] else null;
+  				val masknr = if (mask != null) maskmat.nrows else 0;
+  				val maskdata = if (mask != null) maskmat.data else null;
   				CUMACH.multGradTile(tile.nrows, tile.ncols, tmm.y(i), tmm.x(i), b.nnz, ga.data, a.nrows, gb.data, gb.ir, gb.ic, 
-  						tile.data, maskdata, masklen, glr.data, lr.length, limit, biasv, nbr);
+  						tile.data, maskdata, masknr, glr.data, lr.length, limit, biasv, nbr);
   			}
   		}
   		case _ => {
