@@ -325,7 +325,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     for (i <- 0 until opts.lookahead) {
       prefetchTasks(i).cancel(true);
     }
-    executor.shutdown();
+    if (executor != null) executor.shutdown();
   }
 }
 

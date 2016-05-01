@@ -18,16 +18,16 @@ val (nn,opts) = Net.learnerX(a,c);
 opts.aopts = opts
 opts.batchSize=200
 opts.reg1weight = 0.0001
-opts.npasses = 1
+opts.npasses = 2
 opts.hasBias = true
 opts.links = iones(100,1);
 opts.lrate = 0.4f // best for 6-layer
-opts.lrate = 0.2f 
-opts.texp = 0.4f
+opts.lrate = 0.01f 
+opts.texp = 0.3f
 opts.nweight = 1e-4f
 //opts.useGPU = false
 
-val net = Net.dnodes4(7,500,0.5f,100,opts,2);
+val net = Net.dnodes4(2,500,0.5f,100,opts,2);
 opts.nodeset = net
 
 val dnn = nn.model.asInstanceOf[Net]
