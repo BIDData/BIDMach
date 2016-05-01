@@ -6,24 +6,63 @@ import BIDMat.SciFunctions._
 import BIDMach.datasources._
 import BIDMach.updaters._
 import BIDMach._
+import BIDMach.networks._
 
 import java.text.NumberFormat
 import edu.berkeley.bid.CUMACH._
 import scala.collection.mutable._
 
-class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTest.Opts = new MHTest.Options) extends Model(opts) {
+class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val ecdfmat: FMat, val hash_ecdf:FMat, 
+	override val opts:MHTest.Opts = new MHTest.Options) extends Model(opts) {
 
 	parent_model = objective
+	var ecdf:Ecdf = new Ecdf(x_ecdf, ecdfmat, hash_ecdf)
+	var delta:Double = 1.0
+	var is_estimte_sd: Boolean = true
+	var var_estimate_mat:FMat = zeros(1, opts.num_iter_estimate_var)
+	var estimated_sd:Double = 1.0
 	// TODO: init the MHTest, estimate the variance of
 	// delta here. And load the distribution of X_corr
 	// And we should put the parameters in 
 	// _modelmats:Arrya[Mat]
-	override def init() = {}
+	override def init() = {
+		// init the ecdf
+		// ecdf = new Ecdf(x_ecdf, ecdfmat, hash_ecdf)
+
+		// init the var_estimate_mat container
+		// var_estimate_mat = zeros(1, opts.num_iter_estimate_var)
+		is_estimte_sd = true
+
+		// init the proposer class
+		proposer.init()
+
+		// TODO: check whether we need to init the modelmats here
+	}
 
 	// call proposer to get the theta',
 	// then generate a x_corr from distribution of X_corr
 	// Then decide whether to replace (i.e. accpet) _modelmats 
 	override def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+		if (ipass == opts.num_iter_estimate_var) {
+			// compute the var for the delta
+			estimated_sd = (variance(var_estimate_mat)^0.5).dv
+			// init the ecdf
+			ecdf.init(estimated_sd, opts.ratio_decomposite)
+			is_estimte_sd = false
+		}
+		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(modelmats, mats, ipass, here)
+		if (is_estimte_sd) {
+			var_estimate_mat(0,ipass) = delta
+		} else{
+			// do the test
+			var x_corr = ecdf.generateXcorr
+			if (x_corr + delta > 0) {
+				// accpet the candiate
+				for (i <- 0 until modelmats.length) {
+					modelmats(i) ~ next_mat(i)
+				}
+			}
+		}
 
 	}
 
@@ -38,21 +77,6 @@ class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTes
 
 	// help methods
 
-	// load the distribution of X_corr with known sigma
-	def loadDistribution = {
-
-	}
-
-	// estimate the sd of the delta
-	def estimateSd:Double = {
-		1.0f
-	}
-
-
-	// compute the value of the delta
-	def delta:Double = {
-		0.0f
-	}
 	
 }
 
@@ -60,18 +84,21 @@ class MHTest(var objective:Model, val proposer:Proposer, override val opts:MHTes
 object MHTest {
 	trait  Opts extends Model.Opts {
 		// TODO: define the parameters here
+		var num_iter_estimate_var:Int = 1000
+		// var batchSize:Int = 200 // the parents class already has it
+		var ratio_decomposite:Double = 0.994
 	}
 
 	class Options extends Opts {}
 
-	def learner(data:Mat, model:Model, proposer:Proposer) = {
+	def learner(data:Mat, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat) = {
 		class xopts extends Learner.Options with MHTest.Opts with MatSource.Opts with IncNorm.Opts 
 	    val opts = new xopts
 	    // TODO: define the parameters for the opts
 
 	    val nn = new Learner(
 	      new MatSource(Array(data:Mat), opts),
-	      new MHTest(model, proposer, opts),
+	      new MHTest(model, proposer, x_ecdf, ecdfmat, hash_ecdf, opts),
 	      null,
 	      new IncNorm(opts),
 	      null,
@@ -95,9 +122,13 @@ object MHTest {
 	// not learner
 	// TODO: We need to write this function so that it can generate a model, 
 	// which we can use to compute the jump prob and loss.
-	def constructNNModel(nslabs:Int, width:Int, taper:Float, ntargs:Int, nonlin:Int = 1, mat0:Mat, targ:Mat):Model = {
-		val (nn, opts) = Net.learner(mat0, targ)
-		opts.nend = 10
+	def constructNNModel(nslabs:Int, width:Int, taper:Float, ntargs:Int, nonlin:Int = 1):Model = {
+		val opts = new Net.LearnOptions
+		if (opts.links == null) {
+     		opts.links = izeros(1,1);
+      		opts.links.set(1);
+    	}
+		// opts.nend = 10
 		opts.npasses = 50
 		opts.batchSize = 200
 		opts.reg1weight = 0.0001;
@@ -107,10 +138,11 @@ object MHTest {
 		opts.texp = 0.4f;
 		opts.evalStep = 311;
 		opts.nweight = 1e-4f
-		val net = Net.dnodes3(4, 500, 0.6f, 1, opts, 2);
+		val net = Net.dnodes3(nslabs, width, taper, ntargs, opts, nonlin);
 		opts.nodeset = net
 
-		val model = nn.model.asInstanceOf[Net]
+		val model = new Net(opts)
+		model
 	}
 
 }
