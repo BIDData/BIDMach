@@ -95,8 +95,22 @@ object MHTest {
 	// not learner
 	// TODO: We need to write this function so that it can generate a model, 
 	// which we can use to compute the jump prob and loss.
-	def constructNNModel(nslabs:Int, width:Int, taper:Float, ntargs:Int, nonlin:Int = 1):Model = {
-		null
+	def constructNNModel(nslabs:Int, width:Int, taper:Float, ntargs:Int, nonlin:Int = 1, mat0:Mat, targ:Mat):Model = {
+		val (nn, opts) = Net.learner(mat0, targ)
+		opts.nend = 10
+		opts.npasses = 50
+		opts.batchSize = 200
+		opts.reg1weight = 0.0001;
+		opts.hasBias = true;
+		opts.links = iones(1,1);
+		opts.lrate = 0.01f;
+		opts.texp = 0.4f;
+		opts.evalStep = 311;
+		opts.nweight = 1e-4f
+		val net = Net.dnodes3(4, 500, 0.6f, 1, opts, 2);
+		opts.nodeset = net
+
+		val model = nn.model.asInstanceOf[Net]
 	}
 
 }
