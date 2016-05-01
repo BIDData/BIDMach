@@ -56,7 +56,23 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     mu = mm.zeros(1,1);
   } 
   
+  def clipping() {
+      if (clipByValue>0f) {
+          var i = 0
+          while (i < updatemats.length){
+              updatemats(i)~min(updatemats(i),clipByValue)
+              updatemats(i)~max(updatemats(i),-clipByValue)
+              i+=1
+          }
+      }
+      if (max_grad_norm>0f){
+           
+      }
+          
+  }
+  
 	override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
+	    clipping()
   	val nsteps = if (step == 0) 1f else {
   		if (firstStep == 0f) {
   			firstStep = step;
@@ -129,6 +145,8 @@ object Grad {
     var momentum:FMat = null
     var nesterov:FMat = null
     var langevin = 0f;
+    var clipByValue = -1f
+    var max_grad_norm = -1f
   }
   
   class Options extends Opts {}
