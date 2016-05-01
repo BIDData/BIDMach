@@ -36,5 +36,9 @@ public final class CPUMACH {
   public static native void multADAGrad(int nrows, int ncols, int nnz, float [] A, float [] Bdata, int [] Bir, int [] Bjc, 
   		float [] MM, float [] Sumsq, float [] Mask, int maskrows, float [] lrate, int lrlen,
   		float [] vexp, int vexplen, float [] jtexp, int texplen, float istep, int addgrad, float epsilon, int biasv, int nbr);
+  
+  public static native void multADAGradTile(int nrows, int ncols, int y, int x, int nnz, float [] A, int lda, float [] Bdata, int [] Bir, int [] Bjc, 
+	  		float [] MM, float [] Sumsq, float [] Mask, int maskrows, float [] lrate, int lrlen,
+	  		float [] vexp, int vexplen, float [] jtexp, int texplen, float istep, int addgrad, float epsilon, int biasv, int nbr);
 }
 
