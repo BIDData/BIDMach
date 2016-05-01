@@ -22,6 +22,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	var lrate:Mat = null
 	var mu:Mat = null
 	var randmat:Array[Mat] = null
+	var norm_scaling:Mat = null
 
   override def init(model0:Model) = {
     model = model0;
@@ -57,18 +58,30 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   } 
   
   def clipping() {
-      if (clipByValue>0f) {
+      if (opts.clipByValue>0f) {
           var i = 0
           while (i < updatemats.length){
-              updatemats(i)~min(updatemats(i),clipByValue)
-              updatemats(i)~max(updatemats(i),-clipByValue)
+              updatemats(i)~min(updatemats(i),opts.clipByValue)
+              updatemats(i)~max(updatemats(i),-opts.clipByValue)
               i+=1
           }
       }
-      if (max_grad_norm>0f){
-           
+      if (opts.max_grad_norm>0f){
+        var i=0;
+        var tot = 0.0
+        while(i<updatemats.length){
+            tot+=sum(sum(updatemats(i)*@updatemats(i))).dv
+            i+=1
+        }
+        val scale=opts.max_grad_norm/max(sqrt(tot),opts.max_grad_norm).dv
+        if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1)
+        norm_scaling(0,0) = scale.toFloat
+        i=0;
+        while(i<updatemats.length){
+            updatemats(i)~updatemats(i)*@norm_scaling
+            i+=1
+        }     
       }
-          
   }
   
 	override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
