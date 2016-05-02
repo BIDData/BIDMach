@@ -309,6 +309,28 @@ __forceinline__ __device__ void __gupdate(float grad, int i, int ihere, int jher
   }
 }
 
+__forceinline__ __device__ void __gupdateTile(float grad, int i, int ihere, int jhere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                                              float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon, int x) {
+  float lr, ve, te, pve, ste, ngrad;
+  Sumsq[ihere] += grad * grad + epsilon;
+  if (addgrad) {
+    lr =  (lrlen > 1) ? lrate[i+x] : lrate[0];
+    ve =  (vexplen > 1) ? vexp[i+x] : vexp[0];
+    te =  (texplen > 1) ? texp[i+x] : texp[0];
+    pve = (ve == 0) ? 1.0f : pow(Sumsq[ihere] * istep, ve);
+    ste = pow(istep, te);
+    ngrad = grad * lr * ste / pve;
+    atomicAdd(&MM[ihere], ngrad);
+  }
+  if (Mask != NULL) {
+    if (maskrows > 1) {
+      if (Mask[ihere] == 0) MM[ihere] = 0;
+    } else {
+      if (Mask[jhere] == 0) MM[ihere] = 0;
+    }
+  }
+}
+
 
 __global__ void __multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir, int *Bic, float *MM, 
                               float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen, 
@@ -402,6 +424,230 @@ int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir,
     int nblocks = min(128, ncols);
     __multADAGrad<<<nblocks,nthreads>>>(nrows, ncols, nnz, A, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
                                         vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
+  }
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+
+__global__ void __multADAGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda, float *Bdata, int *Bir, int *Bic, float *MM, 
+                              float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen, 
+                              float *texp, int texplen, float istep, int addgrad, float epsilon, int biasv, int nbr) {
+  float aval, grad;
+  int i, j, ihere, jhere;
+  int jstart = ((long long)blockIdx.x) * nnz / gridDim.x;
+  int jend = ((long long)(blockIdx.x + 1)) * nnz / gridDim.x;
+  if (biasv > 0) {
+    for (i = threadIdx.x; i < nrows; i += blockDim.x) {
+      aval = 0;
+      for (j = jstart; j < jend ; j++) {
+        if (j == jstart || Bic[j-1] != Bic[j]) {
+          aval = A[i + y + lda * Bic[j]];
+          grad = aval;
+          ihere = i + nrows * nbr;
+          jhere = nbr;
+          __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+        }
+        grad = aval * Bdata[j];
+        jhere = Bir[j] - x;
+        if (jhere >= 0 && jhere < ncols) {
+          ihere = i + nrows * jhere;
+          __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+        }
+      }
+    } 
+  } else {
+    for (i = threadIdx.x; i < nrows; i += blockDim.x) {
+      aval = 0;
+      for (j = jstart; j < jend ; j++) {
+        if (j == jstart || Bic[j-1] != Bic[j]) {
+          aval = A[i + y + lda * Bic[j]];
+        }
+        grad = aval * Bdata[j];
+        jhere = Bir[j] - x;
+        if (jhere >= 0 && jhere < ncols) {
+          ihere = i + nrows * jhere;
+          __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+        }
+      }
+    } 
+  }
+}
+
+__global__ void __multADAGradxTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda, float *Bdata, int *Bir, int *Bic, float *MM, 
+                               float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen, 
+                               float *texp, int texplen, float istep, int addgrad, float epsilon, int biasv, int nbr) {
+  float aval, grad;
+  int i, j, ihere, jhere;
+  int bid = threadIdx.y + blockDim.y * blockIdx.x;
+  int nb = blockDim.y * gridDim.x;
+  int jstart = ((long long)bid) * nnz / nb;
+  int jend = ((long long)(bid + 1)) * nnz / nb;
+  i = threadIdx.x;
+  aval = 0;
+  if (biasv > 0) {
+    for (j = jstart; j < jend ; j++) {
+      if (j == jstart || Bic[j-1] != Bic[j]) {
+        aval = A[i + y + lda * Bic[j]];
+        grad = aval;
+        jhere = nbr - x;
+        ihere = i + nrows * jhere;
+        __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+      }
+      grad = aval * Bdata[j];
+      jhere = Bir[j] - x;
+      if (jhere >= 0 && jhere < ncols) {
+        ihere = i + nrows * jhere;
+        __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+      }
+    }
+  } else {
+    for (j = jstart; j < jend ; j++) {
+      if (j == jstart || Bic[j-1] != Bic[j]) {
+        aval = A[i + nrows * Bic[j]];
+      }
+      grad = aval * Bdata[j];
+      jhere = Bir[j] - x;
+      if (jhere >= 0 && jhere < ncols) {
+        ihere = i + nrows * jhere;
+        __gupdateTile(grad, i, ihere, jhere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon, x);
+      }
+    }
+  }
+}
+
+int multADAGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda, float *Bdata, int *Bir, int *Bic, float *MM, 
+                float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, float *vexp, int vexplen, 
+                float *texp, int texplen, float istep, int addgrad, float epsilon, int biasv, int nbr) {
+  if (nrows < 128) {
+    int nt = max(1, min(ncols/2, 256/nrows));
+    dim3 threadDim(nrows, nt, 1);
+    int nblocks = min(256, max(1, 1 + (ncols-1)/nt));
+    __multADAGradxTile<<<nblocks,threadDim>>>(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
+                                          vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
+  } else {
+    int nthreads = min(1024, 32*(1+(nrows-1)/32));
+    int nblocks = min(128, ncols);
+    __multADAGradTile<<<nblocks,nthreads>>>(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
+                                        vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
+  }
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+__forceinline__ __device__ void __kupdateTile(float grad, int i, int ihere, int jhere, float *MM, float *Mask, int maskrows, float *lrate, int lrlen, float limit, int x) {
+  float lr, ngrad;
+  lr =  (lrlen > 1) ? lrate[i+x] : lrate[0];
+  ngrad = grad * lr;
+  if (limit > 0) ngrad = max(-limit, min(limit, ngrad));
+  atomicAdd(&MM[ihere], ngrad);
+  if (Mask != NULL) {
+    if (maskrows > 1) {
+      if (Mask[ihere] == 0) MM[ihere] = 0;
+    } else {
+      if (Mask[jhere] == 0) MM[ihere] = 0;
+    }
+  }
+}
+
+
+__global__ void __multGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda, float *Bdata, int *Bir, int *Bic, float *MM, 
+                               float *Mask, int maskrows, float *lrate, int lrlen, float limit, int biasv, int nbr) {
+  float aval, grad;
+  int i, j, ihere, jhere;
+  int jstart = ((long long)blockIdx.x) * nnz / gridDim.x;
+  int jend = ((long long)(blockIdx.x + 1)) * nnz / gridDim.x;
+  if (biasv > 0) {
+    for (i = threadIdx.x; i < nrows; i += blockDim.x) {
+      aval = 0;
+      for (j = jstart; j < jend ; j++) {
+        if (j == jstart || Bic[j-1] != Bic[j]) {
+          aval = A[i + y + lda * Bic[j]];
+          grad = aval;
+          ihere = i + nrows * nbr;
+          jhere = nbr;
+          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+        }
+        grad = aval * Bdata[j];
+        jhere = Bir[j] - x;
+        if (jhere >= 0 && jhere < ncols) {
+          ihere = i + nrows * jhere;
+          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+        }
+      }
+    } 
+  } else {
+    for (i = threadIdx.x; i < nrows; i += blockDim.x) {
+      aval = 0;
+      for (j = jstart; j < jend ; j++) {
+        if (j == jstart || Bic[j-1] != Bic[j]) {
+          aval = A[i + y + lda * Bic[j]];
+        }
+        grad = aval * Bdata[j];
+        jhere = Bir[j] - x;
+        if (jhere >= 0 && jhere < ncols) {
+          ihere = i + nrows * jhere;
+          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+        }
+      }
+    } 
+  }
+}
+
+__global__ void __multGradxTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda, float *Bdata, int *Bir, int *Bic, float *MM, 
+                               float *Mask, int maskrows, float *lrate, int lrlen, float limit, int biasv, int nbr) {
+  float aval, grad;
+  int i, j, ihere, jhere;
+  int bid = threadIdx.y + blockDim.y * blockIdx.x;
+  int nb = blockDim.y * gridDim.x;
+  int jstart = ((long long)bid) * nnz / nb;
+  int jend = ((long long)(bid + 1)) * nnz / nb;
+  i = threadIdx.x;
+  aval = 0;
+  if (biasv > 0) {
+    for (j = jstart; j < jend ; j++) {
+      if (j == jstart || Bic[j-1] != Bic[j]) {
+        aval = A[i + y + lda * Bic[j]];
+        grad = aval;
+        jhere = nbr - x;
+        ihere = i + nrows * jhere;
+        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+      }
+      grad = aval * Bdata[j];
+      jhere = Bir[j] - x;
+      if (jhere >= 0 && jhere < ncols) {
+        ihere = i + nrows * jhere;
+        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+      }
+    }
+  } else {
+    for (j = jstart; j < jend ; j++) {
+      if (j == jstart || Bic[j-1] != Bic[j]) {
+        aval = A[i + nrows * Bic[j]];
+      }
+      grad = aval * Bdata[j];
+      jhere = Bir[j] - x;
+      if (jhere >= 0 && jhere < ncols) {
+        ihere = i + nrows * jhere;
+        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+      }
+    }
+  }
+}
+
+int multGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda, float *Bdata, int *Bir, int *Bic, float *MM, 
+                 float *Mask, int maskrows, float *lrate, int lrlen, float limit, int biasv, int nbr) {
+  if (nrows < 128) {
+    int nt = max(1, min(ncols/2, 256/nrows));
+    dim3 threadDim(nrows, nt, 1);
+    int nblocks = min(256, max(1, 1 + (ncols-1)/nt));
+    __multGradxTile<<<nblocks,threadDim>>>(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Mask, maskrows, lrate, lrlen, limit, biasv, nbr);
+  } else {
+    int nthreads = min(1024, 32*(1+(nrows-1)/32));
+    int nblocks = min(128, ncols);
+    __multGradTile<<<nblocks,nthreads>>>(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Mask, maskrows, lrate, lrlen, limit, biasv, nbr);
   }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();

@@ -364,6 +364,41 @@ extern "C" {
                        vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_multADAGradTile
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint y, jint x, int nnz, jobject jA, jint lda, jobject jBdata, jobject jBir, jobject jBic,
+   jobject jMM, jobject jSumsq, jobject jMask, int maskrows, jobject jlrate, jint lrlen, jobject jvexp, jint vexplen,
+   jobject jtexp, jint texplen, float istep, jint addgrad, float epsilon, jint biasv, jint nbr)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *Bdata = (float*)getPointer(env, jBdata);
+    int *Bir = (int*)getPointer(env, jBir);
+    int *Bic = (int*)getPointer(env, jBic);
+    float *MM = (float*)getPointer(env, jMM);
+    float *Sumsq = (float*)getPointer(env, jSumsq);
+    float *Mask = (float*)getPointer(env, jMask);
+    float *lrate = (float*)getPointer(env, jlrate);
+    float *vexp = (float*)getPointer(env, jvexp);
+    float *texp = (float*)getPointer(env, jtexp);
+
+    return multADAGradTile(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
+                           vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
+  }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_multGradTile
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint y, jint x, int nnz, jobject jA, jint lda, jobject jBdata, jobject jBir, jobject jBic,
+   jobject jMM, jobject jMask, int maskrows, jobject jlrate, jint lrlen, jfloat limit, jint biasv, jint nbr)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *Bdata = (float*)getPointer(env, jBdata);
+    int *Bir = (int*)getPointer(env, jBir);
+    int *Bic = (int*)getPointer(env, jBic);
+    float *MM = (float*)getPointer(env, jMM);
+    float *Mask = (float*)getPointer(env, jMask);
+    float *lrate = (float*)getPointer(env, jlrate);
+
+    return multGradTile(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Mask, maskrows, lrate, lrlen, limit, biasv, nbr);
+  }
+
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashmultADAGrad
   (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jint bound1, jint bound2, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jint transpose,
    jobject jMM, jobject jSumsq, jobject jMask, int maskrows, jobject jlrate, jint lrlen, jobject jvexp, jint vexplen,

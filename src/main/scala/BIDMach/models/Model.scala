@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -9,7 +9,10 @@ import scala.collection.mutable.ListBuffer
 
 /**
  * Abstract class with shared code for all models
+ * 
+ * Models are saved as separate files into a directory. The model save pathname should contain a trailing "/" and name this parent directory. 
  */
+
 abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializable {
   
   var datasource:DataSource = null;
@@ -103,21 +106,28 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   def loadMetaData(fname:String) = {}
   
+  /**
+   * Save the model to a given path. This is normally a directory (which is created if needed). 
+   * Otherwise the model and metadata filenames are concatenated to form the save file paths. 
+   */
+  
   def save(fname:String) = {
     import java.io._
-    for (i <- 0 until modelmats.length) {
-      val mat = modelmats(i);
-      val f = new File(fname+"modelmat%02d.lz4" format i);
-      f.getParentFile().mkdirs();
-      saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
-    }
-    val pw = new PrintWriter(new File(fname+"options.json"));
+    val metadataname = new File(fname+"options.json");
+    val parentdir = metadataname.getParentFile();
+    if (parentdir != null) parentdir.mkdirs();
+    val pw = new PrintWriter(metadataname);
     pw.print(JSON.toJSON(opts, true));
     pw.close;
     val out  = new FileOutputStream(fname+"options.ser")
     val output = new ObjectOutputStream(out);
     output.writeObject(opts);
     output.close;
+    for (i <- 0 until modelmats.length) {
+      val mat = modelmats(i);
+      val f = new File(fname+"modelmat%02d.lz4" format i);
+      saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
+    }
     saveMetaData(fname);
   }
   
@@ -151,11 +161,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	  putBack = datasource.opts.putBack;
 	  useGPU = opts.useGPU && Mat.hasCUDA > 0;
 	  useDouble = opts.useDouble;
-	  if (useGPU || useDouble) {
-	  	gmats = new Array[Mat](mats.length);
-	  } else {
-	  	gmats = mats;
-	  }
+	  gmats = new Array[Mat](mats.length);
   }
   
   def bind(ds:DataSink):Unit = {
@@ -171,12 +177,12 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
   
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
-    if (useGPU) copyMats(amats, gmats);            		
+    copyMats(amats, gmats);            		
     dobatch(gmats, ipass, here);
   }
   
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
-    if (useGPU) copyMats(amats, gmats)
+    copyMats(amats, gmats)
     val v = evalbatch(gmats, ipass, here)
     if (omats != null) {
       for (i <- 0 until omats.length) {
@@ -251,7 +257,16 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
          	to(i) = from(i) match {
         	case aa:FMat => DMat(aa)
         	case aa:SMat => SDMat(aa)
+        	case aa:DMat => aa;
+        	case aa:SDMat => aa;
         	}
+      	} else {
+         	to(i) = from(i) match {
+        	case aa:FMat => aa
+        	case aa:SMat => aa
+        	case aa:DMat => FMat(aa);
+        	case aa:SDMat => SMat(aa);
+        	}      	  
       	}
       }
     }
@@ -354,6 +369,7 @@ object Model {
       } else {
       	FND(g)
       }
+      case tt:TMat => new TMat(tt.nrows, tt.ncols, tt.y, tt.x, tt.tiles.map(convertMat(_, useGPU, useDouble).asInstanceOf[Mat]));
     }
   }
 }

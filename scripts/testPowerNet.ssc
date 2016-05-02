@@ -1,24 +1,25 @@
 :silent
+import BIDMat.TMat
 
 val mdir = "../data/criteo/parts/"
 
 val (nn,opts) = Net.learner(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4");
-opts.nend = 80;
-opts.lrate = 0.01f;
-opts.reg1weight = 0.0001f;
-opts.batchSize=100
-opts.npasses=5;
-opts.hasBias = true;
-opts.links = irow(1);
-//opts.pstep = 0.001f;
-//opts.aopts = opts;
-opts.texp = 0.4f;
+
+//opts.aopts = opts
+opts.batchSize=200
+opts.reg1weight = 0.0001
+opts.npasses = 1
+//opts.hasBias = true
+opts.links = iones(100,1);
+opts.lrate = 0.1f 
+opts.texp = 0.4f
 opts.nweight = 1e-4f
+opts.lookahead = 0
 
-val net = Net.dnodes3(6,10,1f,1,opts,1);
-opts.nodeset = net
-val model = nn.model.asInstanceOf[Net];
+opts.tmatShape = TMat.powerShape(1)
+opts.nodeset = Net.powerNet(irow(100,100,1),opts,0);
 
+val model = nn.model.asInstanceOf[Net]
 nn.train
 
 val res = nn.results(0,?)
@@ -27,7 +28,6 @@ val testdata = loadSMat(mdir+"trainsorted%02d.smat.lz4" format opts.nend);
 val testlabels = loadFMat(mdir+"trainlabel%02d.fmat.lz4" format opts.nend);
 
 val (mm, mopts) = Net.predictor(model, testdata);
-
 mm.predict
 
 val preds=FMat(mm.preds(0))
@@ -38,4 +38,3 @@ val rc = roc(preds, testlabels, 1-testlabels, 1000);
 :silent
 
 (mean(ll), mean(rc))
-

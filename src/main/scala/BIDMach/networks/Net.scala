@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -228,6 +228,7 @@ object Net  {
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
     var nodeset:NodeSet = null;
+    var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
   }
   
   class Options extends Opts {}
@@ -235,98 +236,73 @@ object Net  {
   
   /**
    * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
-   * Intermediate nodes are Linear alternating with Rect, starting and ending with Linear. 
+   * Intermediate nodes are Linear followed by nonlinear, starting and ending with Linear. 
    * First Linear node width is given as an argument, then it tapers off by taper.
    */
   
-  def dnodes(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
-    val depth = (depth0/2)*2 + 1;              // Round up to an odd number of nodes 
-    val nodes = new NodeSet(depth);
-    var w = width;
-    nodes(0) = new InputNode;
-    for (i <- 1 until depth - 2) {
-    	if (i % 2 == 1) {
-    		nodes(i) = new LinNode{inputs(0) = nodes(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
-    		w = (taper*w).toInt;
-    	} else {
-    	  nonlin match {
-    	    case 1 => nodes(i) = new TanhNode{inputs(0) = nodes(i-1)};
-    	    case 2 => nodes(i) = new SigmoidNode{inputs(0) = nodes(i-1)};
-    	    case 3 => nodes(i) = new RectNode{inputs(0) = nodes(i-1)};
-    	    case 4 => nodes(i) = new SoftplusNode{inputs(0) = nodes(i-1)};
-    	  }
-    	}
-    }
-    nodes(depth-2) = new LinNode{inputs(0) = nodes(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
-    nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
-    nodes;
+  def dnodes2(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
+    val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
+    powerNet(widths, opts, 0, nonlin);
   }
   
   /**
    * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
-   * Intermediate nodes are linear, Rect, Norm, starting and ending with Linear. 
+   * Intermediate nodes are linear, Nonlinear and Norm, starting and ending with Linear. 
    * First Linear node width is given as an argument, then it tapers off by taper.
    */
   
-  def dnodes3(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
-    val depth = (depth0/3)*3;              // Round up to an odd number of nodes 
+  def dnodes3(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
+    val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
+    powerNet(widths, opts, 1, nonlin);
+  }
+  
+  /**
+   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
+   * Intermediate nodes are Linear, Nonlinear, Norm, Dropout, starting and ending with Linear. 
+   * First Linear node width is given as an argument, then it tapers off by taper.
+   */
+  
+  def dnodes4(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
+    val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
+    powerNet(widths, opts, 2, nonlin);
+  }
+  
+  /**
+   * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
+   * Intermediate nodes are Linear followed by Nonlinear, with optional Norm and Dropout, 
+   * starting and ending with Linear. 
+   * The widths argument specifies the sequence of output dimensions for the Linear nodes. 
+   * If a tmatShape argument is given, then that shape is used for the first linear layer. 
+   */
+  
+  def powerNet(widths:IMat, opts:Opts, addons:Int, nonlin:Int = 1):NodeSet = {
+    val thickness = 2 + addons;
+    val depth = 3 + (widths.length - 1) * thickness;  
     val nodes = new NodeSet(depth);
-    var w = width;
     nodes(0) = new InputNode;
-    for (i <- 1 until depth - 2) {
-    	if (i % 3 == 1) {
-    		nodes(i) = new LinNode{inputs(0) = nodes(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
-    		w = (taper*w).toInt;
-    	} else if (i % 3 == 2) {
-    	  nonlin match {
-    	    case 1 => nodes(i) = new TanhNode{inputs(0) = nodes(i-1)};
-    	    case 2 => nodes(i) = new SigmoidNode{inputs(0) = nodes(i-1)};
-    	    case 3 => nodes(i) = new RectNode{inputs(0) = nodes(i-1)};
-    	    case 4 => nodes(i) = new SoftplusNode{inputs(0) = nodes(i-1)};
-    	  }
-    	} else {
+    nodes(1) = new LinNode{inputs(0) = nodes(0); outdim = widths(0); hasBias = opts.hasBias; aopts = opts.aopts; tmatShape = opts.tmatShape};
+    for (i <- 2 until depth - 1) {
+    	((i-1) % thickness) match {
+    	case 0 => {
+    		val w = widths((i-1)/thickness);
+    		nodes(i) = new LinNode{inputs(0) = nodes(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts;};
+    	}
+    	case 1 => {
+    		nonlin match {
+    		case 1 => nodes(i) = new TanhNode{inputs(0) = nodes(i-1)};
+    		case 2 => nodes(i) = new SigmoidNode{inputs(0) = nodes(i-1)};
+    		case 3 => nodes(i) = new RectNode{inputs(0) = nodes(i-1)};
+    		case 4 => nodes(i) = new SoftplusNode{inputs(0) = nodes(i-1)};
+    		}
+    	}
+    	case 2 => {
     		nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
-    }
-    nodes(depth-2) = new LinNode{inputs(0) = nodes(depth-3); outdim = ntargs; hasBias = opts.hasBias; aopts = opts.aopts};
-    nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
-    nodes;
-  }
-  
-  /**
-   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
-   * Intermediate nodes are Linear, Rect, Norm, Dropout, starting and ending with Linear. 
-   * First Linear node width is given as an argument, then it tapers off by taper.
-   */
-  
-  def dnodes4(depth0:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
-    val depth = ((depth0+1)/4)*4 - 1;              // Round up to an odd number of nodes 
-    val nodes = new NodeSet(depth);
-    var w = width;
-    nodes(0) = new InputNode;
-    for (i <- 1 until depth - 2) {
-    	(i % 4) match {
-    	  case 1 => {
-    	  	nodes(i) = new LinNode{inputs(0) = nodes(i-1); outdim = w; hasBias = opts.hasBias; aopts = opts.aopts};
-    	  	w = (taper*w).toInt;
-    	  }
-    	  case 2 => {
-    	  	nonlin match {
-    	  	case 1 => nodes(i) = new TanhNode{inputs(0) = nodes(i-1)};
-    	  	case 2 => nodes(i) = new SigmoidNode{inputs(0) = nodes(i-1)};
-    	  	case 3 => nodes(i) = new RectNode{inputs(0) = nodes(i-1)};
-    	  	case 4 => nodes(i) = new SoftplusNode{inputs(0) = nodes(i-1)};
-    	  	}
-    	  }
-    	  case 3 => {
-    	  	nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
-      }
-    	  case _ => {
-    	  	nodes(i) = new DropoutNode{inputs(0) = nodes(i-1); frac = opts.dropout};
-    	  }
+    	case 3 => {
+    		nodes(i) = new DropoutNode{inputs(0) = nodes(i-1); frac = opts.dropout};
+    	}
     	}
     }
-    nodes(depth-2) = new LinNode{inputs(0) = nodes(depth-3); outdim = ntargs; hasBias =  opts.hasBias; aopts = opts.aopts};
     nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
     nodes;
   }

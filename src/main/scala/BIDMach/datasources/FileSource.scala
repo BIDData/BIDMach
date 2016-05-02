@@ -152,7 +152,10 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     	val filex = fileno % math.max(1, opts.lookahead);
 //    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
     	if (opts.putBack < 0 && opts.lookahead > 0) {
-    	  while (ready(filex) < fileno) Thread.sleep(1); //`yield`
+    	  while (ready(filex) < fileno) {
+    	    if (opts.traceFileSource > 0) println("next %d %d %s" format (fileno, filex, ready.t.toString));
+    	    Thread.sleep(1); //`yield`
+    	  }
     	} else {
     	  fetch
     	}
@@ -223,11 +226,15 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   			ready(ifilex) = ifile - opts.lookahead;
   		}
   		while  (!stop) {
-  			while (pause || (ready(ifilex) >= fileno && !stop)) Thread.sleep(1); // Thread.`yield`
+  			while (pause || (ready(ifilex) >= fileno && !stop)) {
+  				if (opts.traceFileSource > 0) println("prefetch %d %d %s" format (ifilex, fileno, ready.t.toString));
+  			  Thread.sleep(1); // Thread.`yield`
+  			}
   			if (!stop) {
   				val inew = ready(ifilex) + opts.lookahead;
   				val pnew = permfn(inew);
   				val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
+  				if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d %b" format (ifilex, fileno, pnew, fexists));
   				for (i <- 0 until fnames.size) {
   					if (fexists) {
   					  val fname = fnames(i)(pnew);
@@ -235,8 +242,15 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   					  var oldmat:Mat = null;
   					  matqueue.synchronized {
   					    oldmat = matqueue(ifilex)(i);
-  					  } 					 
-  						val newmat = HMat.loadMat(fname, oldmat);	
+  					  } 	
+  					  if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d reading %d %s" format (ifilex, fileno, pnew, i, fname));
+  						val newmat:Mat = try {
+  						  HMat.loadMat(fname, oldmat);	
+  						} catch {
+  						  case e:Exception => {println(stackTraceString(e)); null}
+  						  case _:Throwable => null
+  						}
+  						if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d read %d %s " format (ifilex, fileno, pnew, i, fname));
   						matqueue.synchronized {
   					    matqueue(ifilex)(i) = newmat;
   					  }
@@ -277,7 +291,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
       val fexists = fileExists(fnames(0)(pnew)) && (rand(1,1).v <= opts.sampleFiles);
       for (i <- 0 until fnames.size) {
         if (fexists && lastMat(i).asInstanceOf[AnyRef] != null) {
-          HMat.saveMat(lastFname(i), lastMat(i));
+//          HMat.saveMat(lastFname(i), lastMat(i));
         }
         matqueue(0)(i) = if (fexists) {
           val tmp = HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));
@@ -294,6 +308,12 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
       ready(0) = fileno;
     }
   }
+  
+  def stackTraceString(e:Exception):String = {
+  	val sw = new StringWriter;
+  	e.printStackTrace(new PrintWriter(sw));
+  	sw.toString;
+  }
 
   
   def hasNext:Boolean = {
@@ -305,7 +325,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     for (i <- 0 until opts.lookahead) {
       prefetchTasks(i).cancel(true);
     }
-    executor.shutdown();
+    if (executor != null) executor.shutdown();
   }
 }
 
@@ -383,6 +403,7 @@ object FileSource {
     var order:Int = 0                          // 0 = sequential order, 1 = random
     var eltsPerSample = 10;
     var throwMissing:Boolean = false
+    var traceFileSource = 0;
   }
   
   class Options extends Opts {}

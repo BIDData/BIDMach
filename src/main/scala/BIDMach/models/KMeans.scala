@@ -26,21 +26,19 @@ import BIDMach._
 
 class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends ClusteringModel(opts) {
 
-  var mm:Mat = null
-  var mmnorm:Mat = null
+//  var mm:Mat = null
   var um:Mat = null
   var umcount:Mat = null
   
+  def mm = {modelmats(0)};
+  def mmnorm = {modelmats(1)};
+  
   override def init() = {
     super.init()
-    mm = modelmats(0);
     if (refresh) {
-    	mmnorm = mm dotr mm;
-    	setmodelmats(Array(mm, mmnorm));
+    	setmodelmats(Array(mm, mm dotr mm));
     }
     for (i <- 0 until modelmats.length) modelmats(i) = convertMat(modelmats(i))
-    mm = modelmats(0)
-    mmnorm = modelmats(1)
     um = updatemats(0)
     umcount = mm.zeros(mm.nrows, 1)
     updatemats = Array(um, umcount)
@@ -48,8 +46,8 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   
   def mupdate(sdata:Mat, ipass:Int):Unit = {
 //  println("trace data %f" format sum(sum(sdata)).dv);
-    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)
-    val bestm = vmatch <= mini(vmatch)
+    val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)           // vmatch(i,j) = squared distance from data sample j to centroid i
+    val bestm = vmatch <= mini(vmatch)                             // mini(vmatch) are the minimum 
     bestm ~ bestm / sum(bestm)
     um ~ um + bestm *^ sdata     
     umcount ~ umcount + sum(bestm, 2)
