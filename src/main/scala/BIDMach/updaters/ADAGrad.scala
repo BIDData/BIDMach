@@ -321,7 +321,10 @@ object ADAGrad {
         }
       }
       case _ => {
-        val grad0 = mm + 0;
+        val grad0 = mm match {
+          case tmm:TMat => mm + 0;
+          case _ => mm.view(mm.nrows, mm.ncols - (if (hasBias) 1 else 0)) + 0;
+        }
         a.madd(b, grad0, false, true);
         val grad = if (hasBias) grad0 \ sum(a,2) else grad0;
         sumSq ~ sumSq + (grad ∘ grad);
