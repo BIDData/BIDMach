@@ -53,7 +53,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 			// compute the var for the delta
 			estimated_sd = (variance(var_estimate_mat)^0.5).dv
 			// init the ecdf
-			// println("the sd of the data is " + estimated_sd)
+			println("the sd of the data is " + estimated_sd)
 			ecdf.init(estimated_sd, opts.ratio_decomposite)
 			is_estimte_sd = false
 			proposer.changeToUpdateState()
@@ -71,7 +71,10 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 				// accpet the candiate
 				// println("accpet" + " " + delta + "; X_corr: " + x_corr)
 				for (i <- 0 until _modelmats.length) {
-					_modelmats(i) ~ next_mat(i)
+					// println ("model mats " + _modelmats(i))
+					// println("next: " + next_mat(i))
+					_modelmats(i) <-- next_mat(i)
+					// println ("updated modelmats " + _modelmats(i))
 				}
 			} else {
 				// println("reject" + " " + delta + "; X_corr: " + x_corr)
@@ -152,8 +155,13 @@ object MHTest {
 	}
 
 	// for testing
-	def Langevin_Proposer(init_step:Float, model:Model) = {
+	def Langevin_Proposer(init_step:Float, model:Model):Proposer = {
 		val lp = new Langevin_Proposer(init_step, model)
+		lp
+	}
+
+	def Gradient_descent_proposer(init_step:Float, model:Model):Proposer = {
+		val lp = new Gradient_descent_proposer(init_step, model)
 		lp
 	}
 
@@ -242,8 +250,8 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 			// println(modelmats(i))
 			random_matrixFMat(i) <-- dnormrnd(0, (stepi ^ 0.5).dv, modelmats(i).nrows, modelmats(i).ncols)
 			random_matrix(i) <-- random_matrixFMat(i)
-			candidate(i) ~ modelmats(i) - stepi / 2.0 * model.updatemats(i) 
-			candidate(i) ~ candidate(i) + random_matrix(i)
+			candidate(i) <-- modelmats(i) + stepi / 2.0 * model.updatemats(i) 
+			candidate(i) <-- candidate(i) + random_matrix(i)
 			// println(" rand matrix")
 			// println(random_matrix(i))
 			// println("candiate")
@@ -265,7 +273,7 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		var loglik_new_to_prev = 0.0
 		for (i <- 0 until candidate.length) {
 			// println ((candidate(i) - (modelmats(i) - stepi / 2.0 * model.updatemats(i))))
-			loglik_prev_to_new += (-1.0*sum(sum((abs(candidate(i) - (modelmats(i) - stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
+			loglik_prev_to_new += (-1.0*sum(sum((abs(candidate(i) - (modelmats(i) + stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
 		}
 
 		// jump from the candidate for one more step
@@ -273,10 +281,9 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		model.dobatch(gmats, ipass, pos)
 		loss_mat_prev = model.evalbatch(gmats, ipass, pos)
 		val loss_new:Float = (sum(loss_mat_prev))(0,0)
-
 		for (i <- 0 until candidate.length) {
 			// println("the model update " + ((modelmats(i) - (candidate(i) - stepi / 2.0 * model.updatemats(i)))^2))
-			loglik_new_to_prev +=  (-1.0*sum(sum((abs(modelmats(i) - (candidate(i) - stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
+			loglik_new_to_prev +=  (-1.0*sum(sum((abs(modelmats(i) - (candidate(i) + stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
 		}
 		val delta = (-loss_new) - (-loss_prev) + loglik_new_to_prev - loglik_prev_to_new
 		// println("new loss: " + loss_new + "; prev loss " + loss_prev+ "; loglike new " + loglik_new_to_prev +"; log old" + loglik_prev_to_new)
@@ -286,6 +293,55 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 
 }
 
+
+class Gradient_descent_proposer (val init_step:Float, val model:Model) extends Proposer() {
+	var step:Float = 1.0f
+	var candidate:Array[Mat] = null
+	var learning_rate:Float = 0.5f
+	var stepi:Mat = null
+	var is_estimte_sd = true
+	var mu:Float = 0.9f
+	var moument:Array[Mat] = null
+
+	override def init():Unit = {
+		// init the container here
+		candidate = new Array[Mat](model.modelmats.length)
+		moument = new Array[Mat](model.modelmats.length)	
+		stepi = model.modelmats(0).zeros(1,1)
+		for (i <- 0 until candidate.length) {
+			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			moument(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+		}
+	}
+
+	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
+		// just do the one step gradient descent
+		if (!is_estimte_sd) {
+			model.setmodelmats(modelmats);
+
+			// compute the gradient
+			model.dobatch(gmats, ipass, pos)
+		
+			// sample the new model parameters by the gradient and the stepsize
+			// and store the sample results into the candidate array
+			stepi <-- init_step / step ^ learning_rate;
+			for (i <- 0 until candidate.length) {
+				// println("proposer next " + stepi )
+				// println("the updates " + model.updatemats(i))
+				moument(i) <-- moument(i) * mu + stepi * model.updatemats(i) 
+				candidate(i) <-- modelmats(i) + moument(i) 
+				// println("the candidada " + candidate(i))
+			}
+			step += 1.0f
+		}
+		// for delta, we just return a very large value
+		(candidate, (rand(1,1)*1000000.0).dv)
+	}
+
+	override def changeToUpdateState():Unit = {
+		is_estimte_sd = false
+	}
+}
 
 // Class of the emprical cdf of X_corr, there should be three
 // matrix to hold the data computed from the matlab

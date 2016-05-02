@@ -3,8 +3,8 @@ import BIDMach.models.MHTest
 val dir = "/code/BIDMach/data/uci/Higgs/parts/"
 val model = MHTest.constructNNModel(4, 500, 0.6f, 1, 2);
 
-val proposer = MHTest.Langevin_Proposer(1.0f, model);
-
+val proposer = MHTest.Langevin_Proposer(0.01f, model);
+// val proposer = MHTest.Gradient_descent_proposer(0.1f, model)
 val ecdf = loadFMat("./data/EcdfForMHtest/ecdfmat.txt")
 val x_cdf = loadFMat("./data/EcdfForMHtest/xmat.txt")
 val hash_cdf = loadFMat("./data/EcdfForMHtest/hash.txt")
@@ -13,8 +13,9 @@ val hash_cdf = loadFMat("./data/EcdfForMHtest/hash.txt")
 
 val (nn, opts) = MHTest.learner(dir+"data%03d.fmat.lz4", dir+"label%03d.fmat.lz4", model, proposer, x_cdf, ecdf, hash_cdf)
 
-opts.npasses = 3
+opts.npasses = 100
 opts.nend = 10
+opts.evalStep = 311;
 
 nn.train
 
@@ -26,3 +27,10 @@ val (mm,mopts) = Net.predictor(model, ta);
 mopts.batchSize=1000
 
 mm.predict
+
+
+val pc = FMat(mm.preds(0))
+
+val rc = roc(pc, tc, 1-tc, 1000);
+
+mean(rc)
