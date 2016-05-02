@@ -15,12 +15,13 @@ import scala.collection.mutable._
 class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val ecdfmat: FMat, val hash_ecdf:FMat, 
 	override val opts:MHTest.Opts = new MHTest.Options) extends Model(opts) {
 
-	parent_model = objective
+	// parent_model = objective
 	var ecdf:Ecdf = new Ecdf(x_ecdf, ecdfmat, hash_ecdf)
 	var delta:Double = 1.0
 	var is_estimte_sd: Boolean = true
 	var var_estimate_mat:FMat = zeros(1, opts.num_iter_estimate_var)
 	var estimated_sd:Double = 1.0
+	var num_sd_compute:Int = 0
 	// TODO: init the MHTest, estimate the variance of
 	// delta here. And load the distribution of X_corr
 	// And we should put the parameters in 
@@ -32,35 +33,48 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// init the var_estimate_mat container
 		// var_estimate_mat = zeros(1, opts.num_iter_estimate_var)
 		is_estimte_sd = true
-
+		objective.bind(datasource)
+		objective.init()
+		_modelmats = new Array[Mat](objective.modelmats.length)
+		for (i <- 0 until objective.modelmats.length) {
+			_modelmats(i) = objective.modelmats(i)
+			//println(_modelmats(i))
+		}
 		// init the proposer class
 		proposer.init()
 
-		// TODO: check whether we need to init the modelmats here
 	}
 
 	// call proposer to get the theta',
 	// then generate a x_corr from distribution of X_corr
 	// Then decide whether to replace (i.e. accpet) _modelmats 
 	override def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-		if (ipass == opts.num_iter_estimate_var) {
+		if (num_sd_compute == opts.num_iter_estimate_var && is_estimte_sd) {
 			// compute the var for the delta
 			estimated_sd = (variance(var_estimate_mat)^0.5).dv
 			// init the ecdf
+			// println("the sd of the data is " + estimated_sd)
 			ecdf.init(estimated_sd, opts.ratio_decomposite)
 			is_estimte_sd = false
+			proposer.changeToUpdateState()
 		}
-		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(modelmats, mats, ipass, here)
+
+		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(_modelmats, mats, ipass, here)
 		if (is_estimte_sd) {
-			var_estimate_mat(0,ipass) = delta
+			var_estimate_mat(0,num_sd_compute) = delta
+			num_sd_compute += 1
+			// println(num_sd_compute + "-" +delta)
 		} else {
 			// do the test
 			var x_corr = ecdf.generateXcorr
 			if (x_corr + delta > 0) {
 				// accpet the candiate
-				for (i <- 0 until modelmats.length) {
-					modelmats(i) ~ next_mat(i)
+				// println("accpet" + " " + delta + "; X_corr: " + x_corr)
+				for (i <- 0 until _modelmats.length) {
+					_modelmats(i) ~ next_mat(i)
 				}
+			} else {
+				// println("reject" + " " + delta + "; X_corr: " + x_corr)
 			}
 		}
 
@@ -71,8 +85,8 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// copy back the parameters
 		// Notice: this is not the deep copy, we just
 		// change the reference of the parent_model
-		parent_model._modelmats = modelmats
-		parent_model.evalbatch(mats, ipass, here)
+		objective._modelmats = _modelmats
+		objective.evalbatch(mats, ipass, here)
 	}
 
 	// help methods
@@ -84,7 +98,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 object MHTest {
 	trait  Opts extends Model.Opts {
 		// TODO: define the parameters here
-		var num_iter_estimate_var:Int = 1000
+		var num_iter_estimate_var:Int = 100
 		// var batchSize:Int = 200 // the parents class already has it
 		var ratio_decomposite:Double = 0.994
 	}
@@ -179,6 +193,8 @@ abstract class Proposer() {
 
 	}
 
+	def changeToUpdateState():Unit = {}
+
 	// Function to propose the next parameter, i.e. theta' and the delta
 	def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		null
@@ -189,15 +205,27 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 	var step:Float = 1.0f
 	var candidate:Array[Mat] = null
 	var learning_rate:Float = 0.75f
-
+	var random_matrix:Array[Mat] = null
+	var random_matrixFMat:Array[FMat] = null
+	var stepi:Mat = null
+	var is_estimte_sd = true
 	override def init():Unit = {
 		// init the candidate container
 		// the candidate should have the same shape of the model.modelmats
 		// here assume the model.modelmats are already initalized
-		candidate = new Array[Mat](model.modelmats.length);
+		candidate = new Array[Mat](model.modelmats.length)
+		random_matrix = new Array[Mat](model.modelmats.length)
+		random_matrixFMat = new Array[FMat](model.modelmats.length)
+		stepi = model.modelmats(0).zeros(1,1)
 		for (i <- 0 until candidate.length) {
 			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			random_matrix(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			random_matrixFMat(i) = zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
 		}
+	}
+
+	override def changeToUpdateState():Unit = {
+		is_estimte_sd = false
 	}
 	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		// shadow copy the parameter value to the model's mat
@@ -205,37 +233,53 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 
 		// compute the gradient
 		model.dobatch(gmats, ipass, pos)
+		
 		// sample the new model parameters by the gradient and the stepsize
 		// and store the sample results into the candidate array
-		val stepi = init_step / step ^ learning_rate;
+		stepi <-- init_step / step ^ learning_rate;
 		for (i <- 0 until candidate.length) {
-			candidate(i) ~ modelmats(i) - stepi / 2 * model.updatemats(i) + dnormrnd(0, (stepi ^ 0.5)(0,0), modelmats(i).nrows, modelmats(i).ncols)
+			// println(candidate(i))
+			// println(modelmats(i))
+			random_matrixFMat(i) <-- dnormrnd(0, (stepi ^ 0.5).dv, modelmats(i).nrows, modelmats(i).ncols)
+			random_matrix(i) <-- random_matrixFMat(i)
+			candidate(i) ~ modelmats(i) - stepi / 2.0 * model.updatemats(i) 
+			candidate(i) ~ candidate(i) + random_matrix(i)
+			// println(" rand matrix")
+			// println(random_matrix(i))
+			// println("candiate")
+			// println(candidate(i))
 		}
-		step += 1.0f
+		if (!is_estimte_sd) {
+			step += 1.0f
+		}
 		
 		// compute the delta
 		// loss_mat is a (ouput_layer.length, 1) matrix
 		var loss_mat_prev = model.evalbatch(gmats, ipass, pos)
-		val loss_prev:Float = ln(sum(loss_mat_prev))(0,0)
+		// println (loss_mat_prev)
+		val loss_prev:Float = (sum(loss_mat_prev))(0,0)
 		// compute the log likelihood of the proposal prob
 		// here I ignore the constants
 
 		var loglik_prev_to_new = 0.0
 		var loglik_new_to_prev = 0.0
 		for (i <- 0 until candidate.length) {
-			loglik_prev_to_new += (-1.0*sum(sum((candidate(i) - (modelmats(i) - stepi / 2.0 * model.updatemats(i)))^2)) / 2 / stepi).dv
+			// println ((candidate(i) - (modelmats(i) - stepi / 2.0 * model.updatemats(i))))
+			loglik_prev_to_new += (-1.0*sum(sum((abs(candidate(i) - (modelmats(i) - stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
 		}
 
 		// jump from the candidate for one more step
 		model.setmodelmats(candidate)
 		model.dobatch(gmats, ipass, pos)
 		loss_mat_prev = model.evalbatch(gmats, ipass, pos)
-		val loss_new:Float = ln(sum(loss_mat_prev))(0,0)
+		val loss_new:Float = (sum(loss_mat_prev))(0,0)
 
 		for (i <- 0 until candidate.length) {
-			loglik_new_to_prev += + (-1.0*sum(sum((modelmats(i) - (candidate(i) - stepi / 2.0 * model.updatemats(i)))^2)) / 2 / stepi).dv
+			// println("the model update " + ((modelmats(i) - (candidate(i) - stepi / 2.0 * model.updatemats(i)))^2))
+			loglik_new_to_prev +=  (-1.0*sum(sum((abs(modelmats(i) - (candidate(i) - stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
 		}
 		val delta = (-loss_new) - (-loss_prev) + loglik_new_to_prev - loglik_prev_to_new
+		// println("new loss: " + loss_new + "; prev loss " + loss_prev+ "; loglike new " + loglik_new_to_prev +"; log old" + loglik_prev_to_new)
 		(candidate, delta)
 	}
 
@@ -252,13 +296,14 @@ class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
 	var ratio:Double = 0.995f
 	var f:FMat = null
 	
-	def init(sd:Double, ratio:Double=0.995) = {
+	def init(inputsd:Double, ratio:Double=0.995) = {
 		// looking for the closest index in the hash
 		var index:Int = (ratio * hash.ncols.toDouble).toInt;
 		if (index >= hash.ncols) {
 			index = hash.ncols - 1
 		}
 		f = ecdfmat(?,index)
+		sd = inputsd
 	}
 
 	def generateXcorr : Double = {
@@ -283,6 +328,7 @@ class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
 			}
 		}
 		//println("start: " + start + ", end: "+ end)
+		// println("inside ecdf, " + ((x(start) + x(end))/2) + " - " + sd)
 		(x(start) + x(end))/2 * sd
 	}
 }
