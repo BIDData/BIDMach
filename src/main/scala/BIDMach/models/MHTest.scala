@@ -53,7 +53,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(modelmats, mats, ipass, here)
 		if (is_estimte_sd) {
 			var_estimate_mat(0,ipass) = delta
-		} else{
+		} else {
 			// do the test
 			var x_corr = ecdf.generateXcorr
 			if (x_corr + delta > 0) {
@@ -91,13 +91,13 @@ object MHTest {
 
 	class Options extends Opts {}
 
-	def learner(data:Mat, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat) = {
+	def learner(mat0:Mat, targ:Mat, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat) = {
 		class xopts extends Learner.Options with MHTest.Opts with MatSource.Opts with IncNorm.Opts 
 	    val opts = new xopts
 	    // TODO: define the parameters for the opts
 
 	    val nn = new Learner(
-	      new MatSource(Array(data:Mat), opts),
+	      new MatSource(Array(mat0, targ), opts),
 	      new MHTest(model, proposer, x_ecdf, ecdfmat, hash_ecdf, opts),
 	      null,
 	      new IncNorm(opts),
@@ -105,6 +105,31 @@ object MHTest {
 	      opts)
 	    (nn, opts)
 	}
+
+	class FDSopts extends Learner.Options with MHTest.Opts with FileSource.Opts
+  
+	def learner(fn1:String, fn2:String, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
+			                                                                  FileSource.simpleEnum(fn2,1,0)), model, proposer, x_ecdf, ecdfmat, hash_ecdf);
+
+	//def learner(fn1:String, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)), x_ecdf, ecdfmat, hash_ecdf);
+
+	def learner(fnames:List[(Int)=>String], model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = {
+		
+		val opts = new FDSopts;
+		opts.fnames = fnames
+		opts.batchSize = 200;
+		opts.eltsPerSample = 500;
+		implicit val threads = threadPool(4);
+		val ds = new FileSource(opts)
+			val nn = new Learner(
+					ds, 
+			    new MHTest(model, proposer, x_ecdf, ecdfmat, hash_ecdf, opts), 
+			    null,
+			    null, 
+			    null,
+			    opts)
+		(nn, opts)
+	} 
 
 	// just for testing
 	def Ecdf(x: FMat, ecdfmat: FMat, hash:FMat) = {
