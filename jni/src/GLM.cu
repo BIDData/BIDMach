@@ -539,9 +539,9 @@ int multADAGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int l
   return err;
 }
 
-__forceinline__ __device__ void __kupdateTile(float grad, int i, int ihere, int jhere, float *MM, float *Mask, int maskrows, float *lrate, int lrlen, float limit, int x) {
+__forceinline__ __device__ void __kupdateTile(float grad, int i, int ihere, int jhere, float *MM, float *Mask, int maskrows, float *lrate, int lrlen, float limit, int y) {
   float lr, ngrad;
-  lr =  (lrlen > 1) ? lrate[i+x] : lrate[0];
+  lr =  (lrlen > 1) ? lrate[i+y] : lrate[0];
   ngrad = grad * lr;
   if (limit > 0) ngrad = max(-limit, min(limit, ngrad));
   atomicAdd(&MM[ihere], ngrad);
@@ -570,13 +570,13 @@ __global__ void __multGradTile(int nrows, int ncols, int y, int x, int nnz, floa
           grad = aval;
           ihere = i + nrows * nbr;
           jhere = nbr;
-          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, y);
         }
         grad = aval * Bdata[j];
         jhere = Bir[j] - x;
         if (jhere >= 0 && jhere < ncols) {
           ihere = i + nrows * jhere;
-          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, y);
         }
       }
     } 
@@ -591,7 +591,7 @@ __global__ void __multGradTile(int nrows, int ncols, int y, int x, int nnz, floa
         jhere = Bir[j] - x;
         if (jhere >= 0 && jhere < ncols) {
           ihere = i + nrows * jhere;
-          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+          __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, y);
         }
       }
     } 
@@ -615,13 +615,13 @@ __global__ void __multGradxTile(int nrows, int ncols, int y, int x, int nnz, flo
         grad = aval;
         jhere = nbr - x;
         ihere = i + nrows * jhere;
-        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, y);
       }
       grad = aval * Bdata[j];
       jhere = Bir[j] - x;
       if (jhere >= 0 && jhere < ncols) {
         ihere = i + nrows * jhere;
-        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, y);
       }
     }
   } else {
@@ -633,7 +633,7 @@ __global__ void __multGradxTile(int nrows, int ncols, int y, int x, int nnz, flo
       jhere = Bir[j] - x;
       if (jhere >= 0 && jhere < ncols) {
         ihere = i + nrows * jhere;
-        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, x);
+        __kupdateTile(grad, i, ihere, jhere, MM, Mask, maskrows, lrate, lrlen, limit, y);
       }
     }
   }
