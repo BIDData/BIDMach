@@ -6,7 +6,7 @@ val testdata = test.copy;
 testdata(0->10, ?) = 0;
 val (vbest, ibest) = maxi2(test);
 
-opts.dim = 5000;
+opts.dim = 1000;
 opts.nend = 70;
 opts.batchSize = 5000;
 opts.npasses = 10;

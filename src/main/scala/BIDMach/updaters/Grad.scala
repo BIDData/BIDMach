@@ -61,8 +61,8 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
       if (opts.clipByValue>0f) {
           var i = 0
           while (i < updatemats.length){
-              updatemats(i)~min(updatemats(i),opts.clipByValue)
-              updatemats(i)~max(updatemats(i),-opts.clipByValue)
+              min(updatemats(i),opts.clipByValue,updatemats(i));
+              max(updatemats(i),-opts.clipByValue,updatemats(i));
               i+=1
           }
       }
