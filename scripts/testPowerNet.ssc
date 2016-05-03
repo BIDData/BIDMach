@@ -6,12 +6,14 @@ val mdir = "../data/criteo/parts/"
 val (nn,opts) = Net.learner(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4");
 
 //opts.aopts = opts
+opts.nend = 80
 opts.batchSize=200
-opts.reg1weight = 0.0001
+//opts.reg1weight = 0.0001
 opts.npasses = 1
 //opts.hasBias = true
-opts.links = iones(100,1);
-opts.lrate = 0.1f 
+opts.links = iones(1,1);
+opts.pstep = 0.001f
+opts.lrate = 0.01f 
 opts.texp = 0.4f
 opts.nweight = 1e-4f
 opts.lookahead = 0
