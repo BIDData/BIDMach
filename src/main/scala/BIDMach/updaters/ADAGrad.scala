@@ -273,13 +273,6 @@ object ADAGrad {
         val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
         CPUMACH.multADAGrad(nr, nc, b.nnz, fa.data, sb.data, sb.ir, sb.jc, fmm.data, fssq.data, if (fmask != null) fmask.data else null, masknr, 
             flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
-
-/*        if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
-    			(0 until Mat.numThreads).par.map((ithread:Int) => 
-    			  multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, ithread, Mat.numThreads));
-    		} else {
-    			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, 0, 1);
-    		} */
       }
       case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
@@ -316,8 +309,8 @@ object ADAGrad {
           val nc = mmtile.ncols;
           val y = gmm.y(i);
           val x = gmm.x(i);
-//        CUMACH.multADAGradTile(nr, nc, y, x, b.nnz, ga.data, gsb.data, gsb.ir, gsb.ic, mmtile.data, ssqtile.data, gmaskdata, masknr,
-//            glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr)
+        CUMACH.multADAGradTile(nr, nc, y, x, b.nnz, ga.data, ga.nrows, gsb.data, gsb.ir, gsb.ic, mmtile.data, ssqtile.data, gmaskdata, masknr,
+           glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr)
         }
       }
       case _ => {

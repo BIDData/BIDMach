@@ -178,12 +178,14 @@ object Layer {
   def input = new InputLayer(null);
   
     
-  def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null) = {
+  def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
+      tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int])) = {
     val odim = outdim;
     val hBias = hasBias;
     val aaopts = aopts;
     val mname = name;
-    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts}){inputs(0)=a;};
+    val tms = tmatShape;
+    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts; tmatShape = tms}){inputs(0)=a;};
   }
   
   def linear_(a:LayerTerm)(implicit net:Net, opts:LinNodeOpts) = {
