@@ -18,10 +18,13 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 	// parent_model = objective
 	var ecdf:Ecdf = new Ecdf(x_ecdf, ecdfmat, hash_ecdf)
 	var delta:Double = 1.0
-	var is_estimte_sd: Boolean = true
-	var var_estimate_mat:FMat = zeros(1, opts.num_iter_estimate_var)
+	// var is_estimte_sd: Boolean = true
+	var var_estimate_mat:FMat = zeros(1, 2)
+	var sd_smooth_exp_param:Double = 0.7 // use the exp update to estimate var
 	var estimated_sd:Double = 1.0
 	var num_sd_compute:Int = 0
+	var batch_est_sd0:Array[Mat] = null
+	var batch_est_sd1:Array[Mat] = null
 	// TODO: init the MHTest, estimate the variance of
 	// delta here. And load the distribution of X_corr
 	// And we should put the parameters in 
@@ -32,23 +35,39 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 
 		// init the var_estimate_mat container
 		// var_estimate_mat = zeros(1, opts.num_iter_estimate_var)
-		is_estimte_sd = true
+		// is_estimte_sd = true
 		objective.bind(datasource)
 		objective.init()
 		_modelmats = new Array[Mat](objective.modelmats.length)
 		for (i <- 0 until objective.modelmats.length) {
-			_modelmats(i) = objective.modelmats(i)
+			_modelmats(i) = objective.modelmats(i).zeros(objective.modelmats(i).nrows, objective.modelmats(i).ncols)
+			_modelmats(i) <-- objective.modelmats(i)
 			//println(_modelmats(i))
 		}
 		// init the proposer class
 		proposer.init()
 
+		// init the batch_est_sd0/1
+		var mat = datasource.next
+		batch_est_sd0 = new Array[Mat](mat.length)
+		for (i <- 0 until mat.length) {
+			batch_est_sd0(i) = GMat(mat(i))
+		}
+		mat = datasource.next;
+		batch_est_sd1 = new Array[Mat](mat.length)
+		for (i <- 0 until mat.length) {
+			batch_est_sd1(i) = GMat(mat(i))
+		}
+
+		// init ecdf
+		ecdf.init(opts.ratio_decomposite)
 	}
 
 	// call proposer to get the theta',
 	// then generate a x_corr from distribution of X_corr
 	// Then decide whether to replace (i.e. accpet) _modelmats 
 	override def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
+		/**
 		if (num_sd_compute == opts.num_iter_estimate_var && is_estimte_sd) {
 			// compute the var for the delta
 			estimated_sd = (variance(var_estimate_mat)^0.5).dv
@@ -58,8 +77,26 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 			is_estimte_sd = false
 			proposer.changeToUpdateState()
 		}
-
+		**/
+		// estimate the variance
+		estimated_sd = estimated_sd * sd_smooth_exp_param + (1-sd_smooth_exp_param) * computeVarDelta()
+		// println ("estimated_sd : " + estimated_sd)
 		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(_modelmats, mats, ipass, here)
+		// do the test
+		ecdf.updateSd(estimated_sd)
+		var x_corr = ecdf.generateXcorr
+		if (x_corr + delta > 0) {
+			// accpet the candiate
+			// println("accpet" + " " + delta + "; X_corr: " + x_corr)
+			for (i <- 0 until _modelmats.length) {
+				// println ("model mats " + _modelmats(i))
+				// println("next: " + next_mat(i))
+				_modelmats(i) <-- next_mat(i)
+				// println ("updated modelmats " + _modelmats(i))
+			}
+		}
+
+		/**
 		if (is_estimte_sd) {
 			var_estimate_mat(0,num_sd_compute) = delta
 			num_sd_compute += 1
@@ -79,7 +116,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 			} else {
 				// println("reject" + " " + delta + "; X_corr: " + x_corr)
 			}
-		}
+		}**/
 
 	}
 
@@ -88,20 +125,28 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// copy back the parameters
 		// Notice: this is not the deep copy, we just
 		// change the reference of the parent_model
-		objective._modelmats = _modelmats
+		objective.setmodelmats(_modelmats)
 		objective.evalbatch(mats, ipass, here)
 	}
 
 	// help methods
 
-	
+	def computeVarDelta():Double = {
+		proposer.changeToEstimateSdState()
+		val (next_mat0:Array[Mat], delta0:Double) = proposer.proposeNext(_modelmats, batch_est_sd0, 0, 0)
+		val (next_mat1:Array[Mat], delta1:Double) = proposer.proposeNext(_modelmats, batch_est_sd1, 0, 1)
+		var_estimate_mat(0) = delta0
+		var_estimate_mat(1) = delta1
+		proposer.changeToUpdateState()
+		(variance(var_estimate_mat)^0.5).dv
+	}
 }
 
 
 object MHTest {
 	trait  Opts extends Model.Opts {
 		// TODO: define the parameters here
-		var num_iter_estimate_var:Int = 100
+		// var num_iter_estimate_var:Int = 100
 		// var batchSize:Int = 200 // the parents class already has it
 		var ratio_decomposite:Double = 0.994
 	}
@@ -203,6 +248,8 @@ abstract class Proposer() {
 
 	def changeToUpdateState():Unit = {}
 
+	def changeToEstimateSdState():Unit = {}
+
 	// Function to propose the next parameter, i.e. theta' and the delta
 	def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		null
@@ -235,6 +282,11 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 	override def changeToUpdateState():Unit = {
 		is_estimte_sd = false
 	}
+
+	override def changeToEstimateSdState():Unit = {
+		is_estimte_sd = true
+	}
+
 	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		// shadow copy the parameter value to the model's mat
 		model.setmodelmats(modelmats);
@@ -297,7 +349,7 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 class Gradient_descent_proposer (val init_step:Float, val model:Model) extends Proposer() {
 	var step:Float = 1.0f
 	var candidate:Array[Mat] = null
-	var learning_rate:Float = 0.5f
+	var learning_rate:Float = 0.0001f
 	var stepi:Mat = null
 	var is_estimte_sd = true
 	var mu:Float = 0.9f
@@ -328,7 +380,7 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 			for (i <- 0 until candidate.length) {
 				// println("proposer next " + stepi )
 				// println("the updates " + model.updatemats(i))
-				moument(i) <-- moument(i) * mu + stepi * model.updatemats(i) 
+				moument(i) <-- moument(i) * mu + stepi * model.updatemats(i)
 				candidate(i) <-- modelmats(i) + moument(i) 
 				// println("the candidada " + candidate(i))
 			}
@@ -341,6 +393,10 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 	override def changeToUpdateState():Unit = {
 		is_estimte_sd = false
 	}
+
+	override def changeToEstimateSdState():Unit = {
+		is_estimte_sd = true
+	}
 }
 
 // Class of the emprical cdf of X_corr, there should be three
@@ -348,24 +404,27 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 // there are pre-computed txt file at /data/EcdfForMHtest
 
 class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
-	var sd:Double = 1.0f
+	var sd:Double = 1.0
 	var ratio:Double = 0.995f
 	var f:FMat = null
 	
-	def init(inputsd:Double, ratio:Double=0.995) = {
+	def init(ratio:Double=0.995) = {
 		// looking for the closest index in the hash
 		var index:Int = (ratio * hash.ncols.toDouble).toInt;
 		if (index >= hash.ncols) {
 			index = hash.ncols - 1
 		}
 		f = ecdfmat(?,index)
-		sd = inputsd
 	}
 
 	def generateXcorr : Double = {
 		var u:Float = rand(1,1)(0,0)
 		//println(u)
 		binarySearch(u)
+	}
+
+	def updateSd (inputsd:Double):Unit = {
+		sd = inputsd
 	}
 
 	def binarySearch(u:Float) : Double = {
