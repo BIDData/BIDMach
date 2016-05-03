@@ -296,10 +296,10 @@ object Net  {
     		}
     	}
     	case 2 => {
-    		nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    		nodes(i) = new DropoutNode{inputs(0) = nodes(i-1); frac = opts.dropout};
     	}
     	case 3 => {
-    		nodes(i) = new DropoutNode{inputs(0) = nodes(i-1); frac = opts.dropout};
+    		nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     	}
     }
