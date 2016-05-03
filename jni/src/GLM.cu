@@ -410,10 +410,11 @@ int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir,
 
 __forceinline__ __device__ void __gupdateTile(float grad, int i, int ihere, int jhere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                                               float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon, int y) {
-  float lr, ve, te, pve, ste, ngrad, ssq;
+  float lr, ve, te, pve, ste, ngrad, ssq, ssqnew;
   ssq = Sumsq[ihere];
-  ssq = hypotf(grad * sqrtf(istep), sqrtf(1-istep) * (ssq + epsilon));
-  Sumsq[ihere] = ssq;
+  ssqnew = hypotf(grad,ssq);
+  atomicAdd(&Sumsq[ihere], ssqnew - ssq);
+  ssq = ssqnew * sqrtf(istep);
 
   if (addgrad) {
     lr =  (lrlen > 1) ? lrate[i+y] : lrate[0];

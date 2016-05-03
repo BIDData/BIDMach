@@ -299,6 +299,7 @@ object ADAGrad {
       }
       case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
+//	println("istep=%f" format istep);
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
