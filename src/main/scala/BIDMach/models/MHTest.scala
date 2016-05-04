@@ -81,6 +81,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// estimate the variance
 		estimated_sd = estimated_sd * sd_smooth_exp_param + (1-sd_smooth_exp_param) * computeVarDelta()
 		// println ("estimated_sd : " + estimated_sd)
+		proposer.changeToUpdateState()
 		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(_modelmats, mats, ipass, here)
 		// do the test
 		ecdf.updateSd(estimated_sd)
@@ -125,13 +126,30 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// copy back the parameters
 		// Notice: this is not the deep copy, we just
 		// change the reference of the parent_model
-		objective.setmodelmats(_modelmats)
+		// objective.setmodelmats(_modelmats)
+		changeObjectiveModelMat(objective, _modelmats)
+		// println ("print the eval model")
+		
+
 		objective.evalbatch(mats, ipass, here)
+		//rand(1,1)
 	}
 
 	// help methods
 
+
+	// change the reference of the modelmats in the model
+	// as well as change the reference of modelmats at each layer
+	def changeObjectiveModelMat(model:Model, mats:Array[Mat]):Unit = {
+
+		for (i <- 0 until model.modelmats.length) {
+			model.modelmats(i) <-- mats(i)
+		}
+	}
+
 	def computeVarDelta():Double = {
+		
+		/**
 		proposer.changeToEstimateSdState()
 		val (next_mat0:Array[Mat], delta0:Double) = proposer.proposeNext(_modelmats, batch_est_sd0, 0, 0)
 		val (next_mat1:Array[Mat], delta1:Double) = proposer.proposeNext(_modelmats, batch_est_sd1, 0, 1)
@@ -139,6 +157,8 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		var_estimate_mat(1) = delta1
 		proposer.changeToUpdateState()
 		(variance(var_estimate_mat)^0.5).dv
+		**/
+		rand(1,1).dv
 	}
 }
 
@@ -156,7 +176,6 @@ object MHTest {
 	def learner(mat0:Mat, targ:Mat, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat) = {
 		class xopts extends Learner.Options with MHTest.Opts with MatSource.Opts with IncNorm.Opts 
 	    val opts = new xopts
-	    // TODO: define the parameters for the opts
 
 	    val nn = new Learner(
 	      new MatSource(Array(mat0, targ), opts),
@@ -226,9 +245,6 @@ object MHTest {
 		opts.reg1weight = 0.0001;
 		opts.hasBias = true;
 		opts.links = iones(1,1);
-		opts.lrate = 0.01f;
-		opts.texp = 0.4f;
-		opts.evalStep = 311;
 		opts.nweight = 1e-4f
 		val net = Net.dnodes3(nslabs, width, taper, ntargs, opts, nonlin);
 		opts.nodeset = net
@@ -261,7 +277,7 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 	var candidate:Array[Mat] = null
 	var learning_rate:Float = 0.75f
 	var random_matrix:Array[Mat] = null
-	var random_matrixFMat:Array[FMat] = null
+	// var random_matrixFMat:Array[FMat] = null
 	var stepi:Mat = null
 	var is_estimte_sd = true
 	override def init():Unit = {
@@ -270,12 +286,12 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		// here assume the model.modelmats are already initalized
 		candidate = new Array[Mat](model.modelmats.length)
 		random_matrix = new Array[Mat](model.modelmats.length)
-		random_matrixFMat = new Array[FMat](model.modelmats.length)
+		// random_matrixFMat = new Array[FMat](model.modelmats.length)
 		stepi = model.modelmats(0).zeros(1,1)
 		for (i <- 0 until candidate.length) {
 			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
 			random_matrix(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
-			random_matrixFMat(i) = zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			// random_matrixFMat(i) = zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
 		}
 	}
 
@@ -300,8 +316,9 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		for (i <- 0 until candidate.length) {
 			// println(candidate(i))
 			// println(modelmats(i))
-			random_matrixFMat(i) <-- dnormrnd(0, (stepi ^ 0.5).dv, modelmats(i).nrows, modelmats(i).ncols)
-			random_matrix(i) <-- random_matrixFMat(i)
+			// random_matrixFMat(i) <-- dnormrnd(0, (stepi ^ 0.5).dv, modelmats(i).nrows, modelmats(i).ncols)
+			// random_matrix(i) <-- random_matrixFMat(i)
+			normrnd(0, (stepi ^ 0.5).dv, random_matrix(i))
 			candidate(i) <-- modelmats(i) + stepi / 2.0 * model.updatemats(i) 
 			candidate(i) <-- candidate(i) + random_matrix(i)
 			// println(" rand matrix")
@@ -349,10 +366,10 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 class Gradient_descent_proposer (val init_step:Float, val model:Model) extends Proposer() {
 	var step:Float = 1.0f
 	var candidate:Array[Mat] = null
-	var learning_rate:Float = 0.0001f
+	var learning_rate:Float = 0.4f
 	var stepi:Mat = null
 	var is_estimte_sd = true
-	var mu:Float = 0.9f
+	var mu:Float = 0.0f
 	var moument:Array[Mat] = null
 
 	override def init():Unit = {
@@ -369,8 +386,10 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		// just do the one step gradient descent
 		if (!is_estimte_sd) {
-			model.setmodelmats(modelmats);
-
+			// model.setmodelmats(modelmats);
+			for (i <- 0 until modelmats.length) {
+				model.modelmats(i) <-- modelmats(i)
+			}
 			// compute the gradient
 			model.dobatch(gmats, ipass, pos)
 		
@@ -387,7 +406,7 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 			step += 1.0f
 		}
 		// for delta, we just return a very large value
-		(candidate, (rand(1,1)*1000000.0).dv)
+		(candidate, 1000000.0)
 	}
 
 	override def changeToUpdateState():Unit = {
