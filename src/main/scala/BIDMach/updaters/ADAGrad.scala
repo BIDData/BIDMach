@@ -299,6 +299,7 @@ object ADAGrad {
       }
       case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
+//	println("istep=%f" format istep);
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
@@ -309,28 +310,28 @@ object ADAGrad {
           val nc = mmtile.ncols;
           val y = gmm.y(i);
           val x = gmm.x(i);
-        CUMACH.multADAGradTile(nr, nc, y, x, b.nnz, ga.data, ga.nrows, gsb.data, gsb.ir, gsb.ic, mmtile.data, ssqtile.data, gmaskdata, masknr,
-           glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr)
+          CUMACH.multADAGradTile(nr, nc, y, x, gsb.nnz, ga.data, ga.nrows, gsb.data, gsb.ir, gsb.ic, mmtile.data, ssqtile.data, gmaskdata, masknr,
+          		glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr)
         }
-      }
+      } 
       case _ => {
         val grad0 = mm match {
-          case tmm:TMat => mm + 0;
+          case tmm:TMat => mm + 0f;
           case _ => mm.view(mm.nrows, mm.ncols - (if (hasBias) 1 else 0)) + 0;
         }
+        grad0.clear;
         a.madd(b, grad0, false, true);
         val grad = if (hasBias) grad0 \ sum(a,2) else grad0;
-        sumSq ~ sumSq + (grad ∘ grad);
-        sumSq ~ sumSq + eps;
-        val ssq = sumSq + 0f;
-        ssq ~ ssq * istep;
-        ssq ~ ssq ^ vexp;
+        val ssq = grad ∘ grad;
+        ssq ~ ssq ∘ istep;
+        sumSq ~ sumSq ∘ (1f - istep);
+        sumSq ~ sumSq + ssq;
+        ssq ~ sumSq ^ vexp;
+        grad ~ grad / ssq;
         val te = texp + 0f;
         te.set(istep);
         te ~ te ^ texp;
-        grad ~ grad ∘ lrate;
-        grad ~ grad ∘ te;
-        grad ~ grad / ssq;
+        grad ~ grad ∘ (lrate ∘ te);
         mm ~ mm + grad;
       }
     }    

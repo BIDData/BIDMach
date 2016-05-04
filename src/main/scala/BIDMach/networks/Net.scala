@@ -34,7 +34,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var initialize = false;
 
   override def init() = {
-	  mats = datasource.next;
+//	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
 	  batchSize = mats(0).ncols
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
@@ -64,7 +64,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     evalbatch(gmats, 0, 0);
     initialize = false;
     putBack = pb;
-	  datasource.reset;
+//	  datasource.reset;
   }
   
   def createLayers = {
@@ -296,15 +296,60 @@ object Net  {
     		}
     	}
     	case 2 => {
-    		nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
+    		nodes(i) = new DropoutNode{inputs(0) = nodes(i-1); frac = opts.dropout};
     	}
     	case 3 => {
-    		nodes(i) = new DropoutNode{inputs(0) = nodes(i-1); frac = opts.dropout};
+    		nodes(i) = new NormNode{inputs(0) = nodes(i-1); targetNorm = opts.targetNorm; weight = opts.nweight};
     	}
     	}
     }
     nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
     nodes;
+  }
+  
+  def powerShape(tailHeight:Float, power:Float)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
+    powerShape(tailHeight, power, true)(headCount, nfeats);
+  }
+  
+  def powerShape(tailHeight:Float)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
+    powerShape(tailHeight, 1f, true)(headCount, nfeats);
+  }
+  
+  def powerShape(tailHeight:Float, power:Float, leftAlign:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
+    var nblocks = 1;
+    var tc = tailHeight;
+    var ymin = 0;
+    while (tc < headCount) {
+      val ymax = math.min(headCount, math.round(tc - 1e-5f));
+      if (ymax - ymin > 0) nblocks += 1;
+      ymin = ymax;
+      tc *= 2;
+    }
+    val y = new Array[Int](nblocks);
+    val x = new Array[Int](nblocks);
+    val h = new Array[Int](nblocks);
+    val w = new Array[Int](nblocks);
+    val ratio = math.pow(0.5, power);
+    var xmax = nfeats;
+    ymin = 0;
+    tc = tailHeight;
+    var i = 0;
+    while (i < nblocks) {
+    	val newx = (xmax * ratio).toInt;
+      val xmin = if (leftAlign) 0 else newx; 
+      val ymax = math.min(headCount, math.round(tc - 1e-5f));
+      if (ymax - ymin > 0) {
+      	x(i) = xmin;
+      	y(i) = ymin;
+      	w(i) = xmax - xmin;
+      	h(i) = ymax - ymin;
+      	i += 1;
+      }
+      xmax = newx;
+      ymin = ymax;
+      tc *= 2;
+    }
+    (y, x, h, w)
   }
   
   def mkNetModel(fopts:Model.Opts) = {

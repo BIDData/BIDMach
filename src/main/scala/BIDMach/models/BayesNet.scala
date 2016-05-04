@@ -74,7 +74,7 @@ class BayesNet(val dag:Mat,
         // Some stuff for experiments, predictions, and benchmarking.
         setseed(randSeed);
         println("randSeed = " + randSeed);
-        runtimes = zeros(1,10);
+        runtimes = zeros(1,6);
         useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
 
         // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
@@ -104,6 +104,7 @@ class BayesNet(val dag:Mat,
         if (!isFactorModel) {
             normMat = getNormConstMatrix(lengthCPT)
             cpt <-- ( cpt / (cpt.t * normMat *^ normMat).t )
+            println("cpt.t: " + cpt.t)
         }
         setmodelmats(new Array[Mat](1))
         modelmats(0) = cpt
@@ -153,7 +154,7 @@ class BayesNet(val dag:Mat,
   
     /** Calls a uupdate/evalfun sequence. Known data is in gmats(0), sampled data is in gmats(1). */
     override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
-        // println("runtimes: " + runtimes)
+        //println("runtimes: " + runtimes)
         return FMat(0);
     }
  
@@ -177,32 +178,30 @@ class BayesNet(val dag:Mat,
         val select = stackedData > 0
 
         // For the first pass, we need to create a lot of matrices that rely on knowledge of the batch size.
-        val t0 = toc;
         if (ipass == 0) {
             establishMatrices(sdata.ncols)
             val state = convertMat(rand(sdata.nrows * opts.copiesForSAME, sdata.ncols))
             state <-- float( min( int(statesPerNodeSAME ∘ state), int(statesPerNodeSAME-1) ) )
             user ~ (select ∘ (stackedData-1)) + ((1-select) ∘ state)
         }
-        val t1 = toc;
-        runtimes(0) += t1 - t0;
 
         // Now back to normal from prediction accuracy; usertrans is still user.t.
+        val t0 = toc;
         val usertrans = user.t;
-        val t2 = toc;
-        runtimes(1) += t2 - t1;
+        val t1 = toc;
+        runtimes(0) += t1 - t0;
 
         for (c <- 0 until graph.ncolors) {
 
             // Prepare data by establishing appropriate offset matrices for various CPT blocks. First, clear out usertrans.
-            val t3 = toc;
+            val t2 = toc;
             usertrans(?, colorInfo(c).idsInColorSAME) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes*opts.copiesForSAME) ) 
             val offsetMatrix = usertrans * colorInfo(c).iprojectSlicedSAME + (colorInfo(c).globalOffsetVectorSAME).t
             val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrixSAME) + colorInfo(c).strideVectorSAME
             val logProbs = ln(mm(replicatedOffsetMatrix))
             val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrixSAME).t
-            val t4 = toc;
-            runtimes(2) += t4 - t3;
+            val t3 = toc;
+            runtimes(1) += t3 - t2;
 
             // Establish matrices needed for the multinomial sampling
             val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
@@ -214,13 +213,13 @@ class BayesNet(val dag:Mat,
             // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
             //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
             //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
-            val t5 = toc;
+            val t4 = toc;
             val probs = exp(nonExponentiatedProbs)
             probs <-- (probs + 1e-30f) // Had to add this for the DLM MOOC data to prevent 0/(0+0) problems.
             val cumprobs = cumsumByKey(probs, keys)
             val normedProbs = cumprobs / cumprobs(bkeys)    
-            val t6 = toc;
-            runtimes(3) += t6 - t5;
+            val t5 = toc;
+            runtimes(2) += t5 - t4;
 
             // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
             val randMatrix = randMap( (colorInfo(c).numNodes*opts.copiesForSAME, usertrans.nrows) )
@@ -229,19 +228,16 @@ class BayesNet(val dag:Mat,
             val lessThan = normedProbs < randMatrix(randIndices)
             val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
             usertrans(?, colorInfo(c).idsInColorSAME) = sampleIDs.t // Note the SAME now...
-            val t7 = toc;
-            runtimes(4) += t7 - t6;
+            val t6 = toc;
+            runtimes(3) += t6 - t5;
 
             // After sampling with this color group over all copies (from SAME), we override the known values.
             usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t;
-            val t8 = toc;
-            runtimes(5) += t8 - t7;
+            val t7 = toc;
+            runtimes(4) += t7 - t6;
         }
 
-        val t9 = toc;
         user <-- usertrans.t;
-        val t10 = toc;
-        runtimes(6) += t10 - t9;
     }
 
     /**
@@ -257,31 +253,26 @@ class BayesNet(val dag:Mat,
      * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
      */
     def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-        val t11 = toc;
+        val t8 = toc;
         val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
         val linearIndices = index(?)
 
-        // Drop the corresponding previous mini-batch
-        if (ipass > 0)
+        // Drop the corresponding previous mini-batch and accumulate w/current mini-batch.
+        if (ipass > 0) {
             counts1 ~ counts1 - counts2
-
-        // Accumulate w/current mini-batch
+        }
         counts1 ~ counts1 + float(accum(linearIndices, 1, counts1.length, 1)) 
-        val t12 = toc;
-        runtimes(7) += t12 - t11;
-
         gamrnd(counts1 + dirichletPrior, dirichletScale, counts3)
-        val t13 = toc;
-        runtimes(8) += t13 - t12;
 
         if (!isFactorModel) {
             updatemats(0) <-- (counts3 / (counts3.t * normMat *^ normMat).t);
         } else {
             updatemats(0) <-- counts3;
         }
-        val t14 = toc;
-        runtimes(9) += t14 - t13;
+        println("updatemats(0).t = " + updatemats(0).t)
 
+        val t9 = toc;
+        runtimes(5) += t9 - t8;
     }
  
     /**
