@@ -39,10 +39,11 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		objective.bind(datasource)
 		objective.init()
 		_modelmats = new Array[Mat](objective.modelmats.length)
+		println("init")
 		for (i <- 0 until objective.modelmats.length) {
 			_modelmats(i) = objective.modelmats(i).zeros(objective.modelmats(i).nrows, objective.modelmats(i).ncols)
 			_modelmats(i) <-- objective.modelmats(i)
-			//println(_modelmats(i))
+			println(_modelmats(i))
 		}
 		// init the proposer class
 		proposer.init()
@@ -67,17 +68,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 	// then generate a x_corr from distribution of X_corr
 	// Then decide whether to replace (i.e. accpet) _modelmats 
 	override def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-		/**
-		if (num_sd_compute == opts.num_iter_estimate_var && is_estimte_sd) {
-			// compute the var for the delta
-			estimated_sd = (variance(var_estimate_mat)^0.5).dv
-			// init the ecdf
-			println("the sd of the data is " + estimated_sd)
-			ecdf.init(estimated_sd, opts.ratio_decomposite)
-			is_estimte_sd = false
-			proposer.changeToUpdateState()
-		}
-		**/
+
 		// estimate the variance
 		estimated_sd = estimated_sd * sd_smooth_exp_param + (1-sd_smooth_exp_param) * computeVarDelta()
 		// println ("estimated_sd : " + estimated_sd)
@@ -93,31 +84,10 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 				// println ("model mats " + _modelmats(i))
 				// println("next: " + next_mat(i))
 				_modelmats(i) <-- next_mat(i)
-				// println ("updated modelmats " + _modelmats(i))
+				//println ("updated modelmats " + _modelmats(i))
 			}
+			// println ("updated modelmats " + _modelmats(0))
 		}
-
-		/**
-		if (is_estimte_sd) {
-			var_estimate_mat(0,num_sd_compute) = delta
-			num_sd_compute += 1
-			// println(num_sd_compute + "-" +delta)
-		} else {
-			// do the test
-			var x_corr = ecdf.generateXcorr
-			if (x_corr + delta > 0) {
-				// accpet the candiate
-				// println("accpet" + " " + delta + "; X_corr: " + x_corr)
-				for (i <- 0 until _modelmats.length) {
-					// println ("model mats " + _modelmats(i))
-					// println("next: " + next_mat(i))
-					_modelmats(i) <-- next_mat(i)
-					// println ("updated modelmats " + _modelmats(i))
-				}
-			} else {
-				// println("reject" + " " + delta + "; X_corr: " + x_corr)
-			}
-		}**/
 
 	}
 
@@ -127,10 +97,10 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// Notice: this is not the deep copy, we just
 		// change the reference of the parent_model
 		// objective.setmodelmats(_modelmats)
+		
 		changeObjectiveModelMat(objective, _modelmats)
 		// println ("print the eval model")
 		
-
 		objective.evalbatch(mats, ipass, here)
 		//rand(1,1)
 	}
@@ -248,7 +218,7 @@ object MHTest {
 		opts.nweight = 1e-4f
 		val net = Net.dnodes3(nslabs, width, taper, ntargs, opts, nonlin);
 		opts.nodeset = net
-
+		// opts.debug = 1
 		val model = new Net(opts)
 		model
 	}
@@ -304,8 +274,11 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 	}
 
 	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
-		// shadow copy the parameter value to the model's mat
-		model.setmodelmats(modelmats);
+		// deep copy the parameter value to the model's mat
+		for (i <- 0 until modelmats.length) {
+			model.modelmats(i) <-- modelmats(i)
+		}
+		// model.setmodelmats(modelmats);
 
 		// compute the gradient
 		model.dobatch(gmats, ipass, pos)
@@ -346,7 +319,11 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		}
 
 		// jump from the candidate for one more step
-		model.setmodelmats(candidate)
+		// model.setmodelmats(candidate)
+		for (i <- 0 until candidate.length) {
+			model.modelmats(i) <-- candidate(i)
+		}
+
 		model.dobatch(gmats, ipass, pos)
 		loss_mat_prev = model.evalbatch(gmats, ipass, pos)
 		val loss_new:Float = (sum(loss_mat_prev))(0,0)
@@ -392,10 +369,13 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 			}
 			// compute the gradient
 			model.dobatch(gmats, ipass, pos)
-		
+			// println ("the input data is " + gmats(0))
+			// println ("ipass " + ipass + ", pos: " + pos)
+			// println("Update mats:",model.updatemats(0))
+			// println ("the model modelmats in proposer " + model.modelmats(0))
 			// sample the new model parameters by the gradient and the stepsize
 			// and store the sample results into the candidate array
-			stepi <-- init_step / step ^ learning_rate;
+			stepi <-- init_step / (step ^ learning_rate);
 			for (i <- 0 until candidate.length) {
 				// println("proposer next " + stepi )
 				// println("the updates " + model.updatemats(i))
@@ -404,6 +384,9 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 				// println("the candidada " + candidate(i))
 			}
 			step += 1.0f
+			println()
+			println("the step is " + step + " init step is " + init_step + "learning_rate is " + learning_rate + ", step size is " + stepi)
+			println()
 		}
 		// for delta, we just return a very large value
 		(candidate, 1000000.0)
