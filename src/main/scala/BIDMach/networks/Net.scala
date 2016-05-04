@@ -34,7 +34,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var initialize = false;
 
   override def init() = {
-	  mats = datasource.next;
+//	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
 	  batchSize = mats(0).ncols
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
@@ -64,7 +64,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     evalbatch(gmats, 0, 0);
     initialize = false;
     putBack = pb;
-	  datasource.reset;
+//	  datasource.reset;
   }
   
   def createLayers = {
