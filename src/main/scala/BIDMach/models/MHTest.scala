@@ -36,7 +36,16 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// init the var_estimate_mat container
 		// var_estimate_mat = zeros(1, opts.num_iter_estimate_var)
 		// is_estimte_sd = true
-		objective.bind(datasource)
+		// objective.bind(datasource)
+		objective.mats = mats
+		objective.putBack = datasource.opts.putBack;
+	  	objective.useGPU = opts.useGPU && Mat.hasCUDA > 0;
+	  	objective.useDouble = opts.useDouble;
+		objective.gmats = new Array[Mat](mats.length)
+
+
+
+
 		objective.init()
 		_modelmats = new Array[Mat](objective.modelmats.length)
 		println("init")
@@ -100,7 +109,9 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		
 		changeObjectiveModelMat(objective, _modelmats)
 		// println ("print the eval model")
-		
+		for (i <- 0 until modelmats.length) {
+			// println ("model mats: " + objective.modelmats(i))
+		}
 		objective.evalbatch(mats, ipass, here)
 		//rand(1,1)
 	}
@@ -371,7 +382,7 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 			model.dobatch(gmats, ipass, pos)
 			// println ("the input data is " + gmats(0))
 			// println ("ipass " + ipass + ", pos: " + pos)
-			// println("Update mats:",model.updatemats(0))
+			
 			// println ("the model modelmats in proposer " + model.modelmats(0))
 			// sample the new model parameters by the gradient and the stepsize
 			// and store the sample results into the candidate array
@@ -379,14 +390,17 @@ class Gradient_descent_proposer (val init_step:Float, val model:Model) extends P
 			for (i <- 0 until candidate.length) {
 				// println("proposer next " + stepi )
 				// println("the updates " + model.updatemats(i))
+				// println("Update mats:", mean(mean(snorm(model.updatemats(i)))))
+				// println("Model mats:", mean(mean(snorm(model.modelmats(i)))))
+				// println("model mats: ", model.modelmats(i))
 				moument(i) <-- moument(i) * mu + stepi * model.updatemats(i)
 				candidate(i) <-- modelmats(i) + moument(i) 
 				// println("the candidada " + candidate(i))
 			}
 			step += 1.0f
-			println()
-			println("the step is " + step + " init step is " + init_step + "learning_rate is " + learning_rate + ", step size is " + stepi)
-			println()
+			// println()
+			// println("the step is " + step + " init step is " + init_step + "learning_rate is " + learning_rate + ", step size is " + stepi)
+			// println()
 		}
 		// for delta, we just return a very large value
 		(candidate, 1000000.0)
