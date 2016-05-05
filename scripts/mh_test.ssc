@@ -3,8 +3,8 @@ import BIDMach.models.MHTest
 val dir = "/code/BIDMach/data/uci/Higgs/parts/"
 val model = MHTest.constructNNModel(4, 500, 0.6f, 1, 2);
 
-// val proposer = MHTest.Langevin_Proposer(0.01f, model);
-val proposer = MHTest.Gradient_descent_proposer(0.1f, model)
+// val proposer = MHTest.Langevin_Proposer(0.01f, 0.0f, 0.4f, 0.5f, model);
+val proposer = MHTest.Gradient_descent_proposer(0.01f, 0.0f, 0.4f, 0.5f, model)
 val ecdf = loadFMat("./data/EcdfForMHtest/ecdfmat.txt")
 val x_cdf = loadFMat("./data/EcdfForMHtest/xmat.txt")
 val hash_cdf = loadFMat("./data/EcdfForMHtest/hash.txt")

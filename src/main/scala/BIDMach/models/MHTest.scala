@@ -109,9 +109,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		
 		changeObjectiveModelMat(objective, _modelmats)
 		// println ("print the eval model")
-		for (i <- 0 until modelmats.length) {
-			// println ("model mats: " + objective.modelmats(i))
-		}
+		
 		objective.evalbatch(mats, ipass, here)
 		//rand(1,1)
 	}
@@ -205,8 +203,9 @@ object MHTest {
 		lp
 	}
 
-	def Gradient_descent_proposer(init_step:Float, model:Model):Proposer = {
-		val lp = new Gradient_descent_proposer(init_step, model)
+	def Gradient_descent_proposer(lr:Float, u:Float, t:Float, v:Float, model:Model):Proposer = {
+
+		val lp = new Gradient_descent_proposer(lr, u, t, v, model)
 		lp
 	}
 
@@ -351,50 +350,105 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 }
 
 
-class Gradient_descent_proposer (val init_step:Float, val model:Model) extends Proposer() {
-	var step:Float = 1.0f
+class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:Float, val model:Model) extends Proposer() {
+	var step:Mat = null	// record the step by itself
 	var candidate:Array[Mat] = null
-	var learning_rate:Float = 0.4f
+	// var learning_rate:Float = 0.4f
 	var stepi:Mat = null
 	var is_estimte_sd = true
-	var mu:Float = 0.0f
-	var moument:Array[Mat] = null
-
+	var mu:Mat = null
+	var momentum:Array[Mat] = null
+	var sumSq:Array[Mat] = null // container for g*g
+	var lrate:Mat = null
+	var te:Mat = null
+	var ve:Mat = null
+	var hasmomentum:Boolean = true
+	//var modelmats:Array[Mat] = null // just a reference
+	var updatemats:Array[Mat] = null // just a reference
+	var epsilon:Float = 1e-5f
 	override def init():Unit = {
 		// init the container here
+		hasmomentum = (u > 0)
+
 		candidate = new Array[Mat](model.modelmats.length)
-		moument = new Array[Mat](model.modelmats.length)	
+		sumSq = new Array[Mat](model.modelmats.length)	
+
 		stepi = model.modelmats(0).zeros(1,1)
+		step = model.modelmats(0).ones(1,1)
+		
+		te = model.modelmats(0).zeros(1,1)
+		te(0,0) = t
+		ve = model.modelmats(0).zeros(1,1)
+		ve(0,0) = v
+		lrate = model.modelmats(0).zeros(1,1)
+		lrate(0,0) = lr
+		if (hasmomentum) {
+			momentum = new Array[Mat](model.modelmats.length)
+			mu = model.modelmats(0).zeros(1,1)
+			mu(0,0) = u
+		}
 		for (i <- 0 until candidate.length) {
 			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
-			moument(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			sumSq(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			if (hasmomentum) {
+				momentum(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			}
 		}
+		println("finish init the proposer")
+		println("step: " + step + ", stepi" + stepi + ", te: " + te + ", ve: " + ve +", lrate: " + lrate)
 	}
 
 	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
 		// just do the one step gradient descent
 		if (!is_estimte_sd) {
-			// model.setmodelmats(modelmats);
+
 			for (i <- 0 until modelmats.length) {
 				model.modelmats(i) <-- modelmats(i)
 			}
 			// compute the gradient
 			model.dobatch(gmats, ipass, pos)
+			updatemats = model.updatemats
+
 			// println ("the input data is " + gmats(0))
 			// println ("ipass " + ipass + ", pos: " + pos)
 			
 			// println ("the model modelmats in proposer " + model.modelmats(0))
 			// sample the new model parameters by the gradient and the stepsize
 			// and store the sample results into the candidate array
-			stepi <-- init_step / (step ^ learning_rate);
+			stepi <-- lrate / (step ^ te);
 			for (i <- 0 until candidate.length) {
+				// compute the ss
+				val ss = sumSq(i)
+				val um = updatemats(i)
+				val newsquares = um *@ um
+
+				ss ~ ss *@ (step - 1)
+				ss ~ ss + newsquares
+				ss ~ ss / step
+				val grad = ss ^ ve
+				/**
+				if (i == 0) {
+					println (um)
+					println("the square: " + newsquares)
+					println("the ss " + ss)
+					println("the grad " + grad)
+				}
+				**/
+				// println (grad)
+				grad ~ grad + epsilon
+				grad ~ um / grad
+				grad ~ grad *@ stepi
+				if (hasmomentum) {
+					grad ~ grad + momentum(i)
+					momentum(i) ~ grad *@ mu
+				}
 				// println("proposer next " + stepi )
 				// println("the updates " + model.updatemats(i))
 				// println("Update mats:", mean(mean(snorm(model.updatemats(i)))))
 				// println("Model mats:", mean(mean(snorm(model.modelmats(i)))))
 				// println("model mats: ", model.modelmats(i))
-				moument(i) <-- moument(i) * mu + stepi * model.updatemats(i)
-				candidate(i) <-- modelmats(i) + moument(i) 
+				// moument(i) <-- moument(i) * mu + stepi * model.updatemats(i)
+				candidate(i) <-- modelmats(i) + grad
 				// println("the candidada " + candidate(i))
 			}
 			step += 1.0f
