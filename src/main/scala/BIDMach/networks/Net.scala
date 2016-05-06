@@ -432,8 +432,7 @@ object Net  {
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
-    implicit val threads = threadPool(4);
-    val ds = new FileSource(opts)
+    val ds = new FileSource(opts);
     // val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
   	val nn = new Learner(ds, 
   	                     new Net(opts), 
@@ -467,6 +466,36 @@ object Net  {
         null,
         null, 
         new MatSink(opts),
+        opts);
+    (nn, opts)
+  }
+  
+  class FPredOptions extends Learner.Options with Net.Opts with FileSource.Opts with FileSink.Opts
+  
+  def predictor(model0:Model, infn:String, outfn:String):(Learner, FPredOptions) = 
+    predictor(model0, List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
+  
+  def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FPredOptions) = {
+    val model = model0.asInstanceOf[Net];
+    val mopts = model.opts;
+    val opts = new FPredOptions;
+    opts.fnames = infiles;
+    opts.ofnames = outfiles;
+    opts.links = mopts.links;
+    opts.nodeset = mopts.nodeset.clone;
+    opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    opts.hasBias = mopts.hasBias;
+    opts.dropout = 1f;
+    
+    val newmod = new Net(opts);
+    newmod.refresh = false;
+    newmod.copyFrom(model)
+    val nn = new Learner(
+        new FileSource(opts), 
+        newmod, 
+        null,
+        null, 
+        new FileSink(opts),
         opts);
     (nn, opts)
   }
