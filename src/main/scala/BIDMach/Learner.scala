@@ -60,6 +60,7 @@ case class Learner(
       model.bind(datasink);
     }
     model.init;
+    if (model.opts.logDataSink.asInstanceOf[AnyRef] != null)  model.opts.logDataSink.init
     if (mixins != null) mixins map (_ init(model))
     if (updater != null) updater.init(model)
     Mat.useCache = cacheState;
@@ -175,8 +176,10 @@ case class Learner(
       resetGPUs
       Mat.clearCaches
     }
+    
     datasource.close;
     if (datasink != null) datasink.close;
+    if (model.opts.logDataSink.asInstanceOf[AnyRef] != null) model.opts.logDataSink.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList);
     done = true;
   }

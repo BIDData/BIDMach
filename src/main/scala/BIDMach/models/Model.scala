@@ -176,9 +176,21 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
   
+  def logging(gmats:Array[Mat],ipass:Int, here:Long) = {
+    if (opts.logFuncs!=null){
+        val res = opts.logFuncs.map(f=>f(this,gmats));
+        if (opts.logDataSink != null){
+            opts.logDataSink.omats = res.flatten
+            opts.logDataSink.setnmats(res.length)
+            opts.logDataSink.put
+        }
+    }
+  }
+  
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
     copyMats(amats, gmats);            		
     dobatch(gmats, ipass, here);
+    logging(gmats, ipass, here);
   }
   
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -294,8 +306,10 @@ object Model {
 	  var dim = 256
 	  var debug = 0;
 	  var doAllReduce = false;
+	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
+	  var logDataSink : DataSink = null;
   }
-	
+        
 	class Options extends Opts {} 
   
   def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {	

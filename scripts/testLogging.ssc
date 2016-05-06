@@ -1,0 +1,31 @@
+import BIDMach.networks._
+import scala.io.Source
+import BIDMach.datasources._
+import scala.util.Random
+import BIDMach._
+import BIDMach.updaters._
+import BIDMach.mixins._
+import BIDMat.TMat
+
+val prefix = "/data/word2vec/simple-examples/data/"
+val filename=prefix+"ptb.train.imat.lz4"
+val vob = 10000
+val data = loadIMat(filename)(0,0 until 920000)
+val test = loadIMat(prefix+"ptb.valid.imat.lz4")(0,0 until 70000);
+val (l,o)=NextWord.learner(data)
+val lr = 1f
+o.nvocab=vob;
+o.npasses=1;
+o.lrate=lr;
+o.height=2;
+o.width = 20
+o.batchSize=10000;//For fast testing only... set to 200 if want reasonable results
+o.dim=200
+o.kind=2
+o.pstep = 0.09f
+o.hasBias = true
+o.max_grad_norm = 5
+o.logDataSink = new MatSink() //nmats will be computed automatically during the logging
+o.logFuncs = Array(Logging.logGradientL2Norm,Logging.logGradientL1Norm)
+l.train
+val log = Logging.getResults(l) // or Logging.getResults(l.model)
