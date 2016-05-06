@@ -472,8 +472,9 @@ object Net  {
   
   class FPredOptions extends Learner.Options with Net.Opts with FileSource.Opts with FileSink.Opts
   
-  def predictor(model0:Model, infn:String, outfn:String):(Learner, FPredOptions) = 
+  def predictor(model0:Model, infn:String, outfn:String):(Learner, FPredOptions) = {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
+  }
   
   def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FPredOptions) = {
     val model = model0.asInstanceOf[Net];
