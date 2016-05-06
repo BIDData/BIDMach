@@ -444,7 +444,7 @@ object Net  {
   }
 
   
-  class PredOptions extends Learner.Options with Net.Opts with MatSource.Opts with MatSink.Opts
+  class PredOptions extends Learner.Options with Net.Opts with MatSource.Opts with MatSink.Opts;
   
   def predictor(model0:Model, mat0:Mat):(Learner, PredOptions) = {
     val model = model0.asInstanceOf[Net];
@@ -470,16 +470,16 @@ object Net  {
     (nn, opts)
   }
   
-  class FPredOptions extends Learner.Options with Net.Opts with FileSource.Opts with FileSink.Opts
+  class FilePredOptions extends Learner.Options with Net.Opts with FileSource.Opts with FileSink.Opts;
   
-  def predictor(model0:Model, infn:String, outfn:String):(Learner, FPredOptions) = {
+  def predictor(model0:Model, infn:String, outfn:String):(Learner, FilePredOptions) = {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
   }
   
-  def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FPredOptions) = {
+  def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FilePredOptions) = {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
-    val opts = new FPredOptions;
+    val opts = new FilePredOptions;
     opts.fnames = infiles;
     opts.ofnames = outfiles;
     opts.links = mopts.links;
@@ -490,13 +490,15 @@ object Net  {
     
     val newmod = new Net(opts);
     newmod.refresh = false;
-    newmod.copyFrom(model)
+    newmod.copyFrom(model);
+    val dsource = new FileSource(opts);
+    val dsink = new FileSink(opts);
     val nn = new Learner(
-        new FileSource(opts), 
+        dsource, 
         newmod, 
         null,
         null, 
-        new FileSink(opts),
+        dsink,
         opts);
     (nn, opts)
   }
