@@ -369,6 +369,7 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 			grad ~ grad + random_matrix(i)
 			
 			candidate(i) <-- modelmats(i) + grad
+			if (java.lang.Double.isNaN(sum(sum(candidate(i))).dv)) throw new RuntimeException("candidate"+i);
 		}
 
 		// compute the old loss
@@ -379,7 +380,7 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 		var loglik_prev_to_new = 0.0
 		var loglik_new_to_prev = 0.0
 		for (i <- 0 until random_matrix.length) {
-			loglik_prev_to_new += (-1.0*sum(sum((abs(random_matrix(i)))^2)) / 2 / (stepi*2)).dv
+			loglik_prev_to_new += (-1.0*sum(sum(random_matrix(i) *@ random_matrix(i))) / 2.0 / (stepi*2)).dv
 		}
 
 		// jump from the candidate for one more step
@@ -389,7 +390,7 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 		}
 		model.dobatch(gmats, ipass, pos)
 		updatemats = model.updatemats
-		loss_mat_prev = model.evalbatch(gmats, ipass, pos)
+		loss_mat_prev = model.evalbatch(gmats, ipass, pos)	// re-use the old reference here
 		val loss_new = (sum(loss_mat_prev)).dv
 
 		// compute the new scaled gradient
@@ -414,7 +415,10 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 			grad2 ~ um2 / grad2
 			grad2 ~ grad2 *@ stepi
 
-			loglik_new_to_prev +=  (-1.0*sum(sum((abs(modelmats(i) - (candidate(i) + grad2)))^2)) / 2 / (stepi*2)).dv
+			// re-use the space newsquares here
+			newsquares(i) <-- modelmats(i) - candidate(i)
+			newsquares(i) ~ newsquares(i) - grad2
+			loglik_new_to_prev +=  (-1.0*sum(sum(newsquares(i) *@ newsquares(i))) / 2.0 / (stepi*2)).dv
 		}
 
 		val delta = (loss_new) - (loss_prev) + loglik_new_to_prev - loglik_prev_to_new
@@ -428,8 +432,8 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 		if (java.lang.Double.isNaN(delta)) {
 			println ("delta:" + delta + " loss_new:" + loss_new + " loss_prev:" + loss_prev + " loglik_new_to_prev:" + loglik_new_to_prev + " loglik_prev_to_new:" + loglik_prev_to_new)
 			throw new RuntimeException("Delta")
-
 		}
+
 		(candidate, delta)
 	}
 
