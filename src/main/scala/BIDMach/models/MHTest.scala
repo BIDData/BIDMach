@@ -25,26 +25,20 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 	var num_sd_compute:Int = 0
 	var batch_est_sd0:Array[Mat] = null
 	var batch_est_sd1:Array[Mat] = null
+	var accpet_count:Float = 0.0f
+	var reject_count:Float = 0.0f
 	// TODO: init the MHTest, estimate the variance of
 	// delta here. And load the distribution of X_corr
 	// And we should put the parameters in 
 	// _modelmats:Arrya[Mat]
 	override def init() = {
 		// init the ecdf
-		// ecdf = new Ecdf(x_ecdf, ecdfmat, hash_ecdf)
-
-		// init the var_estimate_mat container
-		// var_estimate_mat = zeros(1, opts.num_iter_estimate_var)
-		// is_estimte_sd = true
-		// objective.bind(datasource)
+		
 		objective.mats = mats
 		objective.putBack = datasource.opts.putBack;
 	  	objective.useGPU = opts.useGPU && Mat.hasCUDA > 0;
 	  	objective.useDouble = opts.useDouble;
 		objective.gmats = new Array[Mat](mats.length)
-
-
-
 
 		objective.init()
 		_modelmats = new Array[Mat](objective.modelmats.length)
@@ -80,10 +74,18 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 
 		// estimate the variance
 		estimated_sd = estimated_sd * sd_smooth_exp_param + (1-sd_smooth_exp_param) * computeVarDelta()
-		// println ("estimated_sd : " + estimated_sd)
+		if (java.lang.Double.isNaN(estimated_sd)) {
+			throw new RuntimeException("NaN for the sd 3 ")
+
+		}
+		if (here == 0) {
+			accpet_count = 0.0f
+			reject_count = 0.0f
+		}
 		proposer.changeToUpdateState()
 		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(_modelmats, mats, ipass, here)
 		// do the test
+		// println ("the delta is " + delta)
 		ecdf.updateSd(estimated_sd)
 		var x_corr = ecdf.generateXcorr
 		if (x_corr + delta > 0) {
@@ -95,7 +97,11 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 				_modelmats(i) <-- next_mat(i)
 				//println ("updated modelmats " + _modelmats(i))
 			}
-			// println ("updated modelmats " + _modelmats(0))
+			changeObjectiveModelMat(objective, _modelmats)
+			accpet_count += 1.0f
+			//println ("updated modelmats " + objective.modelmats(0))
+		} else {
+			reject_count += 1.0f
 		}
 
 	}
@@ -108,8 +114,12 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// objective.setmodelmats(_modelmats)
 		
 		changeObjectiveModelMat(objective, _modelmats)
-		// println ("print the eval model")
-		
+		var accpe_ratio = accpet_count / (accpet_count + reject_count)
+		if (java.lang.Double.isNaN(estimated_sd)) {
+			throw new RuntimeException("ADA0 2 ")
+
+		}
+		println ("the sd of delat is " + estimated_sd + " accpet ratio is " + accpe_ratio)
 		objective.evalbatch(mats, ipass, here)
 		//rand(1,1)
 	}
@@ -128,16 +138,20 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 
 	def computeVarDelta():Double = {
 		
-		/**
+		
 		proposer.changeToEstimateSdState()
 		val (next_mat0:Array[Mat], delta0:Double) = proposer.proposeNext(_modelmats, batch_est_sd0, 0, 0)
 		val (next_mat1:Array[Mat], delta1:Double) = proposer.proposeNext(_modelmats, batch_est_sd1, 0, 1)
 		var_estimate_mat(0) = delta0
 		var_estimate_mat(1) = delta1
 		proposer.changeToUpdateState()
-		(variance(var_estimate_mat)^0.5).dv
-		**/
-		rand(1,1).dv
+		var varianceVal = variance(var_estimate_mat)
+		// println("the var is "+ varianceVal)
+		if (varianceVal.dv < 0) {
+			varianceVal(0,0) = 1e-5f
+		}
+		(varianceVal^0.5).dv
+	
 	}
 }
 
@@ -171,7 +185,6 @@ object MHTest {
 	def learner(fn1:String, fn2:String, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
 			                                                                  FileSource.simpleEnum(fn2,1,0)), model, proposer, x_ecdf, ecdfmat, hash_ecdf);
 
-	//def learner(fn1:String, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)), x_ecdf, ecdfmat, hash_ecdf);
 
 	def learner(fnames:List[(Int)=>String], model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = {
 		
@@ -198,14 +211,14 @@ object MHTest {
 	}
 
 	// for testing
-	def Langevin_Proposer(init_step:Float, model:Model):Proposer = {
-		val lp = new Langevin_Proposer(init_step, model)
+	def Langevin_Proposer(lr:Float, t:Float, v:Float, cp:Float, model:Model):Proposer = {
+		val lp = new Langevin_Proposer(lr, t, v, cp, model)
 		lp
 	}
 
-	def Gradient_descent_proposer(lr:Float, u:Float, t:Float, v:Float, model:Model):Proposer = {
+	def Gradient_descent_proposer(lr:Float, u:Float, t:Float, v:Float, cp:Float, model:Model):Proposer = {
 
-		val lp = new Gradient_descent_proposer(lr, u, t, v, model)
+		val lp = new Gradient_descent_proposer(lr, u, t, v, cp, model)
 		lp
 	}
 
@@ -252,27 +265,56 @@ abstract class Proposer() {
 	}
 }
 
-class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer() {
-	var step:Float = 1.0f
+class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, val model:Model) extends Proposer() {
+
+	var step:Mat = null	// record the step by itself
 	var candidate:Array[Mat] = null
-	var learning_rate:Float = 0.75f
-	var random_matrix:Array[Mat] = null
-	// var random_matrixFMat:Array[FMat] = null
 	var stepi:Mat = null
 	var is_estimte_sd = true
+	var sumSq:Array[Mat] = null // container for g*g
+	var lrate:Mat = null
+	var te:Mat = null
+	var ve:Mat = null
+	var updatemats:Array[Mat] = null // just a reference
+	var epsilon:Float = 1e-5f
+    var initsumsq = 1e-5f
+	var clipByValue:Mat = null
+	var newsquares:Array[Mat] = null
+	var random_matrix:Array[Mat] = null
+	var sumSq_tmp_container:Array[Mat] = null
+
 	override def init():Unit = {
-		// init the candidate container
-		// the candidate should have the same shape of the model.modelmats
-		// here assume the model.modelmats are already initalized
+
 		candidate = new Array[Mat](model.modelmats.length)
+		sumSq = new Array[Mat](model.modelmats.length)
+		sumSq_tmp_container = new Array[Mat](model.modelmats.length)
+		newsquares = new Array[Mat](model.modelmats.length)
 		random_matrix = new Array[Mat](model.modelmats.length)
-		// random_matrixFMat = new Array[FMat](model.modelmats.length)
+
 		stepi = model.modelmats(0).zeros(1,1)
+		step = model.modelmats(0).ones(1,1)
+		
+		te = model.modelmats(0).zeros(1,1)
+		te(0,0) = t
+		ve = model.modelmats(0).zeros(1,1)
+		ve(0,0) = v
+		lrate = model.modelmats(0).zeros(1,1)
+		lrate(0,0) = lr
+		
+		if (cp > 0) {
+			clipByValue = model.modelmats(0).zeros(1,1)
+			clipByValue(0,0) = cp
+		}
 		for (i <- 0 until candidate.length) {
 			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			sumSq(i) = model.modelmats(i).ones(model.modelmats(i).nrows, model.modelmats(i).ncols) *@ initsumsq
+			sumSq_tmp_container(i) = model.modelmats(i).ones(model.modelmats(i).nrows, model.modelmats(i).ncols) *@ initsumsq
+			newsquares(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
 			random_matrix(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
-			// random_matrixFMat(i) = zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
 		}
+		println("finish init the proposer")
+		println("step: " + step + ", stepi" + stepi + ", te: " + te + ", ve: " + ve +", lrate: " + lrate)
+
 	}
 
 	override def changeToUpdateState():Unit = {
@@ -288,44 +330,56 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		for (i <- 0 until modelmats.length) {
 			model.modelmats(i) <-- modelmats(i)
 		}
-		// model.setmodelmats(modelmats);
 
 		// compute the gradient
 		model.dobatch(gmats, ipass, pos)
 		
+		updatemats = model.updatemats
+
 		// sample the new model parameters by the gradient and the stepsize
 		// and store the sample results into the candidate array
-		stepi <-- init_step / step ^ learning_rate;
-		for (i <- 0 until candidate.length) {
-			// println(candidate(i))
-			// println(modelmats(i))
-			// random_matrixFMat(i) <-- dnormrnd(0, (stepi ^ 0.5).dv, modelmats(i).nrows, modelmats(i).ncols)
-			// random_matrix(i) <-- random_matrixFMat(i)
-			normrnd(0, (stepi ^ 0.5).dv, random_matrix(i))
-			candidate(i) <-- modelmats(i) + stepi / 2.0 * model.updatemats(i) 
-			candidate(i) <-- candidate(i) + random_matrix(i)
-			// println(" rand matrix")
-			// println(random_matrix(i))
-			// println("candiate")
-			// println(candidate(i))
-		}
-		if (!is_estimte_sd) {
-			step += 1.0f
-		}
-		
-		// compute the delta
-		// loss_mat is a (ouput_layer.length, 1) matrix
-		var loss_mat_prev = model.evalbatch(gmats, ipass, pos)
-		// println (loss_mat_prev)
-		val loss_prev:Float = (sum(loss_mat_prev))(0,0)
-		// compute the log likelihood of the proposal prob
-		// here I ignore the constants
+		stepi <-- lrate / (step ^ te) / 2.0f
 
+		// adagrad to revise the grad
+		for (i <- 0 until candidate.length) {
+			// clip
+			if (cp > 0f) {
+            	min(updatemats(i), clipByValue,updatemats(i));
+          		max(updatemats(i),-clipByValue,updatemats(i));
+    		}
+
+			// compute the ss
+			val ss = sumSq(i)
+			val um = updatemats(i)
+			newsquares(i) <-- um *@ um
+			
+			sumSq_tmp_container(i) <-- ss // copy to tmp container
+
+			ss ~ ss *@ (step - 1)
+			ss ~ ss + newsquares(i)
+			ss ~ ss / step
+			val grad = ss ^ ve
+
+			grad ~ grad + epsilon
+			grad ~ um / grad
+			grad ~ grad *@ stepi
+
+			// for add the gassian noisy
+			normrnd(0, ((stepi*2) ^ 0.5).dv, random_matrix(i))
+			grad ~ grad + random_matrix(i)
+			
+			candidate(i) <-- modelmats(i) + grad
+		}
+
+		// compute the old loss
+		var loss_mat_prev = model.evalbatch(gmats, ipass, pos)
+		val loss_prev = (sum(loss_mat_prev)).dv
+
+		// compute the jump probability
 		var loglik_prev_to_new = 0.0
 		var loglik_new_to_prev = 0.0
-		for (i <- 0 until candidate.length) {
-			// println ((candidate(i) - (modelmats(i) - stepi / 2.0 * model.updatemats(i))))
-			loglik_prev_to_new += (-1.0*sum(sum((abs(candidate(i) - (modelmats(i) + stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
+		for (i <- 0 until random_matrix.length) {
+			loglik_prev_to_new += (-1.0*sum(sum((abs(random_matrix(i)))^2)) / 2 / (stepi*2)).dv
 		}
 
 		// jump from the candidate for one more step
@@ -333,16 +387,49 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 		for (i <- 0 until candidate.length) {
 			model.modelmats(i) <-- candidate(i)
 		}
-
 		model.dobatch(gmats, ipass, pos)
+		updatemats = model.updatemats
 		loss_mat_prev = model.evalbatch(gmats, ipass, pos)
-		val loss_new:Float = (sum(loss_mat_prev))(0,0)
+		val loss_new = (sum(loss_mat_prev)).dv
+
+		// compute the new scaled gradient
 		for (i <- 0 until candidate.length) {
-			// println("the model update " + ((modelmats(i) - (candidate(i) - stepi / 2.0 * model.updatemats(i)))^2))
-			loglik_new_to_prev +=  (-1.0*sum(sum((abs(modelmats(i) - (candidate(i) + stepi / 2.0 * model.updatemats(i))))^2)) / 2 / stepi).dv
+			// clip
+			if (cp > 0f) {
+            	min(updatemats(i), clipByValue,updatemats(i));
+          		max(updatemats(i),-clipByValue,updatemats(i));
+    		}
+
+			// compute the ss
+			val ss2 = sumSq_tmp_container(i)
+			val um2 = updatemats(i)
+			newsquares(i) <-- um2 *@ um2 	// it's OK to reuse the newsquares
+
+			ss2 ~ ss2 *@ (step - 1)
+			ss2 ~ ss2 + newsquares(i)
+			ss2 ~ ss2 / step
+			val grad2 = ss2 ^ ve
+
+			grad2 ~ grad2 + epsilon
+			grad2 ~ um2 / grad2
+			grad2 ~ grad2 *@ stepi
+
+			loglik_new_to_prev +=  (-1.0*sum(sum((abs(modelmats(i) - (candidate(i) + grad2)))^2)) / 2 / (stepi*2)).dv
 		}
-		val delta = (-loss_new) - (-loss_prev) + loglik_new_to_prev - loglik_prev_to_new
-		// println("new loss: " + loss_new + "; prev loss " + loss_prev+ "; loglike new " + loglik_new_to_prev +"; log old" + loglik_prev_to_new)
+
+		val delta = (loss_new) - (loss_prev) + loglik_new_to_prev - loglik_prev_to_new
+
+		// update the iteration only if it's update
+		if (!is_estimte_sd) {
+			step ~ step + 1.0f
+		}
+		// println ("delta:" + delta + " loss_new:" + loss_new + " loss_prev:" + loss_prev + " loglik_new_to_prev:" + loglik_new_to_prev + " loglik_prev_to_new:" + loglik_prev_to_new)
+
+		if (java.lang.Double.isNaN(delta)) {
+			println ("delta:" + delta + " loss_new:" + loss_new + " loss_prev:" + loss_prev + " loglik_new_to_prev:" + loglik_new_to_prev + " loglik_prev_to_new:" + loglik_prev_to_new)
+			throw new RuntimeException("Delta")
+
+		}
 		(candidate, delta)
 	}
 
@@ -350,10 +437,9 @@ class Langevin_Proposer(val init_step:Float, val model:Model) extends Proposer()
 }
 
 
-class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:Float, val model:Model) extends Proposer() {
+class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:Float, val cp:Float, val model:Model) extends Proposer() {
 	var step:Mat = null	// record the step by itself
 	var candidate:Array[Mat] = null
-	// var learning_rate:Float = 0.4f
 	var stepi:Mat = null
 	var is_estimte_sd = true
 	var mu:Mat = null
@@ -363,15 +449,19 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 	var te:Mat = null
 	var ve:Mat = null
 	var hasmomentum:Boolean = true
-	//var modelmats:Array[Mat] = null // just a reference
 	var updatemats:Array[Mat] = null // just a reference
 	var epsilon:Float = 1e-5f
+    var initsumsq = 1e-5f
+	var clipByValue:Mat = null
+	var newsquares:Array[Mat] = null
+
 	override def init():Unit = {
 		// init the container here
 		hasmomentum = (u > 0)
 
 		candidate = new Array[Mat](model.modelmats.length)
 		sumSq = new Array[Mat](model.modelmats.length)	
+		newsquares = new Array[Mat](model.modelmats.length)
 
 		stepi = model.modelmats(0).zeros(1,1)
 		step = model.modelmats(0).ones(1,1)
@@ -387,9 +477,16 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 			mu = model.modelmats(0).zeros(1,1)
 			mu(0,0) = u
 		}
+
+		if (cp > 0) {
+			clipByValue = model.modelmats(0).zeros(1,1)
+			clipByValue(0,0) = cp
+		}
 		for (i <- 0 until candidate.length) {
 			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
-			sumSq(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			sumSq(i) = model.modelmats(i).ones(model.modelmats(i).nrows, model.modelmats(i).ncols) *@ initsumsq
+			newsquares(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			
 			if (hasmomentum) {
 				momentum(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
 			}
@@ -409,32 +506,26 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 			model.dobatch(gmats, ipass, pos)
 			updatemats = model.updatemats
 
-			// println ("the input data is " + gmats(0))
-			// println ("ipass " + ipass + ", pos: " + pos)
-			
-			// println ("the model modelmats in proposer " + model.modelmats(0))
 			// sample the new model parameters by the gradient and the stepsize
 			// and store the sample results into the candidate array
 			stepi <-- lrate / (step ^ te);
 			for (i <- 0 until candidate.length) {
+				// clip
+				if (cp > 0f) {
+	            	min(updatemats(i), clipByValue,updatemats(i));
+              		max(updatemats(i),-clipByValue,updatemats(i));
+	    		}
+
 				// compute the ss
 				val ss = sumSq(i)
 				val um = updatemats(i)
-				val newsquares = um *@ um
+				newsquares(i) <-- um *@ um
 
 				ss ~ ss *@ (step - 1)
-				ss ~ ss + newsquares
+				ss ~ ss + newsquares(i)
 				ss ~ ss / step
 				val grad = ss ^ ve
-				/**
-				if (i == 0) {
-					println (um)
-					println("the square: " + newsquares)
-					println("the ss " + ss)
-					println("the grad " + grad)
-				}
-				**/
-				// println (grad)
+
 				grad ~ grad + epsilon
 				grad ~ um / grad
 				grad ~ grad *@ stepi
@@ -442,19 +533,10 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 					grad ~ grad + momentum(i)
 					momentum(i) ~ grad *@ mu
 				}
-				// println("proposer next " + stepi )
-				// println("the updates " + model.updatemats(i))
-				// println("Update mats:", mean(mean(snorm(model.updatemats(i)))))
-				// println("Model mats:", mean(mean(snorm(model.modelmats(i)))))
-				// println("model mats: ", model.modelmats(i))
-				// moument(i) <-- moument(i) * mu + stepi * model.updatemats(i)
+				
 				candidate(i) <-- modelmats(i) + grad
-				// println("the candidada " + candidate(i))
 			}
-			step += 1.0f
-			// println()
-			// println("the step is " + step + " init step is " + init_step + "learning_rate is " + learning_rate + ", step size is " + stepi)
-			// println()
+			step ~ step + 1.0f
 		}
 		// for delta, we just return a very large value
 		(candidate, 1000000.0)
@@ -489,7 +571,6 @@ class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
 
 	def generateXcorr : Double = {
 		var u:Float = rand(1,1)(0,0)
-		//println(u)
 		binarySearch(u)
 	}
 
@@ -503,7 +584,6 @@ class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
 		var mid : Int = 0
 		while (end > start + 1) {
 			mid = (start + end) / 2
-			//println("start: " + start + ", end: "+ end + ", mid: " + mid + " val:"+ f(mid))
 			if (u < f(mid)) {
 				end = mid;
 			} else if (u > f(mid)) {
@@ -512,8 +592,6 @@ class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
 				return x(mid) * sd
 			}
 		}
-		//println("start: " + start + ", end: "+ end)
-		// println("inside ecdf, " + ((x(start) + x(end))/2) + " - " + sd)
 		(x(start) + x(end))/2 * sd
 	}
 }
