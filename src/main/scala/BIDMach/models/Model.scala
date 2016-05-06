@@ -149,8 +149,15 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
     val in = new FileInputStream(fname+"options.ser");
     val input = new ObjectInputStream(in);
-    val newopts = input.readObject.asInstanceOf[Model.Opts];
+//    val newopts = input.readObject.asInstanceOf[Model.Opts];
     input.close;
+    val fr = new BufferedReader(new FileReader(fname+"options.json"));
+    val strbuf = new StringBuffer;
+    var line:String = null;
+    while ({line = fr.readLine(); line != null}) {
+      strbuf.append(line).append("\n");
+    }
+    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts];
     opts.copyFrom(newopts)
   }
   
