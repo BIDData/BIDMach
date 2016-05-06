@@ -141,24 +141,26 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     } else {
       var n = 0;
       var mlist = new ListBuffer[Mat]();
-      while ((new java.io.File(fname+"modelmat%02d.lz4" format n)).exists) {
+      while ((new File(fname+"modelmat%02d.lz4" format n)).exists) {
         mlist += loadMat(fname+"modelmat%02d.lz4" format n);
         n += 1;
       }
       setmodelmats(mlist.toArray);
     }
-    val in = new FileInputStream(fname+"options.ser");
-    val input = new ObjectInputStream(in);
-//    val newopts = input.readObject.asInstanceOf[Model.Opts];
-    input.close;
-    val fr = new BufferedReader(new FileReader(fname+"options.json"));
+	  if (new File(fname+"options.ser").exists) {
+	  	val in = new FileInputStream(fname+"options.ser");
+	  	val input = new ObjectInputStream(in);
+	  	val newopts = input.readObject.asInstanceOf[Model.Opts];
+	  	input.close;
+	  	/*    val fr = new BufferedReader(new FileReader(fname+"options.json"));
     val strbuf = new StringBuffer;
     var line:String = null;
     while ({line = fr.readLine(); line != null}) {
       strbuf.append(line).append("\n");
     }
-    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts];
-    opts.copyFrom(newopts)
+    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts]; */
+	  	opts.copyFrom(newopts);
+	  }
   }
   
   def bind(ds:DataSource):Unit = {
