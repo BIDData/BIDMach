@@ -15,22 +15,17 @@ import scala.collection.mutable._
 class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val ecdfmat: FMat, val hash_ecdf:FMat, 
 	override val opts:MHTest.Opts = new MHTest.Options) extends Model(opts) {
 
-	// parent_model = objective
 	var ecdf:Ecdf = new Ecdf(x_ecdf, ecdfmat, hash_ecdf)
 	var delta:Double = 1.0
-	// var is_estimte_sd: Boolean = true
-	var var_estimate_mat:FMat = zeros(1, 2)
+	var var_estimate_mat:FMat = null
 	var sd_smooth_exp_param:Double = 0.7 // use the exp update to estimate var
 	var estimated_sd:Double = 1.0
-	var num_sd_compute:Int = 0
 	var batch_est_sd0:Array[Mat] = null
 	var batch_est_sd1:Array[Mat] = null
 	var accpet_count:Float = 0.0f
 	var reject_count:Float = 0.0f
-	// TODO: init the MHTest, estimate the variance of
-	// delta here. And load the distribution of X_corr
-	// And we should put the parameters in 
-	// _modelmats:Arrya[Mat]
+	var batch_est_data:Array[Array[Mat]] = null
+
 	override def init() = {
 		// init the ecdf
 		
@@ -53,14 +48,16 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 
 		// init the batch_est_sd0/1
 		var mat = datasource.next
-		batch_est_sd0 = new Array[Mat](mat.length)
-		for (i <- 0 until mat.length) {
-			batch_est_sd0(i) = GMat(mat(i))
-		}
-		mat = datasource.next;
-		batch_est_sd1 = new Array[Mat](mat.length)
-		for (i <- 0 until mat.length) {
-			batch_est_sd1(i) = GMat(mat(i))
+
+		// init the container
+		var_estimate_mat = zeros(1, opts.num_data_est_sd)
+
+		batch_est_data = Array.ofDim[Mat](opts.num_data_est_sd, mat.length)
+		for (i_batch <- 0 until opts.num_data_est_sd) {
+			mat = datasource.next
+			for (i_mat <- 0 until mat.length) {
+				batch_est_data(i_batch)(i_mat) = GMat(mat(i_mat))
+			}
 		}
 
 		// init ecdf
@@ -140,13 +137,14 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		
 		
 		proposer.changeToEstimateSdState()
-		val (next_mat0:Array[Mat], delta0:Double) = proposer.proposeNext(_modelmats, batch_est_sd0, 0, 0)
-		val (next_mat1:Array[Mat], delta1:Double) = proposer.proposeNext(_modelmats, batch_est_sd1, 0, 1)
-		var_estimate_mat(0) = delta0
-		var_estimate_mat(1) = delta1
+
+		for (i <- 0 until opts.num_data_est_sd) {
+			val (next_mat0:Array[Mat], delta:Double) = proposer.proposeNext(_modelmats, batch_est_data(i), 0, 0)
+			var_estimate_mat(0,i) = delta
+		}
 		proposer.changeToUpdateState()
 		var varianceVal = variance(var_estimate_mat)
-		// println("the var is "+ varianceVal)
+		// println("the var is "+ varianceVal + ",  the vect is " + var_estimate_mat)
 		if (varianceVal.dv < 0) {
 			varianceVal(0,0) = 1e-5f
 		}
@@ -162,6 +160,7 @@ object MHTest {
 		// var num_iter_estimate_var:Int = 100
 		// var batchSize:Int = 200 // the parents class already has it
 		var ratio_decomposite:Double = 0.994
+		var num_data_est_sd:Int = 3
 	}
 
 	class Options extends Opts {}

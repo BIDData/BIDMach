@@ -13,6 +13,7 @@ val hash_cdf = loadFMat("./data/EcdfForMHtest/hash.txt")
 
 val (nn, opts) = MHTest.learner(dir+"data%03d.fmat.lz4", dir+"label%03d.fmat.lz4", model, proposer, x_cdf, ecdf, hash_cdf)
 
+opts.num_data_est_sd = 2
 opts.npasses = 10
 opts.nend = 10
 opts.evalStep = 311;
