@@ -20,8 +20,6 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 	var var_estimate_mat:FMat = null
 	var sd_smooth_exp_param:Double = 0.7 // use the exp update to estimate var
 	var estimated_sd:Double = 1.0
-	var batch_est_sd0:Array[Mat] = null
-	var batch_est_sd1:Array[Mat] = null
 	var accpet_count:Float = 0.0f
 	var reject_count:Float = 0.0f
 	var batch_est_data:Array[Array[Mat]] = null
@@ -38,13 +36,16 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		objective.init()
 		_modelmats = new Array[Mat](objective.modelmats.length)
 		println("init")
+		// init the proposer class
+		proposer.init()
+
 		for (i <- 0 until objective.modelmats.length) {
 			_modelmats(i) = objective.modelmats(i).zeros(objective.modelmats(i).nrows, objective.modelmats(i).ncols)
 			_modelmats(i) <-- objective.modelmats(i)
+			
 			println(_modelmats(i))
 		}
-		// init the proposer class
-		proposer.init()
+		
 
 		// init the batch_est_sd0/1
 		var mat = datasource.next
@@ -92,7 +93,6 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 				// println ("model mats " + _modelmats(i))
 				// println("next: " + next_mat(i))
 				_modelmats(i) <-- next_mat(i)
-				//println ("updated modelmats " + _modelmats(i))
 			}
 			changeObjectiveModelMat(objective, _modelmats)
 			accpet_count += 1.0f
@@ -139,7 +139,8 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		proposer.changeToEstimateSdState()
 
 		for (i <- 0 until opts.num_data_est_sd) {
-			val (next_mat0:Array[Mat], delta:Double) = proposer.proposeNext(_modelmats, batch_est_data(i), 0, 0)
+			
+			var (next_mat0, delta) = proposer.proposeNext(_modelmats, batch_est_data(i), 0, 0)
 			var_estimate_mat(0,i) = delta
 		}
 		proposer.changeToUpdateState()
@@ -221,6 +222,12 @@ object MHTest {
 		lp
 	}
 
+	def SGHMC_proposer (lr:Float, a:Float, t:Float, v:Float, cp:Float, k:Float, batchSize:Float, model:Model):Proposer = {
+		val lp = new SGHMC_proposer(lr, a, t, v, cp, k, batchSize, model)
+		lp
+	}
+
+
 	// create a fully connected nn model, just model,
 	// not learner
 	// TODO: We need to write this function so that it can generate a model, 
@@ -248,7 +255,6 @@ object MHTest {
 }
 
 abstract class Proposer() {
-
 	// init the proposer class.
 	def init():Unit = {
 
@@ -437,6 +443,176 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 	}
 
 
+}
+
+
+// the stochastic gradient hamiltonian monte carlo updater
+class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val cp:Float, val k:Float, val batchSize:Float, val model:Model) extends Proposer() {
+
+	var step:Mat = null	// record the step by itself
+	var candidate:Array[Mat] = null
+	var stepi:Mat = null
+	var is_estimte_sd:Boolean = true
+	var alpha:Mat = null
+	var v_old:Array[Mat] = null	// the v in the paper
+	var sumSq:Array[Mat] = null // container for g*g
+	var lrate:Mat = null
+	var te:Mat = null
+	var ve:Mat = null
+	var noise_matrix:Array[Mat] = null // contain the v_new
+	var epsilon:Float = 1e-5f
+    var initsumsq = 1e-5f
+	var clipByValue:Mat = null
+	var newsquares:Array[Mat] = null
+	var estimated_v:Mat = null
+	var kir:Mat = null
+	var m:Int = 3
+
+
+	override def init():Unit = {
+		// init the container here
+
+		candidate = new Array[Mat](model.modelmats.length)
+		sumSq = new Array[Mat](model.modelmats.length)	
+		newsquares = new Array[Mat](model.modelmats.length)
+
+		stepi = model.modelmats(0).zeros(1,1)
+		step = model.modelmats(0).ones(1,1)
+		
+		te = model.modelmats(0).zeros(1,1)
+		te(0,0) = t
+		ve = model.modelmats(0).zeros(1,1)
+		ve(0,0) = v
+		lrate = model.modelmats(0).zeros(1,1)
+		lrate(0,0) = lr
+		v_old = new Array[Mat](model.modelmats.length)
+		noise_matrix = new Array[Mat](model.modelmats.length)
+		alpha = model.modelmats(0).zeros(1,1)
+		alpha(0,0) = a
+
+		estimated_v = model.modelmats(0).zeros(1,1)
+
+		kir = model.modelmats(0).zeros(1,1)
+		kir(0,0) = k
+
+		if (cp > 0) {
+			clipByValue = model.modelmats(0).zeros(1,1)
+			clipByValue(0,0) = cp
+		}
+		for (i <- 0 until candidate.length) {
+			candidate(i) =  model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			sumSq(i) = model.modelmats(i).ones(model.modelmats(i).nrows, model.modelmats(i).ncols) *@ initsumsq
+			newsquares(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			v_old(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+			noise_matrix(i) = model.modelmats(i).zeros(model.modelmats(i).nrows, model.modelmats(i).ncols)
+		}
+		println("finish init the proposer")
+		println("step: " + step + ", stepi" + stepi + ", te: " + te + ", ve: " + ve +", lrate: " + lrate)
+	}
+
+
+	override def changeToUpdateState():Unit = {
+		is_estimte_sd = false
+	}
+
+	override def changeToEstimateSdState():Unit = {
+		is_estimte_sd = true
+	}
+
+	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
+		
+		// compute the new v
+
+		// copy the modelmats to the model
+		for (i <- 0 until modelmats.length) {
+			model.modelmats(i) <-- modelmats(i)
+		}
+		val score_old = -1.0 *sum(model.evalbatch(gmats, ipass, pos))
+		stepi <-- lrate / (step ^ te);
+
+		// resample the v_old
+		for (i <- 0 until v_old.length) {
+			normrnd(0, (stepi^0.5).dv, v_old(i))
+		}
+
+		var enery_old = v_old(0).zeros(1,1)
+		for (i <- 0 until candidate.length) {
+			enery_old ~ enery_old + sum(sum(v_old(i) *@ v_old(i)))
+		}
+		enery_old ~ enery_old / 2 / stepi
+
+		// copy the modelmats to candidates
+		for (i <- 0 until modelmats.length) {
+			candidate(i) <-- modelmats(i)
+		}
+		// do update for m steps
+		for (j <- 0 until m) {
+			for (i <- 0 until modelmats.length) {
+				candidate(i) ~ candidate(i) + v_old(i)
+				model.modelmats(i) <-- candidate(i)
+			} 
+
+			model.dobatch(gmats, ipass, pos)
+
+			for (i <- 0 until candidate.length) {
+				// clip
+				if (cp > 0f) {
+		        	min(model.updatemats(i), clipByValue, model.updatemats(i));
+		      		max(model.updatemats(i),-clipByValue, model.updatemats(i));
+				}
+
+				// compute the ss
+				val ss = sumSq(i)
+				val um = model.updatemats(i)
+				newsquares(i) <-- um *@ um
+
+				ss ~ ss *@ (step - 1)
+				ss ~ ss + newsquares(i)
+				ss ~ ss / step
+				val grad = ss ^ ve
+
+				grad ~ grad + epsilon
+				grad ~ um / grad
+
+				// estimate beta
+				estimated_v ~ estimated_v *@ (1 - kir)
+				estimated_v ~ estimated_v + sum(grad *@ grad) *@ kir / batchSize
+
+				grad ~ grad *@ stepi
+
+				// put the val into the container
+				v_old(i) ~ (1-alpha) *@ v_old(i) - grad
+
+				// add the random noise
+				val est_var = 2*(alpha - estimated_v*stepi / 2.0) * stepi
+				normrnd(0, (est_var^0.5).dv, noise_matrix(i))
+				v_old(i) ~ v_old(i) + noise_matrix(i)
+			}
+
+		}	
+		
+		
+		// compute the delta here
+		// place the modelmats by the proposed one
+		for (i <- 0 until candidate.length) {
+			model.modelmats(i) <-- candidate(i)
+		}
+		val score_new = -1.0 * sum(model.evalbatch(gmats, ipass, pos))
+
+		var enery_new = v_old(0).zeros(1,1)
+		for (i <- 0 until candidate.length) {
+			enery_new ~ enery_new + sum(sum(v_old(i) *@ v_old(i)))
+		}
+		enery_new ~ enery_new / 2 / stepi
+		// println ("score_old: " + score_old + ", score_new: " + score_new + ", enery_new:" + enery_new + ", enery_old:"+enery_old)
+		val delta = score_old + enery_old - score_new - enery_new
+		// println ("the delta is " + delta)
+		// incremental the count
+		if (!is_estimte_sd) {
+			step ~ step + 1.0f
+		}
+		(candidate, delta.dv)
+	}
 }
 
 
