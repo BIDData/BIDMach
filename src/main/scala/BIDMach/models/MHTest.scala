@@ -433,6 +433,7 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 			grad2 ~ grad2 *@ stepi
 
 			// re-use the space newsquares here
+			// the pnt jump from candidate is candidate + grad2
 			newsquares(i) <-- modelmats(i) - candidate(i)
 			newsquares(i) ~ newsquares(i) - grad2
 			loglik_new_to_prev +=  (-1.0*sum(sum(newsquares(i) *@ newsquares(i))) / 2.0 / (stepi*2)).dv
@@ -532,6 +533,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		is_estimte_sd = true
 	}
 
+	// notice, the gradient computed by system is for max the objective...
 	override def proposeNext(modelmats:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Array[Mat], Double) = {
 		
 		// compute the new v
@@ -581,7 +583,8 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 				// compute the ss
 				val ss = sumSq(i)
-				val um = model.updatemats(i)
+				// since the gradient is the revise of the max for min problem
+				val um = -1.0 * model.updatemats(i)
 				newsquares(i) <-- um *@ um
 
 				ss ~ ss *@ (step - 1)
