@@ -23,6 +23,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 	var accpet_count:Float = 0.0f
 	var reject_count:Float = 0.0f
 	var batch_est_data:Array[Array[Mat]] = null
+	var help_mats:Array[Mat] = null
 
 	override def init() = {
 		// init the ecdf
@@ -39,10 +40,16 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		// init the proposer class
 		proposer.init()
 
+		if (proposer.has_help_mats) {
+			help_mats = new Array[Mat](objective.modelmats.length)
+		}
+		
 		for (i <- 0 until objective.modelmats.length) {
 			_modelmats(i) = objective.modelmats(i).zeros(objective.modelmats(i).nrows, objective.modelmats(i).ncols)
 			_modelmats(i) <-- objective.modelmats(i)
-			
+			if (proposer.has_help_mats) {
+				help_mats(i) = objective.modelmats(i).zeros(objective.modelmats(i).nrows, objective.modelmats(i).ncols)
+			}
 			println(_modelmats(i))
 		}
 		
@@ -81,7 +88,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 			reject_count = 0.0f
 		}
 		proposer.changeToUpdateState()
-		val (next_mat:Array[Mat], delta:Double) = proposer.proposeNext(_modelmats, mats, ipass, here)
+		val (next_mat:Array[Mat], update_v, delta:Double) = proposer.proposeNext(_modelmats, help_mats, mats, ipass, here)
 		// do the test
 		// println ("the delta is " + delta)
 		ecdf.updateSd(estimated_sd)
@@ -92,6 +99,9 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 			for (i <- 0 until _modelmats.length) {
 				// println ("model mats " + _modelmats(i))
 				// println("next: " + next_mat(i))
+				if (proposer.has_help_mats) {
+					help_mats(i) <-- (update_v.asInstanceOf[Array[Mat]])(i)
+				}
 				_modelmats(i) <-- next_mat(i)
 			}
 			changeObjectiveModelMat(objective, _modelmats)
@@ -140,7 +150,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 
 		for (i <- 0 until opts.num_data_est_sd) {
 			
-			var (next_mat0, delta) = proposer.proposeNext(_modelmats, batch_est_data(i), 0, 0)
+			var (next_mat0, update_v, delta) = proposer.proposeNext(_modelmats, help_mats, batch_est_data(i), 0, 0)
 			var_estimate_mat(0,i) = delta
 		}
 		proposer.changeToUpdateState()
@@ -256,6 +266,7 @@ object MHTest {
 
 abstract class Proposer() {
 	// init the proposer class.
+	var has_help_mats:Boolean
 	def init():Unit = {
 
 	}
@@ -265,7 +276,7 @@ abstract class Proposer() {
 	def changeToEstimateSdState():Unit = {}
 
 	// Function to propose the next parameter, i.e. theta' and the delta
-	def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
+	def proposeNext(modelmats:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Array[Mat], Double) = {
 		null
 	}
 }
@@ -287,6 +298,7 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 	var newsquares:Array[Mat] = null
 	var random_matrix:Array[Mat] = null
 	var sumSq_tmp_container:Array[Mat] = null
+	override var has_help_mats:Boolean = false
 
 	override def init():Unit = {
 
@@ -330,7 +342,7 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 		is_estimte_sd = true
 	}
 
-	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
+	override def proposeNext(modelmats:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Array[Mat], Double) = {
 		// deep copy the parameter value to the model's mat
 		for (i <- 0 until modelmats.length) {
 			model.modelmats(i) <-- modelmats(i)
@@ -439,7 +451,7 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 			throw new RuntimeException("Delta")
 		}
 
-		(candidate, delta)
+		(candidate, null, delta)
 	}
 
 
@@ -467,6 +479,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 	var estimated_v:Mat = null
 	var kir:Mat = null
 	var m:Int = 3
+	override var has_help_mats:Boolean = true
 
 
 	override def init():Unit = {
@@ -519,7 +532,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		is_estimte_sd = true
 	}
 
-	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
+	override def proposeNext(modelmats:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Array[Mat], Double) = {
 		
 		// compute the new v
 
@@ -532,7 +545,12 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 		// resample the v_old
 		for (i <- 0 until v_old.length) {
-			normrnd(0, (stepi^0.5).dv, v_old(i))
+			// normrnd(0, (stepi^0.5).dv, v_old(i))
+			if (step.dv < 100.0) {
+				normrnd(0, (stepi^0.5).dv, v_old(i))
+			} else {
+				v_old(i) <-- prev_v(i)
+			}
 		}
 
 		var enery_old = v_old(0).zeros(1,1)
@@ -611,7 +629,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		if (!is_estimte_sd) {
 			step ~ step + 1.0f
 		}
-		(candidate, delta.dv)
+		(candidate, v_old, delta.dv)
 	}
 }
 
@@ -633,6 +651,8 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
     var initsumsq = 1e-5f
 	var clipByValue:Mat = null
 	var newsquares:Array[Mat] = null
+	override var has_help_mats:Boolean = false
+
 
 	override def init():Unit = {
 		// init the container here
@@ -674,7 +694,7 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 		println("step: " + step + ", stepi" + stepi + ", te: " + te + ", ve: " + ve +", lrate: " + lrate)
 	}
 
-	override def proposeNext(modelmats:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Double) = {
+	override def proposeNext(modelmats:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Array[Mat], Double) = {
 		// just do the one step gradient descent
 		if (!is_estimte_sd) {
 
@@ -718,7 +738,7 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 			step ~ step + 1.0f
 		}
 		// for delta, we just return a very large value
-		(candidate, 1000000.0)
+		(candidate, null, 1000000.0)
 	}
 
 	override def changeToUpdateState():Unit = {
