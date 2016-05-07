@@ -141,17 +141,26 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     } else {
       var n = 0;
       var mlist = new ListBuffer[Mat]();
-      while ((new java.io.File(fname+"modelmat%02d.lz4" format n)).exists) {
+      while ((new File(fname+"modelmat%02d.lz4" format n)).exists) {
         mlist += loadMat(fname+"modelmat%02d.lz4" format n);
         n += 1;
       }
       setmodelmats(mlist.toArray);
     }
-    val in = new FileInputStream(fname+"options.ser");
-    val input = new ObjectInputStream(in);
-    val newopts = input.readObject.asInstanceOf[Model.Opts];
-    input.close;
-    opts.copyFrom(newopts)
+	  if (new File(fname+"options.ser").exists) {
+	  	val in = new FileInputStream(fname+"options.ser");
+	  	val input = new ObjectInputStream(in);
+	  	val newopts = input.readObject.asInstanceOf[Model.Opts];
+	  	input.close;
+	  	/*    val fr = new BufferedReader(new FileReader(fname+"options.json"));
+    val strbuf = new StringBuffer;
+    var line:String = null;
+    while ({line = fr.readLine(); line != null}) {
+      strbuf.append(line).append("\n");
+    }
+    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts]; */
+	  	opts.copyFrom(newopts);
+	  }
   }
   
   def bind(ds:DataSource):Unit = {
@@ -176,9 +185,21 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
   
+  def logging(gmats:Array[Mat],ipass:Int, here:Long) = {
+    if (opts.logFuncs!=null){
+        val res = opts.logFuncs.map(f=>f(this,gmats));
+        if (opts.logDataSink != null){
+            opts.logDataSink.omats = res.flatten
+            opts.logDataSink.setnmats(res.length)
+            opts.logDataSink.put
+        }
+    }
+  }
+  
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
     copyMats(amats, gmats);            		
     dobatch(gmats, ipass, here);
+    logging(gmats, ipass, here);
   }
   
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
@@ -294,8 +315,10 @@ object Model {
 	  var dim = 256
 	  var debug = 0;
 	  var doAllReduce = false;
+	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
+	  var logDataSink : DataSink = null;
   }
-	
+        
 	class Options extends Opts {} 
   
   def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {	
