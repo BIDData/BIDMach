@@ -548,16 +548,18 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		// resample the v_old
 		for (i <- 0 until v_old.length) {
 			// normrnd(0, (stepi^0.5).dv, v_old(i))
+			
 			if (step.dv < 100.0) {
 				normrnd(0, (stepi^0.5).dv, v_old(i))
 			} else {
 				v_old(i) <-- prev_v(i)
 			}
-		}
+			//normrnd(0, (stepi^0.5).dv, v_old(i))
+		}	
 
 		var enery_old = v_old(0).zeros(1,1)
 		for (i <- 0 until candidate.length) {
-			enery_old ~ enery_old + sum(sum(v_old(i) *@ v_old(i)))
+			enery_old <-- enery_old + sum(sum(v_old(i) *@ v_old(i)))
 		}
 		enery_old ~ enery_old / 2 / stepi
 
@@ -597,17 +599,22 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 				// estimate beta
 				estimated_v ~ estimated_v *@ (1 - kir)
-				estimated_v ~ estimated_v + sum(grad *@ grad) *@ kir / batchSize
+				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize
 
 				grad ~ grad *@ stepi
 
 				// put the val into the container
-				v_old(i) ~ (1-alpha) *@ v_old(i) - grad
-
+				v_old(i) <-- (1.0-alpha) *@ v_old(i) - grad
 				// add the random noise
 				val est_var = 2*(alpha - estimated_v*stepi / 2.0) * stepi
+				// println("the est var is " + estimated_v +" ,the var is " + est_var)
+
+				if (est_var.dv < 0.0) {
+					//throw new RuntimeException("2(alpha -beta) < 0")
+					est_var(0,0) = 1e-5f
+				}
 				normrnd(0, (est_var^0.5).dv, noise_matrix(i))
-				v_old(i) ~ v_old(i) + noise_matrix(i)
+				v_old(i) <-- v_old(i) + noise_matrix(i)
 			}
 
 		}	
@@ -622,7 +629,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 		var enery_new = v_old(0).zeros(1,1)
 		for (i <- 0 until candidate.length) {
-			enery_new ~ enery_new + sum(sum(v_old(i) *@ v_old(i)))
+			enery_new <-- enery_new + sum(sum(v_old(i) *@ v_old(i)))
 		}
 		enery_new ~ enery_new / 2 / stepi
 		// println ("score_old: " + score_old + ", score_new: " + score_new + ", enery_new:" + enery_new + ", enery_old:"+enery_old)
@@ -631,6 +638,9 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		// incremental the count
 		if (!is_estimte_sd) {
 			step ~ step + 1.0f
+		}
+		if (java.lang.Double.isNaN(delta.dv)) {
+			throw new RuntimeException("Delta for proposer")
 		}
 		(candidate, v_old, delta.dv)
 	}
