@@ -115,9 +115,11 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 		  if (leftlayer.output.asInstanceOf[AnyRef] == null) {
 			  leftlayer.output = convertMat(zeros(opts.dim \ batchSize));
 		  }
+		  leftlayer.output.clear;
 		  if (leftlayer.outputs(1).asInstanceOf[AnyRef] == null) {
 			  leftlayer.setOutput(1, convertMat(zeros(opts.dim \ batchSize)));
-		  }       
+		  }   
+		  leftlayer.outputs(1).clear;
 	  }
   }
   
