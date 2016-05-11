@@ -24,6 +24,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 	var reject_count:Float = 0.0f
 	var batch_est_data:Array[Array[Mat]] = null
 	var help_mats:Array[Mat] = null
+	var data_buffer:Array[Mat] = null	// the array to hold the previous data batch
 
 	override def init() = {
 		// init the ecdf
@@ -56,6 +57,12 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 
 		// init the batch_est_sd0/1
 		var mat = datasource.next
+		// put the mat into the data buffer
+		data_buffer = new Array[Mat](mat.length)
+		for (i <- 0 until mat.length) {
+			data_buffer(i) = GMat(mat(i).zeros(mat(i).nrows, mat(i).ncols))
+			data_buffer(i) <-- mat(i)
+		}
 
 		// init the container
 		var_estimate_mat = zeros(1, opts.num_data_est_sd)
@@ -81,19 +88,29 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		estimated_sd = estimated_sd * sd_smooth_exp_param + (1-sd_smooth_exp_param) * computeVarDelta()
 		if (java.lang.Double.isNaN(estimated_sd)) {
 			throw new RuntimeException("NaN for the sd 3 ")
-
 		}
 		if (here == 0) {
 			accpet_count = 0.0f
 			reject_count = 0.0f
 		}
 		proposer.changeToUpdateState()
+		// propose the data
 		val (next_mat:Array[Mat], update_v, delta:Double) = proposer.proposeNext(_modelmats, help_mats, mats, ipass, here)
+		
+		// compute the delta by another batch
+		val delta_new = proposer.computeDelta(next_mat, _modelmats, update_v, help_mats, data_buffer, 0, 0)
+
+		// update the data buffer
+
+		for (i <- 0 until mats.length) {
+			data_buffer(i) <-- mats(i)
+		}
+
 		// do the test
 		// println ("the delta is " + delta)
 		ecdf.updateSd(estimated_sd)
 		var x_corr = ecdf.generateXcorr
-		if (x_corr + delta > 0) {
+		if (x_corr + delta_new > 0 || opts.is_always_accpet) {
 			// accpet the candiate
 			// println("accpet" + " " + delta + "; X_corr: " + x_corr)
 			for (i <- 0 until _modelmats.length) {
@@ -172,6 +189,7 @@ object MHTest {
 		// var batchSize:Int = 200 // the parents class already has it
 		var ratio_decomposite:Double = 0.994
 		var num_data_est_sd:Int = 3
+		var is_always_accpet:Boolean = false
 	}
 
 	class Options extends Opts {}
@@ -278,6 +296,10 @@ abstract class Proposer() {
 	// Function to propose the next parameter, i.e. theta' and the delta
 	def proposeNext(modelmats:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long):(Array[Mat], Array[Mat], Double) = {
 		null
+	}
+
+	def computeDelta(mats_new:Array[Mat], mats_old:Array[Mat], new_v:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long): Double ={
+		-1.0
 	}
 }
 
@@ -388,30 +410,50 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 			candidate(i) <-- modelmats(i) + grad
 			if (java.lang.Double.isNaN(sum(sum(candidate(i))).dv)) throw new RuntimeException("candidate"+i);
 		}
+		
 
-		// compute the old loss
+		// compute the delta
+
+		val delta = computeDelta(candidate, modelmats, null, null, gmats, ipass, pos)
+
+		// update the iteration only if it's update
+		if (!is_estimte_sd) {
+			step ~ step + 1.0f
+		}
+		// println ("delta:" + delta + " loss_new:" + loss_new + " loss_prev:" + loss_prev + " loglik_new_to_prev:" + loglik_new_to_prev + " loglik_prev_to_new:" + loglik_prev_to_new)
+
+		if (java.lang.Double.isNaN(delta)) {
+			// println ("delta:" + delta + " loss_new:" + loss_new + " loss_prev:" + loss_prev + " loglik_new_to_prev:" + loglik_new_to_prev + " loglik_prev_to_new:" + loglik_prev_to_new)
+			throw new RuntimeException("Delta")
+		}
+
+		(candidate, null, delta)
+	}
+
+
+	override def computeDelta(mats_new:Array[Mat], mats_old:Array[Mat], new_v:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long): Double ={
+		// copy the mats_old to the model
+		for (i <- 0 until mats_old.length) {
+			model.modelmats(i) <-- mats_old(i)
+		}
+
+		// compute the loss
 		var loss_mat_prev = model.evalbatch(gmats, ipass, pos)
 		val loss_prev = (sum(loss_mat_prev)).dv
 
-		// compute the jump probability
+		// compute the gradient and rescale it
+		model.dobatch(gmats, ipass, pos)
+		
+		updatemats = model.updatemats
+
+		// sample the new model parameters by the gradient and the stepsize
+		// and store the sample results into the candidate array
+
 		var loglik_prev_to_new = 0.0
 		var loglik_new_to_prev = 0.0
-		for (i <- 0 until random_matrix.length) {
-			loglik_prev_to_new += (-1.0*sum(sum(random_matrix(i) *@ random_matrix(i))) / 2.0 / (stepi*2)).dv
-		}
 
-		// jump from the candidate for one more step
-		// model.setmodelmats(candidate)
-		for (i <- 0 until candidate.length) {
-			model.modelmats(i) <-- candidate(i)
-		}
-		model.dobatch(gmats, ipass, pos)
-		updatemats = model.updatemats
-		loss_mat_prev = model.evalbatch(gmats, ipass, pos)	// re-use the old reference here
-		val loss_new = (sum(loss_mat_prev)).dv
-
-		// compute the new scaled gradient
-		for (i <- 0 until candidate.length) {
+		// adagrad to revise the grad
+		for (i <- 0 until updatemats.length) {
 			// clip
 			if (cp > 0f) {
             	min(updatemats(i), clipByValue,updatemats(i));
@@ -428,33 +470,88 @@ class Langevin_Proposer(val lr:Float, val t:Float, val v:Float, val cp:Float, va
 			ss2 ~ ss2 / step
 			val grad2 = ss2 ^ ve
 
+			// de-affect of the ss2
+			ss2 <-- ss2 *@ step
+			ss2 <-- ss2 - newsquares(i)
+			if (step.dv > 1) {
+				ss2 <-- ss2 / (step - 1)
+			}
+			
+			// so sumSq_tmp_container is still the old ss val
+
+			grad2 ~ grad2 + epsilon
+			grad2 ~ um2 / grad2
+			grad2 ~ grad2 *@ stepi
+
+			// re-use the space newsquares here
+			// the pnt jump from modelmats is modelmats + grad2
+			// println("the grad in the new to prev " + grad2)
+			// println(" the newsquares: " + newsquares(i))
+			// println("the stepi " + stepi)
+			newsquares(i) <-- mats_old(i) + grad2
+			newsquares(i) ~ newsquares(i) - mats_new(i)
+			loglik_prev_to_new +=  (-1.0*sum(sum(newsquares(i) *@ newsquares(i))) / 2.0 / (stepi*2)).dv
+	
+		}
+
+		// then jump from the new mats to the old ones
+		// copy the data to the models
+		for (i <- 0 until mats_new.length) {
+			model.modelmats(i) <-- mats_new(i)
+		}
+
+		// eval the new data
+		model.dobatch(gmats, ipass, pos)
+		updatemats = model.updatemats
+		loss_mat_prev = model.evalbatch(gmats, ipass, pos)	// re-use the old reference here
+		val loss_new = (sum(loss_mat_prev)).dv
+
+		// compute the new scaled gradient
+		for (i <- 0 until updatemats.length) {
+			// clip
+			if (cp > 0f) {
+            	min(updatemats(i), clipByValue,updatemats(i));
+          		max(updatemats(i),-clipByValue,updatemats(i));
+    		}
+
+			// compute the ss
+			val ss2 = sumSq_tmp_container(i)
+			val um2 = updatemats(i)
+			newsquares(i) <-- um2 *@ um2 	// it's OK to reuse the newsquares
+
+			ss2 ~ ss2 *@ (step - 1)
+			ss2 ~ ss2 + newsquares(i)
+			ss2 ~ ss2 / step
+			val grad2 = ss2 ^ ve
+
+			// de-affect the ss2
+			ss2 ~ ss2 *@ step
+			ss2 ~ ss2 - newsquares(i)
+			if (step.dv > 1) {
+				ss2 ~ ss2 / (step - 1)
+			}
+			
+
 			grad2 ~ grad2 + epsilon
 			grad2 ~ um2 / grad2
 			grad2 ~ grad2 *@ stepi
 
 			// re-use the space newsquares here
 			// the pnt jump from candidate is candidate + grad2
-			newsquares(i) <-- modelmats(i) - candidate(i)
-			newsquares(i) ~ newsquares(i) - grad2
+			newsquares(i) <-- mats_new(i) + grad2
+			newsquares(i) ~ newsquares(i) - mats_old(i)
 			loglik_new_to_prev +=  (-1.0*sum(sum(newsquares(i) *@ newsquares(i))) / 2.0 / (stepi*2)).dv
 		}
 
 		val delta = (loss_new) - (loss_prev) + loglik_new_to_prev - loglik_prev_to_new
 
-		// update the iteration only if it's update
-		if (!is_estimte_sd) {
-			step ~ step + 1.0f
-		}
-		// println ("delta:" + delta + " loss_new:" + loss_new + " loss_prev:" + loss_prev + " loglik_new_to_prev:" + loglik_new_to_prev + " loglik_prev_to_new:" + loglik_prev_to_new)
-
 		if (java.lang.Double.isNaN(delta)) {
 			println ("delta:" + delta + " loss_new:" + loss_new + " loss_prev:" + loss_prev + " loglik_new_to_prev:" + loglik_new_to_prev + " loglik_prev_to_new:" + loglik_prev_to_new)
 			throw new RuntimeException("Delta")
 		}
+		delta
 
-		(candidate, null, delta)
 	}
-
 
 }
 
@@ -480,6 +577,8 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 	var estimated_v:Mat = null
 	var kir:Mat = null
 	var m:Int = 3
+	var adj_alpha:Mat = null
+
 	override var has_help_mats:Boolean = true
 
 
@@ -508,6 +607,8 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 		kir = model.modelmats(0).zeros(1,1)
 		kir(0,0) = k
+
+		adj_alpha = model.modelmats(0).zeros(1,1)
 
 		if (cp > 0) {
 			clipByValue = model.modelmats(0).zeros(1,1)
@@ -601,19 +702,38 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				estimated_v ~ estimated_v *@ (1 - kir)
 				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize
 
+				// just add by my understanding not sure right
+				// estimated_v <-- estimated_v / grad.length
+				
+				// just debug
+				
+				adj_alpha <-- alpha
+				if ((estimated_v*stepi/2.0).dv > alpha.dv) {
+					adj_alpha = (estimated_v*stepi/2.0) + 1e-4f
+					// println ("alpha change to be " + adj_alpha)
+				}
+				if (adj_alpha.dv > 1.0) {
+					adj_alpha(0,0) = 0.99f
+				}	
+
+
 				grad ~ grad *@ stepi
 
 				// put the val into the container
-				v_old(i) <-- (1.0-alpha) *@ v_old(i) - grad
+				v_old(i) <-- (1.0-adj_alpha) *@ v_old(i) - grad
 				// add the random noise
-				val est_var = 2*(alpha - estimated_v*stepi / 2.0) * stepi
+				val est_var = 2*(adj_alpha - estimated_v*stepi / 2.0) * stepi
 				// println("the est var is " + estimated_v +" ,the var is " + est_var)
-
-				if (est_var.dv < 0.0) {
-					//throw new RuntimeException("2(alpha -beta) < 0")
-					est_var(0,0) = 1e-5f
+				if (est_var.dv < 0) {
+					/// println("the est var is " + estimated_v +" ,the var is " + est_var)
+					est_var(0,0) = 1e-7f
 				}
 				normrnd(0, (est_var^0.5).dv, noise_matrix(i))
+				v_old(i) <-- v_old(i) + noise_matrix(i)
+				
+
+				// insert more noise?
+				normrnd(0, (stepi * 0.1).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
 			}
 
@@ -644,6 +764,36 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		}
 		(candidate, v_old, delta.dv)
 	}
+
+	override def computeDelta(mats_new:Array[Mat], mats_old:Array[Mat], new_v:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long): Double ={
+		for (i <- 0 until mats_old.length) {
+			model.modelmats(i) <-- mats_old(i)
+		}
+		val score_old = -1.0 *sum(model.evalbatch(gmats, ipass, pos))
+		var enery_old = prev_v(0).zeros(1,1)
+		for (i <- 0 until prev_v.length) {
+			enery_old <-- enery_old + sum(sum(prev_v(i) *@ prev_v(i)))
+		}
+		enery_old ~ enery_old / 2 / stepi
+
+
+		for (i <- 0 until mats_new.length) {
+			model.modelmats(i) <-- mats_new(i)
+		}
+		val score_new = -1.0 *sum(model.evalbatch(gmats, ipass, pos))
+
+		var enery_new = v_old(0).zeros(1,1)
+		for (i <- 0 until candidate.length) {
+			enery_new <-- enery_new + sum(sum(v_old(i) *@ v_old(i)))
+		}
+		enery_new ~ enery_new / 2 / stepi
+		// println ("score_old: " + score_old + ", score_new: " + score_new + ", enery_new:" + enery_new + ", enery_old:"+enery_old)
+		val delta = score_old + enery_old - score_new - enery_new
+		if (java.lang.Double.isNaN(delta.dv)) {
+			throw new RuntimeException("Delta for proposer")
+		}
+		delta.dv
+	} 
 }
 
 
@@ -761,6 +911,10 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 	override def changeToEstimateSdState():Unit = {
 		is_estimte_sd = true
 	}
+
+	override def computeDelta(mats_new:Array[Mat], mats_old:Array[Mat], new_v:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long): Double ={
+		100.0
+	} 
 }
 
 // Class of the emprical cdf of X_corr, there should be three
