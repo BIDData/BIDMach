@@ -143,8 +143,9 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 			throw new RuntimeException("ADA0 2 ")
 
 		}
-		println ("the sd of delat is " + estimated_sd + " accpet ratio is " + accpe_ratio)
-		objective.evalbatch(mats, ipass, here)
+		val loss = objective.evalbatch(mats, ipass, here)
+		println ("REST the sd of delat sdDelta: " + estimated_sd + " accpet ratio is AccRate: " + accpe_ratio + " the loss: " + loss)
+		loss
 		//rand(1,1)
 	}
 
@@ -733,7 +734,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				
 
 				// insert more noise?
-				normrnd(0, (stepi * 0.1).dv, noise_matrix(i))
+				normrnd(0, ((stepi * 0.001)^0.5).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
 			}
 
