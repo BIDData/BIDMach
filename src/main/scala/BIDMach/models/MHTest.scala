@@ -276,6 +276,7 @@ object MHTest {
 		opts.nweight = 1e-4f
 		val net = Net.dnodes3(nslabs, width, taper, ntargs, opts, nonlin);
 		opts.nodeset = net
+		opts.lookahead = 0   /// turn off prefetch
 		// opts.debug = 1
 		val model = new Net(opts)
 		model
@@ -731,10 +732,10 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				}
 				normrnd(0, (est_var^0.5).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
-				
+				// println("the inserted noise is " + (est_var^0.5) + ", and "  + ((stepi * 0.001)^0.5) )
 
 				// insert more noise?
-				normrnd(0, ((stepi * 0.001)^0.5).dv, noise_matrix(i))
+				normrnd(0, ((stepi * 0.000001)^0.5).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
 			}
 
