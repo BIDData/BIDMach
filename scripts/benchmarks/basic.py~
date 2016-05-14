@@ -1,0 +1,20 @@
+
+n = 100000000
+a = Float32[n]
+b = Float32[n]
+c = Float32[n]
+t1 = eps(now())
+for i = 1:n
+  a[i] = rand()
+  b[i] = rand()
+  c[i] = 0
+end
+
+t2 = eps(now())
+for i = 1:n
+    c[i] = a[i] + b[i]
+end
+
+t3 = eps(now())
+dt1 = t2 - t1
+dt2 = t3 - t2
