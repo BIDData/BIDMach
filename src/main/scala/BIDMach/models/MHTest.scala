@@ -276,7 +276,7 @@ object MHTest {
 		opts.nweight = 1e-4f
 		val net = Net.dnodes3(nslabs, width, taper, ntargs, opts, nonlin);
 		opts.nodeset = net
-		opts.lookahead = 0   /// turn off prefetch
+		// opts.lookahead = 0   /// turn off prefetch
 		// opts.debug = 1
 		val model = new Net(opts)
 		model
@@ -580,6 +580,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 	var kir:Mat = null
 	var m:Int = 3
 	var adj_alpha:Mat = null
+	var t_init:Mat = null
 
 	override var has_help_mats:Boolean = true
 
@@ -609,6 +610,9 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 		kir = model.modelmats(0).zeros(1,1)
 		kir(0,0) = k
+
+		t_init = model.modelmats(0).ones(1,1)
+		t_init(0,0) = 100.0f
 
 		adj_alpha = model.modelmats(0).zeros(1,1)
 
@@ -728,14 +732,14 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				// println("the est var is " + estimated_v +" ,the var is " + est_var)
 				if (est_var.dv < 0) {
 					/// println("the est var is " + estimated_v +" ,the var is " + est_var)
-					est_var(0,0) = 1e-7f
+					est_var(0,0) = 1e-9f
 				}
 				normrnd(0, (est_var^0.5).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
 				// println("the inserted noise is " + (est_var^0.5) + ", and "  + ((stepi * 0.001)^0.5) )
 
 				// insert more noise?
-				normrnd(0, ((stepi * 0.000001)^0.5).dv, noise_matrix(i))
+				normrnd(0, ((stepi * 0.00001)^0.5).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
 			}
 
@@ -767,11 +771,16 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		(candidate, v_old, delta.dv)
 	}
 
+
 	override def computeDelta(mats_new:Array[Mat], mats_old:Array[Mat], new_v:Array[Mat], prev_v:Array[Mat], gmats:Array[Mat], ipass:Int, pos:Long): Double ={
+		
+		// compute the temperature
+		val t_i = t_init / step ^(0.5)
+
 		for (i <- 0 until mats_old.length) {
 			model.modelmats(i) <-- mats_old(i)
 		}
-		val score_old = -1.0 *sum(model.evalbatch(gmats, ipass, pos))
+		val score_old = -1.0 *sum(model.evalbatch(gmats, ipass, pos)) / t_i
 		var enery_old = prev_v(0).zeros(1,1)
 		for (i <- 0 until prev_v.length) {
 			enery_old <-- enery_old + sum(sum(prev_v(i) *@ prev_v(i)))
@@ -782,7 +791,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		for (i <- 0 until mats_new.length) {
 			model.modelmats(i) <-- mats_new(i)
 		}
-		val score_new = -1.0 *sum(model.evalbatch(gmats, ipass, pos))
+		val score_new = -1.0 *sum(model.evalbatch(gmats, ipass, pos)) / t_i
 
 		var enery_new = v_old(0).zeros(1,1)
 		for (i <- 0 until candidate.length) {
