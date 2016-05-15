@@ -7,13 +7,30 @@ import BIDMach.networks.SeqToSeq
 
 val dir = "/data/livejournal/srcdst/";  // Directory for input data
 val mdir = "/data/livejournal/models/"
-val odir = "/data/livejournal/preds/";  // Directory for input data
+val odir = "/data/livejournal/preds2/";  // Directory for input data
 
-val model = SeqToSeq.load(mdir+"model256_01/")
+val model = SeqToSeq.load(mdir+"model256_te0.3_12/")
 val (nn,opts) = SeqToSeq.embed(model, dir+  "src%04d.smat.lz4", odir + "pred%04d.fmat.lz4")
 
 opts.nend = 1132
 opts.batchSize = 128
 opts.ofcols = 128000
+
+opts.nvocab = 100000;                     // Vocabulary limit
+opts.npasses = 1;                         // Number of passes over the dataset
+opts.height = 2;                          // Height of the network
+opts.dim = 256;                           // Dimension of LSTM units
+opts.kind = 1;                            // LSTM structure
+opts.netType = 0;                         // Net type (softmax=0, or negsampling=1)
+opts.scoreType = 1;                       // Score type (logloss=0, accuracy=1)
+opts.inwidth = 30;                        // Max input sentence length (truncates)
+opts.outwidth = 30;                       // Max output sentence length (truncates)
+opts.hasBias = true;                      // Use bias terms in linear layers
+opts.pstep = 0.0001f;                     // How often to print
+opts.cumScore = 3;                        // Accumulate scores for less-noisy printing
+opts.PADsym = 1;                          // The padding symbol
+opts.OOVsym = 2;                          // The OOV symbol
+opts.STARTsym = 0;
+opts.lookahead = 0;
 
 nn.predict

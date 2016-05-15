@@ -59,17 +59,17 @@ __global__ void __hashmult(int nrows, int nfeats, int ncols, int bound1, int bou
       float f2 = Bdata[jstart + j2];
       int r1 = Bir[jstart + j1];                             // And their row indices
       int r2 = Bir[jstart + j2];
-      int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
       long long rank = r1 + 1;
       float prod = f1;
       if (j1 == j2) {
         doit = (rank < bound1);
       } else {
         prod *= f2;
-	rank *= r2 + 1;
+        rank *= r2 + 1;
         doit = (rank < bound2);
       }
       if (doit) {
+        int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
         if (transpose > 0) {
           float sum = A[threadIdx.x + nrows * i] * prod;    // Do the product
           atomicAdd(&C[threadIdx.x + nrows * ind], sum);
@@ -102,48 +102,48 @@ __global__ void __hashmult2(int nrows, int nfeats, int ncols, int bound1, int bo
       float f1 = 0;
       int r1 = -1;
       if (j1 + threadIdx.x < nr) {
-	f1 = Bdata[jstart + j1 + threadIdx.x];                // Get the two features
-	r1 = Bir[jstart + j1 + threadIdx.x];                  // And their row indices
+        f1 = Bdata[jstart + j1 + threadIdx.x];                // Get the two features
+        r1 = Bir[jstart + j1 + threadIdx.x];                  // And their row indices
       }
       for (int j2 = j1; j2 < nr; j2 += blockDim.x) {             // work on a block of data
-	float f2 = 0;
-	int r2 = -1;
-	if (j2 + threadIdx.x < nr) {
-	  f2 = Bdata[jstart + j2 + threadIdx.x];
-	  r2 = Bir[jstart + j2 + threadIdx.x];
-	}
-	for (int k = 0; k < 32; k++) {
-	  float f2shift = __shfl(f2, k);
-	  int r2shift = __shfl(r2, k);
-	  if (j2 + k < nr && r1 >= 0) {
-	    int ind = mmhash2(r1, r2shift, nfeats);           // Hash the indices
-	    long long rank = r1 + 1;
-	    float prod = f1;
-	    doit = false;
-	    if (j1 + threadIdx.x == j2 + k) {
-	      doit = (rank < bound1);
-	    } else if (j1 + threadIdx.x < j2 + k) {
-	      prod *= f2shift;
-	      rank *= r2shift + 1;
-	      doit = (rank < bound2);
-	    }
-	    if (doit) {
-	      if (transpose > 0) {
-		for (int m = 0; m < nrows; m++) {
-		  float sum = A[m + nrows * i] * prod;    // Do the product
-		  atomicAdd(&C[m + nrows * ind], sum);
-		  //		  atomicAdd(&C[0], sum);
-		}
-	      } else {
-		for (int m = 0; m < nrows; m++) {
-		  float sum = A[m + nrows * ind] * prod;  // Do the product
-		  atomicAdd(&C[m + nrows * i], sum);
-		  //		  atomicAdd(&C[0], sum);
-		}
-	      }
-	    }
-	  }
-	}
+        float f2 = 0;
+        int r2 = -1;
+        if (j2 + threadIdx.x < nr) {
+          f2 = Bdata[jstart + j2 + threadIdx.x];
+          r2 = Bir[jstart + j2 + threadIdx.x];
+        }
+        for (int k = 0; k < 32; k++) {
+          float f2shift = __shfl(f2, k);
+          int r2shift = __shfl(r2, k);
+          if (j2 + k < nr && r1 >= 0) {
+            long long rank = r1 + 1;
+            float prod = f1;
+            doit = false;
+            if (j1 + threadIdx.x == j2 + k) {
+              doit = (rank < bound1);
+            } else if (j1 + threadIdx.x < j2 + k) {
+              prod *= f2shift;
+              rank *= r2shift + 1;
+              doit = (rank < bound2);
+            }
+            if (doit) {
+              int ind = mmhash2(r1, r2shift, nfeats);           // Hash the indices
+              if (transpose > 0) {
+                for (int m = 0; m < nrows; m++) {
+                  float sum = A[m + nrows * i] * prod;    // Do the product
+                  atomicAdd(&C[m + nrows * ind], sum);
+                  //		  atomicAdd(&C[0], sum);
+                }
+              } else {
+                for (int m = 0; m < nrows; m++) {
+                  float sum = A[m + nrows * ind] * prod;  // Do the product
+                  atomicAdd(&C[m + nrows * i], sum);
+                  //		  atomicAdd(&C[0], sum);
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -171,7 +171,178 @@ int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A,
   return err;
 }
 
+__forceinline__ __device__ long long __pairembed(long long r1, int r2) {
+  return ((r1+r2)*(r1+r2+1) >> 1) + r2;
+}
 
+// Pair mult multplies base features and pairs of features.
+//
+// NOTE: The single-matrix version uses a fast lookup recurrence which is only valid up to 3000 base features per column (approx 4.5 million pairs)
+
+// Given dense A and sparse B, for each column of B, enumerate all pairs of features, hash to a single feature index, and multiply by A into C
+// todo: fix offsets
+
+__global__ void __pairmult(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+  bool doit = false;
+  int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
+  int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
+  float *AX;
+  for (int i = istart; i < iend ; i++) {                     // i is the column index
+    int jstart = Bjc[i];                                     // Range of nz rows in this column
+    int jend = Bjc[i+1];
+    int nr = jend - jstart;                                  // Number of nz rows
+    int todo = nr * (nr + 1) / 2;                            // Number of pairs to process (including k,k pairs)
+    for (int j = threadIdx.y; j < todo; j += blockDim.y) {   // j indexes a worker for this column
+      int j1 = solve1(j);                                    // Compute the first and second indices
+      int j2 = j - j1*(j1+1)/2; 
+      //      int j1, j2;
+      //      solvex(todo, j, j1, j2);
+      float f1 = Bdata[jstart + j1];                         // Get the two features
+      float f2 = Bdata[jstart + j2];
+      int r1 = Bir[jstart + j1];                             // And their row indices
+      int r2 = Bir[jstart + j2];
+      long long rank = r1;
+      float prod = f1;
+      if (j1 == j2) {
+        doit = (rank < bound1);
+        AX = A;
+      } else {
+        prod *= f2;
+        rank = __pairembed(r1, r2);
+        doit = (rank < bound2);
+        AX = A2;
+      }
+      if (doit) {
+        if (transpose > 0) {
+          float sum = AX[threadIdx.x + nrows * i] * prod;    // Do the product
+          atomicAdd(&C[threadIdx.x + nrows * rank], sum);
+        } else {
+          float sum = AX[threadIdx.x + nrows * rank] * prod;  // Do the product
+          atomicAdd(&C[threadIdx.x + nrows * i], sum);
+        }
+      }
+    }
+  }
+}
+
+#if __CUDA_ARCH__ >= 300
+
+// This version is designed for few (or one) rows in A. It allocates one warp per column
+// todo: implement the offsets. 
+
+__global__ void __pairmult2(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                            float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+  bool doit = false;
+  int istart = ((long long)blockIdx.x) * ncols / gridDim.x;
+  int iend = ((long long)(blockIdx.x+1)) * ncols / gridDim.x;
+  float *AX;
+  for (int i = istart; i < iend ; i++) {                     // i is the column index
+    int jstart = Bjc[i];                                     // Range of nz rows in this column
+    int jend = Bjc[i+1];
+    int nr = jend - jstart;                                  // Number of nz rows
+    for (int j1 = 0; j1 < nr; j1 += blockDim.x) {               // work on a block of data
+      float f1 = 0;
+      int r1 = -1;
+      if (j1 + threadIdx.x < nr) {
+        f1 = Bdata[jstart + j1 + threadIdx.x];                // Get the two features
+        r1 = Bir[jstart + j1 + threadIdx.x];                  // And their row indices
+      }
+      for (int j2 = j1; j2 < nr; j2 += blockDim.x) {             // work on a block of data
+        float f2 = 0;
+        int r2 = -1;
+        if (j2 + threadIdx.x < nr) {
+          f2 = Bdata[jstart + j2 + threadIdx.x];
+          r2 = Bir[jstart + j2 + threadIdx.x];
+        }
+        for (int k = 0; k < 32; k++) {
+          float f2shift = __shfl(f2, k);
+          int r2shift = __shfl(r2, k);
+          if (j2 + k < nr && r1 >= 0) {
+            long long rank = r1;
+            float prod = f1;
+            doit = false;
+            if (j1 + threadIdx.x == j2 + k) {
+              doit = (rank < bound1);
+              AX = A;
+            } else if (j1 + threadIdx.x < j2 + k) {
+              prod *= f2shift;
+              rank = __pairembed(rank, r2);
+              doit = (rank < bound2);
+              AX = A2;
+            }
+            if (doit) {
+              if (transpose > 0) {
+                for (int m = 0; m < nrows; m++) {
+                  float sum = AX[m + nrows * i] * prod;    // Do the product
+                  atomicAdd(&C[m + nrows * rank], sum);
+                  //		  atomicAdd(&C[0], sum);
+                }
+              } else {
+                for (int m = 0; m < nrows; m++) {
+                  float sum = AX[m + nrows * rank] * prod;  // Do the product
+                  atomicAdd(&C[m + nrows * i], sum);
+                  //		  atomicAdd(&C[0], sum);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+#else
+
+__global__ void __pairmult2(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                            float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {}
+
+#endif
+// todo: fix offsets
+int pairmultTile(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                 float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+  if (nrows >= 0) {
+    int nt = max(1, 256/nrows);
+    dim3 threadDim(nrows, nt, 1);
+    int nblocks = min(MAXXGRID, ncols);
+    __pairmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, y, x, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, C, transpose);
+  } else {
+    dim3 threadDim(32, 1, 1);
+    int nblocks = min(MAXXGRID, ncols);
+    __pairmult2<<<nblocks,threadDim>>>(nrows, nfeats, ncols, y, x, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, C, transpose);
+  }
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
+__forceinline__ __device__ void __gupdate(float grad, int i, int ihere, int jhere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                                              float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
+  float lr, ve, te, pve, ste, ngrad, ssq, ssqnew;
+  ssq = Sumsq[ihere];
+  ssqnew = hypotf(grad,ssq);
+  atomicAdd(&Sumsq[ihere], ssqnew - ssq);
+  ssq = ssqnew * sqrtf(istep);
+
+  if (addgrad) {
+    lr =  (lrlen > 1) ? lrate[i] : lrate[0];
+    ve =  (vexplen > 1) ? vexp[i] : vexp[0];
+    te =  (texplen > 1) ? texp[i] : texp[0];
+    pve = (ve == 0.5f) ? ssq : ((ve == 0) ? 1.0f : pow(ssq, 2*ve));
+    ste = pow(istep, te);
+    ngrad = grad * lr * ste / pve;
+    atomicAdd(&MM[ihere], ngrad);
+  }
+  if (Mask != NULL) {
+    if (maskrows > 1) {
+      if (Mask[ihere] == 0) MM[ihere] = 0;
+    } else {
+      if (Mask[jhere] == 0) MM[ihere] = 0;
+    }
+  }
+}
+
+/*
 __forceinline__ __device__ void __gupdate(float grad, int i, int ithere, int jthere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                                           float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   float lr, ve, te, pve, ste, ngrad;
@@ -192,7 +363,7 @@ __forceinline__ __device__ void __gupdate(float grad, int i, int ithere, int jth
       if (Mask[jthere] == 0) MM[ithere] = 0;
     }
   }
-}
+  }*/
 
 __global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose,
                                   float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
@@ -216,7 +387,6 @@ __global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, 
       float f2 = Bdata[jstart + j2];
       int r1 = Bir[jstart + j1];                             // And their row indices
       int r2 = Bir[jstart + j2];
-      int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
       long long rank = r1 + 1;
       float prod = f1;
       if (j1 == j2) {
@@ -227,6 +397,7 @@ __global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, 
         doit = (rank < bound2);
       }
       if (doit) {
+        int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
         if (transpose > 0) {
           ihere = threadIdx.x + nrows * i;
           ithere = threadIdx.x + nrows * ind;
