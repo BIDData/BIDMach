@@ -12,10 +12,10 @@ import java.text.NumberFormat
 import edu.berkeley.bid.CUMACH._
 import scala.collection.mutable._
 
-class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val ecdfmat: FMat, val hash_ecdf:FMat, 
+class MHTest(var objective:Model, val proposer:Proposer, val ecdfmat: FMat, val hash_ecdf:FMat, 
 	override val opts:MHTest.Opts = new MHTest.Options) extends Model(opts) {
 
-	var ecdf:Ecdf = new Ecdf(x_ecdf, ecdfmat, hash_ecdf)
+	var ecdf:Ecdf = new Ecdf(ecdfmat, hash_ecdf)
 	var delta:Double = 1.0
 	var var_estimate_mat:FMat = null
 	var sd_smooth_exp_param:Double = 0.7 // use the exp update to estimate var
@@ -76,7 +76,7 @@ class MHTest(var objective:Model, val proposer:Proposer, val x_ecdf: FMat, val e
 		}
 
 		// init ecdf
-		ecdf.init(opts.ratio_decomposite)
+		ecdf.init()
 	}
 
 	// call proposer to get the theta',
@@ -195,13 +195,13 @@ object MHTest {
 
 	class Options extends Opts {}
 
-	def learner(mat0:Mat, targ:Mat, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat) = {
+	def learner(mat0:Mat, targ:Mat, model:Model, proposer:Proposer, ecdfmat: FMat, hash_ecdf:FMat) = {
 		class xopts extends Learner.Options with MHTest.Opts with MatSource.Opts with IncNorm.Opts 
 	    val opts = new xopts
 
 	    val nn = new Learner(
 	      new MatSource(Array(mat0, targ), opts),
-	      new MHTest(model, proposer, x_ecdf, ecdfmat, hash_ecdf, opts),
+	      new MHTest(model, proposer, ecdfmat, hash_ecdf, opts),
 	      null,
 	      new IncNorm(opts),
 	      null,
@@ -211,11 +211,11 @@ object MHTest {
 
 	class FDSopts extends Learner.Options with MHTest.Opts with FileSource.Opts
   
-	def learner(fn1:String, fn2:String, model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
-			                                                                  FileSource.simpleEnum(fn2,1,0)), model, proposer, x_ecdf, ecdfmat, hash_ecdf);
+	def learner(fn1:String, fn2:String, model:Model, proposer:Proposer, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
+			                                                                  FileSource.simpleEnum(fn2,1,0)), model, proposer, ecdfmat, hash_ecdf);
 
 
-	def learner(fnames:List[(Int)=>String], model:Model, proposer:Proposer, x_ecdf: FMat, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = {
+	def learner(fnames:List[(Int)=>String], model:Model, proposer:Proposer, ecdfmat: FMat, hash_ecdf:FMat):(Learner, FDSopts) = {
 		
 		val opts = new FDSopts;
 		opts.fnames = fnames
@@ -225,7 +225,7 @@ object MHTest {
 		val ds = new FileSource(opts)
 			val nn = new Learner(
 					ds, 
-			    new MHTest(model, proposer, x_ecdf, ecdfmat, hash_ecdf, opts), 
+			    new MHTest(model, proposer, ecdfmat, hash_ecdf, opts), 
 			    null,
 			    null, 
 			    null,
@@ -234,8 +234,8 @@ object MHTest {
 	} 
 
 	// just for testing
-	def Ecdf(x: FMat, ecdfmat: FMat, hash:FMat) = {
-		val ecdf = new Ecdf(x, ecdfmat, hash)
+	def Ecdf(ecdfmat: FMat, hash:FMat) = {
+		val ecdf = new Ecdf(ecdfmat, hash)
 		ecdf
 	}
 
@@ -612,7 +612,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		kir(0,0) = k
 
 		t_init = model.modelmats(0).ones(1,1)
-		t_init(0,0) = 100.0f
+		t_init(0,0) = 50000.0f
 
 		adj_alpha = model.modelmats(0).zeros(1,1)
 
@@ -664,11 +664,14 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 			//normrnd(0, (stepi^0.5).dv, v_old(i))
 		}	
 
+		/**
 		var enery_old = v_old(0).zeros(1,1)
 		for (i <- 0 until candidate.length) {
 			enery_old <-- enery_old + sum(sum(v_old(i) *@ v_old(i)))
 		}
 		enery_old ~ enery_old / 2 / stepi
+		**/
+
 
 		// copy the modelmats to candidates
 		for (i <- 0 until modelmats.length) {
@@ -706,20 +709,21 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 				// estimate beta
 				estimated_v ~ estimated_v *@ (1 - kir)
-				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize
+				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize /grad.length
 
 				// just add by my understanding not sure right
 				// estimated_v <-- estimated_v / grad.length
 				
 				// just debug
+				// println("estimated_v: " + estimated_v)
 				
 				adj_alpha <-- alpha
 				if ((estimated_v*stepi/2.0).dv > alpha.dv) {
 					adj_alpha = (estimated_v*stepi/2.0) + 1e-4f
-					// println ("alpha change to be " + adj_alpha)
+					println ("alpha change to be " + adj_alpha)
 				}
 				if (adj_alpha.dv > 1.0) {
-					adj_alpha(0,0) = 0.99f
+					adj_alpha(0,0) = alpha.dv
 				}	
 
 
@@ -748,6 +752,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		
 		// compute the delta here
 		// place the modelmats by the proposed one
+		/**
 		for (i <- 0 until candidate.length) {
 			model.modelmats(i) <-- candidate(i)
 		}
@@ -760,15 +765,17 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		enery_new ~ enery_new / 2 / stepi
 		// println ("score_old: " + score_old + ", score_new: " + score_new + ", enery_new:" + enery_new + ", enery_old:"+enery_old)
 		val delta = score_old + enery_old - score_new - enery_new
+		**/
 		// println ("the delta is " + delta)
 		// incremental the count
+		val delta = computeDelta(candidate, modelmats, v_old, prev_v, gmats, ipass, pos)
 		if (!is_estimte_sd) {
 			step ~ step + 1.0f
 		}
 		if (java.lang.Double.isNaN(delta.dv)) {
 			throw new RuntimeException("Delta for proposer")
 		}
-		(candidate, v_old, delta.dv)
+		(candidate, v_old, delta)
 	}
 
 
@@ -776,6 +783,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		
 		// compute the temperature
 		val t_i = t_init / step ^(0.5)
+		// val t_i = t_init
 
 		for (i <- 0 until mats_old.length) {
 			model.modelmats(i) <-- mats_old(i)
@@ -932,44 +940,56 @@ class Gradient_descent_proposer (val lr:Float, val u:Float, val t:Float, val v:F
 // matrix to hold the data computed from the matlab
 // there are pre-computed txt file at /data/EcdfForMHtest
 
-class Ecdf(val x:FMat, val ecdfmat:FMat, val hash:FMat) {
-	var sd:Double = 1.0
-	var ratio:Double = 0.995f
+class Ecdf(val ecdfmat:FMat, val varvect:FMat) {
+	var sd = 1.0f
 	var f:FMat = null
+	var x:FMat = null
 	
-	def init(ratio:Double=0.995) = {
-		// looking for the closest index in the hash
-		var index:Int = (ratio * hash.ncols.toDouble).toInt;
-		if (index >= hash.ncols) {
-			index = hash.ncols - 1
-		}
-		f = ecdfmat(?,index)
+	def init() = {
+		// read the x
+		x = ecdfmat(0, ?)
+		updateSd(1.0)
 	}
 
-	def generateXcorr : Double = {
+	def generateXcorr = {
 		var u:Float = rand(1,1)(0,0)
-		binarySearch(u)
+		// println ("u is " + u) 
+		val index = binarySearch(u, f)
+		// println ("f is " + f)
+		// println ("index is "+ index)
+		x(0, index)
 	}
 
 	def updateSd (inputsd:Double):Unit = {
-		sd = inputsd
+		sd = inputsd.toFloat
+		if (sd > 1.2f) {
+			throw new RuntimeException("Too large sd of Delta'")
+		}
+		// update the f
+		// looking for the closest index in the hash
+		val index = binarySearch(sd, varvect)
+		f = ecdfmat(index+1, ?)
 	}
 
-	def binarySearch(u:Float) : Double = {
+	// return the closest index in xarray for u
+	def binarySearch(u:Float, xarray:FMat) : Int = {
 		var start : Int = 0
-		var end : Int = f.nrows - 1
+		var end : Int = xarray.ncols - 1
 		var mid : Int = 0
+		// println ("mid: "+ mid + " ,start: " + start + " ,end " + end)
 		while (end > start + 1) {
+			// println ("mid: "+ mid + " ,start: " + start + " ,end " + end)
 			mid = (start + end) / 2
-			if (u < f(mid)) {
+			if (u < xarray(0, mid)) {
 				end = mid;
-			} else if (u > f(mid)) {
+			} else if (u > xarray(0, mid)) {
 				start = mid;
 			} else {
-				return x(mid) * sd
+				return mid
 			}
 		}
-		(x(start) + x(end))/2 * sd
+		// (x(start) + x(end))/2 * sd
+		start
 	}
 }
 
