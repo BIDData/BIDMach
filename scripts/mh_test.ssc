@@ -4,8 +4,8 @@ val dir = "/code/BIDMach/data/uci/Higgs/parts/"
 val model = MHTest.constructNNModel(4, 500, 0.6f, 1, 2);
 
 // val proposer = MHTest.Langevin_Proposer(0.001f, 0.4f, 0.5f, 50f, model);
-// val proposer = MHTest.Gradient_descent_proposer(0.01f, 0.01f, 0.4f, 0.5f, 50f, model)
-val proposer = MHTest.SGHMC_proposer(0.005f, 0.01f, 0.4f, 0.5f, 50f, 0.9f, 200, model)
+// val proposer = MHTest.Gradient_descent_proposer(0.01f, 0.9f, 0.4f, 0.5f, 50f, model)
+val proposer = MHTest.SGHMC_proposer(0.01f, 0.1f, 0.4f, 0.5f, 50f, 0.9f, 200, model)
 
 val ecdf = loadFMat("./data/EcdfForMHtest/cdfmat.txt")
 val hash_cdf = loadFMat("./data/EcdfForMHtest/sdmat.txt")

@@ -633,7 +633,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		kir(0,0) = k
 
 		t_init = model.modelmats(0).ones(1,1)
-		t_init(0,0) = 50000.0f
+		t_init(0,0) = 1000.0f
 
 		adj_alpha = model.modelmats(0).zeros(1,1)
 
@@ -677,7 +677,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		for (i <- 0 until v_old.length) {
 			// normrnd(0, (stepi^0.5).dv, v_old(i))
 			
-			if (step.dv < 10.0) {
+			if (step.dv < -1.0) {
 				normrnd(0, (stepi^0.5).dv, v_old(i))
 			} else {
 				v_old(i) <-- prev_v(i)
@@ -722,8 +722,9 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 				// estimate beta
 				estimated_v ~ estimated_v *@ (1 - kir)
-				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize
-
+				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize * 1000000 / grad.length
+				// var tmp = 1 / batchSize * 1000000 / grad.length
+				// println(tmp)
 				// just add by my understanding not sure right
 				// estimated_v <-- estimated_v / grad.length
 				
@@ -732,11 +733,12 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				
 				adj_alpha <-- alpha
 				
+				
 				if ((estimated_v*stepi/2.0).dv > alpha.dv) {
-					adj_alpha = (estimated_v*stepi/2.0) + 1e-4f
+					adj_alpha = (estimated_v*stepi/2.0) + 1e-6f
 					// println ("alpha change to be " + adj_alpha)
 				}
-				if (adj_alpha.dv > 1.0) {
+				if (adj_alpha.dv > 0.2) {
 					adj_alpha <-- alpha
 				}	
 				
@@ -750,8 +752,8 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				val est_var = 2*(adj_alpha - estimated_v*stepi / 2.0) * stepi
 				// println("the est var is " + estimated_v +" ,the var is " + est_var)
 				if (est_var.dv < 0) {
-					/// println("the est var is " + estimated_v +" ,the var is " + est_var)
-					est_var(0,0) = 1e-9f
+					// println("the est var is " + estimated_v +" ,the var is " + est_var)
+					est_var(0,0) = 1e-5f
 				}
 				
 				normrnd(0, (est_var^0.5).dv, noise_matrix(i))
@@ -800,6 +802,9 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		
 		// compute the temperature
 		val t_i = t_init / step ^(0.5)
+		if (t_i.dv <= 1.0f) {
+			t_i(0,0) = 1.0f
+		}
 		// val t_i = t_init
 
 		for (i <- 0 until mats_old.length) {
