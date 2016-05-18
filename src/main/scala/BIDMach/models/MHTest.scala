@@ -108,11 +108,8 @@ class MHTest(var objective:Model, val proposer:Proposer, val ecdfmat: FMat, val 
 
 		// do the test
 		// println ("the delta is " + delta)
-		ecdf.updateSd(estimated_sd)
-		var x_corr = ecdf.generateXcorr
-		if (x_corr + delta_new > 0 || opts.is_always_accpet) {
-			// accpet the candiate
-			// println("accpet" + " " + delta + "; X_corr: " + x_corr)
+		if (opts.is_always_accpet) {
+			// always accept
 			for (i <- 0 until _modelmats.length) {
 				// println ("model mats " + _modelmats(i))
 				// println("next: " + next_mat(i))
@@ -123,10 +120,34 @@ class MHTest(var objective:Model, val proposer:Proposer, val ecdfmat: FMat, val 
 			}
 			changeObjectiveModelMat(objective, _modelmats)
 			accpet_count += 1.0f
-			//println ("updated modelmats " + objective.modelmats(0))
 		} else {
-			reject_count += 1.0f
+			if (estimated_sd < 1.2f) {
+				ecdf.updateSd(estimated_sd)
+				var x_corr = ecdf.generateXcorr
+				if (x_corr + delta_new > 0) {
+					// accpet the candiate
+					// println("accpet" + " " + delta + "; X_corr: " + x_corr)
+					for (i <- 0 until _modelmats.length) {
+						// println ("model mats " + _modelmats(i))
+						// println("next: " + next_mat(i))
+						if (proposer.has_help_mats) {
+							help_mats(i) <-- (update_v.asInstanceOf[Array[Mat]])(i)
+						}
+						_modelmats(i) <-- next_mat(i)
+					}
+					changeObjectiveModelMat(objective, _modelmats)
+					accpet_count += 1.0f
+					//println ("updated modelmats " + objective.modelmats(0))
+				} else {
+					reject_count += 1.0f
+				}
+			} else {
+				println ("skip the large var " + estimated_sd)
+				reject_count += 1.0f
+			}
 		}
+		
+		
 
 	}
 
@@ -578,7 +599,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 	var newsquares:Array[Mat] = null
 	var estimated_v:Mat = null
 	var kir:Mat = null
-	var m:Int = 3
+	var m:Int = 1
 	var adj_alpha:Mat = null
 	var t_init:Mat = null
 
@@ -649,28 +670,20 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		for (i <- 0 until modelmats.length) {
 			model.modelmats(i) <-- modelmats(i)
 		}
-		val score_old = -1.0 *sum(model.evalbatch(gmats, ipass, pos))
+
 		stepi <-- lrate / (step ^ te);
 
 		// resample the v_old
 		for (i <- 0 until v_old.length) {
 			// normrnd(0, (stepi^0.5).dv, v_old(i))
 			
-			if (step.dv < 100.0) {
+			if (step.dv < 10.0) {
 				normrnd(0, (stepi^0.5).dv, v_old(i))
 			} else {
 				v_old(i) <-- prev_v(i)
 			}
-			//normrnd(0, (stepi^0.5).dv, v_old(i))
+			// normrnd(0, (stepi^0.5).dv, v_old(i))
 		}	
-
-		/**
-		var enery_old = v_old(0).zeros(1,1)
-		for (i <- 0 until candidate.length) {
-			enery_old <-- enery_old + sum(sum(v_old(i) *@ v_old(i)))
-		}
-		enery_old ~ enery_old / 2 / stepi
-		**/
 
 
 		// copy the modelmats to candidates
@@ -680,7 +693,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 		// do update for m steps
 		for (j <- 0 until m) {
 			for (i <- 0 until modelmats.length) {
-				candidate(i) ~ candidate(i) + v_old(i)
+				candidate(i) <-- candidate(i) + v_old(i)
 				model.modelmats(i) <-- candidate(i)
 			} 
 
@@ -696,7 +709,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				// compute the ss
 				val ss = sumSq(i)
 				// since the gradient is the revise of the max for min problem
-				val um = -1.0 * model.updatemats(i)
+				val um = model.updatemats(i)
 				newsquares(i) <-- um *@ um
 
 				ss ~ ss *@ (step - 1)
@@ -709,7 +722,7 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 
 				// estimate beta
 				estimated_v ~ estimated_v *@ (1 - kir)
-				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize /grad.length
+				estimated_v <-- estimated_v + sum(sum(grad *@ grad)) *@ kir / batchSize
 
 				// just add by my understanding not sure right
 				// estimated_v <-- estimated_v / grad.length
@@ -718,19 +731,21 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 				// println("estimated_v: " + estimated_v)
 				
 				adj_alpha <-- alpha
+				
 				if ((estimated_v*stepi/2.0).dv > alpha.dv) {
 					adj_alpha = (estimated_v*stepi/2.0) + 1e-4f
-					println ("alpha change to be " + adj_alpha)
+					// println ("alpha change to be " + adj_alpha)
 				}
 				if (adj_alpha.dv > 1.0) {
-					adj_alpha(0,0) = alpha.dv
+					adj_alpha <-- alpha
 				}	
+				
 
 
 				grad ~ grad *@ stepi
 
 				// put the val into the container
-				v_old(i) <-- (1.0-adj_alpha) *@ v_old(i) - grad
+				v_old(i) <-- (1.0-adj_alpha) *@ v_old(i) + grad
 				// add the random noise
 				val est_var = 2*(adj_alpha - estimated_v*stepi / 2.0) * stepi
 				// println("the est var is " + estimated_v +" ,the var is " + est_var)
@@ -738,13 +753,15 @@ class SGHMC_proposer (val lr:Float, val a:Float, val t:Float, val v:Float, val c
 					/// println("the est var is " + estimated_v +" ,the var is " + est_var)
 					est_var(0,0) = 1e-9f
 				}
+				
 				normrnd(0, (est_var^0.5).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
 				// println("the inserted noise is " + (est_var^0.5) + ", and "  + ((stepi * 0.001)^0.5) )
-
+				/**
 				// insert more noise?
 				normrnd(0, ((stepi * 0.00001)^0.5).dv, noise_matrix(i))
 				v_old(i) <-- v_old(i) + noise_matrix(i)
+				**/
 			}
 
 		}	
