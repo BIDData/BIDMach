@@ -101,3 +101,4 @@ int lstm_fwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, flo
 int lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, float *doutC, float *doutH, 
              float *dinC, float *dLIN1, float *dLIN2, float *dLIN3, float *dLIN4, int n);
 
+int pairembed(int *r1, int *r2, long long *res, int n);

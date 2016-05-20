@@ -615,4 +615,15 @@ extern "C" {
 
     return lstm_bwd(inC, LIN1, LIN2, LIN3, LIN4, doutC, doutH, dinC, dLIN1, dLIN2, dLIN3, dLIN4, n);
   }
+
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairembed
+  (JNIEnv *env, jobject obj, jobject jA, jobject jB, jobject jC, jint n)
+  {
+    int *A = (int*)getPointer(env, jA);
+    int *B = (int*)getPointer(env, jB);
+    long long *C = (long long*)getPointer(env, jC);
+
+    return pairembed(A, B, C, n);
+  }
+
 }

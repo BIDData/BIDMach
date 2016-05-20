@@ -10,6 +10,7 @@
 #define MAXXGRID 65535
 #endif
 
+void setsizes(int N, dim3 *gridp, int *nthreadsp);
 
 __forceinline__ __device__ int solve1(int j) {
   float v = sqrtf((float)j);
@@ -171,9 +172,39 @@ int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A,
   return err;
 }
 
+//__forceinline__ __device__ long long __pairembed(long long r1, int r2) {
+//  return ((r1+r2)*(r1+r2+1) >> 1) + r2;
+//}
+
 __forceinline__ __device__ long long __pairembed(long long r1, int r2) {
-  return ((r1+r2)*(r1+r2+1) >> 1) + r2;
+  float loc1 = (float) r1;
+  float loc2 = (float) r2;
+  int nbits1 = ((*(int *)(&loc1)) >> 23) - 126;
+  int nbits2 = ((*(int *)(&loc2)) >> 23) - 126;
+  int len = nbits1 + nbits2 - 1;
+  float loc3 = (float) len; 
+  int lenbits = ((*(int *)(&loc3)) >> 23) - 126;
+  long long x = (((r1 << nbits2) | r2) << lenbits) | nbits2;
+  return x;
 }
+
+__global__ void __dopairembed(int *r1, int *r2, long long *res, int n) {
+  int ip = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
+  for (int i = ip; i < n; i += blockDim.x * gridDim.x * gridDim.y) {
+    res[i] = __pairembed(r1[i], r2[i]);
+  }
+}
+
+int pairembed(int *r1, int *r2, long long *res, int n) {
+  int nthreads;
+  dim3 griddims;
+  setsizes(n, &griddims, &nthreads);
+  __dopairembed<<<griddims,nthreads>>>(r1, r2, res, n);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
 
 // Pair mult multplies base features and pairs of features.
 //
@@ -182,14 +213,16 @@ __forceinline__ __device__ long long __pairembed(long long r1, int r2) {
 // Given dense A and sparse B, for each column of B, enumerate all pairs of features, hash to a single feature index, and multiply by A into C
 // todo: fix offsets
 
-__global__ void __pairmult(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+__global__ void __pairmult(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                           float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {
   bool doit = false;
   int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
   int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
   float *AX;
+  int ldax;
   for (int i = istart; i < iend ; i++) {                     // i is the column index
-    int jstart = Bjc[i];                                     // Range of nz rows in this column
-    int jend = Bjc[i+1];
+    int jstart = Bjc[i + bcoff];                             // Range of nz rows in this column
+    int jend = Bjc[i+1 + bcoff];
     int nr = jend - jstart;                                  // Number of nz rows
     int todo = nr * (nr + 1) / 2;                            // Number of pairs to process (including k,k pairs)
     for (int j = threadIdx.y; j < todo; j += blockDim.y) {   // j indexes a worker for this column
@@ -199,26 +232,30 @@ __global__ void __pairmult(int nrows, int nfeats, int ncols, int y, int x, int b
       //      solvex(todo, j, j1, j2);
       float f1 = Bdata[jstart + j1];                         // Get the two features
       float f2 = Bdata[jstart + j2];
-      int r1 = Bir[jstart + j1];                             // And their row indices
-      int r2 = Bir[jstart + j2];
+      int r1 = Bir[jstart + j1] - broff;                             // And their row indices
+      int r2 = Bir[jstart + j2] - broff;
       long long rank = r1;
       float prod = f1;
+      doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
       if (j1 == j2) {
-        doit = (rank < bound1);
         AX = A;
+        ldax = lda;
       } else {
-        prod *= f2;
         rank = __pairembed(r1, r2);
-        doit = (rank < bound2);
-        AX = A2;
+        doit = doit && (rank >= 0 && rank < bound2);
+        if (doit) {
+          prod *= f2;
+          AX = A2;
+          ldax = lda2;
+        }
       }
       if (doit) {
         if (transpose > 0) {
-          float sum = AX[threadIdx.x + nrows * i] * prod;    // Do the product
-          atomicAdd(&C[threadIdx.x + nrows * rank], sum);
+          float sum = AX[threadIdx.x + ldax * i] * prod;    // Do the product
+          atomicAdd(&C[threadIdx.x + ldc * rank], sum);
         } else {
-          float sum = AX[threadIdx.x + nrows * rank] * prod;  // Do the product
-          atomicAdd(&C[threadIdx.x + nrows * i], sum);
+          float sum = AX[threadIdx.x + ldax * rank] * prod;  // Do the product
+          atomicAdd(&C[threadIdx.x + ldc * i], sum);
         }
       }
     }
@@ -230,29 +267,30 @@ __global__ void __pairmult(int nrows, int nfeats, int ncols, int y, int x, int b
 // This version is designed for few (or one) rows in A. It allocates one warp per column
 // todo: implement the offsets. 
 
-__global__ void __pairmult2(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
-                            float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+__global__ void __pairmult2(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                            float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {
   bool doit = false;
   int istart = ((long long)blockIdx.x) * ncols / gridDim.x;
   int iend = ((long long)(blockIdx.x+1)) * ncols / gridDim.x;
   float *AX;
+  int ldax;
   for (int i = istart; i < iend ; i++) {                     // i is the column index
-    int jstart = Bjc[i];                                     // Range of nz rows in this column
-    int jend = Bjc[i+1];
+    int jstart = Bjc[i + bcoff];                                     // Range of nz rows in this column
+    int jend = Bjc[i+1 + bcoff];
     int nr = jend - jstart;                                  // Number of nz rows
     for (int j1 = 0; j1 < nr; j1 += blockDim.x) {               // work on a block of data
       float f1 = 0;
       int r1 = -1;
       if (j1 + threadIdx.x < nr) {
         f1 = Bdata[jstart + j1 + threadIdx.x];                // Get the two features
-        r1 = Bir[jstart + j1 + threadIdx.x];                  // And their row indices
+        r1 = Bir[jstart + j1 + threadIdx.x] - broff;                  // And their row indices
       }
       for (int j2 = j1; j2 < nr; j2 += blockDim.x) {             // work on a block of data
         float f2 = 0;
         int r2 = -1;
         if (j2 + threadIdx.x < nr) {
           f2 = Bdata[jstart + j2 + threadIdx.x];
-          r2 = Bir[jstart + j2 + threadIdx.x];
+          r2 = Bir[jstart + j2 + threadIdx.x] - broff;
         }
         for (int k = 0; k < 32; k++) {
           float f2shift = __shfl(f2, k);
@@ -260,27 +298,30 @@ __global__ void __pairmult2(int nrows, int nfeats, int ncols, int y, int x, int 
           if (j2 + k < nr && r1 >= 0) {
             long long rank = r1;
             float prod = f1;
-            doit = false;
+            doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
             if (j1 + threadIdx.x == j2 + k) {
-              doit = (rank < bound1);
               AX = A;
+              ldax = lda;
             } else if (j1 + threadIdx.x < j2 + k) {
-              prod *= f2shift;
-              rank = __pairembed(rank, r2);
-              doit = (rank < bound2);
-              AX = A2;
+              rank = __pairembed(r1, r2);
+              doit = doit && (rank < bound2);
+              if (doit) {
+                prod *= f2shift;
+                AX = A2;
+                ldax = lda2;
+              }
             }
             if (doit) {
               if (transpose > 0) {
                 for (int m = 0; m < nrows; m++) {
-                  float sum = AX[m + nrows * i] * prod;    // Do the product
-                  atomicAdd(&C[m + nrows * rank], sum);
+                  float sum = AX[m + ldax * i] * prod;    // Do the product
+                  atomicAdd(&C[m + ldc * rank], sum);
                   //		  atomicAdd(&C[0], sum);
                 }
               } else {
                 for (int m = 0; m < nrows; m++) {
-                  float sum = AX[m + nrows * rank] * prod;  // Do the product
-                  atomicAdd(&C[m + nrows * i], sum);
+                  float sum = AX[m + ldax * rank] * prod;  // Do the product
+                  atomicAdd(&C[m + ldc * i], sum);
                   //		  atomicAdd(&C[0], sum);
                 }
               }
@@ -294,22 +335,22 @@ __global__ void __pairmult2(int nrows, int nfeats, int ncols, int y, int x, int 
 
 #else
 
-__global__ void __pairmult2(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
-                            float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {}
+__global__ void __pairmult2(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                            float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {}
 
 #endif
 // todo: fix offsets
-int pairmultTile(int nrows, int nfeats, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
-                 float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+int pairmultTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                 float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {
   if (nrows >= 0) {
     int nt = max(1, 256/nrows);
     dim3 threadDim(nrows, nt, 1);
     int nblocks = min(MAXXGRID, ncols);
-    __pairmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, y, x, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, C, transpose);
+    __pairmult<<<nblocks,threadDim>>>(nrows, ncols, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
   } else {
     dim3 threadDim(32, 1, 1);
     int nblocks = min(MAXXGRID, ncols);
-    __pairmult2<<<nblocks,threadDim>>>(nrows, nfeats, ncols, y, x, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, C, transpose);
+    __pairmult2<<<nblocks,threadDim>>>(nrows, ncols, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
   }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
