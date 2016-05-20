@@ -1,0 +1,27 @@
+:silent
+val n = 10000;
+val a = rand(n,n);
+val b = rand(n,n);
+val c = zeros(n,n);
+
+tic
+var i = 0;
+while (i < n) {
+  var j = 0;
+  while (j < n) {
+     c(j,i) = a(j,i) + b(j,i);
+     j +=1;
+  }
+  i += 1;
+}
+val t1 = toc;
+
+for (i <- 0 until 100) {
+val c = a+b;
+}
+
+val t2 = toc - t1;
+val n2 = n*n;
+:silent
+println("time %f,%f Mflops %f,%f" format (t1,t2/100,n2/t1/1e6f,n2/t2/1e4f));
+
