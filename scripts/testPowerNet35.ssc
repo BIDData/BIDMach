@@ -1,0 +1,80 @@
+:silent
+import BIDMat.TMat
+
+val mdir = "../data/criteo/parts/"
+
+val opts = new Net.FDSopts;
+val fn1 = mdir+"trainsortedx%02d.smat.lz4";
+val fn2 = mdir+"trainlabel%02d.fmat.lz4";
+opts.fnames = List(FileSource.simpleEnum(fn1,1,0),FileSource.simpleEnum(fn2,1,0));
+opts.eltsPerSample = 500;
+opts.nend = 90
+opts.batchSize= 100
+opts.npasses = 4
+opts.lrate = 0.01f 
+opts.texp = 0.3f
+opts.pstep = 0.001f
+opts.aopts = opts
+//opts.reg1weight = 0.0001
+//opts.hasBias = true
+opts.links = iones(1,1);
+opts.nweight = 1e-4f
+opts.lookahead = 0
+opts.autoReset = false
+
+import BIDMach.networks.layers._
+import BIDMach.networks.layers.Node
+import BIDMach.networks.layers.Node._
+
+val tshape = 0.2f
+val tms = Net.powerShape(tshape)_;
+val shape = irow(200,120,80,50,1);
+val in = input;
+val lin1 = new LinNode{inputs(0) = in; outdim = shape(0); hasBias = opts.hasBias; aopts = opts.aopts; tmatShape = tms};
+val drop1 = dropout(lin1, 0.5f);
+val sig1 = sigmoid(drop1);
+val lin2 = linear(sig1)(outdim = shape(1), hasBias = opts.hasBias, aopts = opts.aopts)
+val sig2 = sigmoid(lin2);
+val lin3 = linear(sig2)(outdim = shape(2), hasBias = opts.hasBias, aopts = opts.aopts)
+val sig3 = sigmoid(lin3);
+val lin4 = linear(sig3)(outdim = shape(3), hasBias = opts.hasBias, aopts = opts.aopts)
+val sig4 = sigmoid(lin4);
+val lin5 = linear(sig4)(outdim = shape(4), hasBias = opts.hasBias, aopts = opts.aopts)
+val out = glm(lin5)(opts.links);
+
+val layers = Array(in, lin1, drop1, sig1, lin2, sig2, lin3, sig3, lin4, sig4, lin5, out)
+
+opts.nodeset = new NodeSet(layers);
+opts.what;
+println(tshape.toString);
+println(shape.toString);
+val zzero = gzeros(1,1)
+
+val nn = new Learner(new FileSource(opts),
+		     new Net(opts),
+		     null,
+		     new Batch, 
+		     null,
+		     opts);
+
+
+
+val model = nn.model.asInstanceOf[Net]
+nn.train
+
+val res = nn.results(0,?)
+
+val testdata = loadSMat(mdir+"trainsortedx%02d.smat.lz4" format opts.nend);
+val testlabels = loadFMat(mdir+"trainlabel%02d.fmat.lz4" format opts.nend);
+
+val (mm, mopts) = Net.predictor(model, testdata);
+mm.predict
+
+val preds=FMat(mm.preds(0))
+
+val ll = DMat(ln(preds *@ testlabels + (1-preds) *@ (1-testlabels)))
+val rc = roc(preds, testlabels, 1-testlabels, 1000);
+
+:silent
+
+(mean(ll), mean(rc))
