@@ -622,7 +622,7 @@ object GLM {
   def pairMult(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
     (a, b, c) match {
       case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
-//      case (fb:GMat, fc:GMat) => pairMult(nr, nc, kk, aroff, acoff, fb, broff, bcoff, fc, croff, ccoff);
+      case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
       case _ => throw new RuntimeException("pairMult couldnt match matrix types")
     }
   }
@@ -656,9 +656,20 @@ object GLM {
     (v+2e-5f).toInt; 
   }
 
+  def pairMult(nrows:Int, ncols:Int, kk:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
+  		C:FMat, croff:Int, ccoff:Int):Unit = {
+  	pairMult(nrows, ncols, kk, kk, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
+  	    B, broff, bcoff, C, croff + ccoff * C.nrows, 0);
+  }
   
-  def pairmult(nrows:Int, ncols:Int, bound1:Int, bound2:Int, A:FMat, aoff:Int, lda:Int, A2:FMat, a2off:Int, lda2:Int,  
-  		B:SMat, broff:Int, bcoff:Int, C:FMat, cr:Int, cc:Int, transpose:Int):Unit = {
+  def pairMultNT(nrows:Int, ncols:Int, kk:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
+  		C:FMat, croff:Int, ccoff:Int):Unit = {
+  	pairMult(nrows, ncols, kk, kk, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
+  	    B, broff, bcoff, C, croff + ccoff * C.nrows, 1);
+  }
+  
+  def pairMult(nrows:Int, ncols:Int, bound1:Int, bound2:Int, A:FMat, aoff:Int, lda:Int, A2:FMat, a2off:Int, lda2:Int,  
+  		B:SMat, broff:Int, bcoff:Int, C:FMat, coff:Int,  transpose:Int):Unit = {
     val Bdata = B.data;
     val Bir = B.ir;
     val Bjc = B.jc;
@@ -705,14 +716,14 @@ object GLM {
   					var k = 0;
   					while (k < nrows) {
   						val sum = AX(aoffx + k + ldax * i) * prod;    // Do the product
-  						C.data(k + ldc * rank.toInt) += sum;
+  						C.data(coff + k + ldc * rank.toInt) += sum;
   						k += 1;
   					}
   				} else {
   					var k = 0;
   					while (k < nrows) {
   						val sum = AX(aoffx + k + ldax * rank.toInt) * prod;  // Do the product
-  						C.data(k + ldc * i) += sum;
+  						C.data(coff + k + ldc * i) += sum;
   						k += 1;
   					}
   				}
