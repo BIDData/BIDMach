@@ -118,5 +118,9 @@ public final class CUMACH {
     
     public static native int LSTMbwd(Pointer inC, Pointer LIN1, Pointer LIN2, Pointer LIN3, Pointer LIN4, Pointer doutC, Pointer doutH, 
     		Pointer dinC, Pointer dLIN1, Pointer dLIN2, Pointer dLIN3, Pointer dLIN4, int n);
+    
+    public static native int pairMultTile(int nrows, int ncols, int bound1, int bound2, Pointer A, int lda, Pointer A2, int lda2,
+    		   Pointer Bdata, Pointer Bir, Pointer Bjc, int broff, int bcoff, Pointer C, int ldc, int transpose);
+
 
 }

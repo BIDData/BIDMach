@@ -340,7 +340,7 @@ __global__ void __pairmult2(int nrows, int ncols, int bound1, int bound2, float 
 
 #endif
 // todo: fix offsets
-int pairmultTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+int pairMultTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
                  float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {
   if (nrows >= 0) {
     int nt = max(1, 256/nrows);

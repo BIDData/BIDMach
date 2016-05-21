@@ -4,7 +4,9 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMACH
-import scala.concurrent.future
+import jcuda._
+import jcuda.runtime._
+import jcuda.runtime.JCuda._
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.CountDownLatch
 import BIDMach.datasources._
@@ -575,6 +577,62 @@ object GLM {
   	(a, b, c) match {
   	  case (ga:GMat, gb:GSMat, gc:GSMat) => hashCrossT(ga, gb, gc, nfeats)
   	}
+  }
+  
+  def pairMult(nr:Int, nc:Int, kk:Int, a:GMat, aroff:Int, acoff:Int, b:GSMat, broff:Int, bcoff:Int, c:GMat, croff:Int, ccoff:Int):GMat = {
+    if (aroff < 0 || acoff < 0 || broff < 0 || bcoff < 0 || croff < 0 || ccoff < 0 || nr < 0 || nc < 0 || kk < 0) {
+      throw new RuntimeException("pairMult: cant have negative offsets or dimensions");
+    } else if (aroff + nr > a.nrows || acoff + 2*kk > a.ncols || broff + kk > b.nrows || bcoff + nc > b.ncols || croff + nr > c.nrows || ccoff + nc > c.ncols) {
+      throw new RuntimeException("pairMult: tile strays outside matrix dimensions");
+    } else {
+      Mat.nflops += 2L * nr * b.nnz;
+      val err = CUMACH.pairMultTile(nr, nc, kk, kk,  
+          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
+          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
+          b.data, b.ir, b.jc, broff, bcoff, 
+          c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
+          0);
+      if (err != 0) {
+        throw new RuntimeException("CUMAT.pairMult error " + cudaGetErrorString(err))
+      }
+      c;
+    }
+  }
+  
+  def pairMultNT(nr:Int, nc:Int, kk:Int, a:GMat, aroff:Int, acoff:Int, b:GSMat, broff:Int, bcoff:Int, c:GMat, croff:Int, ccoff:Int):GMat = {
+    if (aroff < 0 || acoff < 0 || broff < 0 || bcoff < 0 || croff < 0 || ccoff < 0 || nr < 0 || nc < 0 || kk < 0) {
+      throw new RuntimeException("pairMultNT: cant have negative offsets or dimensions");
+    } else if (aroff + nr > a.nrows || acoff + 2*kk > a.ncols || broff + nc > b.nrows || bcoff + kk > b.ncols || croff + nr > c.nrows || ccoff + nc > c.ncols) {
+      throw new RuntimeException("pairMultNT: tile strays outside matrix dimensions");
+    } else {
+      Mat.nflops += 2L * nr * b.nnz * kk / b.ncols;
+      val err = CUMACH.pairMultTile(nr, nc, kk, kk,  
+          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
+          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
+          b.data, b.ir, b.ic, broff, bcoff, 
+          c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
+          1);
+      if (err != 0) {
+        throw new RuntimeException("CUMAT.pairMultNT error " + cudaGetErrorString(err))
+      }
+      c;
+    }
+  }
+  
+  def pairMult(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
+    (a, b, c) match {
+      case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
+//      case (fb:GMat, fc:GMat) => pairMult(nr, nc, kk, aroff, acoff, fb, broff, bcoff, fc, croff, ccoff);
+      case _ => throw new RuntimeException("pairMult couldnt match matrix types")
+    }
+  }
+  
+  def pairMultNT(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
+    (a, b, c) match {
+      case (fa:GMat, sb:GSMat, fc:GMat) => pairMultNT(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
+//      case (fb:GMat, fc:GMat) => pairMultNT(nr, nc, kk, aroff, acoff, fb, broff, bcoff, fc, croff, ccoff);
+      case _ => throw new RuntimeException("pairMultT couldnt match matrix types")
+    }
   }
   
   def mkGLMModel(fopts:Model.Opts) = {

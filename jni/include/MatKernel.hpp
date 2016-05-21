@@ -102,3 +102,7 @@ int lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, flo
              float *dinC, float *dLIN1, float *dLIN2, float *dLIN3, float *dLIN4, int n);
 
 int pairembed(int *r1, int *r2, long long *res, int n);
+
+int pairMultTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+                 float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose);
+

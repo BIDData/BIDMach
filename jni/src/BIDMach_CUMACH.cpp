@@ -626,4 +626,18 @@ extern "C" {
     return pairembed(A, B, C, n);
   }
 
+  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultTile
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint bound1, jint bound2, jobject jA, jint lda, jobject jA2, jint lda2,
+   jobject jBdata, jobject jBir, jobject jBjc, jint broff, jint bcoff, jobject jC, jint ldc, jint transpose)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *A2 = (float*)getPointer(env, jA2);
+    float *Bdata = (float*)getPointer(env, jBdata);
+    int *Bir = (int*)getPointer(env, jBir);
+    int *Bjc = (int*)getPointer(env, jBjc);
+    float *C = (float*)getPointer(env, jC);
+
+    return pairMultTile(nrows, ncols, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
+  }
+
 }
