@@ -635,6 +635,97 @@ object GLM {
     }
   }
   
+  @inline def pairembed(r1:Long, r2:Int):Long = {
+  	val b1 = java.lang.Float.floatToRawIntBits(r1.toFloat);
+  	val b2 = java.lang.Float.floatToRawIntBits(r2.toFloat);
+  	val nbits1 = (b1 >> 23) - 126;
+  	val nbits2 = (b2 >> 23) - 126;
+  	val len = nbits1 + nbits2 - 1;
+  	val b3 = java.lang.Float.floatToRawIntBits(len.toFloat);
+  	val lenbits = (b3 >> 23) - 126;
+  	(((r1 << nbits2) | r2) << lenbits) | nbits2;
+  }
+  
+  @inline def solve1(j:Int):Int = {
+    var v = math.sqrt(j).toFloat;
+    v = v - (v*(v+1)-2*j)/(2*v+1);   // Newton iterations to find first index.
+    v = v - (v*(v+1)-2*j)/(2*v+1);
+    v = v - (v*(v+1)-2*j)/(2*v+1);
+    v = v - (v*(v+1)-2*j)/(2*v+1);
+    v = v - (v*(v+1)-2*j)/(2*v+1);
+    (v+2e-5f).toInt; 
+  }
+
+  
+  def pairmult(nrows:Int, ncols:Int, bound1:Int, bound2:Int, A:FMat, aoff:Int, lda:Int, A2:FMat, a2off:Int, lda2:Int,  
+  		B:SMat, broff:Int, bcoff:Int, C:FMat, cr:Int, cc:Int, transpose:Int):Unit = {
+    val Bdata = B.data;
+    val Bir = B.ir;
+    val Bjc = B.jc;
+  	var doit = false;
+  	val istart = 0;
+  	val iend = ncols;
+  	var AX:Array[Float] = null;
+  	var ldax = 0;
+  	var aoffx = 0;
+  	val ldc = C.nrows;
+  	var i = istart;
+  	while (i < iend) {                                         // i is the column index
+  		val jstart = Bjc(i + bcoff);                             // Range of nz rows in this column
+  		val jend = Bjc(i+1 + bcoff);
+  		val nr = jend - jstart;                                  // Number of nz rows
+  		val todo = nr * (nr + 1) / 2;                            // Number of pairs to process (including k,k pairs)
+  		var j = 0;
+  		while (j < todo) {                                       // j indexes a worker for this column
+  			val j1 = solve1(j);                                    // Compute the first and second indices
+  			val j2 = j - j1*(j1+1)/2; 
+  			val f1 = Bdata(jstart + j1);                           // Get the two features
+  			val f2 = Bdata(jstart + j2);
+  			val r1 = Bir(jstart + j1) - broff;                     // And their row indices
+  			val r2 = Bir(jstart + j2) - broff;
+  			var rank = r1.toLong;
+  			var prod = f1;
+  			doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
+  			if (j1 == j2) {
+  				AX = A.data;
+  				ldax = lda;
+  				aoffx = aoff;
+  			} else {
+  				rank = pairembed(r1, r2);
+  				doit = doit && (rank >= 0 && rank < bound2);
+  				if (doit) {
+  					prod *= f2;
+  					AX = A2.data;
+  					ldax = lda2;
+  					aoffx = a2off;
+  				}
+  			}
+  			if (doit) {
+  				if (transpose > 0) {
+  					var k = 0;
+  					while (k < nrows) {
+  						val sum = AX(aoffx + k + ldax * i) * prod;    // Do the product
+  						C.data(k + ldc * rank.toInt) += sum;
+  						k += 1;
+  					}
+  				} else {
+  					var k = 0;
+  					while (k < nrows) {
+  						val sum = AX(aoffx + k + ldax * rank.toInt) * prod;  // Do the product
+  						C.data(k + ldc * i) += sum;
+  						k += 1;
+  					}
+  				}
+  			}
+  			j += 1;
+  		}
+  		i += 1;
+  	}
+  }
+
+
+
+  
   def mkGLMModel(fopts:Model.Opts) = {
   	new GLM(fopts.asInstanceOf[GLM.Opts])
   }

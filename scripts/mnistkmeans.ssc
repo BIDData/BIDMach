@@ -1,13 +1,13 @@
 val dir="../data/MNIST8M/parts/"
 val (nn, opts) = KMeans.learner(dir+"alls%02d.fmat.lz4");
 
-val test = loadFMat(dir+"alls70.fmat.lz4");
+val test = loadFMat(dir+"alls80.fmat.lz4");
 val testdata = test.copy;
 testdata(0->10, ?) = 0;
 val (vbest, ibest) = maxi2(test);
 
 opts.dim = 1000;
-opts.nend = 70;
+opts.nend = 10;
 opts.batchSize = 5000;
 opts.npasses = 10;
 
