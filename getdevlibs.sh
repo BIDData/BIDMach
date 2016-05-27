@@ -16,7 +16,7 @@ pushd "${BIDMACH_ROOT}"  > /dev/null
 BIDMACH_ROOT=`pwd`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
 
-source="http://www.cs.berkeley.edu/~jfc/biddata"
+source="http://people.eecs.berkeley.edu/~jfc/biddata"
 cd ${BIDMACH_ROOT}/lib
 
 if [ `uname` = "Darwin" ]; then
