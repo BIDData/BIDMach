@@ -674,6 +674,7 @@ object GLM {
     val Bir = B.ir;
     val Bjc = B.jc;
   	var doit = false;
+  	val ioff = Mat.ioneBased;
   	val istart = 0;
   	val iend = ncols;
   	var AX:Array[Float] = null;
@@ -682,8 +683,8 @@ object GLM {
   	val ldc = C.nrows;
   	var i = istart;
   	while (i < iend) {                                         // i is the column index
-  		val jstart = Bjc(i + bcoff);                             // Range of nz rows in this column
-  		val jend = Bjc(i+1 + bcoff);
+  		val jstart = Bjc(i + bcoff)-ioff;                             // Range of nz rows in this column
+  		val jend = Bjc(i+1 + bcoff)-ioff;
   		val nr = jend - jstart;                                  // Number of nz rows
   		val todo = nr * (nr + 1) / 2;                            // Number of pairs to process (including k,k pairs)
   		var j = 0;
@@ -692,8 +693,8 @@ object GLM {
   			val j2 = j - j1*(j1+1)/2; 
   			val f1 = Bdata(jstart + j1);                           // Get the two features
   			val f2 = Bdata(jstart + j2);
-  			val r1 = Bir(jstart + j1) - broff;                     // And their row indices
-  			val r2 = Bir(jstart + j2) - broff;
+  			val r1 = Bir(jstart + j1) - broff-ioff;                     // And their row indices
+  			val r2 = Bir(jstart + j2) - broff-ioff;
   			var rank = r1.toLong;
   			var prod = f1;
   			doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
