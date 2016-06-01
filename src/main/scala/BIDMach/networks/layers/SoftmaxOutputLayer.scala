@@ -57,7 +57,12 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
       	FMat(mean(output(inds) == maxi(output.asMat)));
       }
     } else {
-    	FMat(mean(ln(output(inds))));   
+    	if (opts.doVariance) {
+    	  val out = ln(output(inds));
+    	  FMat(mean(out)) on FMat(variance(out));
+    	} else {
+    		FMat(mean(ln(output(inds))));   
+    	}
     }
   }
   
