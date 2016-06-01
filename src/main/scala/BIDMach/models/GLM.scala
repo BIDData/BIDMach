@@ -198,7 +198,11 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     	if (dweights.asInstanceOf[AnyRef] != null) {
     		FMat(sum(v ∘  dweights, 2) / sum(dweights))
     	} else {
-    		FMat(mean(v, 2))
+    	  if (opts.doVariance) {
+    	    FMat(mean(v, 2)) on FMat(variance(v, 2));
+    	  } else {
+    	  	FMat(mean(v, 2));
+    	  }
     	}
     } else {
       row(0)
@@ -216,6 +220,7 @@ object GLM {
     var hashFeatures = 0;
     var hashBound1:Int = 1000000;
     var hashBound2:Int = 1000000;
+    var doVariance = false;
     var aopts:ADAGrad.Opts = null;
   }
   
