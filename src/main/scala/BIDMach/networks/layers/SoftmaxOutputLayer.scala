@@ -50,7 +50,12 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
     if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
     val inds = target + coloffsets;
     if (opts.scoreType == 1) {
-      FMat(mean(output(inds) == maxi(output.asMat)));
+      if (opts.doVariance) {
+        val matches = (output(inds) == maxi(output.asMat));
+        FMat(mean(matches)) on FMat(variance(matches));
+      } else {
+      	FMat(mean(output(inds) == maxi(output.asMat)));
+      }
     } else {
     	FMat(mean(ln(output(inds))));   
     }
@@ -63,10 +68,12 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 
 trait SoftmaxOutputNodeOpts extends NodeOpts {
 	var scoreType = 0;
+	var doVariance = false;
 		
 	def copyOpts(opts:SoftmaxOutputNodeOpts):SoftmaxOutputNodeOpts = {
 			super.copyOpts(opts);
 			opts.scoreType = scoreType;
+			opts.doVariance = doVariance;
 			opts;
 	}
 }

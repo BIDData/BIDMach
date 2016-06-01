@@ -307,12 +307,13 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
 object Model {
 	trait Opts extends BIDMat.Opts{
-	  var nzPerColumn:Int = 0
-	  var startBlock = 8000
-	  var useGPU = true
-	  var useDouble = false
-	  var doubleScore = false
-	  var dim = 256
+	  var nzPerColumn:Int = 0;
+	  var startBlock = 8000;
+	  var useGPU = true;
+	  var useDouble = false;
+	  var doubleScore = false;
+	  var doVariance = false;
+	  var dim = 256;
 	  var debug = 0;
 	  var doAllReduce = false;
 	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;

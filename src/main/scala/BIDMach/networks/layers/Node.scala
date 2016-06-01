@@ -153,7 +153,7 @@ object Node {
 
   def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
   
-  def softmaxout(a:NodeTerm)(scoreTyp:Int=0) =  new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp}
+  def softmaxout(a:NodeTerm)(scoreTyp:Int=0, doVar:Boolean=false) =  new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; doVariance = doVar}
   
   def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = a};
   

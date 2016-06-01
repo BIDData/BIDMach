@@ -222,7 +222,7 @@ object Layer {
 
   def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a};
   
-  def softmaxout(a:LayerTerm)(scoreTyp:Int=0) =  new SoftmaxOutputLayer(null, new SoftmaxOutputNode{scoreType=scoreTyp}){inputs(0) = a}
+  def softmaxout(a:LayerTerm)(scoreTyp:Int=0, doVar:Boolean=false) =  new SoftmaxOutputLayer(null, new SoftmaxOutputNode{scoreType=scoreTyp;doVariance=doVar}){inputs(0) = a}
   
   def softplus(a:LayerTerm) = new SoftplusLayer(null){inputs(0) = a};
   

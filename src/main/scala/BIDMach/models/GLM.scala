@@ -220,7 +220,6 @@ object GLM {
     var hashFeatures = 0;
     var hashBound1:Int = 1000000;
     var hashBound2:Int = 1000000;
-    var doVariance = false;
     var aopts:ADAGrad.Opts = null;
   }
   
