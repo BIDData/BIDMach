@@ -626,7 +626,7 @@ extern "C" {
     return pairembed(A, B, C, n);
   }
 
-  JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultTile
+JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultTile
   (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint bound1, jint bound2, jobject jA, jint lda, jobject jA2, jint lda2,
    jobject jBdata, jobject jBir, jobject jBjc, jint broff, jint bcoff, jobject jC, jint ldc, jint transpose)
   {
@@ -638,6 +638,26 @@ extern "C" {
     float *C = (float*)getPointer(env, jC);
 
     return pairMultTile(nrows, ncols, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
+  }
+
+JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultADAGradTile
+(JNIEnv *env, jobject obj, jint nrows, jint ncols, jint y, jint x, jint bound1, jint bound2, jobject jA, jint lda,
+ jobject jBdata, jobject jBir, jobject jBjc, jint transpose, jobject jMM, jobject jSumsq, jobject jMask, jint maskrows, jobject jlrate, jint lrlen,
+ jobject jvexp, jint vexplen, jobject jtexp, jint texplen, jfloat istep, jint addgrad, jfloat epsilon)
+  {
+    float *A = (float*)getPointer(env, jA);
+    float *Bdata = (float*)getPointer(env, jBdata);
+    int *Bir = (int*)getPointer(env, jBir);
+    int *Bjc = (int*)getPointer(env, jBjc);
+    float *MM = (float*)getPointer(env, jMM);
+    float *Sumsq = (float*)getPointer(env, jSumsq);
+    float *Mask = (float*)getPointer(env, jMask);
+    float *lrate = (float*)getPointer(env, jlrate);
+    float *vexp = (float*)getPointer(env, jvexp);
+    float *texp = (float*)getPointer(env, jtexp);
+
+    return pairMultADAGradTile(nrows, ncols, y, x, bound1, bound2, A, lda, Bdata, Bir, Bjc, transpose, 
+                               MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   }
 
 }

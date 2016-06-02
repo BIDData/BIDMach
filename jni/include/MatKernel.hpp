@@ -106,3 +106,6 @@ int pairembed(int *r1, int *r2, long long *res, int n);
 int pairMultTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
                  float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose);
 
+int pairMultADAGradTile(int nrows, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, 
+                        float *Bdata, int *Bir, int *Bjc, int transpose, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                        float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);

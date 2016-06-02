@@ -467,6 +467,81 @@ int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, fl
   cudaError_t err = cudaGetLastError();
   return err;
 }
+//
+// nrows = rows of MM (and other model mats)
+// ncols = columns of B
+//
+__global__ void __pairMultADAGradTile(int nrows, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, 
+                                      float *Bdata, int *Bir, int *Bjc, int transpose,
+                                      float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                                      float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
+  bool doit = false;
+  int ihere, ithere, jthere;
+  float grad;
+  int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
+  int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
+  for (int i = istart; i < iend ; i++) {                     // i is the column index
+    int jstart = Bjc[i];                                     // Range of nz rows in this column
+    int jend = Bjc[i+1];
+    int nr = jend - jstart;                                  // Number of nz rows
+    int todo = nr * (nr + 1) / 2;                            // Number of pairs to process (including k,k pairs)
+    for (int j = threadIdx.y; j < todo; j += blockDim.y) {   // j indexes a worker for this column
+      int j1 = solve1(j);                                    // Compute the first and second indices
+      int j2 = j - j1*(j1+1)/2; 
+      //      int j1, j2;
+      //      solvex(todo, j, j1, j2);
+      float f1 = Bdata[jstart + j1];                         // Get the two features
+      float f2 = Bdata[jstart + j2];
+      int r1 = Bir[jstart + j1]-x;                           // And their row indices
+      int r2 = Bir[jstart + j2]-x;
+      long long rank = r1;
+      float prod = f1;
+      doit = (r1 >= 0 && rank < bound1 && r2 >= 0);
+      if (doit) {
+        if (j1 == j2) {
+          ihere = 0;
+          ithere = 0;
+          jthere = 0;
+        } else {
+          rank = __pairembed(r1, r2);
+          doit = doit && (rank < bound2);
+          if (doit) {
+            prod *= f2;
+            ihere = lda;
+            ithere = nrows;
+            jthere = 1;
+          }
+        }
+      }
+      if (doit) {
+        if (transpose > 0) {
+          ihere += threadIdx.x + 2 * lda * i;
+          ithere += threadIdx.x + 2 * nrows * rank;
+          jthere += 2 * rank;
+        } else {
+          ihere += threadIdx.x + 2 * lda * rank;
+          ithere += threadIdx.x + 2 * nrows * i;
+          jthere += 2 * i;
+        }
+        grad = A[ihere + y] * prod;    // raw gradient
+        __gupdate(grad, threadIdx.x + y, ithere, jthere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+      }
+    }
+  }
+}
+
+int pairMultADAGradTile(int nrows, int ncols, int y, int x, int bound1, int bound2, float *A, int lda, 
+                        float *Bdata, int *Bir, int *Bjc, int transpose, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                        float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
+  int nt = max(1, 256/nrows);
+  dim3 threadDim(nrows, nt, 1);
+  int nblocks = min(MAXXGRID, ncols);
+  __pairMultADAGradTile<<<nblocks,threadDim>>>(nrows, ncols, y, x, bound1, bound2, A, lda, Bdata, Bir, Bjc, transpose, 
+                                               MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
 
 __global__ void __hashcross(int nrows, int nfeats, int ncols,
 			     float *A,
