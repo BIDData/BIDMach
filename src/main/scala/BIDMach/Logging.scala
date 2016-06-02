@@ -28,8 +28,8 @@ object Logging{
     
     def getResults(model:Model): Array[Mat] = {
         model.opts.logDataSink match {
-            case m:MatSink=>m.mats
             case f:FileSink=>{println("Found results at "+f.opts.ofnames.head(0));null}
+            case m:MatSink=>m.mats
             case null=>{println("No logDataSink found");null}
         }
     }
