@@ -256,25 +256,25 @@ object ADAGrad {
    * Supports both CPU and GPU implementation.
    */
   
-  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int):Unit = 
-    multUpdate(a, b, mm, sumSq, mask, lrate, texp, vexp, eps, step, waitsteps, false);
+  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int):Unit = 
+    multUpdate(a, b, mm, sumSq, mask, lrate, vexp, texp, eps, step, waitsteps, false);
   
-  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
+  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
     val nc = b.ncols;
     val nbr = b.nrows;
     val biasv = if (hasBias) 1 else 0;
-    (a, b, mm, sumSq, lrate, texp, vexp) match {
-      case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
+    (a, b, mm, sumSq, lrate, vexp, texp) match {
+      case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
         val fmask = mask.asInstanceOf[FMat];
         val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
         CPUMACH.multADAGrad(nr, nc, b.nnz, fa.data, sb.data, sb.ir, sb.jc, fmm.data, fssq.data, if (fmask != null) fmask.data else null, masknr, 
             flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
       }
-      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
@@ -282,7 +282,7 @@ object ADAGrad {
         CUMACH.multADAGrad(nr, nc, b.nnz, ga.data, gsb.data, gsb.ir, gsb.ic, gmm.data, gssq.data, gmaskdata, masknr,
             glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr)
       }
-      case (fa:FMat, sb:SMat, fmm:TMat, fssq:TMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
+      case (fa:FMat, sb:SMat, fmm:TMat, fssq:TMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
         val fmask = mask.asInstanceOf[FMat];
         val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
@@ -297,7 +297,7 @@ object ADAGrad {
         			flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
         }
       }
-      case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+      case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
 //	println("istep=%f" format istep);
         val gmask0 = mask.asInstanceOf[GMat];
@@ -337,35 +337,36 @@ object ADAGrad {
     }    
   }
   
-  def pairMultUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
+  def pairMultUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
-    val nr = a.nrows;
-    val nc = b.ncols;
-    val nbr = b.nrows;
-    val nfeats = mm.ncols/2;
     val biasv = if (hasBias) 1 else 0;
-    (a, b, mm, sumSq, lrate, texp, vexp) match {
-    case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+    (a, b, mm, sumSq, lrate, vexp, texp) match {
+    case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
+      val nr = a.nrows;
+      val nc = b.ncols;
+      val nbr = b.nrows;
+      val nfeats = mm.ncols/2;
     	Mat.nflops += 20L * nr * b.nnz;
-    	val gmdata = if (mask.asInstanceOf[AnyRef] != null) mask.asInstanceOf[GMat].data else null;
+    	val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].data, mask.length) else (null, 0);
     	CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, nr, 0, 0, gsb.data, gsb.ir, gsb.jc, 0, 0, 1, gmm.data, mm.nrows, 
-    	    gssq.data, gmdata, mask.length, glrate.data, lrate.length, gtexp.data, texp.length, gvexp.data, vexp.length,
+    	    gssq.data, gmdata, masklen, glrate.data, lrate.length, gvexp.data, vexp.length, gtexp.data, texp.length,
     	    istep, 1, eps);
     }
-    case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
-    	Mat.nflops += 20L * nr * b.nnz;
+    case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
+    	Mat.nflops += 20L * a.nrows * b.nnz;
     	for (i <- 0 until gmm.tiles.length) {
     		val mmtile = gmm.tiles(i).asInstanceOf[GMat];
     		val ssqtile = gssq.tiles(i).asInstanceOf[GMat];
     		val nr = mmtile.nrows;
     		val nc = mmtile.ncols;
+    		val nfeats = mmtile.ncols/2;
     		val y = gmm.y(i);
     		val x = gmm.x(i);
-    		val gmdata = if (mask.asInstanceOf[AnyRef] != null) mask.asInstanceOf[GMat].data else null;
+    		val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].data, mask.length) else (null, 0);
     		CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, y, 0, nr, gsb.data, gsb.ir, gsb.jc, x, 0, 1, 
-    		    mmtile.data, mm.nrows, ssqtile.data, gmdata, mask.length, glrate.data, lrate.length, 
-    		    gtexp.data, texp.length, gvexp.data, vexp.length,	istep, 1, eps);
+    		    mmtile.data, mm.nrows, ssqtile.data, gmdata, masklen, glrate.data, lrate.length, 
+    		    gvexp.data, vexp.length, gtexp.data, texp.length,	istep, 1, eps);
     	}
     }
     }
@@ -378,24 +379,24 @@ object ADAGrad {
    * Supports both CPU and GPU implementation.
    */
   def hashmultUpdate(a:Mat, b:Mat, nfeats:Int, bound1:Int, bound2:Int, transpose:Int,
-  		mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int) = {
+  		mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int) = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
     val nc = b.ncols;
     val npc = b.nnz / b.ncols;
     Mat.nflops += 2L * nr * b.nnz * npc;
-    (a, b, mm, sumSq, lrate, texp, vexp) match {
-      case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, ftexp:FMat, fvexp:FMat) => {
+    (a, b, mm, sumSq, lrate, vexp, texp) match {
+      case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
         val fmask = mask.asInstanceOf[FMat];
       	if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
     			(0 until Mat.numThreads).par.map((ithread:Int) => 
-    			  multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, ithread, Mat.numThreads));
+    			  multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, fvexp, ftexp, istep, addgrad, eps, ithread, Mat.numThreads));
     		} else {
-    			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, ftexp, fvexp, istep, addgrad, eps, 0, 1);
+    			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, fvexp, ftexp, istep, addgrad, eps, 0, 1);
     		}
       }
-      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;

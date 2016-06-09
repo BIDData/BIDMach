@@ -58,7 +58,7 @@ object MatSink {
     var nmats = 1;
   }
   
-  class Options extends Opts {
+  class Options extends Opts { 
 
   }
   

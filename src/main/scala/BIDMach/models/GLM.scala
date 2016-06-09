@@ -162,10 +162,10 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
       if (firststep <= 0) firststep = pos.toFloat;
       val step = (pos + firststep)/firststep;
       if (hashFeatures == 0) {
-      	ADAGrad.multUpdate(eta, in, modelmats(0), sumsq, mask, lrate, texp, vexp, epsilon, step, waitsteps);
+      	ADAGrad.multUpdate(eta, in, modelmats(0), sumsq, mask, lrate, vexp, texp, epsilon, step, waitsteps);
       } else {
         ADAGrad.hashmultUpdate(eta, in, hashFeatures, opts.hashBound1, opts.hashBound2, 1,
-            modelmats(0), sumsq, mask, lrate, texp, vexp, epsilon, step, waitsteps);
+            modelmats(0), sumsq, mask, lrate, vexp, texp, epsilon, step, waitsteps);
       }
     } else {
     	if (hashFeatures > 0) {
