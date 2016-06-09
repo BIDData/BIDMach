@@ -471,12 +471,12 @@ int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, fl
 // nrows = rows of MM (and other model mats)
 // ncols = columns of B
 //
-__global__ void __pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, 
+__global__ void __pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, int aroff, int acoff, 
                                       float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, int transpose,
                                       float *MM, int ldmm, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                                       float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   bool doit = false;
-  int ihere, ithere, jthere;
+  int ihere, ithere, jhere, jthere;
   float grad;
   int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
   int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
@@ -513,29 +513,31 @@ __global__ void __pairMultADAGradTile(int nrows, int ncols, int bound1, int boun
       }
       if (doit) {
         if (transpose > 0) {
-          ihere = threadIdx.x + lda * i;
+          ihere = threadIdx.x + aroff + lda * (i + acoff);
+          jhere = threadIdx.x + aroff;
           ithere += threadIdx.x + 2 * ldmm * rank;
           jthere += 2 * rank;
         } else {
-          ihere = threadIdx.x + lda * rank;
+          ihere = threadIdx.x + aroff + lda * (rank + acoff);
+          jhere = threadIdx.x + aroff;
           ithere += threadIdx.x + 2 * ldmm * i;
           jthere += 2 * i;
         }
         grad = A[ihere] * prod;    // raw gradient
-        __gupdate(grad, threadIdx.x, ithere, jthere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+        __gupdate(grad, jhere, ithere, jthere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
       }
     }
   }
 }
 
-int pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, 
+int pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, int aroff, int acoff,
                         float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, int transpose, 
                         float *MM, int ldmm, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                         float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   int nt = max(1, 256/nrows);
   dim3 threadDim(nrows, nt, 1);
   int nblocks = min(MAXXGRID, ncols);
-  __pairMultADAGradTile<<<nblocks,threadDim>>>(nrows, ncols, bound1, bound2, A, lda, Bdata, Bir, Bjc, broff, bcoff, transpose, 
+  __pairMultADAGradTile<<<nblocks,threadDim>>>(nrows, ncols, bound1, bound2, A, lda, aroff, acoff, Bdata, Bir, Bjc, broff, bcoff, transpose, 
                                                MM, ldmm, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();

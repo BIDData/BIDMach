@@ -349,7 +349,7 @@ object ADAGrad {
     case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
     	Mat.nflops += 20L * nr * b.nnz;
     	val gmdata = if (mask.asInstanceOf[AnyRef] != null) mask.asInstanceOf[GMat].data else null;
-    	CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, nr, gsb.data, gsb.ir, gsb.jc, 0, 0, 1, gmm.data, mm.nrows, 
+    	CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, nr, 0, 0, gsb.data, gsb.ir, gsb.jc, 0, 0, 1, gmm.data, mm.nrows, 
     	    gssq.data, gmdata, mask.length, glrate.data, lrate.length, gtexp.data, texp.length, gvexp.data, vexp.length,
     	    istep, 1, eps);
     }
@@ -363,7 +363,7 @@ object ADAGrad {
     		val y = gmm.y(i);
     		val x = gmm.x(i);
     		val gmdata = if (mask.asInstanceOf[AnyRef] != null) mask.asInstanceOf[GMat].data else null;
-    		CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data.withByteOffset(4L*y), nr, gsb.data, gsb.ir, gsb.jc, x, 0, 1, 
+    		CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, y, 0, nr, gsb.data, gsb.ir, gsb.jc, x, 0, 1, 
     		    mmtile.data, mm.nrows, ssqtile.data, gmdata, mask.length, glrate.data, lrate.length, 
     		    gtexp.data, texp.length, gvexp.data, vexp.length,	istep, 1, eps);
     	}
