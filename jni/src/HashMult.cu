@@ -177,6 +177,7 @@ int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A,
 //}
 
 __forceinline__ __device__ long long __pairembed(long long r1, int r2) {
+  if (r1 == 0 && r2 < 2) return r2;
   float loc1 = (float) r1;
   float loc2 = (float) r2;
   int nbits1 = ((*(int *)(&loc1)) >> 23) - 126;

@@ -613,7 +613,7 @@ object GLM {
       val err = CUMACH.pairMultTile(nr, nc, kk, kk,  
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
-          b.data, b.ir, b.ic, broff, bcoff, 
+          b.data, b.ir, b.jc, broff, bcoff, 
           c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
           1);
       if (err != 0) {
