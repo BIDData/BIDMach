@@ -121,6 +121,13 @@ public final class CUMACH {
     
     public static native int pairMultTile(int nrows, int ncols, int bound1, int bound2, Pointer A, int lda, Pointer A2, int lda2,
     		   Pointer Bdata, Pointer Bir, Pointer Bjc, int broff, int bcoff, Pointer C, int ldc, int transpose);
+    
+    public static native int pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, Pointer A, int lda, 
+ 		   Pointer Bdata, Pointer Bir, Pointer Bjc, int broff, int bcoff, int transpose, 
+ 		   Pointer MM, int ldmm, Pointer Sumsq, Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, 
+ 		   float istep, int addgrad, float epsilon);   
+    
+
 
 
 }

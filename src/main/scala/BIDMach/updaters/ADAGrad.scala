@@ -336,6 +336,40 @@ object ADAGrad {
       }
     }    
   }
+  
+  def pairMultUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, texp:Mat, vexp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
+    val istep = 1f/step;
+    val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
+    val nr = a.nrows;
+    val nc = b.ncols;
+    val nbr = b.nrows;
+    val nfeats = mm.ncols/2;
+    val biasv = if (hasBias) 1 else 0;
+    (a, b, mm, sumSq, lrate, texp, vexp) match {
+    case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+    	Mat.nflops += 20L * nr * b.nnz;
+    	val gmdata = if (mask.asInstanceOf[AnyRef] != null) mask.asInstanceOf[GMat].data else null;
+    	CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, nr, gsb.data, gsb.ir, gsb.jc, 0, 0, 1, gmm.data, mm.nrows, 
+    	    gssq.data, gmdata, mask.length, glrate.data, lrate.length, gtexp.data, texp.length, gvexp.data, vexp.length,
+    	    istep, 1, eps);
+    }
+    case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gtexp:GMat, gvexp:GMat) => {
+    	Mat.nflops += 20L * nr * b.nnz;
+    	for (i <- 0 until gmm.tiles.length) {
+    		val mmtile = gmm.tiles(i).asInstanceOf[GMat];
+    		val ssqtile = gssq.tiles(i).asInstanceOf[GMat];
+    		val nr = mmtile.nrows;
+    		val nc = mmtile.ncols;
+    		val y = gmm.y(i);
+    		val x = gmm.x(i);
+    		val gmdata = if (mask.asInstanceOf[AnyRef] != null) mask.asInstanceOf[GMat].data else null;
+    		CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data.withByteOffset(4L*y), nr, gsb.data, gsb.ir, gsb.jc, x, 0, 1, 
+    		    mmtile.data, mm.nrows, ssqtile.data, gmdata, mask.length, glrate.data, lrate.length, 
+    		    gtexp.data, texp.length, gvexp.data, vexp.length,	istep, 1, eps);
+    	}
+    }
+    }
+  }
 
   
   
