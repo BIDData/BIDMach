@@ -27,27 +27,31 @@ import BIDMach._
 class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends ClusteringModel(opts) {
 
 //  var mm:Mat = null
-  var um:Mat = null
-  var umcount:Mat = null
+  def um = {updatemats(0)};
+  def umcount = {updatemats(1)};
+  // var umcount:Mat = null
+  var modelsreduced:Int = 1
   
   def mm = {modelmats(0)};
   def mmnorm = {modelmats(1)};
-  
+    
   override def init() = {
     super.init()
     if (refresh) {
     	setmodelmats(Array(mm, mm dotr mm));
     }
     for (i <- 0 until modelmats.length) modelmats(i) = convertMat(modelmats(i))
-    um = updatemats(0)
-    umcount = mm.zeros(mm.nrows, 1)
-    updatemats = Array(um, umcount)
+    updatemats = Array(um, mm.zeros(mm.nrows, 1))
+    for (i <- 0 until updatemats.length) updatemats(i) = convertMat(updatemats(i))
+    //um = updatemats(0)
+    //umcount = mm.zeros(mm.nrows, 1)
+    //updatemats = Array(um, umcount)
   }
   
   def mupdate(sdata:Mat, ipass:Int):Unit = {
 //  println("trace data %f" format sum(sum(sdata)).dv);
     val vmatch = -2 * mm * sdata + mmnorm + snorm(sdata)           // vmatch(i,j) = squared distance from data sample j to centroid i
-    val bestm = vmatch <= mini(vmatch)                             // mini(vmatch) are the minimum 
+    val bestm = vmatch <= mini(vmatch)                             // mini(vmatch) are the minimum
     bestm ~ bestm / sum(bestm)
     um ~ um + bestm *^ sdata     
     umcount ~ umcount + sum(bestm, 2)
@@ -75,9 +79,9 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     if (ipass > 0) {
       max(umcount, 1f, umcount);
       mm ~ um / umcount;
-      um.clear;
-      umcount.clear;
     }
+    um.clear;
+    umcount.clear;
     mmnorm ~ mm dotr mm;
   }
   
@@ -108,6 +112,23 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     	models(i).modelmats(0) <-- mmx(0);
     	models(i).modelmats(1) <-- mmx(1);
     }
+  }
+
+  override def combineModels(ipass:Int, model: Model):Model = {
+    val other:KMeans = model.asInstanceOf[KMeans];
+    if (ipass == 0) {
+      val total_models_reduced = modelsreduced + other.modelsreduced
+      val isel = mm.zeros(mm.nrows, 1)
+      val vsel = min((total_models_reduced-1).toFloat, floor(total_models_reduced*rand(mm.nrows, 1)))
+      isel <-- (vsel < modelsreduced.toFloat)
+      mm ~ isel *@ mm
+      mm ~ mm + (1-isel) *@ other.mm
+      modelsreduced = total_models_reduced
+    } else {
+      um ~ um + other.um;
+      umcount ~ umcount + other.umcount;
+    }
+    this
   }
 }
 
@@ -169,6 +190,20 @@ object KMeans  {
   def learner(fnames:String, d:Int):(Learner, FileOptions) = learner(List(FileSource.simpleEnum(fnames,1,0)), d);
   
   def learner(fnames:String):(Learner, FileOptions) = learner(List(FileSource.simpleEnum(fnames,1,0)), 256);
+
+  class IteratorOptions extends Learner.Options with KMeans.Opts with IteratorSource.Opts with Batch.Opts
+
+  def learner():(Learner, IteratorOptions) = {
+    val opts = new IteratorOptions
+    val nn = new Learner(
+      null,
+      new KMeans(opts),
+      null,
+      new Batch(opts),
+      null,
+      opts)
+    (nn, opts)
+  }
   
   class PredOptions extends Learner.Options with KMeans.Opts with MatSource.Opts with MatSink.Opts;
   
