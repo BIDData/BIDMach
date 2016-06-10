@@ -89,7 +89,7 @@ CUMACH.pairembed(GIMat(irow(x)).data, GIMat(irow(y)).data, a.data, 1)
 a(0,0);
 };
 
-    val n = 4096;
+val n = 1024;
 val ir = icol(0->n) * iones(1,n);
 val ic = iones(n,1) * irow(0->n);
 val ares = glzeros(n,n);

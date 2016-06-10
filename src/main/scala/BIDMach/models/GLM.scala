@@ -639,15 +639,19 @@ object GLM {
     }
   }
   
-  @inline def pairembed(r1:Long, r2:Int):Long = {
+  @inline def pairembed(r1x:Long, r2x:Int):Long = {
+    val r1 = r1x + 1;
+    val r2 = r2x + 1;
   	val b1 = java.lang.Float.floatToRawIntBits(r1.toFloat);
   	val b2 = java.lang.Float.floatToRawIntBits(r2.toFloat);
   	val nbits1 = (b1 >> 23) - 126;
   	val nbits2 = (b2 >> 23) - 126;
-  	val len = nbits1 + nbits2 - 1;
+  	val len = nbits1 + nbits2 - 2;
   	val b3 = java.lang.Float.floatToRawIntBits(len.toFloat);
-  	val lenbits = (b3 >> 23) - 126;
-  	(((r1 << nbits2) | r2) << lenbits) | nbits2;
+  	val lenbits = if (len > 1) ((b3 >> 23) - 127) else 0;
+  	val r2t = r2 & ((1 << (nbits2-1)) - 1);
+  	val x = (((r1 << (nbits2-1)) | r2t) << lenbits) | (nbits2-1);
+  	math.max(0, x-4);
   }
   
   @inline def solve1(j:Int):Int = {

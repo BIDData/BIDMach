@@ -191,7 +191,7 @@ __forceinline__ __device__ long long __pairembed(long long r1x, int r2x) {
   if (len > 1) lenbits = ((*(int *)(&loc3)) >> 23) - 127;
   r2 = r2 & ((1 << (nbits2-1)) - 1);
   long long x = (((r1 << (nbits2-1)) | r2) << lenbits) | (nbits2-1);
-  return x;
+  return max((long long)0,x-2);
 }
 
 __global__ void __dopairembed(int *r1, int *r2, long long *res, int n) {
