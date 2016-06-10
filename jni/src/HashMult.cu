@@ -176,6 +176,8 @@ int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A,
 //  return ((r1+r2)*(r1+r2+1) >> 1) + r2;
 //}
 
+// The pair embedding function assumes r1x > r2x >= 0; 
+
 __forceinline__ __device__ long long __pairembed(long long r1x, int r2x) {
   long long r1 = r1x+1;
   int r2 = r2x+1;
@@ -186,7 +188,7 @@ __forceinline__ __device__ long long __pairembed(long long r1x, int r2x) {
   int len = nbits1 + nbits2 - 2;
   float loc3 = (float) len; 
   int lenbits = 0;
-  if (len > 0) lenbits = ((*(int *)(&loc3)) >> 23) - 126;
+  if (len > 1) lenbits = ((*(int *)(&loc3)) >> 23) - 127;
   r2 = r2 & ((1 << (nbits2-1)) - 1);
   long long x = (((r1 << (nbits2-1)) | r2) << lenbits) | (nbits2-1);
   return x;
