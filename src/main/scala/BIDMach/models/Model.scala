@@ -302,6 +302,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def convertMat(a:ND):ND = {
   	Model.convertMat(a, useGPU, opts.useDouble);
   }
+
+  def combineModels(ipass:Int, model: Model):Model = this
 }
 
 
