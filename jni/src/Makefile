@@ -37,12 +37,16 @@ DNN127.$(OBJ) : DNN127.cu
 install: all
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
+	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(LIBDIR)
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(LIBDIR)
 
 installcudalib: cudalib
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
+	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(LIBDIR)
 
 installcpulib: cpulib
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(LIBDIR)
 
 upload: all
 	if [ -d /biddata/lib ]; then \

@@ -280,6 +280,7 @@ echo "GLD=$GLD" >> Makefile.incl
 echo "LDFLAGS=$LDFLAGS" >> Makefile.incl
 echo "LIBPREPEND=$LIBPREPEND" >> Makefile.incl
 echo "LIBAPPEND=$LIBAPPEND" >> Makefile.incl
+echo "LIBDIR=$LIBDIR" >> Makefile.incl
 echo "LAPACK_INCLUDES=$LAPACK_INCLUDES" >> Makefile.incl
 echo "CPU_LIBS=$CPU_LIBS" >> Makefile.incl
 echo "CUDA_LIBS=$CUDA_LIBS" >> Makefile.incl

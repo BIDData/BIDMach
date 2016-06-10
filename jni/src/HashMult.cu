@@ -176,15 +176,19 @@ int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A,
 //  return ((r1+r2)*(r1+r2+1) >> 1) + r2;
 //}
 
-__forceinline__ __device__ long long __pairembed(long long r1, int r2) {
+__forceinline__ __device__ long long __pairembed(long long r1x, int r2x) {
+  long long r1 = r1x+1;
+  int r2 = r2x+1;
   float loc1 = (float) r1;
   float loc2 = (float) r2;
   int nbits1 = ((*(int *)(&loc1)) >> 23) - 126;
   int nbits2 = ((*(int *)(&loc2)) >> 23) - 126;
-  int len = nbits1 + nbits2 - 1;
+  int len = nbits1 + nbits2 - 2;
   float loc3 = (float) len; 
-  int lenbits = ((*(int *)(&loc3)) >> 23) - 126;
-  long long x = (((r1 << nbits2) | r2) << lenbits) | nbits2;
+  int lenbits = 0;
+  if (len > 0) lenbits = ((*(int *)(&loc3)) >> 23) - 126;
+  r2 = r2 & ((1 << (nbits2-1)) - 1);
+  long long x = (((r1 << (nbits2-1)) | r2) << lenbits) | (nbits2-1);
   return x;
 }
 
