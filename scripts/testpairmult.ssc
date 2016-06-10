@@ -1,0 +1,84 @@
+import edu.berkeley.bid.CUMACH
+
+val nr = 10;
+val nc = 10;
+val kk = 10;
+val nrows = nr * 2;
+val ncols = nc * 2;
+val kcols = kk * 2;
+
+val aroff = 0;
+val acoff = 0;
+val broff = 0;
+val bcoff = 0;
+val croff = 0;
+val ccoff = 0;
+
+val a = rand(nrows, kcols * 2);
+//val a = ones(nrows,1)*row(1->(kcols*2+1));
+val b = powrand(kcols, ncols, 30);
+val sb = sum(b > 0);
+val nt = sb dotr sb;
+
+val c = zeros(nrows, ncols);
+val d = zeros(nrows, ncols);
+val e = zeros(nrows, ncols);
+
+GLM.pairMult(nr, nc, kk, a, aroff, acoff,  b, broff, bcoff, c, croff, ccoff);
+
+val inds = irow(0->kcols) * 2;
+val a0 = a(?,inds);
+
+val aa=a.copy;
+aa(?,inds+1) = 0;
+
+val ga = GMat(aa);
+val gb = GSMat(b);
+val gd = GMat(d);
+
+flip;
+for (i<- 0 until 1) {
+GLM.pairMult(nr, nc, kk, aa, aroff, acoff,  b, broff, bcoff, d, croff, ccoff);
+}
+val gf=gflop;
+
+flip;
+for (i<- 0 until 1) {
+GLM.pairMult(nr, nc, kk, ga, aroff, acoff,  gb, broff, bcoff, gd, croff, ccoff);
+}
+val gf1=gflop;
+
+flip;
+a0.tileMult(nr, nc, kk, aroff, acoff, b, broff, bcoff, e, croff, ccoff);
+val gf2=gflop
+
+val fd = FMat(gd);
+
+maxi(maxi(abs(d-e)));
+
+maxi(maxi(abs(fd-d))); 
+ 
+(gf._2, gf1._2)
+
+val gaa = grand(nrows, ncols)
+val gmod = gzeros(nrows, kcols * 2);
+val gmod2 = gzeros(nrows, kcols * 2);
+val gmod3 = gzeros(nrows, kcols * 2);
+val gsumsq = gones(nrows, kcols * 2);
+val glrate = gones(1,1);
+val gvexp = gzeros(1,1);
+val gtexp = gones(1,1);
+
+CUMACH.pairMultADAGradTile(nr, nc, kk, kk, gaa.data, gaa.nrows, 0, 0, gb.data, gb.ir, gb.jc,
+    0, 0, 1, gmod.data, gmod.nrows, gsumsq.data, null, 0, glrate.data, glrate.length,
+    gvexp.data, gvexp.length, gtexp.data, gtexp.length, 1, 1, 1e-6f);
+
+GLM.pairMultNT(nr, nc, kk, gaa, 0, 0,  gb, 0, 0, gmod2, 0, 0);
+
+gaa.tileMultNT(nr, nc, kk, 0, 0,  gb, 0, 0, gmod3, 0, 0);
+
+val aa=FMat(gaa);
+val bb=SMat(gb);
+val mod4 = aa(0->10,0->10)*^bb(0->10,0->10)
+
+ nt * 200f * nr / gf1._2 / 1e9f
