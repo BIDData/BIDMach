@@ -651,7 +651,7 @@ object GLM {
   	val lenbits = if (len > 1) ((b3 >> 23) - 127) else 0;
   	val r2t = r2 & ((1 << (nbits2-1)) - 1);
   	val x = (((r1 << (nbits2-1)) | r2t) << lenbits) | (nbits2-1);
-  	math.max(0, x-4);
+  	math.max(0, x-2);
   }
   
   @inline def solve1(j:Int):Int = {
