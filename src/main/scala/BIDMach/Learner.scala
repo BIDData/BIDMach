@@ -29,7 +29,7 @@ case class Learner(
     val opts:Learner.Options = new Learner.Options) extends Serializable {
   
   var results:FMat = null
-  val dopts:DataSource.Opts = datasource.opts
+  val dopts:DataSource.Opts = if (datasource != null) datasource.opts else null
   val mopts:Model.Opts	= model.opts
   val ropts:Mixin.Opts = if (mixins != null) mixins(0).opts else null
   val uopts:Updater.Opts = if (updater != null) updater.opts else null
@@ -80,16 +80,15 @@ case class Learner(
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
     firstPass(null);
+    updateM(ipass-1)
     while (ipass < opts.npasses && ! done) {
-      nextPass(null);
+      nextPass(null)
+      updateM(ipass-1)
     }
     wrapUp;
   }
   
   def firstPass(iter:Iterator[(AnyRef, MatIOtrait)]):Unit = {
-  	if (iter != null) {
-  		datasource.asInstanceOf[IteratorSource].opts.iter = iter;
-  	}
     setup
     init
 
@@ -162,12 +161,15 @@ case class Learner(
         lastCheckPoint += 1;
       }
     }
-    if (updater != null) updater.updateM(ipass)
     ipass += 1
   }
 
+  def updateM(ipass: Int): Unit = {
+    if (updater != null) updater.updateM(ipass)
+  }
+
   def wrapUp {
-  	val gf = gflop;
+    val gf = gflop;
     Mat.useCache = cacheState;
     Mat.debugMem = debugMemState;
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
