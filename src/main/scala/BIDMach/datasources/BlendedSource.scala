@@ -83,7 +83,7 @@ class BlendedSource(val s1:DataSource, val s2:DataSource,
         iptr1 = jptr1
       } else {
         while (iptr2 < mats2(0).ncols && rands2.data(iptr2/bBlock) > opts.samp2) iptr2 += bBlock
-      	if (iptr2 >= mats2(0).ncols) {
+        if (iptr2 >= mats2(0).ncols) {
           mats2 = s2.next
           iptr2 = 0
           rand(0, 1f, opts.samp2)
@@ -129,10 +129,10 @@ class BlendedSource(val s1:DataSource, val s2:DataSource,
 
 object BlendedSource {
   trait Opts extends DataSource.Opts {
-  	var bBlock = 1000
-  	var afrac = 0.5f
-  	var samp1 = 1f
-  	var samp2 = 1f 
+    var bBlock = 1000
+    var afrac = 0.5f
+    var samp1 = 1f
+    var samp2 = 1f 
   }
   
   class Options extends Opts {}

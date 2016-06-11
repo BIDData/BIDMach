@@ -10,8 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 
 
@@ -29,14 +29,14 @@ trait InputNodeOpts extends NodeOpts {}
 
 class InputNode extends Node with InputNodeOpts {
   def copyTo(opts:InputNode):InputNode = {
-    super.copyTo(opts);
-    opts;
+    super.copyTo(opts)
+    opts
   }
     
   override def clone:InputNode = {copyTo(new InputNode)}
-  	
+    
   override def create(net:Net):InputLayer = {
-    InputLayer(net, this);
+    InputLayer(net, this)
   }
   
   override def toString = {
@@ -48,8 +48,8 @@ class InputNode extends Node with InputNodeOpts {
   
 object InputLayer {
   
-  def apply(net:Net) = new InputLayer(net, new InputNode);
+  def apply(net:Net) = new InputLayer(net, new InputNode)
   
-  def apply(net:Net, opts:InputNodeOpts) = new InputLayer(net, opts);
+  def apply(net:Net, opts:InputNodeOpts) = new InputLayer(net, opts)
   
 }

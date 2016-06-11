@@ -52,12 +52,12 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
   
   /** Sets up the modelmats and updatemats arrays and initializes modelmats(0) randomly unless stated otherwise. */
   override def init() = {
-    super.init();
-    mm = modelmats(0);
+    super.init()
+    mm = modelmats(0)
     if (refresh) {
-    	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
+      setmodelmats(Array(mm, mm.ones(mm.nrows, 1)))
     }
-    updatemats = new Array[Mat](2);
+    updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols);     // The actual model matrix
     updatemats(1) = mm.zeros(mm.nrows, 1);            
   }
@@ -75,13 +75,13 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
   def uupdate(views:Mat, clicks:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
-    if (putBack < 0 || ipass == 0) user.set(1f);
+    if (putBack < 0 || ipass == 0) user.set(1f)
     for (i <- 0 until opts.uiter) {
-      val preds = DDS(mm, user, views);	
+      val preds = DDS(mm, user, views);  
 //      if (ipass == 0 && pos <= 10000) println("preds "+preds.contents(0->20))
       val dc = clicks.contents - opts.clickOffset;                 // Subtract one assuming click counts incremented to avoid sparse matrix misalignment
-      val dv = views.contents;
-      val pc = preds.contents;
+      val dv = views.contents
+      val pc = preds.contents
       pc ~ pc ∘ dv;                                                // scale the click prediction by the number of views
       max(opts.weps, pc, pc)
       pc ~ dc / pc
@@ -89,7 +89,7 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
       if (opts.exppsi) exppsi(unew, unew)
       user <-- unew   
 //      if (ipass == 0 && pos <= 10000) println("user "+ user(0->20))
-    }	
+    }  
   }
   
   /**
@@ -102,18 +102,18 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
   def mupdate(views:Mat, clicks:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
-    val preds = DDS(mm, user, views);
-    val dc = clicks.contents -opts.clickOffset;
-    val dv = views.contents;
-    val pc = preds.contents;
+    val preds = DDS(mm, user, views)
+    val dc = clicks.contents -opts.clickOffset
+    val dv = views.contents
+    val pc = preds.contents
     pc ~ pc ∘ dv; 
-    max(opts.weps, pc, pc);
+    max(opts.weps, pc, pc)
     pc ~ dc / pc
     val ud = user *^ preds
     ud ~ ud ∘ mm
     ud ~ ud + opts.beta
-  	updatemats(0) <-- ud  
-  	sum(ud, 2, updatemats(1))
+    updatemats(0) <-- ud  
+    sum(ud, 2, updatemats(1))
   }
   
   /** 
@@ -126,33 +126,33 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
   override def evalfun(views:Mat, clicks:Mat, user:Mat, ipass:Int, pos:Long):FMat = {  
-  	if (ogmats != null) ogmats(0) = user;
-  	val preds = DDS(mm, user, views);
-    val dc = clicks.contents - opts.clickOffset;
+    if (ogmats != null) ogmats(0) = user
+    val preds = DDS(mm, user, views)
+    val dc = clicks.contents - opts.clickOffset
     val dv = views.contents;    
-  	val pc = preds.contents;
-    pc ~ pc ∘ dv;
-  	max(opts.weps, pc, pc);
-  	val spc = sum(pc);
-  	ln(pc, pc);
-    val vv = ((dc ∙ pc) - sum(gammaln(dc + 1)) - spc).dv / dc.length;
-  	row(vv)
+    val pc = preds.contents
+    pc ~ pc ∘ dv
+    max(opts.weps, pc, pc)
+    val spc = sum(pc)
+    ln(pc, pc)
+    val vv = ((dc ∙ pc) - sum(gammaln(dc + 1)) - spc).dv / dc.length
+    row(vv)
   }
   
   override def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
-    val views = gmats(0);
-    val clicks = gmats(1);
+    val views = gmats(0)
+    val clicks = gmats(1)
     val user = if (gmats.length > 2) gmats(2) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval)
     uupdate(views, clicks, user, ipass, i)
     mupdate(views, clicks, user, ipass, i)
   }
   
   override def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-    val views = gmats(0);
-    val clicks = gmats(1);
-    val user = if (gmats.length > 2) gmats(2) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval);
-    uupdate(views, clicks, user, ipass, here);
-    evalfun(views, clicks, user, ipass, here);
+    val views = gmats(0)
+    val clicks = gmats(1)
+    val user = if (gmats.length > 2) gmats(2) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval)
+    uupdate(views, clicks, user, ipass, here)
+    evalfun(views, clicks, user, ipass, here)
   }
   
   def uupdate(data:Mat, user:Mat, ipass:Int, pos:Long) = {} 
@@ -175,12 +175,12 @@ object Click  {
   
   /** Creates a new Click model. */
   def mkClickmodel(fopts:Model.Opts) = {
-  	new Click(fopts.asInstanceOf[Click.Opts])
+    new Click(fopts.asInstanceOf[Click.Opts])
   }
   
   /** Creates a new IncNorm updater. */
   def mkUpdater(nopts:Updater.Opts) = {
-  	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
+    new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
    
   /** Online Variational Bayes Click algorithm with a two matrix datasource. */
@@ -189,13 +189,13 @@ object Click  {
     val opts = new xopts
     opts.dim = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0, mat1), opts), 
-  	    new Click(opts), 
-  	    null,
-  	    new IncNorm(opts), 
-  	    null,
-  	    opts)
+    val nn = new Learner(
+        new MatSource(Array(mat0, mat1), opts), 
+        new Click(opts), 
+        null,
+        new IncNorm(opts), 
+        null,
+        opts)
     (nn, opts)
   }
   
@@ -208,16 +208,16 @@ object Click  {
     val opts = new FsOpts
     opts.dim = d
     opts.fnames = fnames
-    opts.batchSize = 100000;
-    opts.eltsPerSample = 500;
+    opts.batchSize = 100000
+    opts.eltsPerSample = 500
     implicit val threads = threadPool(4)
-  	val nn = new Learner(
-  	    new SFileSource(opts), 
-  	    new Click(opts), 
-  	    null,
-  	    new IncNorm(opts),
-  	    null,
-  	    opts)
+    val nn = new Learner(
+        new SFileSource(opts), 
+        new Click(opts), 
+        null,
+        new IncNorm(opts),
+        null,
+        opts)
     (nn, opts)
   }
      
@@ -237,14 +237,14 @@ object Click  {
     (nn, opts)
   }
   
-  class PredOptions extends Learner.Options with Click.Opts with MatSource.Opts with MatSink.Opts;
+  class PredOptions extends Learner.Options with Click.Opts with MatSource.Opts with MatSink.Opts
   
     // This function constructs a predictor from an existing model 
   def predictor(model:Model, mat0:Mat, mat1:Mat):(Learner, PredOptions) = {
-    val nopts = new PredOptions;
+    val nopts = new PredOptions
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.dim = model.opts.dim;
-    val newmod = new Click(nopts);
+    nopts.dim = model.opts.dim
+    val newmod = new Click(nopts)
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
@@ -259,44 +259,44 @@ object Click  {
   
   /** Parallel online Click algorithm with a matrix datasource. */ 
   def learnPar(mat0:Mat, mat1:Mat) = {
-    class xopts extends ParLearner.Options with Click.Opts with MatSource.Opts with IncNorm.Opts;
-    val opts = new xopts;
-    opts.dim = 1;
-    opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1);
+    class xopts extends ParLearner.Options with Click.Opts with MatSource.Opts with IncNorm.Opts
+    val opts = new xopts
+    opts.dim = 1
+    opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
-  	val nn = new ParLearnerF(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkClickmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
-  	    opts)
+    val nn = new ParLearnerF(
+        new MatSource(Array(mat0:Mat), opts), 
+        opts, mkClickmodel _, 
+        null, null, 
+        opts, mkUpdater _,
+        null, null,
+        opts)
     (nn, opts)
   }
   
   class SFDSopts extends ParLearner.Options with Click.Opts with SFileSource.Opts with IncNorm.Opts
   
-  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 1, 0)), d);
+  def learnPar(fnames:String, d:Int):(ParLearnerF, SFDSopts) = learnPar(List(FileSource.simpleEnum(fnames, 1, 0)), d)
   
   /** Parallel online Click algorithm with one file datasource. */
   def learnPar(fnames:List[(Int) => String], d:Int):(ParLearnerF, SFDSopts) = {
-  	val opts = new SFDSopts;
-  	opts.dim = d;
-  	opts.npasses = 4;
-    opts.fnames = fnames;
-    opts.batchSize = 100000;
-    opts.eltsPerSample = 500;
-  	opts.resFile = "../results.mat"
-  	implicit val threads = threadPool(4)
-  	val nn = new ParLearnerF(
-  	    new SFileSource(opts),
-  	    opts, mkClickmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
-  	    opts
-  	)
-  	(nn, opts)
+    val opts = new SFDSopts
+    opts.dim = d
+    opts.npasses = 4
+    opts.fnames = fnames
+    opts.batchSize = 100000
+    opts.eltsPerSample = 500
+    opts.resFile = "../results.mat"
+    implicit val threads = threadPool(4)
+    val nn = new ParLearnerF(
+        new SFileSource(opts),
+        opts, mkClickmodel _, 
+        null, null, 
+        opts, mkUpdater _,
+        null, null,
+        opts
+    )
+    (nn, opts)
   }
 }
 

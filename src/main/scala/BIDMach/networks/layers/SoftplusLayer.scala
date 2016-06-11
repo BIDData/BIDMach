@@ -10,8 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 
 
@@ -20,20 +20,20 @@ import BIDMach.networks._
  */
 
 class SoftplusLayer(override val net:Net, override val opts:SoftplusNodeOpts = new SoftplusNode) extends Layer(net, opts) {
-  var totflops = 0L;
+  var totflops = 0L
 
   override def forward = {
-		  val start = toc;
-		  createOutput;
-		  LayerFn.applyfwd(inputData, output, LayerFn.SOFTPLUSFN);
-		  clearDeriv;
-		  forwardtime += toc - start;
+      val start = toc
+      createOutput
+      LayerFn.applyfwd(inputData, output, LayerFn.SOFTPLUSFN)
+      clearDeriv
+      forwardtime += toc - start
   }
 
   override def backward = {
-		  val start = toc;
-		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(inputData, deriv, LayerFn.SOFTPLUSFN);
-		  backwardtime += toc - start;
+      val start = toc
+      if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(inputData, deriv, LayerFn.SOFTPLUSFN)
+      backwardtime += toc - start
   }
   
    override def toString = {
@@ -46,7 +46,7 @@ trait SoftplusNodeOpts extends NodeOpts {
 
 class SoftplusNode extends Node with SoftplusNodeOpts {
 
-	override def clone:SoftplusNode = {copyTo(new SoftplusNode).asInstanceOf[SoftplusNode];}
+  override def clone:SoftplusNode = {copyTo(new SoftplusNode).asInstanceOf[SoftplusNode];}
 
   override def create(net:Net):SoftplusLayer = {SoftplusLayer(net, this);}
   
@@ -57,8 +57,8 @@ class SoftplusNode extends Node with SoftplusNodeOpts {
 
 object SoftplusLayer {  
   
-  def apply(net:Net) = new SoftplusLayer(net, new SoftplusNode);
+  def apply(net:Net) = new SoftplusLayer(net, new SoftplusNode)
   
-  def apply(net:Net, opts:SoftplusNode) = new SoftplusLayer(net, opts);
+  def apply(net:Net, opts:SoftplusNode) = new SoftplusLayer(net, opts)
 }
 

@@ -14,9 +14,9 @@ class Classifier {
   def init(model_file:String, pretrained_file:String, image_dims:Array[Int] = Array(256, 256), 
       gpu:Boolean = false, mean_file:String = null, input_scale:Float = 1f, channel_swap:IMat = 2\1\0) = {
     
-    net.init(model_file, pretrained_file);
+    net.init(model_file, pretrained_file)
     
-    CAFFE.set_phase(1);
+    CAFFE.set_phase(1)
     
     CAFFE.set_mode(if (gpu) 1 else 0)
         
@@ -35,11 +35,11 @@ class Classifier {
   }
     
   def classify(im:Image):FND = {
-  	val fnd = net.preprocess(im)
-  	net.clear_inputs
-  	net.add_input(fnd, 0, 0)
-  	net.forward
-  	net.output_data(0)(?,?,?,0)
+    val fnd = net.preprocess(im)
+    net.clear_inputs
+    net.add_input(fnd, 0, 0)
+    net.forward
+    net.output_data(0)(?,?,?,0)
   }
 
 

@@ -1,10 +1,8 @@
 package BIDMach
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat}
-import BIDMat.MatFunctions._
-import BIDMat.SciFunctions._
-import BIDMat.Plotting._
-import BIDMach.models._
 import BIDMach.datasinks._
+import BIDMach.models._
+import BIDMat.SciFunctions._
+import BIDMat.{FMat, Mat}
 
 
 object Logging{

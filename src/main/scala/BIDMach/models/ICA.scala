@@ -9,7 +9,7 @@ import BIDMach.datasources._
 import BIDMach.updaters._
 import java.lang.ref._
 import jcuda.NativePointerObject
-import java.lang.Math;
+import java.lang.Math
 
 /**
  * Independent Component Analysis, using FastICA. It has the ability to center and whiten data. It is 
@@ -71,15 +71,15 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
     opts.G_function match {
       case "logcosh" => {
         G_fun = G_logcosh; g_fun = g_logcosh; g_d_fun = g_d_logcosh; 
-        stdNorm = FMat(0.375);
+        stdNorm = FMat(0.375)
       }
       case "exponent" => {
         G_fun = G_exponent; g_fun = g_exponent; g_d_fun = g_d_exponent; 
-        stdNorm = FMat(-1.0 / sqrt(2.0));
+        stdNorm = FMat(-1.0 / sqrt(2.0))
       }
       case "kurtosis" => {
-        G_fun = G_kurtosis; g_fun = g_kurtosis; g_d_fun = g_d_kurtosis;
-        stdNorm = FMat(0.75);
+        G_fun = G_kurtosis; g_fun = g_kurtosis; g_d_fun = g_d_kurtosis
+        stdNorm = FMat(0.75)
       }
       case _ => throw new RuntimeException("opts.G_function is not a valid value: " + opts.G_function)
     }
@@ -292,7 +292,7 @@ object ICA {
     val opts = new xopts
     opts.dim = d
     opts.fnames = fnames
-    opts.batchSize = 25000;
+    opts.batchSize = 25000
     implicit val threads = threadPool(4)
     val nn = new Learner(
         new FileSource(opts), 

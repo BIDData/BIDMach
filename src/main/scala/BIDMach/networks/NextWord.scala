@@ -15,115 +15,115 @@ import BIDMach._
  */
 class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends Net(opts) {
   
-  var shiftedInds:Mat = null;
-  var leftedge:Layer = null;
-  var height = 0;
-  var width = 0;
-  val preamble_size = 3;
+  var shiftedInds:Mat = null
+  var leftedge:Layer = null
+  var height = 0
+  var width = 0
+  val preamble_size = 3
   // define some getters/setters on the grid
-  def getlayer(j:Int, i:Int):Layer = layers(j + i * width + preamble_size);
-  def setlayer(j:Int, i:Int, ll:Layer) = {layers(j + i * width + preamble_size) = ll};
-	
-	override def createLayers = {
-	  height = opts.height;
-	  width = opts.width; 
+  def getlayer(j:Int, i:Int):Layer = layers(j + i * width + preamble_size)
+  def setlayer(j:Int, i:Int, ll:Layer) = {layers(j + i * width + preamble_size) = ll}
+  
+  override def createLayers = {
+    height = opts.height
+    width = opts.width; 
     layers = if (opts.allout) {
-    	new Array[Layer]((height+2) * width + preamble_size);  
+      new Array[Layer]((height+2) * width + preamble_size);  
     } else {
-      new Array[Layer]((height) * width + preamble_size + 2);
+      new Array[Layer]((height) * width + preamble_size + 2)
     }
     leftedge = InputLayer(this);                     // dummy layer, left edge of zeros    
     
     // the preamble (bottom) layers
-    layers(0) = InputLayer(this);
-    val lopts1 = new LinNode{modelName = "inWordMap"; outdim = opts.dim; aopts = opts.aopts};
-    layers(1) = LinLayer(this, lopts1).setInput(0, layers(0));
-    val spopts = new SplitHorizNode{nparts = opts.width};
-    layers(2) = SplitHorizLayer(this, spopts).setInput(0, layers(1));
+    layers(0) = InputLayer(this)
+    val lopts1 = new LinNode{modelName = "inWordMap"; outdim = opts.dim; aopts = opts.aopts}
+    layers(1) = LinLayer(this, lopts1).setInput(0, layers(0))
+    val spopts = new SplitHorizNode{nparts = opts.width}
+    layers(2) = SplitHorizLayer(this, spopts).setInput(0, layers(1))
     
     // the main grid
     for (i <- 0 until height) {
-    	val lopts = new LSTMNode;
-    	lopts.dim = opts.dim;
-    	lopts.aopts = opts.aopts;
-    	lopts.kind = opts.kind;
-    	lopts.prefix = if (opts.bylevel) "level_%d" format i; else ""
-    	lopts.constructGraph;
+      val lopts = new LSTMNode
+      lopts.dim = opts.dim
+      lopts.aopts = opts.aopts
+      lopts.kind = opts.kind
+      lopts.prefix = if (opts.bylevel) "level_%d" format i; else ""
+      lopts.constructGraph
       for (j <- 0 until width) {
-        val layer = LSTMLayer(this, lopts);
+        val layer = LSTMLayer(this, lopts)
         if (i > 0) {
           layer.setInput(2, getlayer(j, i-1));           // in most layers, input 2 (i) is from layer below
         } else {
-        	layer.setInput(2, layers(2)(j));               // on bottom layer, input 2 is j^th output from the split layer
+          layer.setInput(2, layers(2)(j));               // on bottom layer, input 2 is j^th output from the split layer
         }
         if (j > 0) {
           layer.setInput(0, getlayer(j-1, i));           // input 0 (prev_h) is layer to the left, output 0 (h)
           layer.setInput(1, getlayer(j-1, i)(1));        // input 1 (prev_c) is layer to the left, output 1 (c)
         } else {
           layer.setInput(0, leftedge);                   // in first column, just use dummy (zeros) input
-          layer.setInput(1, leftedge);
+          layer.setInput(1, leftedge)
         }
-        setlayer(j, i, layer);
+        setlayer(j, i, layer)
       }
     }
     
     // the top layers
-    val lopts2 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts};
-    val sopts = new SoftmaxOutputNode;
+    val lopts2 = new LinNode{modelName = "outWordMap"; outdim = opts.nvocab; aopts = opts.aopts}
+    val sopts = new SoftmaxOutputNode
     if (opts.allout) {
-    	output_layers = new Array[Layer](width);
-    	for (j <- 0 until width) {
-    		val linlayer = LinLayer(this, lopts2).setInput(0, getlayer(j, height - 1));
-    		setlayer(j, height, linlayer);    	
-    		val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);
-    		setlayer(j, height+1, smlayer);
-    		output_layers(j) = smlayer;
-    	}
+      output_layers = new Array[Layer](width)
+      for (j <- 0 until width) {
+        val linlayer = LinLayer(this, lopts2).setInput(0, getlayer(j, height - 1))
+        setlayer(j, height, linlayer);      
+        val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer)
+        setlayer(j, height+1, smlayer)
+        output_layers(j) = smlayer
+      }
     } else {
-      val linlayer = LinLayer(this, lopts2).setInput(0, getlayer(width-1, height - 1));
-      layers(width*height+preamble_size) = linlayer;
+      val linlayer = LinLayer(this, lopts2).setInput(0, getlayer(width-1, height - 1))
+      layers(width*height+preamble_size) = linlayer
       val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);   
       layers(width*height+preamble_size+1) = smlayer;    
-      output_layers = Array(smlayer);
+      output_layers = Array(smlayer)
     }
   }
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width %d %d" format (batchSize, opts.width))
-    val nr = batchSize / opts.width;
-    val in = gmats(0).view(opts.width, nr).t.view(1, batchSize);
-    layers(0).output = oneHot(in, opts.nvocab);
+    val nr = batchSize / opts.width
+    val in = gmats(0).view(opts.width, nr).t.view(1, batchSize)
+    layers(0).output = oneHot(in, opts.nvocab)
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
-      leftedge.output = convertMat(zeros(opts.dim, nr));
+      leftedge.output = convertMat(zeros(opts.dim, nr))
     }
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
-  	val nr = batchSize / opts.width;
-  	val in0 = gmats(0);
-  	if (shiftedInds.asInstanceOf[AnyRef] == null) shiftedInds = convertMat(irow(1->in0.ncols) \ (in0.ncols-1));
-  	val inshift = in0(0, shiftedInds);
-    val in = inshift.view(opts.width, nr).t;
+    val nr = batchSize / opts.width
+    val in0 = gmats(0)
+    if (shiftedInds.asInstanceOf[AnyRef] == null) shiftedInds = convertMat(irow(1->in0.ncols) \ (in0.ncols-1))
+    val inshift = in0(0, shiftedInds)
+    val in = inshift.view(opts.width, nr).t
     if (opts.allout) {
-    	for (j <- 0 until opts.width) {
-    		val incol = in.colslice(j,j+1).t;
-    		getlayer(j, height+1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
-    	}
+      for (j <- 0 until opts.width) {
+        val incol = in.colslice(j,j+1).t
+        getlayer(j, height+1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol
+      }
     } else {
-      val incol = in.colslice(opts.width-1, opts.width).t;
-      layers(height*width + preamble_size + 1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
+      val incol = in.colslice(opts.width-1, opts.width).t
+      layers(height*width + preamble_size + 1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol
     }
   }
 }
 
 object NextWord {
   trait Opts extends Net.Opts {
-    var width = 1;
-    var height = 1;
-    var nvocab = 100000;
-    var kind = 0;
-    var allout = true;
-    var bylevel = true;
+    var width = 1
+    var height = 1
+    var nvocab = 100000
+    var kind = 0
+    var allout = true
+    var bylevel = true
   }
   
   class Options extends Opts {}
@@ -143,49 +143,49 @@ object NextWord {
   class LearnOptions extends Learner.Options with NextWord.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat) = {
-    val opts = new LearnOptions;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0), opts), 
-  	    new NextWord(opts), 
-  	    Array(new L1Regularizer(opts)),
-  	    new ADAGrad(opts), 
-  	    null,
-  	    opts)
+    val opts = new LearnOptions
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    val nn = new Learner(
+        new MatSource(Array(mat0), opts), 
+        new NextWord(opts), 
+        Array(new L1Regularizer(opts)),
+        new ADAGrad(opts), 
+        null,
+        opts)
     (nn, opts)
   }
   
   def learnerX(mat0:Mat) = {
-    val opts = new LearnOptions;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0), opts), 
-  	    new NextWord(opts), 
-  	    null,
-  	    null, 
-  	    null,
-  	    opts)
+    val opts = new LearnOptions
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    val nn = new Learner(
+        new MatSource(Array(mat0), opts), 
+        new NextWord(opts), 
+        null,
+        null, 
+        null,
+        opts)
     (nn, opts)
   }
   
   class FDSopts extends Learner.Options with NextWord.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)))
 
   def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
-    val opts = new FDSopts;
+    val opts = new FDSopts
     opts.fnames = fnames
-    opts.batchSize = 100000;
-    opts.eltsPerSample = 500;
-    implicit val threads = threadPool(4);
+    opts.batchSize = 100000
+    opts.eltsPerSample = 500
+    implicit val threads = threadPool(4)
     val ds = new FileSource(opts)
-  	val nn = new Learner(
-  			ds, 
-  	    new NextWord(opts), 
-  	    Array(new L1Regularizer(opts)),
-  	    new ADAGrad(opts), 
-  	    null,
-  	    opts)
+    val nn = new Learner(
+        ds, 
+        new NextWord(opts), 
+        Array(new L1Regularizer(opts)),
+        new ADAGrad(opts), 
+        null,
+        opts)
     (nn, opts)
   } 
-}
+}

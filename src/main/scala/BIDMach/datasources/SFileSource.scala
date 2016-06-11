@@ -58,8 +58,8 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     val threshold = opts.featThreshold
     var j = 0
     while (j < nfiles) {
-    	inptrs(j, 0) = binFind(rowno, inmat(j))
-    	j += 1
+      inptrs(j, 0) = binFind(rowno, inmat(j))
+      j += 1
     }
     var irow = rowno
     while (irow < nrow) {
@@ -108,8 +108,8 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     var maxv = 0
     for (i <- 0 until matq.length) {
       if (matq(i).asInstanceOf[AnyRef] != null) {
-      	val mat = matq(i).asInstanceOf[IMat]
-      	maxv = math.max(maxv, mat(mat.nrows-1,0))
+        val mat = matq(i).asInstanceOf[IMat]
+        maxv = math.max(maxv, mat(mat.nrows-1,0))
       }
     }
     maxv
@@ -137,35 +137,35 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     var todo = opts.batchSize
     flushMat(omats(0))
     while (todo > 0 && fileno < nend) {
-    	var nrow = rowno
-    	val filex = fileno % math.max(1, opts.lookahead)
-    	if (opts.lookahead > 0) {
-    	  while (ready(filex) < fileno) Thread.sleep(1); // `yield`
-    	} else {
+      var nrow = rowno
+      val filex = fileno % math.max(1, opts.lookahead)
+      if (opts.lookahead > 0) {
+        while (ready(filex) < fileno) Thread.sleep(1); // `yield`
+      } else {
           fetch
         }
-    	val spm = spmax(matqueue(filex)) + 1
-//    	println("spm %d" format spm)
-    	nrow = math.min(rowno + todo, spm)
-    	val matq = matqueue(filex)
-    	if (matq(0).asInstanceOf[AnyRef] != null) {
-//    	  println("Here %d %d %d" format(rowno, nrow, todo))
-    		omats(0) = sprowslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
-    		if (rowno + todo >= spm) donextfile = true
-    	} else {
-    	  if (opts.throwMissing) {
-    	    throw new RuntimeException("Missing file "+fileno)
-    	  }
-    	  donextfile = true
-    	}
-    	todo -= nrow - rowno
-    	if (donextfile) {
-    	  rowno = 0;
-    	  fileno += 1;
-    	  donextfile = false
-    	} else {
-    	  rowno = nrow;
-    	}
+      val spm = spmax(matqueue(filex)) + 1
+//      println("spm %d" format spm)
+      nrow = math.min(rowno + todo, spm)
+      val matq = matqueue(filex)
+      if (matq(0).asInstanceOf[AnyRef] != null) {
+//        println("Here %d %d %d" format(rowno, nrow, todo))
+        omats(0) = sprowslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
+        if (rowno + todo >= spm) donextfile = true
+      } else {
+        if (opts.throwMissing) {
+          throw new RuntimeException("Missing file "+fileno)
+        }
+        donextfile = true
+      }
+      todo -= nrow - rowno
+      if (donextfile) {
+        rowno = 0
+        fileno += 1
+        donextfile = false
+      } else {
+        rowno = nrow
+      }
     }
     if (todo > 0) {
       fillup(omats(0), todo)
@@ -233,28 +233,28 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     val addConstFeat = opts.addConstFeat
     val featType = opts.featType
     val threshold = opts.featThreshold
-    var icol = colno;
+    var icol = colno
     while (icol < endcol) {
-      var j = 0;
+      var j = 0
       while (j < nfiles) {
-        val mat = inmat(j).asInstanceOf[SMat];
-        var k = mat.jc(icol) - ioff;
-        var lastk = mat.jc(icol+1) - ioff;
-        val xoff = innz - k;
+        val mat = inmat(j).asInstanceOf[SMat]
+        var k = mat.jc(icol) - ioff
+        var lastk = mat.jc(icol+1) - ioff
+        val xoff = innz - k
  //       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
         while (k < lastk && mat.ir(k)-ioff < lims(j)) {
           if (xoff + k >= omat.ir.length) {
-            throw new RuntimeException("SFileSource index out of range. Try increasing opts.eltsPerSample");
+            throw new RuntimeException("SFileSource index out of range. Try increasing opts.eltsPerSample")
           }
-          omat.ir(xoff + k) = mat.ir(k) + offsets(j);
+          omat.ir(xoff + k) = mat.ir(k) + offsets(j)
           omat.data(xoff + k) = if (featType == 0) {
-            1f;
+            1f
           } else if (featType == 1) {
-            mat.data(k) ;
+            mat.data(k) 
           } else {
             if (mat.data(k).toDouble >= threshold.dv) 1f else 0f;       
           }
-          k += 1;
+          k += 1
         }
         innz = xoff + k
         j += 1
@@ -273,10 +273,10 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
   }
   
   def spmax(matq:Array[Mat]):Int = {
-    var maxv = 0;
+    var maxv = 0
     for (i <- 0 until matq.length) {
       if (matq(i).asInstanceOf[AnyRef] != null) {
-      	maxv = matq(i).ncols
+        maxv = matq(i).ncols
       }
     }
     maxv - 1
@@ -304,37 +304,37 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     var todo = opts.batchSize
     flushMat(omats(0))
     while (todo > 0 && fileno < nend) {
-    	var nrow = rowno
-    	val filex = fileno % math.max(1, opts.lookahead)
-    	if (opts.lookahead > 0) {
-    	  while (ready(filex) < fileno) Thread.sleep(1);// `yield`
-    	} else {
-    	  fetch
-    	}    	
-    	val spm = spmax(matqueue(filex)) + 1
-//    	println("spm %d" format spm)
-    	nrow = math.min(rowno + todo, spm)
-    	val matq = matqueue(filex)
-    	if (matq(0).asInstanceOf[AnyRef] != null) {
-//    	  println("Here %d %d %d %d" format(rowno, nrow, todo, spm))
-    		omats(0) = spcolslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
-    		if (rowno + todo >= spm) donextfile = true
-    	} else {
-    	  if (opts.throwMissing) {
-    	    throw new RuntimeException("Missing file "+fileno)
-    	  }
-    	  donextfile = true;
-    	}
-    	todo -= nrow - rowno
-    	fprogress = nrow*1f / spm
-    	if (donextfile) {
-    	  rowno = 0;
-    	  fileno += 1;
-    	  fprogress = 0
-    	  donextfile = false
-    	} else {
-    	  rowno = nrow
-    	}
+      var nrow = rowno
+      val filex = fileno % math.max(1, opts.lookahead)
+      if (opts.lookahead > 0) {
+        while (ready(filex) < fileno) Thread.sleep(1);// `yield`
+      } else {
+        fetch
+      }      
+      val spm = spmax(matqueue(filex)) + 1
+//      println("spm %d" format spm)
+      nrow = math.min(rowno + todo, spm)
+      val matq = matqueue(filex)
+      if (matq(0).asInstanceOf[AnyRef] != null) {
+//        println("Here %d %d %d %d" format(rowno, nrow, todo, spm))
+        omats(0) = spcolslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
+        if (rowno + todo >= spm) donextfile = true
+      } else {
+        if (opts.throwMissing) {
+          throw new RuntimeException("Missing file "+fileno)
+        }
+        donextfile = true
+      }
+      todo -= nrow - rowno
+      fprogress = nrow*1f / spm
+      if (donextfile) {
+        rowno = 0
+        fileno += 1
+        fprogress = 0
+        donextfile = false
+      } else {
+        rowno = nrow
+      }
     }
     if (todo > 0) {
       fillup(omats(0), todo)
@@ -350,7 +350,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
 
 object SFileSource {
   trait Opts extends FileSource.Opts {
-  	var fcounts:IMat = null
+    var fcounts:IMat = null
   }
   
   class Options extends Opts {}

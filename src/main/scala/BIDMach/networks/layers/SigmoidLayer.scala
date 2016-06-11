@@ -10,8 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 
 
@@ -22,17 +22,17 @@ import BIDMach.networks._
 class SigmoidLayer(override val net:Net, override val opts:SigmoidNodeOpts = new SigmoidNode) extends Layer(net, opts) {
 
   override def forward = {
-		val start = toc;
-		createOutput;
-    LayerFn.applyfwd(inputData, output, LayerFn.SIGMOIDFN);
-		clearDeriv;
-		forwardtime += toc - start;
+    val start = toc
+    createOutput
+    LayerFn.applyfwd(inputData, output, LayerFn.SIGMOIDFN)
+    clearDeriv
+    forwardtime += toc - start
 }
 
   override def backward = {
-		val start = toc;
-		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.SIGMOIDFN);
-		backwardtime += toc - start;
+    val start = toc
+    if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.SIGMOIDFN)
+    backwardtime += toc - start
   }
   
   override def toString = {
@@ -46,7 +46,7 @@ trait SigmoidNodeOpts extends NodeOpts {
 
 class SigmoidNode extends Node with SigmoidNodeOpts {
 
-	override def clone:SigmoidNode = {copyTo(new SigmoidNode).asInstanceOf[SigmoidNode];}
+  override def clone:SigmoidNode = {copyTo(new SigmoidNode).asInstanceOf[SigmoidNode];}
 
   override def create(net:Net):SigmoidLayer = {SigmoidLayer(net, this);}
   
@@ -57,7 +57,7 @@ class SigmoidNode extends Node with SigmoidNodeOpts {
 
 object SigmoidLayer {  
   
-  def apply(net:Net) = new SigmoidLayer(net, new SigmoidNode);
+  def apply(net:Net) = new SigmoidLayer(net, new SigmoidNode)
   
-  def apply(net:Net, opts:SigmoidNode) = new SigmoidLayer(net, opts);
+  def apply(net:Net, opts:SigmoidNode) = new SigmoidLayer(net, opts)
 }

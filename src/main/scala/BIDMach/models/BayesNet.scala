@@ -72,9 +72,9 @@ class BayesNet(val dag:Mat,
      */
     override def init() = {
         // Some stuff for experiments, predictions, and benchmarking.
-        setseed(randSeed);
-        println("randSeed = " + randSeed);
-        runtimes = zeros(1,6);
+        setseed(randSeed)
+        println("randSeed = " + randSeed)
+        runtimes = zeros(1,6)
         useGPUnow = opts.useGPU && (Mat.hasCUDA > 0)
 
         // Establish the states per node, the (colored) Graph data structure, and its projection matrices.
@@ -155,7 +155,7 @@ class BayesNet(val dag:Mat,
     /** Calls a uupdate/evalfun sequence. Known data is in gmats(0), sampled data is in gmats(1). */
     override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
         //println("runtimes: " + runtimes)
-        return FMat(0);
+        return FMat(0)
     }
  
     /**
@@ -186,22 +186,22 @@ class BayesNet(val dag:Mat,
         }
 
         // Now back to normal from prediction accuracy; usertrans is still user.t.
-        val t0 = toc;
-        val usertrans = user.t;
-        val t1 = toc;
-        runtimes(0) += t1 - t0;
+        val t0 = toc
+        val usertrans = user.t
+        val t1 = toc
+        runtimes(0) += t1 - t0
 
         for (c <- 0 until graph.ncolors) {
 
             // Prepare data by establishing appropriate offset matrices for various CPT blocks. First, clear out usertrans.
-            val t2 = toc;
+            val t2 = toc
             usertrans(?, colorInfo(c).idsInColorSAME) = zeroMap( (usertrans.nrows, colorInfo(c).numNodes*opts.copiesForSAME) ) 
             val offsetMatrix = usertrans * colorInfo(c).iprojectSlicedSAME + (colorInfo(c).globalOffsetVectorSAME).t
             val replicatedOffsetMatrix = int(offsetMatrix * colorInfo(c).replicationMatrixSAME) + colorInfo(c).strideVectorSAME
             val logProbs = ln(mm(replicatedOffsetMatrix))
             val nonExponentiatedProbs = (logProbs * colorInfo(c).combinationMatrixSAME).t
-            val t3 = toc;
-            runtimes(1) += t3 - t2;
+            val t3 = toc
+            runtimes(1) += t3 - t2
 
             // Establish matrices needed for the multinomial sampling
             val keys = if (user.ncols == batchSize) colorInfo(c).keysMatrix else colorInfo(c).keysMatrixLast
@@ -213,13 +213,13 @@ class BayesNet(val dag:Mat,
             // Parallel multinomial sampling. Check the colorInfo matrices since they contain a lot of info.
             //val maxInGroup = cummaxByKey(nonExponentiatedProbs, keys)(bkeys) // To prevent overflow (if needed).
             //val probs = exp(nonExponentiatedProbs - maxInGroup) // To prevent overflow (if needed).
-            val t4 = toc;
+            val t4 = toc
             val probs = exp(nonExponentiatedProbs)
             probs <-- (probs + 1e-30f) // Had to add this for the DLM MOOC data to prevent 0/(0+0) problems.
             val cumprobs = cumsumByKey(probs, keys)
             val normedProbs = cumprobs / cumprobs(bkeys)    
-            val t5 = toc;
-            runtimes(2) += t5 - t4;
+            val t5 = toc
+            runtimes(2) += t5 - t4
 
             // With cumulative probabilities set up in normedProbs matrix, create a random matrix and sample
             val randMatrix = randMap( (colorInfo(c).numNodes*opts.copiesForSAME, usertrans.nrows) )
@@ -228,16 +228,16 @@ class BayesNet(val dag:Mat,
             val lessThan = normedProbs < randMatrix(randIndices)
             val sampleIDs = cumsumByKey(lessThan, keys)(sampleIndices)
             usertrans(?, colorInfo(c).idsInColorSAME) = sampleIDs.t // Note the SAME now...
-            val t6 = toc;
-            runtimes(3) += t6 - t5;
+            val t6 = toc
+            runtimes(3) += t6 - t5
 
             // After sampling with this color group over all copies (from SAME), we override the known values.
-            usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t;
-            val t7 = toc;
-            runtimes(4) += t7 - t6;
+            usertrans ~ (select ∘ (stackedData-1)).t + ((1-select) ∘ usertrans.t).t
+            val t7 = toc
+            runtimes(4) += t7 - t6
         }
 
-        user <-- usertrans.t;
+        user <-- usertrans.t
     }
 
     /**
@@ -253,7 +253,7 @@ class BayesNet(val dag:Mat,
      * @param ipass The current pass over the full data source (not the Gibbs sampling iteration number).
      */
     def mupdate(sdata:Mat, user:Mat, ipass:Int):Unit = {
-        val t8 = toc;
+        val t8 = toc
         val index = int(cptOffsetSAME + (user.t * iprojectBlockedSAME).t)
         val linearIndices = index(?)
 
@@ -265,14 +265,14 @@ class BayesNet(val dag:Mat,
         gamrnd(counts1 + dirichletPrior, dirichletScale, counts3)
 
         if (!isFactorModel) {
-            updatemats(0) <-- (counts3 / (counts3.t * normMat *^ normMat).t);
+            updatemats(0) <-- (counts3 / (counts3.t * normMat *^ normMat).t)
         } else {
-            updatemats(0) <-- counts3;
+            updatemats(0) <-- counts3
         }
         println("updatemats(0).t = " + updatemats(0).t)
 
-        val t9 = toc;
-        runtimes(5) += t9 - t8;
+        val t9 = toc
+        runtimes(5) += t9 - t8
     }
  
     /**
@@ -586,7 +586,7 @@ class BayesNet(val dag:Mat,
 
     // EDIT: let's just make a copy of the cpt here
     val cptCopy = mm + 0
-    cptCopy <-- (cptCopy / (cptCopy.t * normMat *^ normMat).t);
+    cptCopy <-- (cptCopy / (cptCopy.t * normMat *^ normMat).t)
 
     var klDivergence = convertMat(float(0))
     var numDistributions = 0

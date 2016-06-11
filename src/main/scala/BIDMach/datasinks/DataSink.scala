@@ -9,11 +9,11 @@ abstract class DataSink(val opts:DataSink.Opts = new DataSink.Options) extends S
   private var _GUID = Mat.myrand.nextLong
   def setGUID(v:Long):Unit = {_GUID = v} 
   def GUID:Long = _GUID
-  def put;
+  def put
   def init:Unit = {}
   def close = {}
-  private var _nmats = 0;
-  def nmats = _nmats;
+  private var _nmats = 0
+  def nmats = _nmats
   def setnmats(k:Int) = {_nmats = k;}
   var omats:Array[Mat] = null
 }

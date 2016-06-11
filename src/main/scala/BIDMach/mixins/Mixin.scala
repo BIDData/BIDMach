@@ -21,7 +21,7 @@ abstract class Mixin(val opts:Mixin.Opts = new Mixin.Options) extends Serializab
 }
 
 object Mixin {
-	trait Opts extends BIDMat.Opts {}
-	
-	class Options extends Opts {}
+  trait Opts extends BIDMat.Opts {}
+  
+  class Options extends Opts {}
 }

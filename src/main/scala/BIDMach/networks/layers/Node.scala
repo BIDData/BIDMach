@@ -11,8 +11,8 @@ import BIDMach.networks.layers._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 
 
@@ -21,25 +21,25 @@ trait NodeOpts extends BIDMat.Opts {
   var name = "";  
   
   def copyOpts(opts:NodeOpts):NodeOpts = {
-    opts.name = name;
-		opts;
+    opts.name = name
+    opts
   }
 }
 
 class Node extends NodeTerm(null, 0) with NodeOpts {
-	val inputs:Array[NodeTerm] = Array(null);
-  var myLayer:Layer = null;
-  var myGhost:Node = null;
-  var parent:Node = null;
-  var outputNumbers:Array[Int] = null;
+  val inputs:Array[NodeTerm] = Array(null)
+  var myLayer:Layer = null
+  var myGhost:Node = null
+  var parent:Node = null
+  var outputNumbers:Array[Int] = null
   
-  override def node = this;
+  override def node = this
   
   def copyTo(opts:Node):Node = {
-    copyOpts(opts);
-    opts.inputs(0) = inputs(0);
-    myGhost = opts;
-    opts;
+    copyOpts(opts)
+    opts.inputs(0) = inputs(0)
+    myGhost = opts
+    opts
   }
   
   override def toString = {
@@ -47,10 +47,10 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
   }
 
   override def clone:Node = {
-		copyTo(new Node).asInstanceOf[Node];
+    copyTo(new Node).asInstanceOf[Node]
   } 
   
-  def apply(i:Int) = new NodeTerm(this, i);
+  def apply(i:Int) = new NodeTerm(this, i)
   
   def create(net:Net):Layer = {null}
 }
@@ -58,15 +58,15 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
 
 class NodeTerm(val _node:Node, val term:Int) extends Serializable {  
   
-  def node = _node;
+  def node = _node
   
-  def + (a:NodeTerm) = {val n=this; new AddNode{inputs(0)=n; inputs(1)=a}};
+  def + (a:NodeTerm) = {val n=this; new AddNode{inputs(0)=n; inputs(1)=a}}
 
-  def *@ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
+  def *@ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}}
     
-  def ∘ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
+  def ∘ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}}
         
-  def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
+  def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}}
 }
 
 object Node {
@@ -77,103 +77,103 @@ object Node {
   
   def dropout(a:NodeTerm, frac:Float) = new DropoutNode{inputs(0) = a; frac = frac}
   
-  def exp(a:NodeTerm) = new ExpNode{inputs(0) = a;};
+  def exp(a:NodeTerm) = new ExpNode{inputs(0) = a;}
   
-  def glm_(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
+  def glm_(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links}
   
-  def glm(a:NodeTerm)(links:IMat) = {val ilinks = links; new GLMNode{inputs(0) = a; links = ilinks}};
+  def glm(a:NodeTerm)(links:IMat) = {val ilinks = links; new GLMNode{inputs(0) = a; links = ilinks}}
   
-  def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
+  def input(a:NodeTerm) = new InputNode{inputs(0) = a;}
   
   def input = new InputNode
   
   def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null) = {
-    val odim = outdim;
-    val hBias = hasBias;
-    val aaopts = aopts;
-    val mname = name;
-    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts};
+    val odim = outdim
+    val hBias = hasBias
+    val aaopts = aopts
+    val mname = name
+    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts}
   }
   
   def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {
     val n = new LinNode{inputs(0) = a;}
-    opts.copyOpts(n);
+    opts.copyOpts(n)
     n
   }
   
   def lstm_fused(inc:NodeTerm, lin1:NodeTerm, lin2:NodeTerm, lin3:NodeTerm, lin4:NodeTerm) = {
     new LSTMfusedNode{
-      inputs(0) = inc;
-      inputs(1) = lin1;
-      inputs(2) = lin2;
-      inputs(3) = lin3;
-      inputs(4) = lin4;
+      inputs(0) = inc
+      inputs(1) = lin1
+      inputs(2) = lin2
+      inputs(3) = lin3
+      inputs(4) = lin4
     }
   }
   
-  def ln(a:NodeTerm) = new LnNode{inputs(0) = a};
+  def ln(a:NodeTerm) = new LnNode{inputs(0) = a}
   
   def negsamp(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
-    val odim = outdim;
-    val hBias = hasBias;
-    val aaopts = aopts;
-    val nnsamps = nsamps;
-    val eexpt = expt;
-    val dcr = doCorrect;
-    val sct = scoreType;
-    val mname = name;
-    new NegsampOutputNode{inputs(0)=a; modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr};
+    val odim = outdim
+    val hBias = hasBias
+    val aaopts = aopts
+    val nnsamps = nsamps
+    val eexpt = expt
+    val dcr = doCorrect
+    val sct = scoreType
+    val mname = name
+    new NegsampOutputNode{inputs(0)=a; modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr}
   }
     
   def negsamp_(a:NodeTerm)(implicit opts:NegsampOutputNodeOpts) =     {
     val n = new NegsampOutputNode{inputs(0) = a}
-    opts.copyOpts(n);
+    opts.copyOpts(n)
     n
   }
   
   def norm_(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
     val n = new NormNode{inputs(0) = a;}
-    opts.copyOpts(n);
+    opts.copyOpts(n)
     n
   }
   
   def norm(a:NodeTerm)(targetNorm:Float = 1f, weight:Float = 1f) =  {
-    val tnorm = targetNorm;
-    val nweight = weight;
+    val tnorm = targetNorm
+    val nweight = weight
     new NormNode{inputs(0) = a; targetNorm = tnorm; weight = nweight}
   }
   
-  def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a};
+  def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a}
   
-  def rect(a:NodeTerm) = new RectNode{inputs(0) = a};
+  def rect(a:NodeTerm) = new RectNode{inputs(0) = a}
   
-  def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
+  def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a}
   
-  def σ(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
+  def σ(a:NodeTerm) = new SigmoidNode{inputs(0) = a}
 
-  def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
+  def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a}
   
   def softmaxout(a:NodeTerm)(scoreTyp:Int=0, doVar:Boolean=false) =  new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; doVariance = doVar}
   
-  def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = a};
+  def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = a}
   
-  def splithoriz(a:NodeTerm, np:Int) = new SplitHorizNode{inputs(0) = a; nparts = np};
+  def splithoriz(a:NodeTerm, np:Int) = new SplitHorizNode{inputs(0) = a; nparts = np}
   
-  def splitvert(a:NodeTerm, np:Int) = new SplitVertNode{inputs(0) = a; nparts = np};
+  def splitvert(a:NodeTerm, np:Int) = new SplitVertNode{inputs(0) = a; nparts = np}
   
-  def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
+  def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a}
   
   def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm, m:String)(opts:LSTMNodeOpts) = {
-    val n = new LSTMNode;
-    opts.copyOpts(n);
-    n.modelName = m;
-    n.constructGraph;
-    n.inputs(0) = h;
-    n.inputs(1) = c;
-    n.inputs(2) = i;
+    val n = new LSTMNode
+    opts.copyOpts(n)
+    n.modelName = m
+    n.constructGraph
+    n.inputs(0) = h
+    n.inputs(1) = c
+    n.inputs(2) = i
     n
   }
   
-  implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n);
+  implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n)
 
-}
+}
