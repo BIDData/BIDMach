@@ -49,4 +49,4 @@ object OnehotLayer {
   def apply(net:Net) = new OnehotLayer(net, new OnehotNode)
   
   def apply(net:Net, opts:OnehotNode) = new OnehotLayer(net, opts)
-}
+}

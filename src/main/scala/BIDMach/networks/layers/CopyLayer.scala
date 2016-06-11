@@ -59,4 +59,4 @@ object CopyLayer {
   def apply(net:Net) = new CopyLayer(net, new CopyNode)
   
   def apply(net:Net, opts:CopyNode) = new CopyLayer(net, opts)
-}
+}

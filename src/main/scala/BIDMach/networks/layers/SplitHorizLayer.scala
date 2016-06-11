@@ -70,4 +70,4 @@ object SplitHorizLayer {
   def apply(net:Net) = new SplitHorizLayer(net, new SplitHorizNode)
   
   def apply(net:Net, opts:SplitHorizNode) = new SplitHorizLayer(net, opts)
-}
+}

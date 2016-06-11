@@ -181,4 +181,4 @@ object NegsampOutputLayer {
   def apply(net:Net) = new NegsampOutputLayer(net, new NegsampOutputNode)
   
   def apply(net:Net, opts:NegsampOutputNode) = new NegsampOutputLayer(net, opts)
-}
+}

@@ -60,4 +60,4 @@ object ExpLayer {
   def apply(net:Net) = new ExpLayer(net, new ExpNode)
   
   def apply(net:Net, opts:ExpNode) = new ExpLayer(net, opts)
-}
+}

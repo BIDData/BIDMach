@@ -59,4 +59,4 @@ object SumLayer {
   def apply(net:Net) = new SumLayer(net, new SumNode)
   
   def apply(net:Net, opts:SumNode) = new SumLayer(net, opts)
-}
+}

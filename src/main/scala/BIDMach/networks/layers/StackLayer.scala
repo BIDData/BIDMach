@@ -74,4 +74,4 @@ object StackLayer {
   def apply(net:Net) = new StackLayer(net, new StackNode)
   
   def apply(net:Net, opts:StackNode) = new StackLayer(net, opts)
-}
+}

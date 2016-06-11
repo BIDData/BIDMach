@@ -627,4 +627,4 @@ object TwitterScanner extends Scanner {
     (nuni, nbi, ntri, istatus)
   }
 }
-}
+}

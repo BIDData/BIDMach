@@ -176,4 +176,4 @@ object Node {
   
   implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n)
 
-}
+}

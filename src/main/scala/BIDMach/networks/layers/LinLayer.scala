@@ -142,4 +142,4 @@ object LinLayer {
   
   def apply(net:Net, opts:LinNodeOpts):LinLayer = new LinLayer(net, opts)
   
-}
+}

@@ -59,4 +59,4 @@ object LnLayer {
   def apply(net:Net) = new LnLayer(net, new LnNode)
   
   def apply(net:Net, opts:LnNode) = new LnLayer(net, opts)
-}
+}

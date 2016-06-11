@@ -70,4 +70,4 @@ object SplitVertLayer {
   def apply(net:Net) = new SplitVertLayer(net, new SplitVertNode)
   
   def apply(net:Net, opts:SplitVertNode) = new SplitVertLayer(net, opts)
-}
+}

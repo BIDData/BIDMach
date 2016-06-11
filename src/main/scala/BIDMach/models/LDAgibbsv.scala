@@ -179,4 +179,4 @@ object LDAgibbsv {
     (nn, opts)
   }
   
-}
+}
