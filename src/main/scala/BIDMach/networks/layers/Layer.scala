@@ -10,8 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 
 /**
@@ -76,24 +76,24 @@ import BIDMach.networks._
 @SerialVersionUID(100L)
 class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0) {
   // Internal data arrays
-  val _inputs = new Array[LayerTerm](1);
-  val _outputs = new Array[ND](1);
-  val _derivs = new Array[ND](1);
+  val _inputs = new Array[LayerTerm](1)
+  val _outputs = new Array[ND](1)
+  val _derivs = new Array[ND](1)
   def inputlength = _inputs.length
   var forwardtime = 0.0
   var backwardtime = 0.0
   override def layer = this
-  def inputs = _inputs;
+  def inputs = _inputs
   
   private var _GUID = Mat.myrand.nextLong
   def setGUID(v:Long):Unit = {_GUID = v}
   def GUID:Long = _GUID
   
   // Setters and getters for general elements of those arrays
-  def outputs(i:Int) = _outputs(i);
+  def outputs(i:Int) = _outputs(i)
   def derivs(i:Int) = _derivs(i);  
-  def input(i:Int) = _inputs(i);
-  def apply(i:Int) = new LayerTerm(this, i);
+  def input(i:Int) = _inputs(i)
+  def apply(i:Int) = new LayerTerm(this, i)
   
   def setOutput(i:Int, v:ND):Layer = {_outputs(i) = v; this}
   def setDeriv(i:Int, v:ND):Layer = {_derivs(i) = v; this}
@@ -102,13 +102,13 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def setInputs(v0:LayerTerm, v1:LayerTerm, v2:LayerTerm) = {setInput(0, v0); setInput(1, v1); setInput(2, v2); this}
   
   // Setters and getters for the first input or output
-  def input = _inputs(0);
-  def output = _outputs(0);
-  def deriv = _derivs(0);
+  def input = _inputs(0)
+  def output = _outputs(0)
+  def deriv = _derivs(0)
   
   def input_=(v:LayerTerm): Unit = {_inputs(0) = v}
-  def output_= (v:ND):Unit = {_outputs(0) = v};
-  def deriv_=(v:ND):Unit = {_derivs(0) = v};
+  def output_= (v:ND):Unit = {_outputs(0) = v}
+  def deriv_=(v:ND):Unit = {_derivs(0) = v}
   
   // Input getters (and one setter) which get the appropriate output from each input layer
   def inputData = {val i = _inputs(0); i.layer._outputs(i.term);}
@@ -117,36 +117,36 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def inputDatas(i:Int) = {val lt = _inputs(i); lt.layer._outputs(lt.term);}
   def inputDerivs(i:Int) = {val lt = _inputs(i); lt.layer._derivs(lt.term);}
   
-  var target:Mat = null;
-  def forward = {};
-  def backward:Unit = {};
-  def backward(ipass:Int, pos:Long):Unit = backward;
-  def score:FMat = zeros(1,1);
-  var parent:Layer = null;
-  lazy val modelmats = net.modelmats;
-  lazy val updatemats = net.updatemats;
-  lazy val useGPU = net.useGPU;
-  lazy val nopts = net.opts;
+  var target:Mat = null
+  def forward = {}
+  def backward:Unit = {}
+  def backward(ipass:Int, pos:Long):Unit = backward
+  def score:FMat = zeros(1,1)
+  var parent:Layer = null
+  lazy val modelmats = net.modelmats
+  lazy val updatemats = net.updatemats
+  lazy val useGPU = net.useGPU
+  lazy val nopts = net.opts
   def convertMat(mat:Mat) = {net.convertMat(mat);}
   def convertMat(mat:ND) = {net.convertMat(mat);}
 
   def createOutput = {
-  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(inputData.dims);
+    if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(inputData.dims)
   }
 
   def createOutput(dims:IMat) = {
-  	if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(dims);
+    if (output.asInstanceOf[AnyRef] == null) output = inputData.zeros(dims)
   }
 
   def clearDeriv = {
-  	if (deriv.asInstanceOf[AnyRef] == null) deriv = output.zeros(output.dims);
-  	deriv.clear;
+    if (deriv.asInstanceOf[AnyRef] == null) deriv = output.zeros(output.dims)
+    deriv.clear
   }
   
   def clearDerivs = {
     if (deriv.asInstanceOf[AnyRef] == null) {
       for (i <- 0 until _outputs.length) {
-        _derivs(i) = output.zeros(_outputs(i).dims);
+        _derivs(i) = output.zeros(_outputs(i).dims)
       }
     }
     for (i <- 0 until _derivs.length) {
@@ -169,41 +169,41 @@ object Layer {
   
   def dropout(a:LayerTerm, dfrac:Float) = new DropoutLayer(null, new DropoutNode{frac = dfrac}){inputs(0) = a}
   
-  def exp(a:LayerTerm) = new ExpLayer(null){inputs(0) = a;};
+  def exp(a:LayerTerm) = new ExpLayer(null){inputs(0) = a;}
   
-  def GLM(a:LayerTerm)(implicit opts:GLMNodeOpts) = new GLMLayer(null, opts){inputs(0) = a};
+  def GLM(a:LayerTerm)(implicit opts:GLMNodeOpts) = new GLMLayer(null, opts){inputs(0) = a}
   
-  def input(a:LayerTerm) = new InputLayer(null){inputs(0) = a;};
+  def input(a:LayerTerm) = new InputLayer(null){inputs(0) = a;}
   
-  def input = new InputLayer(null);
+  def input = new InputLayer(null)
   
     
   def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
       tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int])) = {
-    val odim = outdim;
-    val hBias = hasBias;
-    val aaopts = aopts;
-    val mname = name;
-    val tms = tmatShape;
-    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts; tmatShape = tms}){inputs(0)=a;};
+    val odim = outdim
+    val hBias = hasBias
+    val aaopts = aopts
+    val mname = name
+    val tms = tmatShape
+    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts; tmatShape = tms}){inputs(0)=a;}
   }
   
   def linear_(a:LayerTerm)(implicit net:Net, opts:LinNodeOpts) = {
     new LinLayer(net, opts){inputs(0) = a;}
   }
   
-  def ln(a:LayerTerm) = new LnLayer(null){inputs(0) = a};
+  def ln(a:LayerTerm) = new LnLayer(null){inputs(0) = a}
   
   def negsamp(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
-    val odim = outdim;
-    val hBias = hasBias;
-    val aaopts = aopts;
-    val nnsamps = nsamps;
-    val eexpt = expt;
-    val dcr = doCorrect;
-    val sct = scoreType;
-    val mname = name;
-    new NegsampOutputLayer(net, new NegsampOutputNode{modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr}){inputs(0)=a;};
+    val odim = outdim
+    val hBias = hasBias
+    val aaopts = aopts
+    val nnsamps = nsamps
+    val eexpt = expt
+    val dcr = doCorrect
+    val sct = scoreType
+    val mname = name
+    new NegsampOutputLayer(net, new NegsampOutputNode{modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr}){inputs(0)=a;}
   }
     
   def negsamp_(a:LayerTerm)(implicit net:Net, opts:NegsampOutputNodeOpts) = {
@@ -212,99 +212,99 @@ object Layer {
   
   def norm(a:LayerTerm)(implicit opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
   
-  def oneHot(a:LayerTerm) = new OnehotLayer(null){inputs(0) = a};
+  def oneHot(a:LayerTerm) = new OnehotLayer(null){inputs(0) = a}
   
-  def rect(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
+  def rect(a:LayerTerm) = new RectLayer(null){inputs(0) = a}
   
-  def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
+  def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a}
   
-  def σ(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
+  def σ(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a}
 
-  def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a};
+  def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a}
   
   def softmaxout(a:LayerTerm)(scoreTyp:Int=0, doVar:Boolean=false) =  new SoftmaxOutputLayer(null, new SoftmaxOutputNode{scoreType=scoreTyp;doVariance=doVar}){inputs(0) = a}
   
-  def softplus(a:LayerTerm) = new SoftplusLayer(null){inputs(0) = a};
+  def softplus(a:LayerTerm) = new SoftplusLayer(null){inputs(0) = a}
   
-  def splithoriz(a:LayerTerm, np:Int) = new SplitHorizLayer(null, new SplitHorizNode{nparts = np}){inputs(0) = a};
+  def splithoriz(a:LayerTerm, np:Int) = new SplitHorizLayer(null, new SplitHorizNode{nparts = np}){inputs(0) = a}
   
-  def splitvert(a:LayerTerm, np:Int) = new SplitVertLayer(null, new SplitVertNode{nparts = np}){inputs(0) = a};
+  def splitvert(a:LayerTerm, np:Int) = new SplitVertLayer(null, new SplitVertNode{nparts = np}){inputs(0) = a}
   
-  def tanh(a:LayerTerm) = new TanhLayer(null){inputs(0) = a};
+  def tanh(a:LayerTerm) = new TanhLayer(null){inputs(0) = a}
   
   def lstm(h:LayerTerm, c:LayerTerm, i:LayerTerm, m:String)(net:Net, opts:LSTMNodeOpts) = {
-    val node = new LSTMNode;
-    opts.copyOpts(node);
-    node.modelName = m;
-    node.constructGraph;
-    val n = new LSTMLayer(net, node);
-    n.setInput(0, h);
-    n.setInput(1, c);
-    n.setInput(2, i);
+    val node = new LSTMNode
+    opts.copyOpts(node)
+    node.modelName = m
+    node.constructGraph
+    val n = new LSTMLayer(net, node)
+    n.setInput(0, h)
+    n.setInput(1, c)
+    n.setInput(2, i)
     n
   }
   
   def lstm_(h:LayerTerm, c:LayerTerm, i:LayerTerm, m:String)(implicit net:Net, opts:LSTMNodeOpts) = {
-    lstm(h, c, i, m)(net, opts);
+    lstm(h, c, i, m)(net, opts)
   }
   
 }
 
 class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
-  def layer = _layer;
+  def layer = _layer
   
-  def + (a:LayerTerm) = {val n=this; new AddLayer(null){inputs(0)=n; inputs(1)=a}};
+  def + (a:LayerTerm) = {val n=this; new AddLayer(null){inputs(0)=n; inputs(1)=a}}
 
-  def *@ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+  def *@ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}}
     
-  def ∘ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+  def ∘ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}}
         
-  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
+  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}}
 }
 
 trait OutputLayer {}
 
 object LayerFn {
-  final val SIGMOIDFN = 0;
-  final val TANHFN = 1;
-  final val SOFTPLUSFN = 2;
+  final val SIGMOIDFN = 0
+  final val TANHFN = 1
+  final val SOFTPLUSFN = 2
   
-  val fwdflops = irow(20, 20, 40);
-  val bwdflops = irow(3, 3, 20);
+  val fwdflops = irow(20, 20, 40)
+  val bwdflops = irow(3, 3, 20)
   
   // Loosely check dimensions. Skip dimensions of 1 in either tensor.
   def checkdims(dims0:IMat, dims1:IMat) = {
     if (dims1.asInstanceOf[AnyRef] != null) {
-      var i0 = 0;
-      var i1 = 0;
+      var i0 = 0
+      var i1 = 0
       while (i0 < dims0.length && i1 < dims1.length) {
-        while (i0 < dims0.length && dims0(i0) == 1) i0 += 1;
+        while (i0 < dims0.length && dims0(i0) == 1) i0 += 1
         while (i1 < dims1.length && dims1(i1) == 1) i1 += 1; 
         if ((i0 >= dims0.length) != (i1 >= dims1.length)) {
-          throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString);
+          throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString)
         } else if (i0 < dims0.length && i1 < dims1.length && dims0(i0) != dims1(i1)) {
-        	throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString);           
+          throw new RuntimeException("dimensions mismatch in Layer Function " + dims0.toString + " and " + dims1.toString);           
         }
-        i0 += 1;
-        i1 += 1;
+        i0 += 1
+        i1 += 1
       }
     }
   }
   
-  def applyfwd(a:ND, ifn:Int):ND = applyfwd(a, null, ifn);
+  def applyfwd(a:ND, ifn:Int):ND = applyfwd(a, null, ifn)
   
   def applyfwd(a:ND, out:ND, ifn:Int):ND = {
-    Mat.nflops += 1L * a.length * fwdflops(ifn);
-    checkdims(a.dims, out.dims);
+    Mat.nflops += 1L * a.length * fwdflops(ifn)
+    checkdims(a.dims, out.dims)
     a match {
       case af:FND => {
-        val oND = FND.newOrCheckFND(a.dims, out, a.GUID, ifn, "LayerFn".##);
-        CPUMACH.applyfwd(af.data, oND.data, ifn, a.length, Mat.numThreads);
+        val oND = FND.newOrCheckFND(a.dims, out, a.GUID, ifn, "LayerFn".##)
+        CPUMACH.applyfwd(af.data, oND.data, ifn, a.length, Mat.numThreads)
         oND
       }
       case ag:GND => {
-        val oND = GND.newOrCheckGND(a.dims, out, a.GUID, ifn, "LayerFn".##);
-        CUMACH.applyfwd(ag.data, oND.data, ifn, a.length);
+        val oND = GND.newOrCheckGND(a.dims, out, a.GUID, ifn, "LayerFn".##)
+        CUMACH.applyfwd(ag.data, oND.data, ifn, a.length)
         oND
       }
     }
@@ -313,17 +313,17 @@ object LayerFn {
   def applyderiv(a:ND, b:ND, ifn:Int):ND = applyderiv(a, b, null, ifn)
       
   def applyderiv(a:ND, b:ND, out:ND, ifn:Int):ND = {
-	  Mat.nflops += 1L * a.length * bwdflops(ifn);
-	  checkdims(a.dims, b.dims);
+    Mat.nflops += 1L * a.length * bwdflops(ifn)
+    checkdims(a.dims, b.dims)
     (a, b) match {
       case (af:FND, bf:FND) => {
-        val oND = FND.newOrCheckFND(a.dims, out, a.GUID, ifn, "LayerFn".##);
-        CPUMACH.applyderiv(af.data, bf.data, oND.data, ifn, a.length, Mat.numThreads);
+        val oND = FND.newOrCheckFND(a.dims, out, a.GUID, ifn, "LayerFn".##)
+        CPUMACH.applyderiv(af.data, bf.data, oND.data, ifn, a.length, Mat.numThreads)
         oND
       }
       case (ag:GND, bg:GND) => {
-        val oND = GND.newOrCheckGND(a.dims, out, a.GUID, ifn, "LayerFn".##);
-        CUMACH.applyderiv(ag.data, bg.data, oND.data, ifn, a.length);
+        val oND = GND.newOrCheckGND(a.dims, out, a.GUID, ifn, "LayerFn".##)
+        CUMACH.applyderiv(ag.data, bg.data, oND.data, ifn, a.length)
         oND
       }
     }

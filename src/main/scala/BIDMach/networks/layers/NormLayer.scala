@@ -10,8 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 
 
@@ -21,26 +21,26 @@ import BIDMach.networks._
  */
 
 class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormNode) extends Layer(net, opts) {
-	var sconst:Mat = null;
+  var sconst:Mat = null
 
   override def forward = {
-		val start = toc;
-		createOutput;
-		output <-- inputData;
-		clearDeriv;
-		forwardtime += toc - start;
+    val start = toc
+    createOutput
+    output <-- inputData
+    clearDeriv
+    forwardtime += toc - start
   }
 
   override def backward = {
-    val start = toc;
+    val start = toc
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-    	if (sconst.asInstanceOf[AnyRef] == null) sconst = output.zeros(1,1);
-    	sconst.set(math.min(0.1f, math.max(-0.1f, (opts.targetNorm - norm(output.asMat)/output.length).toFloat * opts.weight)));
-    	inputDeriv = output + 0f;
-    	inputDeriv.asMat ~ output.asMat ∘ sconst;
-    	inputDeriv ~ inputDeriv + deriv;  
+      if (sconst.asInstanceOf[AnyRef] == null) sconst = output.zeros(1,1)
+      sconst.set(math.min(0.1f, math.max(-0.1f, (opts.targetNorm - norm(output.asMat)/output.length).toFloat * opts.weight)))
+      inputDeriv = output + 0f
+      inputDeriv.asMat ~ output.asMat ∘ sconst
+      inputDeriv ~ inputDeriv + deriv;  
     }
-    backwardtime += toc - start;
+    backwardtime += toc - start
   }
   
   override def toString = {
@@ -49,37 +49,37 @@ class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormN
 }
 
 trait NormNodeOpts extends NodeOpts {
-	var targetNorm = 1f;
-	var weight = 1f;
-	
-	def copyOpts(opts:NormNodeOpts):NormNodeOpts = {
-  		super.copyOpts(opts);
-  		opts.targetNorm = targetNorm;
-  		opts.weight = weight;
-  		opts;
+  var targetNorm = 1f
+  var weight = 1f
+  
+  def copyOpts(opts:NormNodeOpts):NormNodeOpts = {
+      super.copyOpts(opts)
+      opts.targetNorm = targetNorm
+      opts.weight = weight
+      opts
     }
 }
 
 class NormNode extends Node with NormNodeOpts {  
     
-	def copyTo(opts:NormNode):NormNode = {
-			this.asInstanceOf[Node].copyTo(opts);
-			copyOpts(opts);
-			opts
-	}
+  def copyTo(opts:NormNode):NormNode = {
+      this.asInstanceOf[Node].copyTo(opts)
+      copyOpts(opts)
+      opts
+  }
 
-	override def clone:NormNode = {copyTo(new NormNode).asInstanceOf[NormNode];};
+  override def clone:NormNode = {copyTo(new NormNode).asInstanceOf[NormNode];}
 
-	override def create(net:Net):NormLayer = {NormLayer(net, this);}
+  override def create(net:Net):NormLayer = {NormLayer(net, this);}
 
-	override def toString = {
-			"norm@"+Integer.toHexString(hashCode % 0x10000).toString
-	}
+  override def toString = {
+      "norm@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 }
   
 object NormLayer {  
   
-  def apply(net:Net) = new NormLayer(net, new NormNode);
+  def apply(net:Net) = new NormLayer(net, new NormNode)
   
   def apply(net:Net, opts:NormNode) = new NormLayer(net, opts);  
 }

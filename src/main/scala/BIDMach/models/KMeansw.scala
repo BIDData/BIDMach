@@ -51,14 +51,14 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
       throw new RuntimeException("KMeansw need batchsize >= dim")
     
     if (refresh) {
-    	val rp = randperm(nc);
-    	val mmi = full(data0(?,rp(0,0->opts.dim))).t;
-    	mm = convertMat(mmi);
-    	mcounts = mm.zeros(mm.nrows, 1);
-    	mweights = mm.zeros(mm.nrows, 1);
-    	setmodelmats(Array(mm, mcounts, mweights));
+      val rp = randperm(nc)
+      val mmi = full(data0(?,rp(0,0->opts.dim))).t
+      mm = convertMat(mmi)
+      mcounts = mm.zeros(mm.nrows, 1)
+      mweights = mm.zeros(mm.nrows, 1)
+      setmodelmats(Array(mm, mcounts, mweights))
     }
-    for (i <- 0 until 3) modelmats(i) = convertMat(modelmats(i));
+    for (i <- 0 until 3) modelmats(i) = convertMat(modelmats(i))
     um = modelmats(0).zeros(mm.nrows, mm.ncols)
     umcounts = mm.zeros(mm.nrows, 1)
     umweights = mm.zeros(mm.nrows, 1)
@@ -84,11 +84,11 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
   }
   
   def mupdate(sdata:Mat, weights:Mat, ipass:Int):Unit = {
-    val vmatch = -2 * mm * sdata + snorm(sdata) + ((mm dotr mm) + (opts.wsize * mweights));
-    val bestm = vmatch <= mini(vmatch);
-    bestm ~ bestm / sum(bestm);
-    um ~ bestm *^ sdata;
-    sum(bestm, 2, umcounts);
+    val vmatch = -2 * mm * sdata + snorm(sdata) + ((mm dotr mm) + (opts.wsize * mweights))
+    val bestm = vmatch <= mini(vmatch)
+    bestm ~ bestm / sum(bestm)
+    um ~ bestm *^ sdata
+    sum(bestm, 2, umcounts)
     if (weights.asInstanceOf[AnyRef] != null) {
       umweights ~ bestm *^ weights
     } else {
@@ -105,17 +105,17 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
     } else {
       mean(sqrt(vm)).dv
     }
-  	row(-vv, math.exp(vv))
+    row(-vv, math.exp(vv))
   }
   
   override def updatePass(ipass:Int) = {
     if (ipass > 0) {
-      max(umcounts, 1f, umcounts);
-      mm ~ um / umcounts;
-      mweights <-- umweights;
-      um.clear;
-      umcounts.clear;
-      umweights.clear;
+      max(umcounts, 1f, umcounts)
+      mm ~ um / umcounts
+      mweights <-- umweights
+      um.clear
+      umcounts.clear
+      umweights.clear
     }
   }
 }
@@ -128,11 +128,11 @@ object KMeansw  {
   class Options extends Opts {}
   
   def mkKMeansModel(fopts:Model.Opts) = {
-  	new KMeansw(fopts.asInstanceOf[KMeansw.Opts])
+    new KMeansw(fopts.asInstanceOf[KMeansw.Opts])
   }
   
   def mkUpdater(nopts:Updater.Opts) = {
-  	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
+    new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
   
   class FsOpts extends Learner.Options with KMeansw.Opts with FileSource.Opts with IncNorm.Opts
@@ -145,13 +145,13 @@ object KMeansw  {
     opts.batchSize = math.min(100000, datamat.ncols/30 + 1)
     opts.isprob = false
     opts.power = 0.5f
-  	val nn = new Learner(
-  	    new MatSource(Array(datamat, wghts), opts), 
-  	    new KMeansw(opts), 
-  	    null,
-  	    new IncNorm(opts), 
-  	    null,
-  	    opts)
+    val nn = new Learner(
+        new MatSource(Array(datamat, wghts), opts), 
+        new KMeansw(opts), 
+        null,
+        new IncNorm(opts), 
+        null,
+        opts)
     (nn, opts)
   }
   
@@ -173,10 +173,10 @@ object KMeansw  {
    
   // This function constructs a predictor from an existing model 
   def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, MemOpts) = {
-    val nopts = new MemOpts;
+    val nopts = new MemOpts
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.putBack = 1
-    val newmod = new KMeansw(nopts);
+    val newmod = new KMeansw(nopts)
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
@@ -196,13 +196,13 @@ object KMeansw  {
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
     opts.power = 0.5f
-  	val nn = new ParLearnerF(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkKMeansModel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
-  	    opts)
+    val nn = new ParLearnerF(
+        new MatSource(Array(mat0:Mat), opts), 
+        opts, mkKMeansModel _, 
+        null, null, 
+        opts, mkUpdater _,
+        null, null,
+        opts)
     (nn, opts)
   } 
 }

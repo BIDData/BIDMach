@@ -19,13 +19,13 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
     val data0 = mats(0)
     val m = data0.nrows
     if (refresh) {
-    	val mmi = rand(opts.dim, m);   
-    	setmodelmats(Array(mmi));
+      val mmi = rand(opts.dim, m);   
+      setmodelmats(Array(mmi))
     }
     modelmats(0) = convertMat(modelmats(0))
     updatemats = new Array[Mat](1)
     updatemats(0) = modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols)
-    lastpos = 0;
+    lastpos = 0
   } 
   
   def mupdate(data:Mat, ipass:Int):Unit
@@ -35,40 +35,40 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
   def evalfun(data:Mat, targ:Mat):FMat = {col(0)}
   
   def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    val mm = modelmats(0);
-    val gm = gmats(0);
+    val mm = modelmats(0)
+    val gm = gmats(0)
     if (ipass == 0) {
       if (here.toInt == gm.ncols) {
         println("First pass random centroid initialization")
       }
-      val gg = full(gm).t;
+      val gg = full(gm).t
       val lastp = lastpos.toInt
       if (lastp < mm.nrows - 1) {
-        val step = math.min(gg.nrows, mm.nrows - lastp);
-        mm(lastp->(lastp+step),?) = gg(0->step, ?);
+        val step = math.min(gg.nrows, mm.nrows - lastp)
+        mm(lastp->(lastp+step),?) = gg(0->step, ?)
 //        full(gm).t.rowslice(0, math.min(gm.ncols, mm.nrows - lastp), mm, lastp)
       } else {
-        val rp1 = randperm(gm.ncols);
-        val rp2 = randperm(mm.nrows);
-        val pp = ((here - lastpos) * mm.nrows / here).toInt;
+        val rp1 = randperm(gm.ncols)
+        val rp2 = randperm(mm.nrows)
+        val pp = ((here - lastpos) * mm.nrows / here).toInt
 //        println("here %d lastpos %d pp %d" format (here, lastpos,pp))
         if (pp > 0) {
           mm(rp2(0->pp), ?) = gg(rp1(0->pp), ?);        
         }
       }
-      lastpos = here;
+      lastpos = here
     } else {
       mupdate(gmats(0), ipass)
     }
   }
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-  	lastpos = here;
-  	if (mats.length == 1) {
-  		evalfun(gmats(0));
-  	} else {
-  		evalfun(gmats(0), gmats(1));
-  	}
+    lastpos = here
+    if (mats.length == 1) {
+      evalfun(gmats(0))
+    } else {
+      evalfun(gmats(0), gmats(1))
+    }
   }
 }
 

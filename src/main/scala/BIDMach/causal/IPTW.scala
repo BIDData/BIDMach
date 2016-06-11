@@ -32,7 +32,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
     for (i <- 0 until opts.links.length) {
       totflops += GLM.linkArray(opts.links(i)).fnflops
     }
-    otargets = targets.rowslice(targets.nrows/2, targets.nrows);
+    otargets = targets.rowslice(targets.nrows/2, targets.nrows)
     val tmats = new Array[Mat](3)
     tmats(0) = modelmats(0)
     tmats(1) = modelmats(0).zeros(targets.nrows/2,1)
@@ -53,7 +53,7 @@ class IPTW(opts:IPTW.Opts) extends RegressionModel(opts) {
   
   def mupdate2(in:Mat, targ:Mat, ipass:Int, pos:Long) = {
     val ftarg = full(targ)
-    val treatment = ftarg.rowslice(0, ftarg.nrows/2);
+    val treatment = ftarg.rowslice(0, ftarg.nrows/2)
     val outcome = ftarg.rowslice(ftarg.nrows/2, ftarg.nrows)
     val eta = modelmats(0) * in
     val feta = eta + 0f
@@ -109,11 +109,11 @@ object IPTW {
   class Options extends Opts {}
   
   def mkModel(fopts:Model.Opts) = {
-  	new IPTW(fopts.asInstanceOf[IPTW.Opts])
+    new IPTW(fopts.asInstanceOf[IPTW.Opts])
   }
   
   def mkUpdater(nopts:Updater.Opts) = {
-  	new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
+    new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
   } 
   
   def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
@@ -132,13 +132,13 @@ object IPTW {
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
     opts.links = 1
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  	    new IPTW(opts), 
-  	    mkRegularizer(opts),
-  	    new ADAGrad(opts),
-  	    null,
-  	    opts)
+    val nn = new Learner(
+        new MatSource(Array(mat0:Mat), opts), 
+        new IPTW(opts), 
+        mkRegularizer(opts),
+        new ADAGrad(opts),
+        null,
+        opts)
     (nn, opts)
   }  
   
@@ -148,13 +148,13 @@ object IPTW {
     val opts = new LearnParOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
-  	val nn = new ParLearnerF(
-  	    new MatSource(Array(mat0), opts), 
-  	    opts, mkModel _,
-  	    opts, mkRegularizer _,
-  	    opts, mkUpdater _, 
-  	    null, null,
-  	    opts)
+    val nn = new ParLearnerF(
+        new MatSource(Array(mat0), opts), 
+        opts, mkModel _,
+        opts, mkRegularizer _,
+        opts, mkUpdater _, 
+        null, null,
+        opts)
     (nn, opts)
   }
   
@@ -182,40 +182,40 @@ object IPTW {
   
   def learnFParx(
     nstart:Int=FileSource.encodeDate(2012,3,1,0), 
-		nend:Int=FileSource.encodeDate(2012,12,1,0), 
-		d:Int = 0
-		) = {
-  	
-  	val opts = new LearnFParOptions
-  	opts.lrate = 1f
-  	val nn = new ParLearnerxF(
-  	    null,
-  	    (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
-  	    opts, mkModel _,
-  	    opts, mkRegularizer _,
-  	    opts, mkUpdater _,
-  	    null, null,
-  	    opts
-  	)
-  	(nn, opts)
+    nend:Int=FileSource.encodeDate(2012,12,1,0), 
+    d:Int = 0
+    ) = {
+    
+    val opts = new LearnFParOptions
+    opts.lrate = 1f
+    val nn = new ParLearnerxF(
+        null,
+        (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
+        opts, mkModel _,
+        opts, mkRegularizer _,
+        opts, mkUpdater _,
+        null, null,
+        opts
+    )
+    (nn, opts)
   }
   
   def learnFPar(
     nstart:Int=FileSource.encodeDate(2012,3,1,0), 
-		nend:Int=FileSource.encodeDate(2012,12,1,0), 
-		d:Int = 0
-		) = {	
-  	val opts = new LearnFParOptions
-  	opts.lrate = 1f
-  	val nn = new ParLearnerF(
-  	    Experiments.Twitter.twitterWords(nstart, nend),
-  	    opts, mkModel _, 
+    nend:Int=FileSource.encodeDate(2012,12,1,0), 
+    d:Int = 0
+    ) = {  
+    val opts = new LearnFParOptions
+    opts.lrate = 1f
+    val nn = new ParLearnerF(
+        Experiments.Twitter.twitterWords(nstart, nend),
+        opts, mkModel _, 
         opts, mkRegularizer _,
-  	    opts, mkUpdater _,
-  	    null, null,
-  	    opts
-  	)
-  	(nn, opts)
+        opts, mkUpdater _,
+        null, null,
+        opts
+    )
+    (nn, opts)
   }
 }
 

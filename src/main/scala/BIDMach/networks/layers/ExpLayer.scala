@@ -10,8 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 
 
@@ -21,19 +21,19 @@ import BIDMach.networks._
 
 class ExpLayer(override val net:Net, override val opts:ExpNodeOpts = new ExpNode) extends Layer(net, opts) {
 
-	override def forward = {
-			val start = toc;
-			createOutput;
-			exp(inputData, output);
-			clearDeriv;
-			forwardtime += toc - start;
-	}
+  override def forward = {
+      val start = toc
+      createOutput
+      exp(inputData, output)
+      clearDeriv
+      forwardtime += toc - start
+  }
 
-	override def backward = {
-			val start = toc;
-			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ output);  
-			backwardtime += toc - start;
-	}
+  override def backward = {
+      val start = toc
+      if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ output);  
+      backwardtime += toc - start
+  }
   
   override def toString = {
     "exp@"+Integer.toHexString(hashCode % 0x10000).toString
@@ -46,7 +46,7 @@ trait ExpNodeOpts extends NodeOpts {
 
 class ExpNode extends Node with ExpNodeOpts {
 
-	override def clone:ExpNode = {copyTo(new ExpNode).asInstanceOf[ExpNode];}
+  override def clone:ExpNode = {copyTo(new ExpNode).asInstanceOf[ExpNode];}
 
   override def create(net:Net):ExpLayer = {ExpLayer(net, this);}
   
@@ -57,7 +57,7 @@ class ExpNode extends Node with ExpNodeOpts {
 
 object ExpLayer {  
   
-  def apply(net:Net) = new ExpLayer(net, new ExpNode);
+  def apply(net:Net) = new ExpLayer(net, new ExpNode)
   
-  def apply(net:Net, opts:ExpNode) = new ExpLayer(net, opts);
+  def apply(net:Net, opts:ExpNode) = new ExpLayer(net, opts)
 }

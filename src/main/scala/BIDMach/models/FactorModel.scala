@@ -19,14 +19,14 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     println("corpus perplexity=%f" format math.exp(- (sp ddot ln(sp))) )
     
     if (refresh) {
-    	val modelmat = rand(d,m);
-    	modelmat ~ modelmat *@ sdat;
-    	val msum = sum(modelmat, 2);
-    	modelmat ~ modelmat / msum;
-    	setmodelmats(Array[Mat](1));
-    	modelmats(0) = modelmat;
+      val modelmat = rand(d,m)
+      modelmat ~ modelmat *@ sdat
+      val msum = sum(modelmat, 2)
+      modelmat ~ modelmat / msum
+      setmodelmats(Array[Mat](1))
+      modelmats(0) = modelmat
     }
-    modelmats(0) = convertMat(modelmats(0));
+    modelmats(0) = convertMat(modelmats(0))
     
     if (datasource.opts.putBack > 0) {
       while (datasource.hasNext) {
@@ -58,12 +58,12 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
   
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
     val sdata = gmats(0)
-    val user = if (datasource.opts.putBack > 0) gmats(datasource.opts.putBack) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval);
-    uupdate(sdata, user, ipass, here);
+    val user = if (datasource.opts.putBack > 0) gmats(datasource.opts.putBack) else FactorModel.reuseuser(gmats(0), opts.dim, opts.initUval)
+    uupdate(sdata, user, ipass, here)
     if (gmats.length > 2) {
-    	evalfun(sdata, user, gmats(2), ipass, here);
+      evalfun(sdata, user, gmats(2), ipass, here)
     } else {
-    	evalfun(sdata, user, ipass, here);
+      evalfun(sdata, user, ipass, here)
     }
   } 
 }

@@ -23,13 +23,13 @@ class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Upda
     val um = updatemats(0)
     val ums = updatemats(1)
     val rr = if (step == 0) 1f else {
-	    if (firstStep == 0f) {
-	    		firstStep = step
-	    		1f
-	    	} else {
-	    	(math.pow(firstStep / step, opts.power)).toFloat
-	    }
-  	}
+      if (firstStep == 0f) {
+          firstStep = step
+          1f
+        } else {
+        (math.pow(firstStep / step, opts.power)).toFloat
+      }
+    }
 
     um ~ um *@ rm.set(rr)
     ln(mm, mm)
@@ -40,7 +40,7 @@ class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Upda
   }
   
   override def clear() = {
-	  firstStep = 0f
+    firstStep = 0f
   }
 }
 

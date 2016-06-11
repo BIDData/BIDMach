@@ -17,18 +17,18 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   var sp:Mat = null
    
   override def copyTo(mod:Model) = {
-    super.copyTo(mod);
-    val rmod = mod.asInstanceOf[RegressionModel];
-    rmod.targmap = targmap;
-    rmod.targets = targets;
-    rmod.mask = mask;
+    super.copyTo(mod)
+    val rmod = mod.asInstanceOf[RegressionModel]
+    rmod.targmap = targmap
+    rmod.targets = targets
+    rmod.mask = mask
     rmod.sp = sp;    
   }
   
   def init() = {
     useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
-    val m = data0.nrows;
+    val m = data0.nrows
     val targetData = mats.length > 1
     val d = if (opts.targmap.asInstanceOf[AnyRef] != null) {
       opts.targmap.nrows 
@@ -42,11 +42,11 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
     if (refresh) {
-    	val mm = zeros(d,m);
+      val mm = zeros(d,m)
       setmodelmats(Array(mm))
     }
-    modelmats(0) = convertMat(modelmats(0));
-    updatemats = Array(modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols));
+    modelmats(0) = convertMat(modelmats(0))
+    updatemats = Array(modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols))
     targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else opts.targmap
     if (! targetData) {
       targets = if (opts.targets.asInstanceOf[AnyRef] != null) convertMat(opts.targets) else opts.targets

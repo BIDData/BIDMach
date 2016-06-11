@@ -24,7 +24,7 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
   }
   
   def dists(a:FMat):FMat = {
-    val dd = if (Mat.hasCUDA > 0) a xTG a else a xT a;
+    val dd = if (Mat.hasCUDA > 0) a xTG a else a xT a
     val d1 = getdiag(dd)
     dd ~ dd * 2.0f
     dd ~ d1 - dd
@@ -44,9 +44,9 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
       var j = 0
       while (j < ncache && continue) {
         if (centmap(iss(j, ii)) > 0) {
-        	imin(ii) = centmap(iss(j, ii)) - 1
-        	vmin(ii) = ds(j, ii)
-        	continue = false
+          imin(ii) = centmap(iss(j, ii)) - 1
+          vmin(ii) = ds(j, ii)
+          continue = false
         } 
         j += 1
       }
@@ -71,9 +71,9 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
     var idepth = 0
     while (isamps.length > 0) {
       val isx = centmap(iss(isamps, idepth), 0)
-    	val ifound = find(isx > 0)
-    	imin(isamps(ifound)) = isx(ifound) - 1
-    	vmin(isamps(ifound)) = ds(isamps(ifound), idepth)
+      val ifound = find(isx > 0)
+      imin(isamps(ifound)) = isx(ifound) - 1
+      vmin(isamps(ifound)) = ds(isamps(ifound), idepth)
       Mat.nflops += 4*isamps.length
       isamps = isamps(find(isx == 0))
       idepth += 1
@@ -89,37 +89,37 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
   }
   
   def pointdiffs(ds:FMat, iss:IMat, vd:DMat):DMat = {
-	  val deltas = dzeros(nsamps,1)                                      // Array to hold improvements in distance over vd
-	  var i = 0  
-	  while (i < nsamps) {                                               // Calculate improvements over vd for new candidate centers
-	  	var j = 0  
-	  	while (j < nsamps && ds(j,i) < vd(i)) {                          // using sorted order of ds
-	  		deltas(iss(j,i)) += ds(j,i) - vd(i)
-	  		j += 1
-	  	} 
-	  	maxdepth = math.max(maxdepth, j)
-	  	Mat.nflops += 16*j
-	  	i += 1
-	  }
-	  deltas
+    val deltas = dzeros(nsamps,1)                                      // Array to hold improvements in distance over vd
+    var i = 0  
+    while (i < nsamps) {                                               // Calculate improvements over vd for new candidate centers
+      var j = 0  
+      while (j < nsamps && ds(j,i) < vd(i)) {                          // using sorted order of ds
+        deltas(iss(j,i)) += ds(j,i) - vd(i)
+        j += 1
+      } 
+      maxdepth = math.max(maxdepth, j)
+      Mat.nflops += 16*j
+      i += 1
+    }
+    deltas
   }
   
   def pointdiffs2(ds:FMat, iss:IMat, vd:FMat):FMat = {
-	  val deltas = zeros(nsamps,1)                                       // Array to hold improvements in distance over vd
-	  var ii = icol(0->nsamps)
-	  var idepth = 0  
-	  while (ii.length > 0) {                                            // Calculate improvements over vd for new candidate centers
-	  	ii = ii(find(ds(ii,idepth) < vd(ii,0)))
-	  	var j = 0
-	  	while (j < ii.length) {
-	  		deltas(iss(ii(j),idepth)) +=  (ds(ii(j),idepth) - vd(ii(j)))
-	  		j += 1
-	  	}
-	  	Mat.nflops += 16*j
-	  	idepth += 1
-	  	maxdepth = math.max(maxdepth, idepth)
-	  }
-	  deltas
+    val deltas = zeros(nsamps,1)                                       // Array to hold improvements in distance over vd
+    var ii = icol(0->nsamps)
+    var idepth = 0  
+    while (ii.length > 0) {                                            // Calculate improvements over vd for new candidate centers
+      ii = ii(find(ds(ii,idepth) < vd(ii,0)))
+      var j = 0
+      while (j < ii.length) {
+        deltas(iss(ii(j),idepth)) +=  (ds(ii(j),idepth) - vd(ii(j)))
+        j += 1
+      }
+      Mat.nflops += 16*j
+      idepth += 1
+      maxdepth = math.max(maxdepth, idepth)
+    }
+    deltas
   }
   
   def sortgen(dd:FMat):(FMat,IMat) = {
@@ -151,52 +151,52 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
     var itry = 0
     while (itry < ntrys) {
       println("Try %d" format itry)
-    	val rr = rand(nsamps,1)                                            // Get a random permutation for the centers
-    	val (rs,irs) = sort2(rr,1)
-    	val icenters = irs(0->ncenters,0)                                  // Pick centers from the permutation
-    	val ics = icol(0->nsamps)                            
-    	val (vdists, imin) = mindists(ds, iss, ics, icenters)              // Get min distances from points to centers, and best center ids
-    	println("  pass=0, mean dist=%f" format mean(vdists,1).v)
-    	val vtmp = vdists.copy
-    	val itmp = imin.copy
-    	var nchanged = 1
-    	var ipass = 0
-    	var totchanged = 0
-    	while (nchanged > 0 && ipass < options.maxpasses) {                // Keep making passes until no improvements
-    		ipass += 1
-    		nchanged = 0
-    		var ipc = 0  
-    		while (ipc < ncenters) {                                         // Try to improve this center (ipc)
-    			vtmp <-- vdists                                                // Copy distances 
-    			val ifix = find(imin == ipc)                                   // Find points in cluster with this center
-    			val tcents = icenters((0->ipc) \ ((ipc+1)->ncenters),0)        // List of centers minus the current one
-    			mindists(ds, iss, ifix, tcents, vtmp, itmp)                    // vtmp holds distances to centers minus the current center
-    			val deltas = pointdiffs(ds, iss, vtmp)                         // deltas holds improvements for each potential center over vtmp
-    			val (vs,is) = mini2(deltas)                                    // Find best new center
-    			if (vs.v + sum(vtmp).v < sum(vdists).v && is.v != icenters(ipc,0)) { // Is the new center better than the old (and not equal to it)?
-    				icenters(ipc) = is.v                                         // If yes, update the center list
-    				mindists(ds, iss, ics, icenters, vdists, imin)               // Compute new distances and centers
-    				nchanged += 1
-    				if (options.verb) println("    pass=%d, ipc=%d, mean dist=%f, nchanged=%d" format (ipass, ipc, mean(vdists,1).v, nchanged))
-    			}
-    			ipc += 1
-    		}
-    		println("  pass=%d, mean dist=%f, nchanged=%d, nspills=%d" format (ipass, mean(vdists,1).v, nchanged, nspills))
-    		totchanged += nchanged
-    	}
-    	val mv = mean(vdists).v
-    	if (mv < bestvd) {
-    	  bestc = icenters
-    	  bestv = vdists
-    	  besti = imin
-    	  bestvd = mv    	  
-    	}
-    	itry += 1
+      val rr = rand(nsamps,1)                                            // Get a random permutation for the centers
+      val (rs,irs) = sort2(rr,1)
+      val icenters = irs(0->ncenters,0)                                  // Pick centers from the permutation
+      val ics = icol(0->nsamps)                            
+      val (vdists, imin) = mindists(ds, iss, ics, icenters)              // Get min distances from points to centers, and best center ids
+      println("  pass=0, mean dist=%f" format mean(vdists,1).v)
+      val vtmp = vdists.copy
+      val itmp = imin.copy
+      var nchanged = 1
+      var ipass = 0
+      var totchanged = 0
+      while (nchanged > 0 && ipass < options.maxpasses) {                // Keep making passes until no improvements
+        ipass += 1
+        nchanged = 0
+        var ipc = 0  
+        while (ipc < ncenters) {                                         // Try to improve this center (ipc)
+          vtmp <-- vdists                                                // Copy distances 
+          val ifix = find(imin == ipc)                                   // Find points in cluster with this center
+          val tcents = icenters((0->ipc) \ ((ipc+1)->ncenters),0)        // List of centers minus the current one
+          mindists(ds, iss, ifix, tcents, vtmp, itmp)                    // vtmp holds distances to centers minus the current center
+          val deltas = pointdiffs(ds, iss, vtmp)                         // deltas holds improvements for each potential center over vtmp
+          val (vs,is) = mini2(deltas)                                    // Find best new center
+          if (vs.v + sum(vtmp).v < sum(vdists).v && is.v != icenters(ipc,0)) { // Is the new center better than the old (and not equal to it)?
+            icenters(ipc) = is.v                                         // If yes, update the center list
+            mindists(ds, iss, ics, icenters, vdists, imin)               // Compute new distances and centers
+            nchanged += 1
+            if (options.verb) println("    pass=%d, ipc=%d, mean dist=%f, nchanged=%d" format (ipass, ipc, mean(vdists,1).v, nchanged))
+          }
+          ipc += 1
+        }
+        println("  pass=%d, mean dist=%f, nchanged=%d, nspills=%d" format (ipass, mean(vdists,1).v, nchanged, nspills))
+        totchanged += nchanged
+      }
+      val mv = mean(vdists).v
+      if (mv < bestvd) {
+        bestc = icenters
+        bestv = vdists
+        besti = imin
+        bestvd = mv       
+      }
+      itry += 1
     }
     val t3=gflop
     val vdists2 = mini(dd(?,bestc),2)
     println("Optimum in %f secs, %f gflops, mean dist=%f, verify=%f, maxdepth=%d, nspills=%d\nTotal time %f seconds" format 
-    		(t3._2, t3._1, bestvd, mean(DMat(vdists2),1).v, maxdepth, nspills, t3._2+ft2._2+ft1._2))
+        (t3._2, t3._1, bestvd, mean(DMat(vdists2),1).v, maxdepth, nspills, t3._2+ft2._2+ft1._2))
   }
   
 }

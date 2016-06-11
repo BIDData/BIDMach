@@ -10,8 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
-import scala.util.hashing.MurmurHash3;
-import java.util.HashMap;
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 /*
  * Designed to map linear integer feature arrays to sparse matrices. Doesnt deal with derivatives.
@@ -20,9 +20,9 @@ import BIDMach.networks._
 class OnehotLayer(override val net:Net, override val opts:OnehotNodeOpts = new OnehotNode) extends Layer(net, opts) {
 
   override def forward = {
-		  val start = toc;
-		  output = oneHot(inputData.asMat);
-		  forwardtime += toc - start;
+      val start = toc
+      output = oneHot(inputData.asMat)
+      forwardtime += toc - start
   }
   
   override def toString = {
@@ -35,7 +35,7 @@ trait OnehotNodeOpts extends NodeOpts {
 
 class OnehotNode extends Node with OnehotNodeOpts {
 
-	override def clone:OnehotNode = {copyTo(new OnehotNode).asInstanceOf[OnehotNode];}
+  override def clone:OnehotNode = {copyTo(new OnehotNode).asInstanceOf[OnehotNode];}
 
   override def create(net:Net):OnehotLayer = {OnehotLayer(net, this);}
   
@@ -46,7 +46,7 @@ class OnehotNode extends Node with OnehotNodeOpts {
 
 object OnehotLayer {  
   
-  def apply(net:Net) = new OnehotLayer(net, new OnehotNode);
+  def apply(net:Net) = new OnehotLayer(net, new OnehotNode)
   
-  def apply(net:Net, opts:OnehotNode) = new OnehotLayer(net, opts);
+  def apply(net:Net, opts:OnehotNode) = new OnehotLayer(net, opts)
 }

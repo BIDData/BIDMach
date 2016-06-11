@@ -15,21 +15,21 @@ class BatchNorm(override val opts:BatchNorm.Opts = new BatchNorm.Options) extend
     val updatemats = model.updatemats
     accumulators = new Array[Mat](updatemats.length)
     for (i <- 0 until accumulators.length) {
-    	accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
+      accumulators(i) = updatemats(i).zeros(updatemats(i).nrows, updatemats(i).ncols)
     }
   }
      
   override def update(ipass:Int, step:Long) = {
-  	val updatemats = model.updatemats
+    val updatemats = model.updatemats
     for (i <- 0 until accumulators.length) {
-    	accumulators(i) ~ accumulators(i) + updatemats(i) 
+      accumulators(i) ~ accumulators(i) + updatemats(i) 
     }
   }
   
   override def clear() = {
-	  for (i <- 0 until accumulators.length) {
-	  	accumulators(i).clear
-	  }
+    for (i <- 0 until accumulators.length) {
+      accumulators(i).clear
+    }
   }
   
   override def updateM(ipass:Int):Unit = {

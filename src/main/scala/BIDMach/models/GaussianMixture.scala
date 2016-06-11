@@ -69,9 +69,9 @@ class GaussianMixture(override val opts:GaussianMixture.Opts = new GaussianMixtu
 object GaussianMixture {
     trait Opts extends Model.Opts {}
         
-	class Options extends Opts {} 
-	
-	/** A learner with a single matrix data source. */
+  class Options extends Opts {} 
+  
+  /** A learner with a single matrix data source. */
     def learner(data:Mat) = {
         class xopts extends Learner.Options with GaussianMixture.Opts with MatSource.Opts with ADAGrad.Opts 
         val opts = new xopts

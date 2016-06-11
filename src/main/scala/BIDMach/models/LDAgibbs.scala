@@ -53,8 +53,8 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   override def init() = {
     super.init
     if (refresh) {
-    	mm = modelmats(0);
-    	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
+      mm = modelmats(0)
+      setmodelmats(Array(mm, mm.ones(mm.nrows, 1)))
     }
     updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
@@ -63,44 +63,44 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   
   def uupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
     
-    	if (putBack < 0 || ipass == 0) user.set(1f)
+      if (putBack < 0 || ipass == 0) user.set(1f)
         for (i <- 0 until opts.uiter) yield {
-    	val preds = DDS(mm, user, sdata)	
-    	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
-    	val dc = sdata.contents
-    	val pc = preds.contents
-    	pc ~ pc / dc
-    	
-    	val unew = user*0
-    	val mnew = updatemats(0)
-    	mnew.set(0f)
+      val preds = DDS(mm, user, sdata)  
+      if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
+      val dc = sdata.contents
+      val pc = preds.contents
+      pc ~ pc / dc
+      
+      val unew = user*0
+      val mnew = updatemats(0)
+      mnew.set(0f)
   
-    	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, dc, opts.nsamps, opts.useBino)
+      LDAgibbs.LDAsample(mm, user, mnew, unew, preds, dc, opts.nsamps, opts.useBino)
         
-    	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
-    	user ~ unew + opts.alpha
-    	}
+      if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU))
+      user ~ unew + opts.alpha
+      }
   
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
-	val um = updatemats(0)
-	um ~ um + opts.beta 
-  	sum(um, 2, updatemats(1))
+  val um = updatemats(0)
+  um ~ um + opts.beta 
+    sum(um, 2, updatemats(1))
   }
   
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {  
-  	val preds = DDS(mm, user, sdata)
-  	val dc = sdata.contents
-  	val pc = preds.contents
-  	max(opts.weps, pc, pc)
-  	ln(pc, pc)
-  	val sdat = sum(sdata,1)
-  	val mms = sum(mm,2)
-  	val suu = ln(mms ^* user)
-  	if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1))
-  	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
-  	row(vv, math.exp(-vv))
+    val preds = DDS(mm, user, sdata)
+    val dc = sdata.contents
+    val pc = preds.contents
+    max(opts.weps, pc, pc)
+    ln(pc, pc)
+    val sdat = sum(sdata,1)
+    val mms = sum(mm,2)
+    val suu = ln(mms ^* user)
+    if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1))
+    val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
+    row(vv, math.exp(-vv))
   }
 }
 
@@ -150,11 +150,11 @@ object LDAgibbs  {
   }
   
   def mkGibbsLDAmodel(fopts:Model.Opts) = {
-  	new LDAgibbs(fopts.asInstanceOf[LDAgibbs.Opts])
+    new LDAgibbs(fopts.asInstanceOf[LDAgibbs.Opts])
   }
   
   def mkUpdater(nopts:Updater.Opts) = {
-  	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
+    new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   } 
   
   /*
@@ -166,13 +166,13 @@ object LDAgibbs  {
     opts.dim = d
     opts.putBack = 1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  			new LDAgibbs(opts), 
-  			null,
-  			new IncNorm(opts), 
-  			null,
-  			opts)
+    val nn = new Learner(
+        new MatSource(Array(mat0:Mat), opts), 
+        new LDAgibbs(opts), 
+        null,
+        new IncNorm(opts), 
+        null,
+        opts)
     (nn, opts)
   }
   
@@ -231,12 +231,12 @@ object LDAgibbs  {
     opts.npasses = 4
     opts.resFile = "/big/twitter/test/results.mat"
     val nn = new ParLearnerxF(
-    		null, 
-    		(dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
-    		opts, mkGibbsLDAmodel _, 
-    		null, null, 
-    		opts, mkUpdater _,
-    		null, null,
+        null, 
+        (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
+        opts, mkGibbsLDAmodel _, 
+        null, null, 
+        opts, mkUpdater _,
+        null, null,
         opts
     )
     (nn, opts)

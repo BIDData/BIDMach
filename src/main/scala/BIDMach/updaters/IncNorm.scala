@@ -17,7 +17,7 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
   var started:Int = 0
   
   override def init(model0:Model) = {
-  	super.init(model0)
+    super.init(model0)
     val modelmats = model0.modelmats
     val updatemats = model0.updatemats
     restart = modelmats(0) + 1f
@@ -26,35 +26,35 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
   }
       
   override def update(ipass:Int, step:Long) = {
-  	val modelmats = model.modelmats
-  	val updatemats = model.updatemats
-  	val mm = modelmats(0)
-  	val um = updatemats(0)
-  	val rr = if (step == 0) 0.99f else {
-  	  if (firstStep == 0f) {
-  	    firstStep = step
-  	    0.99f
-  	  } else {
-  	    math.pow(firstStep / step, opts.power).toFloat
-  	  }
-  	}
-  	if (modelmats.length > 1) {
-  		val ms = modelmats(1)
-  		val ums = updatemats(1)
-  		ums ~ ums *@ rm.set(rr)
-  		ms ~ ms *@ rm.set(1-rr)
-  		ms ~ ms + ums
-  		um ~ um / ms
-  	}
-  	if (modelmats.length > 2) {
-  		val ms2 = modelmats(2)
-  		val ums2 = updatemats(2)
-  		ums2 ~ ums2 *@ rm.set(rr)
-  		ms2 ~ ms2 *@ rm.set(1-rr)
-  		ms2 ~ ms2 + ums2
-  	}
-  	um ~ um *@ rm.set(rr)
-  	mm ~ mm *@ rm.set(1-rr)
+    val modelmats = model.modelmats
+    val updatemats = model.updatemats
+    val mm = modelmats(0)
+    val um = updatemats(0)
+    val rr = if (step == 0) 0.99f else {
+      if (firstStep == 0f) {
+        firstStep = step
+        0.99f
+      } else {
+        math.pow(firstStep / step, opts.power).toFloat
+      }
+    }
+    if (modelmats.length > 1) {
+      val ms = modelmats(1)
+      val ums = updatemats(1)
+      ums ~ ums *@ rm.set(rr)
+      ms ~ ms *@ rm.set(1-rr)
+      ms ~ ms + ums
+      um ~ um / ms
+    }
+    if (modelmats.length > 2) {
+      val ms2 = modelmats(2)
+      val ums2 = updatemats(2)
+      ums2 ~ ums2 *@ rm.set(rr)
+      ms2 ~ ms2 *@ rm.set(1-rr)
+      ms2 ~ ms2 + ums2
+    }
+    um ~ um *@ rm.set(rr)
+    mm ~ mm *@ rm.set(1-rr)
     mm ~ mm + um 
     if (opts.isprob) mm ~ mm / sum(mm,2)
     if (opts.warmup > 0) {
@@ -72,7 +72,7 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
   }
   
   override def clear() = {
-	  firstStep = 0f
+    firstStep = 0f
   }
 }
 

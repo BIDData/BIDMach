@@ -56,8 +56,8 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
   override def init() = {
     super.init
     if (refresh) {
-    	mm = modelmats(0);
-    	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
+      mm = modelmats(0)
+      setmodelmats(Array(mm, mm.ones(mm.nrows, 1)))
     }
     updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
@@ -74,7 +74,7 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
      mnew.set(0f)
     
         for (i <- 0 until opts.uiter) yield {
-        val preds = DDS(mm, user, sdata)	
+        val preds = DDS(mm, user, sdata)  
         if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU))
      val dc = sdata.contents
      val pc = preds.contents
@@ -115,7 +115,7 @@ um ~ um + opts.beta
   
   // call this if nsamps matrix is changed during optimization
   def updateSamps = {
-    nsamps <-- opts.nsamps;
+    nsamps <-- opts.nsamps
   }
 }
 

@@ -48,14 +48,14 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   var udiag:Mat = null
   
   override def init() = {
-  	super.init()
-  	mm = modelmats(0)
-    setmodelmats(Array(mm, mm.zeros(mm.nrows, mm.ncols)));
-  	updatemats = new Array[Mat](2)
+    super.init()
+    mm = modelmats(0)
+    setmodelmats(Array(mm, mm.zeros(mm.nrows, mm.ncols)))
+    updatemats = new Array[Mat](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     updatemats(1) = mm.zeros(mm.nrows, mm.ncols)
     udiag = mkdiag(opts.uprior*ones(opts.dim,1))
-  	mdiag = mkdiag(opts.mprior*ones(opts.dim,1))
+    mdiag = mkdiag(opts.mprior*ones(opts.dim,1))
     if (useGPU) {
       udiag = GMat(udiag)
       mdiag = GMat(mdiag)
@@ -63,14 +63,14 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   }
   
   override def uupdate(sdata:Mat, user:Mat, ipass:Int, pos:Long) = {
-	if (putBack < 0 || ipass == 0) user.set(1f)
-	val modeldata = mm * sdata
-  	val mmu = mm *^ mm + udiag
+  if (putBack < 0 || ipass == 0) user.set(1f)
+  val modeldata = mm * sdata
+    val mmu = mm *^ mm + udiag
     for (i <- 0 until opts.uiter) {
-    	val quot =  modeldata / (mmu * user)               
-    	min(10.0f, max(0.1f, quot, quot), quot)
-    	user ~ user ∘ quot
-    	max(opts.minuser, user, user)
+      val quot =  modeldata / (mmu * user)               
+      min(10.0f, max(0.1f, quot, quot), quot)
+      user ~ user ∘ quot
+      max(opts.minuser, user, user)
     }
   }  
   
@@ -88,20 +88,20 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   }
   
   override def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
-    if (ogmats != null) ogmats(0) = user;
+    if (ogmats != null) ogmats(0) = user
     if (opts.doubleScore) {
       evalfunx(sdata, user)
     } else {
-    	val modeldata =  mm * sdata
-    	val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
-    	val mmm = mm *^ mm
+      val modeldata =  mm * sdata
+      val uu = user *^ user + mdiag *@ (1.0f*size(user,2)/opts.nusers)
+      val mmm = mm *^ mm
 
-    	val ll0 =  sdata.contents ddot sdata.contents
-    	val ll1 =  modeldata ddot user
-    	val ll2 =  uu ddot mmm
-    	val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
-    	val v2 =               -opts.uprior*(user ddot user)/sdata.nnz
-    	row(v1,v2)
+      val ll0 =  sdata.contents ddot sdata.contents
+      val ll1 =  modeldata ddot user
+      val ll2 =  uu ddot mmm
+      val v1  =              (-ll0 + 2*ll1 - ll2)/sdata.nnz
+      val v2 =               -opts.uprior*(user ddot user)/sdata.nnz
+      row(v1,v2)
     }
   }
   
@@ -111,7 +111,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
     val mmf = DMat(mm)
     val mdiagf = DMat(mdiag)
 
-	  val modeldata =  mmf * sdata
+    val modeldata =  mmf * sdata
     val uu = user *^ user + mdiagf *@ (1.0f*size(user,2)/opts.nusers)
     val mmm = mmf *^ mmf
 
@@ -135,11 +135,11 @@ object NMF  {
   class Options extends Opts {}
   
   def mkNMFmodel(fopts:Model.Opts) = {
-  	new NMF(fopts.asInstanceOf[NMF.Opts])
+    new NMF(fopts.asInstanceOf[NMF.Opts])
   } 
    
   def mkUpdater(nopts:Updater.Opts) = {
-  	new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
+    new IncNorm(nopts.asInstanceOf[IncNorm.Opts])
   }
     
   def learner(mat0:Mat, d:Int = 256) = {
@@ -148,24 +148,24 @@ object NMF  {
     opts.dim = d
     opts.uiter = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  			new NMF(opts), 
-  			null,
-  			new IncNorm(opts), 
-  			null,
-  			opts)
+    val nn = new Learner(
+        new MatSource(Array(mat0:Mat), opts), 
+        new NMF(opts), 
+        null,
+        new IncNorm(opts), 
+        null,
+        opts)
     (nn, opts)
   }
   
-  class PredOptions extends Learner.Options with NMF.Opts with MatSource.Opts with MatSink.Opts;
+  class PredOptions extends Learner.Options with NMF.Opts with MatSource.Opts with MatSink.Opts
   
     // This function constructs a predictor from an existing model 
   def predictor(model:Model, mat1:Mat):(Learner, PredOptions) = {
-    val nopts = new PredOptions;
+    val nopts = new PredOptions
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.dim = model.opts.dim;
-    val newmod = new NMF(nopts);
+    nopts.dim = model.opts.dim
+    val newmod = new NMF(nopts)
     newmod.refresh = false
     model.copyTo(newmod)
     val nn = new Learner(
@@ -201,13 +201,13 @@ object NMF  {
     opts.npasses = 4
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
-  	val nn = new ParLearnerF(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkNMFmodel _, 
-  			null, null, 
-  			opts, mkUpdater _,
-  			null, null,
-  			opts)
+    val nn = new ParLearnerF(
+        new MatSource(Array(mat0:Mat), opts), 
+        opts, mkNMFmodel _, 
+        null, null, 
+        opts, mkUpdater _,
+        null, null,
+        opts)
     (nn, opts)
   }
  
