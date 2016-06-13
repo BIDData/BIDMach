@@ -1,8 +1,8 @@
 import edu.berkeley.bid.CUMACH
 
-val nr = 10;
-val nc = 10;
-val kk = 10;
+val nr = 100;
+val nc = 200;
+val kk = 1000;
 val nrows = nr * 2;
 val ncols = nc * 2;
 val kcols = kk * 2;
@@ -61,25 +61,40 @@ maxi(maxi(abs(fd-d)));
 (gf._2, gf1._2)
 
 val gaa = grand(nrows, ncols)
+val aa=FMat(gaa);
+val gc = GMat(c);
 val gmod = gzeros(nrows, kcols * 2);
 val gmod2 = gzeros(nrows, kcols * 2);
 val gmod3 = gzeros(nrows, kcols * 2);
+val gmode = gzeros(nrows, kcols * 2);
 val gsumsq = gones(nrows, kcols * 2);
 val glrate = gones(1,1);
 val gvexp = gzeros(1,1);
 val gtexp = gones(1,1);
 
-CUMACH.pairMultADAGradTile(nr, nc, kk, kk, gaa.data, gaa.nrows, 0, 0, gb.data, gb.ir, gb.jc,
+CUMACH.pairMultADAGradTile(nr, nc, kk, kk, gc.data, gc.nrows, 0, 0, gb.data, gb.ir, gb.jc,
     0, 0, 1, gmod.data, gmod.nrows, gsumsq.data, null, 0, glrate.data, glrate.length,
     gvexp.data, gvexp.length, gtexp.data, gtexp.length, 1, 1, 1e-6f);
 
-GLM.pairMultNT(nr, nc, kk, gaa, 0, 0,  gb, 0, 0, gmod2, 0, 0);
+val tiley = 2;
+val tilex = 3;
+val tilex2 = tilex;
 
-gaa.tileMultNT(nr, nc, kk, 0, 0,  gb, 0, 0, gmod3, 0, 0);
+val ce = zeros(tiley, c.ncols) on c;
+val gce = GMat(ce);
 
-val aa=FMat(gaa);
-val bb=SMat(gb);
-val mod4 = aa(0->10,0->10)*^bb(0->10,0->10);
+val be = spzeros(tilex, b.ncols) on b;
+val gbe = GSMat(be);
+
+CUMACH.pairMultADAGradTile(nr, nc, kk, kk, gce.data, gce.nrows, tiley, 0, gbe.data, gbe.ir, gbe.jc,
+    tilex2, 0, 1, gmode.data, gmode.nrows, gsumsq.data, null, 0, glrate.data, glrate.length,
+    gvexp.data, gvexp.length, gtexp.data, gtexp.length, 1, 1, 1e-6f);
+
+GLM.pairMultNT(nr, kk, nc, gc, 0, 0,  gb, 0, 0, gmod2, 0, 0);
+
+gc.tileMultNT(nr, kk, nc, 0, 0,  gb, 0, 0, gmod3, 0, 0);
+
+val mod4 = aa(0->10,0->10)*^b(0->10,0->10);
 
 nt * 200f * nr / gf1._2 / 1e9f;
 
@@ -106,4 +121,5 @@ for (j <- 0 until n) {
     }
 }
 
+val xs=sort(x);
 float(sum(x < n))/n

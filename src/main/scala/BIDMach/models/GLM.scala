@@ -610,7 +610,7 @@ object GLM {
       throw new RuntimeException("pairMultNT: tile strays outside matrix dimensions");
     } else {
       Mat.nflops += 2L * nr * b.nnz * kk / b.ncols;
-      val err = CUMACH.pairMultTile(nr, nc, kk, kk,  
+      val err = CUMACH.pairMultTile(nr, kk, nc, nc,  
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
           b.data, b.ir, b.jc, broff, bcoff, 

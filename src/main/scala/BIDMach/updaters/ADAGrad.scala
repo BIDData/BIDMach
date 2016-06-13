@@ -348,6 +348,9 @@ object ADAGrad {
       val nbr = b.nrows;
       val nfeats = mm.ncols/2;
     	Mat.nflops += 20L * nr * b.nnz;
+    	if (nr != mm.nrows || nc != a.ncols) {
+    	  throw new RuntimeException("pairMultUpdate: dimensions mismatch");
+    	}
     	val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].data, mask.length) else (null, 0);
     	CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, nr, 0, 0, gsb.data, gsb.ir, gsb.jc, 0, 0, 1, gmm.data, mm.nrows, 
     	    gssq.data, gmdata, masklen, glrate.data, lrate.length, gvexp.data, vexp.length, gtexp.data, texp.length,
@@ -359,10 +362,13 @@ object ADAGrad {
     		val mmtile = gmm.tiles(i).asInstanceOf[GMat];
     		val ssqtile = gssq.tiles(i).asInstanceOf[GMat];
     		val nr = mmtile.nrows;
-    		val nc = mmtile.ncols;
+    		val nc = a.ncols;
     		val nfeats = mmtile.ncols/2;
     		val y = gmm.y(i);
     		val x = gmm.x(i);
+    		if (y < 0 || y + nr > a.nrows || x < 0 || nc > b.ncols) {
+    		  throw new RuntimeException("pairMultUpdate: tile strays outside matrix dimensions");
+    		}
     		val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].data, mask.length) else (null, 0);
     		CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, y, 0, nr, gsb.data, gsb.ir, gsb.jc, x, 0, 1, 
     		    mmtile.data, mm.nrows, ssqtile.data, gmdata, masklen, glrate.data, lrate.length, 
