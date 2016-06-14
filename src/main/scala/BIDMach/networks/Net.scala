@@ -228,6 +228,7 @@ object Net  {
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
     var nodeset:NodeSet = null;
+    var withInteractions = false;
     var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
   }
   
@@ -280,7 +281,8 @@ object Net  {
     val depth = 3 + (widths.length - 1) * thickness;  
     val nodes = new NodeSet(depth);
     nodes(0) = new InputNode;
-    nodes(1) = new LinNode{inputs(0) = nodes(0); outdim = widths(0); hasBias = opts.hasBias; aopts = opts.aopts; tmatShape = opts.tmatShape};
+    nodes(1) = new LinNode{inputs(0) = nodes(0); outdim = widths(0); hasBias = opts.hasBias; aopts = opts.aopts; 
+         withInteractions = opts.withInteractions; tmatShape = opts.tmatShape};
     for (i <- 2 until depth - 1) {
     	((i-1) % thickness) match {
     	case 0 => {
