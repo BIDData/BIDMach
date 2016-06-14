@@ -375,10 +375,41 @@ object ADAGrad {
     		    gvexp.data, vexp.length, gtexp.data, texp.length,	istep, 1, eps);
     	}
     }
+    case (fa:FMat, fsb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
+      val nr = a.nrows;
+      val nc = b.ncols;
+      val nbr = b.nrows;
+      val nfeats = mm.ncols/2;
+    	Mat.nflops += 20L * nr * b.nnz;
+    	if (nr != mm.nrows || nc != a.ncols) {
+    	  throw new RuntimeException("pairMultUpdate: dimensions mismatch");
+    	}
+    	val (fmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[FMat].data, mask.length) else (null, 0);
+    	CPUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, fa.data, nr, 0, 0, fsb.data, fsb.ir, fsb.jc, 0, 0, fmm.data, mm.nrows, 
+    	    fssq.data, fmdata, masklen, flrate.data, lrate.length, fvexp.data, vexp.length, ftexp.data, texp.length,
+    	    istep, 1, eps, 0, 0);
+    }
+    case (fa:FMat, fsb:SMat, fmm:TMat, fssq:TMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
+    	Mat.nflops += 20L * a.nrows * b.nnz;
+    	for (i <- 0 until fmm.tiles.length) {
+    		val mmtile = fmm.tiles(i).asInstanceOf[FMat];
+    		val ssqtile = fssq.tiles(i).asInstanceOf[FMat];
+    		val nr = mmtile.nrows;
+    		val nc = a.ncols;
+    		val nfeats = mmtile.ncols/2;
+    		val y = fmm.y(i);
+    		val x = fmm.x(i);
+    		if (y < 0 || y + nr > a.nrows || x < 0 || nc > b.ncols) {
+    		  throw new RuntimeException("pairMultUpdate: tile strays outside matrix dimensions");
+    		}
+    		val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[FMat].data, mask.length) else (null, 0);
+    		CPUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, fa.data, y, 0, nr, fsb.data, fsb.ir, fsb.jc, x, 0, 
+    		    mmtile.data, mm.nrows, ssqtile.data, gmdata, masklen, flrate.data, lrate.length, 
+    		    fvexp.data, vexp.length, ftexp.data, texp.length,	istep, 1, eps, 0, 0);
+    	}
+    }
     }
   }
-
-  
   
   /**
    * Integrate the last stage of a gradient update (sparse, transposed multiply) with ADAGRAD. 
