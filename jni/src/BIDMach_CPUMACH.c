@@ -1029,38 +1029,39 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_pairMultADAGradTile
   for (i = 0; i < ncols; i++) {
     int jstart = Bjc[i+bcoff] - ioff;
     int jend = Bjc[i+1+bcoff] - ioff;
-    int j1, j2, k, ihere, jhere, ithere, jthere, doit;
-    float grad;
+    int j1, j2, k, ihere, jhere, ithere, jthere, doit, r1, r2;
+    float grad, f1, f2;
     for (j1 = jstart; j1 < jend ; j1++) {
-      for (j2 = jstart; j2 <= j1 ; j2++) {
-        float f1 = Bdata[jstart + j1];                         // Get the two features
-        float f2 = Bdata[jstart + j2];
-        int r1 = Bir[jstart + j1]-broff-ioff;                  // And their row indices
-        int r2 = Bir[jstart + j2]-broff-ioff;
-        long long rank = r1;
-        float prod = f1;
-        doit = (r1 >= 0 && rank < bound1 && r2 >= 0);
-        if (doit) {                                            // Compute offsets for diagonal or non-diagonal pairs
-          if (j1 == j2) {
-            ithere = 0;
-            jthere = 0;
-          } else {
+      f1 = Bdata[jstart + j1];                         // Get the feature
+      r1 = Bir[jstart + j1]-broff-ioff;                  // And its row index
+      long long rank = r1;
+      if (r1 >= 0 && r1 < bound1) {
+        for (k = 0; k < nrows; k++) {
+          ihere = k + aroff + lda * (i + acoff);
+          jhere = k + aroff;
+          ithere = k + 2 * ldmm * rank;
+          jthere = 2 * rank;
+          grad = A[ihere] * prod;    // raw gradient
+          __gupdate(grad, jhere, ithere, jthere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+        }
+        for (j2 = jstart; j2 < j1 ; j2++) {
+          f2 = Bdata[jstart + j2];                    // Get the other feature
+          r2 = Bir[jstart + j2]-broff-ioff;
+          float prod = f1;
+          if (r2 >= 0) {
             rank = __pairembed(r1, r2);
-            doit = doit && (rank < bound2);
-            if (doit) {
+            if (rank < bound2) {
               prod *= f2;
-              ithere = ldmm;
-              jthere = 1;
+              for (k = 0; k < nrows; k++) {
+                ihere = k + aroff + lda * (i + acoff);
+                jhere = k + aroff;
+                ithere = ldmm + k + 2 * ldmm * rank;
+                jthere = 1 + 2 * rank;
+                grad = A[ihere] * prod;    // raw gradient
+                __gupdate(grad, jhere, ithere, jthere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+              }
             }
           }
-        }
-	for (k = 0; k < nrows; k++) {
-	  ihere = k + aroff + lda * (i + acoff);
-	  jhere = k + aroff;
-	  ithere += k + 2 * ldmm * rank;
-	  jthere += 2 * rank;
-	  grad = A[ihere] * prod;    // raw gradient
-	  __gupdate(grad, jhere, ithere, jthere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
 	}
       }
     }
