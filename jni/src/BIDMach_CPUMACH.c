@@ -960,3 +960,119 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_multADAGradTile
   (*env)->ReleasePrimitiveArrayCritical(env, jBdata, Bdata, 0);
   (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
 }
+
+
+inline long long __pairembed(long long r1x, int r2x) {
+  long long r1 = r1x+1;
+  int r2 = r2x+1;
+  float loc1 = (float) r1;
+  float loc2 = (float) r2;
+  int nbits1 = ((*(int *)(&loc1)) >> 23) - 126;
+  int nbits2 = ((*(int *)(&loc2)) >> 23) - 126;
+  int len = nbits1 + nbits2 - 2;
+  float loc3 = (float) len; 
+  int lenbits = 0;
+  if (len > 1) lenbits = ((*(int *)(&loc3)) >> 23) - 127;
+  r2 = r2 & ((1 << (nbits2-1)) - 1);
+  long long x = (((r1 << (nbits2-1)) | r2) << lenbits) | (nbits2-1);
+  return (x-2) >= 0 ? (x-2) : 0;
+}
+
+
+inline void __gupdate(float grad, int i, int ihere, int jhere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+                      float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
+  float lr, ve, te, pve, ste, ngrad, ssq, ssqnew;
+  ssq = Sumsq[ihere];
+  ssqnew = hypotf(grad,ssq);
+  Sumsq[ihere] += ssqnew - ssq;
+  ssq = ssqnew * sqrtf(istep);
+
+  if (addgrad) {
+    lr =  (lrlen > 1) ? lrate[i] : lrate[0];
+    ve =  (vexplen > 1) ? vexp[i] : vexp[0];
+    te =  (texplen > 1) ? texp[i] : texp[0];
+    pve = (ve == 0.5f) ? ssq : ((ve == 0) ? 1.0f : pow(ssq, 2*ve));
+    ste = pow(istep, te);
+    ngrad = grad * lr * ste / pve;
+    MM[ihere] += ngrad;
+  }
+  if (Mask != NULL) {
+    if (maskrows > 1) {
+      if (Mask[ihere] == 0) MM[ihere] = 0;
+    } else {
+      if (Mask[jhere] == 0) MM[ihere] = 0;
+    }
+  }
+}
+
+JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_pairMultADAGradTile
+(JNIEnv *env, jobject obj, jint nrows, jint ncols, jint bound1, jint bound2, jfloatArray jA, jint lda, jint aroff, jint acoff, 
+ jfloatArray jBdata, jintArray jBir, jintArray jBjc, jint broff, jint bcoff,
+ jfloatArray jMM, jint ldmm, jfloatArray jSumsq, jfloatArray jMask, int maskrows, jfloatArray jlrate, jint lrlen,
+ jfloatArray jvexp, jint vexplen, jfloatArray jtexp, jint texplen, jfloat istep, jint addgrad, jfloat epsilon, jint biasv, jint nbr)
+{
+  float * A = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jA, JNI_FALSE));
+  float * Bdata = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jBdata, JNI_FALSE));
+  int * Bir = (jint *)((*env)->GetPrimitiveArrayCritical(env, jBir, JNI_FALSE));
+  int * Bjc = (jint *)((*env)->GetPrimitiveArrayCritical(env, jBjc, JNI_FALSE));
+  float * MM = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jMM, JNI_FALSE));
+  float * Sumsq = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jSumsq, JNI_FALSE));
+  float * lrate = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jlrate, JNI_FALSE));
+  float * vexp = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jvexp, JNI_FALSE));
+  float * texp = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jtexp, JNI_FALSE));
+  float * Mask = NULL;
+  int i;
+  int ioff = Bjc[0];
+  if (jMask != NULL) Mask = (jfloat *)((*env)->GetPrimitiveArrayCritical(env, jMask, JNI_FALSE));
+
+#pragma omp parallel for
+  for (i = 0; i < ncols; i++) {
+    int jstart = Bjc[i+bcoff] - ioff;
+    int jend = Bjc[i+1+bcoff] - ioff;
+    int j1, j2, k, ihere, jhere, ithere, jthere, doit;
+    float grad;
+    for (j1 = jstart; j1 < jend ; j1++) {
+      for (j2 = jstart; j2 <= j1 ; j2++) {
+        float f1 = Bdata[jstart + j1];                         // Get the two features
+        float f2 = Bdata[jstart + j2];
+        int r1 = Bir[jstart + j1]-broff-ioff;                  // And their row indices
+        int r2 = Bir[jstart + j2]-broff-ioff;
+        long long rank = r1;
+        float prod = f1;
+        doit = (r1 >= 0 && rank < bound1 && r2 >= 0);
+        if (doit) {                                            // Compute offsets for diagonal or non-diagonal pairs
+          if (j1 == j2) {
+            ithere = 0;
+            jthere = 0;
+          } else {
+            rank = __pairembed(r1, r2);
+            doit = doit && (rank < bound2);
+            if (doit) {
+              prod *= f2;
+              ithere = ldmm;
+              jthere = 1;
+            }
+          }
+        }
+	for (k = 0; k < nrows; k++) {
+	  ihere = k + aroff + lda * (i + acoff);
+	  jhere = k + aroff;
+	  ithere += k + 2 * ldmm * rank;
+	  jthere += 2 * rank;
+	  grad = A[ihere] * prod;    // raw gradient
+	  __gupdate(grad, jhere, ithere, jthere, MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
+	}
+      }
+    }
+  }
+  if (Mask != NULL) (*env)->ReleasePrimitiveArrayCritical(env, jMask, Mask, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jtexp, texp, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jvexp, vexp, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jlrate, lrate, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jSumsq, Sumsq, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jMM, MM, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jBjc, Bjc, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jBir, Bir, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jBdata, Bdata, 0);
+  (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
+}
