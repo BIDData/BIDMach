@@ -387,7 +387,7 @@ object ADAGrad {
     	val (fmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[FMat].data, mask.length) else (null, 0);
     	CPUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, fa.data, nr, 0, 0, fsb.data, fsb.ir, fsb.jc, 0, 0, fmm.data, mm.nrows, 
     	    fssq.data, fmdata, masklen, flrate.data, lrate.length, fvexp.data, vexp.length, ftexp.data, texp.length,
-    	    istep, 1, eps, 0, 0);
+    	    istep, 1, eps, biasv, 0);
     }
     case (fa:FMat, fsb:SMat, fmm:TMat, fssq:TMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
     	Mat.nflops += 20L * a.nrows * b.nnz;
@@ -405,7 +405,7 @@ object ADAGrad {
     		val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[FMat].data, mask.length) else (null, 0);
     		CPUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, fa.data, y, 0, nr, fsb.data, fsb.ir, fsb.jc, x, 0, 
     		    mmtile.data, mm.nrows, ssqtile.data, gmdata, masklen, flrate.data, lrate.length, 
-    		    fvexp.data, vexp.length, ftexp.data, texp.length,	istep, 1, eps, 0, 0);
+    		    fvexp.data, vexp.length, ftexp.data, texp.length,	istep, 1, eps, biasv, 0);
     	}
     }
     }
