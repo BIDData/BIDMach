@@ -1,3 +1,5 @@
+// This script needs to be run after getmnist8m.sh
+// from the BIDMach/data/MNIST8M/parts directory
 
 for (i <- 0 to 80) {
     val (d,c,w) = loadLibSVM("part%02d" format i, 784);

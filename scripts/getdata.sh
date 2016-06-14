@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This script should be run from the BIDMach/scripts directory
+
 BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_SCRIPTS=`readlink -f "${BIDMACH_SCRIPTS}"`
