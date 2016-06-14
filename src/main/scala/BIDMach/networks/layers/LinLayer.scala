@@ -53,7 +53,11 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     createOutput(mm.nrows \ inputData.ncols);
-    output.asMat ~ mm * inputData.asMat;
+    if (opts.withInteractions) {
+      GLM.pairMult(mm, inputData.asMat, output.asMat);
+    } else {
+    	output.asMat ~ mm * inputData.asMat; 
+    }
     if (opts.hasBias) output.asMat ~ output.asMat + modelmats(imodel).colslice(modelcols, modelcols+1);
     clearDeriv;
     forwardtime += toc - start;
@@ -69,7 +73,11 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
       val step = (pos + firststep)/firststep;
-      ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
+      if (opts.withInteractions) {
+      	ADAGrad.pairMultUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);        
+      } else {
+      	ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
+      }
     } else {
     	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
     	deriv.asMat.madd(inputData.asMat, um, false, true);
@@ -106,6 +114,7 @@ trait LinNodeOpts extends ModelNodeOpts {
   var aopts:ADAGrad.Opts = null;
   var outdim = 0;
   var tmatShape:(Int, Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
+  var withInteractions = false;
   
   def copyOpts(opts:LinNodeOpts):LinNodeOpts = {
   		super.copyOpts(opts);

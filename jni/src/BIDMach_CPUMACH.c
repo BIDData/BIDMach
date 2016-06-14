@@ -961,8 +961,7 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_multADAGradTile
   (*env)->ReleasePrimitiveArrayCritical(env, jA, A, 0);
 }
 
-
-inline long long __pairembed(long long r1x, int r2x) {
+__forceinline long long __pairembed(long long r1x, int r2x) {
   long long r1 = r1x+1;
   int r2 = r2x+1;
   float loc1 = (float) r1;
@@ -972,14 +971,15 @@ inline long long __pairembed(long long r1x, int r2x) {
   int len = nbits1 + nbits2 - 2;
   float loc3 = (float) len; 
   int lenbits = 0;
+  long long x;
   if (len > 1) lenbits = ((*(int *)(&loc3)) >> 23) - 127;
   r2 = r2 & ((1 << (nbits2-1)) - 1);
-  long long x = (((r1 << (nbits2-1)) | r2) << lenbits) | (nbits2-1);
+  x = (((r1 << (nbits2-1)) | r2) << lenbits) | (nbits2-1);
   return (x-2) >= 0 ? (x-2) : 0;
 }
 
 
-inline void __gupdate(float grad, int i, int ihere, int jhere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
+__forceinline void __gupdate(float grad, int i, int ihere, int jhere, float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                       float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   float lr, ve, te, pve, ste, ngrad, ssq, ssqnew;
   ssq = Sumsq[ihere];
@@ -1031,10 +1031,11 @@ JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_pairMultADAGradTile
     int jend = Bjc[i+1+bcoff] - ioff;
     int j1, j2, k, ihere, jhere, ithere, jthere, doit, r1, r2;
     float grad, f1, f2, prod;
+    long long rank;
     for (j1 = jstart; j1 < jend ; j1++) {
       f1 = Bdata[jstart + j1];                          // Get the feature
       r1 = Bir[jstart + j1]-broff-ioff;                 // And its row index
-      long long rank = r1;
+      rank = r1;
       if (r1 >= 0 && r1 < bound1) {
         for (k = 0; k < nrows; k++) {
           ihere = k + aroff + lda * (i + acoff);

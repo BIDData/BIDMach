@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMACH
@@ -622,23 +622,7 @@ object GLM {
       c;
     }
   }
-  
-  def pairMult(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
-    (a, b, c) match {
-      case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
-      case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
-      case _ => throw new RuntimeException("pairMult couldnt match matrix types")
-    }
-  }
-  
-  def pairMultNT(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
-    (a, b, c) match {
-      case (fa:GMat, sb:GSMat, fc:GMat) => pairMultNT(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
-//      case (fb:GMat, fc:GMat) => pairMultNT(nr, nc, kk, aroff, acoff, fb, broff, bcoff, fc, croff, ccoff);
-      case _ => throw new RuntimeException("pairMultT couldnt match matrix types")
-    }
-  }
-  
+ 
   @inline def pairembed(r1x:Long, r2x:Int):Long = {
     val r1 = r1x + 1;
     val r2 = r2x + 1;
@@ -742,8 +726,56 @@ object GLM {
   		i += 1;
   	}
   }
-
-
+ 
+  def pairMult(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
+    (a, b, c) match {
+      case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
+      case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
+      case _ => throw new RuntimeException("pairMult couldnt match matrix types")
+    }
+    c
+  }
+  
+  def pairMultNT(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
+    (a, b, c) match {
+      case (fa:GMat, sb:GSMat, fc:GMat) => pairMultNT(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
+//      case (fb:GMat, fc:GMat) => pairMultNT(nr, nc, kk, aroff, acoff, fb, broff, bcoff, fc, croff, ccoff);
+      case _ => throw new RuntimeException("pairMultT couldnt match matrix types")
+    }
+  }
+  
+  def pairMult(a:Mat, b:Mat, c:Mat):Mat = {
+    val nrows = c.nrows;
+    val ncols = c.ncols;
+    val kk = a.ncols/2;
+    c.clear;
+   	(a, b, c) match {
+  	case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nrows, ncols, kk, fa, 0, 0, sb, 0, 0, fc, 0, 0);
+  	case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nrows, ncols, kk, fa, 0, 0, sb, 0, 0, fc, 0, 0);
+  	case (ft:TMat, sb:GSMat, fc:GMat) => {
+  	  for (i <- 0 until ft.tiles.length) {
+  	    val fa = ft.tiles(i).asInstanceOf[GMat];
+  	    val x = ft.x(i);
+  	    val y = ft.y(i);
+  	    val nr = fa.nrows;
+  	    val k = fa.ncols/2;  	    
+  	  	pairMult(nr, ncols, k, fa, 0, 0, sb, x, 0, fc, y, 0);
+  	  }
+  	}
+  	case (ft:TMat, sb:SMat, fc:FMat) => {
+  	  for (i <- 0 until ft.tiles.length) {
+  	    val fa = ft.tiles(i).asInstanceOf[FMat];
+  	    val x = ft.x(i);
+  	    val y = ft.y(i);
+  	    val nr = fa.nrows;
+  	    val k = fa.ncols/2;  	    
+  	  	pairMult(nr, ncols, k, fa, 0, 0, sb, x, 0, fc, y, 0);
+  	  }
+  	}
+  	}
+   	c;
+  }
+  
 
   
   def mkGLMModel(fopts:Model.Opts) = {
