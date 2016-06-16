@@ -42,10 +42,10 @@ __forceinline__ __device__ void solvex(int n, int v, int &i, int &j) {
 
 // Given dense A and sparse B, for each column of B, enumerate all pairs of features, hash to a single feature index, and multiply by A into C
 
-__global__ void __hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+__global__ void __hashmult(int nrows, int nfeats, int bncols, int brows1, int brows2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
   bool doit = false;
-  int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
-  int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
+  int istart = ((long long)blockIdx.x) * bncols/ gridDim.x;
+  int iend = ((long long)(blockIdx.x + 1)) * bncols / gridDim.x;
   for (int i = istart; i < iend ; i++) {                     // i is the column index
     int jstart = Bjc[i];                                     // Range of nz rows in this column
     int jend = Bjc[i+1];
@@ -63,11 +63,11 @@ __global__ void __hashmult(int nrows, int nfeats, int ncols, int bound1, int bou
       long long rank = r1 + 1;
       float prod = f1;
       if (j1 == j2) {
-        doit = (rank < bound1);
+        doit = (rank < brows1);
       } else {
         prod *= f2;
         rank *= r2 + 1;
-        doit = (rank < bound2);
+        doit = (rank < brows2);
       }
       if (doit) {
         int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
@@ -91,7 +91,7 @@ __forceinline__ __device__ int hash2(int a, int b, int modulus) {
 
 // This version is designed for few (or one) row in A. It allocates one warp per column
 
-__global__ void __hashmult2(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+__global__ void __hashmult2(int nrows, int nfeats, int ncols, int brows1, int brows2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
   bool doit = false;
   int istart = ((long long)blockIdx.x) * ncols / gridDim.x;
   int iend = ((long long)(blockIdx.x+1)) * ncols / gridDim.x;
@@ -121,11 +121,11 @@ __global__ void __hashmult2(int nrows, int nfeats, int ncols, int bound1, int bo
             float prod = f1;
             doit = false;
             if (j1 + threadIdx.x == j2 + k) {
-              doit = (rank < bound1);
+              doit = (rank < brows1);
             } else if (j1 + threadIdx.x < j2 + k) {
               prod *= f2shift;
               rank *= r2shift + 1;
-              doit = (rank < bound2);
+              doit = (rank < brows2);
             }
             if (doit) {
               int ind = mmhash2(r1, r2shift, nfeats);           // Hash the indices
@@ -152,20 +152,20 @@ __global__ void __hashmult2(int nrows, int nfeats, int ncols, int bound1, int bo
 
 #else
 
-__global__ void __hashmult2(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {}
+__global__ void __hashmult2(int nrows, int nfeats, int ncols, int brows1, int brows2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {}
 
 #endif
 
-int hashmult(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
+int hashmult(int nrows, int nfeats, int ncols, int brows1, int brows2, float *A, float *Bdata, int *Bir, int *Bjc, float *C, int transpose) {
   if (nrows >= 0) {
     int nt = max(1, 256/nrows);
     dim3 threadDim(nrows, nt, 1);
     int nblocks = min(MAXXGRID, ncols);
-    __hashmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
+    __hashmult<<<nblocks,threadDim>>>(nrows, nfeats, ncols, brows1, brows2, A, Bdata, Bir, Bjc, C, transpose);
   } else {
     dim3 threadDim(32, 1, 1);
     int nblocks = min(MAXXGRID, ncols);
-    __hashmult2<<<nblocks,threadDim>>>(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
+    __hashmult2<<<nblocks,threadDim>>>(nrows, nfeats, ncols, brows1, brows2, A, Bdata, Bir, Bjc, C, transpose);
   }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -219,11 +219,11 @@ int pairembed(int *r1, int *r2, long long *res, int n) {
 // Given dense A and sparse B, for each column of B, enumerate all pairs of features, hash to a single feature index, and multiply by A into C
 // todo: fix offsets
 
-__global__ void __pairmult(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+__global__ void __pairmult(int nrows, int bncols, int brows1, int brows2, float *A, int lda, float *A2, int lda2, 
                            float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {
   bool doit = false;
-  int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
-  int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
+  int istart = ((long long)blockIdx.x) * bncols/ gridDim.x;
+  int iend = ((long long)(blockIdx.x + 1)) * bncols / gridDim.x;
   float *AX;
   int ldax;
   for (int i = istart; i < iend ; i++) {                     // i is the column index
@@ -242,13 +242,14 @@ __global__ void __pairmult(int nrows, int ncols, int bound1, int bound2, float *
       int r2 = Bir[jstart + j2] - broff;
       long long rank = r1;
       float prod = f1;
-      doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
+      doit = (r1 >= 0 && r2 >= 0);
       if (j1 == j2) {
+        doit = doit && r1 < brows1;
         AX = A;
         ldax = lda;
       } else {
         rank = __pairembed(r1, r2);
-        doit = doit && (rank >= 0 && rank < bound2);
+        doit = doit && (rank >= 0 && rank < brows2);
         if (doit) {
           prod *= f2;
           AX = A2;
@@ -273,11 +274,11 @@ __global__ void __pairmult(int nrows, int ncols, int bound1, int bound2, float *
 // This version is designed for few (or one) rows in A. It allocates one warp per column
 // todo: implement the offsets. 
 
-__global__ void __pairmult2(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+__global__ void __pairmult2(int nrows, int bncols, int brows1, int brows2, float *A, int lda, float *A2, int lda2, 
                             float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {
   bool doit = false;
-  int istart = ((long long)blockIdx.x) * ncols / gridDim.x;
-  int iend = ((long long)(blockIdx.x+1)) * ncols / gridDim.x;
+  int istart = ((long long)blockIdx.x) * bncols / gridDim.x;
+  int iend = ((long long)(blockIdx.x+1)) * bncols / gridDim.x;
   float *AX;
   int ldax;
   for (int i = istart; i < iend ; i++) {                     // i is the column index
@@ -304,13 +305,13 @@ __global__ void __pairmult2(int nrows, int ncols, int bound1, int bound2, float 
           if (j2 + k < nr && r1 >= 0) {
             long long rank = r1;
             float prod = f1;
-            doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
+            doit = (r1 >= 0 && r1 < brows1 && r2 >= 0 && r2 < brows1);
             if (j1 + threadIdx.x == j2 + k) {
               AX = A;
               ldax = lda;
             } else if (j1 + threadIdx.x < j2 + k) {
               rank = __pairembed(r1, r2);
-              doit = doit && (rank < bound2);
+              doit = doit && (rank < brows2);
               if (doit) {
                 prod *= f2shift;
                 AX = A2;
@@ -341,22 +342,22 @@ __global__ void __pairmult2(int nrows, int ncols, int bound1, int bound2, float 
 
 #else
 
-__global__ void __pairmult2(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+__global__ void __pairmult2(int nrows, int bncols, int brows1, int brows2, float *A, int lda, float *A2, int lda2, 
                             float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {}
 
 #endif
-// todo: fix offsets
-int pairMultTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, float *A2, int lda2, 
+
+int pairMultTile(int nrows, int bncols, int brows1, int brows2, float *A, int lda, float *A2, int lda2, 
                  float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, float *C, int ldc, int transpose) {
   if (nrows >= 0) {
     int nt = max(1, 256/nrows);
     dim3 threadDim(nrows, nt, 1);
-    int nblocks = min(MAXXGRID, ncols);
-    __pairmult<<<nblocks,threadDim>>>(nrows, ncols, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
+    int nblocks = min(MAXXGRID, bncols);
+    __pairmult<<<nblocks,threadDim>>>(nrows, bncols, brows1, brows2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
   } else {
     dim3 threadDim(32, 1, 1);
-    int nblocks = min(MAXXGRID, ncols);
-    __pairmult2<<<nblocks,threadDim>>>(nrows, ncols, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
+    int nblocks = min(MAXXGRID, bncols);
+    __pairmult2<<<nblocks,threadDim>>>(nrows, bncols, brows1, brows2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
   }
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -412,7 +413,7 @@ __forceinline__ __device__ void __gupdate(float grad, int i, int ithere, int jth
   }
   }*/
 
-__global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose,
+__global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int brows1, int brows2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose,
                                   float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                                   float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   bool doit = false;
@@ -437,11 +438,11 @@ __global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, 
       long long rank = r1 + 1;
       float prod = f1;
       if (j1 == j2) {
-        doit = (rank < bound1);
+        doit = (rank < brows1);
       } else {
         prod *= f2;
         rank *= r2 + 1;
-        doit = (rank < bound2);
+        doit = (rank < brows2);
       }
       if (doit) {
         int ind = mmhash2(r1, r2, nfeats);                     // Hash the indices
@@ -461,13 +462,13 @@ __global__ void __hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, 
   }
 }
 
-int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose, 
+int hashmultADAGrad(int nrows, int nfeats, int ncols, int brows1, int brows2, float *A, float *Bdata, int *Bir, int *Bjc, int transpose, 
                     float *MM, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                     float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   int nt = max(1, 256/nrows);
   dim3 threadDim(nrows, nt, 1);
   int nblocks = min(MAXXGRID, ncols);
-  __hashmultADAGrad<<<nblocks,threadDim>>>(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, transpose, 
+  __hashmultADAGrad<<<nblocks,threadDim>>>(nrows, nfeats, ncols, brows1, brows2, A, Bdata, Bir, Bjc, transpose, 
                                            MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -475,17 +476,17 @@ int hashmultADAGrad(int nrows, int nfeats, int ncols, int bound1, int bound2, fl
 }
 //
 // nrows = rows of MM (and other model mats)
-// ncols = columns of B
+// ncols = columns of B = columns of A 
 //
-__global__ void __pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, int aroff, int acoff, 
+__global__ void __pairMultADAGradTile(int nrows, int bncols, int brows1, int brows2, float *A, int lda, int aroff, int acoff, 
                                       float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, int transpose,
                                       float *MM, int ldmm, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                                       float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   bool doit = false;
   int ihere, ithere, jhere, jthere;
   float grad;
-  int istart = ((long long)blockIdx.x) * ncols/ gridDim.x;
-  int iend = ((long long)(blockIdx.x + 1)) * ncols / gridDim.x;
+  int istart = ((long long)blockIdx.x) * bncols/ gridDim.x;
+  int iend = ((long long)(blockIdx.x + 1)) * bncols / gridDim.x;
   for (int i = istart; i < iend ; i++) {                     // i is the column index
     int jstart = Bjc[i+bcoff];                               // Range of nz rows in this column
     int jend = Bjc[i+1+bcoff];
@@ -502,14 +503,15 @@ __global__ void __pairMultADAGradTile(int nrows, int ncols, int bound1, int boun
       int r2 = Bir[jstart + j2]-broff;
       long long rank = r1;
       float prod = f1;
-      doit = (r1 >= 0 && rank < bound1 && r2 >= 0);
+      doit = (r1 >= 0 && r2 >= 0);
       if (doit) {
         if (j1 == j2) {
+          doit = doit && r1 < brows1;
           ithere = 0;
           jthere = 0;
         } else {
           rank = __pairembed(r1, r2);
-          doit = doit && (rank < bound2);
+          doit = doit && (rank < brows2);
           if (doit) {
             prod *= f2;
             ithere = ldmm;
@@ -536,14 +538,14 @@ __global__ void __pairMultADAGradTile(int nrows, int ncols, int bound1, int boun
   }
 }
 
-int pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, float *A, int lda, int aroff, int acoff,
+int pairMultADAGradTile(int nrows, int bncols, int brows1, int brows2, float *A, int lda, int aroff, int acoff,
                         float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, int transpose, 
                         float *MM, int ldmm, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                         float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon) {
   int nt = max(1, 256/nrows);
   dim3 threadDim(nrows, nt, 1);
-  int nblocks = min(MAXXGRID, ncols);
-  __pairMultADAGradTile<<<nblocks,threadDim>>>(nrows, ncols, bound1, bound2, A, lda, aroff, acoff, Bdata, Bir, Bjc, broff, bcoff, transpose, 
+  int nblocks = min(MAXXGRID, bncols);
+  __pairMultADAGradTile<<<nblocks,threadDim>>>(nrows, bncols, brows1, brows2, A, lda, aroff, acoff, Bdata, Bir, Bjc, broff, bcoff, transpose, 
                                                MM, ldmm, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();

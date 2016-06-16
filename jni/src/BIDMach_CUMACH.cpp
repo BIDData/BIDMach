@@ -296,7 +296,7 @@ extern "C" {
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashMult
-  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jint bound1, jint bound2,
+  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jint brows1, jint brows2,
    jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jobject jC, jint transpose)
   {
     float *A = (float*)getPointer(env, jA);
@@ -305,7 +305,7 @@ extern "C" {
     int *Bjc = (int*)getPointer(env, jBjc);
     float *C = (float*)getPointer(env, jC);
 
-    return hashmult(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, C, transpose);
+    return hashmult(nrows, nfeats, ncols, brows1, brows2, A, Bdata, Bir, Bjc, C, transpose);
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashCross
@@ -400,7 +400,7 @@ extern "C" {
   }
 
   JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_hashmultADAGrad
-  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jint bound1, jint bound2, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jint transpose,
+  (JNIEnv *env, jobject obj, jint nrows, jint nfeats, jint ncols, jint brows1, jint brows2, jobject jA, jobject jBdata, jobject jBir, jobject jBjc, jint transpose,
    jobject jMM, jobject jSumsq, jobject jMask, int maskrows, jobject jlrate, jint lrlen, jobject jvexp, jint vexplen,
    jobject jtexp, jint texplen, float istep, jint addgrad, float epsilon)
   {
@@ -415,7 +415,7 @@ extern "C" {
     float *vexp = (float*)getPointer(env, jvexp);
     float *texp = (float*)getPointer(env, jtexp);
 
-    return hashmultADAGrad(nrows, nfeats, ncols, bound1, bound2, A, Bdata, Bir, Bjc, transpose,
+    return hashmultADAGrad(nrows, nfeats, ncols, brows1, brows2, A, Bdata, Bir, Bjc, transpose,
                            MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   }
   /*
@@ -627,7 +627,7 @@ extern "C" {
   }
 
 JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultTile
-  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint bound1, jint bound2, jobject jA, jint lda, jobject jA2, jint lda2,
+  (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint brows1, jint brows2, jobject jA, jint lda, jobject jA2, jint lda2,
    jobject jBdata, jobject jBir, jobject jBjc, jint broff, jint bcoff, jobject jC, jint ldc, jint transpose)
   {
     float *A = (float*)getPointer(env, jA);
@@ -637,11 +637,11 @@ JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultTile
     int *Bjc = (int*)getPointer(env, jBjc);
     float *C = (float*)getPointer(env, jC);
 
-    return pairMultTile(nrows, ncols, bound1, bound2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
+    return pairMultTile(nrows, ncols, brows1, brows2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
   }
 
 JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultADAGradTile
-(JNIEnv *env, jobject obj, jint nrows, jint ncols, jint bound1, jint bound2, jobject jA, jint lda, jint aroff, jint acoff,
+(JNIEnv *env, jobject obj, jint nrows, jint bncols, jint brows1, jint brows2, jobject jA, jint lda, jint aroff, jint acoff,
  jobject jBdata, jobject jBir, jobject jBjc, jint broff, jint bcoff, jint transpose, 
  jobject jMM, jint ldmm, jobject jSumsq, jobject jMask, jint maskrows, jobject jlrate, jint lrlen,
  jobject jvexp, jint vexplen, jobject jtexp, jint texplen, jfloat istep, jint addgrad, jfloat epsilon)
@@ -657,7 +657,7 @@ JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultADAGradTile
     float *vexp = (float*)getPointer(env, jvexp);
     float *texp = (float*)getPointer(env, jtexp);
 
-    return pairMultADAGradTile(nrows, ncols, bound1, bound2, A, lda, aroff, acoff, Bdata, Bir, Bjc, broff, bcoff, transpose, 
+    return pairMultADAGradTile(nrows, bncols, brows1, brows2, A, lda, aroff, acoff, Bdata, Bir, Bjc, broff, bcoff, transpose, 
                                MM, ldmm, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   }
 

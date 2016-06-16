@@ -583,14 +583,15 @@ object GLM {
   	}
   }
   
-  def pairMult(nr:Int, nc:Int, kk:Int, a:GMat, aroff:Int, acoff:Int, b:GSMat, broff:Int, bcoff:Int, c:GMat, croff:Int, ccoff:Int):GMat = {
-    if (aroff < 0 || acoff < 0 || broff < 0 || bcoff < 0 || croff < 0 || ccoff < 0 || nr < 0 || nc < 0 || kk < 0) {
+  def pairMult(nr:Int, bnc:Int, kk:Int, a:GMat, aroff:Int, acoff:Int, b:GSMat, broff:Int, bcoff:Int, c:GMat, croff:Int, ccoff:Int):GMat = {
+    if (aroff < 0 || acoff < 0 || broff < 0 || bcoff < 0 || croff < 0 || ccoff < 0 || nr < 0 || bnc < 0 || kk < 0) {
       throw new RuntimeException("pairMult: cant have negative offsets or dimensions");
-    } else if (aroff + nr > a.nrows || acoff + 2*kk > a.ncols || broff + kk > b.nrows || bcoff + nc > b.ncols || croff + nr > c.nrows || ccoff + nc > c.ncols) {
+    } else if (aroff + nr > a.nrows || acoff + 2*kk > a.ncols || broff + kk > b.nrows || bcoff + bnc > b.ncols || croff + nr > c.nrows || ccoff + bnc > c.ncols) {
       throw new RuntimeException("pairMult: tile strays outside matrix dimensions");
     } else {
       Mat.nflops += 2L * nr * b.nnz;
-      val err = CUMACH.pairMultTile(nr, nc, kk, kk,  
+//      val err = CUMACH.pairMultTile(nr, bnc, kk, kk, 
+      val err = CUMACH.pairMultTile(nr, bnc, 0, kk,
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
           b.data, b.ir, b.jc, broff, bcoff, 
@@ -603,14 +604,14 @@ object GLM {
     }
   }
   
-  def pairMultNT(nr:Int, nc:Int, kk:Int, a:GMat, aroff:Int, acoff:Int, b:GSMat, broff:Int, bcoff:Int, c:GMat, croff:Int, ccoff:Int):GMat = {
-    if (aroff < 0 || acoff < 0 || broff < 0 || bcoff < 0 || croff < 0 || ccoff < 0 || nr < 0 || nc < 0 || kk < 0) {
+  def pairMultNT(nr:Int, cnc:Int, kk:Int, a:GMat, aroff:Int, acoff:Int, b:GSMat, broff:Int, bcoff:Int, c:GMat, croff:Int, ccoff:Int):GMat = {
+    if (aroff < 0 || acoff < 0 || broff < 0 || bcoff < 0 || croff < 0 || ccoff < 0 || nr < 0 || cnc < 0 || kk < 0) {
       throw new RuntimeException("pairMultNT: cant have negative offsets or dimensions");
-    } else if (aroff + nr > a.nrows || acoff + 2*kk > a.ncols || broff + nc > b.nrows || bcoff + kk > b.ncols || croff + nr > c.nrows || ccoff + nc > c.ncols) {
+    } else if (aroff + nr > a.nrows || acoff + kk > a.ncols || broff + cnc > b.nrows || bcoff + kk > b.ncols || croff + nr > c.nrows || ccoff + 2*cnc > c.ncols) {
       throw new RuntimeException("pairMultNT: tile strays outside matrix dimensions");
     } else {
       Mat.nflops += 2L * nr * b.nnz * kk / b.ncols;
-      val err = CUMACH.pairMultTile(nr, kk, nc, nc,  
+      val err = CUMACH.pairMultTile(nr, kk, cnc, cnc,  
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
           b.data, b.ir, b.jc, broff, bcoff, 
@@ -648,19 +649,19 @@ object GLM {
     (v+2e-5f).toInt; 
   }
 
-  def pairMult(nrows:Int, ncols:Int, kk:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
+  def pairMult(nrows:Int, bncols:Int, bnrows:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
   		C:FMat, croff:Int, ccoff:Int):Unit = {
-  	pairMult(nrows, ncols, kk, kk, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
+  	pairMult(nrows, bncols, bnrows, bnrows, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
   	    B, broff, bcoff, C, croff + ccoff * C.nrows, 0);
   }
   
-  def pairMultNT(nrows:Int, ncols:Int, kk:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
+  def pairMultNT(nrows:Int, cncols:Int, bnrows:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
   		C:FMat, croff:Int, ccoff:Int):Unit = {
-  	pairMult(nrows, ncols, kk, kk, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
+  	pairMult(nrows, cncols, bnrows, bnrows, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
   	    B, broff, bcoff, C, croff + ccoff * C.nrows, 1);
   }
   
-  def pairMult(nrows:Int, ncols:Int, bound1:Int, bound2:Int, A:FMat, aoff:Int, lda:Int, A2:FMat, a2off:Int, lda2:Int,  
+  def pairMult(nrows:Int, bncols:Int, bound1:Int, bound2:Int, A:FMat, aoff:Int, lda:Int, A2:FMat, a2off:Int, lda2:Int,  
   		B:SMat, broff:Int, bcoff:Int, C:FMat, coff:Int,  transpose:Int):Unit = {
     val Bdata = B.data;
     val Bir = B.ir;
@@ -668,7 +669,7 @@ object GLM {
   	var doit = false;
   	val ioff = Mat.ioneBased;
   	val istart = 0;
-  	val iend = ncols;
+  	val iend = bncols;
   	var AX:Array[Float] = null;
   	var ldax = 0;
   	var aoffx = 0;
@@ -727,10 +728,10 @@ object GLM {
   	}
   }
  
-  def pairMult(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
+  def pairMult(nr:Int, bnc:Int, bnr:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
     (a, b, c) match {
-      case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
-      case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
+      case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nr, bnc, bnr, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
+      case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nr, bnc, bnr, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
       case _ => throw new RuntimeException("pairMult couldnt match matrix types")
     }
     c
