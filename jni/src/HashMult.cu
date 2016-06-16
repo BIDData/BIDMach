@@ -251,7 +251,7 @@ __global__ void __pairmult(int nrows, int bncols, int brows1, int brows2, float 
         rank = __pairembed(r1, r2);
         doit = doit && (rank >= 0 && rank < brows2);
         if (doit) {
-          prod += f2;
+          prod = f1*f2/(abs(f1)+abs(f2)+1.0e-7f);
           AX = A2;
           ldax = lda2;
         }
@@ -513,7 +513,7 @@ __global__ void __pairMultADAGradTile(int nrows, int bncols, int brows1, int bro
           rank = __pairembed(r1, r2);
           doit = doit && (rank < brows2);
           if (doit) {
-            prod += f2;
+            prod = f1*f2/(abs(f1)+abs(f2)+1.0e-7f);
             ithere = ldmm;
             jthere = 1;
           }
