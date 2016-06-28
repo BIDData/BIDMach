@@ -169,7 +169,7 @@ object LDAgibbs  {
     class xopts extends Learner.Options with LDAgibbs.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
+    opts.putBack = -1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatSource(Array(mat0:Mat), opts), 
@@ -188,7 +188,7 @@ object LDAgibbs  {
     class xopts extends Learner.Options with LDAgibbs.Opts with MatSource.Opts with BatchNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
+    opts.putBack = -1
     opts.uiter = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
