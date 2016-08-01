@@ -1,5 +1,5 @@
 package BIDMach.datasources
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,ND,FND,GND}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.MatIOtrait
@@ -19,9 +19,9 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
   var nmats = 1;
   omats = null;
   var fprogress:Float = 0
-  var inMats:Array[Mat] = null;
+  var inMats:Array[ND] = null;
   var inFname:Array[String] = null;
-  @transient var iter:Iterator[(AnyRef, MatIOtrait)] = null;
+  @transient var iter:Iterator[AnyRef] = null;
   var nblocks = -1;
   var iblock = 0;
   
@@ -68,12 +68,12 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
     		    val nc = omats(i).ncols;
     		    val nr = samplesTodo - samplesDone + blockSize - todo - off; 
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
-    		    omats(i) = matq.rowslice(samplesDone, samplesTodo, omats(i), blockSize - todo); 			  
+    		    omats(i) = matq.asMat.rowslice(samplesDone, samplesTodo, omats(i), blockSize - todo); 			  
     		  } else {
     		    val nr = omats(i).nrows;
     		    val nc = samplesTodo - samplesDone + blockSize - todo - off;
     		    omats(i) = checkCaches(nr, nc, omats(i), GUID, i); 
-    		  	omats(i) = matq.colslice(samplesDone, samplesTodo, omats(i), blockSize - todo);
+    		  	omats(i) = matq.asMat.colslice(samplesDone, samplesTodo, omats(i), blockSize - todo);
     		  }
 
     		  if (featType == 0) {
@@ -123,7 +123,15 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
   }
   
   def iterNext() = {
-    inMats = iter.next._2.get
+    val marr = iter.next;
+    marr match {
+      case (key:AnyRef,v:MatIOtrait) => {inMats = v.get}
+      case m:ND => {
+        if (inMats == null) inMats = Array[ND](1);
+        inMats(0) = m;
+      }
+      case ma:Array[ND] => inMats = ma;
+    }
   }
   
   def lazyTranspose(a:Mat) = {

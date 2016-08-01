@@ -589,9 +589,8 @@ object GLM {
     } else if (aroff + nr > a.nrows || acoff + 2*kk > a.ncols || broff + kk > b.nrows || bcoff + bnc > b.ncols || croff + nr > c.nrows || ccoff + bnc > c.ncols) {
       throw new RuntimeException("pairMult: tile strays outside matrix dimensions");
     } else {
-      Mat.nflops += 2L * nr * b.nnz;
-//      val err = CUMACH.pairMultTile(nr, bnc, kk, kk, 
-      val err = CUMACH.pairMultTile(nr, bnc, 0, kk,
+      Mat.nflops += 2L * nr * b.nnz; 
+      val err = CUMACH.pairMultTile(nr, bnc, kk, kk,
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
           a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
           b.data, b.ir, b.jc, broff, bcoff, 
