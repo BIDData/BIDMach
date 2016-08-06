@@ -118,8 +118,9 @@ object LDAgibbs  {
       var alpha = row(0.1f);
       var beta = row(0.1f);
       var nsamps = 100f;
-      var doDirichlet = false; // Explicitly do Dirichlet sampling
-      var useBino = false; // Use binomial or poisson (default) sampling
+      var putBack = -1;
+      var doDirichlet = true; // Explicitly do Dirichlet sampling
+      var useBino = true; // Use binomial or poisson (default) sampling
   }
   
   class Options extends Opts {}
