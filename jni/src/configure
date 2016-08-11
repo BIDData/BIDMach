@@ -6,7 +6,7 @@ if [ "$ARCH" = "" ]; then
     ARCH=`arch`
 fi
  
-VERSION="dev"
+VERSION="1.1.0-cuda7.0"
 
 # standardise the OS and ARCH names
 if [[ "$OS" == Darwin* ]] ; then
@@ -91,6 +91,7 @@ if [ "$OS" = "apple" ] ; then
     LDFLAGS="$LDFLAGS"
     LIBPREPEND="lib"
     LIBAPPEND="-${OS}-${ARCH}.dylib"
+    LIBIOMPAPPEND=".dylib"
     FC="gfortran"
     FFLAGS="$CFLAGS"
     LAPACK_INCLUDES=""
@@ -153,6 +154,7 @@ elif [ "$OS" = "linux" ] ; then
 	LIBPREPEND="lib"
 	LIBAPPEND="-${OS}-${ARCH}.so"
 	LIBAPPENDLIB="-${OS}-${ARCH}.so"
+	LIBIOMPAPPEND=".so"
 	FC="gfortran"
 	FFLAGS="$CFLAGS"
 	LAPACK_INCLUDES=""
@@ -194,6 +196,7 @@ else
 	LDFLAGS="$LDFLAGS"
 	LIBPREPEND="lib"
 	LIBAPPEND="-${OS}-${ARCH}.so"
+	LIBIOMPAPPEND=".so"
 	FC="gfortran"
 	FFLAGS="$CFLAGS"
 	LAPACK_INCLUDES=""
@@ -246,6 +249,7 @@ elif [ "$OS" = "windows" ] ; then
     LDFLAGS="/DLL /MACHINE:${WINARCH} $LDFLAGS"
     LIBPREPEND=""
     LIBAPPEND="-${OS}-${ARCH}.dll"
+    LIBIOMPAPPEND="md.dll"
     FC="ifort"
     FFLAGS="-c $FFLAGS"
     LAPACK_INCLUDES=""
@@ -265,7 +269,11 @@ else
     exit 1
 fi
 
-echo "CC=$CC" > Makefile.incl
+echo "OS=$OS" > Makefile.incl
+echo "MARCH=$ARCH" >> Makefile.incl
+echo "VERSION=$VERSION" >> Makefile.incl
+echo "BIDMACH_ROOT=$BIDMACH_ROOT" >> Makefile.incl
+echo "CC=$CC" >> Makefile.incl
 echo "GCC=$GCC" >> Makefile.incl
 echo "NVCC=$NVCC" >> Makefile.incl
 echo "NVCCFLAGS=$NVCCFLAGS" >> Makefile.incl
@@ -280,6 +288,7 @@ echo "GLD=$GLD" >> Makefile.incl
 echo "LDFLAGS=$LDFLAGS" >> Makefile.incl
 echo "LIBPREPEND=$LIBPREPEND" >> Makefile.incl
 echo "LIBAPPEND=$LIBAPPEND" >> Makefile.incl
+echo "LIBIOMPAPPEND=$LIBIOMPAPPEND" >> Makefile.incl
 echo "LIBDIR=$LIBDIR" >> Makefile.incl
 echo "LAPACK_INCLUDES=$LAPACK_INCLUDES" >> Makefile.incl
 echo "CPU_LIBS=$CPU_LIBS" >> Makefile.incl

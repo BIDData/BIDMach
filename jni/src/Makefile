@@ -29,30 +29,52 @@ DNN63.$(OBJ) : DNN63.cu
 	$(NVCC) --maxrregcount=63 $(NVCCFLAGS) -Xptxas -v DNN63.cu
 
 DNN127.$(OBJ) : DNN127.cu
-	$(NVCC) --maxrregcount=127 $(NVCCFLAGS) -Xptxas -v DNN127.cu
+	$(NVCC) --maxrregcount=127 $(NVCCFLAGS) 
+#	$(NVCC) --maxrregcount=127 $(NVCCFLAGS) -Xptxas -v DNN127.cu
 
 %.$(OBJ) : %.cu
 	$(NVCC) $(NVCCFLAGS) $*.cu
 
-install: all
+install: installcudalib installcpulib
+
+installcudalib: $(INSTALLDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND)
+
+installcpulib: $(INSTALLDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND)
+
+$(INSTALLDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
-	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
+
+$(INSTALLDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND): $(LIBPREPEND)bidmachcpu$(LIBAPPEND)
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND) $(INSTALL_DIR)
+	cp $(LIBDIR)/libiomp5$(LIBIOMPAPPEND)  $(INSTALL_DIR)
+
+jars: cudajar cpujar
+
+cudajar: $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-$(OS)-$(MARCH).jar
+
+cpujar: $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar
+
+$(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-$(OS)-$(MARCH).jar: $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(LIBDIR)
-	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(LIBDIR)
+	jar cf $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-$(OS)-$(MARCH).jar \
+	-C $(BIDMACH_ROOT) lib/$(LIBPREPEND)bidmachcuda$(LIBAPPEND)
+	rm $(LIBDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 
-installcudalib: cudalib
-	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
-	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(LIBDIR)
+$(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar: $(LIBPREPEND)bidmachcpu$(LIBAPPEND)
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND) $(LIBDIR)
+	jar cf $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar \
+	-C $(BIDMACH_ROOT) lib/$(LIBPREPEND)bidmachcpu$(LIBAPPEND)
+	jar uf $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar \
+	-C $(BIDMACH_ROOT) lib/libiomp5$(LIBIOMPAPPEND)
+	rm $(LIBDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND)
 
-installcpulib: cpulib
-	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(INSTALL_DIR)
-	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  $(LIBDIR)
-
-upload: all
+upload: jars
 	if [ -d /biddata/lib ]; then \
-	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) /biddata/lib ; \
-	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  /biddata/lib ; else \
-	scp $(LIBPREPEND)bidmach*$(LIBAPPEND) login.eecs.berkeley.edu:biddata/lib ; fi
+	cp $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-$(OS)-$(MARCH).jar /biddata/lib/$(VERSION) ; \
+	cp $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar /biddata/lib/$(VERSION) ; \
+	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) /biddata/lib/$(VERSION) ; \
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  /biddata/lib/$(VERSION) ; else \
+	scp $(LIBPREPEND)bidmach*$(LIBAPPEND) $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)*-$(OS)-$(MARCH).jar login.eecs.berkeley.edu:biddata/lib/$(VERSION) ; fi
 
 clean:
 	rm -f *.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib
@@ -60,3 +82,5 @@ clean:
 distclean: clean
 	rm -f  *.jnilib Makefile.incl
 
+cleanres:
+	rm $(BIDMACH_ROOT)/src/main/resources/lib/*
