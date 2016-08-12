@@ -1,21 +1,15 @@
 
-val d= loadSMat("../data/uci/nytimes.smat.lz4");
-val ii = find(sum(d,2)>100);
-val jj = randperm(d.ncols);
-val dd = d(ii,jj);
-val rs = sum(dd,2);
-rs ~ rs / sum(rs);
+val dd= loadSMat("../data/uci/nytimes.smat.lz4");
 
 val (nn,opts)=LDAgibbs.learner(dd)
 
 opts.dim=32;
-opts.uiter=10;
+opts.uiter=5;
 opts.batchSize=1000;
 opts.npasses=1;
 opts.useBino=true;
 opts.doDirichlet=true;
 opts.nsamps=100;
 opts.power=0.5f;
-// opts.beta=rs.t;
 
 nn.train
