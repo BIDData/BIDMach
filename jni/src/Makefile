@@ -70,11 +70,9 @@ $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar: $(LIBPREPEND)b
 
 upload: jars
 	if [ -d /biddata/lib ]; then \
-	cp $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-$(OS)-$(MARCH).jar /biddata/lib/$(VERSION) ; \
-	cp $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar /biddata/lib/$(VERSION) ; \
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) /biddata/lib/$(VERSION) ; \
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  /biddata/lib/$(VERSION) ; else \
-	scp $(LIBPREPEND)bidmach*$(LIBAPPEND) $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)*-$(OS)-$(MARCH).jar login.eecs.berkeley.edu:biddata/lib/$(VERSION) ; fi
+	scp $(LIBPREPEND)bidmach*$(LIBAPPEND) login.eecs.berkeley.edu:biddata/lib/$(VERSION) ; fi
 
 clean:
 	rm -f *.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib

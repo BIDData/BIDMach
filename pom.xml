@@ -6,7 +6,7 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>1.1.0-cuda${cudaVersion}</version>
+  <version>1.1.0-cuda7.5</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
@@ -24,14 +24,162 @@
       </snapshots>
     </repository>
     <repository>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
       <id>bintray-biddata-BIDData</id>
       <name>bintray</name>
       <url>http://dl.bintray.com/biddata/BIDData</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
     </repository>
   </repositories>
+  <profiles>
+    <profile>
+      <id>win</id>
+      <activation>
+      	<os>
+          <family>Windows</family>
+      	</os>
+      </activation>
+      <properties>
+        <osarch>windows-x86-64</osarch>
+      </properties>
+    </profile>
+    <profile>
+      <id>mac</id>
+      <activation>
+      	<os>
+          <family>mac</family>
+      	</os>
+      </activation>
+      <properties>
+        <osarch>apple-x86-64</osarch>
+      </properties>
+    </profile>
+    <profile>
+      <id>linux_arm</id>
+      <activation>
+      	<os>
+          <family>unix</family>
+          <arch>arm</arch>
+          <name>!mac os x</name>  <!--https://issues.apache.org/jira/browse/MNG-4983-->
+      	</os>
+      </activation>
+      <properties>
+        <osarch>linux-arm</osarch>
+      </properties>
+    </profile>
+    <profile>
+      <id>linux</id>
+      <activation>
+      	<os>
+          <family>unix</family>
+          <name>!mac os x</name> <!--https://issues.apache.org/jira/browse/MNG-4983-->
+      	</os>
+      </activation>
+      <properties>
+        <osarch>linux-x86-64</osarch>
+      </properties>
+    </profile>
+    <profile>
+      <id>gpu</id>
+      <activation>
+        <property>
+          <name>gpu</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>3.0.2</version>
+            <executions>
+              <execution>
+                <id>build_cuda_native_jar</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <classesDirectory>src/main/resources</classesDirectory>
+                  <classifier>gpu-${osarch}</classifier>
+                  <includes>
+                    <include>lib/*bidmatcuda*</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>cpu</id>
+      <activation>
+        <property>
+          <name>cpu</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>3.0.2</version>
+            <executions>
+              <execution>
+                <id>build_cpu_native_jar</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <classesDirectory>src/main/resources</classesDirectory>
+                  <classifier>cpu-${osarch}</classifier>
+                  <includes>
+                    <include>lib/*bidmatcpu*</include>
+                    <include>lib/*iomp5*</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>dependcpu</id>
+      <activation>
+        <property>
+          <name>!cpu</name>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>${project.groupId}</groupId>
+          <artifactId>${project.artifactId}</artifactId>
+          <version>${project.version}</version>
+          <classifier>cpu-${osarch}</classifier>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>dependgpu</id>
+      <activation>
+        <property>
+          <name>!gpu</name>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>${project.groupId}</groupId>
+          <artifactId>${project.artifactId}</artifactId>
+          <version>${project.version}</version>
+          <classifier>gpu-${osarch}</classifier>
+        </dependency> 
+      </dependencies>
+    </profile>
+  </profiles>
   <dependencies>
     <dependency>
       <groupId>BIDMat</groupId>
@@ -92,6 +240,13 @@
       </resource>
     </resources>
   </build>	
+  <distributionManagement>
+    <repository>
+      <id>bintray-biddata-BIDData</id>
+      <name>biddata-BIDData</name>
+      <url>https://api.bintray.com/maven/biddata/BIDData/BIDMach/;publish=1;override=1</url>
+    </repository>
+  </distributionManagement>
 </project>
 
 
