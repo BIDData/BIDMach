@@ -104,7 +104,7 @@
                   <classesDirectory>src/main/resources</classesDirectory>
                   <classifier>gpu-${osarch}</classifier>
                   <includes>
-                    <include>lib/*bidmatcuda*</include>
+                    <include>lib/*bidmachcuda*</include>
                   </includes>
                 </configuration>
               </execution>
@@ -137,7 +137,7 @@
                   <classesDirectory>src/main/resources</classesDirectory>
                   <classifier>cpu-${osarch}</classifier>
                   <includes>
-                    <include>lib/*bidmatcpu*</include>
+                    <include>lib/*bidmachcpu*</include>
                     <include>lib/*iomp5*</include>
                   </includes>
                 </configuration>

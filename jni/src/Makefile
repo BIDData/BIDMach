@@ -29,7 +29,7 @@ DNN63.$(OBJ) : DNN63.cu
 	$(NVCC) --maxrregcount=63 $(NVCCFLAGS) -Xptxas -v DNN63.cu
 
 DNN127.$(OBJ) : DNN127.cu
-	$(NVCC) --maxrregcount=127 $(NVCCFLAGS) 
+	$(NVCC) --maxrregcount=127 $(NVCCFLAGS) DNN127.cu
 #	$(NVCC) --maxrregcount=127 $(NVCCFLAGS) -Xptxas -v DNN127.cu
 
 %.$(OBJ) : %.cu
@@ -68,7 +68,7 @@ $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar: $(LIBPREPEND)b
 	-C $(BIDMACH_ROOT) lib/libiomp5$(LIBIOMPAPPEND)
 	rm $(LIBDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND)
 
-upload: jars
+upload: $(LIBPREPEND)bidmachcpu$(LIBAPPEND) $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 	if [ -d /biddata/lib ]; then \
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) /biddata/lib/$(VERSION) ; \
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  /biddata/lib/$(VERSION) ; else \
