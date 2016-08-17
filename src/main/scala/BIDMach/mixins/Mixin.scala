@@ -9,7 +9,8 @@ abstract class Mixin(val opts:Mixin.Opts = new Mixin.Options) extends Serializab
   val options = opts
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null
-  
+  var counter = 0 
+
   def compute(mats:Array[Mat], step:Float)
   
   def score(mats:Array[Mat], step:Float):FMat
@@ -21,7 +22,9 @@ abstract class Mixin(val opts:Mixin.Opts = new Mixin.Options) extends Serializab
 }
 
 object Mixin {
-	trait Opts extends BIDMat.Opts {}
+	trait Opts extends BIDMat.Opts {
+        var mixinInterval = 1
+    }
 	
 	class Options extends Opts {}
 }
