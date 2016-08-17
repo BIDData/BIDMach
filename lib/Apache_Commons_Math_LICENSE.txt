@@ -1,387 +1,353 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" version="XHTML+RDFa 1.0" dir="ltr">
+
+<head profile="http://www.w3.org/1999/xhtml/vocab">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="shortcut icon" href="https://eecs.berkeley.edu/sites/all/themes/eecs/favicon.ico" type="image/vnd.microsoft.icon" />
+<!-- YOUR TITLE next -->
+
+
+<title>Resource not found | EECS UC Berkeley</title>
+
+<style type="text/css" media="all">
+@import url("https://eecs.berkeley.edu/modules/system/system.base.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/system/system.messages.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/system/system.theme.css?oblzkb");
+</style>
+<style type="text/css" media="all">
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_core/css/panopoly-jquery-ui-theme.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/themes/base/minified/jquery.ui.accordion.min.css?oblzkb");
+</style>
+<style type="text/css" media="all">
+@import url("https://eecs.berkeley.edu/modules/book/book.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/date/date_api/date.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/date/date_popup/themes/datepicker.1.7.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/field/theme/field.css?oblzkb");
+@import url("https://eecs.berkeley.edu/sites/all/modules/contrib/google_cse/google_cse.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/node/node.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_admin/panopoly-admin-navbar.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_core/css/panopoly-dropbutton.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_magic/css/panopoly-magic.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-featured.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-accordian.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-layouts.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_widgets/panopoly-widgets-spotlight.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_wysiwyg/panopoly-wysiwyg.css?oblzkb");
+@import url("https://eecs.berkeley.edu/sites/all/modules/contrib/picture/picture_wysiwyg.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/radix_layouts/radix_layouts.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/search/search.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/user/user.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/views/css/views.css?oblzkb");
+</style>
+<style type="text/css" media="all">
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/ctools/css/ctools.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/panels/css/panels.css?oblzkb");
+</style>
+<style type="text/css" media="screen">
+@import url("https://eecs.berkeley.edu/sites/all/themes/kalatheme/css/tweaks.css?oblzkb");
+@import url("https://eecs.berkeley.edu/sites/all/themes/kalatheme/css/panopoly.css?oblzkb");
+</style>
+<style type="text/css" media="all">
+@import url("https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/styles/main.css?oblzkb");
+@import url("https://eecs.berkeley.edu/sites/all/themes/eecs/css/eecs.css?oblzkb");
+</style>
+<style type="text/css" media="all">
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_images/panopoly-images.css?oblzkb");
+</style>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/jquery/1.10/jquery.min.js?v=1.10.2"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/misc/jquery.once.js?v=1.2"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/misc/drupal.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.core.min.js?v=1.10.2"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.widget.min.js?v=1.10.2"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.tabs.min.js?v=1.10.2"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.accordion.min.js?v=1.10.2"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_images/panopoly-images.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/modules/contrib/google_cse/google_cse.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_admin/panopoly-admin.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_magic/panopoly-magic.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/js/panopoly-accordion.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/libraries/jquery.imagesloaded/jquery.imagesloaded.min.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/matchHeight/jquery.matchHeight-min.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/Chart.js/Chart.min.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/js/charts.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/js/eecs.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/bootstrap-sass-twbs/assets/javascripts/bootstrap.min.js?oblzkb"></script>
+<script type="text/javascript">
+<!--//--><![CDATA[//><!--
+jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":{"theme":"eecs","theme_token":"K_tLk3j8asz4gIQWNS-M7NOcvMDjcWuEGxeR89xFHeo","js":{"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/jquery\/1.10\/jquery.min.js":1,"misc\/jquery.once.js":1,"misc\/drupal.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.core.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.widget.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.tabs.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.accordion.min.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_images\/panopoly-images.js":1,"sites\/all\/modules\/contrib\/google_cse\/google_cse.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_admin\/panopoly-admin.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_magic\/panopoly-magic.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_theme\/js\/panopoly-accordion.js":1,"profiles\/panopoly\/libraries\/jquery.imagesloaded\/jquery.imagesloaded.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/matchHeight\/jquery.matchHeight-min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/Chart.js\/Chart.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/charts.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/eecs.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/bootstrap-sass-twbs\/assets\/javascripts\/bootstrap.min.js":1}},"googleCSE":{"cx":"010464314754576911738:fu9nvbsz9t0","language":"","resultsWidth":600,"domain":"www.google.com"},"CToolsModal":{"modalSize":{"type":"scale","width":".9","height":".9","addWidth":0,"addHeight":0,"contentRight":25,"contentBottom":75},"modalOptions":{"opacity":".55","background-color":"#FFF"},"animationSpeed":"fast","modalTheme":"CToolsModalDialog","throbberTheme":"CToolsModalThrobber"},"panopoly_magic":{"pane_add_preview_mode":"single"}});
+//--><!]]>
+</script>
+<!-- pagehead1 file, then title element, then this file -->
+</head>
+<body class="html not-front not-logged-in no-sidebars page-node region-content" >
+  <div id="skip-link">
+    <a href="#main-content" class="element-focusable element-invisible">Skip to main content</a>
+  </div>
+    <div id="page-wrapper"><div id="page">
+
+ <!-- Page Header -->
+<header class="navbar navbar-default">
+  <div class="navbar-header">
+
+    <div class='brand navbar-brand'>
+      <a href="https://eecs.berkeley.edu/" title="Home" rel="home" class="logo">
+      </a>
+    </div>
+
+    <button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".navbar-collapse">
+      <span class="element-invisible">Toggle navigation</span>
+      <span class="icon-bar" aria-hidden="true"></span>
+      <span class="icon-bar" aria-hidden="true"></span>
+      <span class="icon-bar" aria-hidden="true"></span>
+    </button>
+
+    <div id="site-name-slogan" class="brand navbar-brand">
+
+      <h1 id="site-name" class="element-invisible">
+        <strong>
+          <a href="https://eecs.berkeley.edu/" title="Home" rel="home" tabindex="-1">
+            <span>EECS at UC Berkeley</span>
+          </a>
+        </strong>
+      </h1>
+
+    </div> <!-- /#name-and-slogan -->
+
+  </div><!-- /.navbar-header -->
+
+  <nav class="collapse navbar-collapse" role="navigation">
+        <h2 class="element-invisible">Main menu</h2><ul id="main-nav" class="nav navbar-nav links clearfix" role="menubar"><li class="mid-2018 first dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/about" class="first expanded" role="button" id="main-menu-dropdown-1" data-toggle="dropdown" aria-haspopup="true">About<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for About</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-1" aria-expanded="false"><li class="mid-2019 first" role="presentation"><a href="https://eecs.berkeley.edu/about" class="first leaf" role="menuitem">About Overview</a></li>
+<li class="mid-2016" role="presentation"><a href="https://eecs.berkeley.edu/about/by-the-numbers" class="leaf" role="menuitem">By the Numbers</a></li>
+<li class="mid-2343" role="presentation"><a href="https://eecs.berkeley.edu/about/diversity" class="collapsed" role="menuitem">Diversity</a></li>
+<li class="mid-2020" role="presentation"><a href="https://eecs.berkeley.edu/about/history" class="collapsed" role="menuitem">History</a></li>
+<li class="mid-2345 last" role="presentation"><a href="https://eecs.berkeley.edu/about/visiting" class="last collapsed" role="menuitem">Visiting</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1632 dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/academics" class="expanded" role="button" id="main-menu-dropdown-2" data-toggle="dropdown" aria-haspopup="true">Academics<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Academics</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-2" aria-expanded="false"><li class="mid-2015 first" role="presentation"><a href="https://eecs.berkeley.edu/academics" class="first leaf" role="menuitem">Academics Overview</a></li>
+<li class="mid-2353" role="presentation"><a href="https://eecs.berkeley.edu/academics/undergraduate" class="collapsed" role="menuitem">Undergraduate Admissions &amp; Programs</a></li>
+<li class="mid-2352" role="presentation"><a href="https://eecs.berkeley.edu/academics/graduate" class="collapsed" role="menuitem">Graduate Admissions &amp; Programs</a></li>
+<li class="mid-1716 last" role="presentation"><a href="https://eecs.berkeley.edu/academics/courses" class="last leaf" role="menuitem">Courses</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1635 dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/research" class="expanded" role="button" id="main-menu-dropdown-3" data-toggle="dropdown" aria-haspopup="true">Research<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Research</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-3" aria-expanded="false"><li class="mid-2023 first" role="presentation"><a href="https://eecs.berkeley.edu/research" class="first leaf" role="menuitem">Research Overview</a></li>
+<li class="mid-2025" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/" class="leaf" role="menuitem">Areas</a></li>
+<li class="mid-2024" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf" role="menuitem">Centers &amp; Labs</a></li>
+<li class="mid-2026" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf" role="menuitem">Projects</a></li>
+<li class="mid-2027" role="presentation"><a href="https://www2.eecs.berkeley.edu/bears/" class="leaf" role="menuitem">BEARS Symposium</a></li>
+<li class="mid-2327 last" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="last collapsed" role="menuitem">Colloquium</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1634 dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/people" class="expanded" role="button" id="main-menu-dropdown-4" data-toggle="dropdown" aria-haspopup="true">People<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for People</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-4" aria-expanded="false"><li class="mid-2029 first" role="presentation"><a href="https://eecs.berkeley.edu/people" class="first leaf" role="menuitem">People Overview</a></li>
+<li class="mid-2035" role="presentation"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="leaf" role="menuitem">Directory</a></li>
+<li class="mid-2034" role="presentation"><a href="https://eecs.berkeley.edu/people/leadership" class="leaf" role="menuitem">Leadership</a></li>
+<li class="mid-2201" role="presentation"><a href="https://eecs.berkeley.edu/people/faculty" class="collapsed" role="menuitem">Faculty</a></li>
+<li class="mid-2032" role="presentation"><a href="https://eecs.berkeley.edu/people/students" class="collapsed" role="menuitem">Students</a></li>
+<li class="mid-2348" role="presentation"><a href="https://eecs.berkeley.edu/people/staff" class="collapsed" role="menuitem">Staff</a></li>
+<li class="mid-2028 last" role="presentation"><a href="https://eecs.berkeley.edu/people/alumni" class="last collapsed" role="menuitem">Alumni</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1633 last dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/connect" class="last expanded" role="button" id="main-menu-dropdown-5" data-toggle="dropdown" aria-haspopup="true">Connect<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Connect</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-5" aria-expanded="false"><li class="mid-2203 first" role="presentation"><a href="https://eecs.berkeley.edu/connect" class="first leaf" role="menuitem">Connect Overview</a></li>
+<li class="mid-2531" role="presentation"><a href="https://eecs.berkeley.edu/connect/support" class="collapsed" role="menuitem">Support EECS</a></li>
+<li class="mid-2208" role="presentation"><a href="https://eecs.berkeley.edu/connect/k-12" class="leaf" role="menuitem">K-12 Programs</a></li>
+<li class="mid-2206 last" role="presentation"><a href="https://eecs.berkeley.edu/connect/contact" class="last leaf" role="menuitem">Contact</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+</ul>
+    
+    <h2 class="element-invisible">Secondary menu</h2><ul id="utility-nav" class="nav navbar-nav secondary-links"><li class="menu-1608 first home"><a href="https://eecs.berkeley.edu/"><span class="sr-only home">Home</span></a></li>
+<li class="menu-1628 "><a href="https://eecs.berkeley.edu/resources/students" title="Information for Current Students">Students</a></li>
+<li class="menu-1629 "><a href="https://eecs.berkeley.edu/resources/faculty-staff" title="Information for Current Faculty/Staff">Faculty/Staff</a></li>
+<li class="menu-1630 "><a href="https://eecs.berkeley.edu/industry" title="Information for Industry contacts">Industry</a></li>
+<li class="menu-1631 "><a href="https://eecs.berkeley.edu/news">News</a></li>
+<li class="menu-1885 "><a href="https://eecs.berkeley.edu/events">Events</a></li>
+<li class="menu-2772 last "><a href="https://eecs.berkeley.edu/connect/support" class="highlight">Give</a></li>
+</ul>  </nav>
+
+  <a href="#" aria-hidden="true" class="search-toggle" data-toggle="collapse" data-target=".search-collapse" aria-expanded="true"><span>Toggle Search</span><i class="icon search" aria-hidden="true"></i></a>
+
+  <div class="search-container">
+    <form class="google-cse" action="https://eecs.berkeley.edu/" method="post" id="search-block-form" accept-charset="UTF-8" role="form"><div><div class="container-inline form-inline search-collapse collapse">
+      <h2 class="element-invisible">Search form</h2>
+    <div class="form-item form-type-textfield form-item-search-block-form form-group">
+  <label class="element-invisible" for="edit-search-block-form--2">Search </label>
+ <input title="Enter the terms you wish to search for." placeholder="Search" class="form-control form-text fa-on" type="text" id="edit-search-block-form--2" name="search_block_form" value="" size="15" maxlength="128" />
+</div>
+<div class="form-actions form-wrapper" id="edit-actions"><button type="submit" id="edit-submit" name="op" class="form-submit btn btn-default btn-primary"><span>Search</span><i class="icon search" aria-hidden="true"></i></button></div><input type="hidden" name="form_build_id" value="form-T8sAz4N1Vd7EpP3SG9I1d0XD4_KtDg2FeH27kvDqry4" />
+<input type="hidden" name="form_id" value="search_block_form" />
+</div>
+</div></form>  </div>
+</header>
+
+
+<!-- this bodyhead1 file goes after the header from the drupal site -->
+
+<!-- Page Main -->
+  <div id="main-wrapper" class="clearfix">
+    <main id="main" class="clearfix" role="main">
+      <div id="top-content">
+        <div class="column container">
+          <a id="main-content"></a>
+
+<!-- YOUR HEADER h1 next: id="page-title" class="title" -->
+
+
+<h1>Resource not found</h1>
+
+          
+        <!-- h1 before this file -->
+
+                  </div>
+      </div> <!-- /.section, /#top-content -->
+
+      <div class="container">
+        <div id="content">
+          <div class="column container">
+              <div class="region region-content">
+    <div id="block-system-main" class="block block-system">
+
+    
+  <div class="content">
+
+  <!-- YOUR CONTENT HERE -->
+
+<script type="text/javascript">
+<!--
+
+function validate() {
+  var val = document.contact.message.value
+  if ( val == '' ) {
+     alert ( "Please include a Message" )
+     return false
+  }
+}
+
+//-->
+</script>
+<!-- <style type="text/css" media="all">@import
+"/ErrorDocuments/webteamErrorPage.css";</style> -->
+
+<h2>The server has encountered a problem because the resource was not found.</h2>
+
+<dl>
+<dt>Your request was :</dt>
+<dd>http://people.eecs.berkeley.edu/~jfc/biddata/lib/dev-cuda7.5/Apache_Commons_Math_LICENSE.txt</dd>
+</dl>
+
+<h2>What are you looking for?</h2>
+<ul>
+    <li><a href="https://eecs.berkeley.edu/academics/graduate">Graduate Programs and Admissions</a>.  There's also a <a href="https://eecs.berkeley.edu/academics/graduate/faq">Graduate Admissions FAQ</a> for answers to specific questions.</li>
+    <li><a href="https://eecs.berkeley.edu/academics/undergraduate">Undergraduate Programs and Admissions</a></li>
+    <li><a href="https://eecs.berkeley.edu/industry/recruit-students">Recruiting EECS students and posting jobs</a></li>
+    <li><a href="http://iris.eecs.berkeley.edu/helpdesk/">EECS Departmental Computer or Network Support</a></li>
+    <li><a href="https://eecs.berkeley.edu/people">People and Directories</a></li>
+</ul>
+
+<h2>Contact Us</h2>
+<p>
+To report problems or submit questions and comments related to the
+site, please send an email to the following email address:</p>
+
+<code style="margin: 20px; padding: 0 20px ;">
+<a href="mailto:webteam@eecs.berkeley.edu?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FApache_Commons_Math_LICENSE.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FApache_Commons_Math_LICENSE.txt%0AReferrer%3A%20">webteam@EECS.Berkeley.EDU</a></code>
+</p><p>To contact the owner of the specific page you were
+   looking for send an email to:</p><code style="margin: 20px; padding: 0 20px ;"><a href="mailto:jfc AT CS.Berkeley.EDU?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FApache_Commons_Math_LICENSE.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FApache_Commons_Math_LICENSE.txt%0AReferrer%3A%20">jfc AT CS.Berkeley.EDU</a></code>
+<!-- debug info
+<dl>
+<dt><em>Debugging Info:</em></dt>
+<dt>This resource is likely managed by :</dt>
+<dd>user: jfc</dd>
+<dd>ldap count: (1)</dd>
+<dd>Code: (404)</dd>
+<dd>Local Email: jfc AT CS.Berkeley.EDU</dd>
+<dd>Name: John Canny</dd>
+</dl>
+-->
+
+
+
+ <!-- end of YOUR CONTENT; standard div et al closures below -->
+
+  </div>
+</div>
+  </div>
+          </div>
+        </div>
+      </div><!-- /.section, /#content -->
+
+    </main><!-- /#main -->
+  </div> <!-- /#main-wrapper -->
+
+<footer class="footer">
+  <div class="brand navbar-brand">
+    <a href="https://eecs.berkeley.edu/" title="Home" rel="home" class="logo"><span class="sr-only">Home</span></a>
+  </div>
+  <ul class="nav navbar-nav footer-nav" role="menubar"><li class="mid-2039 first " role="presentation"><a href="https://eecs.berkeley.edu/about" class="first expanded" role="menuitem">About</a><ul role="menu" class="nav"><li class="mid-2199 first" role="presentation"><a href="https://eecs.berkeley.edu/about/by-the-numbers" class="first leaf" role="menuitem">By the Numbers</a></li>
+<li class="mid-2197" role="presentation"><a href="https://eecs.berkeley.edu/about/history" class="leaf" role="menuitem">History</a></li>
+<li class="mid-2344" role="presentation"><a href="https://eecs.berkeley.edu/about/diversity" class="leaf" role="menuitem">Diversity</a></li>
+<li class="mid-2346" role="presentation"><a href="https://eecs.berkeley.edu/about/visiting" class="leaf" role="menuitem">Visiting</a></li>
+<li class="mid-2758 last" role="presentation"><a href="https://eecs.berkeley.edu/about/principles-community" class="last leaf" role="menuitem">Principles of Community</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1585 " role="presentation"><a href="https://eecs.berkeley.edu/academics" class="expanded" role="menuitem">Academics</a><ul role="menu" class="nav"><li class="mid-2355 first" role="presentation"><a href="https://eecs.berkeley.edu/academics/undergraduate" class="first leaf" role="menuitem">Undergrad Admissions &amp; Programs</a></li>
+<li class="mid-2354" role="presentation"><a href="https://eecs.berkeley.edu/academics/graduate" class="leaf" role="menuitem">Graduate Admissions &amp; Programs</a></li>
+<li class="mid-2041" role="presentation"><a href="https://eecs.berkeley.edu/academics/courses" class="leaf" role="menuitem">Courses</a></li>
+<li class="mid-2393 last" role="presentation"><a href="https://eecs.berkeley.edu/academics/prospective-women" class="last leaf" role="menuitem">Prospective Women Students</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1588 " role="presentation"><a href="https://eecs.berkeley.edu/research" class="expanded" role="menuitem">Research</a><ul role="menu" class="nav"><li class="mid-1593 first" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/" class="first leaf" role="menuitem">Areas</a></li>
+<li class="mid-2042" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf" role="menuitem">Centers &amp; Labs</a></li>
+<li class="mid-2043" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf" role="menuitem">Projects</a></li>
+<li class="mid-2044" role="presentation"><a href="https://www2.eecs.berkeley.edu/bears/" class="leaf" role="menuitem">BEARS Symposium</a></li>
+<li class="mid-2326" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="collapsed" role="menuitem">Colloquium</a></li>
+<li class="mid-2045" role="presentation"><a href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/" class="leaf" role="menuitem">Technical Reports</a></li>
+<li class="mid-2046 last" role="presentation"><a href="https://www2.eecs.berkeley.edu/Pubs/Dissertations/" class="last leaf" role="menuitem">PhD Dissertations</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1589 " role="presentation"><a href="https://eecs.berkeley.edu/people" class="expanded" role="menuitem">People</a><ul role="menu" class="nav"><li class="mid-2047 first" role="presentation"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="first leaf" role="menuitem">Directory</a></li>
+<li class="mid-1594" role="presentation"><a href="https://eecs.berkeley.edu/people/leadership" class="leaf" role="menuitem">Leadership</a></li>
+<li class="mid-2202" role="presentation"><a href="https://eecs.berkeley.edu/people/faculty" class="leaf" role="menuitem">Faculty</a></li>
+<li class="mid-2407" role="presentation"><a href="https://eecs.berkeley.edu/people/students" class="collapsed" role="menuitem">Students</a></li>
+<li class="mid-2397" role="presentation"><a href="https://eecs.berkeley.edu/people/staff" class="leaf" role="menuitem">Staff</a></li>
+<li class="mid-2051 last" role="presentation"><a href="https://eecs.berkeley.edu/people/alumni" class="last leaf" role="menuitem">Alumni</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1590 " role="presentation"><a href="https://eecs.berkeley.edu/resources" class="expanded" role="menuitem">Resources</a><ul role="menu" class="nav"><li class="mid-2182 first" role="presentation"><a href="https://eecs.berkeley.edu/resources/facilities/room-reservations" class="first collapsed" role="menuitem">Room Reservations</a></li>
+<li class="mid-2755" role="presentation"><a href="https://www2.eecs.berkeley.edu/deptinfo" class="leaf" role="menuitem">My EECS Info</a></li>
+<li class="mid-2409" role="presentation"><a href="https://eecs.berkeley.edu/resources/grads" class="collapsed" role="menuitem">For Grads</a></li>
+<li class="mid-2577" role="presentation"><a href="https://eecs.berkeley.edu/resources/undergrads" class="collapsed" role="menuitem">For Undergrads</a></li>
+<li class="mid-2811" role="presentation"><a href="https://eecs.berkeley.edu/resources/gsis" class="collapsed" role="menuitem">GSIs/Readers/Tutors</a></li>
+<li class="mid-2184" role="presentation"><a href="http://iris.eecs.berkeley.edu/" class="leaf" role="menuitem">IT Services</a></li>
+<li class="mid-2717" role="presentation"><a href="https://eecs.berkeley.edu/resources/facilities" class="collapsed" role="menuitem">Facilities, Safety &amp; Space</a></li>
+<li class="mid-1595" role="presentation"><a href="https://eecs.berkeley.edu/resources/faculty-staff" class="collapsed" role="menuitem">For Faculty/Staff</a></li>
+<li class="mid-2357 last" role="presentation"><a href="https://eecs.berkeley.edu/resources/visiting-scholars" class="last collapsed" role="menuitem">Visiting Scholars</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1591 " role="presentation"><a href="https://eecs.berkeley.edu/industry" class="expanded" role="menuitem">Industry</a><ul role="menu" class="nav"><li class="mid-2196 first" role="presentation"><a href="https://eecs.berkeley.edu/industry/recruit-students" class="first collapsed" role="menuitem">Recruit Students</a></li>
+<li class="mid-3036 last" role="presentation"><a href="https://eecs.berkeley.edu/industry/entrepreneurship" class="last leaf" role="menuitem">Entrepreneurship</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+<li class="mid-1592 last " role="presentation"><a href="https://eecs.berkeley.edu/connect" class="last expanded" role="menuitem">Connect</a><ul role="menu" class="nav"><li class="mid-2189 first" role="presentation"><a href="https://eecs.berkeley.edu/connect/support" class="first collapsed" role="menuitem">Support Us</a></li>
+<li class="mid-2207" role="presentation"><a href="https://eecs.berkeley.edu/connect/k-12" class="leaf" role="menuitem">K-12 Programs</a></li>
+<li class="mid-2204 last" role="presentation"><a href="https://eecs.berkeley.edu/connect/contact" class="last leaf" role="menuitem">Contact</a></li>
+</ul></li><div class='clearfix visible-xs'></div>
+</ul>
+  <div class="footer-tier">
+    <ul class="nav navbar-nav links utility-nav clearfix" role="menubar"><li class="mid-1598 first " role="presentation"><a href="https://eecs.berkeley.edu/" class="first leaf" role="menuitem"><i class="fa fa-home"></i><span class="sr-only">Home</span></a></li>
+<li class="mid-1710 " role="presentation"><a href="https://ee.berkeley.edu/" class="leaf" role="menuitem">EE</a></li>
+<li class="mid-1711 " role="presentation"><a href="https://cs.berkeley.edu/" class="leaf" role="menuitem">CS</a></li>
+<li class="mid-1712 " role="presentation"><a href="http://berkeley.edu/" class="leaf" role="menuitem">UC Berkeley</a></li>
+<li class="mid-1713 " role="presentation"><a href="http://engineering.berkeley.edu/" class="leaf" role="menuitem">Berkeley Engineering</a></li>
+<li class="mid-1603 " role="presentation"><a href="https://eecs.berkeley.edu/news" class="leaf" role="menuitem">News</a></li>
+<li class="mid-2037 last " role="presentation"><a href="https://eecs.berkeley.edu/events" class="last leaf" role="menuitem">Events</a></li>
+</ul>    <ul class="nav navbar-nav links social" role="menubar"><li class="mid-1599 first last twitter" role="presentation"><a href="https://twitter.com/UCB_EECS" target="_blank" class="first last leaf" role="menuitem"><span class="sr-only">Berkley EECS on Twitter</span></a></li>
+</ul>  </div>
+  <div class="small-print">
+    <div class="copyright">&copy; 2016 UC Regents</div>
+
+    <ul class="links policies">
+      <li>
+        <a href="https://eecs.berkeley.edu/privacy-policy"><span>Privacy Policy</span></a>
+      </li>
+    </ul>
+  </div>
+</footer>
+
+
+<!-- Google Tag Manager -->
+<noscript><iframe src="//www.googletagmanager.com/ns.html?id=GTM-WZMWWC" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<script type="text/javascript">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0];var j=d.createElement(s);var dl=l!='dataLayer'?'&l='+l:'';j.src='//www.googletagmanager.com/gtm.js?id='+i+dl;j.type='text/javascript';j.async=true;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-WZMWWC');</script>
+<!-- End Google Tag Manager -->
+</div></div> <!-- /#page, /#page-wrapper -->
+</body>
+</html>
 
-                                 Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
-
-   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
-
-   1. Definitions.
-
-      "License" shall mean the terms and conditions for use, reproduction,
-      and distribution as defined by Sections 1 through 9 of this document.
-
-      "Licensor" shall mean the copyright owner or entity authorized by
-      the copyright owner that is granting the License.
-
-      "Legal Entity" shall mean the union of the acting entity and all
-      other entities that control, are controlled by, or are under common
-      control with that entity. For the purposes of this definition,
-      "control" means (i) the power, direct or indirect, to cause the
-      direction or management of such entity, whether by contract or
-      otherwise, or (ii) ownership of fifty percent (50%) or more of the
-      outstanding shares, or (iii) beneficial ownership of such entity.
-
-      "You" (or "Your") shall mean an individual or Legal Entity
-      exercising permissions granted by this License.
-
-      "Source" form shall mean the preferred form for making modifications,
-      including but not limited to software source code, documentation
-      source, and configuration files.
-
-      "Object" form shall mean any form resulting from mechanical
-      transformation or translation of a Source form, including but
-      not limited to compiled object code, generated documentation,
-      and conversions to other media types.
-
-      "Work" shall mean the work of authorship, whether in Source or
-      Object form, made available under the License, as indicated by a
-      copyright notice that is included in or attached to the work
-      (an example is provided in the Appendix below).
-
-      "Derivative Works" shall mean any work, whether in Source or Object
-      form, that is based on (or derived from) the Work and for which the
-      editorial revisions, annotations, elaborations, or other modifications
-      represent, as a whole, an original work of authorship. For the purposes
-      of this License, Derivative Works shall not include works that remain
-      separable from, or merely link (or bind by name) to the interfaces of,
-      the Work and Derivative Works thereof.
-
-      "Contribution" shall mean any work of authorship, including
-      the original version of the Work and any modifications or additions
-      to that Work or Derivative Works thereof, that is intentionally
-      submitted to Licensor for inclusion in the Work by the copyright owner
-      or by an individual or Legal Entity authorized to submit on behalf of
-      the copyright owner. For the purposes of this definition, "submitted"
-      means any form of electronic, verbal, or written communication sent
-      to the Licensor or its representatives, including but not limited to
-      communication on electronic mailing lists, source code control systems,
-      and issue tracking systems that are managed by, or on behalf of, the
-      Licensor for the purpose of discussing and improving the Work, but
-      excluding communication that is conspicuously marked or otherwise
-      designated in writing by the copyright owner as "Not a Contribution."
-
-      "Contributor" shall mean Licensor and any individual or Legal Entity
-      on behalf of whom a Contribution has been received by Licensor and
-      subsequently incorporated within the Work.
-
-   2. Grant of Copyright License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      copyright license to reproduce, prepare Derivative Works of,
-      publicly display, publicly perform, sublicense, and distribute the
-      Work and such Derivative Works in Source or Object form.
-
-   3. Grant of Patent License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      (except as stated in this section) patent license to make, have made,
-      use, offer to sell, sell, import, and otherwise transfer the Work,
-      where such license applies only to those patent claims licensable
-      by such Contributor that are necessarily infringed by their
-      Contribution(s) alone or by combination of their Contribution(s)
-      with the Work to which such Contribution(s) was submitted. If You
-      institute patent litigation against any entity (including a
-      cross-claim or counterclaim in a lawsuit) alleging that the Work
-      or a Contribution incorporated within the Work constitutes direct
-      or contributory patent infringement, then any patent licenses
-      granted to You under this License for that Work shall terminate
-      as of the date such litigation is filed.
-
-   4. Redistribution. You may reproduce and distribute copies of the
-      Work or Derivative Works thereof in any medium, with or without
-      modifications, and in Source or Object form, provided that You
-      meet the following conditions:
-
-      (a) You must give any other recipients of the Work or
-          Derivative Works a copy of this License; and
-
-      (b) You must cause any modified files to carry prominent notices
-          stating that You changed the files; and
-
-      (c) You must retain, in the Source form of any Derivative Works
-          that You distribute, all copyright, patent, trademark, and
-          attribution notices from the Source form of the Work,
-          excluding those notices that do not pertain to any part of
-          the Derivative Works; and
-
-      (d) If the Work includes a "NOTICE" text file as part of its
-          distribution, then any Derivative Works that You distribute must
-          include a readable copy of the attribution notices contained
-          within such NOTICE file, excluding those notices that do not
-          pertain to any part of the Derivative Works, in at least one
-          of the following places: within a NOTICE text file distributed
-          as part of the Derivative Works; within the Source form or
-          documentation, if provided along with the Derivative Works; or,
-          within a display generated by the Derivative Works, if and
-          wherever such third-party notices normally appear. The contents
-          of the NOTICE file are for informational purposes only and
-          do not modify the License. You may add Your own attribution
-          notices within Derivative Works that You distribute, alongside
-          or as an addendum to the NOTICE text from the Work, provided
-          that such additional attribution notices cannot be construed
-          as modifying the License.
-
-      You may add Your own copyright statement to Your modifications and
-      may provide additional or different license terms and conditions
-      for use, reproduction, or distribution of Your modifications, or
-      for any such Derivative Works as a whole, provided Your use,
-      reproduction, and distribution of the Work otherwise complies with
-      the conditions stated in this License.
-
-   5. Submission of Contributions. Unless You explicitly state otherwise,
-      any Contribution intentionally submitted for inclusion in the Work
-      by You to the Licensor shall be under the terms and conditions of
-      this License, without any additional terms or conditions.
-      Notwithstanding the above, nothing herein shall supersede or modify
-      the terms of any separate license agreement you may have executed
-      with Licensor regarding such Contributions.
-
-   6. Trademarks. This License does not grant permission to use the trade
-      names, trademarks, service marks, or product names of the Licensor,
-      except as required for reasonable and customary use in describing the
-      origin of the Work and reproducing the content of the NOTICE file.
-
-   7. Disclaimer of Warranty. Unless required by applicable law or
-      agreed to in writing, Licensor provides the Work (and each
-      Contributor provides its Contributions) on an "AS IS" BASIS,
-      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-      implied, including, without limitation, any warranties or conditions
-      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
-      PARTICULAR PURPOSE. You are solely responsible for determining the
-      appropriateness of using or redistributing the Work and assume any
-      risks associated with Your exercise of permissions under this License.
-
-   8. Limitation of Liability. In no event and under no legal theory,
-      whether in tort (including negligence), contract, or otherwise,
-      unless required by applicable law (such as deliberate and grossly
-      negligent acts) or agreed to in writing, shall any Contributor be
-      liable to You for damages, including any direct, indirect, special,
-      incidental, or consequential damages of any character arising as a
-      result of this License or out of the use or inability to use the
-      Work (including but not limited to damages for loss of goodwill,
-      work stoppage, computer failure or malfunction, or any and all
-      other commercial damages or losses), even if such Contributor
-      has been advised of the possibility of such damages.
-
-   9. Accepting Warranty or Additional Liability. While redistributing
-      the Work or Derivative Works thereof, You may choose to offer,
-      and charge a fee for, acceptance of support, warranty, indemnity,
-      or other liability obligations and/or rights consistent with this
-      License. However, in accepting such obligations, You may act only
-      on Your own behalf and on Your sole responsibility, not on behalf
-      of any other Contributor, and only if You agree to indemnify,
-      defend, and hold each Contributor harmless for any liability
-      incurred by, or claims asserted against, such Contributor by reason
-      of your accepting any such warranty or additional liability.
-
-   END OF TERMS AND CONDITIONS
-
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "[]"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright [yyyy] [name of copyright owner]
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-
-APACHE COMMONS MATH DERIVATIVE WORKS: 
-
-The Apache commons-math library includes a number of subcomponents
-whose implementation is derived from original sources written
-in C or Fortran.  License terms of the original sources
-are reproduced below.
-
-===============================================================================
-For the lmder, lmpar and qrsolv Fortran routine from minpack and translated in
-the LevenbergMarquardtOptimizer class in package
-org.apache.commons.math3.optimization.general 
-Original source copyright and license statement:
-
-Minpack Copyright Notice (1999) University of Chicago.  All rights reserved
-
-Redistribution and use in source and binary forms, with or
-without modification, are permitted provided that the
-following conditions are met:
-
-1. Redistributions of source code must retain the above
-copyright notice, this list of conditions and the following
-disclaimer.
-
-2. Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following
-disclaimer in the documentation and/or other materials
-provided with the distribution.
-
-3. The end-user documentation included with the
-redistribution, if any, must include the following
-acknowledgment:
-
-   "This product includes software developed by the
-   University of Chicago, as Operator of Argonne National
-   Laboratory.
-
-Alternately, this acknowledgment may appear in the software
-itself, if and wherever such third-party acknowledgments
-normally appear.
-
-4. WARRANTY DISCLAIMER. THE SOFTWARE IS SUPPLIED "AS IS"
-WITHOUT WARRANTY OF ANY KIND. THE COPYRIGHT HOLDER, THE
-UNITED STATES, THE UNITED STATES DEPARTMENT OF ENERGY, AND
-THEIR EMPLOYEES: (1) DISCLAIM ANY WARRANTIES, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO ANY IMPLIED WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE
-OR NON-INFRINGEMENT, (2) DO NOT ASSUME ANY LEGAL LIABILITY
-OR RESPONSIBILITY FOR THE ACCURACY, COMPLETENESS, OR
-USEFULNESS OF THE SOFTWARE, (3) DO NOT REPRESENT THAT USE OF
-THE SOFTWARE WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS, (4)
-DO NOT WARRANT THAT THE SOFTWARE WILL FUNCTION
-UNINTERRUPTED, THAT IT IS ERROR-FREE OR THAT ANY ERRORS WILL
-BE CORRECTED.
-
-5. LIMITATION OF LIABILITY. IN NO EVENT WILL THE COPYRIGHT
-HOLDER, THE UNITED STATES, THE UNITED STATES DEPARTMENT OF
-ENERGY, OR THEIR EMPLOYEES: BE LIABLE FOR ANY INDIRECT,
-INCIDENTAL, CONSEQUENTIAL, SPECIAL OR PUNITIVE DAMAGES OF
-ANY KIND OR NATURE, INCLUDING BUT NOT LIMITED TO LOSS OF
-PROFITS OR LOSS OF DATA, FOR ANY REASON WHATSOEVER, WHETHER
-SUCH LIABILITY IS ASSERTED ON THE BASIS OF CONTRACT, TORT
-(INCLUDING NEGLIGENCE OR STRICT LIABILITY), OR OTHERWISE,
-EVEN IF ANY OF SAID PARTIES HAS BEEN WARNED OF THE
-POSSIBILITY OF SUCH LOSS OR DAMAGES.
-===============================================================================
-
-Copyright and license statement for the odex Fortran routine developed by
-E. Hairer and G. Wanner and translated in GraggBulirschStoerIntegrator class
-in package org.apache.commons.math3.ode.nonstiff:
-
-
-Copyright (c) 2004, Ernst Hairer
-
-Redistribution and use in source and binary forms, with or without 
-modification, are permitted provided that the following conditions are 
-met:
-
-- Redistributions of source code must retain the above copyright 
-notice, this list of conditions and the following disclaimer.
-
-- Redistributions in binary form must reproduce the above copyright 
-notice, this list of conditions and the following disclaimer in the 
-documentation and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
-IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
-TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
-PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR 
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-===============================================================================
-
-Copyright and license statement for the original lapack fortran routines
-translated in EigenDecompositionImpl class in package
-org.apache.commons.math3.linear:
-
-Copyright (c) 1992-2008 The University of Tennessee.  All rights reserved.
-
-$COPYRIGHT$
-
-Additional copyrights may follow
-
-$HEADER$
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-- Redistributions of source code must retain the above copyright
-  notice, this list of conditions and the following disclaimer. 
-  
-- Redistributions in binary form must reproduce the above copyright
-  notice, this list of conditions and the following disclaimer listed
-  in this license in the documentation and/or other materials
-  provided with the distribution.
-  
-- Neither the name of the copyright holders nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-  
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT  
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT  
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-===============================================================================
-
-Copyright and license statement for the original Mersenne twister C
-routines translated in MersenneTwister class in package 
-org.apache.commons.math3.random:
-
-   Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
-   All rights reserved.                          
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions
-   are met:
-
-     1. Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-
-     2. Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-     3. The names of its contributors may not be used to endorse or promote 
-        products derived from this software without specific prior written 
-        permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-   EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-   PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-   PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-===============================================================================
-
-The class "org.apache.commons.math3.exception.util.LocalizedFormatsTest" is
-an adapted version of "OrekitMessagesTest" test class for the Orekit library
-The "org.apache.commons.math3.analysis.interpolation.HermiteInterpolator"
-has been imported from the Orekit space flight dynamics library.
-
-Th Orekit library is described at:
-  https://www.orekit.org/forge/projects/orekit
-The original files are distributed under the terms of the Apache 2 license
-which is: Copyright 2010 CS Communication & Systèmes

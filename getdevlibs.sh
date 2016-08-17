@@ -3,6 +3,13 @@ if [[ ${ARCH} == "" ]]; then
     ARCH=`arch`
 fi
 
+if [ "${CUDA_VERSION}" = "" ];then
+    CUDA_VERSION=`nvcc --version | grep release | sed 's/.*release //' | sed 's/\,.*//'`
+fi
+
+devdir="dev-cuda${CUDA_VERSION}"
+echo "Fetching libs from ${devdir}"
+
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
@@ -22,26 +29,26 @@ cd ${BIDMACH_ROOT}/lib
 if [ `uname` = "Darwin" ]; then
     subdir="osx"
     suffix="dylib"
-    curl -o liblist.txt ${source}/lib/liblist_osx.txt 
+    curl -o liblist.txt ${source}/lib/${devdir}/liblist_osx.txt 
 elif [ "$OS" = "Windows_NT" ]; then
     subdir="win"
     suffix="dll"
-    curl -o liblist.txt ${source}/lib/liblist_win.txt
+    curl -o liblist.txt ${source}/lib/${devdir}/liblist_win.txt
 else
     if [[ "${ARCH}" == arm* || "${ARCH}" == aarch* ]]; then
         subdir="linux_arm"
 	suffix="so"
-        curl -o liblist.txt ${source}/lib/liblist_linux_arm.txt
+        curl -o liblist.txt ${source}/lib/${devdir}/liblist_linux_arm.txt
     else
         subdir="linux"
 	suffix="so"
-        curl -o liblist.txt ${source}/lib/liblist_linux.txt
+        curl -o liblist.txt ${source}/lib/${devdir}/liblist_linux.txt
     fi
 fi
 
 while read fname; do
    echo -e "\nDownloading ${fname}"
-   curl --retry 2  -z ${fname} -o ${fname} ${source}/lib/${fname}
+   curl --retry 2  -z ${fname} -o ${fname} "${source}/lib/${devdir}/${fname}"
    chmod 755 ${fname}
 done < liblist.txt
 
