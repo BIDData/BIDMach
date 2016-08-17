@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.1.0-cuda7.5"
+VERSION="1.1.0-cuda7.0"
 
 OS=`uname -a`
 PARLIB=$1
