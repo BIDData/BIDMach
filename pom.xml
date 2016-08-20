@@ -10,7 +10,9 @@
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
-    <scalaVersion>2.11</scalaVersion>
+    <scala.version>2.11.8</scala.version>
+    <scala.binary.version>2.11</scala.binary.version>
+    <jline.version>${scala.binary.version}</jline.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <repositories>
