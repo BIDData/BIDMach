@@ -42,9 +42,11 @@ installcudalib: $(INSTALLDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 installcpulib: $(INSTALLDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND)
 
 $(INSTALLDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
+	mkdir -p $(INSTALLDIR)
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
 
 $(INSTALLDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND): $(LIBPREPEND)bidmachcpu$(LIBAPPEND)
+	mkdir -p $(INSTALLDIR)
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND) $(INSTALL_DIR)
 	cp $(LIBDIR)/libiomp5$(LIBIOMPAPPEND)  $(INSTALL_DIR)
 
@@ -70,9 +72,9 @@ $(BIDMACH_ROOT)/target/BIDMach-$(VERSION)-cpu-$(OS)-$(MARCH).jar: $(LIBPREPEND)b
 
 upload: $(LIBPREPEND)bidmachcpu$(LIBAPPEND) $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 	if [ -d /biddata/lib ]; then \
-	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) /biddata/lib/$(VERSION) ; \
-	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  /biddata/lib/$(VERSION) ; else \
-	scp $(LIBPREPEND)bidmach*$(LIBAPPEND) login.eecs.berkeley.edu:biddata/lib/$(VERSION) ; fi
+	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) /biddata/lib/$(DEVVERSION) ; \
+	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND)  /biddata/lib/$(DEVVERSION) ; else \
+	scp $(LIBPREPEND)bidmach*$(LIBAPPEND) login.eecs.berkeley.edu:biddata/lib/$(DEVVERSION) ; fi
 
 clean:
 	rm -f *.$(OBJ) *$(LIBAPPEND) *.pdb *.exp *.lib
