@@ -8,7 +8,7 @@ else
   while [ -L "${BIDMACH_SCRIPTS}" ]; do
     BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
   done
-  export WGET='curl --retry 2 -O'
+  export WGET='curl -C - --retry 2 -O'
 fi
 
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
