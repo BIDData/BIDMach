@@ -21,9 +21,8 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 
-class Response(val ctype:Int, val dest0:Int, val clen:Int, val bytes:Array[Byte]) {
+class Response(val rtype:Int, val src:Int, val clen:Int, val bytes:Array[Byte]) {
   val magic = Response.magic;
-  var dest = dest0;
   val byteData = ByteBuffer.wrap(bytes);
   val intData = byteData.asIntBuffer;
   val floatData = byteData.asFloatBuffer;
@@ -32,22 +31,22 @@ class Response(val ctype:Int, val dest0:Int, val clen:Int, val bytes:Array[Byte]
   def encode() = {}
   def decode() = {}
   
-  def this(ctype0:Int, dest0:Int, clen0:Int) = this(ctype0, dest0, clen0, new Array[Byte](4*clen0));
+  def this(Rtype0:Int, dest0:Int, clen0:Int) = this(Rtype0, dest0, clen0, new Array[Byte](4*clen0));
   
   override def toString():String = {
-    "Response %s, length %d bytes" format (Response.names(ctype), clen*4);
+    "Response %s, length %d bytes" format (Response.names(rtype), clen*4);
   }
   
 }
 
 object Response {
 	val magic = 0xa6b38734;
-	final val configCtype = 1;
-	final val permuteCtype = 2;
-	final val allreduceCtype = 3;
-	final val permuteAllreduceCtype = 4;
-	final val setMachineCtype = 5;
-	final val startLearnerCtype = 6;
+	final val configRtype = 1;
+	final val permuteRtype = 2;
+	final val allreduceRtype = 3;
+	final val permuteAllreduceRtype = 4;
+	final val setMachineRtype = 5;
+	final val startLearnerRtype = 6;
 	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner");
 	
 	  

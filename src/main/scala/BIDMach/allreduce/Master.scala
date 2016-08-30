@@ -33,6 +33,8 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	
 	def init() {
 	  executor = Executors.newFixedThreadPool(opts.numThreads);
+	  listener = new ResponseListener(opts.responseSocketNum);
+	  listenerTask = executor.submit(listener);
 	}
 	
 	def readConfig(configDir:String) {
@@ -242,8 +244,8 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     if (response.magic != Response.magic) {
       if (opts.trace > 0) log("Master got message with bad magic number %d\n" format (response.magic));      
     } else {
-    	response.ctype match {
-    	case Response.configCtype => {
+    	response.rtype match {
+    	case Response.configRtype => {
     		
     	}
     	}
@@ -338,6 +340,7 @@ object Master {
 		var recvTimeout = 1000;
 		var trace = 0;
 		var commandSocketNum = 50050;
+		var responseSocketNum = 50049;
 		var numThreads = 16;
   }
 	

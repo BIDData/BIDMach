@@ -13,7 +13,9 @@ import java.util.concurrent.Future;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.InetSocketAddress;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 
 class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
@@ -237,6 +239,41 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 		}
 	}
 	
+	def send(resp:Response):Future[_] = {
+    val cw = new ResponseWriter(Command.toAddress(opts.masterAddress), opts.responseSocketNum, resp);
+    executor.submit(cw);
+  }
+  
+  class ResponseWriter(dest:String, socketnum:Int, resp:Response) extends Runnable {
+
+  	def run() {
+  		var socket:Socket = null;
+  	  try {
+  	  	socket = new Socket();
+  	  	socket.setReuseAddress(true);
+  	  	socket.connect(new InetSocketAddress(dest, socketnum), opts.sendTimeout);
+  	  	if (socket.isConnected()) {
+  	  		val ostr = new DataOutputStream(socket.getOutputStream());
+  	  		ostr.writeInt(resp.magic)
+  	  		ostr.writeInt(resp.rtype);
+  	  		ostr.writeInt(resp.src);
+  	  		ostr.writeInt(resp.clen);
+  	  		ostr.write(resp.bytes, 0, resp.clen*4);		
+  	  	}
+  	  }	catch {
+  	  case e:Exception =>
+  	  if (opts.trace > 0) {
+  	    log("Master problem sending resp %s\n%s\n" format (resp.toString, Response.printStackTrace(e)));
+  	  }
+  	  } finally {
+  	  	try { if (socket != null) socket.close(); } catch {
+  	  	case e:Exception =>
+  	  	if (opts.trace > 0) log("Master problem closing socket\n%s\n" format Response.printStackTrace(e));			  
+  	  	}
+  	  }
+  	}
+  }
+	
 	class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {		
 		def run() {
 			try {
@@ -265,8 +302,10 @@ object Worker {
 		var sendTimeout = 1000;
 		var recvTimeout = 1000;
 		var cmdTimeout = 1000;
+		var responseSocketNum = 50049;
 		var commandSocketNum = 50050;
 		var peerSocketNum = 50051;
+		var masterAddress = 0;
 		var fuseConfigReduce = false;
 		var doAvg = true;
 		var useLong = false;
@@ -274,6 +313,7 @@ object Worker {
 		var machineTrace = 0;
 		var replicate = 1;
 		var bufsize = 10*1000000;
+		var respond = true;
   }
 	
 	class Options extends Opts {}
