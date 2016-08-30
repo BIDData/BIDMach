@@ -45,23 +45,13 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 		gmods = allgmods(0->clengths(M-1), M-1);
 		gridmachines = allmachinecodes(0->M, M-1);
 	}
-	
-	def treesize(m:Int):Int = {
-	  var lsize = m;
-	  var tot = 1;
-	  while (lsize > 1) {
-	    tot += lsize;
-	    lsize = (lsize + 1) / 2;
-	  }
-	  tot;
-	}
   
   def config(gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat) {
     gmods = gmods0;
     gridmachines = gridmachines0;
     workerIPs = workerIPs0;
     M = workerIPs.length;
-    responders = izeros(1, treesize(M));
+    responders = izeros(1, M+1);
   }
   
   def sendConfig() {
@@ -253,20 +243,10 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     val tt= toc;
   }
   
-  def inctree(src:Int) = {
-    var here = src;
-    var layerstart = 0;
-    var layerend = M;
-    var diff = M;
+  def inctable(src:Int) = {
     responders.synchronized {
-    	while (diff > 1) {
-    		responders(0, here) += 1;
-    		here = layerend + (here - layerstart) / 2;     // parent
-    		diff = (diff + 1) / 2;                         // parent layer size
-    		layerstart = layerend;                         // go up
-    		layerend += diff;
-    	}
-    	responders(0, here) += 1;
+    	responders(0, src) += 1;
+    	responders(0, M) += 1;
     }
   }
   
@@ -274,7 +254,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     if (response.magic != Response.magic) {
       if (opts.trace > 0) log("Master got message with bad magic number %d\n" format (response.magic));      
     } else {
-    	inctree(response.src);
+    	inctable(response.src);
     }
   }
 
