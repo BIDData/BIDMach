@@ -1,6 +1,7 @@
 #!/bin/bash
 
-VERSION="1.1.0-cuda7.0"
+VERSION="1.1.0-cuda7.5"
+DEVVERSION="dev-cuda7.5"
 
 OS=`uname -a`
 PARLIB=$1
@@ -272,6 +273,7 @@ fi
 echo "OS=$OS" > Makefile.incl
 echo "MARCH=$ARCH" >> Makefile.incl
 echo "VERSION=$VERSION" >> Makefile.incl
+echo "DEVVERSION=$DEVVERSION" >> Makefile.incl
 echo "BIDMACH_ROOT=$BIDMACH_ROOT" >> Makefile.incl
 echo "CC=$CC" >> Makefile.incl
 echo "GCC=$GCC" >> Makefile.incl

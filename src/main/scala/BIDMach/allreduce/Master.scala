@@ -24,6 +24,8 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	var gridmachines:IMat = null;
 	var workerIPs:IMat = null
 	var executor:ExecutorService = null;
+  var listener:ResponseListener = null;
+	var listenerTask:Future[_] = null;
 	var reduceTask:Future[_] = null;
 	var reducer:Reducer = null
 	var sendTiming = false
@@ -224,6 +226,105 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 			}
 		}
   }
+  
+    
+  def stop = {
+    listener.stop = true;
+    listenerTask.cancel(true);
+  }
+  
+  def shutdown = {
+    executor.shutdownNow();
+    val tt= toc;
+  }
+  
+  def handleResponse(response:Response) = {
+    if (response.magic != Response.magic) {
+      if (opts.trace > 0) log("Master got message with bad magic number %d\n" format (response.magic));      
+    } else {
+    	response.ctype match {
+    	case Response.configCtype => {
+    		
+    	}
+    	}
+    }
+  }
+
+	class ResponseListener(val socketnum:Int) extends Runnable {
+		var stop = false;
+		var ss:ServerSocket = null;
+
+		def start() {
+			try {
+				ss = new ServerSocket(socketnum);
+			} catch {
+			case e:Exception => {if (opts.trace > 0) log("Problem in ResponseListener\n%s" format Response.printStackTrace(e));}
+			}
+		}
+
+		def run() {
+			start();
+			while (!stop) {
+				try {
+					val scs = new ResponseReader(ss.accept());
+					if (opts.trace > 2) log("Command Listener got a message\n");
+					val fut = executor.submit(scs);
+				} catch {
+				case e:SocketException => {
+				  if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Response.printStackTrace(e));
+				}
+				// This is probably due to the server shutting to. Don't do anything.
+				case e:Exception => {
+					if (opts.trace > 0) log("Master Response listener had a problem "+e);
+				}
+				}
+			}
+		}
+
+		def stop(force:Boolean) {
+			stop = true;
+			if (force) {
+				try {
+					stop = true;
+					ss.close();
+				} catch {
+				case e:Exception => {
+					if (opts.trace > 0) log("Master trouble closing response listener\n%s" format ( Response.printStackTrace(e)));
+				}
+				}			
+			}
+		}
+	}
+
+	class ResponseReader(socket:Socket) extends Runnable {
+		def run() {
+			try {
+				val istr = new DataInputStream(socket.getInputStream());
+				val magic = istr.readInt();
+				val ctype = istr.readInt();
+				val dest = istr.readInt();
+				val clen = istr.readInt();
+				val response = new Response(ctype, dest, clen, new Array[Byte](clen*4));
+				if (opts.trace > 2) log("Master got packet %s\n" format (response.toString));
+				istr.readFully(response.bytes, 0, clen*4);
+				try {
+  				socket.close();
+				} catch {
+				case e:IOException => {if (opts.trace > 0) log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
+				}
+				handleResponse(response);
+			} catch {
+			case e:Exception =>	if (opts.trace > 0) log("Master Problem reading socket "+Response.printStackTrace(e)+"\n");
+			} finally {
+				try {
+					if (!socket.isClosed) socket.close();
+				} catch {
+				case e:IOException => {if (opts.trace > 0) log("Master Final Problem closing socket "+Response.printStackTrace(e)+"\n")}
+				}
+			}
+		}
+	}
+
 }
 
 object Master {

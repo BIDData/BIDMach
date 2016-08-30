@@ -4,12 +4,12 @@
 BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_SCRIPTS=`readlink -f "${BIDMACH_SCRIPTS}"`
-  export WGET='wget --no-check-certificate'
+  export WGET='wget -c --no-check-certificate'
 else 
   while [ -L "${BIDMACH_SCRIPTS}" ]; do
     BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
   done
-  export WGET='curl --retry 20 -O'
+  export WGET='curl -C - --retry 20 -O'
 fi
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 cd ${BIDMACH_SCRIPTS}
@@ -23,11 +23,13 @@ MNIST8M="${BIDMACH_SCRIPTS}/../data/MNIST8M"
 mkdir -p ${MNIST8M}/parts
 cd ${MNIST8M}
 
-if [ ! -e mnist8m.bz2 ]; then
-    ${WGET} http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist8m.bz2
-fi
+${WGET} http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist8m.bz2
+
+echo "Uncompressing MNIST8M data"
 
 bunzip2 -c mnist8m.bz2 > mnist8m.libsvm
+
+echo "Splitting MNIST8M data"
 
 if [ ! `uname` = "Darwin" ]; then
     split -l 100000 -d mnist8m.libsvm parts/part
