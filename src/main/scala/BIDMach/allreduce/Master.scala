@@ -22,7 +22,8 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   var M = 0;
 	var gmods:IMat = null;
 	var gridmachines:IMat = null;
-	var workerIPs:IMat = null
+	var workerIPs:IMat = null;
+	var responders:IMat = null;
 	var executor:ExecutorService = null;
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
@@ -44,12 +45,23 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 		gmods = allgmods(0->clengths(M-1), M-1);
 		gridmachines = allmachinecodes(0->M, M-1);
 	}
+	
+	def treesize(m:Int):Int = {
+	  var lsize = m;
+	  var tot = 1;
+	  while (lsize > 1) {
+	    tot += lsize;
+	    lsize = (lsize + 1) / 2;
+	  }
+	  tot;
+	}
   
   def config(gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat) {
     gmods = gmods0;
     gridmachines = gridmachines0;
     workerIPs = workerIPs0;
     M = workerIPs.length;
+    responders = izeros(1, treesize(M));
   }
   
   def sendConfig() {
@@ -95,6 +107,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	}
     
   def broadcastCommand(cmd:Command) {
+  	responders.clear;
   	cmd.encode;
   	if (opts.trace > 2) log("Broadcasting cmd %s\n" format cmd);
   	val futures = new Array[Future[_]](M);
@@ -240,15 +253,28 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     val tt= toc;
   }
   
+  def inctree(src:Int) = {
+    var here = src;
+    var layerstart = 0;
+    var layerend = M;
+    var diff = M;
+    responders.synchronized {
+    	while (diff > 1) {
+    		responders(0, here) += 1;
+    		here = layerend + (here - layerstart) / 2;     // parent
+    		diff = (diff + 1) / 2;                         // parent layer size
+    		layerstart = layerend;                         // go up
+    		layerend += diff;
+    	}
+    	responders(0, here) += 1;
+    }
+  }
+  
   def handleResponse(response:Response) = {
     if (response.magic != Response.magic) {
       if (opts.trace > 0) log("Master got message with bad magic number %d\n" format (response.magic));      
     } else {
-    	response.rtype match {
-    	case Response.configRtype => {
-    		
-    	}
-    	}
+    	inctree(response.src);
     }
   }
 

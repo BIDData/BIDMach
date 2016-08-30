@@ -46,21 +46,8 @@ object Response {
 	final val allreduceRtype = 3;
 	final val permuteAllreduceRtype = 4;
 	final val setMachineRtype = 5;
-	final val startLearnerRtype = 6;
-	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner");
-	
-	  
-  def toAddress(v:Int):String = {
-    val p0 = (v >> 24) & 255;
-    val p1 = (v >> 16) & 255;
-    val p2 = (v >> 8) & 255;
-    val p3 = v & 255;
-    "%d.%d.%d.%d" format(p0,p1,p2,p3);
-   }
-  
-  def address(a:Int, b:Int, c:Int, d:Int):Int = {
-    d + ((c + ((b + (a << 8)) << 8)) << 8);
-  }
+	final val learnerDoneRtype = 6;
+	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "learnerDone");
   
   def printStackTrace(e:Exception):String = {
     val baos = new ByteArrayOutputStream();

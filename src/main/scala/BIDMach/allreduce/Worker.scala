@@ -313,7 +313,7 @@ object Worker {
 		var machineTrace = 0;
 		var replicate = 1;
 		var bufsize = 10*1000000;
-		var respond = true;
+		var respond = 0;
   }
 	
 	class Options extends Opts {}
