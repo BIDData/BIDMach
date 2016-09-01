@@ -1,0 +1,93 @@
+:silent
+import BIDMat.TMat
+
+val mdir = "/code/BIDMach/data/criteo/parts/"
+
+class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts with L2Regularizer.Opts
+//class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  
+def learnerX2(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+val opts = new FDSopts
+opts.fnames = fnames
+opts.batchSize = 100000;
+opts.eltsPerSample = 500;
+implicit val threads = threadPool(4);
+val ds = new FileSource(opts)
+// val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
+  val nn = new Learner(ds, 
+                       new Net(opts), 
+                       Array(new L1Regularizer(opts)),
+                       null, 
+                       null,
+                       opts)
+(nn, opts)
+}
+
+def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX2(List(FileSource.simpleEnum(fn1,1,0),
+  	                                                                  FileSource.simpleEnum(fn2,1,0)));
+
+
+
+//val (nn,opts) = Net.learnerX(mdir+"trainsortedx%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4");
+val (nn,opts) = learnerX(mdir+"trainsortedx%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4");
+
+opts.nend = 90
+opts.batchSize= 100
+opts.npasses = 1
+opts.lrate = 0.01f 
+opts.texp = 0.3f
+opts.pstep = 0.01f
+
+opts.aopts = opts
+//opts.reg1weight = 0.0002f//.00001f
+opts.reg1weight = 0.0001f
+opts.r1nmats = 1
+opts.mixinInterval = 100
+//opts.hasBias = true
+opts.links = iones(1,1);
+opts.nweight = 1e-4f
+opts.lookahead = 0
+opts.autoReset = false
+
+val tshape = 0.25f
+val shape = irow(200,120,80,50,1)
+opts.tmatShape = Net.powerShape(tshape)_;
+opts.nodeset = Net.powerNet(shape,opts,0,2);
+opts.what
+println(tshape.toString)
+println(shape.toString)
+
+val model = nn.model.asInstanceOf[Net]
+nn.train
+
+val res = nn.results(0,?)
+
+val testdata = loadSMat(mdir+"trainsortedx%02d.smat.lz4" format opts.nend);
+val testlabels = loadFMat(mdir+"trainlabel%02d.fmat.lz4" format opts.nend);
+
+val (mm, mopts) = Net.predictor(model, mdir + "testsortedx%02d.smat.lz4","/home/byeah/ts/criteo/out%d.fmat.lz4");
+mopts.nend=13
+mm.predict
+import java.io._
+val pw = new PrintWriter(new File("/home/byeah/ts/criteo/resl1p1n5_0001.csv"))
+pw.write("Id,Predicted\n")
+var tot = 0
+for(i<-0 until 65){
+    val data = loadFMat("/home/byeah/ts/criteo/out%d.fmat.lz4" format i)
+    var j = 0
+    while (j<data.ncols && tot < 6042135){
+        pw.write("%d,%.9f\n" format (tot+60000000,data(j)))
+        j+=1
+        tot+=1
+    }
+}
+pw.close()
+:silent
+
+
+/*val preds=FMat(mm.preds(0))
+
+val ll = DMat(ln(preds *@ testlabels + (1-preds) *@ (1-testlabels)))
+val rc = roc(preds, testlabels, 1-testlabels, 1000);
+*/
+//(mean(ll), mean(rc))
