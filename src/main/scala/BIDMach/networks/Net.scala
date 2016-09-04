@@ -57,7 +57,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
         updatemats(i).clear;
 	  	}
 	  };
-	  if (useGPU) copyMats(mats, gmats);
+	  copyMats(mats, gmats);
 	  val pb = putBack;
 	  putBack = -1;
     initialize = true;
