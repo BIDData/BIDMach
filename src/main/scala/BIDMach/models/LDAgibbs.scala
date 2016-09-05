@@ -14,10 +14,11 @@ import BIDMach._
  * Extends Factor Model Options with:
  - dim(256): Model dimension
  - uiter(5): Number of iterations on one block of data
- - alpha(0.001f) Dirichlet prior on document-topic weights
+ - alpha(0.1f) Dirichlet prior on document-topic weights
  - beta(0.0001f) Dirichlet prior on word-topic weights
  - nsamps(100) the number of repeated samples to take
- - useBino(false): use poisson (default) or binomial sampling (if true)
+ - useBino(true): use poisson (default) or binomial sampling (if true)
+ - doDirichlet(true): explicitly sample theta params from a Dirichlet posterior
  *
  * Other key parameters inherited from the learner, datasource and updater:
  - batchSize: the number of samples processed in a block
@@ -50,61 +51,77 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
     var alpha:Mat = null;
     var beta:Mat = null;	
     var traceMem = false;
+    var iupdate = 0;
   
   override def init() = {
       super.init;
       if (refresh) {
-	  mm = modelmats(0);
-	  setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
+      	mm = modelmats(0);
+      	setmodelmats(Array(mm, mm.ones(mm.nrows, 1), mm.zeros(mm.nrows, 1)));
       }
-      updatemats = new Array[Mat](2);
+      updatemats = new Array[Mat](3);
       updatemats(0) = mm.zeros(mm.nrows, mm.ncols);
       updatemats(1) = mm.zeros(mm.nrows, 1);
-      alpha = convertMat(opts.alpha);
+      updatemats(2) = mm.zeros(mm.nrows, 1);
+      alpha = mm.zeros(mm.nrows, 1) + convertMat(opts.alpha);
       beta = convertMat(opts.beta);
+      iupdate = 0;
   }
   
   def uupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
-    	if (putBack < 0 || ipass == 0) user.set(1f);
-        for (i <- 0 until opts.uiter) {
-	    if (opts.doDirichlet) {                         // Here the user mat contains Dirichlet params, replace it with Dirichlet samples
-		val scaleFact = (user == user);             // Make a matrix of ones for the Dirichlet scale params.
-		gamrnd(user, scaleFact, user);              // Replace user mat with gamma random variables with unit scale params.
-		user ~ user / sum(user,1);                  // Dirichlet = normalized colums of gamma variables
-	    }		
-	    val preds = DDS(mm, user, sdata)	            // Probability normalizer for each word (inner product of beta and theta for that word).
-	    if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU));
-	    val dc = sdata.contents;
-	    val pc = preds.contents;
-	    pc ~ pc / dc;                                   // Scale preds mat by 1/word freq. Only needed by Poisson sampler. 
-	    val unew = user*0;
-	    val mnew = updatemats(0);
-	    updatemats(0).clear;
+    if (putBack < 0 || ipass == 0) user.set(1f);
+    for (i <- 0 until opts.uiter) {
+    	if (opts.doDirichlet) {                         // Here the user mat contains Dirichlet params, replace it with Dirichlet samples
+    		val scaleFact = (user == user);             // Make a matrix of ones for the Dirichlet scale params.
+    		gamrnd(user, scaleFact, user);              // Replace user mat with gamma random variables with unit scale params.
+    		user ~ user / sum(user,1);                  // Dirichlet = normalized colums of gamma variables
+    	}		
+    	val preds = DDS(mm, user, sdata);	            // Probability normalizer for each word (inner product of beta and theta for that word).
+    	if (traceMem) println("uupdate %d %d %d, %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, GPUmem._1, getGPU));
+    	val dc = sdata.contents;
+    	val pc = preds.contents;
+    	pc ~ pc / dc;                                   // Scale preds mat by 1/word freq. Only needed by Poisson sampler. 
+    	val unew = user*0;
+    	val mnew = updatemats(0);
+    	updatemats(0).clear;
 
-	    LDAgibbs.LDAsample(mm, user, mnew, unew, preds, dc, opts.nsamps, opts.useBino);
-	    if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU));
-	    user ~ unew + alpha;
-    	}
+    	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, dc, opts.nsamps, opts.useBino);
+    	if (traceMem) println("uupdate %d %d %d, %d %d %d %d %f %d" format (mm.GUID, user.GUID, sdata.GUID, preds.GUID, dc.GUID, pc.GUID, unew.GUID, GPUmem._1, getGPU));
+    	user ~ unew + alpha;
+    }
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
-	val um = updatemats(0)
-	um ~ um + beta 
-  	sum(um, 2, updatemats(1))
+  	val um = updatemats(0);
+  	um ~ um + beta ;	 
+  	sum(um, 2, updatemats(1));
+  	user ~ user / sum(user,1);
+  	sum(ln(user), 2, updatemats(2));
+  	updatemats(2) ~ updatemats(2) * (1.0f/user.ncols);
+  	if (opts.doAlpha && iupdate > 10) {
+  		alpha <-- psiinv(psi(sum(alpha)) + modelmats(2));
+  	}
+  	iupdate += 1;
   }
   
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {  
-  	val preds = DDS(mm, user, sdata)
-  	val dc = sdata.contents
-  	val pc = preds.contents
-  	max(opts.weps, pc, pc)
-  	ln(pc, pc)
-  	val sdat = sum(sdata,1)
-  	val mms = sum(mm,2)
-  	val suu = ln(mms ^* user)
-  	if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1))
-  	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv
-  	row(vv, math.exp(-vv))
+  	val preds = DDS(mm, user, sdata);
+  	val dc = sdata.contents;
+  	val pc = preds.contents;
+  	max(opts.weps, pc, pc);
+  	ln(pc, pc);
+  	val sdat = sum(sdata,1);
+  	val mms = sum(mm,2);
+  	val suu = ln(mms ^* user);
+  	if (traceMem) println("evalfun %d %d %d, %d %d %d, %d %f" format (sdata.GUID, user.GUID, preds.GUID, pc.GUID, sdat.GUID, mms.GUID, suu.GUID, GPUmem._1));
+  	val vv = ((pc ddot dc) - (sdat ddot suu))/sum(sdat,2).dv;
+  	row(vv, math.exp(-vv));
+  }
+  
+  override def wrapUp(ipass:Int):Unit = {
+    if (opts.doAlpha) {
+    	modelmats(2) <-- alpha;
+    }
   }
 }
 
@@ -119,7 +136,8 @@ object LDAgibbs  {
       var beta = row(0.1f);
       var nsamps = 100f;
       var doDirichlet = true; // Explicitly do Dirichlet sampling
-      var useBino = true; // Use binomial or poisson (default) sampling
+      var useBino = true;     // Use binomial or poisson (default) sampling
+      var doAlpha = false;    // Perform updates to alpha
   }
   
   class Options extends Opts {}
@@ -149,7 +167,6 @@ object LDAgibbs  {
     if (A.nrows != B.nrows || C.nrows != A.ncols || C.ncols != B.ncols || C.nnz != Ms.ncols || C.nnz != Us.ncols || Ms.nrows != Us.nrows) {
       throw new RuntimeException("LDAgibbsx dimensions mismatch")
     }
-
 
     Mat.nflops += 12L * C.nnz * A.nrows    // Charge 10 for Poisson RNG
   }

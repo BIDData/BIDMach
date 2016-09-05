@@ -85,7 +85,7 @@ case class Learner(
       nextPass(null)
       updateM(ipass-1)
     }
-    wrapUp;
+    wrapUp(ipass);
   }
   
   def firstPass(iter:Iterator[(AnyRef, MatIOtrait)]):Unit = {
@@ -168,7 +168,8 @@ case class Learner(
     if (updater != null) updater.updateM(ipass)
   }
 
-  def wrapUp {
+  def wrapUp(ipass:Int) {
+    model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
     Mat.debugMem = debugMemState;
