@@ -38,7 +38,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 	  learner = learner0;
 	  if (model == null && learner != null) model = learner.model;
 	  executor = Executors.newFixedThreadPool(8);
-	  listener = new CommandListener(opts.commandSocketNum);
+	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
 	}
   
@@ -122,38 +122,38 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
-    		val newcmd = new ConfigCommand(cmd.clen, imach, cmd.bytes);
+    		val newcmd = new ConfigCommand(0, 0, cmd.clen, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines, newcmd.workerIPs);
     	}
     	case Command.permuteCtype => {
-    		val newcmd = new PermuteCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new PermuteCommand(0, cmd.dest, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);
     	}
     	case Command.allreduceCtype => {
-    		val newcmd = new AllreduceCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new AllreduceCommand(0, cmd.dest, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		allReduce(newcmd.round, newcmd.limit);
     	}
     	case Command.permuteAllreduceCtype => {
-    		val newcmd = new PermuteAllreduceCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);
     		allReduce(newcmd.round, newcmd.limit);
     	}
     	case Command.setMachineCtype => {
-    		val newcmd = new SetMachineCommand(cmd.dest, 0, cmd.bytes);
+    		val newcmd = new SetMachineCommand(0, cmd.dest, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		imach = newcmd.newdest;
     	}
     	case Command.startLearnerCtype => {
-    		val newcmd = new StartLearnerCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new StartLearnerCommand(0, cmd.dest, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		if (learner != null) {
@@ -164,7 +164,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     }
   }
 
-	class CommandListener(val socketnum:Int) extends Runnable {
+	class CommandListener(val socketnum:Int, worker:Worker) extends Runnable {
 		var stop = false;
 		var ss:ServerSocket = null;
 
@@ -180,7 +180,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 			start();
 			while (!stop) {
 				try {
-					val scs = new CommandReader(ss.accept());
+					val scs = new CommandReader(ss.accept(), worker);
 					if (opts.trace > 2) log("Command Listener got a message\n");
 					val fut = executor.submit(scs);
 				} catch {
@@ -210,34 +210,6 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 		}
 	}
 
-	class CommandReader(socket:Socket) extends Runnable {
-		def run() {
-			try {
-				val istr = new DataInputStream(socket.getInputStream());
-				val magic = istr.readInt();
-				val ctype = istr.readInt();
-				val dest = istr.readInt();
-				val clen = istr.readInt();
-				val cmd = new Command(ctype, dest, clen, new Array[Byte](clen*4));
-				if (opts.trace > 2) log("Worker %d got packet %s\n" format (imach, cmd.toString));
-				istr.readFully(cmd.bytes, 0, clen*4);
-				try {
-  				socket.close();
-				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+Command.printStackTrace(e)+"\n" format (imach))}
-				}
-				handleCMD(cmd);
-			} catch {
-			case e:Exception =>	if (opts.trace > 0) log("Worker %d Problem reading socket "+Command.printStackTrace(e)+"\n" format (imach));
-			} finally {
-				try {
-					if (!socket.isClosed) socket.close();
-				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Worker %d Final Problem closing socket "+Command.printStackTrace(e)+"\n" format (imach))}
-				}
-			}
-		}
-	}
 	
 	def send(resp:Response):Future[_] = {
     val cw = new ResponseWriter(Command.toAddress(opts.masterAddress), opts.responseSocketNum, resp);

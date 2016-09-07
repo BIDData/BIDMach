@@ -23,6 +23,7 @@ import java.nio.IntBuffer;
 
 class Response(val rtype:Int, val src:Int, val clen:Int, val bytes:Array[Byte]) {
   val magic = Response.magic;
+  var round = 0;
   val byteData = ByteBuffer.wrap(bytes);
   val intData = byteData.asIntBuffer;
   val floatData = byteData.asFloatBuffer;

@@ -28,8 +28,9 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
 	var reduceTask:Future[_] = null;
-	var reducer:Reducer = null
-	var sendTiming = false
+	var reducer:Reducer = null;
+	var sendTiming = false;
+	var round = 0;
 
 	
 	def init() {
@@ -56,7 +57,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   
   def sendConfig() {
     val clen = 3 + gmods.length + gridmachines.length + workerIPs.length;
-    val cmd = new ConfigCommand(clen, 0);
+    val cmd = new ConfigCommand(round, clen, 0);
     cmd.gmods = gmods;
     cmd.gridmachines = gridmachines;
     cmd.workerIPs = workerIPs;
@@ -64,7 +65,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   }
   
   def permuteNodes(seed:Long) {
-    val cmd = new PermuteCommand(0);
+    val cmd = new PermuteCommand(round, 0);
     cmd.seed = seed;
     broadcastCommand(cmd);
   }
@@ -80,12 +81,12 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   }
   
   def startLearners() {
-    val cmd = new StartLearnerCommand(0);
+    val cmd = new StartLearnerCommand(round, 0);
     broadcastCommand(cmd);
   }
   
   def permuteAllreduce(round:Int, limit:Int) {
-  	val cmd = new PermuteAllreduceCommand(0);
+  	val cmd = new PermuteAllreduceCommand(round, 0);
   	cmd.round = round;
   	cmd.seed = round;
   	cmd.limit = limit;
@@ -104,7 +105,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	sendTiming = true;
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
-  	  val newcmd = new Command(cmd.ctype, imach, cmd.clen, cmd.bytes);
+  	  val newcmd = new Command(cmd.ctype, round, imach, cmd.clen, cmd.bytes);
   		futures(imach) = send(newcmd, workerIPs(imach));   
   	}
   	for (imach <- 0 until M) {
@@ -127,7 +128,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	sendTiming = true;
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
-  	  val cmd = new SetMachineCommand(0, imach);
+  	  val cmd = new SetMachineCommand(round, 0, imach);
   	  cmd.encode
   		futures(imach) = send(cmd, workerIPs(imach));   
   	}
@@ -146,39 +147,10 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   }
   
   def send(cmd:Command, address:Int):Future[_] = {
-    val cw = new CommandWriter(Command.toAddress(address), opts.commandSocketNum, cmd);
+    val cw = new CommandWriter(Command.toAddress(address), opts.commandSocketNum, cmd, this);
     executor.submit(cw);
   }
-  
-  class CommandWriter(dest:String, socketnum:Int, command:Command) extends Runnable {
 
-  	def run() {
-  		var socket:Socket = null;
-  	  try {
-  	  	socket = new Socket();
-  	  	socket.setReuseAddress(true);
-  	  	socket.connect(new InetSocketAddress(dest, socketnum), opts.sendTimeout);
-  	  	if (socket.isConnected()) {
-  	  		val ostr = new DataOutputStream(socket.getOutputStream());
-  	  		ostr.writeInt(command.magic)
-  	  		ostr.writeInt(command.ctype);
-  	  		ostr.writeInt(command.dest);
-  	  		ostr.writeInt(command.clen);
-  	  		ostr.write(command.bytes, 0, command.clen*4);		
-  	  	}
-  	  }	catch {
-  	  case e:Exception =>
-  	  if (opts.trace > 0) {
-  	    log("Master problem sending command %s\n%s\n" format (command.toString, Command.printStackTrace(e)));
-  	  }
-  	  } finally {
-  	  	try { if (socket != null) socket.close(); } catch {
-  	  	case e:Exception =>
-  	  	if (opts.trace > 0) log("Master problem closing socket\n%s\n" format Command.printStackTrace(e));			  
-  	  	}
-  	  }
-  	}
-  }
   
   class Reducer() extends Runnable {
   	var stop = false;
@@ -194,13 +166,13 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   			}
   			limit = if (newlimit0 <= 0) 2000000000 else newlimit0;
   			val cmd = if (opts.permuteAlways) {
-  				val cmd0 = new PermuteAllreduceCommand(0);
+  				val cmd0 = new PermuteAllreduceCommand(round, 0);
   				cmd0.round = round;
   				cmd0.seed = round;
   				cmd0.limit = limit;
   				cmd0;
   			} else {
-  				val cmd0 = new AllreduceCommand(0);
+  				val cmd0 = new AllreduceCommand(round, 0);
   				cmd0.round = round;
   				cmd0.limit = limit;
   				cmd0;
