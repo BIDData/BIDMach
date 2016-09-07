@@ -212,39 +212,11 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 
 	
 	def send(resp:Response):Future[_] = {
-    val cw = new ResponseWriter(Command.toAddress(opts.masterAddress), opts.responseSocketNum, resp);
+    val cw = new ResponseWriter(Command.toAddress(opts.masterAddress), opts.responseSocketNum, resp, this);
     executor.submit(cw);
   }
   
-  class ResponseWriter(dest:String, socketnum:Int, resp:Response) extends Runnable {
-
-  	def run() {
-  		var socket:Socket = null;
-  	  try {
-  	  	socket = new Socket();
-  	  	socket.setReuseAddress(true);
-  	  	socket.connect(new InetSocketAddress(dest, socketnum), opts.sendTimeout);
-  	  	if (socket.isConnected()) {
-  	  		val ostr = new DataOutputStream(socket.getOutputStream());
-  	  		ostr.writeInt(resp.magic)
-  	  		ostr.writeInt(resp.rtype);
-  	  		ostr.writeInt(resp.src);
-  	  		ostr.writeInt(resp.clen);
-  	  		ostr.write(resp.bytes, 0, resp.clen*4);		
-  	  	}
-  	  }	catch {
-  	  case e:Exception =>
-  	  if (opts.trace > 0) {
-  	    log("Master problem sending resp %s\n%s\n" format (resp.toString, Response.printStackTrace(e)));
-  	  }
-  	  } finally {
-  	  	try { if (socket != null) socket.close(); } catch {
-  	  	case e:Exception =>
-  	  	if (opts.trace > 0) log("Master problem closing socket\n%s\n" format Response.printStackTrace(e));			  
-  	  	}
-  	  }
-  	}
-  }
+ 
 	
 	class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {		
 		def run() {

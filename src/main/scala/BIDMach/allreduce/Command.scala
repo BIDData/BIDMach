@@ -21,7 +21,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 
-class Command(val ctype:Int, val round0:Int, val dest0:Int, val clen:Int, val bytes:Array[Byte]) {
+class Command(val ctype:Int, round0:Int, dest0:Int, val clen:Int, val bytes:Array[Byte]) {
   val magic = Command.magic;
   var dest = dest0;
   var round = round0;

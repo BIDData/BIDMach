@@ -35,7 +35,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	
 	def init() {
 	  executor = Executors.newFixedThreadPool(opts.numThreads);
-	  listener = new ResponseListener(opts.responseSocketNum);
+	  listener = new ResponseListener(opts.responseSocketNum, this);
 	  listenerTask = executor.submit(listener);
 	}
 	
@@ -156,7 +156,6 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	var stop = false;
 
   	def run() {
-  		var round = 0;
   		var limit = 0;
   		while (!stop) {
   			val newlimit0 = if (opts.limitFctn != null) {
@@ -230,7 +229,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     }
   }
 
-	class ResponseListener(val socketnum:Int) extends Runnable {
+	class ResponseListener(val socketnum:Int, me:Master) extends Runnable {
 		var stop = false;
 		var ss:ServerSocket = null;
 
@@ -246,7 +245,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 			start();
 			while (!stop) {
 				try {
-					val scs = new ResponseReader(ss.accept());
+					val scs = new ResponseReader(ss.accept(), me);
 					if (opts.trace > 2) log("Command Listener got a message\n");
 					val fut = executor.submit(scs);
 				} catch {
@@ -275,36 +274,6 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 			}
 		}
 	}
-
-	class ResponseReader(socket:Socket) extends Runnable {
-		def run() {
-			try {
-				val istr = new DataInputStream(socket.getInputStream());
-				val magic = istr.readInt();
-				val ctype = istr.readInt();
-				val dest = istr.readInt();
-				val clen = istr.readInt();
-				val response = new Response(ctype, dest, clen, new Array[Byte](clen*4));
-				if (opts.trace > 2) log("Master got packet %s\n" format (response.toString));
-				istr.readFully(response.bytes, 0, clen*4);
-				try {
-  				socket.close();
-				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
-				}
-				handleResponse(response);
-			} catch {
-			case e:Exception =>	if (opts.trace > 0) log("Master Problem reading socket "+Response.printStackTrace(e)+"\n");
-			} finally {
-				try {
-					if (!socket.isClosed) socket.close();
-				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Master Final Problem closing socket "+Response.printStackTrace(e)+"\n")}
-				}
-			}
-		}
-	}
-
 }
 
 object Master {
