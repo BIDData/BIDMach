@@ -17,13 +17,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 
-class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
+class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   
-  var M = 0;
-	var gmods:IMat = null;
-	var gridmachines:IMat = null;
 	var workerIPs:IMat = null;
-	var executor:ExecutorService = null;
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
 	var reduceTask:Future[_] = null;
@@ -32,7 +28,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	var round = 0;
 	var activeCommand:Command = null;
 	var responses:IMat = null;
-
+	var learners:IMat = null;
 	
 	def init() {
 	  executor = Executors.newFixedThreadPool(opts.numThreads);
@@ -54,6 +50,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     workerIPs = workerIPs0;
     M = workerIPs.length;
     responses = izeros(1,M+1);
+    learners = izeros(1,M+1);
   }
   
   def sendConfig() {
@@ -93,10 +90,6 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	cmd.limit = limit;
   	broadcastCommand(cmd);
   }
-  
-  def log(msg:String) {
-		print(msg);	
-	}
     
   def broadcastCommand(cmd:Command) {
   	cmd.encode;
@@ -192,24 +185,6 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	}
   }
   
-  class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {		
-		def run() {
-			try {
-				Thread.sleep(mtime);
-				if (sendTiming) {
-					for (i <- 0 until futures.length) {
-						if (futures(i) != null) {
-							if (opts.trace > 0) log("Master cancelling thread %d\n" format i);
-							futures(i).cancel(true);
-						}
-					}
-				}
-			} catch {
-			  case e:InterruptedException => if (opts.trace > 3) log("Master interrupted timeout thread %s\n" format Command.printStackTrace(e));
-			}
-		}
-  }
-  
     
   def stop = {
     listener.stop = true;
@@ -221,18 +196,22 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     val tt= toc;
   }
   
-  def inctable(responders:IMat, src:Int) = {
-    responders.synchronized {
-    	responders(0, src) += 1;
-    	responders(0, M) += 1;
+  def inctable(mat:IMat, src:Int) = {
+    mat.synchronized {
+    	mat(0, src) += 1;
+    	mat(0, M) += 1;
     }
   }
   
   def handleResponse(response:Response) = {
     if (response.magic != Response.magic) {
-      if (opts.trace > 0) log("Master got message with bad magic number %d\n" format (response.magic));      
+      if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (response.magic));      
     } else {
-//    	inctable(response.src);
+      if (response.rtype == activeCommand.ctype && response.round == activeCommand.round) {
+    	  inctable(responses, response.src);
+      } else if (response.rtype == Command.learnerDoneCtype) {
+    	  inctable(learners, response.src);
+      } else if (opts.trace > 0) log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n" format (response.rtype, response.round, activeCommand.ctype, activeCommand.round)); 
     }
   }
 
@@ -284,17 +263,12 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 }
 
 object Master {
-	trait Opts extends BIDMat.Opts{
+	trait Opts extends Host.Opts{
 		var limit = 0;
 		var limitFctn:(Int,Int)=>Int = null;
 		var intervalMsec = 1000;
 		var timeScaleMsec = 1e-4f;
 		var permuteAlways = true;
-		var sendTimeout = 1000;
-		var recvTimeout = 1000;
-		var trace = 0;
-		var commandSocketNum = 50050;
-		var responseSocketNum = 50049;
 		var numThreads = 16;
   }
 	

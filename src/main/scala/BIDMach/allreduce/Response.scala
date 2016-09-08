@@ -32,10 +32,12 @@ class Response(val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:A
   def encode() = {}
   def decode() = {}
   
-  def this(Rtype0:Int, round0:Int, dest0:Int, clen0:Int) = this(Rtype0, round0, dest0, clen0, new Array[Byte](4*clen0));
+  def this(rtype0:Int, round0:Int, dest0:Int, clen0:Int) = this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0));
+  
+  def this(rtype0:Int, round0:Int, dest0:Int) = this(rtype0, round0, dest0, 0, null);
   
   override def toString():String = {
-    "Response %s, round %d, src %d, length %d bytes" format (Response.names(rtype), round, src, clen*4);
+    "Response %s, round %d, src %d, length %d bytes" format (Command.names(rtype), round, src, clen*4);
   }
   
 }
@@ -103,13 +105,6 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
 
 object Response {
 	val magic = 0xa6b38734;
-	final val configRtype = 1;
-	final val permuteRtype = 2;
-	final val allreduceRtype = 3;
-	final val permuteAllreduceRtype = 4;
-	final val setMachineRtype = 5;
-	final val learnerDoneRtype = 6;
-	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "learnerDone");
   
   def printStackTrace(e:Exception):String = {
     val baos = new ByteArrayOutputStream();

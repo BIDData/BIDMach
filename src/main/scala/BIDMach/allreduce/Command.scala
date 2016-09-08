@@ -13,6 +13,9 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.IOException;
@@ -110,7 +113,10 @@ object Command {
 	final val permuteAllreduceCtype = 4;
 	final val setMachineCtype = 5;
 	final val startLearnerCtype = 6;
-	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner");
+	final val learnerDoneCtype = 7;
+	final val sendObjectCtype = 8;
+	final val sendLearnerCtype = 8;
+	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone", "sendObject", "sendLearner");
 	
 	  
   def toAddress(v:Int):String = {
@@ -319,6 +325,39 @@ class PermuteAllreduceCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends 
   override def toString():String = {
      "Command %s, length %d words, round %d seed %d limit %d" format (Command.names(ctype), clen, round, seed, limit);
   }
+}
+
+class SendObjectCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command(Command.sendObjectCtype, round0, dest0, bytes.size, bytes) {
+  
+  dest = dest0;
+  var obj:AnyRef = null;
+  
+  def this(round0:Int, dest0:Int, obj0:AnyRef) = {
+    this(round0, dest0,  {
+    	val out  = new ByteArrayOutputStream();
+    	val output = new ObjectOutputStream(out);
+    	output.writeObject(obj0);
+    	output.close;
+    	out.toByteArray()});
+  }
+  
+  override def encode ():Unit = {
+  }
+  
+  override def decode():Unit = {    
+		val in = new ByteArrayInputStream(bytes);
+		val input = new ObjectInputStream(in);
+		obj = input.readObject;
+		input.close;
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
+  }
+}
+
+class SendLearnerCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends SendObjectCommand(round0, dest0, bytes) {
+  override val ctype = Command.sendLearnerCtype;
 }
 
 
