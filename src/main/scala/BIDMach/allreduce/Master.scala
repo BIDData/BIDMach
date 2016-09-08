@@ -23,7 +23,6 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	var gmods:IMat = null;
 	var gridmachines:IMat = null;
 	var workerIPs:IMat = null;
-	var responders:IMat = null;
 	var executor:ExecutorService = null;
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
@@ -31,6 +30,8 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	var reducer:Reducer = null;
 	var sendTiming = false;
 	var round = 0;
+	var activeCommand:Command = null;
+	var responses:IMat = null;
 
 	
 	def init() {
@@ -52,7 +53,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     gridmachines = gridmachines0;
     workerIPs = workerIPs0;
     M = workerIPs.length;
-    responders = izeros(1, M+1);
+    responses = izeros(1,M+1);
   }
   
   def sendConfig() {
@@ -98,10 +99,11 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
 	}
     
   def broadcastCommand(cmd:Command) {
-  	responders.clear;
   	cmd.encode;
+  	activeCommand = cmd;
   	if (opts.trace > 2) log("Broadcasting cmd %s\n" format cmd);
   	val futures = new Array[Future[_]](M);
+  	responses.clear;
   	sendTiming = true;
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
@@ -120,6 +122,11 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
   	}
   	sendTiming = false;
   	timeout.cancel(true);
+  }
+  
+  def almostDone(threshold:Float = 0.75f):Boolean = {
+    val c = responses.synchronized { responses(M); }
+    c >= M * threshold;
   }
   
   def setMachineNumbers {
@@ -214,7 +221,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     val tt= toc;
   }
   
-  def inctable(src:Int) = {
+  def inctable(responders:IMat, src:Int) = {
     responders.synchronized {
     	responders(0, src) += 1;
     	responders(0, M) += 1;
@@ -225,7 +232,7 @@ class Master(val opts:Master.Opts = new Master.Options) extends Serializable {
     if (response.magic != Response.magic) {
       if (opts.trace > 0) log("Master got message with bad magic number %d\n" format (response.magic));      
     } else {
-    	inctable(response.src);
+//    	inctable(response.src);
     }
   }
 
