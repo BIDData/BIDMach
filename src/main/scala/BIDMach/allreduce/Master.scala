@@ -19,13 +19,11 @@ import java.io.IOException;
 
 class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   
-	var workerIPs:IMat = null;
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
 	var reduceTask:Future[_] = null;
 	var reducer:Reducer = null;
 	var sendTiming = false;
-	var round = 0;
 	var activeCommand:Command = null;
 	var responses:IMat = null;
 	var learners:IMat = null;

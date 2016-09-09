@@ -55,8 +55,6 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
 
 object Host {
   trait Opts extends BIDMat.Opts{
-    var intervalMsec = 1000;
-    var timeScaleMsec = 1e-4f;
     var sendTimeout = 1000;
     var recvTimeout = 1000;
     var trace = 0;
@@ -64,7 +62,6 @@ object Host {
     var commandSocketNum = 50050;
     var responseSocketNum = 50049;
     var peerSocketNum = 50051;
-    var numThreads = 16;
   }
   
   class Options extends Opts {} 
