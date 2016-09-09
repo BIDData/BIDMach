@@ -17,6 +17,7 @@ import java.net.InetSocketAddress;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import scala.tools.nsc.interpreter.IMain
 
 class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
@@ -27,6 +28,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var obj:AnyRef = null;
 	var model:Model = null;
 	var master:Int = 0;
+  var intp:IMain = null;
 	
 	def start(learner0:Learner) = {
 	  learner = learner0;
