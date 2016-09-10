@@ -61,8 +61,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
   
   def permuteNodes(seed:Long) {
-    val cmd = new PermuteCommand(round, 0);
-    cmd.seed = seed;
+    val cmd = new PermuteCommand(round, 0, seed);
     broadcastCommand(cmd);
   }
   
@@ -82,10 +81,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
   
   def permuteAllreduce(round:Int, limit:Int) {
-  	val cmd = new PermuteAllreduceCommand(round, 0);
-  	cmd.round = round;
-  	cmd.seed = round;
-  	cmd.limit = limit;
+  	val cmd = new PermuteAllreduceCommand(round, 0, round, limit);
   	broadcastCommand(cmd);
   }
     
@@ -163,16 +159,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   			}
   			limit = if (newlimit0 <= 0) 2000000000 else newlimit0;
   			val cmd = if (opts.permuteAlways) {
-  				val cmd0 = new PermuteAllreduceCommand(round, 0);
-  				cmd0.round = round;
-  				cmd0.seed = round;
-  				cmd0.limit = limit;
-  				cmd0;
+  				new PermuteAllreduceCommand(round, 0, round, limit);
   			} else {
-  				val cmd0 = new AllreduceCommand(round, 0);
-  				cmd0.round = round;
-  				cmd0.limit = limit;
-  				cmd0;
+  				new AllreduceCommand(round, 0, limit);
   			}
   			broadcastCommand(cmd);
   			val timems = opts.intervalMsec + (limit * opts.timeScaleMsec).toInt;
