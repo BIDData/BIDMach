@@ -192,6 +192,14 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		sendMaster(resp);
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     	}
+    	case Command.callCtype => {
+    		val newcmd = new CallCommand(0, cmd.dest, null, cmd.bytes);
+    		newcmd.decode;
+    		obj = newcmd.callable.call;
+    		val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
+    		sendMaster(resp);
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    	}
     	}
     }
   }

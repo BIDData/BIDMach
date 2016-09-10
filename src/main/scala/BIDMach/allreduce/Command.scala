@@ -8,6 +8,7 @@ import edu.berkeley.bid.comm._
 import scala.collection.parallel._
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Callable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.InetSocketAddress;
@@ -58,8 +59,9 @@ object Command {
 	final val sendLearnerCtype = 9;
 	final val evalStringCtype = 10;
 	final val returnObjectCtype = 11;
+	final val callCtype = 12;
 	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone", 
-	    "assignObject", "sendLearner", "evalString", "returnObject");
+	    "assignObject", "sendLearner", "evalString", "returnObject", "call");
 	
 	  
   def toAddress(v:Int):String = {
@@ -327,7 +329,7 @@ class SendLearnerCommand(round0:Int, dest0:Int, learner0:Learner, bytes:Array[By
   }
 }
 
-class EvalStringCommand(round0:Int, dest0:Int, str0:String, bytes:Array[Byte]) extends Command(Command.assignObjectCtype, round0, dest0, bytes.size, bytes) {
+class EvalStringCommand(round0:Int, dest0:Int, str0:String, bytes:Array[Byte]) extends Command(Command.evalStringCtype, round0, dest0, bytes.size, bytes) {
 
   var str:String = str0;
   
@@ -347,6 +349,34 @@ class EvalStringCommand(round0:Int, dest0:Int, str0:String, bytes:Array[Byte]) e
 		val in = new ByteArrayInputStream(bytes);
 		val input = new ObjectInputStream(in);
 		str = input.readObject.asInstanceOf[String];
+		input.close;
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
+  }
+}
+
+class CallCommand(round0:Int, dest0:Int,callable0:Callable[AnyRef], bytes:Array[Byte]) extends Command(Command.callCtype, round0, dest0, bytes.size, bytes) {
+
+  var callable = callable0;
+  
+  def this(round0:Int, dest0:Int, callable0:Callable[AnyRef]) = {
+    this(round0, dest0, callable0, {
+    	val out  = new ByteArrayOutputStream();
+    	val output = new ObjectOutputStream(out);
+    	output.writeObject(callable0);
+    	output.close;
+    	out.toByteArray()});
+  }
+  
+  override def encode ():Unit = {
+  }
+  
+  override def decode():Unit = {    
+		val in = new ByteArrayInputStream(bytes);
+		val input = new ObjectInputStream(in);
+		callable = input.readObject.asInstanceOf[Callable[AnyRef]];
 		input.close;
   }
   

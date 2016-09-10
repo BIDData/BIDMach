@@ -7,6 +7,7 @@ import edu.berkeley.bid.comm._
 import scala.collection.parallel._
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -27,6 +28,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	var activeCommand:Command = null;
 	var responses:IMat = null;
 	var learners:IMat = null;
+	var results:Array[AnyRef] = null;
+	var nresults = 0;
 	
 	def init() {
 	  executor = Executors.newFixedThreadPool(opts.numThreads);
@@ -49,11 +52,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     M = workerIPs.length;
     responses = izeros(1,M+1);
     learners = izeros(1,M+1);
+    results = new Array[AnyRef](M);
+    nresults = 0;
   }
   
   def sendConfig() {
     val clen = 3 + gmods.length + gridmachines.length + workerIPs.length;
-    val cmd = new ConfigCommand(round, clen, 0);
+    val cmd = new ConfigCommand(round, 0, clen);
     cmd.gmods = gmods;
     cmd.gridmachines = gridmachines;
     cmd.workerIPs = workerIPs;
@@ -83,6 +88,56 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def permuteAllreduce(round:Int, limit:Int) {
   	val cmd = new PermuteAllreduceCommand(round, 0, round, limit);
   	broadcastCommand(cmd);
+  }
+  
+  def parEval(str:String, timesecs:Int = 10):Array[AnyRef] = {
+    val cmd = new EvalStringCommand(round, 0, str);
+    for (i <- 0 until M) results(i) = null;
+    nresults = 0;
+    broadcastCommand(cmd); 
+    var tmsec = 0;
+    while (nresults < M && tmsec < timesecs * 1000) {
+      Thread.`sleep`(10);
+      tmsec += 10;
+    }
+    results.clone
+  }
+  
+  def parCall(callable:Callable[AnyRef], timesecs:Int = 10):Array[AnyRef] = {
+    val cmd = new CallCommand(round, 0, callable);
+    for (i <- 0 until M) results(i) = null;
+    nresults = 0;
+    broadcastCommand(cmd); 
+    var tmsec = 0;
+    while (nresults < M && tmsec < timesecs * 1000) {
+      Thread.`sleep`(10);
+      tmsec += 10;
+    }
+    results.clone
+  }
+  
+  def setMachineNumbers {
+  	if (opts.trace > 2) log("Broadcasting setMachineNumbers\n");
+  	val futures = new Array[Future[_]](M);
+  	sendTiming = true;
+  	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
+  	for (imach <- 0 until M) {
+  	  val cmd = new SetMachineCommand(round, 0, imach);
+  	  cmd.encode
+  		futures(imach) = send(cmd, workerIPs(imach));   
+  	}
+  	for (imach <- 0 until M) {
+  		try {
+  			futures(imach).get() 
+  		} catch {
+  		case e:Exception => {}
+  		}
+  		if (futures(imach).isCancelled()) {
+  			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd setMachineNumbers\n" format (imach));
+  		}
+  	}
+  	sendTiming = false;
+  	timeout.cancel(true);
   }
     
   def broadcastCommand(cmd:Command) {
@@ -114,30 +169,6 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def almostDone(threshold:Float = 0.75f):Boolean = {
     val c = responses.synchronized { responses(M); }
     c >= M * threshold;
-  }
-  
-  def setMachineNumbers {
-  	if (opts.trace > 2) log("Broadcasting setMachineNumbers\n");
-  	val futures = new Array[Future[_]](M);
-  	sendTiming = true;
-  	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
-  	for (imach <- 0 until M) {
-  	  val cmd = new SetMachineCommand(round, 0, imach);
-  	  cmd.encode
-  		futures(imach) = send(cmd, workerIPs(imach));   
-  	}
-  	for (imach <- 0 until M) {
-  		try {
-  			futures(imach).get() 
-  		} catch {
-  		case e:Exception => {}
-  		}
-  		if (futures(imach).isCancelled()) {
-  			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd setMachineNumbers\n" format (imach));
-  		}
-  	}
-  	sendTiming = false;
-  	timeout.cancel(true);
   }
   
   def send(cmd:Command, address:Int):Future[_] = {
@@ -190,15 +221,27 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
   }
   
-  def handleResponse(response:Response) = {
-    if (response.magic != Response.magic) {
-      if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (response.magic));      
+  def addObj(obj:AnyRef, src:Int) = {
+    results.synchronized {
+    	results(src) = obj;
+    	nresults += 1;
+    }
+  }
+  
+  def handleResponse(resp:Response) = {
+    if (resp.magic != Response.magic) {
+      if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (resp.magic));      
     } else {
-      if (response.rtype == activeCommand.ctype && response.round == activeCommand.round) {
-    	  inctable(responses, response.src);
-      } else if (response.rtype == Command.learnerDoneCtype) {
-    	  inctable(learners, response.src);
-      } else if (opts.trace > 0) log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n" format (response.rtype, response.round, activeCommand.ctype, activeCommand.round)); 
+      if (resp.rtype == activeCommand.ctype && resp.round == activeCommand.round) {
+    	  inctable(responses, resp.src);
+      } else if (activeCommand.ctype == Command.evalStringCtype && resp.rtype == Command.returnObjectCtype && resp.round == activeCommand.round) {
+        val newresp = new ReturnObjectResponse(resp.round, resp.src, null, resp.bytes);
+    		newresp.decode;
+    		addObj(newresp.obj, resp.src)
+    		if (opts.trace > 2) log("Received %s\n" format newresp.toString);
+      } else if (resp.rtype == Command.learnerDoneCtype) {
+    	  inctable(learners, resp.src);
+      } else if (opts.trace > 0) log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n" format (resp.rtype, resp.round, activeCommand.ctype, activeCommand.round)); 
     }
   }
 

@@ -24,13 +24,13 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
   
   var M = 0;
   var imach = 0;
+  var round = 0;
   var gmods:IMat = null;
   var gridmachines:IMat = null;
   var workerIPs:IMat = null; 
   var machineIPs:Array[String] = null;
   var groups:Groups = null;
   var executor:ExecutorService = null;  
-  var round = 0;
   
   def log(msg:String) {
     print(msg); 
