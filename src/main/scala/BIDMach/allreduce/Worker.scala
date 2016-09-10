@@ -17,6 +17,8 @@ import java.net.InetSocketAddress;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 import scala.tools.nsc.interpreter.IMain
 
 class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
@@ -26,9 +28,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var machine:Machine = null;
 	var learner:Learner = null;
 	var obj:AnyRef = null;
+	var str:String = null;
 	var model:Model = null;
 	var master:Int = 0;
-  var intp:IMain = null;
+  var intp:ScriptEngine = null;
 	
 	def start(learner0:Learner) = {
 	  learner = learner0;
@@ -36,6 +39,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  executor = Executors.newFixedThreadPool(8);
 	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
+	  intp = new ScriptEngineManager().getEngineByName("scala");
 	}
   
   def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, machineIPs0:IMat) = {
@@ -55,6 +59,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     machine.sockBase = opts.peerSocketNum;
     machine.sockOffset = 0;
     machine.start(machine.maxk);
+    intp.put("$imach", imach);
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
   }
@@ -125,21 +130,21 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
     	}
     	case Command.permuteCtype => {
-    		val newcmd = new PermuteCommand(0, cmd.dest, cmd.bytes);
+    		val newcmd = new PermuteCommand(0, cmd.dest, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);
     		if (opts.respond > 0) sendMaster(new Response(Command.permuteCtype, newcmd.round, imach));
     	}
     	case Command.allreduceCtype => {
-    		val newcmd = new AllreduceCommand(0, cmd.dest, cmd.bytes);
+    		val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		allReduce(newcmd.round, newcmd.limit);
     		if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
     	}
     	case Command.permuteAllreduceCtype => {
-    		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, cmd.bytes);
+    		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);
@@ -163,18 +168,29 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		if (opts.respond > 0) sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach));
     	}
     	case Command.sendLearnerCtype => {
-    		val newcmd = new SendObjectCommand(0, cmd.dest, cmd.bytes);
+    		val newcmd = new SendLearnerCommand(0, cmd.dest, null, cmd.bytes);
     		newcmd.decode;
-    		learner = newcmd.obj.asInstanceOf[Learner];
+    		learner = newcmd.learner;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		if (opts.respond > 0) sendMaster(new Response(Command.sendLearnerCtype, newcmd.round, imach));
     	}
-    	case Command.sendObjectCtype => {
-    		val newcmd = new SendObjectCommand(0, cmd.dest, cmd.bytes);
+    	case Command.assignObjectCtype => {
+    		val newcmd = new AssignObjectCommand(0, cmd.dest, null, null, cmd.bytes);
     		newcmd.decode;
     		obj = newcmd.obj;
+    		str = newcmd.str;
+    		intp.put(str, obj);
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-    		if (opts.respond > 0) sendMaster(new Response(Command.sendObjectCtype, newcmd.round, imach));
+    		if (opts.respond > 0) sendMaster(new Response(Command.assignObjectCtype, newcmd.round, imach));
+    	}
+    	case Command.evalStringCtype => {
+    		val newcmd = new EvalStringCommand(0, cmd.dest, null, cmd.bytes);
+    		newcmd.decode;
+    		str = newcmd.str;
+    		obj = intp.eval(str);
+    		val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
+    		sendMaster(resp);
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     	}
     	}
     }

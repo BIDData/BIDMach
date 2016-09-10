@@ -13,6 +13,9 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.IOException;
@@ -40,6 +43,30 @@ class Response(val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:A
     "Response %s, round %d, src %d, length %d bytes" format (Command.names(rtype), round, src, clen*4);
   }
   
+}
+
+class ReturnObjectResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte]) extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes) {
+
+  var obj:AnyRef = obj0;
+
+  def this(round0:Int, dest0:Int, obj0:AnyRef) = {
+    this(round0, dest0, obj0, {
+    	val out  = new ByteArrayOutputStream();
+    	val output = new ObjectOutputStream(out);
+    	output.writeObject(obj0);
+    	output.close;
+    	out.toByteArray()});
+  }
+  
+  override def encode ():Unit = {
+  }
+  
+  override def decode():Unit = {    
+		val in = new ByteArrayInputStream(bytes);
+		val input = new ObjectInputStream(in);
+		obj = input.readObject;
+		input.close;
+  }
 }
 
 class ResponseWriter(dest:String, socketnum:Int, resp:Response, me:Worker) extends Runnable {

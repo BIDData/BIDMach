@@ -3,6 +3,7 @@ package BIDMach.allreduce
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMach.Learner
 import edu.berkeley.bid.comm._
 import scala.collection.parallel._
 import java.util.concurrent.ExecutorService;
@@ -44,67 +45,6 @@ class Command(val ctype:Int, round0:Int, dest0:Int, val clen:Int, val bytes:Arra
   
 }
 
-class CommandWriter(dest:String, socketnum:Int, command:Command, me:Master) extends Runnable {
-
-	def run() {
-		var socket:Socket = null;
-	  try {
-	  	socket = new Socket();
-	  	socket.setReuseAddress(true);
-	  	socket.connect(new InetSocketAddress(dest, socketnum), me.opts.sendTimeout);
-	  	if (socket.isConnected()) {
-	  		val ostr = new DataOutputStream(socket.getOutputStream());
-	  		ostr.writeInt(command.magic);
-	  		ostr.writeInt(command.ctype);
-	  		ostr.writeInt(command.round);
-	  		ostr.writeInt(command.dest);
-	  		ostr.writeInt(command.clen);
-	  		ostr.write(command.bytes, 0, command.clen*4);		
-	  	}
-	  }	catch {
-	  case e:Exception =>
-	  if (me.opts.trace > 0) {
-	  	me.log("Master problem sending command %s\n%s\n" format (command.toString, Command.printStackTrace(e)));
-	  }
-	  } finally {
-	  	try { if (socket != null) socket.close(); } catch {
-	  	case e:Exception =>
-	  	if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Command.printStackTrace(e));			  
-	  	}
-	  }
-	}
-}
-
-class CommandReader(socket:Socket, me:Worker) extends Runnable {
-	def run() {
-		try {
-			val istr = new DataInputStream(socket.getInputStream());
-			val magic = istr.readInt();
-			val ctype = istr.readInt();
-			val round = istr.readInt();
-			val dest = istr.readInt();
-			val clen = istr.readInt();
-			val cmd = new Command(ctype, round, dest, clen, new Array[Byte](clen*4));
-			if (me.opts.trace > 2) me.log("Worker %d got packet %s\n" format (me.imach, cmd.toString));
-			istr.readFully(cmd.bytes, 0, clen*4);
-			try {
-				socket.close();
-			} catch {
-			case e:IOException => {if (me.opts.trace > 0) me.log("Worker %d Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach))}
-			}
-			me.handleCMD(cmd);
-		} catch {
-		case e:Exception =>	if (me.opts.trace > 0) me.log("Worker %d Problem reading socket "+Command.printStackTrace(e)+"\n" format (me.imach));
-		} finally {
-			try {
-				if (!socket.isClosed) socket.close();
-			} catch {
-			case e:IOException => {if (me.opts.trace > 0) me.log("Worker %d Final Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach))}
-			}
-		}
-	}
-}
-
 object Command {
 	val magic = 0xa6b38734;
 	final val configCtype = 1;
@@ -114,9 +54,12 @@ object Command {
 	final val setMachineCtype = 5;
 	final val startLearnerCtype = 6;
 	final val learnerDoneCtype = 7;
-	final val sendObjectCtype = 8;
-	final val sendLearnerCtype = 8;
-	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone", "sendObject", "sendLearner");
+	final val assignObjectCtype = 8;
+	final val sendLearnerCtype = 9;
+	final val evalStringCtype = 10;
+	final val returnObjectCtype = 11;
+	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone", 
+	    "assignObject", "sendLearner", "evalString", "returnObject");
 	
 	  
   def toAddress(v:Int):String = {
@@ -198,11 +141,11 @@ class ConfigCommand(round0:Int, dest0:Int, clen:Int, bytes:Array[Byte]) extends 
   }
 }
 
-class PermuteCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command(Command.permuteCtype, round0, dest0, 2, bytes) {
+class PermuteCommand(round0:Int, dest0:Int, seed0:Long, bytes:Array[Byte]) extends Command(Command.permuteCtype, round0, dest0, 2, bytes) {
   
-  var seed:Long = 0;
+  var seed:Long = seed0;
   
-  def this(round0:Int, dest0:Int) = this(round0, dest0, new Array[Byte](2*4));
+  def this(round0:Int, dest0:Int, seed0:Long) = this(round0, dest0, seed0, new Array[Byte](2*4));
   
   def setFields(round0:Int, seed0:Long) {
     round = round0;
@@ -228,7 +171,6 @@ class PermuteCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command(C
 
 class SetMachineCommand(round0:Int, dest0:Int, newdest0:Int, bytes:Array[Byte]) extends Command(Command.setMachineCtype, round0, dest0, 1, bytes) {
   
-  dest = dest0;
   var newdest = newdest0;
   
   def this(round0:Int, dest0:Int, newdest0:Int) = this(round0, dest0, newdest0, new Array[Byte](1*4));
@@ -250,8 +192,6 @@ class SetMachineCommand(round0:Int, dest0:Int, newdest0:Int, bytes:Array[Byte]) 
 
 class StartLearnerCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command(Command.startLearnerCtype, round0, dest0, 1, bytes) {
   
-  dest = dest0;
-  
   def this(round0:Int, dest0:Int) = this(round0, dest0, new Array[Byte](1*4));
   
   override def encode ():Unit = {
@@ -267,11 +207,11 @@ class StartLearnerCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Comm
   }
 }
 
-class AllreduceCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command(Command.allreduceCtype, round0, dest0, 4, bytes) {
+class AllreduceCommand(round0:Int, dest0:Int, limit0:Long, bytes:Array[Byte]) extends Command(Command.allreduceCtype, round0, dest0, 4, bytes) {
   
-  var limit:Long = 0;
+  var limit:Long = limit0;
   
-  def this(round0:Int, dest0:Int) = this(round0, dest0, new Array[Byte](4*4));
+  def this(round0:Int, dest0:Int, limit0:Long) = this(round0, dest0, limit0, new Array[Byte](4*4));
   
   def setFields(round0:Int, limit0:Long) {
     round = round0;
@@ -295,12 +235,13 @@ class AllreduceCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command
   }
 }
 
-class PermuteAllreduceCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command(Command.permuteAllreduceCtype, round0, dest0, 6, bytes) {
+class PermuteAllreduceCommand(round0:Int, dest0:Int, seed0:Long, limit0:Long, bytes:Array[Byte]) extends Command(Command.permuteAllreduceCtype, round0, dest0, 6, bytes) {
   
-	def this(round0:Int, dest0:Int) = this(round0, dest0, new Array[Byte](6*4));
-  
-  var seed:Long = 0;
-  var limit:Long = 0;
+  var seed:Long = seed0;
+  var limit:Long = limit0; 
+	
+  def this(round0:Int, dest0:Int, seed0:Long, limit0:Long) = this(round0, dest0, seed0, limit0, new Array[Byte](6*4));
+
   
   def setFields(round0:Int, seed0:Long, limit0:Long) {
     round = round0;
@@ -327,16 +268,17 @@ class PermuteAllreduceCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends 
   }
 }
 
-class SendObjectCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Command(Command.sendObjectCtype, round0, dest0, bytes.size, bytes) {
+class AssignObjectCommand(round0:Int, dest0:Int, obj0:AnyRef, str0:String, bytes:Array[Byte]) extends Command(Command.assignObjectCtype, round0, dest0, bytes.size, bytes) {
+
+  var obj:AnyRef = obj0;
+  var str:String = str0;
   
-  dest = dest0;
-  var obj:AnyRef = null;
-  
-  def this(round0:Int, dest0:Int, obj0:AnyRef) = {
-    this(round0, dest0,  {
+  def this(round0:Int, dest0:Int, obj0:AnyRef, str0:String) = {
+    this(round0, dest0, obj0, str0,  {
     	val out  = new ByteArrayOutputStream();
     	val output = new ObjectOutputStream(out);
     	output.writeObject(obj0);
+    	output.writeObject(str0);
     	output.close;
     	out.toByteArray()});
   }
@@ -348,6 +290,7 @@ class SendObjectCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Comman
 		val in = new ByteArrayInputStream(bytes);
 		val input = new ObjectInputStream(in);
 		obj = input.readObject;
+		str = input.readObject.asInstanceOf[String];
 		input.close;
   }
   
@@ -356,8 +299,122 @@ class SendObjectCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends Comman
   }
 }
 
-class SendLearnerCommand(round0:Int, dest0:Int, bytes:Array[Byte]) extends SendObjectCommand(round0, dest0, bytes) {
-  override val ctype = Command.sendLearnerCtype;
+class SendLearnerCommand(round0:Int, dest0:Int, learner0:Learner, bytes:Array[Byte]) extends Command(Command.sendLearnerCtype, round0, dest0, bytes.size, bytes) {
+
+  var learner:Learner = learner0;
+
+  def this(round0:Int, dest0:Int, learner0:Learner) = {
+    this(round0, dest0, learner0, {
+    	val out  = new ByteArrayOutputStream();
+    	val output = new ObjectOutputStream(out);
+    	output.writeObject(learner0);
+    	output.close;
+    	out.toByteArray()});
+  }
+  
+  override def encode ():Unit = {
+  }
+  
+  override def decode():Unit = {    
+		val in = new ByteArrayInputStream(bytes);
+		val input = new ObjectInputStream(in);
+		learner = input.readObject.asInstanceOf[Learner];
+		input.close;
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
+  }
+}
+
+class EvalStringCommand(round0:Int, dest0:Int, str0:String, bytes:Array[Byte]) extends Command(Command.assignObjectCtype, round0, dest0, bytes.size, bytes) {
+
+  var str:String = str0;
+  
+  def this(round0:Int, dest0:Int, str0:String) = {
+    this(round0, dest0, str0, {
+    	val out  = new ByteArrayOutputStream();
+    	val output = new ObjectOutputStream(out);
+    	output.writeObject(str0);
+    	output.close;
+    	out.toByteArray()});
+  }
+  
+  override def encode ():Unit = {
+  }
+  
+  override def decode():Unit = {    
+		val in = new ByteArrayInputStream(bytes);
+		val input = new ObjectInputStream(in);
+		str = input.readObject.asInstanceOf[String];
+		input.close;
+  }
+  
+  override def toString():String = {
+     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
+  }
+}
+
+
+class CommandWriter(dest:String, socketnum:Int, command:Command, me:Master) extends Runnable {
+
+	def run() {
+		var socket:Socket = null;
+	  try {
+	  	socket = new Socket();
+	  	socket.setReuseAddress(true);
+	  	socket.connect(new InetSocketAddress(dest, socketnum), me.opts.sendTimeout);
+	  	if (socket.isConnected()) {
+	  		val ostr = new DataOutputStream(socket.getOutputStream());
+	  		ostr.writeInt(command.magic);
+	  		ostr.writeInt(command.ctype);
+	  		ostr.writeInt(command.round);
+	  		ostr.writeInt(command.dest);
+	  		ostr.writeInt(command.clen);
+	  		ostr.write(command.bytes, 0, command.clen*4);		
+	  	}
+	  }	catch {
+	  case e:Exception =>
+	  if (me.opts.trace > 0) {
+	  	me.log("Master problem sending command %s\n%s\n" format (command.toString, Command.printStackTrace(e)));
+	  }
+	  } finally {
+	  	try { if (socket != null) socket.close(); } catch {
+	  	case e:Exception =>
+	  	if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Command.printStackTrace(e));			  
+	  	}
+	  }
+	}
+}
+
+class CommandReader(socket:Socket, me:Worker) extends Runnable {
+	def run() {
+		try {
+			val istr = new DataInputStream(socket.getInputStream());
+			val magic = istr.readInt();
+			val ctype = istr.readInt();
+			val round = istr.readInt();
+			val dest = istr.readInt();
+			val clen = istr.readInt();
+			val cmd = new Command(ctype, round, dest, clen, new Array[Byte](clen*4));
+			if (me.opts.trace > 2) me.log("Worker %d got packet %s\n" format (me.imach, cmd.toString));
+			istr.readFully(cmd.bytes, 0, clen*4);
+			try {
+				socket.close();
+			} catch {
+			case e:IOException => {if (me.opts.trace > 0) me.log("Worker %d Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach))}
+			}
+			me.handleCMD(cmd);
+		} catch {
+		case e:Exception =>	if (me.opts.trace > 0) me.log("Worker %d Problem reading socket "+Command.printStackTrace(e)+"\n" format (me.imach));
+		} finally {
+			try {
+				if (!socket.isClosed) socket.close();
+			} catch {
+			case e:IOException => {if (me.opts.trace > 0) me.log("Worker %d Final Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach))}
+			}
+		}
+	}
 }
 
 
