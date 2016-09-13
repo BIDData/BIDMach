@@ -62,19 +62,7 @@ object Command {
 	final val callCtype = 12;
 	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone", 
 	    "assignObject", "sendLearner", "evalString", "returnObject", "call");
-	
-	  
-  def toAddress(v:Int):String = {
-    val p0 = (v >> 24) & 255;
-    val p1 = (v >> 16) & 255;
-    val p2 = (v >> 8) & 255;
-    val p3 = v & 255;
-    "%d.%d.%d.%d" format(p0,p1,p2,p3);
-   }
-  
-  def address(a:Int, b:Int, c:Int, d:Int):Int = {
-    d + ((c + ((b + (a << 8)) << 8)) << 8);
-  }
+
   
   def printStackTrace(e:Exception):String = {
     val baos = new ByteArrayOutputStream();
@@ -86,20 +74,22 @@ object Command {
   }
 }
 
-class ConfigCommand(round0:Int, dest0:Int, clen:Int, bytes:Array[Byte]) extends Command(Command.configCtype, round0, dest0, clen, bytes) {
+class ConfigCommand(round0:Int, dest0:Int, gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat, workerPorts0:IMat, clen:Int, bytes:Array[Byte]) extends 
+      Command(Command.configCtype, round0, dest0, clen, bytes) {
   
-  var gmods:IMat = null;
-  var gridmachines:IMat = null;
-  var workerIPs:IMat = null;
+  var gmods:IMat = gmods0;
+  var gridmachines:IMat = gridmachines0;
+  var workerIPs:IMat = workerIPs0;
+  var workerPorts:IMat = workerPorts0;
   
-  def this(round0:Int, dest0:Int, clen0:Int) = this(round0, dest0, clen0, new Array[Byte](clen0*4));
+  def this(round0:Int, dest0:Int, clen0:Int) = this(round0, dest0, null, null, null, null, clen0, new Array[Byte](clen0*4));
   
-  def setFields(imach0:Int, gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat) {
-    dest = imach0;
-    gmods = gmods;
-    gridmachines = gridmachines0;
-    workerIPs = workerIPs0;
-  }
+  def this(round0:Int, dest0:Int, gmods0:IMat, gridmachines0:IMat, workers:Array[InetSocketAddress]) =
+    this(round0, dest0, gmods0, gridmachines0, 
+        new IMat(1, workers.length, workers.map((x)=>Host.inetStringToInt(x.getAddress.toString))),
+        new IMat(1, workers.length, workers.map(_.getPort)), 
+        3 + gmods0.length + gridmachines0.length + 2 * workers.length, 
+        new Array[Byte]((3 + gmods0.length + gridmachines0.length + 2 * workers.length) * 4));
   
   override def encode ():Unit = {
   	intData.rewind();
@@ -109,6 +99,7 @@ class ConfigCommand(round0:Int, dest0:Int, clen:Int, bytes:Array[Byte]) extends 
   	intData.put(gridmachines.data, 0, gridmachines.length);
   	intData.put(workerIPs.length);
   	intData.put(workerIPs.data, 0, workerIPs.length);
+  	intData.put(workerPorts.data, 0, workerIPs.length);
   }
   
   override def decode():Unit = {
@@ -122,6 +113,7 @@ class ConfigCommand(round0:Int, dest0:Int, clen:Int, bytes:Array[Byte]) extends 
     val lwips = intData.get();
     workerIPs = izeros(lwips, 1);
     intData.get(workerIPs.data, 0, lwips);    
+    intData.get(workerPorts.data, 0, lwips);
   }
   
   override def toString():String = {
@@ -136,7 +128,7 @@ class ConfigCommand(round0:Int, dest0:Int, clen:Int, bytes:Array[Byte]) extends 
     }
     ostring.append("\nWorkerIPs: ");
     for (i <- 0 until math.min(20, gridmachines.length)) {
-      ostring.append("%s " format Command.toAddress(workerIPs(i)));
+      ostring.append("%s " format Host.inetIntToString(workerIPs(i)));
     }
     ostring.append("\n")
     ostring.toString;
@@ -386,14 +378,14 @@ class CallCommand(round0:Int, dest0:Int,callable0:Callable[AnyRef], bytes:Array[
 }
 
 
-class CommandWriter(dest:String, socketnum:Int, command:Command, me:Master) extends Runnable {
+class CommandWriter(address:InetSocketAddress, command:Command, me:Master) extends Runnable {
 
 	def run() {
 		var socket:Socket = null;
 	  try {
 	  	socket = new Socket();
 	  	socket.setReuseAddress(true);
-	  	socket.connect(new InetSocketAddress(dest, socketnum), me.opts.sendTimeout);
+	  	socket.connect(address, me.opts.sendTimeout);
 	  	if (socket.isConnected()) {
 	  		val ostr = new DataOutputStream(socket.getOutputStream());
 	  		ostr.writeInt(command.magic);

@@ -69,14 +69,14 @@ class ReturnObjectResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
   }
 }
 
-class ResponseWriter(dest:String, socketnum:Int, resp:Response, me:Worker) extends Runnable {
+class ResponseWriter(address:InetSocketAddress, resp:Response, me:Worker) extends Runnable {
 
 	def run() {
 		var socket:Socket = null;
 	try {
 		socket = new Socket();
 		socket.setReuseAddress(true);
-		socket.connect(new InetSocketAddress(dest, socketnum), me.opts.sendTimeout);
+		socket.connect(address, me.opts.sendTimeout);
 		if (socket.isConnected()) {
 			val ostr = new DataOutputStream(socket.getOutputStream());
 			ostr.writeInt(resp.magic)

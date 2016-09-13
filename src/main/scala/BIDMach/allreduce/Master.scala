@@ -45,11 +45,11 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 		gridmachines = allmachinecodes(0->M, M-1);
 	}
   
-  def config(gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat) {
+  def config(gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress]) {
     gmods = gmods0;
     gridmachines = gridmachines0;
-    workerIPs = workerIPs0;
-    M = workerIPs.length;
+    workers = workers0;
+    M = workers.length;
     responses = izeros(1,M+1);
     learners = izeros(1,M+1);
     results = new Array[AnyRef](M);
@@ -57,11 +57,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
   
   def sendConfig() {
-    val clen = 3 + gmods.length + gridmachines.length + workerIPs.length;
-    val cmd = new ConfigCommand(round, 0, clen);
-    cmd.gmods = gmods;
-    cmd.gridmachines = gridmachines;
-    cmd.workerIPs = workerIPs;
+    val cmd = new ConfigCommand(round, 0, gmods, gridmachines, workers)
     broadcastCommand(cmd);
   }
   
@@ -124,7 +120,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   	for (imach <- 0 until M) {
   	  val cmd = new SetMachineCommand(round, 0, imach);
   	  cmd.encode
-  		futures(imach) = send(cmd, workerIPs(imach));   
+  		futures(imach) = send(cmd, workers(imach));   
   	}
   	for (imach <- 0 until M) {
   		try {
@@ -150,7 +146,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
   	  val newcmd = new Command(cmd.ctype, round, imach, cmd.clen, cmd.bytes);
-  		futures(imach) = send(newcmd, workerIPs(imach));   
+  		futures(imach) = send(newcmd, workers(imach));   
   	}
   	for (imach <- 0 until M) {
   		try {
@@ -171,8 +167,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     c >= M * threshold;
   }
   
-  def send(cmd:Command, address:Int):Future[_] = {
-    val cw = new CommandWriter(Command.toAddress(address), opts.commandSocketNum, cmd, this);
+  def send(cmd:Command, address:InetSocketAddress):Future[_] = {
+    val cw = new CommandWriter(address, cmd, this);
     executor.submit(cw);
   }
 

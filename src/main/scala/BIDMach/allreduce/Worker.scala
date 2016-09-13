@@ -30,7 +30,6 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var obj:AnyRef = null;
 	var str:String = null;
 	var model:Model = null;
-	var master:Int = 0;
   var intp:ScriptEngine = null;
 	
 	def start(learner0:Learner) = {
@@ -42,22 +41,21 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  intp = new ScriptEngineManager().getEngineByName("scala");
 	}
   
-  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, machineIPs0:IMat) = {
+  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress]) = {
     val t1 = toc;
     imach = imach0;
     gmods = gmods0;
     gridmachines = gridmachines0;
     M = gridmachines.length;
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
-    machineIPs = machineIPs0.data.map(Command.toAddress(_));
+    workers = workers0;
     if (machine != null) machine.stop;
-    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, machineIPs);
+    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers);
     machine.configTimeout = opts.configTimeout;
     machine.reduceTimeout = opts.reduceTimeout;
     machine.sendTimeout = opts.sendTimeout;
     machine.recvTimeout = opts.recvTimeout;
     machine.sockBase = opts.peerSocketNum;
-    machine.sockOffset = 0;
     machine.start(machine.maxk);
     intp.put("$imach", imach);
     val t2 = toc
@@ -123,10 +121,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
-    		val newcmd = new ConfigCommand(0, 0, cmd.clen, cmd.bytes);
+    		val newcmd = new ConfigCommand(0, 0, null, null, null, null, cmd.clen, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-    		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines, newcmd.workerIPs);
+    		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines, Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts));
     		if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
     	}
     	case Command.permuteCtype => {
@@ -252,7 +250,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
 	
 	def sendMaster(resp:Response):Future[_] = {
-    val cw = new ResponseWriter(Command.toAddress(master), opts.responseSocketNum, resp, this);
+    val cw = new ResponseWriter(master, resp, this);
     executor.submit(cw);
   }
 }
