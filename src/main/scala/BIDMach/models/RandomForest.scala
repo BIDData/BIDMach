@@ -206,7 +206,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     fieldshifts = getFieldShifts(fieldlengths);
     if (refresh) {
     	if (sum(fieldlengths).v > 63) {
-    		throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
+            throw new RuntimeException("RandomForest: Too many bits in treepack! "+ sum(fieldlengths).v);
     	}
     	opts.asInstanceOf[Learner.Options].npasses = opts.depth;                   // Make sure we make the correct number of passes
     	itrees = izeros(nnodes, ntrees);
@@ -1177,7 +1177,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 
 }
 
-class SVec(val inds:LMat, val counts:IMat) {
+class SVec(val inds:LMat, val counts:IMat) extends Serializable {
 
   def length = inds.length
 
@@ -1255,7 +1255,7 @@ class SVec(val inds:LMat, val counts:IMat) {
   }
 }
 
-class SVTree(val n:Int) {
+class SVTree(val n:Int) extends Serializable {
   val tree = new Array[SVec](n);
 
   def showTree = {
