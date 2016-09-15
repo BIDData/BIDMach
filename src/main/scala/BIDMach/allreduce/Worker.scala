@@ -31,7 +31,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var str:String = null;
 	var model:Model = null;
   var intp:ScriptEngine = null;
-	
+
 	def start(learner0:Learner) = {
 	  learner = learner0;
 	  if (model == null && learner != null) model = learner.model;
@@ -40,7 +40,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  listenerTask = executor.submit(listener);
 	  intp = new ScriptEngineManager().getEngineByName("scala");
 	}
-  
+
   def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress]) = {
     val t1 = toc;
     imach = imach0;
@@ -50,7 +50,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
     workers = workers0;
     if (machine != null) machine.stop;
-    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers);
+    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers.map(x => x.toString()));
     machine.configTimeout = opts.configTimeout;
     machine.reduceTimeout = opts.reduceTimeout;
     machine.sendTimeout = opts.sendTimeout;
@@ -61,11 +61,11 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
   }
-  
+
   def permute(seed:Long) = {
     machine.groups.permute(seed.toInt);
   }
-  
+
   def allReduce(round:Int, limit:Long) = {
     if (model != null) {
       val t1=toc;
@@ -95,24 +95,24 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     	val nbytes = indexmat match {
     	  case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;
     	  case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f;
-    	}	
+    	}
     	if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
     } else {
       if (opts.trace > 2) log("Allreduce model is null\n")
     }
 	}
-  
+
   def stop = {
     listener.stop = true;
     listenerTask.cancel(true);
     machine.stop;
   }
-  
+
   def shutdown = {
     executor.shutdownNow();
     val tt= toc;
   }
-  
+
   def handleCMD(cmd:Command) = {
     if (cmd.magic != Command.magic) {
       if (opts.trace > 0) log("Machine %d got message with bad magic number %d\n" format (imach, cmd.magic));
@@ -243,12 +243,12 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 				case e:Exception => {
 					if (opts.trace > 0) log("Machine %d trouble closing command listener\n%s" format (imach, Command.printStackTrace(e)));
 				}
-				}			
+				}
 			}
 		}
 	}
 
-	
+
 	def sendMaster(resp:Response):Future[_] = {
     val cw = new ResponseWriter(master, resp, this);
     executor.submit(cw);
@@ -267,6 +267,6 @@ object Worker {
 		var bufsize = 10*1000000;
 		var respond = 0;
   }
-	
+
 	class Options extends Opts {}
 }
