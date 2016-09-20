@@ -24,4 +24,3 @@ m.setMachineNumbers
 
 //m.startLearners
 //m.startUpdates
-//m.permuteAllreduce(0,1000000)

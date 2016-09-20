@@ -54,6 +54,7 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
     gridmachines = gridmachines0;
     M = gridmachines.length;
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
+    workers = workers0;
     masterSocketAddr = masterSocketAddr0;
     if (machine != null) machine.stop;
     machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers);
@@ -74,26 +75,26 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
 
   def allReduce(round: Int, limit: Long) = {
     if (model != null) {
-      val t1 = toc;
+      val t1=toc;
       model.snapshot(limit.toInt, opts.doAvg);
       val sendmat = model.sendmat;
       val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
-        model.indexmat
+	model.indexmat
       } else {
-        irow(0 -> sendmat.ncols)
+	irow(0 -> sendmat.ncols)
       }
 
       val result = if (opts.fuseConfigReduce) {
-        (indexmat, sendmat) match {
-          case (lmat: LMat, fsendmat: FMat) => machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
-          case (imat: IMat, fsendmat: FMat) => machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
-        }
+	(indexmat, sendmat) match {
+	  case (lmat:LMat, fsendmat:FMat) =>  machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
+	  case (imat:IMat, fsendmat:FMat) =>  machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
+	}
       } else {
-        (indexmat, sendmat) match {
-          case (lmat: LMat, fsendmat: FMat) => machine.config(lmat.data, lmat.data, round);
-          case (imat: IMat, fsendmat: FMat) => machine.config(imat.data, imat.data, round);
-        }
-        machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
+	(indexmat, sendmat) match {
+	  case (lmat:LMat, fsendmat:FMat) =>  machine.config(lmat.data, lmat.data, round);
+	  case (imat:IMat, fsendmat:FMat) =>  machine.config(imat.data, imat.data, round);
+	}
+	machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
       }
       model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
       model.addStep(limit.toInt, opts.doAvg);
@@ -121,154 +122,151 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
 
   def handleCMD(cmd: Command) = {
     if (cmd.magic != Command.magic) {
-      if (opts.trace > 0) log("Machine %d got message with bad magic number %d\n" format(imach, cmd.magic));
-    } else if (cmd.dest != imach) {
-      if (opts.trace > 0) log("Machine %d got message with bad destination %d\n" format(imach, cmd.dest));
-    } else {
-      cmd.ctype match {
-        case Command.configCtype => {
-          val newcmd = new ConfigCommand(0, cmd.dest, null, null, null, null, -1, -1, cmd.clen, cmd.bytes);
-          newcmd.decode;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          config(newcmd.dest, newcmd.gmods, newcmd.gridmachines,
-            Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts),
-            Host.hostPortToInet(newcmd.masterIP, newcmd.masterResPort)
-          );
-          if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
-        }
-        case Command.permuteCtype => {
-          val newcmd = new PermuteCommand(0, cmd.dest, 0, cmd.bytes);
-          newcmd.decode;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          permute(newcmd.seed);
-          if (opts.respond > 0) sendMaster(new Response(Command.permuteCtype, newcmd.round, imach));
-        }
-        case Command.allreduceCtype => {
-          val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes);
-          newcmd.decode;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          allReduce(newcmd.round, newcmd.limit);
-          if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
-        }
-        case Command.permuteAllreduceCtype => {
-          val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes);
-          newcmd.decode;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          permute(newcmd.seed);
-          allReduce(newcmd.round, newcmd.limit);
-          if (opts.respond > 0) sendMaster(new Response(Command.permuteAllreduceCtype, newcmd.round, imach));
-        }
-        case Command.setMachineCtype => {
-          val newcmd = new SetMachineCommand(0, cmd.dest, 0, cmd.bytes);
-          newcmd.decode;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          imach = newcmd.newdest;
-          if (opts.respond > 0) sendMaster(new Response(Command.setMachineCtype, newcmd.round, imach));
-        }
-        case Command.startLearnerCtype => {
-          val newcmd = new StartLearnerCommand(0, cmd.dest, cmd.bytes);
-          newcmd.decode;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          if (learner != null) {
-            learner.paused = false;
-          }
-          if (opts.respond > 0) sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach));
-        }
-        case Command.sendLearnerCtype => {
-          val newcmd = new SendLearnerCommand(0, cmd.dest, null, cmd.bytes);
-          newcmd.decode;
-          learner = newcmd.learner;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          if (opts.respond > 0) sendMaster(new Response(Command.sendLearnerCtype, newcmd.round, imach));
-        }
-        case Command.assignObjectCtype => {
-          val newcmd = new AssignObjectCommand(0, cmd.dest, null, null, cmd.bytes);
-          newcmd.decode;
-          obj = newcmd.obj;
-          str = newcmd.str;
-          intp.put(str, obj);
-          //intp.getBindings(ScriptContext.ENGINE_SCOPE).put(str,obj);
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          if (opts.respond > 0) sendMaster(new Response(Command.assignObjectCtype, newcmd.round, imach));
-        }
-        case Command.evalStringCtype => {
-          val newcmd = new EvalStringCommand(0, cmd.dest, null, cmd.bytes);
-          newcmd.decode;
-          str = newcmd.str;
-          obj = intp.eval(str);
-          val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
-          sendMaster(resp);
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-        }
-        case Command.callCtype => {
-          val newcmd = new CallCommand(0, cmd.dest, null, cmd.bytes);
-          newcmd.decode;
-          obj = newcmd.callable.call;
-          if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-          if (opts.trace > 3) log("Computed %s\n" format obj.toString);
-          val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
-          sendMaster(resp);
-        }
-      }
-    }
+      if (opts.trace > 0) log("Machine %d got message with bad magic number %d\n" format (imach, cmd.magic));
+      }  else if (cmd.dest != imach) {
+	if (opts.trace > 0) log("Machine %d got message with bad destination %d\n" format (imach, cmd.dest));
+	} else {
+	  cmd.ctype match {
+	    case Command.configCtype => {
+	      val newcmd = new ConfigCommand(0, 0, null, null, null, null, -1, -1, cmd.clen, cmd.bytes);
+	      newcmd.decode;
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      config(newcmd.dest, newcmd.gmods, newcmd.gridmachines,
+		Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts),
+		Host.hostPortToInet(newcmd.masterIP, newcmd.masterResPort)
+		);
+	      if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
+	    }
+	    case Command.permuteCtype => {
+	      val newcmd = new PermuteCommand(0, cmd.dest, 0, cmd.bytes);
+	      newcmd.decode;
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      permute(newcmd.seed);
+	      if (opts.respond > 0) sendMaster(new Response(Command.permuteCtype, newcmd.round, imach));
+	    }
+	    case Command.allreduceCtype => {
+	      val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes);
+	      newcmd.decode;
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      allReduce(newcmd.round, newcmd.limit);
+	    if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
+	    }
+	    case Command.permuteAllreduceCtype => {
+	      val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes);
+	      newcmd.decode;
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      permute(newcmd.seed);
+	    allReduce(newcmd.round, newcmd.limit);
+	    if (opts.respond > 0) sendMaster(new Response(Command.permuteAllreduceCtype, newcmd.round, imach));
+	    }
+	    case Command.setMachineCtype => {
+	      val newcmd = new SetMachineCommand(0, cmd.dest, 0, cmd.bytes);
+	      newcmd.decode;
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      imach = newcmd.newdest;
+	    if (opts.respond > 0) sendMaster(new Response(Command.setMachineCtype, newcmd.round, imach));
+	    }
+	    case Command.startLearnerCtype => {
+	      val newcmd = new StartLearnerCommand(0, cmd.dest, cmd.bytes);
+	      newcmd.decode;
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      if (learner != null) {
+		learner.paused = false;
+	      }
+	      if (opts.respond > 0) sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach));
+	    }
+	    case Command.sendLearnerCtype => {
+	      val newcmd = new SendLearnerCommand(0, cmd.dest, null, cmd.bytes);
+	      newcmd.decode;
+	      learner = newcmd.learner;
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      if (opts.respond > 0) sendMaster(new Response(Command.sendLearnerCtype, newcmd.round, imach));
+	    }
+	    case Command.assignObjectCtype => {
+	      val newcmd = new AssignObjectCommand(0, cmd.dest, null, null, cmd.bytes);
+	      newcmd.decode;
+	      obj = newcmd.obj;
+	      str = newcmd.str;
+	      intp.put(str, obj);
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	      if (opts.respond > 0) sendMaster(new Response(Command.assignObjectCtype, newcmd.round, imach));
+	    }
+	    case Command.evalStringCtype => {
+	      val newcmd = new EvalStringCommand(0, cmd.dest, null, cmd.bytes);
+	      newcmd.decode;
+	      str = newcmd.str;
+	      obj = intp.eval(str);
+	      val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
+	      sendMaster(resp);
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	    }
+	    case Command.callCtype => {
+	      val newcmd = new CallCommand(0, cmd.dest, null, cmd.bytes);
+	      newcmd.decode;
+	      obj = newcmd.callable.call;
+	      val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
+	      sendMaster(resp);
+	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+	    }
+	  }
+	}
   }
 
-  class CommandListener(val socketnum: Int, worker: Worker) extends Runnable {
+  class CommandListener(val socketnum:Int, worker:Worker) extends Runnable {
     var stop = false;
-    var ss: ServerSocket = null;
+    var ss:ServerSocket = null;
 
     def start() {
       try {
-        ss = new ServerSocket(socketnum);
+	ss = new ServerSocket(socketnum);
       } catch {
-        case e: Exception => {
-          if (opts.trace > 0) log("Problem in CommandListener\n%s" format Command.printStackTrace(e));
-        }
+	case e:Exception => {if (opts.trace > 0) log("Problem in CommandListener\n%s" format Command.printStackTrace(e));}
       }
     }
 
     def run() {
       start();
       while (!stop) {
-        try {
-          val scs = new CommandReader(ss.accept(), worker);
-          if (opts.trace > 2) log("Command Listener got a message\n");
-          val fut = executor.submit(scs);
-        } catch {
-          case e: SocketException => {
-            if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Command.printStackTrace(e));
-          }
-          // This is probably due to the server shutting to. Don't do anything.
-          case e: Exception => {
-            if (opts.trace > 0) log("Machine %d Command listener had a problem " + e format imach);
-          }
-        }
+	try {
+	  val scs = new CommandReader(ss.accept(), worker);
+	  if (opts.trace > 2) log("Command Listener got a message\n");
+	  val fut = executor.submit(scs);
+	} catch {
+	  case e:SocketException => {
+	    if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Command.printStackTrace(e));
+	  }
+	  // This is probably due to the server shutting to. Don't do anything.
+	  case e:Exception => {
+	    if (opts.trace > 0) log("Machine %d Command listener had a problem "+e format imach);
+	  }
+	}
       }
     }
 
-    def stop(force: Boolean) {
+    def stop(force:Boolean) {
       stop = true;
       if (force) {
-        try {
-          stop = true;
-          ss.close();
-        } catch {
-          case e: Exception => {
-            if (opts.trace > 0) log("Machine %d trouble closing command listener\n%s" format(imach, Command.printStackTrace(e)));
-          }
-        }
+	try {
+	  stop = true;
+	  ss.close();
+	} catch {
+	  case e:Exception => {
+	    if (opts.trace > 0) log("Machine %d trouble closing command listener\n%s" format (imach, Command.printStackTrace(e)));
+	  }
+	}
       }
     }
   }
 
 
-  def sendMaster(resp: Response): Future[_] = {
+  def sendMaster(resp:Response):Future[_] = {
     val cw = new ResponseWriter(masterSocketAddr, resp, this);
     executor.submit(cw);
   }
 }
 
 object Worker {
+<<<<<<< HEAD
 
   trait Opts extends Host.Opts {
     var configTimeout = 3000;

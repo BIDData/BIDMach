@@ -34,6 +34,7 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
   var round = 0;
   var gmods:IMat = null;
   var gridmachines:IMat = null;
+  var masterIP:InetAddress = null;
   var workers:Array[InetSocketAddress] = null;
   var groups:Groups = null;
   var executor:ExecutorService = null;
@@ -94,6 +95,7 @@ object Host {
   }
 
   def inetStringToFields(s:String):(Int, Int, Int, Int) = {
+    println(s)
     val fields = s.split("\\.");
     val ff = fields.map(_.toInt);
     (ff(0), ff(1), ff(2), ff(3))
