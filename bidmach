@@ -95,6 +95,3 @@ if [ "$1" = "notebook" ]; then
 else
     ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala ${NOREPL} "$@"
 fi
-
-
-

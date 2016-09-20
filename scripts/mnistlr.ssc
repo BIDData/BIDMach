@@ -1,12 +1,17 @@
-val dir="../data/MNIST8M/parts/"
-val (nn, opts) = GLM.learner(List(dir+"part%02d.fmat.lz4",dir+"cats%02d.fmat.lz4"))
+val data_dir = System.getenv("BIDMACH_DATA_HOME")+"/MNIST8M/parts/"
+val (nn, opts) = GLM.learner(data_dir+"data%02d.fmat.lz4", data_dir+"cats%02d.fmat.lz4")
 
+Mat.checkMKL
+Mat.checkCUDA
+Mat.setInline
+
+opts.useGPU = true;
 opts.nend = 70;
 opts.order = 0;
 opts.lookahead = 2;
 opts.featType = 1;
-opts.eltsPerSample = 300;
 opts.links = 2*iones(10,1);
+opts.eltsPerSample = 300;
 opts.targets = mkdiag(ones(10,1)) \ zeros(10, 784);
 opts.rmask = zeros(1,10) \ ones(1, 784);
 
@@ -15,3 +20,32 @@ opts.npasses = 1;
 opts.lrate = 0.001;  // for logistic
 
 nn.train
+
+println("Done training! Checking training set accuracy...")
+
+val randPartNum = scala.util.Random.nextInt(80)
+
+var test = loadFMat(data_dir+"data%02d.fmat.lz4" format randPartNum)
+val tcats = loadFMat(data_dir+"cats%02d.fmat.lz4" format randPartNum)
+val tcat = maxi2(tcats, 1)._2
+
+val pmodel = new GLM(new GLM.PredOptions());
+pmodel.copyFrom(nn.model);
+val popts = pmodel.opts.asInstanceOf[GLM.Opts]
+popts.targmap = opts.targmap;
+popts.links = opts.links;
+popts.targets = null
+popts.iweight = opts.iweight;
+popts.lim = opts.lim;
+popts.hashFeatures = opts.hashFeatures;
+popts.hashBound1 = opts.hashBound1;
+popts.hashBound2 = opts.hashBound2;
+
+val (pp, popts) = GLM.predictor(pmodel, test)
+pp.predict
+
+val preds = FMat(pp.preds(0))
+
+val rocs = roc2(preds, tcats, 1-tcats, 100)
+
+println("Training AUCs:\n%s" format ((0 to 9) on mean(rocs)))

@@ -214,6 +214,12 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   }
 
   def snapshot(len:Int, avg:Boolean) = {
+
+        // TODO: remove before merge
+        println("-------------------------------")
+        println("len: " + len + ", modelmats: " + modelmats)
+        println("-------------------------------")
+
   	val len0 = math.min(len, modelmats(0).ncols);
   	modelmats(0).synchronized {
   		sendmat = cpu(modelmats(0).colslice(0, len0));

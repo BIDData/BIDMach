@@ -47,7 +47,7 @@ import BIDMach._
  *                                       // returns a training learner mm, with options mopts. Also returns a prediction model nn with its own options.
  *                                       // typically set options, then do mm.train; nn.predict with results in pc.  
  * val (mm, opts) = learner(ds)          // Build a learner for a general datasource ds (e.g. a files data source). 
- * }}}                                   
+ * }}}
  */
 
 class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
@@ -77,7 +77,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   }
   
   override def init() = {
-  	useGPU = opts.useGPU && Mat.hasCUDA > 0
+    useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
     val m = if (opts.hashFeatures > 0) opts.hashFeatures else size(data0, 1)
     val targetData = mats.length > 1
@@ -95,7 +95,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
     if (refresh) {
-    	val mm = zeros(d,m);
+      val mm = zeros(d,m);
       setmodelmats(Array(mm))
     }
     modelmats(0) = convertMat(modelmats(0));
@@ -119,10 +119,10 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     if (opts.aopts != null) {
       initADAGrad(d, m);
     } else {
-    	vexp = null;
-    	texp = null;
-    	lrate = null;
-    	sumsq = null;
+      vexp = null;
+      texp = null;
+      lrate = null;
+      sumsq = null;
     }
   }
   
@@ -162,20 +162,20 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
       if (firststep <= 0) firststep = pos.toFloat;
       val step = (pos + firststep)/firststep;
       if (hashFeatures == 0) {
-      	ADAGrad.multUpdate(eta, in, modelmats(0), sumsq, mask, lrate, vexp, texp, epsilon, step, waitsteps);
+        ADAGrad.multUpdate(eta, in, modelmats(0), sumsq, mask, lrate, vexp, texp, epsilon, step, waitsteps);
       } else {
         ADAGrad.hashmultUpdate(eta, in, hashFeatures, opts.hashBound1, opts.hashBound2, 1,
-            modelmats(0), sumsq, mask, lrate, vexp, texp, epsilon, step, waitsteps);
+          modelmats(0), sumsq, mask, lrate, vexp, texp, epsilon, step, waitsteps);
       }
     } else {
-    	if (hashFeatures > 0) {
-    		updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols, opts.hashBound1, opts.hashBound2);
-    	} else {
-    		updatemats(0) ~ eta *^ in;
-    	}
-    	if (mask.asInstanceOf[AnyRef] != null) {
-    		updatemats(0) ~ updatemats(0) ∘ mask
-    	}
+      if (hashFeatures > 0) {
+        updatemats(0) <-- GLM.hashMultT(eta, in, modelmats(0).ncols, opts.hashBound1, opts.hashBound2);
+      } else {
+        updatemats(0) ~ eta *^ in;
+      }
+      if (mask.asInstanceOf[AnyRef] != null) {
+        updatemats(0) ~ updatemats(0) ∘ mask
+      }
     }
   }
   
@@ -244,145 +244,145 @@ object GLM {
   val maxp = 2;
   val svm = 3;
 
-  object LinearLink extends GLMlink {
-  	def link(in:Float) = {
-  		in
-  	}
+  object LinearLink extends GLMlink with Serializable {
+    def link(in:Float) = {
+      in
+    }
 
-  	def mean(in:Float) = {
-  		in
-  	}
+    def mean(in:Float) = {
+      in
+    }
 
-  	def derivlink(in:Float, targ:Float) = {
-  		targ - in;
-  	}
+    def derivlink(in:Float, targ:Float) = {
+      targ - in;
+    }
 
-  	def likelihood(pred:Float, targ:Float) = {
-  		val diff = targ - pred;
-  		- diff * diff;
-  	}
+    def likelihood(pred:Float, targ:Float) = {
+      val diff = targ - pred;
+      - diff * diff;
+    }
 
-  	override val linkfn = link _;
+    override val linkfn = link _;
 
-  	override val derivfn = derivlink _;
+    override val derivfn = derivlink _;
 
-  	override val meanfn = mean _;
+    override val meanfn = mean _;
 
-  	override val likelihoodfn = likelihood _;
+    override val likelihoodfn = likelihood _;
 
-  	val fnflops = 2;
+    val fnflops = 2;
   }
 
-  object LogisticLink extends GLMlink {
-  	def link(in:Float) = {
-  		math.log(in / (1.0f - in)).toFloat;
-  	}
+  object LogisticLink extends GLMlink with Serializable {
+    def link(in:Float) = {
+      math.log(in / (1.0f - in)).toFloat;
+    }
 
-  	def mean(in:Float) = {
-  		if (in > 0) {
-  			val tmp = math.exp(-in);
-  			(1.0 / (1.0 + tmp)).toFloat;
-  		} else {
-  			val tmp = math.exp(in);
-  			(tmp / (1.0 + tmp)).toFloat;
-  		}
-  	}
+    def mean(in:Float) = {
+      if (in > 0) {
+        val tmp = math.exp(-in);
+        (1.0 / (1.0 + tmp)).toFloat;
+      } else {
+        val tmp = math.exp(in);
+        (tmp / (1.0 + tmp)).toFloat;
+      }
+    }
 
-  	def derivlink(in:Float, targ:Float) = {
-  		targ - in;
-  	}
+    def derivlink(in:Float, targ:Float) = {
+      targ - in;
+    }
 
-  	def likelihood(pred:Float, targ:Float) = {
-  		math.log(targ * pred + (1.0f - targ) * (1.0f - pred) + 1e-20).toFloat
-  	}
+    def likelihood(pred:Float, targ:Float) = {
+      math.log(targ * pred + (1.0f - targ) * (1.0f - pred) + 1e-20).toFloat
+    }
 
-  	override val linkfn = link _;
+    override val linkfn = link _;
 
-  	override val derivfn = derivlink _;
+    override val derivfn = derivlink _;
 
-  	override val meanfn = mean _;
+    override val meanfn = mean _;
 
-  	override val likelihoodfn = likelihood _;
+    override val likelihoodfn = likelihood _;
 
-  	val fnflops = 20;
+    val fnflops = 20;
   }
 
 
-  object MaxpLink extends GLMlink {
-  	def link(in:Float) = {
-  		math.log(in / (1.0f - in)).toFloat;
-  	}
+  object MaxpLink extends GLMlink with Serializable {
+    def link(in:Float) = {
+      math.log(in / (1.0f - in)).toFloat;
+    }
 
-  	def mean(in:Float) = {
-  		if (in > 0) {
-  			val tmp = math.exp(-in);
-  			(1.0 / (1.0 + tmp)).toFloat;
-  		} else {
-  			val tmp = math.exp(in);
-  			(tmp / (1.0 + tmp)).toFloat;
-  		}
-  	}
+    def mean(in:Float) = {
+      if (in > 0) {
+        val tmp = math.exp(-in);
+        (1.0 / (1.0 + tmp)).toFloat;
+      } else {
+        val tmp = math.exp(in);
+        (tmp / (1.0 + tmp)).toFloat;
+      }
+    }
 
-  	def derivlink(p:Float, targ:Float) = {
-  		(2.0f * targ - 1.0f) * p * (1.0f - p);
-  	}
+    def derivlink(p:Float, targ:Float) = {
+      (2.0f * targ - 1.0f) * p * (1.0f - p);
+    }
 
-  	def likelihood(pred:Float, targ:Float) = {
-  		targ * pred + (1.0f - targ) * (1.0f - pred) -1.0f;
-  	}
+    def likelihood(pred:Float, targ:Float) = {
+      targ * pred + (1.0f - targ) * (1.0f - pred) -1.0f;
+    }
 
-  	override val linkfn = link _;
+    override val linkfn = link _;
 
-  	override val derivfn = derivlink _;
+    override val derivfn = derivlink _;
 
-  	override val meanfn = mean _;
+    override val meanfn = mean _;
 
-  	override val likelihoodfn = likelihood _;
+    override val likelihoodfn = likelihood _;
 
-  	val fnflops = 20;
+    val fnflops = 20;
   }
 
-  object SVMLink extends GLMlink {
-  	def link(in:Float) = {
-  		in
-  	}
+  object SVMLink extends GLMlink with Serializable {
+    def link(in:Float) = {
+      in
+    }
 
-  	def mean(in:Float) = {
-  		in
-  	}
+    def mean(in:Float) = {
+      in
+    }
 
-  	def derivlink(pred:Float, targ:Float) = {
-  		val ttarg = 2 * targ - 1;
-  		if (pred * ttarg < 1f) ttarg else 0f;
-  	}
+    def derivlink(pred:Float, targ:Float) = {
+      val ttarg = 2 * targ - 1;
+      if (pred * ttarg < 1f) ttarg else 0f;
+    }
 
-  	def likelihood(pred:Float, targ:Float) = {
-  		val ttarg = 2 * targ - 1;
-  		scala.math.min(0f, ttarg * pred - 1f);
-  	}
+    def likelihood(pred:Float, targ:Float) = {
+      val ttarg = 2 * targ - 1;
+      scala.math.min(0f, ttarg * pred - 1f);
+    }
 
-  	override val linkfn = link _;
+    override val linkfn = link _;
 
-  	override val derivfn = derivlink _;
+    override val derivfn = derivlink _;
 
-  	override val meanfn = mean _;
+    override val meanfn = mean _;
 
-  	override val likelihoodfn = likelihood _;
+    override val likelihoodfn = likelihood _;
 
-  	val fnflops = 2;
+    val fnflops = 2;
   }
 
-  object LinkEnum extends Enumeration {
-  	type LinkEnum = Value;
-  	val Linear, Logistic, Maxp, SVMLink = Value
+  object LinkEnum extends Enumeration with Serializable {
+    type LinkEnum = Value;
+    val Linear, Logistic, Maxp, SVMLink = Value
   }
 
   abstract class GLMlink {
-  	val linkfn:(Float => Float)
-  	val derivfn:((Float,Float) => Float)
-  	val meanfn:(Float => Float)
-  	val likelihoodfn:((Float,Float) => Float)
-  	val fnflops:Int
+    val linkfn:(Float => Float)
+    val derivfn:((Float,Float) => Float)
+    val meanfn:(Float => Float)
+    val likelihoodfn:((Float,Float) => Float)
+    val fnflops:Int
   }
   
   val linkArray = Array[GLMlink](LinearLink, LogisticLink, MaxpLink, SVMLink)
@@ -437,7 +437,7 @@ object GLM {
         gout
       }
       case (geta:GDMat, gilinks:GIMat) => {
-      	val gout = GDMat.newOrCheckGDMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+        val gout = GDMat.newOrCheckGDMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
         Mat.nflops += totflops * geta.ncols
         CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
         gout
@@ -449,18 +449,18 @@ object GLM {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
         Mat.nflops += 10L * ftarg.length
-            var i = 0
-            val out = (ftarg + 5f)
-            while (i < ftarg.ncols) {
-                var j = 0
-                while (j < ftarg.nrows) {
-                    val fun = GLM.linkArray(ilinks(j)).likelihoodfn
-                    out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
-                    j += 1
-                }
-                i += 1
-            }
-            out
+        var i = 0
+        val out = (ftarg + 5f)
+        while (i < ftarg.ncols) {
+          var j = 0
+          while (j < ftarg.nrows) {
+            val fun = GLM.linkArray(ilinks(j)).likelihoodfn
+            out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
+            j += 1
+          }
+          i += 1
+        }
+        out
       }
       case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
@@ -480,18 +480,18 @@ object GLM {
   def derivs(pred:Mat, targ:Mat, out:Mat, links:Mat, totflops:Long) = {
     (pred, targ, out, links) match {
       case (fpred:FMat, ftarg:FMat, fout:FMat, ilinks:IMat) => {
-      	Mat.nflops += 10L * ftarg.length;
-      	var i = 0;
-      	while (i < ftarg.ncols) {
-      		var j = 0;
-      		while (j < ftarg.nrows) {
-      			val fun = GLM.linkArray(ilinks(j)).derivfn;
-      			fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
-      			j += 1;
-      		}
-      		i += 1;
-      	}
-      	fout;
+        Mat.nflops += 10L * ftarg.length;
+        var i = 0;
+        while (i < ftarg.ncols) {
+          var j = 0;
+          while (j < ftarg.nrows) {
+            val fun = GLM.linkArray(ilinks(j)).derivfn;
+            fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+            j += 1;
+          }
+          i += 1;
+        }
+        fout;
       }
       case (gpred:GMat, gtarg:GMat, gout:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
@@ -509,22 +509,22 @@ object GLM {
   def derivs(pred:Mat, targ:Mat, links:Mat, totflops:Long) = {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
-      	val fout = FMat.newOrCheckFMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        val fout = FMat.newOrCheckFMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
         Mat.nflops += 10L * ftarg.length;
-      	var i = 0;
-      	while (i < ftarg.ncols) {
-      		var j = 0
-      				while (j < ftarg.nrows) {
-      					val fun = GLM.linkArray(ilinks(j)).derivfn;
-      					fout.data(j + i * fout.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
-      					j += 1;
-      				}
-      		i += 1;
-      	}
-      	fout;
+        var i = 0;
+        while (i < ftarg.ncols) {
+          var j = 0
+          while (j < ftarg.nrows) {
+            val fun = GLM.linkArray(ilinks(j)).derivfn;
+            fout.data(j + i * fout.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+            j += 1;
+          }
+          i += 1;
+        }
+        fout;
       }
       case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
-      	val gout = GMat.newOrCheckGMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        val gout = GMat.newOrCheckGMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
         Mat.nflops += totflops * gpred.ncols
         CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
         gout
@@ -548,9 +548,9 @@ object GLM {
   }
   
   def hashMult(a:Mat, b:Mat, bound1:Int, bound2:Int):Mat = {
-  	(a, b) match {
-  	  case (ga:GMat, gb:GSMat) => hashMult(ga, gb, bound1, bound2)
-  	}
+    (a, b) match {
+      case (ga:GMat, gb:GSMat) => hashMult(ga, gb, bound1, bound2)
+    }
   }
 
   
@@ -564,9 +564,9 @@ object GLM {
   }
   
   def hashMultT(a:Mat, b:Mat, nfeats:Int, bound1:Int, bound2:Int):Mat = {
-  	(a, b) match {
-  	  case (ga:GMat, gb:GSMat) => hashMultT(ga, gb, nfeats, bound1, bound2)
-  	}
+    (a, b) match {
+      case (ga:GMat, gb:GSMat) => hashMultT(ga, gb, nfeats, bound1, bound2)
+    }
   }
 
   def hashCross(a:GMat, b:GSMat, c:GSMat):GMat = {
@@ -579,9 +579,9 @@ object GLM {
   }
   
   def hashCross(a:Mat, b:Mat, c:Mat):Mat = {
-  	(a, b, c) match {
-  	  case (ga:GMat, gb:GSMat, gc:GSMat) => hashCross(ga, gb, gc)
-  	}
+    (a, b, c) match {
+      case (ga:GMat, gb:GSMat, gc:GSMat) => hashCross(ga, gb, gc)
+    }
   }
   
   def hashCrossT(a:GMat, b:GSMat, c:GSMat, nfeats:Int):GMat = {
@@ -594,9 +594,9 @@ object GLM {
   }
   
   def hashCrossT(a:Mat, b:Mat, c:Mat, nfeats:Int):Mat = {
-  	(a, b, c) match {
-  	  case (ga:GMat, gb:GSMat, gc:GSMat) => hashCrossT(ga, gb, gc, nfeats)
-  	}
+    (a, b, c) match {
+      case (ga:GMat, gb:GSMat, gc:GSMat) => hashCrossT(ga, gb, gc, nfeats)
+    }
   }
   
   def pairMult(nr:Int, bnc:Int, kk:Int, a:GMat, aroff:Int, acoff:Int, b:GSMat, broff:Int, bcoff:Int, c:GMat, croff:Int, ccoff:Int):GMat = {
@@ -607,11 +607,11 @@ object GLM {
     } else {
       Mat.nflops += 2L * nr * b.nnz; 
       val err = CUMACH.pairMultTile(nr, bnc, kk, kk,
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
-          b.data, b.ir, b.jc, broff, bcoff, 
-          c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
-          0);
+        a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2,
+        a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2,
+        b.data, b.ir, b.jc, broff, bcoff,
+        c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows,
+        0);
       if (err != 0) {
         throw new RuntimeException("CUMAT.pairMult error " + cudaGetErrorString(err))
       }
@@ -627,11 +627,11 @@ object GLM {
     } else {
       Mat.nflops += 2L * nr * b.nnz * kk / b.ncols;
       val err = CUMACH.pairMultTile(nr, kk, cnc, cnc,  
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
-          b.data, b.ir, b.jc, broff, bcoff, 
-          c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
-          1);
+        a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2,
+        a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2,
+        b.data, b.ir, b.jc, broff, bcoff,
+        c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows,
+        1);
       if (err != 0) {
         throw new RuntimeException("CUMAT.pairMultNT error " + cudaGetErrorString(err))
       }
@@ -642,16 +642,16 @@ object GLM {
   @inline def pairembed(r1x:Long, r2x:Int):Long = {
     val r1 = r1x + 1;
     val r2 = r2x + 1;
-  	val b1 = java.lang.Float.floatToRawIntBits(r1.toFloat);
-  	val b2 = java.lang.Float.floatToRawIntBits(r2.toFloat);
-  	val nbits1 = (b1 >> 23) - 126;
-  	val nbits2 = (b2 >> 23) - 126;
-  	val len = nbits1 + nbits2 - 2;
-  	val b3 = java.lang.Float.floatToRawIntBits(len.toFloat);
-  	val lenbits = if (len > 1) ((b3 >> 23) - 127) else 0;
-  	val r2t = r2 & ((1 << (nbits2-1)) - 1);
-  	val x = (((r1 << (nbits2-1)) | r2t) << lenbits) | (nbits2-1);
-  	math.max(0, x-2);
+    val b1 = java.lang.Float.floatToRawIntBits(r1.toFloat);
+    val b2 = java.lang.Float.floatToRawIntBits(r2.toFloat);
+    val nbits1 = (b1 >> 23) - 126;
+    val nbits2 = (b2 >> 23) - 126;
+    val len = nbits1 + nbits2 - 2;
+    val b3 = java.lang.Float.floatToRawIntBits(len.toFloat);
+    val lenbits = if (len > 1) ((b3 >> 23) - 127) else 0;
+    val r2t = r2 & ((1 << (nbits2-1)) - 1);
+    val x = (((r1 << (nbits2-1)) | r2t) << lenbits) | (nbits2-1);
+    math.max(0, x-2);
   }
   
   @inline def solve1(j:Int):Int = {
@@ -665,82 +665,82 @@ object GLM {
   }
 
   def pairMult(nrows:Int, bncols:Int, bnrows:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
-  		C:FMat, croff:Int, ccoff:Int):Unit = {
-  	pairMult(nrows, bncols, bnrows, bnrows, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
-  	    B, broff, bcoff, C, croff + ccoff * C.nrows, 0);
+    C:FMat, croff:Int, ccoff:Int):Unit = {
+      pairMult(nrows, bncols, bnrows, bnrows, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
+        B, broff, bcoff, C, croff + ccoff * C.nrows, 0);
   }
   
   def pairMultNT(nrows:Int, cncols:Int, bnrows:Int, A:FMat, aroff:Int, acoff:Int, B:SMat, broff:Int, bcoff:Int, 
-  		C:FMat, croff:Int, ccoff:Int):Unit = {
-  	pairMult(nrows, cncols, bnrows, bnrows, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
-  	    B, broff, bcoff, C, croff + ccoff * C.nrows, 1);
+    C:FMat, croff:Int, ccoff:Int):Unit = {
+      pairMult(nrows, cncols, bnrows, bnrows, A, aroff + acoff * 2 * A.nrows, A.nrows*2, A, aroff + (acoff*2+1) * A.nrows, A.nrows*2,
+        B, broff, bcoff, C, croff + ccoff * C.nrows, 1);
   }
   
   def pairMult(nrows:Int, bncols:Int, bound1:Int, bound2:Int, A:FMat, aoff:Int, lda:Int, A2:FMat, a2off:Int, lda2:Int,  
-  		B:SMat, broff:Int, bcoff:Int, C:FMat, coff:Int,  transpose:Int):Unit = {
-    val Bdata = B.data;
-    val Bir = B.ir;
-    val Bjc = B.jc;
-  	var doit = false;
-  	val ioff = Mat.ioneBased;
-  	val istart = 0;
-  	val iend = bncols;
-  	var AX:Array[Float] = null;
-  	var ldax = 0;
-  	var aoffx = 0;
-  	val ldc = C.nrows;
-  	var i = istart;
-  	while (i < iend) {                                         // i is the column index
-  		val jstart = Bjc(i + bcoff)-ioff;                             // Range of nz rows in this column
-  		val jend = Bjc(i+1 + bcoff)-ioff;
-  		val nr = jend - jstart;                                  // Number of nz rows
-  		val todo = nr * (nr + 1) / 2;                            // Number of pairs to process (including k,k pairs)
-  		var j = 0;
-  		while (j < todo) {                                       // j indexes a worker for this column
-  			val j1 = solve1(j);                                    // Compute the first and second indices
-  			val j2 = j - j1*(j1+1)/2; 
-  			val f1 = Bdata(jstart + j1);                           // Get the two features
-  			val f2 = Bdata(jstart + j2);
-  			val r1 = Bir(jstart + j1) - broff-ioff;                     // And their row indices
-  			val r2 = Bir(jstart + j2) - broff-ioff;
-  			var rank = r1.toLong;
-  			var prod = f1;
-  			doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
-  			if (j1 == j2) {
-  				AX = A.data;
-  				ldax = lda;
-  				aoffx = aoff;
-  			} else {
-  				rank = pairembed(r1, r2);
-  				doit = doit && (rank >= 0 && rank < bound2);
-  				if (doit) {
-  					prod *= f2;
-  					AX = A2.data;
-  					ldax = lda2;
-  					aoffx = a2off;
-  				}
-  			}
-  			if (doit) {
-  				if (transpose > 0) {
-  					var k = 0;
-  					while (k < nrows) {
-  						val sum = AX(aoffx + k + ldax * i) * prod;    // Do the product
-  						C.data(coff + k + ldc * rank.toInt) += sum;
-  						k += 1;
-  					}
-  				} else {
-  					var k = 0;
-  					while (k < nrows) {
-  						val sum = AX(aoffx + k + ldax * rank.toInt) * prod;  // Do the product
-  						C.data(coff + k + ldc * i) += sum;
-  						k += 1;
-  					}
-  				}
-  			}
-  			j += 1;
-  		}
-  		i += 1;
-  	}
+    B:SMat, broff:Int, bcoff:Int, C:FMat, coff:Int,  transpose:Int):Unit = {
+      val Bdata = B.data;
+      val Bir = B.ir;
+      val Bjc = B.jc;
+      var doit = false;
+      val ioff = Mat.ioneBased;
+      val istart = 0;
+      val iend = bncols;
+      var AX:Array[Float] = null;
+      var ldax = 0;
+      var aoffx = 0;
+      val ldc = C.nrows;
+      var i = istart;
+      while (i < iend) {                                         // i is the column index
+        val jstart = Bjc(i + bcoff)-ioff;                             // Range of nz rows in this column
+        val jend = Bjc(i+1 + bcoff)-ioff;
+        val nr = jend - jstart;                                  // Number of nz rows
+        val todo = nr * (nr + 1) / 2;                            // Number of pairs to process (including k,k pairs)
+        var j = 0;
+        while (j < todo) {                                       // j indexes a worker for this column
+          val j1 = solve1(j);                                    // Compute the first and second indices
+          val j2 = j - j1*(j1+1)/2;
+          val f1 = Bdata(jstart + j1);                           // Get the two features
+          val f2 = Bdata(jstart + j2);
+          val r1 = Bir(jstart + j1) - broff-ioff;                     // And their row indices
+          val r2 = Bir(jstart + j2) - broff-ioff;
+          var rank = r1.toLong;
+          var prod = f1;
+          doit = (r1 >= 0 && r1 < bound1 && r2 >= 0 && r2 < bound1);
+          if (j1 == j2) {
+            AX = A.data;
+            ldax = lda;
+            aoffx = aoff;
+          } else {
+            rank = pairembed(r1, r2);
+            doit = doit && (rank >= 0 && rank < bound2);
+            if (doit) {
+              prod *= f2;
+              AX = A2.data;
+              ldax = lda2;
+              aoffx = a2off;
+            }
+          }
+          if (doit) {
+            if (transpose > 0) {
+              var k = 0;
+              while (k < nrows) {
+                val sum = AX(aoffx + k + ldax * i) * prod;    // Do the product
+                C.data(coff + k + ldc * rank.toInt) += sum;
+                k += 1;
+              }
+              } else {
+                var k = 0;
+                while (k < nrows) {
+                  val sum = AX(aoffx + k + ldax * rank.toInt) * prod;  // Do the product
+                  C.data(coff + k + ldc * i) += sum;
+                  k += 1;
+                }
+              }
+          }
+          j += 1;
+        }
+        i += 1;
+      }
   }
  
   def pairMult(nr:Int, bnc:Int, bnr:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
@@ -755,7 +755,7 @@ object GLM {
   def pairMultNT(nr:Int, nc:Int, kk:Int, a:Mat, aroff:Int, acoff:Int, b:Mat, broff:Int, bcoff:Int, c:Mat, croff:Int, ccoff:Int):Mat = {
     (a, b, c) match {
       case (fa:GMat, sb:GSMat, fc:GMat) => pairMultNT(nr, nc, kk, fa, aroff, acoff, sb, broff, bcoff, fc, croff, ccoff);
-//      case (fb:GMat, fc:GMat) => pairMultNT(nr, nc, kk, aroff, acoff, fb, broff, bcoff, fc, croff, ccoff);
+      //      case (fb:GMat, fc:GMat) => pairMultNT(nr, nc, kk, aroff, acoff, fb, broff, bcoff, fc, croff, ccoff);
       case _ => throw new RuntimeException("pairMultT couldnt match matrix types")
     }
   }
@@ -765,41 +765,41 @@ object GLM {
     val ncols = c.ncols;
     val kk = a.ncols/2;
     c.clear;
-   	(a, b, c) match {
-  	case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nrows, ncols, kk, fa, 0, 0, sb, 0, 0, fc, 0, 0);
-  	case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nrows, ncols, kk, fa, 0, 0, sb, 0, 0, fc, 0, 0);
-  	case (ft:TMat, sb:GSMat, fc:GMat) => {
-  	  for (i <- 0 until ft.tiles.length) {
-  	    val fa = ft.tiles(i).asInstanceOf[GMat];
-  	    val x = ft.x(i);
-  	    val y = ft.y(i);
-  	    val nr = fa.nrows;
-  	    val k = fa.ncols/2;  	    
-  	  	pairMult(nr, ncols, k, fa, 0, 0, sb, x, 0, fc, y, 0);
-  	  }
-  	}
-  	case (ft:TMat, sb:SMat, fc:FMat) => {
-  	  for (i <- 0 until ft.tiles.length) {
-  	    val fa = ft.tiles(i).asInstanceOf[FMat];
-  	    val x = ft.x(i);
-  	    val y = ft.y(i);
-  	    val nr = fa.nrows;
-  	    val k = fa.ncols/2;  	    
-  	  	pairMult(nr, ncols, k, fa, 0, 0, sb, x, 0, fc, y, 0);
-  	  }
-  	}
-  	}
-   	c;
+    (a, b, c) match {
+      case (fa:GMat, sb:GSMat, fc:GMat) => pairMult(nrows, ncols, kk, fa, 0, 0, sb, 0, 0, fc, 0, 0);
+      case (fa:FMat, sb:SMat, fc:FMat) => pairMult(nrows, ncols, kk, fa, 0, 0, sb, 0, 0, fc, 0, 0);
+      case (ft:TMat, sb:GSMat, fc:GMat) => {
+        for (i <- 0 until ft.tiles.length) {
+          val fa = ft.tiles(i).asInstanceOf[GMat];
+          val x = ft.x(i);
+          val y = ft.y(i);
+          val nr = fa.nrows;
+          val k = fa.ncols/2;
+          pairMult(nr, ncols, k, fa, 0, 0, sb, x, 0, fc, y, 0);
+        }
+      }
+      case (ft:TMat, sb:SMat, fc:FMat) => {
+        for (i <- 0 until ft.tiles.length) {
+          val fa = ft.tiles(i).asInstanceOf[FMat];
+          val x = ft.x(i);
+          val y = ft.y(i);
+          val nr = fa.nrows;
+          val k = fa.ncols/2;
+          pairMult(nr, ncols, k, fa, 0, 0, sb, x, 0, fc, y, 0);
+        }
+      }
+    }
+    c;
   }
   
 
   
   def mkGLMModel(fopts:Model.Opts) = {
-  	new GLM(fopts.asInstanceOf[GLM.Opts])
+    new GLM(fopts.asInstanceOf[GLM.Opts])
   }
   
   def mkUpdater(nopts:Updater.Opts) = {
-  	new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
+    new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
   } 
   
   def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
@@ -812,7 +812,7 @@ object GLM {
 
   def mkL1L2Regularizers(nopts:Mixin.Opts):Array[Mixin] = {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]),
-	  new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
+      new L2Regularizer(nopts.asInstanceOf[L2Regularizer.Opts]))
   }
   
   class LearnOptions extends Learner.Options with GLM.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
@@ -823,31 +823,31 @@ object GLM {
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  	    new GLM(opts), 
-  	    mkRegularizer(opts),
-  	    new ADAGrad(opts), 
-  	    null,
-  	    opts)
+    val nn = new Learner(
+      new MatSource(Array(mat0:Mat), opts),
+      new GLM(opts),
+      mkRegularizer(opts),
+      new ADAGrad(opts),
+      null,
+      opts)
     (nn, opts)
   } 
     
   def learner(mat0:Mat):(Learner, LearnOptions) = learner(mat0, 0)
   
-    // Basic in-memory learner with generated target
+  // Basic in-memory learner with generated target
   def learnerX(mat0:Mat, d:Int = 0) = { 
     val opts = new LearnOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
     opts.aopts = opts
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  	    new GLM(opts), 
-  	    mkRegularizer(opts),
-  	    null, 
-  	    null,
-  	    opts)
+    val nn = new Learner(
+      new MatSource(Array(mat0:Mat), opts),
+      new GLM(opts),
+      mkRegularizer(opts),
+      null,
+      null,
+      opts)
     (nn, opts)
   } 
     
@@ -862,12 +862,12 @@ object GLM {
     mopts.links.set(d)
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatSource(Array(mat0, targ), mopts), 
-        model, 
-        mkRegularizer(mopts),
-        new ADAGrad(mopts), 
-        null,
-        mopts)
+      new MatSource(Array(mat0, targ), mopts),
+      model,
+      mkRegularizer(mopts),
+      new ADAGrad(mopts),
+      null,
+      mopts)
     (mm, mopts)
   }
 
@@ -882,12 +882,12 @@ object GLM {
     val model = new GLM(mopts)
     mopts.aopts = mopts;
     val mm = new Learner(
-        new MatSource(Array(mat0, targ), mopts), 
-        model, 
-        mkRegularizer(mopts),
-        null, 
-        null,
-        mopts)
+      new MatSource(Array(mat0, targ), mopts),
+      model,
+      mkRegularizer(mopts),
+      null,
+      null,
+      mopts)
     (mm, mopts)
   }
   
@@ -909,23 +909,38 @@ object GLM {
     nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatSource(Array(mat0, targ), mopts), 
-        model, 
-        mkRegularizer(mopts),
-        new ADAGrad(mopts), 
-        null,
-        mopts)
+      new MatSource(Array(mat0, targ), mopts),
+      model,
+      mkRegularizer(mopts),
+      new ADAGrad(mopts),
+      null,
+      mopts)
     val nn = new Learner(
-        new MatSource(Array(mat1, preds), nopts), 
-        model, 
-        null,
-        null, 
-        null,
-        nopts)
+      new MatSource(Array(mat1, preds), nopts),
+      model,
+      null,
+      null,
+      null,
+      nopts)
     (mm, mopts, nn, nopts)
   }
   
   class GOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts 
+  class GUnboundOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with DataSource.Opts with Batch.Opts;
+
+  // A learner with no bound datasource
+  def learner():(Learner, GUnboundOptions) = {
+    val opts = new GUnboundOptions;
+    opts.lrate = 1f
+    val nn = new Learner(
+      null,
+      new GLM(opts),
+      mkRegularizer(opts),
+      new ADAGrad(opts),
+      null,
+      opts)
+    (nn, opts)
+  }
 
   // A learner that uses a general data source (e.g. a files data source). 
   // The datasource options (like batchSize) need to be set externally. 
@@ -934,12 +949,12 @@ object GLM {
     mopts.lrate = 1f
     val model = new GLM(mopts)
     val mm = new Learner(
-        ds, 
-        model, 
-        mkRegularizer(mopts),
-        new ADAGrad(mopts),
-        null,
-        mopts)
+      ds,
+      model,
+      mkRegularizer(mopts),
+      new ADAGrad(mopts),
+      null,
+      mopts)
     (mm, mopts)
   }
   
@@ -949,35 +964,35 @@ object GLM {
     mopts.aopts = mopts;
     val model = new GLM(mopts)
     val mm = new Learner(
-        ds, 
-        model, 
-        mkRegularizer(mopts),
-        null,
-        null,
-        mopts);
+      ds,
+      model,
+      mkRegularizer(mopts),
+      null,
+      null,
+      mopts);
     (mm, mopts)
   }
   
   class FGOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FileSource.Opts
   
-  // A learner that uses a files data source specified by a list of strings.  
-  def learner(fnames:List[String]):(Learner, FGOptions) = {
+  def learner(datafile:String, labelfile:String):(Learner, FGOptions) =
+    learner(List(FileSource.simpleEnum(datafile, 1, 0), FileSource.simpleEnum(labelfile, 1, 0)))
+
+  def learner(fnames:List[(Int)=>String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
-    val model = new GLM(mopts);
-    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
-    val ds = new FileSource(mopts);    
+    mopts.fnames = fnames;
     val mm = new Learner(
-        ds, 
-        model, 
-        mkRegularizer(mopts),
-        new ADAGrad(mopts), 
-        null,
-        mopts)
+      new FileSource(mopts),
+      new GLM(mopts),
+      mkRegularizer(mopts),
+      new ADAGrad(mopts),
+      null,
+      mopts)
     (mm, mopts)
   }
   
-    // A learner that uses a files data source specified by a list of strings.  
+  // A learner that uses a files data source specified by a list of strings.
   def learnerX(fnames:List[String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
@@ -986,12 +1001,12 @@ object GLM {
     mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
     val ds = new FileSource(mopts);    
     val mm = new Learner(
-        ds, 
-        model, 
-        mkRegularizer(mopts),
-        null,
-        null,
-        mopts)
+      ds,
+      model,
+      mkRegularizer(mopts),
+      null,
+      null,
+      mopts)
     (mm, mopts)
   }
   
@@ -1016,16 +1031,16 @@ object GLM {
     nopts.hashBound1 = mopts.hashBound1;
     nopts.hashBound2 = mopts.hashBound2;   
     val nn = new Learner(
-        new MatSource(Array(mat1), nopts), 
-        newmod, 
-        null,
-        null,
-        new MatSink(nopts),
-        nopts)
+      new MatSource(Array(mat1), nopts),
+      newmod,
+      null,
+      null,
+      new MatSink(nopts),
+      nopts)
     (nn, nopts)
   }
   
-   // Basic in-memory SVM learner with explicit target
+  // Basic in-memory SVM learner with explicit target
   def SVMlearner(mat0:Mat, targ:Mat):(Learner, Learn12Options) = {
     val mopts = new Learn12Options;
     mopts.lrate = 1f
@@ -1035,12 +1050,12 @@ object GLM {
     mopts.reg2weight = 1f
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatSource(Array(mat0, targ), mopts), 
-        model, 
-        mkL1L2Regularizers(mopts),
-        new ADAGrad(mopts), 
-        null,
-        mopts)
+      new MatSource(Array(mat0, targ), mopts),
+      model,
+      mkL1L2Regularizers(mopts),
+      new ADAGrad(mopts),
+      null,
+      mopts)
     (mm, mopts)
   }
   
@@ -1058,23 +1073,23 @@ object GLM {
     nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
-        new MatSource(Array(mat0, targ), mopts), 
-        model, 
-        mkL1L2Regularizers(mopts),
-        new ADAGrad(mopts), 
-        null,
-        mopts)
+      new MatSource(Array(mat0, targ), mopts),
+      model,
+      mkL1L2Regularizers(mopts),
+      new ADAGrad(mopts),
+      null,
+      mopts)
     val nn = new Learner(
-        new MatSource(Array(mat1, preds), nopts), 
-        model, 
-        null,
-        null,
-        null,
-        nopts)
+      new MatSource(Array(mat1, preds), nopts),
+      model,
+      null,
+      null,
+      null,
+      nopts)
     (mm, mopts, nn, nopts)
   }
   
-   // This function constructs a predictor from an existing model 
+  // This function constructs a predictor from an existing model
   def SVMpredictor(model:Model, mat1:Mat, preds:Mat):(Learner, LearnOptions) = {
     val nopts = new LearnOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
@@ -1082,12 +1097,12 @@ object GLM {
     nopts.links.set(3)
     nopts.putBack = 1
     val nn = new Learner(
-        new MatSource(Array(mat1, preds), nopts), 
-        model.asInstanceOf[GLM], 
-        null,
-        null,
-        null,
-        nopts)
+      new MatSource(Array(mat1, preds), nopts),
+      model.asInstanceOf[GLM],
+      null,
+      null,
+      null,
+      nopts)
     (nn, nopts)
   }
      
@@ -1097,12 +1112,12 @@ object GLM {
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     val nn = new Learner(
-        new MatSource(Array(mat0, targ), opts), 
-        new GLM(opts), 
-        mkRegularizer(opts), 
-        new ADAGrad(opts),
-        null,
-        opts)
+      new MatSource(Array(mat0, targ), opts),
+      new GLM(opts),
+      mkRegularizer(opts),
+      new ADAGrad(opts),
+      null,
+      opts)
     (nn, opts)
   }
   
@@ -1112,13 +1127,13 @@ object GLM {
     val opts = new LearnParOptions
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     opts.lrate = 1f
-  	val nn = new ParLearnerF(
-  	    new MatSource(Array(mat0), opts), 
-  	    opts, mkGLMModel _,
-  	    opts, mkRegularizer _,
-  	    opts, mkUpdater _, 
-  	    null, null,
-  	    opts)
+    val nn = new ParLearnerF(
+      new MatSource(Array(mat0), opts),
+      opts, mkGLMModel _,
+      opts, mkRegularizer _,
+      opts, mkUpdater _,
+      null, null,
+      opts)
     (nn, opts)
   }
   
@@ -1131,12 +1146,12 @@ object GLM {
     if (opts.links == null) opts.links = izeros(targ.nrows,1)
     opts.links.set(d)
     val nn = new ParLearnerF(
-        new MatSource(Array(mat0, targ), opts), 
-        opts, mkGLMModel _,
-        opts, mkRegularizer _,
-        opts, mkUpdater _, 
-        null, null,
-        opts)
+      new MatSource(Array(mat0, targ), opts),
+      opts, mkGLMModel _,
+      opts, mkRegularizer _,
+      opts, mkUpdater _,
+      null, null,
+      opts)
     (nn, opts)
   }
   
@@ -1145,40 +1160,40 @@ object GLM {
   class LearnFParOptions extends ParLearner.Options with GLM.Opts with SFileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learnFParx(
-  		nstart:Int=FileSource.encodeDate(2012,3,1,0), 
-  		nend:Int=FileSource.encodeDate(2012,12,1,0), 
-  		d:Int = 0
-  		) = {
-  	val opts = new LearnFParOptions;
-  	opts.lrate = 1f;
-  	val nn = new ParLearnerxF(
-  			null,
-  			(dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
-  			opts, mkGLMModel _,
-  			opts, mkRegularizer _,
-  			opts, mkUpdater _,
-  			null, null,
-  			opts
-  			)
-  	(nn, opts)
+    nstart:Int=FileSource.encodeDate(2012,3,1,0),
+    nend:Int=FileSource.encodeDate(2012,12,1,0),
+    d:Int = 0
+  ) = {
+    val opts = new LearnFParOptions;
+    opts.lrate = 1f;
+    val nn = new ParLearnerxF(
+      null,
+      (dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i),
+      opts, mkGLMModel _,
+      opts, mkRegularizer _,
+      opts, mkUpdater _,
+      null, null,
+      opts
+    )
+    (nn, opts)
   }
   
   def learnFPar(
-  		nstart:Int=FileSource.encodeDate(2012,3,1,0), 
-  		nend:Int=FileSource.encodeDate(2012,12,1,0), 
-  		d:Int = 0
-  		) = {	
-  	val opts = new LearnFParOptions;
-  	opts.lrate = 1f;
-  	val nn = new ParLearnerF(
-  			Experiments.Twitter.twitterWords(nstart, nend),
-  			opts, mkGLMModel _, 
-  			opts, mkRegularizer _,
-  			opts, mkUpdater _,
-  			null, null,
-  			opts
-  			)
-  	(nn, opts)
+    nstart:Int=FileSource.encodeDate(2012,3,1,0),
+    nend:Int=FileSource.encodeDate(2012,12,1,0),
+    d:Int = 0
+  ) = {
+    val opts = new LearnFParOptions;
+    opts.lrate = 1f;
+    val nn = new ParLearnerF(
+      Experiments.Twitter.twitterWords(nstart, nend),
+      opts, mkGLMModel _,
+      opts, mkRegularizer _,
+      opts, mkUpdater _,
+      null, null,
+      opts
+    )
+    (nn, opts)
   }
 }
 

@@ -6,7 +6,7 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>1.1.1-cuda8.0</version>
+  <version>1.1.0-cuda7.5</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
@@ -309,8 +309,3 @@
     </repository>
   </distributionManagement>
 </project>
-
-
-
-
-
