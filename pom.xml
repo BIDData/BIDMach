@@ -241,6 +241,7 @@
             <arg>-deprecation</arg>
             <arg>-target:jvm-1.7</arg>
           </args>
+          <recompileMode>incremental</recompileMode>
         </configuration>
       </plugin>
       <plugin>
