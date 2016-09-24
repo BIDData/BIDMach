@@ -75,7 +75,7 @@
 <script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/bootstrap-sass-twbs/assets/javascripts/bootstrap.min.js?oblzkb"></script>
 <script type="text/javascript">
 <!--//--><![CDATA[//><!--
-jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":{"theme":"eecs","theme_token":"z8EmLLBQiZom26J2EXGt1VjexGib7z03InuFamSgm1w","js":{"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/jquery\/1.10\/jquery.min.js":1,"misc\/jquery.once.js":1,"misc\/drupal.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.core.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.widget.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.tabs.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.accordion.min.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_images\/panopoly-images.js":1,"sites\/all\/modules\/contrib\/google_cse\/google_cse.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_admin\/panopoly-admin.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_magic\/panopoly-magic.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_theme\/js\/panopoly-accordion.js":1,"profiles\/panopoly\/libraries\/jquery.imagesloaded\/jquery.imagesloaded.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/matchHeight\/jquery.matchHeight-min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/Chart.js\/Chart.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/charts.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/eecs.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/bootstrap-sass-twbs\/assets\/javascripts\/bootstrap.min.js":1}},"googleCSE":{"cx":"010464314754576911738:fu9nvbsz9t0","language":"","resultsWidth":600,"domain":"www.google.com"},"CToolsModal":{"modalSize":{"type":"scale","width":".9","height":".9","addWidth":0,"addHeight":0,"contentRight":25,"contentBottom":75},"modalOptions":{"opacity":".55","background-color":"#FFF"},"animationSpeed":"fast","modalTheme":"CToolsModalDialog","throbberTheme":"CToolsModalThrobber"},"panopoly_magic":{"pane_add_preview_mode":"single"}});
+jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":{"theme":"eecs","theme_token":"3qM6wfBytIYXFHw5jXhqLM8LrQ5br364MV1PO2wURaY","js":{"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/jquery\/1.10\/jquery.min.js":1,"misc\/jquery.once.js":1,"misc\/drupal.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.core.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.widget.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.tabs.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.accordion.min.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_images\/panopoly-images.js":1,"sites\/all\/modules\/contrib\/google_cse\/google_cse.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_admin\/panopoly-admin.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_magic\/panopoly-magic.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_theme\/js\/panopoly-accordion.js":1,"profiles\/panopoly\/libraries\/jquery.imagesloaded\/jquery.imagesloaded.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/matchHeight\/jquery.matchHeight-min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/Chart.js\/Chart.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/charts.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/eecs.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/bootstrap-sass-twbs\/assets\/javascripts\/bootstrap.min.js":1}},"googleCSE":{"cx":"010464314754576911738:fu9nvbsz9t0","language":"","resultsWidth":600,"domain":"www.google.com"},"CToolsModal":{"modalSize":{"type":"scale","width":".9","height":".9","addWidth":0,"addHeight":0,"contentRight":25,"contentBottom":75},"modalOptions":{"opacity":".55","background-color":"#FFF"},"animationSpeed":"fast","modalTheme":"CToolsModalDialog","throbberTheme":"CToolsModalThrobber"},"panopoly_magic":{"pane_add_preview_mode":"single"}});
 //--><!]]>
 </script>
 <!-- pagehead1 file, then title element, then this file -->
@@ -133,7 +133,7 @@ jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":
 <li class="mid-2024" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf" role="menuitem">Centers &amp; Labs</a></li>
 <li class="mid-2026" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf" role="menuitem">Projects</a></li>
 <li class="mid-2027" role="presentation"><a href="https://www2.eecs.berkeley.edu/bears/" class="leaf" role="menuitem">BEARS Symposium</a></li>
-<li class="mid-2327 last" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="last collapsed" role="menuitem">Colloquium</a></li>
+<li class="mid-2326 last" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="last leaf" role="menuitem">Colloquium</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
 <li class="mid-1634 dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/people" class="expanded" role="button" id="main-menu-dropdown-4" data-toggle="dropdown" aria-haspopup="true">People<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for People</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-4" aria-expanded="false"><li class="mid-2029 first" role="presentation"><a href="https://eecs.berkeley.edu/people" class="first leaf" role="menuitem">People Overview</a></li>
 <li class="mid-2035" role="presentation"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="leaf" role="menuitem">Directory</a></li>
@@ -168,7 +168,7 @@ jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":
   <label class="element-invisible" for="edit-search-block-form--2">Search </label>
  <input title="Enter the terms you wish to search for." placeholder="Search" class="form-control form-text fa-on" type="text" id="edit-search-block-form--2" name="search_block_form" value="" size="15" maxlength="128" />
 </div>
-<div class="form-actions form-wrapper" id="edit-actions"><button type="submit" id="edit-submit" name="op" class="form-submit btn btn-default btn-primary"><span>Search</span><i class="icon search" aria-hidden="true"></i></button></div><input type="hidden" name="form_build_id" value="form-QfOEPXJKJEZ2PolIOAIFYMD75rC8UvNw5Hh2rsN2yJg" />
+<div class="form-actions form-wrapper" id="edit-actions"><button type="submit" id="edit-submit" name="op" class="form-submit btn btn-default btn-primary"><span>Search</span><i class="icon search" aria-hidden="true"></i></button></div><input type="hidden" name="form_build_id" value="form-iR0UWt6Ht9vABZDR7tNmvcx6kzY3fffTg1R-uNRBvz4" />
 <input type="hidden" name="form_id" value="search_block_form" />
 </div>
 </div></form>  </div>
@@ -226,7 +226,7 @@ function validate() {
 
 <dl>
 <dt>Your request was :</dt>
-<dd>http://people.eecs.berkeley.edu/~jfc/biddata/lib/dev-cuda7.5/Jcommon_JfreeChart_LGPL.txt</dd>
+<dd>http://people.eecs.berkeley.edu/~jfc/biddata/lib/dev-cuda7.0/Jcommon_JfreeChart_LGPL.txt</dd>
 </dl>
 
 <h2>What are you looking for?</h2>
@@ -244,9 +244,9 @@ To report problems or submit questions and comments related to the
 site, please send an email to the following email address:</p>
 
 <code style="margin: 20px; padding: 0 20px ;">
-<a href="mailto:webteam@eecs.berkeley.edu?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FJcommon_JfreeChart_LGPL.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FJcommon_JfreeChart_LGPL.txt%0AReferrer%3A%20">webteam@EECS.Berkeley.EDU</a></code>
+<a href="mailto:webteam@eecs.berkeley.edu?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FJcommon_JfreeChart_LGPL.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FJcommon_JfreeChart_LGPL.txt%0AReferrer%3A%20">webteam@EECS.Berkeley.EDU</a></code>
 </p><p>To contact the owner of the specific page you were
-   looking for send an email to:</p><code style="margin: 20px; padding: 0 20px ;"><a href="mailto:jfc AT CS.Berkeley.EDU?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FJcommon_JfreeChart_LGPL.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FJcommon_JfreeChart_LGPL.txt%0AReferrer%3A%20">jfc AT CS.Berkeley.EDU</a></code>
+   looking for send an email to:</p><code style="margin: 20px; padding: 0 20px ;"><a href="mailto:jfc AT CS.Berkeley.EDU?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FJcommon_JfreeChart_LGPL.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FJcommon_JfreeChart_LGPL.txt%0AReferrer%3A%20">jfc AT CS.Berkeley.EDU</a></code>
 <!-- debug info
 <dl>
 <dt><em>Debugging Info:</em></dt>
@@ -292,9 +292,9 @@ site, please send an email to the following email address:</p>
 <li class="mid-2042" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf" role="menuitem">Centers &amp; Labs</a></li>
 <li class="mid-2043" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf" role="menuitem">Projects</a></li>
 <li class="mid-2044" role="presentation"><a href="https://www2.eecs.berkeley.edu/bears/" class="leaf" role="menuitem">BEARS Symposium</a></li>
-<li class="mid-2326" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="collapsed" role="menuitem">Colloquium</a></li>
 <li class="mid-2045" role="presentation"><a href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/" class="leaf" role="menuitem">Technical Reports</a></li>
-<li class="mid-2046 last" role="presentation"><a href="https://www2.eecs.berkeley.edu/Pubs/Dissertations/" class="last leaf" role="menuitem">PhD Dissertations</a></li>
+<li class="mid-2046" role="presentation"><a href="https://www2.eecs.berkeley.edu/Pubs/Dissertations/" class="leaf" role="menuitem">PhD Dissertations</a></li>
+<li class="mid-2327 last" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="last collapsed" role="menuitem">Colloquium</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
 <li class="mid-1589 " role="presentation"><a href="https://eecs.berkeley.edu/people" class="expanded" role="menuitem">People</a><ul role="menu" class="nav"><li class="mid-2047 first" role="presentation"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="first leaf" role="menuitem">Directory</a></li>
 <li class="mid-1594" role="presentation"><a href="https://eecs.berkeley.edu/people/leadership" class="leaf" role="menuitem">Leadership</a></li>
