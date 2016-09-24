@@ -3,7 +3,7 @@
 BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_SCRIPTS=`readlink -f "${BIDMACH_SCRIPTS}"`
-  export WGET='wget --no-check-certificate'
+  export WGET='wget -c --no-check-certificate'
 else
   while [ -L "${BIDMACH_SCRIPTS}" ]; do
     BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
@@ -25,24 +25,18 @@ pwd
 
 # Get test and training sets
 for i in `seq 0 3`; do 
-    if [ ! -e lyrl2004_tokens_test_pt${i}.dat.gz ]; then
-        ${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a12-token-files/lyrl2004_tokens_test_pt${i}.dat.gz
-    fi
+  ${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a12-token-files/lyrl2004_tokens_test_pt${i}.dat.gz
     if [ $i -eq "0" ]; then
         allfiles=lyrl2004_tokens_test_pt0.dat.gz
     else
         allfiles=${allfiles},lyrl2004_tokens_test_pt${i}.dat.gz
     fi
 done
-if [ ! -e lyrl2004_tokens_train.dat.gz ]; then
-    ${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a12-token-files/lyrl2004_tokens_train.dat.gz
-fi
+${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a12-token-files/lyrl2004_tokens_train.dat.gz
 allfiles=${allfiles},lyrl2004_tokens_train.dat.gz
 
 # Get topic assignments
-if [ ! -e rcv1-v2.topics.qrels.gz ]; then
-    ${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a08-topic-qrels/rcv1-v2.topics.qrels.gz
-fi
+${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a08-topic-qrels/rcv1-v2.topics.qrels.gz
 
 # Tokenize the text files
 # Windows cant use an uncompression pipe so uncompress here

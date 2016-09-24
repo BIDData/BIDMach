@@ -132,7 +132,7 @@ object LDAgibbs  {
   import jcuda.runtime._
   
   trait Opts extends FactorModel.Opts {
-      var alpha = row(0.1f);
+      var alpha = row(0.3f);
       var beta = row(0.1f);
       var nsamps = 100f;
       var doDirichlet = true; // Explicitly do Dirichlet sampling

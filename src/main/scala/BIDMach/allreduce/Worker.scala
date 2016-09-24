@@ -17,48 +17,47 @@ import java.net.InetSocketAddress;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import scala.tools.nsc.interpreter.IMain
 
-class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
+class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
-  var M = 0;
-  var imach = 0;
-	var gmods:IMat = null;
-	var gridmachines:IMat = null;  
-	var machineIPs:Array[String] = null;
-	var groups:Groups = null;
-
-	var executor:ExecutorService = null;
 	var listener:CommandListener = null;
 	var listenerTask:Future[_] = null;
 	var machine:Machine = null;
 	var learner:Learner = null;
+	var obj:AnyRef = null;
+	var str:String = null;
 	var model:Model = null;
+  var intp:ScriptEngine = null;
 	
 	def start(learner0:Learner) = {
 	  learner = learner0;
 	  if (model == null && learner != null) model = learner.model;
 	  executor = Executors.newFixedThreadPool(8);
-	  listener = new CommandListener(opts.commandSocketNum);
+	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
+	  intp = new ScriptEngineManager().getEngineByName("scala");
 	}
   
-  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, machineIPs0:IMat) = {
+  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress]) = {
     val t1 = toc;
     imach = imach0;
     gmods = gmods0;
     gridmachines = gridmachines0;
     M = gridmachines.length;
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
-    machineIPs = machineIPs0.data.map(Command.toAddress(_));
+    workers = workers0;
     if (machine != null) machine.stop;
-    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, machineIPs);
+    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers);
     machine.configTimeout = opts.configTimeout;
     machine.reduceTimeout = opts.reduceTimeout;
     machine.sendTimeout = opts.sendTimeout;
     machine.recvTimeout = opts.recvTimeout;
     machine.sockBase = opts.peerSocketNum;
-    machine.sockOffset = 0;
     machine.start(machine.maxk);
+    intp.put("$imach", imach);
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
   }
@@ -122,49 +121,88 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
-    		val newcmd = new ConfigCommand(cmd.clen, imach, cmd.bytes);
+    		val newcmd = new ConfigCommand(0, 0, null, null, null, null, cmd.clen, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-    		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines, newcmd.workerIPs);
+    		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines, Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts));
+    		if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
     	}
     	case Command.permuteCtype => {
-    		val newcmd = new PermuteCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new PermuteCommand(0, cmd.dest, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);
+    		if (opts.respond > 0) sendMaster(new Response(Command.permuteCtype, newcmd.round, imach));
     	}
     	case Command.allreduceCtype => {
-    		val newcmd = new AllreduceCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		allReduce(newcmd.round, newcmd.limit);
+    		if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
     	}
     	case Command.permuteAllreduceCtype => {
-    		val newcmd = new PermuteAllreduceCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);
     		allReduce(newcmd.round, newcmd.limit);
+    		if (opts.respond > 0) sendMaster(new Response(Command.permuteAllreduceCtype, newcmd.round, imach));
     	}
     	case Command.setMachineCtype => {
-    		val newcmd = new SetMachineCommand(cmd.dest, 0, cmd.bytes);
+    		val newcmd = new SetMachineCommand(0, cmd.dest, 0, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		imach = newcmd.newdest;
+    		if (opts.respond > 0) sendMaster(new Response(Command.setMachineCtype, newcmd.round, imach));
     	}
     	case Command.startLearnerCtype => {
-    		val newcmd = new StartLearnerCommand(cmd.dest, cmd.bytes);
+    		val newcmd = new StartLearnerCommand(0, cmd.dest, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		if (learner != null) {
     		  learner.paused = false;
     		}
+    		if (opts.respond > 0) sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach));
+    	}
+    	case Command.sendLearnerCtype => {
+    		val newcmd = new SendLearnerCommand(0, cmd.dest, null, cmd.bytes);
+    		newcmd.decode;
+    		learner = newcmd.learner;
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		if (opts.respond > 0) sendMaster(new Response(Command.sendLearnerCtype, newcmd.round, imach));
+    	}
+    	case Command.assignObjectCtype => {
+    		val newcmd = new AssignObjectCommand(0, cmd.dest, null, null, cmd.bytes);
+    		newcmd.decode;
+    		obj = newcmd.obj;
+    		str = newcmd.str;
+    		intp.put(str, obj);
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    		if (opts.respond > 0) sendMaster(new Response(Command.assignObjectCtype, newcmd.round, imach));
+    	}
+    	case Command.evalStringCtype => {
+    		val newcmd = new EvalStringCommand(0, cmd.dest, null, cmd.bytes);
+    		newcmd.decode;
+    		str = newcmd.str;
+    		obj = intp.eval(str);
+    		val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
+    		sendMaster(resp);
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+    	}
+    	case Command.callCtype => {
+    		val newcmd = new CallCommand(0, cmd.dest, null, cmd.bytes);
+    		newcmd.decode;
+    		obj = newcmd.callable.call;
+    		val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
+    		sendMaster(resp);
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     	}
     	}
     }
   }
 
-	class CommandListener(val socketnum:Int) extends Runnable {
+	class CommandListener(val socketnum:Int, worker:Worker) extends Runnable {
 		var stop = false;
 		var ss:ServerSocket = null;
 
@@ -180,7 +218,7 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 			start();
 			while (!stop) {
 				try {
-					val scs = new CommandReader(ss.accept());
+					val scs = new CommandReader(ss.accept(), worker);
 					if (opts.trace > 2) log("Command Listener got a message\n");
 					val fut = executor.submit(scs);
 				} catch {
@@ -210,107 +248,21 @@ class Worker(val opts:Worker.Opts = new Worker.Options) extends Serializable {
 		}
 	}
 
-	class CommandReader(socket:Socket) extends Runnable {
-		def run() {
-			try {
-				val istr = new DataInputStream(socket.getInputStream());
-				val magic = istr.readInt();
-				val ctype = istr.readInt();
-				val dest = istr.readInt();
-				val clen = istr.readInt();
-				val cmd = new Command(ctype, dest, clen, new Array[Byte](clen*4));
-				if (opts.trace > 2) log("Worker %d got packet %s\n" format (imach, cmd.toString));
-				istr.readFully(cmd.bytes, 0, clen*4);
-				try {
-  				socket.close();
-				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Worker %d Problem closing socket "+Command.printStackTrace(e)+"\n" format (imach))}
-				}
-				handleCMD(cmd);
-			} catch {
-			case e:Exception =>	if (opts.trace > 0) log("Worker %d Problem reading socket "+Command.printStackTrace(e)+"\n" format (imach));
-			} finally {
-				try {
-					if (!socket.isClosed) socket.close();
-				} catch {
-				case e:IOException => {if (opts.trace > 0) log("Worker %d Final Problem closing socket "+Command.printStackTrace(e)+"\n" format (imach))}
-				}
-			}
-		}
-	}
 	
-	def send(resp:Response):Future[_] = {
-    val cw = new ResponseWriter(Command.toAddress(opts.masterAddress), opts.responseSocketNum, resp);
+	def sendMaster(resp:Response):Future[_] = {
+    val cw = new ResponseWriter(master, resp, this);
     executor.submit(cw);
   }
-  
-  class ResponseWriter(dest:String, socketnum:Int, resp:Response) extends Runnable {
-
-  	def run() {
-  		var socket:Socket = null;
-  	  try {
-  	  	socket = new Socket();
-  	  	socket.setReuseAddress(true);
-  	  	socket.connect(new InetSocketAddress(dest, socketnum), opts.sendTimeout);
-  	  	if (socket.isConnected()) {
-  	  		val ostr = new DataOutputStream(socket.getOutputStream());
-  	  		ostr.writeInt(resp.magic)
-  	  		ostr.writeInt(resp.rtype);
-  	  		ostr.writeInt(resp.src);
-  	  		ostr.writeInt(resp.clen);
-  	  		ostr.write(resp.bytes, 0, resp.clen*4);		
-  	  	}
-  	  }	catch {
-  	  case e:Exception =>
-  	  if (opts.trace > 0) {
-  	    log("Master problem sending resp %s\n%s\n" format (resp.toString, Response.printStackTrace(e)));
-  	  }
-  	  } finally {
-  	  	try { if (socket != null) socket.close(); } catch {
-  	  	case e:Exception =>
-  	  	if (opts.trace > 0) log("Master problem closing socket\n%s\n" format Response.printStackTrace(e));			  
-  	  	}
-  	  }
-  	}
-  }
-	
-	class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {		
-		def run() {
-			try {
-				Thread.sleep(mtime);
-				for (i <- 0 until futures.length) {
-					if (futures(i) != null) {
-						if (opts.trace > 0) log("Worker cancelling thread %d" format i);
-						futures(i).cancel(true);
-					}
-				}
-			} catch {
-			case e:InterruptedException => if (opts.trace > 2) log("Worker interrupted timeout thread");
-			}
-		}
-	}
-  
-  def log(msg:String) {
-		print(msg);	
-	}
 }
 
 object Worker {
-	trait Opts extends BIDMat.Opts{
+	trait Opts extends Host.Opts{
 		var configTimeout = 3000;
 		var reduceTimeout = 3000;
-		var sendTimeout = 1000;
-		var recvTimeout = 1000;
 		var cmdTimeout = 1000;
-		var responseSocketNum = 50049;
-		var commandSocketNum = 50050;
-		var peerSocketNum = 50051;
-		var masterAddress = 0;
 		var fuseConfigReduce = false;
 		var doAvg = true;
 		var useLong = false;
-		var trace = 0;
-		var machineTrace = 0;
 		var replicate = 1;
 		var bufsize = 10*1000000;
 		var respond = 0;
