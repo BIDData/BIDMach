@@ -42,11 +42,11 @@ installcudalib: $(INSTALLDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND)
 installcpulib: $(INSTALLDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND)
 
 $(INSTALLDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(LIBPREPEND)bidmachcuda$(LIBAPPEND)
-	mkdir -p $(INSTALLDIR)
+	mkdir -p $(INSTALL_DIR)
 	cp $(LIBPREPEND)bidmachcuda$(LIBAPPEND) $(INSTALL_DIR)
 
 $(INSTALLDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND): $(LIBPREPEND)bidmachcpu$(LIBAPPEND)
-	mkdir -p $(INSTALLDIR)
+	mkdir -p $(INSTALL_DIR)
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND) $(INSTALL_DIR)
 	cp $(LIBDIR)/libiomp5$(LIBIOMPAPPEND)  $(INSTALL_DIR)
 
