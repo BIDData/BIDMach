@@ -16,18 +16,18 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
- *  Basic sequential Learner class with a single datasource 
+ *  Basic sequential Learner class with a single datasource
  */
 
 @SerialVersionUID(100L)
 case class Learner(
     val datasource:DataSource,
-    val model:Model, 
-    val mixins:Array[Mixin], 
-    val updater:Updater, 
+    val model:Model,
+    val mixins:Array[Mixin],
+    val updater:Updater,
     val datasink:DataSink,
     val opts:Learner.Options = new Learner.Options) extends Serializable {
-  
+
   var results:FMat = null
   val dopts:DataSource.Opts = if (datasource != null) datasource.opts else null
   val mopts:Model.Opts	= model.opts
@@ -45,11 +45,11 @@ case class Learner(
   var bytes = 0L;
   var cacheState = false;
   var debugMemState = false;
-	
+
   def setup = {
-	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)   
+	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
   }
-  
+
   def init = {
     var cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
@@ -66,13 +66,13 @@ case class Learner(
     Mat.useCache = cacheState;
     useGPU = model.useGPU
   }
-    
+
   def train = {
     retrain
   }
-   
+
   def retrain() = {
-    flip 
+    flip
     var cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
     debugMemState = Mat.debugMem;
@@ -87,7 +87,7 @@ case class Learner(
     }
     wrapUp(ipass);
   }
-  
+
   def firstPass(iter:Iterator[(AnyRef, MatIOtrait)]):Unit = {
     setup
     init
@@ -106,7 +106,7 @@ case class Learner(
     nextPass(iter);
   }
 
-  
+
   def nextPass(iter:Iterator[(AnyRef, MatIOtrait)]): Unit = {
     if (opts.debugMem && ipass > 0) Mat.debugMem = true;
     var lastp = 0f
@@ -179,14 +179,14 @@ case class Learner(
       resetGPUs
       Mat.clearCaches
     }
-    
+
     datasource.close;
     if (datasink != null) datasink.close;
     if (model.opts.logDataSink.asInstanceOf[AnyRef] != null) model.opts.logDataSink.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList);
     done = true;
   }
-  
+
   def predict() = {
     setup;
     datasource.init;
@@ -202,9 +202,9 @@ case class Learner(
     model.refresh = rstate
     results
   }
-  
+
   def repredict() = {
-    flip 
+    flip
     useGPU = model.useGPU
     var cacheState = Mat.useCache
     Mat.useCache = opts.useCache
@@ -217,7 +217,7 @@ case class Learner(
     println("Predicting")
     datasource.reset
     while (datasource.hasNext) {
-      val mats = datasource.next    
+      val mats = datasource.next
       here += datasource.opts.batchSize
       bytes += mats.map(Learner.numBytes _).reduce(_+_);
       val scores = model.evalbatchg(mats, 0, here);
@@ -229,14 +229,14 @@ case class Learner(
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
         print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-            100f*lastp, 
+            100f*lastp,
             Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
             gf._1,
-            gf._2, 
+            gf._2,
             bytes*1e-9,
-            bytes/gf._2*1e-6))  
+            bytes/gf._2*1e-6))
             if (useGPU) {
-              print(", GPUmem=%3.2f" format GPUmem._1) 
+              print(", GPUmem=%3.2f" format GPUmem._1)
             }
         println
         lasti = reslist.length
@@ -254,7 +254,7 @@ case class Learner(
     if (datasink != null) datasink.close;
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
-  
+
   def datamats = datasource.asInstanceOf[MatSource].mats;
   def modelmats = model.modelmats;
   def datamat = datasource.asInstanceOf[MatSource].mats(0);
@@ -263,29 +263,29 @@ case class Learner(
 }
 
 
-/** 
+/**
  * Parallel Learner with a single datasource.
  */
 
 case class ParLearner(
-    val datasource:DataSource, 
-    val models:Array[Model], 
-    val mixins:Array[Array[Mixin]], 
+    val datasource:DataSource,
+    val models:Array[Model],
+    val mixins:Array[Array[Mixin]],
     val updaters:Array[Updater],
     val datasink:DataSink,
     val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
-  
+
   var um:Array[Mat] = null
   var mm:Array[Mat] = null
   var results:FMat = null
   var cmats:Array[Array[Mat]] = null
   var useGPU = false
-  
+
   def setup = {
 	  val dopts	= datasource.opts
-	  Learner.setupPB(datasource, datasource.opts.putBack, models(0).opts.dim)  
+	  Learner.setupPB(datasource, datasource.opts.putBack, models(0).opts.dim)
   }
-  
+
   def init = {
     datasource.init
     useGPU = models(0).opts.useGPU
@@ -297,7 +297,7 @@ case class ParLearner(
     	if (mixins != null) mixins(i) map (_ init(models(i)))
     	if (updaters != null && updaters(i) != null) updaters(i).init(models(i))
     }
-    if (useGPU) setGPU(thisGPU) 
+    if (useGPU) setGPU(thisGPU)
     val mml = models(0).modelmats.length
     um = new Array[Mat](mml)
     mm = new Array[Mat](mml)
@@ -308,13 +308,13 @@ case class ParLearner(
     }
     ParLearner.syncmodels(models, mm, um, 0, useGPU)
   }
-  
+
   def train = {
-    setup 
+    setup
     init
     retrain
   }
-  
+
   def retrain = {
     flip
     val mm0 = models(0).modelmats(0)
@@ -327,7 +327,7 @@ case class ParLearner(
 	    for (i <- 0 until opts.nthreads) {
 //	      if (i != thisGPU) connect(i)
 	    }
-	  }    
+	  }
     @volatile var done = iones(opts.nthreads, 1)
     var ipass = 0
     var here = 0L
@@ -371,9 +371,9 @@ case class ParLearner(
     				restart(ithread)
     				println("Restarted: Keep on truckin...")
     			}
-    			} 
-    			done(ithread) = 1 
-    		}  
+    			}
+    			done(ithread) = 1
+    		}
     	}
     }
     while (ipass < opts.npasses) {
@@ -388,12 +388,12 @@ case class ParLearner(
             progress = datasource.progress
             gprogress = (ipass + progress)/opts.npasses
     				for (j <- 0 until mats.length) {
-    				  cmats(ithread)(j) = safeCopy(mats(j), ithread) 
+    				  cmats(ithread)(j) = safeCopy(mats(j), ithread)
     				}
     				if (ithread == 0) here += datasource.opts.batchSize
     				done(ithread) = 0;
     				bytes += mats.map(Learner.numBytes _).reduce(_+_);
-    			} 
+    			}
     		}
       	while (mini(done).v == 0) Thread.sleep(1)
       	Thread.sleep(opts.coolit)
@@ -404,12 +404,12 @@ case class ParLearner(
       		val gf = gflop
       		if (reslist.length > lasti) {
       			print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-      					100f*lastp, 
+      					100f*lastp,
       					Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
       					gf._1,
-      					gf._2, 
+      					gf._2,
       					bytes*1e-9,
-      					bytes/gf._2*1e-6))  
+      					bytes/gf._2*1e-6))
       		  if (useGPU) {
       		    for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
       		      setGPU(i)
@@ -423,7 +423,7 @@ case class ParLearner(
       	}
       }
       for (i <- 0 until opts.nthreads) {
-        if (useGPU && i < Mat.hasCUDA) setGPU(i); 
+        if (useGPU && i < Mat.hasCUDA) setGPU(i);
         if (updaters != null && updaters(i) != null) updaters(i).updateM(ipass)
       }
       setGPU(thisGPU)
@@ -441,7 +441,7 @@ case class ParLearner(
     	for (i <- 0 until opts.nthreads) {
  //   		if (i != thisGPU) disconnect(i);
     	}
-    } 
+    }
     if (opts.autoReset && useGPU) {
       Learner.toCPU(models(0).modelmats)
       resetGPUs
@@ -449,7 +449,7 @@ case class ParLearner(
     println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*opts.nthreads*here, bytes/gf._2/1e6))
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
-  
+
   def safeCopy(m:Mat, ithread:Int):Mat = {
     m match {
       case ss:SMat => {
@@ -466,7 +466,7 @@ case class ParLearner(
       }
     }
   }
-  
+
   def restart(ithread:Int) = {
     if (useGPU) {
       resetGPU
@@ -475,9 +475,9 @@ case class ParLearner(
     models(ithread).bind(datasource)
     models(ithread).init
     models(ithread).modelmats(0) <-- mm(0)
-    updaters(ithread).init(models(ithread))      
+    updaters(ithread).init(models(ithread))
   }
-    
+
   def datamats = datasource.asInstanceOf[MatSource].mats
   def modelmats = models(0).modelmats
   def datamat = datasource.asInstanceOf[MatSource].mats(0)
@@ -486,29 +486,29 @@ case class ParLearner(
 
 
 /**
- * Parallel Learner class with multiple datasources, models, mixins, and updaters. 
- * i.e. several independent Learners whose models are synchronized periodically. 
+ * Parallel Learner class with multiple datasources, models, mixins, and updaters.
+ * i.e. several independent Learners whose models are synchronized periodically.
  */
 
 case class ParLearnerx(
-    val datasources:Array[DataSource], 
-    val models:Array[Model], 
-    val mixins:Array[Array[Mixin]], 
-    val updaters:Array[Updater], 
+    val datasources:Array[DataSource],
+    val models:Array[Model],
+    val mixins:Array[Array[Mixin]],
+    val updaters:Array[Updater],
     val datasinks:Array[DataSink],
 		val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
-  
+
   var um:Array[Mat] = null
   var mm:Array[Mat] = null
   var results:FMat = null
   var useGPU = false
-  
+
   def setup = {
 	  for (i <- 0 until opts.nthreads) {
 	  	Learner.setupPB(datasources(i), datasources(i).opts.putBack, models(i).opts.dim)
-	  }   
+	  }
   }
-  
+
   def init = {
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
   	for (i <- 0 until opts.nthreads) {
@@ -530,15 +530,15 @@ case class ParLearnerx(
     	um(i) = zeros(mm0.nrows, mm0.ncols)
     }
   }
-  
+
   def train = {
     setup
     init
     retrain
   }
-  
+
   def retrain() = {
-	  flip 
+	  flip
 	  var cacheState = Mat.useCache
     Mat.useCache = opts.useCache
 	  val thisGPU = if (useGPU) getGPU else 0
@@ -551,10 +551,10 @@ case class ParLearnerx(
 	  @volatile var done = izeros(opts.nthreads, 1)
 	  var ipass = 0
 	  var istep0 = 0L
-	  var ilast0 = 0L	
+	  var ilast0 = 0L
 	  var bytes = 0L
 	  val reslist = new ListBuffer[FMat]
-	  val samplist = new ListBuffer[Float]    	  	
+	  val samplist = new ListBuffer[Float]
 	  var lastp = 0f
 	  var lasti = 0
     var gprogress = 0f
@@ -593,7 +593,7 @@ case class ParLearnerx(
 	  					restart(ithread)
 	  					println("Keep on truckin...")
 	  				}
-	  				} 
+	  				}
 	  				if (useGPU) Thread.sleep(opts.coolit)
 	  				if (datasources(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, datasources(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
@@ -604,7 +604,7 @@ case class ParLearnerx(
 	  		}
 	  	}
 	  }
-	  println("pass=%2d" format ipass) 
+	  println("pass=%2d" format ipass)
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {
 	  		if (istep0 >= ilast0 + opts.syncStep) {
@@ -616,14 +616,14 @@ case class ParLearnerx(
 	  			val gf = gflop
 	  			if (reslist.length > lasti) {
 	  				print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-	  						100f*lastp, 
+	  						100f*lastp,
 	  						reslist.synchronized {
 	  							Learner.scoreSummary(reslist, lasti, reslist.length)
 	  						},
 	  						gf._1,
-	  						gf._2, 
+	  						gf._2,
 	  						bytes*1e-9,
-	  						bytes/gf._2*1e-6))  
+	  						bytes/gf._2*1e-6))
 	  						if (useGPU) {
 	  							for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
 	  								setGPU(i)
@@ -641,7 +641,7 @@ case class ParLearnerx(
 	  	lastp = 0f
 	  	if (ipass < opts.npasses) {
 	  	  for (i <- 0 until opts.nthreads) datasources(i).reset
-	  	  println("pass=%2d" format ipass+1) 
+	  	  println("pass=%2d" format ipass+1)
 	  	}
 	  	if (opts.resFile != null) {
       	saveAs(opts.resFile, Learner.scores2FMat(reslist) on row(samplist.toList), "results")
@@ -658,7 +658,7 @@ case class ParLearnerx(
 	  for (ithread <- 0 until opts.nthreads) datasources(ithread).close
 	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
-  
+
   def syncmodel(models:Array[Model], ithread:Int) = {
 	  mm.synchronized {
 	    for (i <- 0 until models(ithread).modelmats.length) {
@@ -670,7 +670,7 @@ case class ParLearnerx(
 	    }
 	  }
   }
-  
+
   def restart(ithread:Int) = {
     if (useGPU) {
       resetGPU
@@ -681,9 +681,9 @@ case class ParLearnerx(
     for (i <- 0 until models(ithread).modelmats.length) {
     	models(ithread).modelmats(i) <-- mm(i)
     }
-    updaters(ithread).init(models(ithread))      
+    updaters(ithread).init(models(ithread))
   }
-  
+
   def dsProgress:Float = {
     var sum = 0f
     for (i <- 0 until datasources.length) {
@@ -691,15 +691,15 @@ case class ParLearnerx(
     }
     sum / datasources.length
   }
-  
+
   def modelmats = models(0).modelmats
   def modelmat = models(0).modelmats(0)
 
 }
 
 /**
- * Parallel multi-datasource Learner that takes function arguments. 
- * This allows classes to be initialized later, when the learner is setup. 
+ * Parallel multi-datasource Learner that takes function arguments.
+ * This allows classes to be initialized later, when the learner is setup.
  */
 
 class ParLearnerxF(
@@ -721,7 +721,7 @@ class ParLearnerxF(
   var mixins:Array[Array[Mixin]] = null
   var updaters:Array[Updater] = null
   var learner:ParLearnerx = null
-  
+
   def setup = {
     dds = new Array[DataSource](lopts.nthreads);
     sss = new Array[DataSink](lopts.nthreads);
@@ -740,9 +740,9 @@ class ParLearnerxF(
     learner = new ParLearnerx(dds, models, mixins, updaters, sss, lopts)
     learner.setup
   }
-  
+
   def init = learner.init
-  
+
   def train = {
     setup
     init
@@ -770,11 +770,11 @@ class ParLearnerF(
   var mixins:Array[Array[Mixin]] = null
   var updaters:Array[Updater] = null
   var learner:ParLearner = null
-  
+
   def setup = {
     models = new Array[Model](lopts.nthreads)
     if (mkreg != null) mixins = new Array[Array[Mixin]](lopts.nthreads)
-    if (mkupdater != null) updaters = new Array[Updater](lopts.nthreads) 
+    if (mkupdater != null) updaters = new Array[Updater](lopts.nthreads)
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
       if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
@@ -783,23 +783,23 @@ class ParLearnerF(
     	if (mkupdater != null) updaters(i) = mkupdater(uopts)
     }
     if (0 < Mat.hasCUDA) setGPU(thisGPU)
-    learner = new ParLearner(ds, models, mixins, updaters, ss, lopts)   
+    learner = new ParLearner(ds, models, mixins, updaters, ss, lopts)
     learner.setup
   }
-  
+
   def init =	learner.init
-  
+
   def train = {
     setup
     init
     retrain
   }
-  
+
   def retrain = learner.retrain
 }
 
 object Learner {
-  
+
   class Options extends BIDMat.Opts {
   	var npasses = 2;
   	var evalStep = 11;
@@ -813,7 +813,7 @@ object Learner {
     var checkPointFile:String = null;
     var checkPointInterval = 0f;
   }
-  
+
   def numBytes(mat:Mat):Long = {
     mat match {
       case a:FMat => 4L * mat.length;
@@ -824,7 +824,7 @@ object Learner {
       case a:SDMat => 12L * mat.nnz;
     }
   }
-    
+
   def toCPU(mats:Array[Mat]) {
     for (i <- 0 until mats.length) {
       mats(i) match {
@@ -839,7 +839,7 @@ object Learner {
       }
     }
   }
-  
+
   def setupPB(ds:DataSource, npb:Int, dim:Int) = {
     ds match {
     case ddm:MatSource => {
@@ -850,7 +850,7 @@ object Learner {
     case _ => {}
     }
   }
-  
+
   def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):String = {
     val istart = if (cumScore == 0) lasti else {if (cumScore == 1) 0 else if (cumScore == 2) len/2 else 3*len/4};
     var i = 0
@@ -859,10 +859,12 @@ object Learner {
       if (i >= istart) sum += mean(scoremat(?,0)).v
       i += 1
     }
-    ("ll=%6.5f" format sum/(len - istart))    
+    ("ll=%6.5f" format sum/(len - istart))
   }
-  
+
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
+    if (reslist.length == 0) return zeros(0, 0)
+
     val out = FMat(reslist(0).nrows, reslist.length)
     var i = 0;
     while (i < reslist.length) {
@@ -875,21 +877,21 @@ object Learner {
 }
 
 object ParLearner {
-  
-  class Options extends 
+
+  class Options extends
   Learner.Options {
   	var nthreads = math.max(0, Mat.hasCUDA)
   	var syncStep = 32
   	var coolit = 60
   }
-  
+
   def syncmodelsPass(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) = {
     models(0).mergeModelPassFn(models, mm, um, ipass);
   }
-  
+
   def syncmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, useGPU:Boolean) = {
     models(0).mergeModelFn(models, mm, um, istep);
   }
-  
+
 }
 

@@ -9,20 +9,20 @@ import scala.collection.mutable.ListBuffer
 
 /**
  * Abstract class with shared code for all models
- * 
- * Models are saved as separate files into a directory. The model save pathname should contain a trailing "/" and name this parent directory. 
+ *
+ * Models are saved as separate files into a directory. The model save pathname should contain a trailing "/" and name this parent directory.
  */
 
 abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializable {
-  
+
   var datasource:DataSource = null;
-  
+
   var datasink:DataSink = null;
-  
+
   var _modelmats:Array[Mat] = null;
-  
+
   var parent_model:Model = null;
-  
+
   def modelmats:Array[Mat] = {
     if (_modelmats != null) {
       _modelmats
@@ -32,39 +32,39 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       null
     }
   }
-  
+
   def setmodelmats(a:Array[Mat]) = {
     _modelmats = a;
   }
-  
+
   var updatemats:Array[Mat] = null;
-  
+
   // For Allreduce: the local indices
   var indexmat:Mat = null;
-  
+
   // For Allreduce: cached local matrices:
   var sendmat:Mat = null;
-  
+
   var recvmat:Mat = null;
-  
+
   var mats:Array[Mat] = null;
-  
+
   var gmats:Array[Mat] = null;
-  
+
   var omats:Array[Mat] = null;
-  
+
   var ogmats:Array[Mat] = null;
-  
+
   var useGPU = false;
-  
+
   var useDouble = false;
-  
+
   var putBack = -1;
-  
+
   var refresh = true;
-  
+
   var runtimes:FMat = null;
-  
+
   def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long):Unit = {
     val mlen = models(0).modelmats.length;
     val thisGPU = getGPU;
@@ -82,9 +82,9 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
     setGPU(thisGPU);
   }
-  
+
   def mergeModelPassFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) {}
-  
+
   def copyTo(mod:Model) = {
     mod.datasource = datasource;
     mod._modelmats = modelmats;
@@ -94,23 +94,23 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     mod.omats = omats;
     mod.ogmats = ogmats;
   }
-  
+
   def copyFrom(mod:Model) = {
     setmodelmats(new Array[Mat](mod.modelmats.length));
     for (i <- 0 until modelmats.length) {
       modelmats(i) = mod.modelmats(i);
     }
   }
-  
+
   def saveMetaData(fname:String) = {}
-  
+
   def loadMetaData(fname:String) = {}
-  
+
   /**
-   * Save the model to a given path. This is normally a directory (which is created if needed). 
-   * Otherwise the model and metadata filenames are concatenated to form the save file paths. 
+   * Save the model to a given path. This is normally a directory (which is created if needed).
+   * Otherwise the model and metadata filenames are concatenated to form the save file paths.
    */
-  
+
   def save(fname:String) = {
     import java.io._
     val metadataname = new File(fname+"options.json");
@@ -130,7 +130,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
     saveMetaData(fname);
   }
-  
+
   def load(fname:String) = {
 	  import java.io._
     import BIDMat.JSON
@@ -162,7 +162,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	  	opts.copyFrom(newopts);
 	  }
   }
-  
+
   def bind(ds:DataSource):Unit = {
 	  datasource = ds;
 	  mats = datasource.next;
@@ -172,19 +172,19 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	  useDouble = opts.useDouble;
 	  gmats = new Array[Mat](mats.length);
   }
-  
+
   def bind(ds:DataSink):Unit = {
 	  datasink = ds;
 	  omats = datasink.omats;
 	  ogmats = new Array[Mat](omats.length);
   }
-  
+
   def init():Unit
-  
+
   def dobatch(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
-  
+
   def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
-  
+
   def logging(gmats:Array[Mat],ipass:Int, here:Long) = {
     if (opts.logFuncs!=null){
         val res = opts.logFuncs.map(f=>f(this,gmats));
@@ -195,13 +195,13 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         }
     }
   }
-  
+
   def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
-    copyMats(amats, gmats);            		
+    copyMats(amats, gmats);
     dobatch(gmats, ipass, here);
     logging(gmats, ipass, here);
   }
-  
+
   def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
     copyMats(amats, gmats)
     val v = evalbatch(gmats, ipass, here)
@@ -212,7 +212,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
 	v
   }
-  
+
   def snapshot(len:Int, avg:Boolean) = {
   	val len0 = math.min(len, modelmats(0).ncols);
   	modelmats(0).synchronized {
@@ -220,9 +220,9 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   	}
   	if (avg) {
   		sendmat = ones(1, len0) on sendmat;
-  	}      
+  	}
   }
-  
+
   def addStep(len:Int, avg:Boolean) = {
   	val len0 = math.min(len, modelmats(0).ncols);
   	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
@@ -234,9 +234,9 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   		chead <-- head;
   		chead ~ chead + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat);
   		head <-- chead;
-  	}      
+  	}
   }
-  
+
   def elasticStep(len:Int, avg:Boolean, ee:Float) = {
   	val len0 = math.min(len, modelmats(0).ncols);
   	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
@@ -248,7 +248,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   		chead <-- head;
   		chead ~ chead * (1 - ee) + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat) * ee;
   		head <-- chead;
-  	}      
+  	}
   }
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
@@ -262,12 +262,12 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SMat => GSDMat(aa)
         	case aa:GDMat => aa
         	case aa:GMat => GDMat(aa)
-        	}         
+        	}
         } else {
         	to(i) = from(i) match {
         	case aa:FMat => GMat(aa)
         	case aa:DMat => GMat(aa)
-        	case aa:IMat => GIMat(aa)        	
+        	case aa:IMat => GIMat(aa)
         	case aa:SMat => GSMat(aa)
         	case aa:GMat => aa
         	case aa:GDMat => GMat(aa)
@@ -287,24 +287,25 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SMat => aa
         	case aa:DMat => FMat(aa);
         	case aa:SDMat => SMat(aa);
-        	}      	  
+        	}
       	}
       }
     }
   }
-  
+
   def updatePass(ipass:Int) = {}
-  
+
   def convertMat(a:Mat):Mat = {
   	Model.convertMat(a, useGPU, opts.useDouble).asInstanceOf[Mat];
   }
-  
+
   def convertMat(a:ND):ND = {
   	Model.convertMat(a, useGPU, opts.useDouble);
   }
 
   def combineModels(ipass:Int, model: Model):Model = this;
-  
+  def combineModels(model: Model):Model = combineModels(0, model);
+
   def wrapUp(ipass:Int):Unit = {}
 }
 
@@ -323,10 +324,10 @@ object Model {
 	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
 	  var logDataSink : DataSink = null;
   }
-        
-	class Options extends Opts {} 
-  
-  def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {	
+
+	class Options extends Opts {}
+
+  def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {
 	   a match {
       case f:FMat =>
       if (useGPU) {
@@ -336,7 +337,7 @@ object Model {
       		GMat(f);
       	}
       } else {
-      	if (useDouble) {  
+      	if (useDouble) {
       		DMat(f);
       	} else {
       		f
@@ -353,7 +354,7 @@ object Model {
       		GDMat(g);
       	} else {
       	  g
-      	} 
+      	}
       } else {
       	if (useDouble) {
       	  DMat(FMat(g));
@@ -366,7 +367,7 @@ object Model {
       		g;
       	} else {
       	  GMat(g)
-      	} 
+      	}
       } else {
       	if (useDouble) {
       	  DMat(g);
@@ -379,7 +380,7 @@ object Model {
       		GSDMat(g);
       	} else {
       	  g;
-      	} 
+      	}
       } else {
       	if (useDouble) {
       	  SDMat(SMat(g));

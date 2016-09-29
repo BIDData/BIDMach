@@ -1,8 +1,13 @@
-val (mm,opts) = RandomForest.learner("../data/MNIST8M/parts/data%02d.fmat.lz4","../data/MNIST8M/parts/cat%02d.imat.lz4")
+val (mm,opts) = RandomForest.learner(
+  "/opt/BIDMach/data/MNIST8M/parts/data%02d.fmat.lz4",
+  "/opt/BIDMach/data/MNIST8M/parts/cats%02d.imat.lz4"
+)
+opts.useGPU = true
 opts.batchSize = 20000
-opts.depth =  24
-opts.nend = 8
+opts.depth = 10
+// opts.nend = 8
 opts.ntrees = 100
+opts.ncats = 10
 opts.impurity = 0
 
 opts.nsamps = 12
