@@ -308,16 +308,25 @@ object Net  {
     nodes(depth-1) = new GLMNode{inputs(0) = nodes(depth-2); links = opts.links};
     nodes;
   }
-  
-  def powerShape(tailHeight:Float, power:Float)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
-    powerShape(tailHeight, power, true)(headCount, nfeats);
-  }
-  
+
   def powerShape(tailHeight:Float)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
-    powerShape(tailHeight, 1f, true)(headCount, nfeats);
+    powerShape(tailHeight, 1f, true, true)(headCount, nfeats);
+  }
+
+  def powerShape(tailHeight:Float, power:Float)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
+    powerShape(tailHeight, power, true, true)(headCount, nfeats);
+  }
+
+  def powerShape(tailHeight:Float, power:Float, leftAlign:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
+    powerShape(tailHeight, power, leftAlign, true)(headCount, nfeats);  
+  }
+
+  def powerShape(tailHeight:Float, power:Float, leftAlign:Boolean, horizontal:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = { 
+    if (horizontal) powerShapeH(tailHeight, power,leftAlign)(headCount,nfeats)
+    else  powerShapeV(tailHeight, power,leftAlign)(headCount,nfeats)
   }
   
-  def powerShape(tailHeight:Float, power:Float, leftAlign:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
+  def powerShapeH(tailHeight:Float, power:Float, leftAlign:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
     var nblocks = 1;
     var tc = tailHeight;
     var ymin = 0;
@@ -349,6 +358,41 @@ object Net  {
       }
       xmax = newx;
       ymin = ymax;
+      tc *= 2;
+    }
+    (y, x, h, w)
+  }
+
+  def powerShapeV(tailHeight:Float, power:Float, leftAlign:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
+    var nblocks = 1;
+    var tc = tailHeight;
+    var ymin = 0;
+    while (tc < headCount) {
+      val ymax = math.min(headCount, math.round(tc - 1e-5f));
+      if (ymax - ymin > 0) nblocks += 1;
+      ymin = ymax;
+      tc *= 2;
+    }
+    val y = new Array[Int](nblocks);
+    val x = new Array[Int](nblocks);
+    val h = new Array[Int](nblocks);
+    val w = new Array[Int](nblocks);
+    val ratio = math.pow(0.5, power);
+    var xmax = nfeats;
+    ymin = 0;
+    tc = tailHeight;
+    var i = nblocks - 1;
+    while (i >= 0) {
+    	val newx = if (i == 0) 0 else (xmax * ratio).toInt;
+      val ymax = math.min(headCount, math.round(tc - 1e-5f));
+      if (ymax > 0) {
+      	x(i) = newx;
+      	y(i) = 0;
+      	w(i) = xmax - newx;
+      	h(i) = ymax;
+      	i -= 1;
+      }
+      xmax = newx;
       tc *= 2;
     }
     (y, x, h, w)
