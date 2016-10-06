@@ -139,6 +139,7 @@
                   <includes>
                     <include>lib/*bidmachcpu*</include>
                     <include>lib/*iomp5*</include>
+                    <include>bin/*</include>
                   </includes>
                 </configuration>
               </execution>
@@ -235,36 +236,27 @@
 	<version>2.10</version>
 	<executions>
 	  <execution>
-	    <id>resource-dependencies</id>
-	    <phase>generate-resources</phase>
+	    <id>unpack-resources</id>
+	    <phase>package</phase>
 	    <goals>
-              <goal>unpack-dependencies</goal>
+              <goal>unpack</goal>
 	    </goals>
 	    <configuration>
-	      <includes>**/*.exe</includes>
-              <classifier>cpu-${osarch}</classifier>
-              <outputDirectory>${project.directory}/cbin</outputDirectory>
+	      <artifactItems>
+		<artifactItem>
+		  <groupId>BIDMach</groupId>
+		  <artifactId>BIDMach</artifactId>
+		  <classifier>cpu-${osarch}</classifier>
+		  <version>${project.version}</version>
+		  <includes>**/*.exe</includes>
+		  <outputDirectory>${project.basedir}/cbin</outputDirectory>
+		</artifactItem>
+	      </artifactItems>
 	    </configuration>
 	  </execution>
 	</executions>
       </plugin> 
     </plugins>
-    <resources>
-      <resource>
-        <targetPath>lib/</targetPath>
-        <directory>src/main/resources/lib/</directory>
-        <excludes>
-          <exclude>**/*.jar</exclude>
-        </excludes>
-      </resource>
-      <resource>
-        <targetPath>bin/</targetPath>
-        <directory>src/main/resources/bin/</directory>
-        <excludes>
-          <exclude>**/*.jar</exclude>
-        </excludes>
-      </resource>
-    </resources>
   </build>	
   <distributionManagement>
     <repository>
