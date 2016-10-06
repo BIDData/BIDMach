@@ -2,7 +2,7 @@
 
 val mdir = "../data/criteo/parts/"
 
-val (nn,opts) = GLM.learnerX(List(mdir+"trainsortedx%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4"));
+val (nn,opts) = GLM.learnerX(List(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4"));
 opts.nend = 80;
 opts.lrate = 0.01f;
 opts.reg1weight = 1e-7f;
@@ -24,7 +24,7 @@ val tscores = dzeros(filesize*10, 1);
 val tcats = dzeros(filesize*10, 1);
 var len = 0;
 for (i <- 0 until 10) {
-  val a = loadSMat(mdir + "trainsortedx%02d.smat.lz4" format i + opts.nend);
+  val a = loadSMat(mdir + "trainsorted%02d.smat.lz4" format i + opts.nend);
   val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + opts.nend);
   val sc = mm * a;
   tscores(i * filesize -> (i * filesize + sc.length), 0) = DMat(sc.t);

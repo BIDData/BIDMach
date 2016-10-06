@@ -1,0 +1,12 @@
+
+val wdir = "../data/YearPrediction/"
+val a = loadFMat(wdir+"YearPredictionMSD.txt");
+
+val labels = a(?,0);
+val data = a(?,1->a.ncols);
+
+saveFMat(wdir+"train.fmat.lz4", data.t);
+saveFMat(wdir+"cats.fmat.lz4", labels.t);
+saveIMat(wdir+"cats.imat.lz4", IMat(labels.t));
+
+sys.exit;

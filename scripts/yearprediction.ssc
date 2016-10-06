@@ -5,7 +5,8 @@ val opts = new xopts
 
 val mdir = "../data/YearPrediction/"
 val data = loadFMat(mdir+"train.fmat.lz4");
-val cats = loadFMat(mdir+"cats.fmat.lz4");
+val cats0 = loadFMat(mdir+"cats.fmat.lz4");
+val cats = cats0 - mini(cats0);
 
 val rr = rand(1,data.ncols);
 val itrain = find(rr > 0.1f);
