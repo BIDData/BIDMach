@@ -257,6 +257,20 @@
 	</executions>
       </plugin> 
     </plugins>
+    <resources>
+      <resource>
+	<directory>lib/</directory>
+	<excludes>
+	  <exclude>*</exclude>
+	</excludes>
+      </resource>
+      <resource>
+	<directory>bin/</directory>
+	<excludes>
+	  <exclude>*</exclude>
+	</excludes>
+      </resource>
+    </resources>	
   </build>	
   <distributionManagement>
     <repository>
