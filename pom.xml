@@ -139,7 +139,7 @@
                   <includes>
                     <include>lib/*bidmachcpu*</include>
                     <include>lib/*iomp5*</include>
-                    <include>bin/*</include>
+                    <include>cbin/*</include>
                   </includes>
                 </configuration>
               </execution>
@@ -249,7 +249,7 @@
 		  <classifier>cpu-${osarch}</classifier>
 		  <version>${project.version}</version>
 		  <includes>**/*.exe</includes>
-		  <outputDirectory>${project.basedir}/cbin</outputDirectory>
+		  <outputDirectory>${project.basedir}</outputDirectory>
 		</artifactItem>
 	      </artifactItems>
 	    </configuration>
@@ -265,7 +265,7 @@
 	</excludes>
       </resource>
       <resource>
-	<directory>bin/</directory>
+	<directory>cbin/</directory>
 	<excludes>
 	  <exclude>*</exclude>
 	</excludes>
