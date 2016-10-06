@@ -1458,8 +1458,10 @@ object RandomForest {
 
   def predictor(models:Array[Model], data:Mat):(Learner, PredOpts) = {
     val opts = new PredOpts;
-    val mergedModel = models(0)
-    (0 until models.length).map(i => {mergedModel.combineModels(models(i))})
+    var mergedModel = models(0)
+    (1 until models.length).map(i => {
+      mergedModel = mergedModel.combineModels(models(i))
+    })
     mergedModel.opts.asInstanceOf[RandomForest.Opts].training = false;
     opts.copyFrom(mergedModel.opts);
     val nn = new Learner(
