@@ -7,7 +7,7 @@ export JAVA_OPTS="${MEMSIZE} -Xms16G -Dfile.encoding=UTF-8" # Set as much memory
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
-else 
+else
   while [ -L "${BIDMACH_ROOT}" ]; do
     BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
   done
@@ -15,7 +15,7 @@ fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 pushd "${BIDMACH_ROOT}"  > /dev/null
 BIDMACH_ROOT=`pwd`
-BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )" 
+BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )"
 JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
 JCUDA_VERSION=`echo lib/jcuda*.jar | sed 's/.*jcuda-//' | sed 's/\.jar//'`
@@ -24,7 +24,7 @@ JAVA_NATIVE=`java getnativepath`
 if [ `uname` = "Darwin" ]; then
     export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${DYLD_LIBRARY_PATH}"
 else
-    export LD_LIBRARY_PATH="${LIBDIR}:${LIBDIR}/cuda:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" 
+    export LD_LIBRARY_PATH="${LIBDIR}:${LIBDIR}/cuda:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 fi
 export JAVA_NATIVE=${LD_LIBRARY_PATH}:${DYLD_LIBRARY_PATH}:${JAVA_NATIVE}:
 popd > /dev/null
@@ -64,7 +64,8 @@ if [ "$1" = "notebook" ]; then
     fi
     ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    ${BIDMACH_ROOT}/scripts/scala/scala -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "$@"
+    [[ $(ps -o stat= -p $$) == *+* ]] || export NOREPL="-howtorun:script"
+    ${BIDMACH_ROOT}/scripts/scala/scala -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala ${NOREPL} "$@"
 fi
 
 
