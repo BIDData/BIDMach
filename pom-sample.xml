@@ -229,11 +229,37 @@
           <skipTests>true</skipTests>
         </configuration>
       </plugin>
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-dependency-plugin</artifactId>
+	<version>2.10</version>
+	<executions>
+	  <execution>
+	    <id>resource-dependencies</id>
+	    <phase>generate-resources</phase>
+	    <goals>
+              <goal>unpack-dependencies</goal>
+	    </goals>
+	    <configuration>
+	      <includes>**/*.exe</includes>
+              <classifier>cpu-${osarch}</classifier>
+              <outputDirectory>${project.directory}/cbin</outputDirectory>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin> 
     </plugins>
     <resources>
       <resource>
         <targetPath>lib/</targetPath>
         <directory>src/main/resources/lib/</directory>
+        <excludes>
+          <exclude>**/*.jar</exclude>
+        </excludes>
+      </resource>
+      <resource>
+        <targetPath>bin/</targetPath>
+        <directory>src/main/resources/bin/</directory>
         <excludes>
           <exclude>**/*.jar</exclude>
         </excludes>
