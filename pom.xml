@@ -163,6 +163,36 @@
           <classifier>cpu-${osarch}</classifier>
         </dependency>
       </dependencies>
+      <build>
+	<plugins>
+	  <plugin>
+	    <groupId>org.apache.maven.plugins</groupId>
+	    <artifactId>maven-dependency-plugin</artifactId>
+	    <version>2.10</version>
+	    <executions>
+	      <execution>
+		<id>unpack-resources</id>
+		<phase>package</phase>
+		<goals>
+		  <goal>unpack</goal>
+		</goals>
+		<configuration>
+		  <artifactItems>
+		    <artifactItem>
+		      <groupId>BIDMach</groupId>
+		      <artifactId>BIDMach</artifactId>
+		      <classifier>cpu-${osarch}</classifier>
+		      <version>${project.version}</version>
+		      <includes>**/*.exe</includes>
+		      <outputDirectory>${project.basedir}</outputDirectory>
+		    </artifactItem>
+		  </artifactItems>
+		</configuration>
+	      </execution>
+	    </executions>
+	  </plugin>
+	</plugins>
+      </build>
     </profile>
     <profile>
       <id>dependgpu</id>
@@ -230,32 +260,6 @@
           <skipTests>true</skipTests>
         </configuration>
       </plugin>
-      <plugin>
-	<groupId>org.apache.maven.plugins</groupId>
-	<artifactId>maven-dependency-plugin</artifactId>
-	<version>2.10</version>
-	<executions>
-	  <execution>
-	    <id>unpack-resources</id>
-	    <phase>package</phase>
-	    <goals>
-              <goal>unpack</goal>
-	    </goals>
-	    <configuration>
-	      <artifactItems>
-		<artifactItem>
-		  <groupId>BIDMach</groupId>
-		  <artifactId>BIDMach</artifactId>
-		  <classifier>cpu-${osarch}</classifier>
-		  <version>${project.version}</version>
-		  <includes>**/*.exe</includes>
-		  <outputDirectory>${project.basedir}</outputDirectory>
-		</artifactItem>
-	      </artifactItems>
-	    </configuration>
-	  </execution>
-	</executions>
-      </plugin> 
     </plugins>
     <resources>
       <resource>
