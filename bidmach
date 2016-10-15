@@ -68,6 +68,7 @@ for lib in jcuda jcublas jcufft jcurand jcusolver jcusparse; do
 done
 
 if [ ! -e ${LIBDIR}/IScala.jar ]; then
+    echo "Downloading Iscala jar"
     source="http://people.eecs.berkeley.edu/~jfc/biddata"
     curl -o ${LIBDIR}/IScala.jar ${source}/lib/IScala.jar
 fi
