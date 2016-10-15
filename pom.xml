@@ -41,7 +41,7 @@
       	</os>
       </activation>
       <properties>
-        <osarch>windows-x86-64</osarch>
+        <osarch>windows-x86_64</osarch>
       </properties>
     </profile>
     <profile>
@@ -52,7 +52,7 @@
       	</os>
       </activation>
       <properties>
-        <osarch>apple-x86-64</osarch>
+        <osarch>apple-x86_64</osarch>
       </properties>
     </profile>
     <profile>
@@ -77,7 +77,7 @@
       	</os>
       </activation>
       <properties>
-        <osarch>linux-x86-64</osarch>
+        <osarch>linux-x86_64</osarch>
       </properties>
     </profile>
     <profile>
@@ -259,6 +259,26 @@
         <configuration>
           <skipTests>true</skipTests>
         </configuration>
+      </plugin>
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-dependency-plugin</artifactId>
+	<version>2.10</version>
+	<executions>
+	  <execution>
+	    <id>copy-dependencies</id>
+	    <phase>package</phase>
+	    <goals>
+	      <goal>copy-dependencies</goal>
+	    </goals>
+	    <configuration>
+	      <outputDirectory>${project.basedir}/lib</outputDirectory>
+	      <overWriteReleases>false</overWriteReleases>
+	      <overWriteSnapshots>false</overWriteSnapshots>
+	      <overWriteIfNewer>true</overWriteIfNewer>
+	    </configuration>
+          </execution>
+	</executions>
       </plugin>
     </plugins>
     <resources>

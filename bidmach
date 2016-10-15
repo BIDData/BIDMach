@@ -18,15 +18,31 @@ BIDMACH_ROOT=`pwd`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )"
 JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
-JCUDA_VERSION=`echo lib/jcuda*.jar | sed 's/.*jcuda-//' | sed 's/\.jar//'`
 
-JAVA_NATIVE=`java getnativepath`
-if [ `uname` = "Darwin" ]; then
-    export DYLD_LIBRARY_PATH="${LIBDIR}:/usr/local/cuda/lib:${DYLD_LIBRARY_PATH}"
-else
-    export LD_LIBRARY_PATH="${LIBDIR}:${LIBDIR}/cuda:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+JCUDA_VERSION=`echo lib/jcuda-natives-*.jar | sed 's/.*jcuda-natives-//' | sed 's/-.*\.jar//'`
+BIDMAT_VERSION=`echo lib/BIDMat-*-cpu-*.jar | sed 's/.*BIDMat-//' | sed 's/-cpu.*\.jar//'`
+
+OS=`uname -a`
+if [ "$ARCH" = "" ]; then
+    ARCH=`arch`
 fi
-export JAVA_NATIVE=${LD_LIBRARY_PATH}:${DYLD_LIBRARY_PATH}:${JAVA_NATIVE}:
+if [[ "$OS" == Darwin* ]] ; then
+    if [[ "$OS" == *x86_64 ]] ; then
+	    ARCH="x86_64"
+    fi
+    OS="apple"
+elif [[ "$OS" == Linux* ]] ; then
+    OS="linux"
+elif [[ "$OS" == CYGWIN* ]] ; then
+    if [[ "$OS" == *WOW* ]] ; then
+        ARCH="x86_64"
+    fi
+	OS="windows"
+else
+    echo "OS not supported" $OS
+    exit 1
+fi
+
 popd > /dev/null
 if [ "$OS" = "Windows_NT" ]; then
     if [ ! "${JAVA_HOME}" = "" ]; then
@@ -35,32 +51,44 @@ if [ "$OS" = "Windows_NT" ]; then
     fi
 fi
 
-BIDMACH_LIBS="${LIBDIR}/BIDMat.jar;${LIBDIR}/ptplot.jar;${LIBDIR}/ptplotapplication.jar;${LIBDIR}/jhdf5.jar;\
+BIDMACH_LIBS="${BIDMACH_ROOT}/target/BIDMach-${BIDMAT_VERSION}.jar;\
+${LIBDIR}/BIDMach-${BIDMAT_VERSION}-cpu-${OS}-${ARCH}.jar;\
+${LIBDIR}/BIDMach-${BIDMAT_VERSION}-gpu-${OS}-${ARCH}.jar;\
+${LIBDIR}/BIDMat-${BIDMAT_VERSION}.jar;\
+${LIBDIR}/BIDMat-${BIDMAT_VERSION}-cpu-${OS}-${ARCH}.jar;\
+${LIBDIR}/BIDMat-${BIDMAT_VERSION}-gpu-${OS}-${ARCH}.jar;\
+${LIBDIR}/ptplot.jar;${LIBDIR}/ptplotapplication.jar;\
+${LIBDIR}/jhdf5-3.2.1.jar;${LIBDIR}/jhdf5-3.2.1-${OS}-${ARCH}.jar;\
 ${LIBDIR}/commons-math3-3.2.jar;${LIBDIR}/lz4-1.3.jar;${LIBDIR}/json-io-4.1.6.jar;\
 ${LIBDIR}/jfreechart-1.0.19.jar;${LIBDIR}/jcommon-1.0.23.jar"
 
-JCUDA_LIBS="${JCUDA_LIBDIR}/jcuda-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcublas-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcufft-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcurand-${JCUDA_VERSION}.jar;${JCUDA_LIBDIR}/jcusparse-${JCUDA_VERSION}.jar"
+JCUDA_LIBS=""
+for lib in jcuda jcublas jcufft jcurand jcusolver jcusparse; do
+    JCUDA_LIBS="${JCUDA_LIBS};${LIBDIR}/${lib}-${JCUDA_VERSION}.jar;${LIBDIR}/${lib}-natives-${JCUDA_VERSION}-${OS}-${ARCH}.jar"
+done
 
-ALL_LIBS=";${LIBDIR}/IScala.jar;${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
+if [ ! -e ${LIBDIR}/IScala.jar ]; then
+    source="http://people.eecs.berkeley.edu/~jfc/biddata"
+    curl -o ${LIBDIR}/IScala.jar ${source}/lib/IScala.jar
+fi
+
+ALL_LIBS="${LIBDIR}/IScala.jar;${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
 
 if [ "$OS" = "Windows_NT" ]; then
     if [ ! "${CUDA_PATH}" = "" ]; then
-	    NEWPATH=`${BIDMACH_ROOT}/shortpath.bat "${CUDA_PATH}"`
-	    NEWPATH=`echo ${NEWPATH} | sed 's_\\\\_/_g'`/bin
+	    NEWPATH=`${BIDMAT_ROOT}/shortpath.bat "${CUDA_PATH}"`
+	    NEWPATH=`echo $NEWPATH | sed 's_\\\\_/_g'`/bin
     fi
-    DJAVA_NATIVE="-Djava.library.path=${LIBDIR};${NEWPATH}"
 else
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
-    DJAVA_NATIVE="-Djava.library.path=${JAVA_NATIVE}"
 fi
-export JAVA_OPTS="${DJAVA_NATIVE} ${JAVA_OPTS}"
 
 if [ "$1" = "notebook" ]; then
     shift 1
     if [ ! -z "$@" ]; then
-        KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"$DJAVA_NATIVE\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\", \"$@\"]"
+        KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\", \"$@\"]"
     else
-        KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"$DJAVA_NATIVE\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\"]"
+        KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\"]"
     fi
     ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
