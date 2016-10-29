@@ -25,7 +25,20 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.io._
+import java.nio.charset.StandardCharsets
 import java.lang.ClassLoader;
+import org.apache.commons.io.IOUtils;
+
+
+class MyClassLoader extends ClassLoader {
+  def loadClass(name:String, b:Array[Byte]):Class[_] = {
+    return defineClass(name, b, 0, b.length);
+  }
+}
+
+
+
 
 class Command(val ctype:Int, round0:Int, dest0:Int, val clen:Int, val bytes:Array[Byte], val blen:Int) {
   val magic = Command.magic;
@@ -375,19 +388,35 @@ extends Command(Command.evalStringCtype, round0, dest0, bytes.size, bytes, bytes
   }
 }
 
-class CallCommand(round0:Int, dest0:Int, callable0:Callable[AnyRef], class0:Class[_ <:Callable[AnyRef]], bytes:Array[Byte])
+class CallCommand(round0:Int, dest0:Int, func0:() => AnyRef, bytes:Array[Byte])
 extends Command(Command.callCtype, round0, dest0, bytes.size, bytes, bytes.size) {
 
-  var callable = callable0;
-  var one_class = class0;
+  //var callable = callable0;
+  //var one_class = class0;
+  var func = func0;
 
-  def this(round0:Int, dest0:Int, callable0:Callable[AnyRef], class0:Class[_ <:Callable[AnyRef]]) = {
-    this(round0, dest0, callable0, class0, {
+
+  //def this(round0:Int, dest0:Int, callable0:Callable[AnyRef], class0:Class[_ <:Callable[AnyRef]]) = {
+  def this(round0:Int, dest0:Int, func0:() => AnyRef) = {
+    this(round0, dest0, func0, {
       val out  = new ByteArrayOutputStream()
-      val output = new ObjectOutputStream(out)
-      output.writeObject(class0)
-      output.writeObject(callable0)
-      output.close
+
+      val fooCls = func0.getClass();
+      val cleanClassName = fooCls.getName.replaceFirst("^.*\\.", "") + ".class";
+      val fooClsStream = fooCls.getResourceAsStream(cleanClassName);
+      //val fooClsBytes = org.apache.commons.io.IOUtils.toByteArray(fooClsStream)
+      //val fooClsBytes = fooClsStream.readAllBytes();
+      //val fooClsBytes = IOUtils.toByteArray(fooClsStream);
+      val fooClsBytes = Stream.continually(fooClsStream.read()).takeWhile(_ != -1).map(_.toByte).toArray;
+
+
+      val clsName = fooCls.getName
+//byte[] bytes = ByteBuffer.allocate(4).putInt(1695609641).array();
+      out.write(ByteBuffer.allocate(4).putInt(clsName.length).array(),0,4);
+      out.write(clsName.getBytes(StandardCharsets.UTF_8), 0, clsName.length);
+      out.write(ByteBuffer.allocate(4).putInt(fooClsBytes.length).array(),0,4);
+      out.write(fooClsBytes, 0, fooClsBytes.length);
+
       out.toByteArray()
     });
   }
@@ -397,13 +426,26 @@ extends Command(Command.callCtype, round0, dest0, bytes.size, bytes, bytes.size)
 
   override def decode():Unit = {
     val in = new ByteArrayInputStream(bytes);
-    val input = new ObjectInputStream(in);
-    //val cl  = ClassLoader.getSystemClassLoader();
-    //one_class = cl.defineClass("testing",input.readObject.asInstanceOf[Array[Byte]]);
-    //cl.resolveClass(one_class);
-    one_class = input.readObject.asInstanceOf[Class[_ <:Callable[AnyRef]]];
-    //callable = input.readObject.asInstanceOf[one_class];
-    input.close;
+
+    val clsName_len_bytes = new Array[Byte](4); 
+    in.read(clsName_len_bytes,0,4);
+    val clsName_len = ByteBuffer.wrap(clsName_len_bytes).getInt();
+
+    val clsName_bytes = new Array[Byte](clsName_len);
+    in.read(clsName_bytes,0,clsName_len);
+    val clsName = new String(clsName_bytes, StandardCharsets.UTF_8);
+
+    val cls_len_bytes = new Array[Byte](4); 
+    in.read(cls_len_bytes,0,4);
+    val cls_len = ByteBuffer.wrap(cls_len_bytes).getInt();
+
+    val cls_bytes = new Array[Byte](cls_len);
+    in.read(cls_bytes,0,cls_len);
+
+    val loader = new MyClassLoader;
+    val fooCls = loader.loadClass(clsName.trim(), cls_bytes);
+
+    func = fooCls.newInstance.asInstanceOf[() => AnyRef];
   }
 
   override def toString():String = {
