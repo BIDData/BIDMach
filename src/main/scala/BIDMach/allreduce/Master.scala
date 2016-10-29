@@ -117,8 +117,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     results.clone
   }
 
-  def parCall(callable:Callable[AnyRef], one_class:Class[_ <:Callable[AnyRef]], timesecs:Int = 10):Array[AnyRef] = {
-    val cmd = new CallCommand(round, 0, callable, one_class);
+  def parCall(func:() => AnyRef, timesecs:Int = 10):Array[AnyRef] = {
+    val cmd = new CallCommand(round, 0, func);
     for (i <- 0 until M) results(i) = null;
     nresults = 0;
     broadcastCommand(cmd);
