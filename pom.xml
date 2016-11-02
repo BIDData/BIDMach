@@ -54,6 +54,18 @@
       <properties>
         <osarch>apple-x86_64</osarch>
       </properties>
+      <dependencies>
+        <dependency>
+          <groupId>org.ow2.asm</groupId>
+          <artifactId>asm</artifactId>
+          <version>5.1</version>
+        </dependency>
+        <dependency>
+          <groupId>commons-io</groupId>
+          <artifactId>commons-io</artifactId>
+          <version>2.1</version>
+        </dependency>
+      </dependencies>
     </profile>
     <profile>
       <id>linux_arm</id>
@@ -79,6 +91,18 @@
       <properties>
         <osarch>linux-x86_64</osarch>
       </properties>
+      <dependencies>
+        <dependency>
+          <groupId>org.ow2.asm</groupId>
+          <artifactId>asm</artifactId>
+          <version>5.1</version>
+        </dependency>
+        <dependency>
+          <groupId>commons-io</groupId>
+          <artifactId>commons-io</artifactId>
+          <version>2.1</version>
+        </dependency>
+      </dependencies>
     </profile>
     <profile>
       <id>gpu</id>
@@ -221,17 +245,6 @@
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
       <version>3.1.0</version>
-    </dependency>
-    <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
-    <dependency>
-      <groupId>org.ow2.asm</groupId>
-      <artifactId>asm</artifactId>
-      <version>5.1</version>
-    </dependency>
-    <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>2.1</version>
     </dependency>
   </dependencies>
   <build>

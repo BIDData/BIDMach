@@ -1,9 +1,11 @@
 import java.net.{InetAddress,InetSocketAddress}
 import BIDMach.allreduce.{Master,Worker,Command}
 
-val addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+var addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
   map(InetAddress.getByName(_).getHostAddress()).
   map(new InetSocketAddress(_, 50050)).toArray
+
+addresses = addresses.slice(0, 1)
 
 val m = new Master();
 val opts = m.opts;
@@ -12,6 +14,7 @@ opts.intervalMsec = 2000;
 //opts.limitFctn = Master.powerLimitFctn
 opts.limit = 1000000
 opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
 val nmachines = addresses.length;
 
 val gmods = irow(nmachines);
@@ -21,7 +24,6 @@ m.init
 m.config(gmods, gmachines, addresses)
 m.setMachineNumbers
 m.sendConfig
-m.setMachineNumbers // BUG: need to send this twice for it to work
 
 //m.startLearners
 //m.startUpdates

@@ -18,6 +18,7 @@ import java.net.InetSocketAddress;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import javax.script.ScriptEngine;
 
 
 class Master(override val opts:Master.Opts = new Master.Options) extends Host {
@@ -31,8 +32,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   var responses:IMat = null;
   var learners:IMat = null;
   var results:Array[AnyRef] = null;
-  var nresults = 0;
   var masterIP:InetAddress = null;
+  var nresults = 0;
 
   def init() {
     masterIP = InetAddress.getLocalHost;
@@ -117,7 +118,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     results.clone
   }
 
-  def parCall(func:() => AnyRef, timesecs:Int = 10):Array[AnyRef] = {
+  def parCall(func:(Worker) => AnyRef, timesecs:Int = 10):Array[AnyRef] = {
     val cmd = new CallCommand(round, 0, func);
     for (i <- 0 until M) results(i) = null;
     nresults = 0;
