@@ -206,7 +206,7 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
 	    case Command.callCtype => {
 	      val newcmd = new CallCommand(0, cmd.dest, null, cmd.bytes);
 	      newcmd.decode;
-	      obj = newcmd.func();
+	      obj = newcmd.func(intp);
 	      if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
 	      if (opts.trace > 3) log("Computed %s\n" format obj.toString);
 	      val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
