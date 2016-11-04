@@ -44,6 +44,8 @@ initialCommands := scala.io.Source.fromFile("lib/bidmach_init.scala").getLines.m
 
 javaOptions += "-Xmx12g"
 
-
-
+libraryDependencies ++= Seq(
+  "com.typesafe.play" %% "play" % "2.4.3",
+  "com.typesafe.play" %% "play-netty-server" % "2.4.3"
+)
 
