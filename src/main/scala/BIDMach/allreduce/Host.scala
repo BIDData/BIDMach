@@ -34,7 +34,6 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
   var round = 0;
   var gmods:IMat = null;
   var gridmachines:IMat = null;
-  var masterIP:InetAddress = null;
   var workers:Array[InetSocketAddress] = null;
   var groups:Groups = null;
   var executor:ExecutorService = null;

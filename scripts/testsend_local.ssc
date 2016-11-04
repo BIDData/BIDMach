@@ -1,0 +1,27 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+
+val addresses = new Array[InetSocketAddress](1)
+addresses(0) = new InetSocketAddress("0.0.0.0", 12345)
+
+val m = new Master();
+val opts = m.opts;
+opts.trace = 3;
+opts.intervalMsec = 2000;
+//opts.limitFctn = Master.powerLimitFctn
+opts.limit = 1000000
+opts.timeScaleMsec = 2e-3f
+val nmachines = addresses.length;
+
+val gmods = irow(nmachines);
+val gmachines = irow(0->nmachines);
+
+m.init
+m.config(gmods, gmachines, addresses)
+m.sendConfig
+m.setMachineNumbers
+
+//m.startLearners
+//m.startUpdates
+//m.permuteAllreduce(0,1000000)
+

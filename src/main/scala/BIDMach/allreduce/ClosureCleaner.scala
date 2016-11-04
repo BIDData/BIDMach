@@ -21,7 +21,7 @@ import java.io._
 import scala.collection.mutable.{Map, Set, Stack}
 import scala.language.existentials
 
-import org.objectweb.asm.{ClassReader, ClassVisitor, MethodVisitor, Type}
+import org.objectweb.asm.{ClassWriter, ClassReader, ClassVisitor, MethodVisitor, Type}
 import org.objectweb.asm.Opcodes._
 
 class ReturnStatementFinder extends ClassVisitor(ASM5) {
@@ -474,5 +474,47 @@ object ClosureCleaner {
       field.set(obj, enclosingObject)
     }
     obj
+  }
+
+  def readAndTransformClass(name: String, clsBytes: Array[Byte]): Array[Byte] = {
+    if (name.startsWith("$line")) {
+      // Class seems to be an interpreter "wrapper" object storing a val or var.
+      // Replace its constructor with a dummy one that does not run the
+      // initialization code placed there by the REPL. The val or var will
+      // be initialized later through reflection when it is used in a task.
+      val cr = new ClassReader(clsBytes)
+      val cw = new ClassWriter(
+        ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS)
+      val cleaner = new ConstructorCleaner(name, cw)
+      cr.accept(cleaner, 0)
+      return cw.toByteArray
+    } else {
+      return clsBytes
+    }
+  }
+
+}
+
+class ConstructorCleaner(className: String, cv: ClassVisitor)
+extends ClassVisitor(ASM5, cv) {
+  override def visitMethod(access: Int, name: String, desc: String,
+      sig: String, exceptions: Array[String]): MethodVisitor = {
+    val mv = cv.visitMethod(access, name, desc, sig, exceptions)
+    if (name == "<init>" && (access & ACC_STATIC) == 0) {
+      // This is the constructor, time to clean it; just output some new
+      // instructions to mv that create the object and set the static MODULE$
+      // field in the class to point to it, but do nothing otherwise.
+      mv.visitCode()
+      mv.visitVarInsn(ALOAD, 0) // load this
+      mv.visitMethodInsn(INVOKESPECIAL, "scala/runtime/AbstractFunction1", "<init>", "()V", false)
+      // val classType = className.replace('.', '/')
+      // mv.visitFieldInsn(PUTSTATIC, classType, "MODULE$", "L" + classType + ";")
+      mv.visitInsn(RETURN)
+      mv.visitMaxs(-1, -1) // stack size and local vars will be auto-computed
+      mv.visitEnd()
+      return null
+    } else {
+      return mv
+    }
   }
 }

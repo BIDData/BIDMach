@@ -3,7 +3,7 @@
 # export CUDA_PATH="" # Set here if not set in environment
 
 MEMSIZE="-Xmx14G"
-export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8" # Set as much memory as possible
+export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8 ${JAVA_OPTS}" # Set as much memory as possible
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
@@ -73,7 +73,14 @@ if [ ! -e ${LIBDIR}/IScala.jar ]; then
     curl -o ${LIBDIR}/IScala.jar ${source}/lib/IScala.jar
 fi
 
-ALL_LIBS=";${LIBDIR}/IScala.jar;${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
+TOOL_LIBS="${LIBDIR}/IScala.jar;\
+${JAVA_HOME}/lib/tools.jar"
+
+CP_LIBS="${TOOL_LIBS};\
+${JCUDA_LIBS};\
+${BIDMACH_LIBS};\
+${LIBDIR}/asm-5.1.jar;\
+${LIBDIR}/commons-io-2.1.jar"
 
 if [ "$OSS" = "windows" ]; then
     if [ ! "${CUDA_PATH}" = "" ]; then
@@ -81,7 +88,14 @@ if [ "$OSS" = "windows" ]; then
 	    NEWPATH=`echo $NEWPATH | sed 's_\\\\_/_g'`/bin
     fi
 else
-    ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
+    TOOL_LIBS=`echo "${TOOL_LIBS}" | sed 's/;/:/g'`
+    CP_LIBS=`echo "${CP_LIBS}" | sed 's/;/:/g'`
+fi
+
+if [[ $(ps -o stat= -p $$) == *+* && "$*" != *-howtorun:script* ]]; then
+  BOOTCP="-nobootcp"
+else
+  HOWTORUN="-howtorun:script"
 fi
 
 if [ "$1" = "notebook" ]; then
@@ -93,6 +107,5 @@ if [ "$1" = "notebook" ]; then
     fi
     ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    [[ $(ps -o stat= -p $$) == *+* ]] || export NOREPL="-howtorun:script"
-    ${BIDMACH_ROOT}/scripts/scala/scala -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala ${NOREPL} "$@"
+    ${BIDMACH_ROOT}/scripts/scala/scala ${BOOTCP} -toolcp ${TOOL_LIBS} -cp "${CP_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "${HOWTORUN}" "$@"
 fi
