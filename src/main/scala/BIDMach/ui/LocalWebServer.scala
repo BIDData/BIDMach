@@ -13,8 +13,13 @@ import play.api.mvc._
 import play.api.libs.iteratee._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
-
-class LocalWebServer {
+/**
+ * A simple lightweight web server built upon Play framework https://www.playframework.com/
+ * Please override the routes before using it
+ * See the examples below in object LocalWebServer, supporting WebSocket and static file serving
+ **/
+ 
+abstract class LocalWebServer {
   val environment = new Environment(
     new File("."),
     getClass.getClassLoader,
@@ -23,33 +28,10 @@ class LocalWebServer {
 
   val context = ApplicationLoader.createContext(environment)
 
-  //def routes:Router.Routes = new Router.Routes 
-  //if (routes == null) throw new Exception("Routes is null")
+  def routes:Router.Routes
+  if (routes == null) throw new Exception("Routes is null")
   val components = new BuiltInComponentsFromContext(context) {
-    override def router: Router = Router.from{
-        case GET(p"/hello/$to") => Action {
-            Results.Ok(s"Hello2 $to")
-        }
-        case GET(p"/ws")=>
-           WebSocket.using[String] { request =>
-
-                // Concurrent.broadcast returns (Enumerator, Concurrent.Channel)
-                val (out, channel) = Concurrent.broadcast[String]
-
-                // log the message to stdout and send response back to client
-                val in = Iteratee.foreach[String] {
-                  msg =>
-                    println(msg)
-                    // the Enumerator returned by Concurrent.broadcast subscribes to the channel and will
-                    // receive the pushed messages
-                    channel push("I received your message: " + msg)
-                }
-                (in,out)
-              }
-        case GET(p"/assets/$file*")=>
-          //Assets.versioned(path="/public", file=file)
-          controllers.Assets.at(path="/public", file=file)
-    }
+    override def router: Router = Router.from(routes)
   }
 
   val applicationLoader = new ApplicationLoader {
@@ -73,15 +55,45 @@ class LocalWebServer {
       }
     }
   }
+  
+  def startPort = 9000
 
-  val (port, server) = startFindPort(9000)
-
+  val (port, server) = startFindPort(startPort)
+  
   def stop() = server.stop()
 
 }
 
 object  LocalWebServer {
     def main(arg:Array[String]) {
-        val a = new LocalWebServer
+        //Examples about using the LocalWebServer
+        //It will start a simple web server supporting WebSocket and static file serving
+        val server = new LocalWebServer {
+            override def startPort = 21000
+            override def routes = {
+                case GET(p"/hello/$to") => Action {
+                    Results.Ok(s"Hello $to")
+                }
+                case GET(p"/ws")=>
+                   WebSocket.using[String] { 
+                       request =>
+                   
+                        // Concurrent.broadcast returns (Enumerator, Concurrent.Channel)
+                        val (out, channel) = Concurrent.broadcast[String]
+        
+                        // log the message to stdout and send response back to client
+                        val in = Iteratee.foreach[String] {
+                          msg =>
+                            println(msg)
+                            // the Enumerator returned by Concurrent.broadcast subscribes to the channel and will
+                            // receive the pushed messages
+                            channel push("I received your message: " + msg)
+                        }
+                        (in,out)
+                      }
+                case GET(p"/assets/$file*")=>
+                  controllers.Assets.at(path="/public", file=file)
+            }
+        }
     }
 }
