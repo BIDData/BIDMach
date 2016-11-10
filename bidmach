@@ -15,7 +15,7 @@ fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 pushd "${BIDMACH_ROOT}"  > /dev/null
 BIDMACH_ROOT=`pwd`
-BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed s+/cygdrive/c+c:+ )"
+BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed 's+/cygdrive/\(.\)+\1:+' )"
 JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
 
