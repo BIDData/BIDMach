@@ -5,7 +5,7 @@ var addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
   map(InetAddress.getByName(_).getHostAddress()).
   map(new InetSocketAddress(_, 50050)).toArray
 
-addresses = addresses.slice(0, 1)
+// addresses = addresses.slice(0, 1)
 
 val m = new Master();
 val opts = m.opts;
@@ -25,5 +25,11 @@ m.config(gmods, gmachines, addresses)
 m.setMachineNumbers
 m.sendConfig
 
-//m.startLearners
-//m.startUpdates
+// m.parCall((w) => { w.learner.opts.npasses = 10; "done" })
+// m.parCall((w) => { w.learner.opts.asInstanceOf[GLM.FGOptions].nstart = w.imach * 20; "done"})
+// m.parCall((w) => { w.learner.opts.asInstanceOf[GLM.FGOptions].nend = (w.imach+1) * 20; "done"})
+// m.parCall((w) => { w.learner.paused = true; "done"})
+// m.parCall((w) => { w.learner.train; "not reached" }) // this will hang, just wait for it to timeout
+
+// m.startLearners
+// m.startUpdates

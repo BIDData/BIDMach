@@ -24,8 +24,8 @@ val data_dir = "/mnt/BIDMach/data/MNIST8M/parts/"
 val (nn, nnopts) = GLM.learner(data_dir+"data%02d.fmat.lz4", data_dir+"cats%02d.fmat.lz4")
 
 nnopts.useGPU = true;
-nnopts.nstart = 0;
-nnopts.nend = 0;
+// nnopts.nstart = 0;
+// nnopts.nend = 0;
 nnopts.order = 0;
 nnopts.lookahead = 2;
 nnopts.featType = 1;
@@ -46,7 +46,3 @@ wopts.machineTrace = 1;
 w.start(nn)
 
 nn.paused = true
-
-Future {
-  nn.train
-}
