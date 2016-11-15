@@ -19,7 +19,7 @@ BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed 's+/cygdrive/\(.\)+\1:+' )"
 JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
 
-JCUDA_VERSION=`echo lib/jcuda-natives-*.jar | sed 's/.*jcuda-natives-//' | sed 's/-.*\.jar//'`
+JCUDA_VERSION=`echo lib/jcuda-*.jar | sed 's/.*jcuda-//' | sed 's/-.*\.jar//'`
 BIDMAT_VERSION=`echo lib/BIDMat-*-cpu-*.jar | sed 's/.*BIDMat-//' | sed 's/-cpu.*\.jar//'`
 
 OSS=`uname -a`
