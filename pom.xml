@@ -54,18 +54,6 @@
       <properties>
         <osarch>apple-x86_64</osarch>
       </properties>
-      <dependencies>
-        <dependency>
-          <groupId>org.ow2.asm</groupId>
-          <artifactId>asm</artifactId>
-          <version>5.1</version>
-        </dependency>
-        <dependency>
-          <groupId>commons-io</groupId>
-          <artifactId>commons-io</artifactId>
-          <version>2.1</version>
-        </dependency>
-      </dependencies>
     </profile>
     <profile>
       <id>linux_arm</id>
@@ -91,18 +79,6 @@
       <properties>
         <osarch>linux-x86_64</osarch>
       </properties>
-      <dependencies>
-        <dependency>
-          <groupId>org.ow2.asm</groupId>
-          <artifactId>asm</artifactId>
-          <version>5.1</version>
-        </dependency>
-        <dependency>
-          <groupId>commons-io</groupId>
-          <artifactId>commons-io</artifactId>
-          <version>2.1</version>
-        </dependency>
-      </dependencies>
     </profile>
     <profile>
       <id>gpu</id>
@@ -240,6 +216,16 @@
       <groupId>BIDMat</groupId>
       <artifactId>BIDMat</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm</artifactId>
+      <version>5.1</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.1</version>
     </dependency>
   </dependencies>
   <build>

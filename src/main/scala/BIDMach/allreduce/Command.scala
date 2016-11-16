@@ -62,8 +62,6 @@ class SocketClassLoader(parent:ClassLoader) extends ClassLoader(parent) {
   override def loadClass(name: String) = loadClass(name, true)
 }
 
-
-
 class Command(val ctype:Int, round0:Int, dest0:Int, val clen:Int, val bytes:Array[Byte], val blen:Int) {
   val magic = Command.magic;
   var dest = dest0;

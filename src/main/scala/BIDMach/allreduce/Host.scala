@@ -94,7 +94,6 @@ object Host {
   }
 
   def inetStringToFields(s:String):(Int, Int, Int, Int) = {
-    println(s)
     val fields = s.split("\\.");
     val ff = fields.map(_.toInt);
     (ff(0), ff(1), ff(2), ff(3))

@@ -34,22 +34,22 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
   var model:Model = null;
   var intp:ScriptEngine = null;
   var masterSocketAddr:InetSocketAddress = null;
+  var testing:String = "test";
   var workerIP:InetAddress = null;
 
   def start(learner0:Learner) = {
-    workerIP = InetAddress.getLocalHost;
     learner = learner0;
     if (model == null && learner != null) model = learner.model;
     executor = Executors.newFixedThreadPool(8);
     listener = new CommandListener(opts.commandSocketNum, this);
     listenerTask = executor.submit(listener);
     intp = new ScriptEngineManager().getEngineByName("scala");
-    intp.put("worker", "try");
-    intp.put("worker2", this);
   }
 
-  def config(imach0: Int, gmods0: IMat, gridmachines0: IMat, workers0: Array[InetSocketAddress],
-             masterSocketAddr0: InetSocketAddress) = {
+  def config(
+    imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress],
+    masterSocketAddr0:InetSocketAddress
+  ) = {
     val t1 = toc;
     imach = imach0;
     gmods = gmods0;
@@ -80,26 +80,26 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
 
   def allReduce(round: Int, limit: Long) = {
     if (model != null) {
-      val t1=toc;
+      val t1 = toc;
       model.snapshot(limit.toInt, opts.doAvg);
       val sendmat = model.sendmat;
       val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
-	model.indexmat
+        model.indexmat
       } else {
-	irow(0 -> sendmat.ncols)
+        irow(0 -> sendmat.ncols)
       }
 
       val result = if (opts.fuseConfigReduce) {
-	(indexmat, sendmat) match {
-	  case (lmat:LMat, fsendmat:FMat) =>  machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
-	  case (imat:IMat, fsendmat:FMat) =>  machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
-	}
+        (indexmat, sendmat) match {
+          case (lmat: LMat, fsendmat: FMat) => machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
+          case (imat: IMat, fsendmat: FMat) => machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
+        }
       } else {
-	(indexmat, sendmat) match {
-	  case (lmat:LMat, fsendmat:FMat) =>  machine.config(lmat.data, lmat.data, round);
-	  case (imat:IMat, fsendmat:FMat) =>  machine.config(imat.data, imat.data, round);
-	}
-	machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
+        (indexmat, sendmat) match {
+          case (lmat: LMat, fsendmat: FMat) => machine.config(lmat.data, lmat.data, round);
+          case (imat: IMat, fsendmat: FMat) => machine.config(imat.data, imat.data, round);
+        }
+        machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
       }
       model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
       model.addStep(limit.toInt, opts.doAvg);
@@ -219,61 +219,62 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
     }
   }
 
-  class CommandListener(val socketnum:Int, worker:Worker) extends Runnable {
+  class CommandListener(val socketnum: Int, worker: Worker) extends Runnable {
     var stop = false;
-    var ss:ServerSocket = null;
+    var ss: ServerSocket = null;
 
     def start() {
       try {
-	ss = new ServerSocket(socketnum);
+        ss = new ServerSocket(socketnum);
       } catch {
-	case e:Exception => {if (opts.trace > 0) log("Problem in CommandListener\n%s" format Command.printStackTrace(e));}
+        case e: Exception => {
+          if (opts.trace > 0) log("Problem in CommandListener\n%s" format Command.printStackTrace(e));
+        }
       }
     }
 
     def run() {
       start();
       while (!stop) {
-	try {
-	  val scs = new CommandReader(ss.accept(), worker);
-	  if (opts.trace > 2) log("Command Listener got a message\n");
-	  val fut = executor.submit(scs);
-	} catch {
-	  case e:SocketException => {
-	    if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Command.printStackTrace(e));
-	  }
-	  // This is probably due to the server shutting to. Don't do anything.
-	  case e:Exception => {
-	    if (opts.trace > 0) log("Machine %d Command listener had a problem "+e format imach);
-	  }
-	}
+        try {
+          val scs = new CommandReader(ss.accept(), worker);
+          if (opts.trace > 2) log("Command Listener got a message\n");
+          val fut = executor.submit(scs);
+        } catch {
+          case e: SocketException => {
+            if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Command.printStackTrace(e));
+          }
+          // This is probably due to the server shutting to. Don't do anything.
+          case e: Exception => {
+            if (opts.trace > 0) log("Machine %d Command listener had a problem " + e format imach);
+          }
+        }
       }
     }
 
-    def stop(force:Boolean) {
+    def stop(force: Boolean) {
       stop = true;
       if (force) {
-	try {
-	  stop = true;
-	  ss.close();
-	} catch {
-	  case e:Exception => {
-	    if (opts.trace > 0) log("Machine %d trouble closing command listener\n%s" format (imach, Command.printStackTrace(e)));
-	  }
-	}
+        try {
+          stop = true;
+          ss.close();
+        } catch {
+          case e: Exception => {
+            if (opts.trace > 0) log("Machine %d trouble closing command listener\n%s" format(imach, Command.printStackTrace(e)));
+          }
+        }
       }
     }
   }
 
 
-  def sendMaster(resp:Response):Future[_] = {
+  def sendMaster(resp: Response): Future[_] = {
     val cw = new ResponseWriter(masterSocketAddr, resp, this);
     executor.submit(cw);
   }
 }
 
 object Worker {
-<<<<<<< HEAD
 
   trait Opts extends Host.Opts {
     var configTimeout = 3000;

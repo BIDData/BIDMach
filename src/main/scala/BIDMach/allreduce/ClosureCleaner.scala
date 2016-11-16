@@ -1,3 +1,8 @@
+// TODO:
+// TODO:
+// TODO: need to include the spark NOTICE file with BIDMach!!!
+// TODO:
+// TODO:
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
