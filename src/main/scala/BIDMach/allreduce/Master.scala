@@ -208,10 +208,21 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	} else {
 	  new AllreduceCommand(round, 0, limit);
 	}
+  listener.allreduce_collected = 0
 	broadcastCommand(cmd);
-	val timems = opts.intervalMsec + (limit * opts.timeScaleMsec).toInt;
-	if (opts.trace > 2) log("Sleeping for %d msec\n" format timems);
-	Thread.sleep(timems);
+
+  val machine_threshold = 0.8;
+  val time_threshold = 5000;
+  val t0 = System.currentTimeMillis;
+  var t = System.currentTimeMillis;
+  while(listener.allreduce_collected < machine_threshold*M && (t-t0)< time_threshold){
+    //Check the result every 100 ms
+    Thread.sleep(100);
+    t = System.currentTimeMillis;
+  }
+	//val timems = opts.intervalMsec + (limit * opts.timeScaleMsec).toInt;
+	//if (opts.trace > 2) log("Sleeping for %d msec\n" format timems);
+	//Thread.sleep(timems);
       round += 1;
       }
     }
@@ -263,6 +274,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   class ResponseListener(val socketnum:Int, me:Master) extends Runnable {
     var stop = false;
     var ss:ServerSocket = null;
+    var allreduce_collected:Int = 0;
 
     def start() {
       try {
@@ -280,6 +292,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  val scs = new ResponseReader(ss.accept(), me);
 	  if (opts.trace > 2) log("Command Listener got a message\n");
 	  val fut = executor.submit(scs);
+    log("allreduce_collected is now %d \n" format allreduce_collected);
 	} catch {
 	  case e:SocketException => {
 	    if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Response.printStackTrace(e));

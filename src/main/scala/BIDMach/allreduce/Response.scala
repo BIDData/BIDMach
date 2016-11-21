@@ -143,6 +143,9 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
       val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen);
       if (me.opts.trace > 2) me.log("Master got packet %s\n" format (response.toString));
       istr.readFully(response.bytes, 0, blen);
+      if (rtype==Command.allreduceCtype){
+        me.listener.allreduce_collected += 1;
+      }
     try {
       socket.close();
     } catch {
