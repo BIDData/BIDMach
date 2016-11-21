@@ -154,9 +154,8 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
           newcmd.decode;
           if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
           allReduce(newcmd.round, newcmd.limit);
-          
-          obj = "Finished 1 allreduce"
-          val resp = new AllreduceResponse(cmd.round, cmd.dest, obj);
+
+          val resp = new AllreduceResponse(cmd.round, cmd.dest);
           sendMaster(resp);
 
           //if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
