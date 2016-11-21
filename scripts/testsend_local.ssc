@@ -11,6 +11,7 @@ opts.intervalMsec = 2000;
 //opts.limitFctn = Master.powerLimitFctn
 opts.limit = 1000000
 opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
 val nmachines = addresses.length;
 
 val gmods = irow(nmachines);
