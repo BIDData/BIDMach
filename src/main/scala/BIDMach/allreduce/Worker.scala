@@ -155,11 +155,11 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
           if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
           allReduce(newcmd.round, newcmd.limit);
           log("opts.respond is now %d \n" format opts.respond)
-          if (opts.respond > 0){
-            obj = "Finished 1 allreduce"
-            val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
-            sendMaster(resp);
-          }
+          
+          obj = "Finished 1 allreduce"
+          val resp = new AllreduceResponse(cmd.round, cmd.dest, obj);
+          sendMaster(resp);
+
           //if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
         }
         case Command.permuteAllreduceCtype => {

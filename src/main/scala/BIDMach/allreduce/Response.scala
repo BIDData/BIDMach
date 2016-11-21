@@ -47,6 +47,32 @@ class Response(
 
 }
 
+class AllreduceResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
+extends Response(Command.allreduceCtype, round0, src0, bytes.size, bytes, bytes.size) {
+
+  var obj:AnyRef = obj0;
+
+  def this(round0:Int, dest0:Int, obj0:AnyRef) = {
+    this(round0, dest0, obj0, {
+      val out  = new ByteArrayOutputStream()
+      val output = new ObjectOutputStream(out)
+      output.writeObject(obj0)
+      output.close
+      out.toByteArray()
+    });
+  }
+
+  override def encode ():Unit = { }
+
+  override def decode():Unit = {
+    val in = new ByteArrayInputStream(bytes);
+    val input = new ObjectInputStream(in);
+    obj = input.readObject;
+    input.close;
+  }
+}
+
+
 class ReturnObjectResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
 extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes, bytes.size) {
 
