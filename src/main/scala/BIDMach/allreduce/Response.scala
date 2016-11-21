@@ -47,29 +47,17 @@ class Response(
 
 }
 
-class AllreduceResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
-extends Response(Command.allreduceCtype, round0, src0, bytes.size, bytes, bytes.size) {
+class AllreduceResponse(round0:Int, src0:Int, bytes:Array[Byte])
+extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4) {
 
-  var obj:AnyRef = obj0;
+  def this(round0:Int, src0:Int, obj0:AnyRef) = this(round0, src0, new Array[Byte](1*4));
 
-  def this(round0:Int, dest0:Int, obj0:AnyRef) = {
-    this(round0, dest0, obj0, {
-      val out  = new ByteArrayOutputStream()
-      val output = new ObjectOutputStream(out)
-      output.writeObject(obj0)
-      output.close
-      out.toByteArray()
-    });
+  override def encode():Unit = {
+    intData.rewind();
+    intData.put(src);
   }
 
-  override def encode ():Unit = { }
-
-  override def decode():Unit = {
-    val in = new ByteArrayInputStream(bytes);
-    val input = new ObjectInputStream(in);
-    obj = input.readObject;
-    input.close;
-  }
+  override def decode():Unit = {}
 }
 
 
@@ -145,6 +133,7 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
       istr.readFully(response.bytes, 0, blen);
       if (rtype==Command.allreduceCtype){
         me.listener.allreduce_collected += 1;
+        me.log("allreduce_collected inside ResponseReader: %d\n" format me.listener.allreduce_collected);
       }
     try {
       socket.close();

@@ -215,10 +215,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   val time_threshold = 5000;
   val t0 = System.currentTimeMillis;
   var t = System.currentTimeMillis;
+  log("threshold is: %5.2f\n" format machine_threshold*M);
   while(listener.allreduce_collected < machine_threshold*M && (t-t0)< time_threshold){
     //Check the result every 100 ms
     Thread.sleep(100);
     t = System.currentTimeMillis;
+    log("current waiting time: %d \n" format t-t0);
+    log("listener.allreduce_collected: %d \n" format listener.allreduce_collected);
   }
 	//val timems = opts.intervalMsec + (limit * opts.timeScaleMsec).toInt;
 	//if (opts.trace > 2) log("Sleeping for %d msec\n" format timems);
