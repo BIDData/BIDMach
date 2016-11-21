@@ -45,7 +45,6 @@ wopts.machineTrace = 1;
 wopts.commandSocketNum = 12345
 wopts.responseSocketNum = 12346
 wopts.peerSocketNum = 12347
-wopts.respond = 1
 
 w.start(nn)
 
