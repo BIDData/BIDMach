@@ -1,0 +1,90 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+
+val datadir = "/mnt/BIDMach/data/rcv1/"
+
+var addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+  map(InetAddress.getByName(_).getHostAddress()).
+  map(new InetSocketAddress(_, 50050)).toArray
+
+val m = new Master();
+val opts = m.opts;
+opts.trace = 3;
+opts.intervalMsec = 2000;
+opts.limit = 1000000
+opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
+
+val nmachines = addresses.length;
+val gmods = irow(nmachines);
+val gmachines = irow(0->nmachines);
+
+m.init
+m.config(gmods, gmachines, addresses)
+m.setMachineNumbers
+m.sendConfig
+
+// m.parCall((w) => {
+//   var learnSource = w.learner.datasource.asInstanceOf[MatSource];
+//   var totalNumSamples = learnSource.mats(0).ncols;
+//   var workerNumSamples = totalNumSamples / 4; // TODO: don't hardcode this
+//   var nstart = (w.imach*workerNumSamples);
+//   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1);
+//   learnSource.mats(0) = learnSource.mats(0)(?, nstart->nend);
+//   learnSource.mats(1) = learnSource.mats(1)(?, nstart->nend);
+//   "done"
+// })
+// m.parCall((w) => { w.learner.paused = true; "done"})
+// m.parCall((w) => { w.learner.train; "not reached" }) // this will hang, just wait for it to timeout
+
+// m.startLearners
+// m.startUpdates
+
+// /* later */
+// m.stopUpdates
+
+// val anyrefModels = m.parCall((w) => { w.learner.modelmats(0) })
+// val fmatModels = anyrefModels.map(_.asInstanceOf[FMat])
+
+// val a0 = loadSMat(datadir + "docs.smat.lz4")
+// val c0 = loadFMat(datadir + "cats.fmat.lz4")(0->100,?)
+// val rr = rand(c0.ncols,1);
+// val (ss, ii) = sort2(rr);
+// val a = a0(?,ii);
+// val c = c0(?,ii);
+//
+// val ta = loadSMat(datadir + "testdocs.smat.lz4")
+// val tc = loadFMat(datadir + "testcats.fmat.lz4")(0->100,?)
+//
+// setNumThreads(1)
+// val (nn,opts)=GLM.learnerX(a,c,1)
+//
+// opts.batchSize=20000
+// opts.lrate = 0.02f
+// opts.npasses = 4
+// opts.reg1weight = 0.0
+// opts.links = iones(103,1)
+// opts.addConstFeat=true;
+// opts.aopts = opts;
+// opts.doVariance = true;
+// opts.evalStep = 3;
+//
+// nn.init
+// nn.modelmats(0) = fmatModels(0)  // chosen arbitrary
+
+// val ta = loadSMat(datadir + "testdocs.smat.lz4")
+// val tc = loadFMat(datadir + "testcats.fmat.lz4")(0->100,?)
+//
+// val (mm, mopts) = GLM.predictor(nn.model, ta)
+// mopts.addConstFeat=opts.addConstFeat;
+// mopts.batchSize=20000
+// mopts.links = opts.links
+// mm.predict
+//
+// val pc = FMat(mm.preds(0))
+//
+// val rc = roc2(pc, tc, 1-tc, 1000)
+// val nc = sum(tc,2);
+// val wmean = mean(rc)*nc/sum(nc)
+// println("roc6 = %5.4f, roc weighted mean = %5.4f" format (mean(rc)(6), wmean.v))
+//

@@ -3,7 +3,7 @@ import BIDMach.allreduce.{Master,Worker,Command}
 
 val addresses = new Array[InetSocketAddress](2)
 addresses(0) = new InetSocketAddress("0.0.0.0", 12345)
-addresses(1) = new InetSocketAddress("0.0.0.0", 12341)
+addresses(1) = new InetSocketAddress("0.0.0.0", 22345)
 
 val m = new Master();
 val opts = m.opts;
@@ -20,8 +20,8 @@ val gmachines = irow(0->nmachines);
 
 m.init
 m.config(gmods, gmachines, addresses)
-m.sendConfig
 m.setMachineNumbers
+m.sendConfig
 
 //m.startLearners
 //m.startUpdates
