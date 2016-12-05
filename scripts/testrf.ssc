@@ -4,7 +4,7 @@ val (mm,opts) = RandomForest.learner(
 )
 opts.useGPU = true
 opts.batchSize = 20000
-opts.depth = 10
+opts.depth = 25
 // opts.nend = 8
 opts.ntrees = 100
 opts.ncats = 10

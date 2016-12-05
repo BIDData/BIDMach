@@ -60,6 +60,19 @@ extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4) {
   override def decode():Unit = {}
 }
 
+class LearnerDoneResponse(round0:Int, src0:Int, bytes:Array[Byte])
+extends Response(Command.learnerDoneCtype, round0, src0, 1, bytes, 1*4) {
+
+  def this(round0:Int, src0:Int) = this(round0, src0, new Array[Byte](1*4));
+
+  override def encode():Unit = {
+    intData.rewind();
+    intData.put(src);
+  }
+
+  override def decode():Unit = {}
+}
+
 
 class ReturnObjectResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
 extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes, bytes.size) {
@@ -134,6 +147,10 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
       if (rtype==Command.allreduceCtype){
         me.listener.allreduce_collected += 1;
         me.log("allreduce_collected inside ResponseReader: %d\n" format me.listener.allreduce_collected);
+      }
+      if (rtype==Command.learnerDoneCtype){
+        me.stopUpdates();
+        me.log("Stopping allreduce update\n");
       }
     try {
       socket.close();

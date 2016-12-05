@@ -1,0 +1,104 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+
+
+val datadir = "/mnt/BIDMach/data/criteo/parts/"
+
+var addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+  map(InetAddress.getByName(_).getHostAddress()).
+  map(new InetSocketAddress(_, 50050)).toArray
+
+val m = new Master();
+val opts = m.opts;
+opts.trace = 3;
+opts.intervalMsec = 2000;
+opts.limit = 1000000
+opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
+
+opts.machine_threshold = 0.75
+opts.min_time_to_wait_for_all = 3000
+opts.time_threshold = 5000
+
+val nmachines = addresses.length;
+val gmods = irow(nmachines);
+val gmachines = irow(0->nmachines);
+
+m.init
+m.config(gmods, gmachines, addresses)
+m.setMachineNumbers
+m.sendConfig
+
+
+// m.parCall((w) => {
+//   var totalNumSamples = 80;
+//   var workerNumSamples = totalNumSamples / 4; // TODO: don't hardcode this
+//   var nstart = (w.imach*workerNumSamples);
+//   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1);
+//   var fgopts = w.learner.opts.asInstanceOf[GLM.FGOptions];
+//   fgopts.nstart = nstart;
+//   fgopts.nend = nend;
+//   "imach: %d, nstart: %d, nend: %d" format (w.imach, nstart, nend)
+// })
+// m.parCall((w) => { w.learner.paused = true; "done"})
+// m.parCall((w) => { w.learner.train; "not reached" }) // this will hang, just wait for it to timeout
+
+// m.startLearners
+// m.startUpdates
+
+/*Later*/
+
+// val anyrefModels = m.parCall((w) => { w.learner.modelmats(0) })
+// val fmatModels = anyrefModels.map(_.asInstanceOf[FMat])
+
+// val mdir = "/mnt/BIDMach/data/criteo/parts/"
+
+// val (nn,opts) = GLM.learner(mdir+"trainsorted%02d.smat.lz4", mdir+"trainlabel%02d.fmat.lz4");
+// opts.useGPU = true;
+// opts.nend = 80;
+// opts.lrate = 0.05f;
+// opts.reg1weight = 0.0f;
+// opts.batchSize = 5000;
+// opts.npasses = 5;
+// opts.links = irow(1);
+// //opts.pstep = 0.01f;
+// opts.aopts = opts;
+// opts.texp = 0.5f;
+// opts.lookahead = 0;
+
+// nn.init
+// nn.modelmats(0) = fmatModels(0)
+
+// val model = nn.model.asInstanceOf[GLM];
+// val mm = FMat(model.modelmats(0))
+
+// val ntest = 10
+// val filesize = 500000;
+// val tscores = dzeros(filesize*ntest, 1);
+// val tcats = dzeros(filesize*ntest, 1);
+// var len = 0;
+// for (i <- 0 until ntest) {
+//   val a = loadSMat(mdir + "trainsorted%02d.smat.lz4" format i + 18);
+//   val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + 18);
+//   val sc = mm * a;
+//   tscores(i * filesize -> (i * filesize + sc.length), 0) = DMat(sc.t);
+//   tcats(i * filesize -> (i * filesize + sc.length), 0) = DMat(c.t);
+//   len += c.length;
+//   print(".");
+// }
+// val scores = tscores(0->len,0);
+// val cats = tcats(0->len,0);
+
+// val rr = roc(scores, cats, 1-cats, 1000)
+
+// mean(rr)
+
+// val bounds = 7.0
+// val bscores = min(max(scores, drow(-bounds)), drow(bounds));
+// val probs = 1/(1 + exp(-bscores));
+// val lln = ((cats dot ln(probs)) + ((1-cats) dot ln(1-probs)))/probs.length.toDouble
+
+// println("roc area = %5.4f, ll = %5.4f" format (mean(rr).v, lln.v))
+
+
+

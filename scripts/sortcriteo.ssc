@@ -1,7 +1,7 @@
 val ntrain = 92
 val ntest = 13
 val ndense = 2*ntest+1;
-val dir = "../data/criteo/parts/";
+val dir = "/mnt/BIDMach/data/criteo/parts/";
  
 println("\nCounting features");
 val x= loadSMat(dir+"train00.smat.lz4");

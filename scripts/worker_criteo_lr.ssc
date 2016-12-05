@@ -1,0 +1,43 @@
+import BIDMat.{CMat,CSMat,DMat,Dict,FMat,FND,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,HMat,IDict,Image,IMat,LMat,Mat,SMat,SBMat,SDMat,TMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMat.Solvers._
+import BIDMat.Plotting._
+import BIDMach.Learner
+import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
+import BIDMach.networks.{Net}
+import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
+import BIDMach.datasinks.{DataSink,MatSink}
+import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
+import BIDMach.causal.{IPTW}
+import BIDMach.allreduce.{Master,Worker,Command}
+import BIDMach.models.GLM
+
+Mat.checkMKL(false)
+Mat.checkCUDA
+
+val mdir = "/mnt/BIDMach/data/criteo/parts/"
+
+val (nn,opts) = GLM.learner(mdir+"trainsorted%02d.smat.lz4", mdir+"trainlabel%02d.fmat.lz4");
+opts.useGPU = true;
+opts.nend = 80;
+opts.lrate = 0.05f;
+opts.reg1weight = 0.0f;
+opts.batchSize = 5000;
+opts.npasses = 5;
+opts.links = irow(1);
+//opts.pstep = 0.01f;
+opts.aopts = opts;
+opts.texp = 0.5f;
+opts.lookahead = 0;
+
+val w = new Worker();
+val wopts = w.opts;
+wopts.trace = 4;
+wopts.machineTrace = 1;
+
+w.start(nn);
+
+nn.paused = true
+

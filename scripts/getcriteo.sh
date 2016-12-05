@@ -1,12 +1,12 @@
 #!/bin/bash
 
-cd ../data/criteo
+cd /mnt/BIDMach/data/criteo
 mkdir -p parts
 
 split -a 2 -d -l 500000 train.txt parts/train
 split -a 2 -d -l 500000 test.txt parts/test
 
-cd ../../scripts
+cd /opt/BIDMach/scripts
 
 bidmach readcriteo.ssc
 

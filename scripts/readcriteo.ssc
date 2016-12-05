@@ -43,7 +43,7 @@ def readcritfile(fname:String, haslabel:Int):(FMat, IMat, IMat) = {
   (labels, numpart, bpart);
 }
 
-val dir = "../data/criteo/parts/"
+val dir = "/mnt/BIDMach/data/criteo/parts/"
 println("reading and converting training data")
 for (i <- 0 to 91) { 
   val (a,b,c) = readcritfile(dir+("train%02d" format i), 1);
