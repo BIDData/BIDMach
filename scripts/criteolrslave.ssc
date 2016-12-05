@@ -2,17 +2,17 @@
 
 import BIDMach.allreduce.{Master,Worker,Command}
 
-val mdir = "../data/criteo/parts/"
+val mdir = "/mnt/BIDMach/data/criteo/parts/"
 
 val (nn,opts) = GLM.learnerX(List(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4"));
-val ntest = 2;
+val ntest = 2;i
 opts.nend = 20 - ntest;
-opts.lrate = 0.0001f;
+opts.lrate = 0.0003f;
 opts.reg1weight = 0.0001f;
-opts.batchSize=1000;
-opts.npasses=2;
+opts.batchSize = 30000;
+opts.npasses = 5;
 opts.links = irow(1);
-//opts.pstep = 0.001f;
+//opts.pstep = 0.01f;
 opts.aopts = opts;
 opts.texp = 0.4f;
 

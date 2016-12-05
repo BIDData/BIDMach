@@ -1,4 +1,5 @@
-val dir="../data/MNIST8M/parts/"
+// val dir="../data/MNIST8M/parts/"
+val dir="/mnt/BIDMach/data/MNIST8M/parts/"
 val (nn, opts) = KMeans.learner(dir+"alls%02d.fmat.lz4");
 
 val test = loadFMat(dir+"alls70.fmat.lz4");

@@ -3,7 +3,7 @@ val ntest = 13
 
 val maxrange = 20000000
 
-val dir = "../data/criteo/parts/";
+val dir = "/mnt/BIDMach/data/criteo/parts/";
 val ivals = new Array[IMat](26);
 val mvals = new Array[IMat](26);
 println("Building feature lookup tables")

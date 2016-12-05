@@ -34,6 +34,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   var results:Array[AnyRef] = null;
   var masterIP:InetAddress = null;
   var nresults = 0;
+  var timer_for_distr:Long = 0;
 
   def init() {
     masterIP = InetAddress.getLocalHost;
@@ -80,11 +81,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def stopUpdates() {
     reducer.stop = true;
     reduceTask.cancel(true);
+    log("Total time for distributed version is %d\n" format (System.currentTimeMillis-timer_for_distr));
   }
 
   def startLearners() {
     val cmd = new StartLearnerCommand(round, 0);
     broadcastCommand(cmd);
+    timer_for_distr = System.currentTimeMillis;
   }
 
   def permuteAllreduce(round:Int, limit:Int) {
@@ -211,17 +214,28 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   listener.allreduce_collected = 0
 	broadcastCommand(cmd);
 
-  val machine_threshold = 0.8;
-  val time_threshold = 5000;
+  
   val t0 = System.currentTimeMillis;
   var t = System.currentTimeMillis;
-  log("threshold is: %5.2f\n" format machine_threshold*M);
-  while(listener.allreduce_collected < machine_threshold*M && (t-t0)< time_threshold){
+  log("threshold is: %5.2f\n" format opts.machine_threshold*M);
+  var flag = true;
+
+  while(flag){
     //Check the result every 100 ms
     Thread.sleep(100);
     t = System.currentTimeMillis;
     log("current waiting time: %d \n" format t-t0);
     log("listener.allreduce_collected: %d \n" format listener.allreduce_collected);
+
+    if((t-t0)< opts.min_time_to_wait_for_all){
+      if(listener.allreduce_collected == M) flag = false
+    }
+    else if ((t-t0)< opts.time_threshold){
+      if(listener.allreduce_collected >= opts.machine_threshold*M) flag = false
+    }
+    else{
+      flag = false
+    }
   }
 	//val timems = opts.intervalMsec + (limit * opts.timeScaleMsec).toInt;
 	//if (opts.trace > 2) log("Sleeping for %d msec\n" format timems);
@@ -335,6 +349,10 @@ object Master {
     var timeScaleMsec = 1e-4f;
     var permuteAlways = true;
     var numThreads = 16;
+
+    var machine_threshold = 0.75;
+    var min_time_to_wait_for_all = 3000;
+    var time_threshold = 5000;
   }
 
   class Options extends Opts {}

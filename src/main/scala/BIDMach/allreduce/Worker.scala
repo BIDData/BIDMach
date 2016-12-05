@@ -155,8 +155,15 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
           if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
           allReduce(newcmd.round, newcmd.limit);
 
-          val resp = new AllreduceResponse(cmd.round, cmd.dest);
-          sendMaster(resp);
+          if(learner.done){
+            val resp = new LearnerDoneResponse(cmd.round, cmd.dest);
+            sendMaster(resp);
+          }
+          else{
+            val resp = new AllreduceResponse(cmd.round, cmd.dest);
+            sendMaster(resp);
+          }
+          
 
           //if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
         }

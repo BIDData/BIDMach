@@ -15,6 +15,12 @@ opts.intervalMsec = 2000;
 opts.limit = 1000000
 opts.timeScaleMsec = 2e-3f
 opts.permuteAlways = false
+
+opts.machine_threshold = 0.75
+opts.min_time_to_wait_for_all = 3000
+opts.time_threshold = 5000
+
+
 val nmachines = addresses.length;
 
 val gmods = irow(nmachines);
