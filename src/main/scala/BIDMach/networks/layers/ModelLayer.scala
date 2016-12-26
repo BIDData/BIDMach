@@ -14,14 +14,21 @@ import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
 
+/**
+ * Assign an integer id (imodel) which points to the model matrix (or matrices) used by this layer. 
+ * nmats is the number of model matrices use by this layer. When multiple model matrices are used, 
+ * they are assumed to be consecutive. 
+ * If using named model layers, the model layer name is augmented with "_i" for matrices >= 1. 
+ */
+
 
 class ModelLayer(override val net:Net, override val opts:ModelNodeOpts = new ModelNode, val nmats:Int = 1) extends Layer(net, opts) {
 	var imodel = 0;
   
   override def getModelMats(net:Net):Unit = {
-		imodel = if (net.opts.nmodelmats > 0) {   // If explicit model numbers are given, use them. 
+		imodel = if (net.opts.nmodelmats > 0) {             // If explicit model numbers are given, use them. 
 			opts.imodel;
-		} else if (opts.modelName.length > 0) {               // If this is a named layer, look it up. 
+		} else if (opts.modelName.length > 0) {             // If this is a named layer, look it up. 
 			if (net.modelMap.containsKey(opts.modelName)) {
 				net.modelMap.get(opts.modelName);
 			} else {
@@ -32,7 +39,7 @@ class ModelLayer(override val net:Net, override val opts:ModelNodeOpts = new Mod
 				}
 				len;
 			}
-		} else {                                         // Otherwise return the next available int
+		} else {                                            // Otherwise return the next available int
 			net.imodel += nmats;
 			net.imodel - nmats;
 		};
