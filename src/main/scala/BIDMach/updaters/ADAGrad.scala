@@ -1,6 +1,6 @@
 package BIDMach.updaters
  
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
@@ -13,19 +13,19 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Updater {
   
   var firstStep = 0f
-  var modelmats:Array[Mat] = null
-  var updatemats:Array[Mat] = null  
-  var sumSq:Array[Mat] = null 
-  var stepn:Mat = null
-  var mask:Mat = null
-  var momentum:Array[Mat] = null;
-  var ve:Mat = null
-  var pe:Mat = null
-  var te:Mat = null
-  var lrate:Mat = null
-  var mu:Mat = null
-  var one:Mat = null
-  var randmat:Array[Mat] = null
+  var modelmats:Array[ND] = null
+  var updatemats:Array[ND] = null  
+  var sumSq:Array[ND] = null 
+  var stepn:ND = null
+  var mask:ND = null
+  var momentum:Array[ND] = null;
+  var ve:ND = null
+  var pe:ND = null
+  var te:ND = null
+  var lrate:ND = null
+  var mu:ND = null
+  var one:ND = null
+  var randmat:Array[ND] = null
 
   override def init(model0:Model) = {
     model = model0
@@ -34,15 +34,15 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     val mm = modelmats(0);
     mask = opts.mask;
     val nmats = modelmats.length;
-    sumSq = new Array[Mat](nmats);
+    sumSq = new Array[ND](nmats);
     val hasmomentum = (opts.momentum.asInstanceOf[AnyRef] != null || opts.nesterov.asInstanceOf[AnyRef] != null);
-    if (hasmomentum) momentum = new Array[Mat](nmats);
+    if (hasmomentum) momentum = new Array[ND](nmats);
     for (i <- 0 until nmats) {
     	sumSq(i) = modelmats(i).ones(modelmats(i).nrows, modelmats(i).ncols) *@ opts.initsumsq
       if (hasmomentum) momentum(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
     }
     if (opts.langevin > 0) {
-    	randmat = new Array[Mat](nmats);
+    	randmat = new Array[ND](nmats);
     	for (i <- 0 until nmats) {
     		randmat(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
     	}
@@ -88,12 +88,12 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   		ss ~ ss + newsquares;
   		if (opts.waitsteps < nsteps) {
   			val grad = ss ^ ve;
-  			if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADA0 1 "+i);
+//  			if (java.lang.Double.isNaN(sum(sum(grad.asMat)).dv)) throw new RuntimeException("ADA0 1 "+i);
   			grad ~ grad *@ (stepn ^ te);
-  			if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADA0 2 "+i);
+//  			if (java.lang.Double.isNaN(sum(sum(grad.asMat)).dv)) throw new RuntimeException("ADA0 2 "+i);
   			grad ~ grad + opts.epsilon;
   			mm ~ mm + ((um / grad) *@ lrate);
-  			if (java.lang.Double.isNaN(sum(sum(mm)).dv)) throw new RuntimeException("ADA0 3 "+i);
+//  			if (java.lang.Double.isNaN(sum(sum(mm.asMat)).dv)) throw new RuntimeException("ADA0 3 "+i);
   			if (mask != null) mm ~ mm *@ mask;
   		}
       um.clear;

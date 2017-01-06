@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GDMat,GMat,GIMat,GSMat,GSDMat,GND,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMACH
@@ -79,7 +79,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   override def init() = {
   	useGPU = opts.useGPU && Mat.hasCUDA > 0
     val data0 = mats(0)
-    val m = if (opts.hashFeatures > 0) opts.hashFeatures else size(data0, 1)
+    val m = if (opts.hashFeatures > 0) opts.hashFeatures else data0.nrows
     val targetData = mats.length > 1
     val d = if (opts.targmap.asInstanceOf[AnyRef] != null) {
       opts.targmap.nrows 
@@ -90,7 +90,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     } else {
       modelmats(0).nrows;
     }
-    val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
+    val sdat = (sum(data0.asMat,2).t + 0.5f).asInstanceOf[FMat]
     sp = sdat / sum(sdat)
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
@@ -150,7 +150,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def mupdate3(in:Mat, targ:Mat, dweights:Mat, ipass:Int, pos:Long) = {        
     val ftarg = full(targ);
     val targs = if (targmap.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
-    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in 
+    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0).asMat, in, opts.hashBound1, opts.hashBound2) else modelmats(0).asMat * in 
     if (opts.lim > 0) {
       max(eta, llim, eta);
       min(eta, ulim, eta);
@@ -190,18 +190,18 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
     val ftarg = if (targ.asInstanceOf[AnyRef] != null) full(targ) else null;
     val targs = if (targmap.asInstanceOf[AnyRef] != null && ftarg.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
-    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in;
+    val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0).asMat, in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in;
     GLM.preds(eta, eta, mylinks, totflops);
     if (ogmats != null) {ogmats(0) = eta;}
     if (targs.asInstanceOf[AnyRef] != null) {
     	val v = GLM.llfun(eta, targs, mylinks, totflops);
     	if (dweights.asInstanceOf[AnyRef] != null) {
-    		FMat(sum(v ∘  dweights, 2) / sum(dweights))
+    		FMat(sum(v.asMat ∘  dweights, 2) / sum(dweights))
     	} else {
     	  if (opts.doVariance) {
-    	    FMat(mean(v, 2)) on FMat(variance(v, 2));
+    	    FMat(mean(v.asMat, 2)) on FMat(variance(v.asMat, 2));
     	  } else {
-    	  	FMat(mean(v, 2));
+    	  	FMat(mean(v.asMat, 2));
     	  }
     	}
     } else {
@@ -373,24 +373,29 @@ object GLM {
   
   class Options extends Opts {}
   
-  def meanHelper(feta:FMat, fout:FMat, ilinks:IMat, istart:Int, iend:Int) {
+  def meanHelper(feta:Array[Float], erows:Int, fout:Array[Float], orows:Int, ilinks:IMat, istart:Int, iend:Int) {
     var i = istart
     while (i < iend) {
       var j = 0
-      while (j < feta.nrows) { 
+      while (j < erows) { 
         val fun = GLM.linkArray(ilinks(j)).meanfn
-        fout.data(j + i * fout.nrows) = fun(feta.data(j + i * feta.nrows))
+        fout(j + i * orows) = fun(feta(j + i * erows))
         j += 1 
       }
       i += 1
     }     
   }
   
-  def preds(eta:Mat, out:Mat, links:Mat, totflops:Long):Mat = {
+  def preds(eta:ND, out:ND, links:Mat, totflops:Long):ND = {
     (eta, links, out) match {
       case (feta:FMat, ilinks:IMat, fout:FMat) => {
         Mat.nflops += totflops * feta.ncols
-        meanHelper(feta, fout, ilinks, 0, feta.ncols)
+        meanHelper(feta.data, feta.nrows, fout.data, fout.nrows, ilinks, 0, feta.ncols)
+        out
+      }
+      case (feta:FND, ilinks:IMat, fout:FND) => {
+        Mat.nflops += totflops * feta.ncols
+        meanHelper(feta.data, feta.nrows, fout.data, fout.nrows, ilinks, 0, feta.ncols)
         out
       }
       case (geta:GMat, gilinks:GIMat, gout:GMat) => {
@@ -403,35 +408,32 @@ object GLM {
         CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
         out
       }
-    }
-  }
-  
-  def preds(eta:Mat, links:Mat, totflops:Long):Mat = {
-    (eta, links) match {
-      case (feta:FMat, ilinks:IMat) => {
-        val fout = FMat.newOrCheckFMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
-        Mat.nflops += totflops * feta.ncols
-        meanHelper(feta, fout, ilinks, 0, feta.ncols)
-        fout
-      }
-      case (geta:GMat, gilinks:GIMat) => {
-        val gout = GMat.newOrCheckGMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+      case (geta:GND, gilinks:GIMat, gout:GND) => {
         Mat.nflops += totflops * geta.ncols
         CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
-        gout
-      }
-      case (geta:GDMat, gilinks:GIMat) => {
-      	val gout = GDMat.newOrCheckGDMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
-        Mat.nflops += totflops * geta.ncols
-        CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
-        gout
+        out
       }
     }
   }
   
-  def llfun(pred:Mat, targ:Mat, links:Mat, totflops:Long):Mat = {
+  def llfun(pred:ND, targ:ND, links:Mat, totflops:Long):ND = {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
+        Mat.nflops += 10L * ftarg.length
+            var i = 0
+            val out = (ftarg + 5f)
+            while (i < ftarg.ncols) {
+                var j = 0
+                while (j < ftarg.nrows) {
+                    val fun = GLM.linkArray(ilinks(j)).likelihoodfn
+                    out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
+                    j += 1
+                }
+                i += 1
+            }
+            out
+      }
+      case (fpred:FND, ftarg:FND, ilinks:IMat) => {
         Mat.nflops += 10L * ftarg.length
             var i = 0
             val out = (ftarg + 5f)
@@ -452,6 +454,12 @@ object GLM {
         CUMACH.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
         out
       }
+      case (gpred:GND, gtarg:GND, gilinks:GIMat) => {
+        Mat.nflops += totflops * gpred.ncols
+        val out = (gpred + 3f)
+        CUMACH.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
+        out
+      }
       case (gpred:GDMat, gtarg:GDMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         val out = (gpred + 3f)
@@ -461,9 +469,23 @@ object GLM {
     }
   }
   
-  def derivs(pred:Mat, targ:Mat, out:Mat, links:Mat, totflops:Long) = {
+  def derivs(pred:ND, targ:ND, out:ND, links:Mat, totflops:Long) = {
     (pred, targ, out, links) match {
       case (fpred:FMat, ftarg:FMat, fout:FMat, ilinks:IMat) => {
+      	Mat.nflops += 10L * ftarg.length;
+      	var i = 0;
+      	while (i < ftarg.ncols) {
+      		var j = 0;
+      		while (j < ftarg.nrows) {
+      			val fun = GLM.linkArray(ilinks(j)).derivfn;
+      			fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+      			j += 1;
+      		}
+      		i += 1;
+      	}
+      	fout;
+      }
+      case (fpred:FND, ftarg:FND, fout:FND, ilinks:IMat) => {
       	Mat.nflops += 10L * ftarg.length;
       	var i = 0;
       	while (i < ftarg.ncols) {
@@ -482,6 +504,11 @@ object GLM {
         CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
         gout
       }
+      case (gpred:GMat, gtarg:GMat, gout:GMat, gilinks:GIMat) => {
+        Mat.nflops += totflops * gpred.ncols
+        CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        gout
+      }
       case (gpred:GDMat, gtarg:GDMat, gout:GDMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         CUMACH.applydderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
@@ -490,7 +517,7 @@ object GLM {
     }
   }
    
-  def derivs(pred:Mat, targ:Mat, links:Mat, totflops:Long) = {
+  def derivs(pred:ND, targ:ND, links:Mat, totflops:Long) = {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
       	val fout = FMat.newOrCheckFMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
@@ -507,8 +534,29 @@ object GLM {
       	}
       	fout;
       }
+      case (fpred:FND, ftarg:FND, ilinks:IMat) => {
+      	val fout = FND.newOrCheckFND(fpred.dims, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        Mat.nflops += 10L * ftarg.length;
+      	var i = 0;
+      	while (i < ftarg.ncols) {
+      		var j = 0
+      				while (j < ftarg.nrows) {
+      					val fun = GLM.linkArray(ilinks(j)).derivfn;
+      					fout.data(j + i * fout.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+      					j += 1;
+      				}
+      		i += 1;
+      	}
+      	fout;
+      }
       case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
       	val gout = GMat.newOrCheckGMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        Mat.nflops += totflops * gpred.ncols
+        CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        gout
+      }
+      case (gpred:GND, gtarg:GND, gilinks:GIMat) => {
+      	val gout = GND.newOrCheckGND(gpred.dims, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
         Mat.nflops += totflops * gpred.ncols
         CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
         gout
@@ -890,7 +938,6 @@ object GLM {
     nopts.links = mopts.links
     mopts.links.set(d)
     nopts.batchSize = mopts.batchSize
-    nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
         new MatSource(Array(mat0, targ), mopts), 
@@ -986,7 +1033,6 @@ object GLM {
     val model = model0.asInstanceOf[GLM]
     val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 0
     val newmod = new GLM(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);
@@ -1039,7 +1085,6 @@ object GLM {
     mopts.reg2weight = 1f
     nopts.links = mopts.links
     nopts.batchSize = mopts.batchSize
-    nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
         new MatSource(Array(mat0, targ), mopts), 
@@ -1064,7 +1109,6 @@ object GLM {
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
     nopts.links.set(3)
-    nopts.putBack = 1
     val nn = new Learner(
         new MatSource(Array(mat1, preds), nopts), 
         model.asInstanceOf[GLM], 

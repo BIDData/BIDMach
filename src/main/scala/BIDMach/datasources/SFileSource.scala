@@ -1,5 +1,5 @@
 package BIDMach.datasources
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,Filter,FND,IMat,HMat,GMat,GIMat,GSMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.concurrent.future
@@ -24,13 +24,13 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     initbase
     var totsize = sum(opts.fcounts).v
     if (opts.addConstFeat) totsize += 1
-    omats = new Array[Mat](1)
+    omats = new Array[ND](1)
     omats(0) = SMat(totsize, opts.batchSize, opts.batchSize * opts.eltsPerSample)
     inptrs = izeros(opts.fcounts.length, 1)
     offsets = 0 on cumsum(opts.fcounts)
   }
   
-  def binFind(i:Int, mat:Mat):Int = {
+  def binFind(i:Int, mat:ND):Int = {
     val imat = mat.asInstanceOf[IMat]
     val nrows = mat.nrows
     var ibeg = 0
@@ -46,7 +46,7 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     iend    
   }
   
-  def sprowslice(inmat:Array[Mat], rowno:Int, nrow:Int, omat0:Mat, done:Int):Mat = {
+  def sprowslice(inmat:Array[ND], rowno:Int, nrow:Int, omat0:ND, done:Int):ND = {
     val omat = omat0.asInstanceOf[SMat]
     val ioff = Mat.ioneBased
     var idone = done
@@ -104,7 +104,7 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     omat    
   }
   
-  def spmax(matq:Array[Mat]):Int = {
+  def spmax(matq:Array[ND]):Int = {
     var maxv = 0
     for (i <- 0 until matq.length) {
       if (matq(i).asInstanceOf[AnyRef] != null) {
@@ -115,7 +115,7 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     maxv
   }
   
-  def fillup(mat:Mat, todo:Int) = {
+  def fillup(mat:ND, todo:Int) = {
     val smat = mat.asInstanceOf[SMat]
     val ncols = mat.ncols
     var i = ncols - todo
@@ -126,18 +126,18 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
     }
   }
   
-  def flushMat(mat:Mat) = {
+  def flushMat(mat:ND) = {
     val smat = mat.asInstanceOf[SMat]
     smat.nnz0 = 0
     smat.jc(0) = Mat.ioneBased
   }
   
-  override def next:Array[Mat] = {
+  override def next:Array[ND] = {
     var donextfile = false
     var todo = opts.batchSize
     flushMat(omats(0))
     while (todo > 0 && fileno < nend) {
-    	var nrow = rowno
+    	var ncol = colno
     	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
     	  while (ready(filex) < fileno) Thread.sleep(1); // `yield`
@@ -146,25 +146,25 @@ class SFileSourcev1(override val opts:SFileSource.Opts = new SFileSource.Options
         }
     	val spm = spmax(matqueue(filex)) + 1
 //    	println("spm %d" format spm)
-    	nrow = math.min(rowno + todo, spm)
+    	ncol = math.min(colno + todo, spm)
     	val matq = matqueue(filex)
     	if (matq(0).asInstanceOf[AnyRef] != null) {
 //    	  println("Here %d %d %d" format(rowno, nrow, todo))
-    		omats(0) = sprowslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
-    		if (rowno + todo >= spm) donextfile = true
+    		omats(0) = sprowslice(matq, colno, ncol, omats(0), opts.batchSize - todo)
+    		if (colno + todo >= spm) donextfile = true
     	} else {
     	  if (opts.throwMissing) {
     	    throw new RuntimeException("Missing file "+fileno)
     	  }
     	  donextfile = true
     	}
-    	todo -= nrow - rowno
+    	todo -= ncol - colno
     	if (donextfile) {
-    	  rowno = 0;
+    	  colno = 0;
     	  fileno += 1;
     	  donextfile = false
     	} else {
-    	  rowno = nrow;
+    	  colno = ncol;
     	}
     }
     if (todo > 0) {
@@ -201,7 +201,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     } else opts.fcounts
     var totsize = sum(fcounts).v
     if (opts.addConstFeat) totsize += 1
-    omats = new Array[Mat](1)
+    omats = new Array[ND](1)
     omats(0) = SMat(totsize, opts.batchSize, opts.batchSize * opts.eltsPerSample)
     inptrs = izeros(fcounts.length, 1)
     offsets = 0 on cumsum(fcounts)
@@ -223,7 +223,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     iend    
   }
   
-  def spcolslice(inmat:Array[Mat], colno:Int, endcol:Int, omat0:Mat, done:Int):Mat = {
+  def spcolslice(inmat:Array[ND], colno:Int, endcol:Int, omat0:ND, done:Int):Mat = {
     val omat = omat0.asInstanceOf[SMat]
     val ioff = Mat.ioneBased
     var idone = done
@@ -272,7 +272,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     omat    
   }
   
-  def spmax(matq:Array[Mat]):Int = {
+  def spmax(matq:Array[ND]):Int = {
     var maxv = 0;
     for (i <- 0 until matq.length) {
       if (matq(i).asInstanceOf[AnyRef] != null) {
@@ -282,7 +282,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     maxv - 1
   }
   
-  def fillup(mat:Mat, todo:Int) = {
+  def fillup(mat:ND, todo:Int) = {
     val smat = mat.asInstanceOf[SMat]
     val ncols = mat.ncols
     var i = ncols - todo
@@ -293,18 +293,18 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     }
   }
   
-  def flushMat(mat:Mat) = {
+  def flushMat(mat:ND) = {
     val smat = mat.asInstanceOf[SMat]
     smat.nnz0 = 0
     smat.jc(0) = Mat.ioneBased
   }
   
-  override def next:Array[Mat] = {
+  override def next:Array[ND] = {
     var donextfile = false
     var todo = opts.batchSize
     flushMat(omats(0))
     while (todo > 0 && fileno < nend) {
-    	var nrow = rowno
+    	var ncol = colno
     	val filex = fileno % math.max(1, opts.lookahead)
     	if (opts.lookahead > 0) {
     	  while (ready(filex) < fileno) Thread.sleep(1);// `yield`
@@ -313,27 +313,27 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     	}    	
     	val spm = spmax(matqueue(filex)) + 1
 //    	println("spm %d" format spm)
-    	nrow = math.min(rowno + todo, spm)
+    	ncol = math.min(colno + todo, spm)
     	val matq = matqueue(filex)
     	if (matq(0).asInstanceOf[AnyRef] != null) {
 //    	  println("Here %d %d %d %d" format(rowno, nrow, todo, spm))
-    		omats(0) = spcolslice(matq, rowno, nrow, omats(0), opts.batchSize - todo)
-    		if (rowno + todo >= spm) donextfile = true
+    		omats(0) = spcolslice(matq, colno, ncol, omats(0), opts.batchSize - todo)
+    		if (colno + todo >= spm) donextfile = true
     	} else {
     	  if (opts.throwMissing) {
     	    throw new RuntimeException("Missing file "+fileno)
     	  }
     	  donextfile = true;
     	}
-    	todo -= nrow - rowno
-    	fprogress = nrow*1f / spm
+    	todo -= ncol - colno
+    	fprogress = ncol*1f / spm
     	if (donextfile) {
-    	  rowno = 0;
+    	  colno = 0;
     	  fileno += 1;
     	  fprogress = 0
     	  donextfile = false
     	} else {
-    	  rowno = nrow
+    	  colno = ncol
     	}
     }
     if (todo > 0) {

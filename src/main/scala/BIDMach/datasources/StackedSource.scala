@@ -1,5 +1,5 @@
 package BIDMach.datasources
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,Filter,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
@@ -16,7 +16,7 @@ class StackedDS(val s1:DataSource, val s2:DataSource,
     s2.init;
     val mats1 = s1.omats;
     val mats2 = s2.omats;
-    omats = new Array[Mat](mats1.length + mats2.length);
+    omats = new Array[ND](mats1.length + mats2.length);
     for (i <- 0 until mats1.length) {
       omats(i) = mats1(i);
     }
@@ -32,13 +32,13 @@ class StackedDS(val s1:DataSource, val s2:DataSource,
     s2.reset;
   }
   
-  def next:Array[Mat] = {
+  def next:Array[ND] = {
     val mats1 = s1.next;
     val mats2 = s2.next;
     val fs1 = s1.asInstanceOf[FileSource];
     val fs2 = s2.asInstanceOf[FileSource];
-    if (fs1.fileno != fs2.fileno || fs1.rowno != fs2.rowno) {
-      throw new RuntimeException("Data source skew %d %d %d %d" format (fs1.fileno, fs2.fileno, fs1.rowno, fs2.rowno))
+    if (fs1.fileno != fs2.fileno || fs1.colno != fs2.colno) {
+      throw new RuntimeException("Data source skew %d %d %d %d" format (fs1.fileno, fs2.fileno, fs1.colno, fs2.colno))
     }
     for (i <- 0 until mats1.length) {
       omats(i) = mats1(i);

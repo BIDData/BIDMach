@@ -22,7 +22,7 @@ class ArraySource(override val opts:ArraySource.Opts = new ArraySource.Options) 
 
   override def hasNext:Boolean = {
     val matq = inMats(0)
-    val matqnr = if (opts.dorows) matq.nrows else matq.ncols
+    val matqnr = matq.ncols
     val ihn = iblock < dataArray.length
     if (! ihn && iblock > 0) {
       nblocks = iblock

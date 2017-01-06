@@ -1,5 +1,5 @@
 package BIDMach.datasources
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,Filter,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.util.concurrent.ExecutorService;
@@ -11,19 +11,19 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   var sizeMargin = 0f
   var blockSize = 0
   @volatile var fileno = 0
-  var rowno = 0
+  var colno = 0
   var nstart = 0
   var nend = 0
   var fnames:List[(Int)=>String] = null;
   omats = null;
-  var matqueue:Array[Array[Mat]] = null;
+  var matqueue:Array[Array[ND]] = null;
   var ready:IMat = null;
   var stop:Boolean = false;
   var pause:Boolean = true;
   var permfn:(Int)=>Int = null;
   var totalSize = 0;
   var fprogress:Float = 0;
-  var lastMat:Array[Mat] = null;
+  var lastMat:Array[ND] = null;
   var lastFname:Array[String] = null;
   var executor:ExecutorService = null;
   var prefetchTasks:Array[Future[_]] = null;
@@ -67,17 +67,11 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     }
     ready = -iones(math.max(opts.lookahead,1), 1)                              // Numbers of files currently loaded in queue
     reset
-    rowno = 0;
+    colno = 0;
     fileno = nstart;                                                           // Number of the current output file
-    matqueue = new Array[Array[Mat]](math.max(1,opts.lookahead))               // Queue of matrices for each output matrix
+    matqueue = new Array[Array[ND]](math.max(1,opts.lookahead))               // Queue of matrices for each output matrix
     for (i <- 0 until math.max(1,opts.lookahead)) {
-      matqueue(i) = new Array[Mat](fnames.size);
-    }
-    if (opts.putBack < 0) {
-      for (i <- 0 until opts.lookahead) {
-        prefetchers(i) = new Prefetcher(nstart + i);
-        prefetchTasks(i) = executor.submit(prefetchers(i));
-      }
+      matqueue(i) = new Array[ND](fnames.size);
     }
     pause = false;
   }
@@ -105,7 +99,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
         FileSource.encodeDate(yy, mm, hhdd % 31 + 1, hhdd / 31)
       }
     }
-    rowno = 0;
+    colno = 0;
     fileno = nstart;
     for (i <- 0 until math.max(1,opts.lookahead)) {
       val ifile = nstart + i;
@@ -115,7 +109,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
       }
     }
     totalSize = nend - nstart;
-    lastMat = new Array[Mat](fnames.size);
+    lastMat = new Array[ND](fnames.size);
     lastFname = new Array[String](fnames.size);
     for (i <- 0 until lastMat.length) {lastMat(i) = null;}
     for (i <- 0 until lastFname.length) {lastFname(i) = null;}
@@ -123,15 +117,21 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 
   def init = {
     initbase
-    omats = new Array[Mat](fnames.size)
+    omats = new Array[ND](fnames.size)
     for (i <- 0 until fnames.size) {
       var mm = HMat.loadMat(fnames(i)(nstart));
-      val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
+      val (nr, nc) = (mm.nrows, blockSize);
       omats(i) = mm match {
         case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_FMat".##);
         case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_IMat".##);
         case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_DMat".##);
         case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_SMat".##);
+        case a:FND => {
+        	val newdims = mm.dims.copy;
+        	newdims(newdims.length-1) = nc;
+        	val hmm = Filter.hashIMat(newdims);
+        	FND.newOrCheckFND(newdims, null, GUID, i, hmm, "FileSource_FND".##);
+        }
       }
     }
   }
@@ -142,16 +142,16 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 
   def nmats = omats.length
 
-  def next:Array[Mat] = {
+  def next:Array[ND] = {
     var donextfile = false;
     var todo = blockSize;
     val featType = opts.featType;
     val threshold = opts.featThreshold;
     while (todo > 0 && fileno < nend) {
-      var nrow = rowno;
+      var ncol = colno;
       val filex = fileno % math.max(1, opts.lookahead);
-      //    	        println("todo %d, fileno %d, filex %d, rowno %d" format (todo, fileno, filex, rowno))
-      if (opts.putBack < 0 && opts.lookahead > 0) {
+      //    	        println("todo %d, fileno %d, filex %d, colno %d" format (todo, fileno, filex, colno))
+      if (opts.lookahead > 0) {
         while (ready(filex) < fileno) {
           if (opts.traceFileSource > 0) println("next %d %d %s" format (fileno, filex, ready.t.toString));
           Thread.sleep(1); //`yield`
@@ -159,31 +159,24 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
         } else {
           fetch
         }
-        var matqnr = 0
+        var matqnc = 0
         for (i <- 0 until fnames.size) {
           val matq = matqueue(filex)(i);
           if (matq.asInstanceOf[AnyRef] != null) {
-            matqnr = if (opts.dorows) matq.nrows else matq.ncols;
-            nrow = math.min(rowno + todo, matqnr);
-            val off = Mat.oneBased
-            if (opts.dorows) {
-              val nc = omats(i).ncols;
-              val nr = nrow - rowno + blockSize - todo - off;
-              omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
-              omats(i) = matq.rowslice(rowno, nrow, omats(i), blockSize - todo);
-            } else {
-              val nr = omats(i).nrows;
-              val nc = nrow - rowno + blockSize - todo - off;
-              omats(i) = checkCaches(nr, nc, omats(i), GUID, i);
-              omats(i) = matq.colslice(rowno, nrow, omats(i), blockSize - todo);
-            }
+            matqnc = matq.ncols;
+            ncol = math.min(colno + todo, matqnc);
+            val off = Mat.oneBased;
+            val nr = omats(i).nrows;
+            val nc = ncol - colno + blockSize - todo - off;
+            omats(i) = checkCaches(nc, omats(i), GUID, i);
+            omats(i) = matq.colslice(colno, ncol, omats(i), blockSize - todo);
 
             if (featType == 0) {
-              min(1f, omats(i), omats(i));
+              min(omats(i), 1f, omats(i));
             } else if (featType == 2) {
               omats(i) ~ omats(i) >= threshold;
             }
-            if (matqnr == nrow) donextfile = true;
+            if (matqnc == ncol) donextfile = true;
             } else {
               if (opts.throwMissing) {
                 throw new RuntimeException("Missing file "+fileno);
@@ -191,15 +184,15 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
               donextfile = true;
             }
         }
-        todo -= nrow - rowno;
+        todo -= ncol - colno;
         if (donextfile) {
-          rowno = 0;
+          colno = 0;
           fileno += 1;
           donextfile = false;
         } else {
-          rowno = nrow;
+          colno = ncol;
         }
-        fprogress = rowno*1f / matqnr;
+        fprogress = colno*1f / matqnc;
     }
     omats
   }
@@ -209,14 +202,6 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     testme.exists
   }
 
-  def lazyTranspose(a:Mat) = {
-    a match {
-      case af:FMat => FMat(a.ncols, a.nrows, af.data)
-      case ad:DMat => DMat(a.ncols, a.nrows, ad.data)
-      case ai:IMat => IMat(a.ncols, a.nrows, ai.data)
-      case _ => throw new RuntimeException("laztTranspose cant deal with "+a.getClass.getName)
-    }
-  }
 
   class Prefetcher(val ifile:Int) extends Runnable {
 
@@ -239,12 +224,12 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
             if (fexists) {
               val fname = fnames(i)(pnew);
               //  					  println("loading %d %d %d %s" format (inew, pnew, i, fname));
-              var oldmat:Mat = null;
+              var oldmat:ND = null;
               matqueue.synchronized {
                 oldmat = matqueue(ifilex)(i);
               }
               if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d reading %d %s" format (ifilex, fileno, pnew, i, fname));
-              val newmat:Mat = try {
+              val newmat:ND = try {
                 HMat.loadMat(fname, oldmat);
               } catch {
                 case e:Exception => {println(stackTraceString(e)); null}
@@ -272,8 +257,10 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     }
   }
 
-  def checkCaches(nr:Int, nc:Int, out:Mat, GUID:Long, i:Int):Mat = {
-    if (nr == out.nrows && nc == out.ncols) {
+  def checkCaches(nc:Int, out:ND, GUID:Long, i:Int):ND = {
+    val dims = out.dims;
+    val nr = out.nrows;
+    if (nc == out.ncols) {
       out
     } else {
       out match {
@@ -281,6 +268,12 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
         case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_IMat".##);
         case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_DMat".##);
         case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_SMat".##);
+        case a:FND => {
+          val newdims = dims.copy;
+          newdims(dims.length-1) = nc;
+        	val hmm = Filter.hashIMat(newdims);
+          FND.newOrCheckFND(newdims, null, GUID, i, hmm, "FileSource_FND".##);
+        }
       }
     }
   }
@@ -399,7 +392,6 @@ object FileSource {
     var sampleFiles = 1.0f
     var nstart:Int = 0
     var nend:Int = 0
-    var dorows:Boolean = false
     var order:Int = 0                          // 0 = sequential order, 1 = random
     var eltsPerSample = 10;
     var throwMissing:Boolean = false

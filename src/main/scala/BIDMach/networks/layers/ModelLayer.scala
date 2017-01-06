@@ -26,9 +26,7 @@ class ModelLayer(override val net:Net, override val opts:ModelNodeOpts = new Mod
 	var imodel = 0;
   
   override def getModelMats(net:Net):Unit = {
-		imodel = if (net.opts.nmodelmats > 0) {             // If explicit model numbers are given, use them. 
-			opts.imodel;
-		} else if (opts.modelName.length > 0) {             // If this is a named layer, look it up. 
+		imodel = if (opts.modelName.length > 0) {             // If this is a named layer, look it up. 
 			if (net.modelMap.containsKey(opts.modelName)) {
 				net.modelMap.get(opts.modelName);
 			} else {
@@ -39,7 +37,9 @@ class ModelLayer(override val net:Net, override val opts:ModelNodeOpts = new Mod
 				}
 				len;
 			}
-		} else {                                            // Otherwise return the next available int
+		} else if (net.opts.nmodelmats > 0) {             // If explicit model numbers are given, use them. 
+		  opts.imodel;
+		} else {                                          // Otherwise return the next available int
 			net.imodel += nmats;
 			net.imodel - nmats;
 		};

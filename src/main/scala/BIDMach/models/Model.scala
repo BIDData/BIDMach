@@ -19,11 +19,11 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   var datasink:DataSink = null;
 
-  var _modelmats:Array[Mat] = null;
+  var _modelmats:Array[ND] = null;
 
   var parent_model:Model = null;
 
-  def modelmats:Array[Mat] = {
+  def modelmats:Array[ND] = {
     if (_modelmats != null) {
       _modelmats
     } else if (parent_model != null) {
@@ -33,11 +33,11 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
   }
 
-  def setmodelmats(a:Array[Mat]) = {
+  def setmodelmats(a:Array[ND]) = {
     _modelmats = a;
   }
 
-  var updatemats:Array[Mat] = null;
+  var updatemats:Array[ND] = null;
 
   // For Allreduce: the local indices
   var indexmat:Mat = null;
@@ -47,13 +47,13 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   var recvmat:Mat = null;
 
-  var mats:Array[Mat] = null;
+  var mats:Array[ND] = null;
 
-  var gmats:Array[Mat] = null;
+  var gmats:Array[ND] = null;
 
-  var omats:Array[Mat] = null;
+  var omats:Array[ND] = null;
 
-  var ogmats:Array[Mat] = null;
+  var ogmats:Array[ND] = null;
 
   var useGPU = false;
 
@@ -65,7 +65,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   var runtimes:FMat = null;
 
-  def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long):Unit = {
+  def mergeModelFn(models:Array[Model], mm:Array[ND], um:Array[ND], istep:Long):Unit = {
     val mlen = models(0).modelmats.length;
     val thisGPU = getGPU;
     for (j <- 0 until mlen) {
@@ -83,7 +83,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     setGPU(thisGPU);
   }
 
-  def mergeModelPassFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) {}
+  def mergeModelPassFn(models:Array[Model], mm:Array[ND], um:Array[ND], ipass:Int) {}
 
   def copyTo(mod:Model) = {
     mod.datasource = datasource;
@@ -96,7 +96,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   }
 
   def copyFrom(mod:Model) = {
-    setmodelmats(new Array[Mat](mod.modelmats.length));
+    setmodelmats(new Array[ND](mod.modelmats.length));
     for (i <- 0 until modelmats.length) {
       modelmats(i) = mod.modelmats(i);
     }
@@ -140,7 +140,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     	}
     } else {
       var n = 0;
-      var mlist = new ListBuffer[Mat]();
+      var mlist = new ListBuffer[ND]();
       while ((new File(fname+"modelmat%02d.lz4" format n)).exists) {
         mlist += loadMat(fname+"modelmat%02d.lz4" format n);
         n += 1;
@@ -167,27 +167,26 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	  datasource = ds;
 	  mats = datasource.next;
 	  datasource.reset;
-	  putBack = datasource.opts.putBack;
 	  useGPU = opts.useGPU && Mat.hasCUDA > 0;
 	  useDouble = opts.useDouble;
-	  gmats = new Array[Mat](mats.length);
+	  gmats = new Array[ND](mats.length);
   }
 
   def bind(ds:DataSink):Unit = {
 	  datasink = ds;
 	  omats = datasink.omats;
-	  ogmats = new Array[Mat](omats.length);
+	  ogmats = new Array[ND](omats.length);
   }
 
   def init():Unit
 
-  def dobatch(mats:Array[Mat], ipass:Int, here:Long)                                       // Calculate an update for the updater
+  def dobatch(mats:Array[ND], ipass:Int, here:Long)                                       // Calculate an update for the updater
 
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
+  def evalbatch(mats:Array[ND], ipass:Int, here:Long):FMat              // Scores (log likelihoods)
 
-  def logging(gmats:Array[Mat],ipass:Int, here:Long) = {
+  def logging(gmats:Array[ND],ipass:Int, here:Long) = {
     if (opts.logFuncs!=null){
-        val res = opts.logFuncs.map(f=>f(this,gmats));
+        val res = opts.logFuncs.map(f=>f(this, gmats));
         if (opts.logDataSink != null){
             opts.logDataSink.omats = res.flatten
             opts.logDataSink.setnmats(res.length)
@@ -196,13 +195,13 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
   }
 
-  def dobatchg(amats:Array[Mat], ipass:Int, here:Long) = {
+  def dobatchg(amats:Array[ND], ipass:Int, here:Long) = {
     copyMats(amats, gmats);
     dobatch(gmats, ipass, here);
     logging(gmats, ipass, here);
   }
 
-  def evalbatchg(amats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatchg(amats:Array[ND], ipass:Int, here:Long):FMat = {
     copyMats(amats, gmats)
     val v = evalbatch(gmats, ipass, here)
     if (omats != null) {
@@ -216,7 +215,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def snapshot(len:Int, avg:Boolean) = {
   	val len0 = math.min(len, modelmats(0).ncols);
   	modelmats(0).synchronized {
-  		sendmat = cpu(modelmats(0).colslice(0, len0));
+  		sendmat = cpu(modelmats(0).colslice(0, len0)).asMat;
   	}
   	if (avg) {
   		sendmat = ones(1, len0) on sendmat;
@@ -229,7 +228,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   	recvmat = recvmat - sendmat;
   	val nr = modelmats(0).nrows;
   	modelmats(0).synchronized {
-  		val head = modelmats(0).view(nr, len0);
+  		val head = modelmats(0).asMat.view(nr, len0);
   		val chead = sendmat.view(nr, len0);
   		chead <-- head;
   		chead ~ chead + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat);
@@ -243,7 +242,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   	recvmat = recvmat - sendmat;
   	val nr = modelmats(0).nrows;
   	modelmats(0).synchronized {
-  		val head = modelmats(0).view(nr, len0);
+  		val head = modelmats(0).asMat.view(nr, len0);
   		val chead = sendmat.view(nr, len0);
   		chead <-- head;
   		chead ~ chead * (1 - ee) + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat) * ee;
@@ -251,7 +250,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   	}
   }
 
-  def copyMats(from:Array[Mat], to:Array[Mat]) = {
+  def copyMats(from:Array[ND], to:Array[ND]) = {
     for (i <- 0 until from.length) {
       if (useGPU) {
         if (useDouble) {
@@ -321,7 +320,7 @@ object Model {
 	  var dim = 256;
 	  var debug = 0;
 	  var doAllReduce = false;
-	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
+	  var logFuncs : Array[(Model,Array[ND]) => Array[ND]] = null;
 	  var logDataSink : DataSink = null;
   }
 

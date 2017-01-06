@@ -1,5 +1,5 @@
 package BIDMach.datasinks
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
@@ -15,7 +15,7 @@ abstract class DataSink(val opts:DataSink.Opts = new DataSink.Options) extends S
   private var _nmats = 0;
   def nmats = _nmats;
   def setnmats(k:Int) = {_nmats = k;}
-  var omats:Array[Mat] = null
+  var omats:Array[ND] = null
 }
 
 

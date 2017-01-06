@@ -1,5 +1,5 @@
 package BIDMach.datasinks
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,LMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,LMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -10,9 +10,9 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends M
   var colsdone = 0;
   
   override def init = { 
-    blocks = new ListBuffer[Array[Mat]]();
+    blocks = new ListBuffer[Array[ND]]();
     setnmats(opts.ofnames.length);
-    omats = new Array[Mat](nmats);
+    omats = new Array[ND](nmats);
     ifile = 0;
     opts match {
       case fopts:FileSource.Opts => {
@@ -29,7 +29,7 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends M
       mergeSaveBlocks;
       colsdone = 0;
       ifile += 1;
-      blocks = new ListBuffer[Array[Mat]]();
+      blocks = new ListBuffer[Array[ND]]();
     }
   }
 

@@ -1,18 +1,18 @@
 package BIDMach.datasinks
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,LMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,LMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.collection.mutable.ListBuffer
 
 
 class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends DataSink(opts) { 
-  var blocks = new ListBuffer[Array[Mat]]();
-  var mats:Array[Mat] = null;
+  var blocks = new ListBuffer[Array[ND]]();
+  var mats:Array[ND] = null;
   
   override def init = { 
-    blocks = new ListBuffer[Array[Mat]]();
+    blocks = new ListBuffer[Array[ND]]();
     setnmats(opts.nmats);
-    omats = new Array[Mat](nmats);
+    omats = new Array[ND](nmats);
   }
   
   def put = {
@@ -26,7 +26,7 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
     	val ncols = blocks.map(_(0).ncols).reduce(_+_);
     	val imats = blocks(0);
     	val ablocks = blocks.toArray;
-    	mats = new Array[Mat](nmats);
+    	mats = new Array[ND](nmats);
     	for (i <- 0 until nmats) {
     		val nrows = imats(i).nrows;
     		val nnz0 = imats(i) match {
@@ -45,7 +45,7 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
     		var here = 0;
     		for (j <- 0 until ablocks.length) {
     			val am = ablocks(j)(i);
-    			am.colslice(0, am.ncols, mats(i), here, true);
+    			am.asMat.colslice(0, am.ncols, mats(i).asMat, here, true);
     			here += am.ncols;
     		}
     	}
@@ -62,7 +62,7 @@ object MatSink {
 
   }
   
-  def copyCPUmat(m:Mat):Mat = {
+  def copyCPUmat(m:ND):ND = {
     val nr = m.nrows;
     val nc = m.ncols;
     val out = makeCPUmat(m, nr, nc);
@@ -70,7 +70,7 @@ object MatSink {
     out;   
   }
   
-  def makeCPUmat(m:Mat,nr:Int, nc:Int):Mat = {
+  def makeCPUmat(m:ND, nr:Int, nc:Int):ND = {
   	m match {
   		case f:FMat => zeros(nr,nc);
   		case g:GMat => zeros(nr,nc);

@@ -1,5 +1,5 @@
 package BIDMach.datasources
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,ND,FND,GND}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,Filter,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.MatIOtrait
@@ -37,51 +37,50 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
     iterNext;
     nmats = inMats.length;
     inFname = new Array[String](nmats);
-    omats = new Array[Mat](nmats);
+    omats = new Array[ND](nmats);
     for (i <- 0 until nmats) {
       val mm = inMats(i);
-      val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
+      val (nr, nc) = (mm.nrows, blockSize);
       omats(i) = mm match {
         case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_FMat".##);
         case mi:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_IMat".##);
         case md:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_DMat".##);
         case ms:SMat => SMat.newOrCheckSMat(nr, nc, nc * opts.eltsPerSample, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_SMat".##);
+        case a:FND => {
+        	val newdims = mm.dims.copy;
+        	newdims(newdims.length-1) = nc;
+        	val hmm = Filter.hashIMat(newdims);
+        	FND.newOrCheckFND(newdims, null, GUID, i, hmm, "IteratorSource_FND".##);
+        }
       }
     }
   }
 
-  def next:Array[Mat] = {;
+  def next:Array[ND] = {;
     var donextfile = false;
     var todo = blockSize;
     val featType = opts.featType;
     val threshold = opts.featThreshold;
     while (todo > 0) {
       var samplesTodo = samplesDone;
-      var matqnr = 0
+      var matqnc = 0
       for (i <- 0 until nmats) {
         val matq = inMats(i);
         if (matq.asInstanceOf[AnyRef] != null) {
-          matqnr = if (opts.dorows) matq.nrows else matq.ncols;
-          samplesTodo = math.min(samplesDone + todo, matqnr);
-          val off = Mat.oneBased
-          if (opts.dorows) {
-            val nc = omats(i).ncols;
-            val nr = samplesTodo - samplesDone + blockSize - todo - off;
-            omats(i) = checkCaches(nr, nc, omats(i), GUID, i);                                         // otherwise, check for a cached copy
-            omats(i) = matq.asMat.rowslice(samplesDone, samplesTodo, omats(i), blockSize - todo);
-          } else {
-            val nr = omats(i).nrows;
-            val nc = samplesTodo - samplesDone + blockSize - todo - off;
-            omats(i) = checkCaches(nr, nc, omats(i), GUID, i);
-            omats(i) = matq.asMat.colslice(samplesDone, samplesTodo, omats(i), blockSize - todo);
-          }
+          matqnc = matq.ncols;
+          samplesTodo = math.min(samplesDone + todo, matqnc);
+          val off = Mat.oneBased;
+          val nr = omats(i).nrows;
+          val nc = samplesTodo - samplesDone + blockSize - todo - off;
+          omats(i) = checkCaches(nc, omats(i), GUID, i);
+          omats(i) = matq.colslice(samplesDone, samplesTodo, omats(i), blockSize - todo);
 
           if (featType == 0) {
-            min(1f, omats(i), omats(i));
+            min(omats(i), 1f, omats(i));
           } else if (featType == 2) {
             omats(i) ~ omats(i) >= threshold;
           }
-          if (matqnr == samplesTodo) donextfile = true;
+          if (matqnc == samplesTodo) donextfile = true;
           } else {
             donextfile = true;
           }
@@ -96,7 +95,7 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
       } else {
         samplesDone = samplesTodo;
       }
-      fprogress = samplesDone*1f / matqnr;
+      fprogress = samplesDone*1f / matqnc;
     }
     omats;
   }
@@ -109,12 +108,12 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
 
   def hasNext:Boolean = {
     val matq = inMats(0);
-    val matqnr = if (opts.dorows) matq.nrows else matq.ncols;
+    val matqnc = matq.ncols;
     val ihn = iter.hasNext;
     if (! ihn && iblock > 0) {
       nblocks = iblock;
     }
-    (ihn || (matqnr - samplesDone) == 0);
+    (ihn || (matqnc - samplesDone) == 0);
   }
 
   def iterHasNext:Boolean = {
@@ -134,17 +133,10 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
     }
   }
 
-  def lazyTranspose(a:Mat) = {
-    a match {
-      case af:FMat => FMat(a.ncols, a.nrows, af.data)
-      case ad:DMat => DMat(a.ncols, a.nrows, ad.data)
-      case ai:IMat => IMat(a.ncols, a.nrows, ai.data)
-      case _ => throw new RuntimeException("laztTranspose cant deal with "+a.getClass.getName)
-    }
-  }
-
-  def checkCaches(nr:Int, nc:Int, out:Mat, GUID:Long, i:Int):Mat = {
-    if (nr == out.nrows && nc == out.ncols) {
+ def checkCaches(nc:Int, out:ND, GUID:Long, i:Int):ND = {
+    val dims = out.dims;
+    val nr = out.nrows;
+    if (nc == out.ncols) {
       out
     } else {
       out match {
@@ -152,6 +144,12 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
         case a:IMat => IMat.newOrCheckIMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_IMat".##);
         case a:DMat => DMat.newOrCheckDMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_DMat".##);
         case a:SMat => SMat.newOrCheckSMat(nr, nc, a.nnz, null, GUID, i, ((nr*1L) << 32) + nc, "IteratorSource_SMat".##);
+        case a:FND => {
+          val newdims = dims.copy;
+          newdims(dims.length-1) = nc;
+        	val hmm = Filter.hashIMat(newdims);
+          FND.newOrCheckFND(newdims, null, GUID, i, hmm, "IteratorSource_FND".##);
+        }
       }
     }
   }
@@ -175,7 +173,6 @@ object IteratorSource {
 
   trait Opts extends DataSource.Opts {
     var nmats = 1;
-    var dorows:Boolean = false
     @transient var iter:Iterator[Tuple2[AnyRef, MatIOtrait]] = null;
     var eltsPerSample = 10;
     var throwMissing:Boolean = false;
