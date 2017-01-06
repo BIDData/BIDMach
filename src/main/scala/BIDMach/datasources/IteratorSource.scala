@@ -49,7 +49,7 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
         case a:FND => {
         	val newdims = mm.dims.copy;
         	newdims(newdims.length-1) = nc;
-        	val hmm = Filter.hashIMat(newdims);
+        	val hmm = ND.hashIMat(newdims);
         	FND.newOrCheckFND(newdims, null, GUID, i, hmm, "IteratorSource_FND".##);
         }
       }
@@ -147,7 +147,7 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
         case a:FND => {
           val newdims = dims.copy;
           newdims(dims.length-1) = nc;
-        	val hmm = Filter.hashIMat(newdims);
+        	val hmm = ND.hashIMat(newdims);
           FND.newOrCheckFND(newdims, null, GUID, i, hmm, "IteratorSource_FND".##);
         }
       }

@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,GND,LMat,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
@@ -48,7 +48,6 @@ case class Learner(
   var debugMemState = false;
 
   def setup = {
-	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
   }
 
   def init = {
@@ -146,7 +145,6 @@ case class Learner(
         if (mixins != null) mixins map (_ compute(mats, here))
         if (updater != null) updater.update(ipass, here, gprogress)
       }
-      if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
       istep += 1
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
@@ -287,15 +285,13 @@ case class ParLearner(
     val datasink:DataSink,
     val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
 
-  var um:Array[Mat] = null
-  var mm:Array[Mat] = null
+  var um:Array[ND] = null
+  var mm:Array[ND] = null
   var results:FMat = null
-  var cmats:Array[Array[Mat]] = null
+  var cmats:Array[Array[ND]] = null
   var useGPU = false
 
   def setup = {
-	  val dopts	= datasource.opts
-	  Learner.setupPB(datasource, datasource.opts.putBack, models(0).opts.dim)
   }
 
   def init = {
@@ -311,8 +307,8 @@ case class ParLearner(
     }
     if (useGPU) setGPU(thisGPU)
     val mml = models(0).modelmats.length
-    um = new Array[Mat](mml)
-    mm = new Array[Mat](mml)
+    um = new Array[ND](mml)
+    mm = new Array[ND](mml)
     for (i <- 0 until mml) {
     	val mm0 = models(0).modelmats(i)
     	mm(i) = zeros(mm0.nrows, mm0.ncols)
@@ -332,8 +328,8 @@ case class ParLearner(
     val mm0 = models(0).modelmats(0)
     var cacheState = Mat.useCache
     Mat.useCache = opts.useCache
-    cmats = new Array[Array[Mat]](opts.nthreads)
-    for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
+    cmats = new Array[Array[ND]](opts.nthreads)
+    for (i <- 0 until opts.nthreads) cmats(i) = new Array[ND](datasource.omats.length)
     val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
@@ -510,15 +506,12 @@ case class ParLearnerx(
     val datasinks:Array[DataSink],
 		val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
 
-  var um:Array[Mat] = null
-  var mm:Array[Mat] = null
+  var um:Array[ND] = null
+  var mm:Array[ND] = null
   var results:FMat = null
   var useGPU = false
 
   def setup = {
-	  for (i <- 0 until opts.nthreads) {
-	  	Learner.setupPB(datasources(i), datasources(i).opts.putBack, models(i).opts.dim)
-	  }
   }
 
   def init = {
@@ -534,8 +527,8 @@ case class ParLearnerx(
   	useGPU = models(0).useGPU
   	if (Mat.hasCUDA > 0) setGPU(thisGPU)
   	val mml = models(0).modelmats.length
-    um = new Array[Mat](mml)
-    mm = new Array[Mat](mml)
+    um = new Array[ND](mml)
+    mm = new Array[ND](mml)
     for (i <- 0 until mml) {
     	val mm0 = models(0).modelmats(i)
     	mm(i) = zeros(mm0.nrows, mm0.ncols)
@@ -609,7 +602,6 @@ case class ParLearnerx(
 	  				}
 	  				}
 	  				if (useGPU) Thread.sleep(opts.coolit)
-	  				if (datasources(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, datasources(ithread).opts.putBack)
 //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  			}
 	  			models(ithread).synchronized { updaters(ithread).updateM(ipass) }
@@ -829,7 +821,7 @@ object Learner {
     var checkPointInterval = 0f;
   }
 
-  def numBytes(mat:Mat):Long = {
+  def numBytes(mat:ND):Long = {
     mat match {
       case a:FMat => 4L * mat.length;
       case a:IMat => 4L * mat.length;
@@ -837,10 +829,11 @@ object Learner {
       case a:LMat => 8L * mat.length;
       case a:SMat => 8L * mat.nnz;
       case a:SDMat => 12L * mat.nnz;
+      case a:FND => 8L * mat.length;
     }
   }
 
-  def toCPU(mats:Array[Mat]) {
+  def toCPU(mats:Array[ND]) {
     for (i <- 0 until mats.length) {
       mats(i) match {
         case g:GMat => mats(i) = FMat(g)
@@ -849,20 +842,10 @@ object Learner {
         case g:GLMat => mats(i) = LMat(g)
         case g:GSMat => mats(i) = SMat(g)
         case g:GSDMat => mats(i) = SDMat(g)
+        case g:GND => mats(i) = FND(g);
         case g:TMat => mats(i) = cpu(mats(i))
         case _ => {}
       }
-    }
-  }
-
-  def setupPB(ds:DataSource, npb:Int, dim:Int) = {
-    ds match {
-    case ddm:MatSource => {
-    	if (npb >= 0) {
-    		ddm.setupPutBack(npb, dim)
-    	}
-    }
-    case _ => {}
     }
   }
 
@@ -900,11 +883,11 @@ object ParLearner {
   	var coolit = 60
   }
 
-  def syncmodelsPass(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) = {
+  def syncmodelsPass(models:Array[Model], mm:Array[ND], um:Array[ND], ipass:Int) = {
     models(0).mergeModelPassFn(models, mm, um, ipass);
   }
 
-  def syncmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, useGPU:Boolean) = {
+  def syncmodels(models:Array[Model], mm:Array[ND], um:Array[ND], istep:Long, useGPU:Boolean) = {
     models(0).mergeModelFn(models, mm, um, istep);
   }
 

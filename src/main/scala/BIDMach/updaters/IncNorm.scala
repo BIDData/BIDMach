@@ -1,6 +1,6 @@
 package BIDMach.updaters
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
@@ -12,8 +12,8 @@ import BIDMach.models._
 class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Updater(opts) {
   
   var firstStep = 0f
-  var rm:Mat = null
-  var restart:Mat = null
+  var rm:ND = null
+  var restart:ND = null
   var started:Int = 0
   
   override def init(model0:Model) = {
@@ -56,7 +56,7 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
   	um ~ um *@ rm.set(rr)
   	mm ~ mm *@ rm.set(1-rr)
     mm ~ mm + um 
-    if (opts.isprob) mm ~ mm / sum(mm,2)
+    if (opts.isprob) mm.asMat ~ mm.asMat / sum(mm.asMat,2)
     if (opts.warmup > 0) {
       if (started == 0 && step > opts.warmup) {
         restart <-- mm
@@ -65,7 +65,7 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
       if (started == 1 && step > 2*opts.warmup) {
         mm ~ mm - restart
         max(mm, 0f, mm)
-        if (opts.isprob) mm ~ mm / sum(mm,2)
+        if (opts.isprob) mm.asMat ~ mm.asMat / sum(mm.asMat,2)
         started = 2
       }
     }

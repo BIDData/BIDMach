@@ -16,7 +16,7 @@ class CG(override val opts:CG.Opts = new CG.Options) extends Updater(opts) {
 	
 	override def init(model0:Model) = {
   	super.init(model0)
-  	mm = model0.modelmats(0)
+  	mm = model0.modelmats(0).asMat
 	  res = mm.zeros(mm.nrows, mm.ncols)
 	  Ap = mm.zeros(mm.nrows, mm.ncols)
 	  pm = mm.zeros(mm.nrows, mm.ncols)

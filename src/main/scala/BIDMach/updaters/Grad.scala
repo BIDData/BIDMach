@@ -1,6 +1,6 @@
 package BIDMach.updaters
  
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
@@ -10,19 +10,19 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   
   var firstStep = 0f
  
-  var modelmats:Array[Mat] = null
-  var updatemats:Array[Mat] = null
-  var sumSq:Mat = null 
-  var momentum:Array[Mat] = null;
-  var stepn:Mat = null
-  var mask:Mat = null
-  var ve:Mat = null
-	var te:Mat = null
-	var pe:Mat = null
-	var lrate:Mat = null
-	var mu:Mat = null
-	var randmat:Array[Mat] = null
-	var norm_scaling:Mat = null
+  var modelmats:Array[ND] = null
+  var updatemats:Array[ND] = null
+  var sumSq:ND = null 
+  var momentum:Array[ND] = null;
+  var stepn:ND = null
+  var mask:ND = null
+  var ve:ND = null
+	var te:ND = null
+	var pe:ND = null
+	var lrate:ND = null
+	var mu:ND = null
+	var randmat:Array[ND] = null
+	var norm_scaling:ND = null
 
   override def init(model0:Model) = {
     model = model0;
@@ -34,13 +34,13 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     val nmats = modelmats.length;
     val hasmomentum = (opts.momentum.asInstanceOf[AnyRef] != null || opts.nesterov.asInstanceOf[AnyRef] != null);
     if (hasmomentum) {
-      momentum = new Array[Mat](nmats);
+      momentum = new Array[ND](nmats);
       for (i <- 0 until nmats) {
     	  momentum(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
       }
     }
     if (opts.langevin > 0) {
-      randmat = new Array[Mat](nmats);
+      randmat = new Array[ND](nmats);
       for (i <- 0 until nmats) {
         randmat(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
       }
@@ -70,12 +70,12 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
         var i=0;
         var tot = 0.0
         while(i<updatemats.length){
-            tot+=sum(sum(updatemats(i)*@updatemats(i))).dv
+            tot+=sum(sum(updatemats(i).asMat*@updatemats(i).asMat)).dv
             i+=1
         }
         val scale=opts.max_grad_norm/max(sqrt(tot),opts.max_grad_norm).dv
         if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1)
-        norm_scaling(0,0) = scale.toFloat
+        norm_scaling.set(scale.toFloat);
         i=0;
         while(i<updatemats.length){
             updatemats(i)~updatemats(i)*@norm_scaling
@@ -127,13 +127,13 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  		grad ~ grad *@ (lrate *@ tscale);
 	  		if (opts.momentum.asInstanceOf[AnyRef] != null) {
 	  			val i0 = if (opts.momentum.length > 1) i else 0;
-	  			mu <-- opts.momentum(i0);                           // Get the momentum decay rate
+	  			mu.set(opts.momentum(i0));                           // Get the momentum decay rate
 	  			grad ~ grad + momentum(i);                          // Add momentum to the gradient
 	  			momentum(i) ~ grad *@ mu;                           // update momentum using the new gradient
 	  		}
 	  		if (opts.nesterov.asInstanceOf[AnyRef] != null) {
 	  			val i0 = if (opts.nesterov.length > 1) i else 0;
-	  			mu <-- opts.nesterov(i0);                           // Get the momentum decay rate
+	  			mu.set(opts.nesterov(i0));                           // Get the momentum decay rate
 	  			grad ~ grad + momentum(i);                          // Add momentum to the gradient
 	  			mm ~ mm - momentum(i);                              // A bit of algebra, remove old momentum from the model
 	  			momentum(i) ~ grad *@ mu;                           // Update the momentum
@@ -150,7 +150,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 object Grad {
   trait Opts extends Updater.Opts {
     var lrate:FMat = 1f
-    var texp:FMat = 0.5f
+    var texp:FND = 0.5f
     var pexp:FMat = 0.5f
     var waitsteps = 3
     var mask:FMat = null

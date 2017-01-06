@@ -35,7 +35,7 @@ class BatchNorm(override val opts:BatchNorm.Opts = new BatchNorm.Options) extend
   override def updateM(ipass:Int):Unit = {
     val mm = model.modelmats(0)
     mm ~ accumulators(0) / accumulators(1)
-    mm ~ mm / sum(mm,2)
+    mm ~ mm / sum(mm.asMat,2)
     clear
   }
 }

@@ -18,7 +18,7 @@ class L1Regularizer(override val opts:L1Regularizer.Opts = new L1Regularizer.Opt
    def score(mats:Array[Mat], step:Float):FMat = {
      val sc = zeros(opts.r1nmats,1)
      for (i <- 0 until opts.r1nmats) {
-       sc(i) = mean(sum(abs(modelmats(i)),2)).dv
+       sc(i) = mean(sum(abs(modelmats(i).asMat),2)).dv
      }
      sc
    }
@@ -38,7 +38,7 @@ class L2Regularizer(override val opts:L2Regularizer.Opts = new L2Regularizer.Opt
    def score(mats:Array[Mat], step:Float):FMat = {
      val sc = zeros(opts.r2nmats,1)
      for (i <- 0 until opts.r2nmats) {
-       sc(i) = mean(modelmats(i) dotr modelmats(i)).dv
+       sc(i) = mean(modelmats(i).asMat dot modelmats(i).asMat).dv
      }
      sc
    }

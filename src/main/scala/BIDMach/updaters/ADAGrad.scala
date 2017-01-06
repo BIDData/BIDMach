@@ -169,13 +169,13 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	  		grad ~ grad *@ (tscale *@ lrate);                                   // Basic scaled gradient
             if (opts.momentum.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.momentum.length > 1) i else 0;
-              mu <-- opts.momentum(i0);                           // Get the momentum decay rate
+              mu.set(opts.momentum(i0));                           // Get the momentum decay rate
               grad ~ grad + momentum(i);                            // Add momentum to the gradient
             	momentum(i) ~ grad *@ mu;                            // update momentum using the new gradient
             }
             if (opts.nesterov.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.nesterov.length > 1) i else 0;
-              mu <-- opts.nesterov(i0);                           // Get the momentum decay rate
+              mu.set(opts.nesterov(i0));                           // Get the momentum decay rate
               grad ~ grad + momentum(i);                            // Add momentum to the gradient
               mm ~ mm - momentum(i);                              // A bit of algebra, remove old momentum from the model
               momentum(i) ~ grad *@ mu;                            // Update the momentum

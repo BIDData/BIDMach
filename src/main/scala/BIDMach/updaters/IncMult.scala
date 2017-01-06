@@ -36,7 +36,7 @@ class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Upda
     mm ~ mm *@ rm.set(1-rr)
     mm ~ mm + um 
     exp(mm, mm)
-    if (opts.isprob) mm ~ mm / sum(mm,2)
+    if (opts.isprob) mm.asMat ~ mm.asMat / sum(mm.asMat,2)
   }
   
   override def clear() = {
