@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -23,7 +23,7 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
     	setmodelmats(Array(mmi));
     }
     modelmats(0) = convertMat(modelmats(0))
-    updatemats = new Array[Mat](1)
+    updatemats = new Array[ND](1)
     updatemats(0) = modelmats(0).zeros(modelmats(0).nrows, modelmats(0).ncols)
     lastpos = 0;
   } 
@@ -34,9 +34,9 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
   
   def evalfun(data:Mat, targ:Mat):FMat = {col(0)}
   
-  def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
-    val mm = modelmats(0);
-    val gm = gmats(0);
+  def dobatch(gmats:Array[ND], ipass:Int, here:Long) = {
+    val mm = modelmats(0).asMat;
+    val gm = gmats(0).asMat;
     if (ipass == 0) {
       if (here.toInt == gm.ncols) {
         println("First pass random centroid initialization")
@@ -58,16 +58,16 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
       }
       lastpos = here;
     } else {
-      mupdate(gmats(0), ipass)
+      mupdate(gmats(0).asMat, ipass)
     }
   }
   
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(mats:Array[ND], ipass:Int, here:Long):FMat = {
   	lastpos = here;
   	if (mats.length == 1) {
-  		evalfun(gmats(0));
+  		evalfun(gmats(0).asMat);
   	} else {
-  		evalfun(gmats(0), gmats(1));
+  		evalfun(gmats(0).asMat, gmats(1).asMat);
   	}
   }
 }

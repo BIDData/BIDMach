@@ -117,7 +117,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def inputDatas(i:Int) = {val lt = _inputs(i); lt.layer._outputs(lt.term);}
   def inputDerivs(i:Int) = {val lt = _inputs(i); lt.layer._derivs(lt.term);}
   
-  var target:Mat = null;
+  var target:ND = null;
   def forward = {};
   def backward:Unit = {};
   def backward(ipass:Int, pos:Long):Unit = backward;

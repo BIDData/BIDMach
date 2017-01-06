@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -24,7 +24,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var texp:Mat = null;
   var lrate:Mat = null;
 //  var sumsq:Mat = null;
-  var mask:Mat = null;
+  var mask:ND = null;
   var dprod:Mat = null;
   var firststep = -1f;
   var waitsteps = 0;
@@ -51,7 +51,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
-    val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
+    val mm = if (opts.hasBias) modelmats(imodel).asMat.view(modelmats(imodel).nrows, modelcols) else modelmats(imodel).asMat;
     createOutput(mm.nrows \ inputData.ncols);
     if (opts.withInteractions) {
       GLM.pairMult(mm, inputData.asMat, output.asMat);
@@ -66,7 +66,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   override def backward(ipass:Int, pos:Long) = {
     val start = toc;
 	  val modelcols = inputData.nrows;
-    val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
+    val mm = if (opts.hasBias) modelmats(imodel).asMat.view(modelmats(imodel).nrows, modelcols) else modelmats(imodel).asMat;
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
       mm.madd(deriv.asMat, inputDeriv.asMat, true, false);
     }
@@ -79,7 +79,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       	ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
       }
     } else {
-    	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
+    	val um = if (opts.hasBias) updatemats(imodel).asMat.view(updatemats(imodel).nrows, modelcols) else updatemats(imodel).asMat;
     	deriv.asMat.madd(inputData.asMat, um, false, true);
       if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv.asMat,2)
     }

@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
@@ -56,10 +56,10 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   override def init() = {
       super.init;
       if (refresh) {
-      	mm = modelmats(0);
+      	mm = modelmats(0).asMat;
       	setmodelmats(Array(mm, mm.ones(mm.nrows, 1), mm.zeros(mm.nrows, 1)));
       }
-      updatemats = new Array[Mat](3);
+      updatemats = new Array[ND](3);
       updatemats(0) = mm.zeros(mm.nrows, mm.ncols);
       updatemats(1) = mm.zeros(mm.nrows, 1);
       updatemats(2) = mm.zeros(mm.nrows, 1);
@@ -69,7 +69,7 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   }
   
   def uupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
-    if (putBack < 0 || ipass == 0) user.set(1f);
+    if (ipass == 0) user.set(1f);
     for (i <- 0 until opts.uiter) {
     	if (opts.doDirichlet) {                         // Here the user mat contains Dirichlet params, replace it with Dirichlet samples
     		val scaleFact = (user == user);             // Make a matrix of ones for the Dirichlet scale params.
@@ -82,7 +82,7 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
     	val pc = preds.contents;
     	pc ~ pc / dc;                                   // Scale preds mat by 1/word freq. Only needed by Poisson sampler. 
     	val unew = user*0;
-    	val mnew = updatemats(0);
+    	val mnew = updatemats(0).asMat;
     	updatemats(0).clear;
 
     	LDAgibbs.LDAsample(mm, user, mnew, unew, preds, dc, opts.nsamps, opts.useBino);
@@ -92,14 +92,14 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
-  	val um = updatemats(0);
+  	val um = updatemats(0).asMat;
   	um ~ um + beta ;	 
-  	sum(um, 2, updatemats(1));
+  	sum(um, 2, updatemats(1).asMat);
   	user ~ user / sum(user,1);
-  	sum(ln(user), 2, updatemats(2));
-  	updatemats(2) ~ updatemats(2) * (1.0f/user.ncols);
+  	sum(ln(user), 2, updatemats(2).asMat);
+  	updatemats(2).asMat ~ updatemats(2).asMat * (1.0f/user.ncols);
   	if (opts.doAlpha && iupdate > 10) {
-  		alpha <-- psiinv(psi(sum(alpha)) + modelmats(2));
+  		alpha <-- psiinv(psi(sum(alpha)) + modelmats(2).asMat);
   	}
   	iupdate += 1;
   }
@@ -186,7 +186,6 @@ object LDAgibbs  {
     class xopts extends Learner.Options with LDAgibbs.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
   	    new MatSource(Array(mat0:Mat), opts), 
@@ -205,7 +204,6 @@ object LDAgibbs  {
     class xopts extends Learner.Options with LDAgibbs.Opts with MatSource.Opts with BatchNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
     opts.uiter = 2
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
     val nn = new Learner(
@@ -225,7 +223,6 @@ object LDAgibbs  {
     class xopts extends ParLearner.Options with LDAgibbs.Opts with MatSource.Opts with IncNorm.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
     opts.uiter = 5
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input

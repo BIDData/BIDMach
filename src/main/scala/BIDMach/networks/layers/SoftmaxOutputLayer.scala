@@ -39,8 +39,8 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
         deriv.asMat ~ zero - output.asMat;
-        val inds = target + coloffsets;
-			  deriv.asMat(inds) = deriv.asMat(inds) + 1f;               // deriv = target - preds
+        val inds = target.asMat + coloffsets;
+			  deriv.asMat(inds) ~ deriv.asMat(inds) + 1f;               // deriv = target - preds
         inputDeriv ~ inputDeriv + deriv; 
       }
 		  backwardtime += toc - start;
@@ -48,7 +48,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
   
   override def score:FMat = {
     if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
-    val inds = target + coloffsets;
+    val inds = target.asMat + coloffsets;
     if (opts.scoreType == 1) {
       if (opts.doVariance) {
         val matches = (output(inds) == maxi(output.asMat));

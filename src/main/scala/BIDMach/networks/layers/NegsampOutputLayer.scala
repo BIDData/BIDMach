@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -23,7 +23,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
   var cfact:Mat = null;
   var cexpt:Mat = null;  
 //  var sumsq:Mat = null;
-  var mask:Mat = null;
+  var mask:ND = null;
   var firststep = -1f;
   var waitsteps = 0;
   var epsilon = 0f;
@@ -50,7 +50,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
     if (randwords.asInstanceOf[AnyRef] == null) randwords = convertMat(zeros(opts.nsamps + 1, inputData.ncols));
     if (iexpt.asInstanceOf[AnyRef] == null) iexpt = convertMat(row(1f/(1f-opts.expt)));
     if (onerow.asInstanceOf[AnyRef] == null) onerow = convertMat(ones(1, inputData.ncols));
-    val mm = modelmats(imodel); 
+    val mm = modelmats(imodel).asMat; 
     inputMat = if (opts.hasBias) (inputData.asMat on onerow) else inputData.asMat;
     
     rand(randwords);                                                          // Compute some random negatives
@@ -77,8 +77,8 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
 		val modelrows = inputData.nrows;
 		val nfeats = if (opts.outdim == 0) inputData.nrows else opts.outdim;
 		if (targMat.asInstanceOf[AnyRef] == null) targMat = convertMat(zeros(opts.nsamps, inputData.ncols) on ones(1, inputData.ncols));
-		val mm = modelmats(imodel); 
-		val um = updatemats(imodel);
+		val mm = modelmats(imodel).asMat; 
+		val um = updatemats(imodel).asMat;
 		
 		deriv = targMat - output;
 		prods.contents <-- deriv.asMat.contents;  
@@ -119,12 +119,12 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
         case 1 => FMat(mean(output.asMat(opts.nsamps, ?) == maxi(output.asMat)));
       }    	   
     } else {
-      val mprod = modelmats(imodel) ^* inputMat;
+      val mprod = modelmats(imodel).asMat ^* inputMat;
       mprod ~ mprod - maxi(mprod);
       exp(mprod, mprod);
       mprod ~ mprod / sum(mprod);
       if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->mprod.ncols)*mprod.nrows);
-      val inds = target + coloffsets;
+      val inds = target.asMat + coloffsets;
       opts.scoreType match {
         case 2 => FMat(mean(ln(mprod(inds))));
         case 3 => FMat(mean(mprod(inds) == maxi(mprod)));        

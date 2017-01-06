@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GDMat,GIMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
@@ -89,7 +89,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     } 
     useGPU = opts.useGPU && Mat.hasCUDA > 0;    
 	  if (useGPU || useDouble) {
-	    gmats = new Array[Mat](mats.length);
+	    gmats = new Array[ND](mats.length);
 	  } else {
 	    gmats = mats;
 	  }  
@@ -97,9 +97,9 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
 	  modelmats(0) = convertMat(modelmats(0));
 	  modelmats(1) = convertMat(modelmats(1));
 	  modelmats(2) = convertMat(modelmats(2));
-	  mm = modelmats(0);
-    iavg = modelmats(1);
-    avg = modelmats(2);
+	  mm = modelmats(0).asMat;
+    iavg = modelmats(1).asMat;
+    avg = modelmats(2).asMat;
     lamu = mm.ones(d, 1) ∘ opts.lambdau 
     if (opts.doUsers) lamu(0) = opts.regumean;
     slm = mm.ones(1,1) ∘ (opts.lambdam * batchSize);
@@ -109,7 +109,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     cscale = mm.ones(d, 1);
     cscale(0,0) = 0.0001f;
     if (opts.doUsers) mm(0,?) = 1f
-    updatemats = new Array[Mat](3);
+    updatemats = new Array[ND](3);
     updatemats(2) = mm.zeros(1,1);
     if (opts.aopts != null) initADAGrad(d, nfeats);
     vexp = convertMat(row(0.5f));
@@ -138,9 +138,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   	}
   	uscale.set(opts.urate * math.pow(ipass+1, - texp).toFloat) 
     val sdata = sdata0 - (iavg + avg);
-	  if (putBack < 0) {
-	  	user.clear
-	  }
+  	user.clear;
 	  val b = mm * sdata;
 	  val ucounts = sum(sdata0 != 0f);
 	  val uci = (ucounts + 1f) ^ (- vexp);
@@ -189,7 +187,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     	if (opts.lsgd >= 0) {
     		val step = (pos + firststep)/firststep;
     		uscale.set((lrate.dv * math.pow(step, - texp.dv)).toFloat);
-    		val dm = updatemats(0) ∘ uscale ∘ cscale;
+    		val dm = updatemats(0).asMat ∘ uscale ∘ cscale;
     	  val dpreds = DDS(dm, user, sdata);
     	  accept(sdata, mm, dm, preds, dpreds, uscale, slm, true);
     	}
@@ -268,7 +266,6 @@ object SMF {
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
     opts.npasses = 4
     opts.lrate = 0.1
     opts.initUval = 0f;
@@ -287,7 +284,6 @@ object SMF {
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
     opts.npasses = 4
     opts.lrate = 0.1;
     opts.initUval = 0f;
@@ -307,7 +303,6 @@ object SMF {
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
     opts.npasses = 4
     opts.lrate = 0.1;
     opts.initUval = 0f;
@@ -326,7 +321,6 @@ object SMF {
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
     opts.npasses = 4
     opts.lrate = 0.1;
     opts.initUval = 0f;
@@ -347,7 +341,6 @@ object SMF {
     val model = model0.asInstanceOf[SMF]
     val nopts = new xopts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 1
     val newmod = new SMF(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);

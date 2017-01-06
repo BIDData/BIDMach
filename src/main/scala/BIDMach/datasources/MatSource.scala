@@ -40,10 +40,16 @@ class MatSource(var mats:Array[ND], override val opts:MatSource.Opts = new MatSo
     there = math.min(here+blockSize, mats(0).ncols)
   	for (i <- 0 until mats.length) {
   	  if (there - here == blockSize) {
-  	    fullmats(i) = mats(i).colslice(here, there, fullmats(i))
+  	    mats(i) match {
+  	      case aa:Mat => fullmats(i) = mats(i).colslice(here, there, fullmats(i).asInstanceOf[Mat]);
+  	      case _ => fullmats(i) = mats(i).colslice(here, there, fullmats(i));
+  	    } 	    
   	    omats(i) = fullmats(i)
   	  } else {
-  	    endmats(i) = mats(i).colslice(here, there, endmats(i))
+  	  	mats(i) match {
+  	  	  case aa:Mat => endmats(i) = mats(i).colslice(here, there, endmats(i).asInstanceOf[Mat]);
+  	  	  case _ => endmats(i) = mats(i).colslice(here, there, endmats(i));
+  	  	} 
   	    omats(i) = endmats(i) 	    
   	  }
   	}

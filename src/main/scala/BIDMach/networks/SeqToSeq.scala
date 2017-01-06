@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -71,8 +71,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     in ~ in + ((in >= opts.nvocab) ∘ (OOVelem - in))
   }
   
-  override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) = {
-    val src = gmats(0);
+  override def assignInputs(gmats:Array[ND], ipass:Int, pos:Long) = {
+    val src = gmats(0).asMat;
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows.
@@ -123,7 +123,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
 	  }
   }
   
-  override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
+  override def assignTargets(gmats:Array[ND], ipass:Int, pos:Long) {
 	  val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
 	  val dstyn0 = dsty.nnz/dsty.ncols;
     if (dstyn0*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
@@ -131,7 +131,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     mapOOV(dstydata);
     val dstyn1 = math.min(dstyn0 - (if (opts.addStart) 0 else 1), opts.outwidth);
     for (j <- 0 until dstyn1) {
-    	val incol = if (opts.addStart) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t
+    	val incol = if (opts.addStart) dstydata.colslice(j,j+1).asMat.t else dstydata.colslice(j+1,j+2).asMat.t
     	output_layers(j).target = incol;
     }
     if (PADrow.asInstanceOf[AnyRef] == null) {
@@ -143,7 +143,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     }
   }
   
-  override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
+  override def dobatch(gmats:Array[ND], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
       assignInputs(gmats, ipass, pos);
@@ -167,7 +167,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     }
   }
   
-  override def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
+  override def evalbatch(mats:Array[ND], ipass:Int, pos:Long):FMat = {  
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) { 
       assignInputs(gmats, ipass, pos);
@@ -180,9 +180,6 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       	val maxcol = dstxn;
       	assignTargets(gmats, ipass, pos);
       	dstGrid.forward(0, maxcol-1, opts.debug);     
-      	if (putBack >= 0) {
-      		output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));
-      	}
       	var score = 0f;
       	var j = 0;
       	while (j < dstxn-1) {

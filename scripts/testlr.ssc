@@ -25,6 +25,8 @@ opts.doVariance = true;
 opts.evalStep = 3;
 //opts.useGPU = false
 //Mat.useMKL = false
+opts.debugMem = true
+
 
 val model = nn.model.asInstanceOf[GLM]
 nn.train

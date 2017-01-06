@@ -1,12 +1,12 @@
 package BIDMach.mixins
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
 // Minimize the pairwise cosine of all model vectors
 class CosineSim(override val opts:CosineSim.Opts = new CosineSim.Options) extends Mixin(opts) { 
-   def compute(mats:Array[Mat], step:Float) = {
+   def compute(mats:Array[ND], step:Float) = {
      for (i <- 0 until opts.cosnmats) {
        val v = if (opts.cosweight.length == 1) - opts.cosweight(0) else - opts.cosweight(i)
        if (v != 0) {
@@ -23,7 +23,7 @@ class CosineSim(override val opts:CosineSim.Opts = new CosineSim.Options) extend
      }
    }
    
-   def score(mats:Array[Mat], step:Float):FMat = {
+   def score(mats:Array[ND], step:Float):FMat = {
      val sc = zeros(opts.cosnmats,1)
      for (i <- 0 until opts.cosnmats) {
        val mv = if (opts.cosorthog) {
@@ -40,7 +40,7 @@ class CosineSim(override val opts:CosineSim.Opts = new CosineSim.Options) extend
 
 // Minimize the within-cluster perplexity
 class Perplexity(override val opts:Perplexity.Opts = new Perplexity.Options) extends Mixin(opts) { 
-   def compute(mats:Array[Mat], step:Float) = {
+   def compute(mats:Array[ND], step:Float) = {
      for (i <- 0 until opts.perpnmats) {
        val v = if (opts.perpweight.length == 1) opts.perpweight(0) else opts.perpweight(i)
        if (v != 0) {
@@ -61,7 +61,7 @@ class Perplexity(override val opts:Perplexity.Opts = new Perplexity.Options) ext
      }
    }
    
-   def score(mats:Array[Mat], step:Float):FMat = {
+   def score(mats:Array[ND], step:Float):FMat = {
      val sc = zeros(opts.perpnmats,1)
      for (i <- 0 until opts.perpnmats) {
        val nmodel = if (opts.perporthog) {
@@ -79,7 +79,7 @@ class Perplexity(override val opts:Perplexity.Opts = new Perplexity.Options) ext
 
 // Minimize the non-top weights
 class Top(override val opts:Top.Opts = new Top.Options) extends Mixin(opts) { 
-   def compute(mats:Array[Mat], step:Float) = {
+   def compute(mats:Array[ND], step:Float) = {
      for (i <- 0 until opts.topnmats) {
        val v = if (opts.topweight.length == 1) opts.topweight(0) else opts.topweight(i)
        if (v != 0) {
@@ -90,7 +90,7 @@ class Top(override val opts:Top.Opts = new Top.Options) extends Mixin(opts) {
      }
    }
    
-   def score(mats:Array[Mat], step:Float):FMat = {
+   def score(mats:Array[ND], step:Float):FMat = {
      val sc = zeros(opts.topnmats,1)
      for (i <- 0 until opts.topnmats) {
        val nmodel = if (opts.toporthog) {

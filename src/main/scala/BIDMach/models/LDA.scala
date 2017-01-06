@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -51,11 +51,11 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   /** Sets up the modelmats and updatemats arrays and initializes modelmats(0) randomly unless stated otherwise. */
   override def init() = {
     super.init();
-    mm = modelmats(0);
+    mm = modelmats(0).asMat;
     if (refresh) {
     	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
     }
-    updatemats = new Array[Mat](2);
+    updatemats = new Array[ND](2);
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols);
     updatemats(1) = mm.zeros(mm.nrows, 1);
   }
@@ -73,7 +73,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
    * @param ipass Index of the pass over the data (0 = first pass, 1 = second pass, etc.).
    */
   def uupdate(sdata:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
-    if (putBack < 0 || ipass == 0) user.set(1f)
+    if (ipass == 0) user.set(1f)
     for (i <- 0 until opts.uiter) {
       val preds = DDS(mm, user, sdata)	
       val dc = sdata.contents
@@ -105,7 +105,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
     ud ~ ud ∘ mm
     ud ~ ud + opts.beta
   	updatemats(0) <-- ud  
-  	sum(ud, 2, updatemats(1))
+  	sum(ud, 2, updatemats(1).asMat)
   }
   
   /** 

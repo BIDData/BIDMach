@@ -150,10 +150,10 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 object Grad {
   trait Opts extends Updater.Opts {
     var lrate:FMat = 1f
-    var texp:FND = 0.5f
+    var texp:FMat = 0.5f
     var pexp:FMat = 0.5f
     var waitsteps = 3
-    var mask:FMat = null
+    var mask:FND = null
     var policies:Array[(Float, Float)=>Float] = null
     var momentum:FMat = null
     var nesterov:FMat = null
@@ -168,7 +168,7 @@ object Grad {
   def multUpdate(a:Mat, b:Mat, mm:Mat, mask:Mat, lrate:Mat, texp:Mat, step:Float, limit:Float):Unit = 
     multUpdate(a, b, mm, mask, lrate, texp, step, limit, false);
   
-  def multUpdate(a:Mat, b:Mat, mm:Mat, mask:Mat, lrate:Mat, texp:Mat, step:Float, limit:Float, hasBias:Boolean):Unit = {
+  def multUpdate(a:ND, b:ND, mm:ND, mask:ND, lrate:ND, texp:ND, step:Float, limit:Float, hasBias:Boolean):Unit = {
   		val istep = 1f/step;
   		val nr = a.nrows;
   		val nc = b.ncols;
@@ -197,8 +197,8 @@ object Grad {
   		}
   		case _ => {
   			val grad0 = mm + 0;
-  			a.madd(b, grad0, false, true);
-  			val grad = if (hasBias) grad0 \ sum(a,2) else grad0;
+  			a.asMat.madd(b.asMat, grad0.asMat, false, true);
+  			val grad = if (hasBias) grad0.asMat \ sum(a.asMat,2) else grad0;
   			if (limit > 0) {
   			  min(grad, limit, grad);
   			  max(grad, -limit, grad);

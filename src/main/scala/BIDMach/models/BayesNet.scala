@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -106,10 +106,10 @@ class BayesNet(val dag:Mat,
             cpt <-- ( cpt / (cpt.t * normMat *^ normMat).t )
             println("cpt.t: " + cpt.t)
         }
-        setmodelmats(new Array[Mat](1))
+        setmodelmats(new Array[ND](1))
         modelmats(0) = cpt
-        mm = modelmats(0)
-        updatemats = new Array[Mat](1)
+        mm = modelmats(0).asMat
+        updatemats = new Array[ND](1)
         updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
 
         // For each color group, pre-compute most relevant matrices we need later (this does a lot!).
@@ -142,18 +142,18 @@ class BayesNet(val dag:Mat,
      * @param ipass The current pass over the data.
      * @param here The total number of samples (columns) of the data seen thus far.
      */
-    override def dobatch(gmats:Array[Mat], ipass:Int, here:Long) = {
+    override def dobatch(gmats:Array[ND], ipass:Int, here:Long) = {
         if (ipass > 0) {
-            val index = int(cptOffsetSAME + (gmats(1).t * iprojectBlockedSAME).t)
+            val index = int(cptOffsetSAME + (gmats(1).asMat.t * iprojectBlockedSAME).t)
             val linearIndices = index(?)
             counts2 <-- float(accum(linearIndices, 1, counts2.length, 1))
         }
-        uupdate(gmats(0), gmats(1), ipass)
-        mupdate(gmats(0), gmats(1), ipass)
+        uupdate(gmats(0).asMat, gmats(1).asMat, ipass)
+        mupdate(gmats(0).asMat, gmats(1).asMat, ipass)
     }
   
     /** Calls a uupdate/evalfun sequence. Known data is in gmats(0), sampled data is in gmats(1). */
-    override def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
+    override def evalbatch(gmats:Array[ND], ipass:Int, here:Long):FMat = {
         //println("runtimes: " + runtimes)
         return FMat(0);
     }
@@ -269,7 +269,7 @@ class BayesNet(val dag:Mat,
         } else {
             updatemats(0) <-- counts3;
         }
-        println("updatemats(0).t = " + updatemats(0).t)
+        println("updatemats(0).t = " + updatemats(0).asMat.t)
 
         val t9 = toc;
         runtimes(5) += t9 - t8;
@@ -706,7 +706,6 @@ object BayesNet {
         opts.useGPU = true
         opts.npasses = 10
         opts.isprob = false     // Our CPT should NOT be normalized across their (one) column.
-        opts.putBack = 1        // Because this stores samples across ipasses, as required by Gibbs sampling
         opts.power = 0.0f       // So that the sampled CPT parameters are exactly what we use next iteration
         val secondMatrix = data.zeros(opts.copiesForSAME*data.nrows,data.ncols)
 

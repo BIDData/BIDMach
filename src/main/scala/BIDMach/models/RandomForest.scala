@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,GMat,GIMat,GLMat,GSMat,HMat,IMat,LMat,Mat,SMat,SDMat}
+import BIDMat.{SBMat,CMat,CSMat,DMat,Dict,IDict,FMat,FND,GMat,GIMat,GLMat,GSMat,GND,HMat,IMat,LMat,Mat,ND,SMat,SDMat}
 import BIDMach.Learner
 import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
 import BIDMach.datasinks._
@@ -195,7 +195,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     useIfeats = opts.useIfeats;
     lens0 = 0;
     lens1 = 0;
-    ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1)).dv.toInt + 1);
+    ncats = if (opts.ncats > 0) opts.ncats else (maxi(mats(1).asMat).dv.toInt + 1);
     fieldlengths(ITree) = RandomForest.countbits(ntrees);
     fieldlengths(INode) = RandomForest.countbits(nnodes);
     fieldlengths(JFeat) = RandomForest.countbits(nsamps);
@@ -261,9 +261,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     }
   }
 
-  def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
-    val data = full(gmats(0));
-    val cats = gmats(1);
+  def dobatch(gmats:Array[ND], ipass:Int, i:Long) = {
+    val data = full(gmats(0).asMat);
+    val cats = gmats(1).asMat;
     //    val xcats = IMat(cats);println("trace data %s  %f" format (xcats(0,0->10).toString, sum(data(120,?)).dv));
 
     val t0 = toc;
@@ -322,11 +322,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     t5 = toc; runtimes(4) += t5 - t4;
   }
 
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(mats:Array[ND], ipass:Int, here:Long):FMat = {
     val depth = if (opts.training) ipass else opts.depth
-    val data = full(gmats(0));
-    val cats = if (gmats.length > 1) gmats(1) else null;
-    val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
+    val data = full(gmats(0).asMat);
+    val cats = if (gmats.length > 1) gmats(1).asMat else null;
+    val nnodes:Mat = if (gmats.length > 2) gmats(2).asMat else null;
     val fnodes:FMat = zeros(ntrees, data.ncols);
     data match {
       case fdata:FMat => {

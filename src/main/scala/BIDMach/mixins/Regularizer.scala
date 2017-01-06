@@ -1,11 +1,11 @@
 package BIDMach.mixins
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
 class L1Regularizer(override val opts:L1Regularizer.Opts = new L1Regularizer.Options) extends Mixin(opts) { 
-   def compute(mats:Array[Mat], step:Float) = {
+   def compute(mats:Array[ND], step:Float) = {
      if (counter == 0 ) {  
          for (i <- 0 until opts.r1nmats) {
            val v = if (opts.reg1weight.ncols == 1) - opts.reg1weight else - opts.reg1weight(?,i);
@@ -15,7 +15,7 @@ class L1Regularizer(override val opts:L1Regularizer.Opts = new L1Regularizer.Opt
      counter = (counter+1) % opts.mixinInterval
    }
    
-   def score(mats:Array[Mat], step:Float):FMat = {
+   def score(mats:Array[ND], step:Float):FMat = {
      val sc = zeros(opts.r1nmats,1)
      for (i <- 0 until opts.r1nmats) {
        sc(i) = mean(sum(abs(modelmats(i).asMat),2)).dv
@@ -25,7 +25,7 @@ class L1Regularizer(override val opts:L1Regularizer.Opts = new L1Regularizer.Opt
 }
 
 class L2Regularizer(override val opts:L2Regularizer.Opts = new L2Regularizer.Options) extends Mixin(opts) { 
-   def compute(mats:Array[Mat], step:Float) = {
+   def compute(mats:Array[ND], step:Float) = {
      if (counter == 0 ) {  
          for (i <- 0 until opts.r2nmats) {
            val v = if (opts.reg2weight.ncols == 1) - opts.reg2weight else - opts.reg2weight(?,i);
@@ -35,7 +35,7 @@ class L2Regularizer(override val opts:L2Regularizer.Opts = new L2Regularizer.Opt
      counter = (counter+1) % opts.mixinInterval
    }
    
-   def score(mats:Array[Mat], step:Float):FMat = {
+   def score(mats:Array[ND], step:Float):FMat = {
      val sc = zeros(opts.r2nmats,1)
      for (i <- 0 until opts.r2nmats) {
        sc(i) = mean(modelmats(i).asMat dot modelmats(i).asMat).dv

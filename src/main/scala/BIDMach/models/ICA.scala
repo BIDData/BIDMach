@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
@@ -62,10 +62,10 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   override def init() {
     super.init()
     if (refresh) {
-      mm = modelmats(0)
+      mm = modelmats(0).asMat
       setmodelmats(Array(mm, mm.zeros(mm.nrows,1)))
     }
-    updatemats = new Array[Mat](2)
+    updatemats = new Array[ND](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.nrows)
     updatemats(1) = mm.zeros(mm.nrows,1) // Keep to avoid null pointer exceptions, but we don't use it
     opts.G_function match {

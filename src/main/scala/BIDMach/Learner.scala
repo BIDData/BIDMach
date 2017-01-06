@@ -458,7 +458,7 @@ case class ParLearner(
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
 
-  def safeCopy(m:Mat, ithread:Int):Mat = {
+  def safeCopy(m:ND, ithread:Int):ND = {
     m match {
       case ss:SMat => {
         val out = SMat.newOrCheckSMat(ss.nrows, ss.ncols, ss.nnz, null, m.GUID, ithread, "safeCopy".##)
@@ -466,6 +466,10 @@ case class ParLearner(
       }
       case ss:FMat => {
         val out = FMat.newOrCheckFMat(ss.nrows, ss.ncols, null, m.GUID, ithread, "safeCopy".##)
+        ss.copyTo(out)
+      }
+      case ss:FND => {
+        val out = FND.newOrCheckFND(ss.dims, null, m.GUID, ithread, "safeCopy".##)
         ss.copyTo(out)
       }
       case ss:IMat => {

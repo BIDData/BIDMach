@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GDMat,GIMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GDMat,GIMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
@@ -93,7 +93,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     } 
     useGPU = opts.useGPU && Mat.hasCUDA > 0;    
 	  if (useGPU || useDouble) {
-	    gmats = new Array[Mat](mats.length);
+	    gmats = new Array[ND](mats.length);
 	  } else {
 	    gmats = mats;
 	  }  
@@ -102,10 +102,10 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
 	  modelmats(1) = convertMat(modelmats(1));
 	  modelmats(2) = convertMat(modelmats(2));
 	  modelmats(3) = convertMat(modelmats(3));
-	  mm = modelmats(0);
-    iavg = modelmats(1);
-    avg = modelmats(2);
-    Minv = modelmats(3);
+	  mm = modelmats(0).asMat;
+    iavg = modelmats(1).asMat;
+    avg = modelmats(2).asMat;
+    Minv = modelmats(3).asMat;
     lamu = mm.ones(d, 1) ∘ opts.lambdau 
     if (opts.doUsers) lamu(0) = opts.regumean;
     slm = mm.ones(1,1) ∘ (opts.lambdam * batchSize);
@@ -113,7 +113,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     mzero = mm.zeros(1,1)
 
     if (opts.doUsers) mm(0,?) = 1f
-    updatemats = new Array[Mat](3);
+    updatemats = new Array[ND](3);
     if (opts.aopts != null) initADAGrad(d, nfeats);
   }
   
@@ -139,7 +139,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     if (pos == 0) println("start "+user(?,0).t.toString)
     val sdata = sdata0 - (iavg + avg);
 	  val b = mm * sdata;
-	  val r = if (ipass < opts.startup || putBack < 0) {
+	  val r = if (ipass < opts.startup) {
 	    // Setup CG on the first pass, or if no saved state
 	  	user.clear
 	  	b + 0
@@ -271,7 +271,6 @@ object SFA  {
     class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
     opts.npasses = 4
     opts.lrate = 0.1
     opts.initUval = 0f;
@@ -290,7 +289,6 @@ object SFA  {
     class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = -1
     opts.npasses = 4
     opts.lrate = 0.1;
     opts.initUval = 0f;
@@ -310,7 +308,6 @@ object SFA  {
     class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with Grad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
     opts.npasses = 4
     opts.lrate = 0.1;
     opts.initUval = 0f;
@@ -329,7 +326,6 @@ object SFA  {
     class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
     opts.npasses = 4
     opts.lrate = 0.1;
     opts.initUval = 0f;
@@ -349,7 +345,6 @@ object SFA  {
     class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
     opts.dim = d
-    opts.putBack = 1
     opts.npasses = 4
     opts.lrate = 0.1;
     opts.initUval = 0f;
@@ -370,7 +365,6 @@ object SFA  {
     val model = model0.asInstanceOf[SFA]
     val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = -1
     val newmod = new SFA(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);
@@ -399,7 +393,6 @@ object SFA  {
     val model = model0.asInstanceOf[SFA]
     val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = -1
     val newmod = new SFA(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);

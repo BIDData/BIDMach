@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
@@ -44,9 +44,9 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   		SV = Q.zeros(1, opts.dim);                           // Holder for Singular values
   		if (opts.subMean) Mean = Q.zeros(nfeats, 1)
   	} else {
-  	  Q = modelmats(0);
-  	  SV = modelmats(1);
-  	  if (opts.subMean) Mean = modelmats(2);
+  	  Q = modelmats(0).asMat;
+  	  SV = modelmats(1).asMat;
+  	  if (opts.subMean) Mean = modelmats(2).asMat;
   	}
   	Q = convertMat(Q);                                     // Move to GPU or double if needed
   	SV = convertMat(SV);
@@ -66,8 +66,8 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     batchStep = opts.batchesPerUpdate;
   }
   
-  def dobatch(mats:Array[Mat], ipass:Int, pos:Long):Unit = {
-    val M = mats(0);
+  def dobatch(mats:Array[ND], ipass:Int, pos:Long):Unit = {
+    val M = mats(0).asMat;
     if (opts.subMean && ipass == 0) {
       meanCount += 1;
       alpha.set(1f/meanCount);
@@ -92,8 +92,8 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
     batchCount += 1;
   }
   
-  def evalbatch(mat:Array[Mat], ipass:Int, pos:Long):FMat = {
-	  val M = mat(0);
+  def evalbatch(mat:Array[ND], ipass:Int, pos:Long):FMat = {
+	  val M = mat(0).asMat;
 	  if (ogmats != null) {
 	  	val Qt = Q.t; 
 	  	val QtM = Qt * M;

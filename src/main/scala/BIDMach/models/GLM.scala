@@ -78,7 +78,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   override def init() = {
   	useGPU = opts.useGPU && Mat.hasCUDA > 0
-    val data0 = mats(0)
+    val data0 = mats(0).asMat
     val m = if (opts.hashFeatures > 0) opts.hashFeatures else data0.nrows
     val targetData = mats.length > 1
     val d = if (opts.targmap.asInstanceOf[AnyRef] != null) {
@@ -416,6 +416,42 @@ object GLM {
     }
   }
   
+  def preds(eta:ND, links:Mat, totflops:Long):ND = {
+    (eta, links) match {
+      case (feta:FMat, ilinks:IMat) => {
+      	val fout = FMat.newOrCheckFMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##);
+        Mat.nflops += totflops * feta.ncols;
+        meanHelper(feta.data, feta.nrows, fout.data, fout.nrows, ilinks, 0, feta.ncols)
+        fout
+      }
+      case (feta:FND, ilinks:IMat) => {
+      	val fout = FND.newOrCheckFND(eta.dims, null, eta.GUID, links.GUID, "GLM.preds".##);
+        Mat.nflops += totflops * feta.ncols
+        meanHelper(feta.data, feta.nrows, fout.data, fout.nrows, ilinks, 0, feta.ncols)
+        fout
+      }
+      case (geta:GMat, gilinks:GIMat) => {
+      	val gout = GMat.newOrCheckGMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+        Mat.nflops += totflops * geta.ncols
+        CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        gout
+      }
+      case (geta:GDMat, gilinks:GIMat) => {
+      	val gout = GDMat.newOrCheckGDMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+        Mat.nflops += totflops * geta.ncols
+        CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        gout
+      }
+      case (geta:GND, gilinks:GIMat) => {
+      	val gout = GND.newOrCheckGND(eta.dims, null, eta.GUID, links.GUID, "GLM.preds".##);
+        Mat.nflops += totflops * geta.ncols
+        CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        gout
+      }
+    }
+  }
+
+  
   def llfun(pred:ND, targ:ND, links:Mat, totflops:Long):ND = {
     (pred, targ, links) match {
       case (fpred:FMat, ftarg:FMat, ilinks:IMat) => {
@@ -504,7 +540,7 @@ object GLM {
         CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
         gout
       }
-      case (gpred:GMat, gtarg:GMat, gout:GMat, gilinks:GIMat) => {
+      case (gpred:GND, gtarg:GND, gout:GND, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
         gout

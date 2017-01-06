@@ -34,7 +34,7 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 			  	totflops += GLM.linkArray(opts.links(i)).fnflops
 			  }
 			}
-			output.asMat <-- GLM.preds(inputData.asMat, ilinks, totflops);
+			GLM.preds(inputData.asMat, output, ilinks, totflops);
 			clearDeriv;
 			forwardtime += toc - start;
 	}
@@ -47,7 +47,7 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 
 	override def score:FMat = { 
 			val v = if (target.asInstanceOf[AnyRef] != null) GLM.llfun(output.asMat, target, ilinks, totflops) else row(0);
-			FMat(mean(mean(v, 2)));
+			FMat(mean(mean(v.asMat, 2)));
 	}
   
   override def toString = {

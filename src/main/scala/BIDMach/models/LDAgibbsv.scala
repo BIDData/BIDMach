@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
@@ -56,10 +56,10 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
   override def init() = {
     super.init
     if (refresh) {
-    	mm = modelmats(0);
+    	mm = modelmats(0).asMat;
     	setmodelmats(Array(mm, mm.ones(mm.nrows, 1)));
     }
-    updatemats = new Array[Mat](2)
+    updatemats = new Array[ND](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     updatemats(1) = mm.zeros(mm.nrows, 1)
     
@@ -68,9 +68,9 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
   
   def uupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
     
-     if (putBack < 0 || ipass == 0) user.set(1f)
+     if (ipass == 0) user.set(1f)
     
-     val mnew = updatemats(0)
+     val mnew = updatemats(0).asMat;
      mnew.set(0f)
     
         for (i <- 0 until opts.uiter) yield {
@@ -94,9 +94,9 @@ class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extend
   }
   
   def mupdate(sdata:Mat, user:Mat, ipass: Int, pos:Long):Unit = {
-val um = updatemats(0)
-um ~ um + opts.beta
-   sum(um, 2, updatemats(1))
+  	val um = updatemats(0).asMat;
+  	um ~ um + opts.beta;
+  	sum(um, 2, updatemats(1).asMat);
   }
   
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
@@ -165,10 +165,9 @@ object LDAgibbsv {
 */
   def learner(mat0:Mat, d:Int = 256) = {
     class xopts extends Learner.Options with LDAgibbsv.Opts with MatSource.Opts with IncNorm.Opts
-    val opts = new xopts
-    opts.dim = d
-    opts.putBack = 1
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    val opts = new xopts;
+    opts.dim = d;
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
    val nn = new Learner(
    new MatSource(Array(mat0:Mat), opts),
    new LDAgibbsv(opts),

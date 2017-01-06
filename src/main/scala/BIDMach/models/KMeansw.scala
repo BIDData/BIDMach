@@ -4,7 +4,7 @@ package BIDMach.models
 // Includes a size weight matrix w. Size of a cluster is the sum of the w values for that cluster. 
 // Size weight is controlled by wsize.
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -52,7 +52,7 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
     
     if (refresh) {
     	val rp = randperm(nc);
-    	val mmi = full(data0(?,rp(0,0->opts.dim))).t;
+    	val mmi = full(data0.asMat(?,rp(0,0->opts.dim))).t;
     	mm = convertMat(mmi);
     	mcounts = mm.zeros(mm.nrows, 1);
     	mweights = mm.zeros(mm.nrows, 1);
@@ -67,19 +67,19 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
   } 
 
   
-  def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
+  def dobatch(gmats:Array[ND], ipass:Int, i:Long) = {
     if (gmats.length > 1) {
-      mupdate(gmats(0), gmats(1), ipass)
+      mupdate(gmats(0).asMat, gmats(1).asMat, ipass)
     } else {
-      mupdate(gmats(0), null, ipass)
+      mupdate(gmats(0).asMat, null, ipass)
     }
   }
   
-  def evalbatch(gmats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(gmats:Array[ND], ipass:Int, here:Long):FMat = {
     if (gmats.length > 1) {
-      evalfun(gmats(0), gmats(1))
+      evalfun(gmats(0).asMat, gmats(1).asMat)
     } else {
-      evalfun(gmats(0), null)
+      evalfun(gmats(0).asMat, null)
     }
   }
   
@@ -175,7 +175,6 @@ object KMeansw  {
   def predictor(model:Model, mat1:Mat, preds:Mat, d:Int):(Learner, MemOpts) = {
     val nopts = new MemOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 1
     val newmod = new KMeansw(nopts);
     newmod.refresh = false
     model.copyTo(newmod)

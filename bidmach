@@ -73,7 +73,7 @@ if [ ! -e ${LIBDIR}/IScala.jar ]; then
     curl -o ${LIBDIR}/IScala.jar ${source}/lib/IScala.jar
 fi
 
-ALL_LIBS=";${LIBDIR}/IScala.jar;${BIDMACH_ROOT}/BIDMach.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
+ALL_LIBS=";${LIBDIR}/IScala.jar;${BIDMACH_LIBS};${JCUDA_LIBS};${JAVA_HOME}/lib/tools.jar"
 
 if [ "$OSS" = "windows" ]; then
     if [ ! "${CUDA_PATH}" = "" ]; then

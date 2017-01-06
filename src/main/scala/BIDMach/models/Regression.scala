@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -37,7 +37,7 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
     } else {
       mats(1).nrows  
     }
-    val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
+    val sdat = (sum(data0.asMat,2).t + 0.5f).asInstanceOf[FMat]
     sp = sdat / sum(sdat)
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
@@ -62,19 +62,19 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
   
   def meval2(data:Mat, targ:Mat):FMat
   
-  def dobatch(gmats:Array[Mat], ipass:Int, i:Long) = {
+  def dobatch(gmats:Array[ND], ipass:Int, i:Long) = {
     if (gmats.length == 1) {
-      mupdate(gmats(0), ipass, i)
+      mupdate(gmats(0).asMat, ipass, i)
     } else {
-      mupdate2(gmats(0), gmats(1), ipass, i)
+      mupdate2(gmats(0).asMat, gmats(1).asMat, ipass, i)
     }
   }
   
-  def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
+  def evalbatch(mats:Array[ND], ipass:Int, here:Long):FMat = {
     if (gmats.length == 1) {
-      meval(gmats(0))
+      meval(gmats(0).asMat)
     } else {
-      meval2(gmats(0), gmats(1))
+      meval2(gmats(0).asMat, gmats(1).asMat)
     }
   }
 }

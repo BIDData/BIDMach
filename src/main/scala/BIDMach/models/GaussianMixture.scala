@@ -24,28 +24,28 @@ class GaussianMixture(override val opts:GaussianMixture.Opts = new GaussianMixtu
     
     /** Sets up the modelmats and updatemats, which each simply consist of one 2-D vector. */
     override def init() = {
-        setmodelmats(new Array[Mat](1))
+        setmodelmats(new Array[ND](1))
         modelmats(0) = convertMat(rand(2,1))
-        theta = modelmats(0)
-        updatemats = new Array[Mat](1)
+        theta = modelmats(0).asMat
+        updatemats = new Array[ND](1)
         updatemats(0) = theta.zeros(theta.nrows, theta.ncols)
     }
   
     /** Based on the mini-batch, compute a gradient update term via finite differences. */
-    override def dobatch(mats:Array[Mat], ipass:Int, here:Long) = {
-        println("ipass = " + ipass + ", func(theta, mats(0)) = " + func(theta, mats(0)))
+    override def dobatch(mats:Array[ND], ipass:Int, here:Long) = {
+        println("ipass = " + ipass + ", func(theta, mats(0)) = " + func(theta, mats(0).asMat))
         val eps = 0.00001
         val base1 = FMat(1 on 0)
         val base2 = FMat(0 on 1)
-        val term1 = func(theta+base1, mats(0)) - func(theta-base1, mats(0))
-        val term2 = func(theta+base2, mats(0)) - func(theta-base2, mats(0))
+        val term1 = func(theta+base1, mats(0).asMat) - func(theta-base1, mats(0).asMat)
+        val term2 = func(theta+base2, mats(0).asMat) - func(theta-base2, mats(0).asMat)
         val gradient = FMat(term1 on term2) * (1.0 / (2*eps))
         updatemats(0) = convertMat(gradient)
     }
   
     /** Computes the posterior (log) probability of the current parameters given the data. */
-    override def evalbatch(mats:Array[Mat], ipass:Int, here:Long):FMat = {
-        return FMat(func(theta, mats(0)))
+    override def evalbatch(mats:Array[ND], ipass:Int, here:Long):FMat = {
+        return FMat(func(theta, mats(0).asMat))
     }
     
     /** Returns the function of interest, the log-likelihood, for arbitrary parameters. */
@@ -53,7 +53,7 @@ class GaussianMixture(override val opts:GaussianMixture.Opts = new GaussianMixtu
         val c1 = ln((1.0 / (2 * scala.math.Pi * sqrt(10)))).dv.toFloat
         val c2 = ln((1.0 / (4 * sqrt(scala.math.Pi)))).dv.toFloat
         val inverse_covariance = FMat(0.1 \ 0 on 0 \ 1)
-        val first = (c1 - 0.5*(param.t)*inverse_covariance*param).dv.toFloat
+        val first = (-0.5*(param.t)*inverse_covariance*param + c1).dv.toFloat
         var second = 0f
         for (i <- 0 until mats(0).length) {
             val x_i = mats(0)(i)

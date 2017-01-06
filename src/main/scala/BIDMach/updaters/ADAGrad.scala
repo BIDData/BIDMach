@@ -257,10 +257,10 @@ object ADAGrad {
    * Supports both CPU and GPU implementation.
    */
   
-  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int):Unit = 
+  def multUpdate(a:ND, b:ND, mm:ND, sumSq:ND, mask:ND, lrate:ND, vexp:ND, texp:ND, eps:Float, step:Float, waitsteps:Int):Unit = 
     multUpdate(a, b, mm, sumSq, mask, lrate, vexp, texp, eps, step, waitsteps, false);
   
-  def multUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
+  def multUpdate(a:ND, b:ND, mm:ND, sumSq:ND, mask:ND, lrate:ND, vexp:ND, texp:ND, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
@@ -324,11 +324,11 @@ object ADAGrad {
       case _ => {
         val grad0 = mm match {
           case tmm:TMat => mm + 0f;
-          case _ => mm.view(mm.nrows, mm.ncols - (if (hasBias) 1 else 0)) + 0;
+          case _ => mm.asMat.view(mm.nrows, mm.ncols - (if (hasBias) 1 else 0)) + 0;
         }
         grad0.clear;
-        a.madd(b, grad0, false, true);
-        val grad = if (hasBias) grad0 \ sum(a,2) else grad0;
+        a.asMat.madd(b.asMat, grad0.asMat, false, true);
+        val grad = if (hasBias) grad0.asMat \ sum(a.asMat,2) else grad0;
         val ssq = grad ∘ grad;
         ssq ~ ssq ∘ istep;
         sumSq ~ sumSq ∘ (1f - istep);
@@ -344,7 +344,7 @@ object ADAGrad {
     }    
   }
   
-  def pairMultUpdate(a:Mat, b:Mat, mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
+  def pairMultUpdate(a:ND, b:ND, mm:ND, sumSq:ND, mask:ND, lrate:ND, vexp:ND, texp:ND, eps:Float, step:Float, waitsteps:Int, hasBias:Boolean):Unit = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val biasv = if (hasBias) 1 else 0;
@@ -428,8 +428,8 @@ object ADAGrad {
    * Integrate the last stage of a gradient update (sparse, transposed multiply) with ADAGRAD. 
    * Supports both CPU and GPU implementation.
    */
-  def hashmultUpdate(a:Mat, b:Mat, nfeats:Int, bound1:Int, bound2:Int, transpose:Int,
-  		mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int) = {
+  def hashmultUpdate(a:ND, b:ND, nfeats:Int, bound1:Int, bound2:Int, transpose:Int,
+  		mm:ND, sumSq:ND, mask:ND, lrate:ND, vexp:ND, texp:ND, eps:Float, step:Float, waitsteps:Int) = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;

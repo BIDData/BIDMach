@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import edu.berkeley.bid.CUMAT
@@ -101,7 +101,7 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     ulim = convertMat(row(opts.lim));
     llim = convertMat(row(-opts.lim));
     if (refresh) {
-    	mv = modelmats(0);
+    	mv = modelmats(0).asMat;
     	mm1 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim1).toFloat, opts.dim1, mv.ncols));
     	if (opts.dim2 > 0) mm2 = convertMat(normrnd(0, opts.initscale/math.sqrt(opts.dim2).toFloat, opts.dim2, mv.ncols));
     	if (opts.dim2 > 0) setmodelmats(Array(mv, mm1, mm2)) else setmodelmats(Array(mv, mm1))
@@ -112,10 +112,10 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     	}
     }
     (0 until modelmats.length).map((i) => modelmats(i) = convertMat(modelmats(i)));
-    mv = modelmats(0);
-    mm1 = modelmats(1);
-    if (opts.dim2 > 0) mm2 = modelmats(2);
-    uv = updatemats(0)
+    mv = modelmats(0).asMat;
+    mm1 = modelmats(1).asMat;
+    if (opts.dim2 > 0) mm2 = modelmats(2).asMat;
+    uv = updatemats(0).asMat
     um1 = uv.zeros(opts.dim1, uv.ncols)
     if (opts.dim2 > 0) um2 = uv.zeros(opts.dim2, uv.ncols)
     updatemats = if (opts.dim2 > 0) Array(uv, um1, um2) else Array(uv, um1)
@@ -229,7 +229,7 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     }
     GLM.preds(eta, eta, mylinks, totflops);
     if (ogmats != null) ogmats(0) = eta;
-    val v = GLM.llfun(eta, ftarg, mylinks, totflops);
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops).asMat;
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights));
     } else {
@@ -246,7 +246,7 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     val eta = mv * in + (vt1 dot vt2);
     GLM.preds(eta, eta, mylinks, totflops);
     if (ogmats != null) ogmats(0) = eta;
-    val v = GLM.llfun(eta, ftarg, mylinks, totflops);
+    val v = GLM.llfun(eta, ftarg, mylinks, totflops).asMat;
     if (ogmats != null) {ogmats(0) = eta};
     if (dweights.asInstanceOf[AnyRef] != null) {
       FMat(sum(v ∘  dweights, 2) / sum(dweights));
@@ -322,7 +322,6 @@ object FM {
     val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.links = mopts.links.copy;
-    nopts.putBack = 1;
     nopts.dim1 = mopts.dim1;
     nopts.dim2 = mopts.dim2;
     nopts.strictFM = mopts.strictFM;

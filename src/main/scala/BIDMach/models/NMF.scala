@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,HMat,GMat,GIMat,GSMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -49,9 +49,9 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   
   override def init() = {
   	super.init()
-  	mm = modelmats(0)
+  	mm = modelmats(0).asMat
     setmodelmats(Array(mm, mm.zeros(mm.nrows, mm.ncols)));
-  	updatemats = new Array[Mat](2)
+  	updatemats = new Array[ND](2)
     updatemats(0) = mm.zeros(mm.nrows, mm.ncols)
     updatemats(1) = mm.zeros(mm.nrows, mm.ncols)
     udiag = mkdiag(opts.uprior*ones(opts.dim,1))
@@ -63,7 +63,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   }
   
   override def uupdate(sdata:Mat, user:Mat, ipass:Int, pos:Long) = {
-	if (putBack < 0 || ipass == 0) user.set(1f)
+	if (ipass == 0) user.set(1f)
 	val modeldata = mm * sdata
   	val mmu = mm *^ mm + udiag
     for (i <- 0 until opts.uiter) {

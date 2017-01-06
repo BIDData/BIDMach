@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -88,30 +88,30 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
     }
   }
   
-  override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
+  override def assignInputs(gmats:Array[ND], ipass:Int, pos:Long) {
     if (batchSize % opts.width != 0) throw new RuntimeException("LSTMwordPredict error: batch size must be a multiple of network width %d %d" format (batchSize, opts.width))
     val nr = batchSize / opts.width;
-    val in = gmats(0).view(opts.width, nr).t.view(1, batchSize);
+    val in = gmats(0).asMat.view(opts.width, nr).t.view(1, batchSize);
     layers(0).output = oneHot(in, opts.nvocab);
     if (leftedge.output.asInstanceOf[AnyRef] == null) {
       leftedge.output = convertMat(zeros(opts.dim, nr));
     }
   }
   
-  override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
+  override def assignTargets(gmats:Array[ND], ipass:Int, pos:Long) {
   	val nr = batchSize / opts.width;
-  	val in0 = gmats(0);
+  	val in0 = gmats(0).asMat;
   	if (shiftedInds.asInstanceOf[AnyRef] == null) shiftedInds = convertMat(irow(1->in0.ncols) \ (in0.ncols-1));
   	val inshift = in0(0, shiftedInds);
     val in = inshift.view(opts.width, nr).t;
     if (opts.allout) {
     	for (j <- 0 until opts.width) {
-    		val incol = in.colslice(j,j+1).t;
-    		getlayer(j, height+1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
+    		val incol = in.colslice(j,j+1).asMat.t;
+    		getlayer(j, height+1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap.asMat * incol; else incol;
     	}
     } else {
-      val incol = in.colslice(opts.width-1, opts.width).t;
-      layers(height*width + preamble_size + 1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap * incol; else incol;
+      val incol = in.colslice(opts.width-1, opts.width).asMat.t;
+      layers(height*width + preamble_size + 1).target = if (targmap.asInstanceOf[AnyRef] != null) targmap.asMat * incol; else incol;
     }
   }
 }

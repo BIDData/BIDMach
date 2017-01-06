@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,JSON,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -25,8 +25,8 @@ import java.util.HashMap;
 class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var layers:Array[Layer] = null;
   var output_layers:Array[Layer] = null;
-  var targmap:Mat = null;
-  var mask:Mat = null;
+  var targmap:ND = null;
+  var mask:ND = null;
   var bufmat:Mat = null;
   var modelMap:HashMap[String,Int] = null;
   var batchSize = -1;
@@ -47,9 +47,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  imodel = 0;
 	  layers.map((x:Layer) => if (x != null)x.getModelMats(this));
 	  if (refresh) {
-	  	setmodelmats(new Array[Mat](imodel + modelMap.size));
+	  	setmodelmats(new Array[ND](imodel + modelMap.size));
 	  }
-	  if (updatemats == null) updatemats = new Array[Mat](modelmats.length);
+	  if (updatemats == null) updatemats = new Array[ND](modelmats.length);
 	  for (i <- 0 until modelmats.length) {
 	  	if (modelmats(i).asInstanceOf[AnyRef] != null) modelmats(i) = convertMat(modelmats(i));
 	  	if (updatemats(i).asInstanceOf[AnyRef] != null) {
@@ -58,12 +58,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  	}
 	  };
 	  copyMats(mats, gmats);
-	  val pb = putBack;
-	  putBack = -1;
     initialize = true;
     evalbatch(gmats, 0, 0);
     initialize = false;
-    putBack = pb;
 //	  datasource.reset;
   }
   
@@ -84,11 +81,11 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
   }
   
-  def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
+  def assignInputs(gmats:Array[ND], ipass:Int, pos:Long) {
   	layers(0).output = gmats(0);
   }
   
-  def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
+  def assignTargets(gmats:Array[ND], ipass:Int, pos:Long) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
   	} else if (gmats.length > 1) {
@@ -97,7 +94,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
   
   
-  def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
+  def dobatch(gmats:Array[ND], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
     	assignInputs(gmats, ipass, pos);
@@ -134,7 +131,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
   }
   
-  def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
+  def evalbatch(mats:Array[ND], ipass:Int, pos:Long):FMat = {  
   	if (batchSize < 0) batchSize = gmats(0).ncols;
   	if (batchSize == gmats(0).ncols) { 
   		assignInputs(gmats, ipass, pos);
@@ -149,9 +146,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		  }
   			layers(i).forward;
   			i += 1;
-  		}
-  		if (putBack >= 0) {
-  			output_layers(output_layers.length-1).output.colslice(0, gmats(0).ncols, gmats(1));
   		}
       val scores = zeros(output_layers.length, 1);
   		var j = 0;
