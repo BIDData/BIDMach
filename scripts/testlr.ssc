@@ -18,14 +18,14 @@ opts.batchSize=20000
 opts.lrate = 0.02f
 opts.npasses = 4
 opts.reg1weight = 0.0
-opts.links = iones(103,1)
+opts.links = iones(100,1)
 opts.addConstFeat=true;
 opts.aopts = opts;
-opts.doVariance = true;
+//opts.doVariance = true;
 opts.evalStep = 3;
 //opts.useGPU = false
 //Mat.useMKL = false
-opts.debugMem = true
+//opts.debugMem = true
 
 
 val model = nn.model.asInstanceOf[GLM]

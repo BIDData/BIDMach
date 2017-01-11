@@ -47,8 +47,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     		randmat(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
     	}
     }
-    stepn = mm.zeros(1,1);
-    one = mm.ones(1,1);
+    stepn = mm.zero;
+    one = mm.one;
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols);
     if (opts.texp.asInstanceOf[AnyRef] != null) te = mm.zeros(opts.texp.nrows, opts.texp.ncols);
     if (opts.pexp.asInstanceOf[AnyRef] != null) pe = mm.zeros(opts.pexp.nrows, opts.pexp.ncols);

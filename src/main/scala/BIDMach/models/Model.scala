@@ -250,8 +250,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   def copyMats(from:Array[ND], to:Array[ND]) = {
     for (i <- 0 until from.length) {
-      println("should be line 253 %s %s" format (if (to(i).asInstanceOf[AnyRef] == null) "null" else to(i).mytype, from(i).mytype))
-      if (useGPU) {
+       if (useGPU) {
         if (useDouble) {
          	to(i) = from(i) match {
         	case aa:FMat => GDMat(aa)
@@ -288,7 +287,6 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	}
       	}
       }
-      println("should be line 291 %s %s" format (if (to(i).asInstanceOf[AnyRef] == null) "null" else to(i).mytype, from(i).mytype))
     }
   }
 
