@@ -141,6 +141,11 @@ case class Learner(
         if (datasink != null) datasink.put;
         reslist.append(scores.newcopy)
         samplist.append(here)
+        
+        // notify observer
+        if (opts.observer != null) {
+            opts.observer.notify(ipass, model, mats)
+        }
       } else {
         model.dobatchg(mats, ipass, here)
         if (mixins != null) mixins map (_ compute(mats, here))
@@ -815,6 +820,12 @@ class ParLearnerF(
 
 object Learner {
 
+  trait LearnerObserver {
+      def init
+      def notify(ipass: Int, model: Model, minibatch: Array[Mat])
+      def cleanup
+  }
+
   class Options extends BIDMat.Opts {
   	var npasses = 2;
   	var evalStep = 11;
@@ -827,6 +838,7 @@ object Learner {
     var cumScore = 0;
     var checkPointFile:String = null;
     var checkPointInterval = 0f;
+    var observer: LearnerObserver = null;
   }
 
   def numBytes(mat:Mat):Long = {
