@@ -821,9 +821,9 @@ class ParLearnerF(
 object Learner {
 
   trait LearnerObserver {
-      def init
+      def init = {}
       def notify(ipass: Int, model: Model, minibatch: Array[Mat])
-      def cleanup
+      def cleanup = {}
   }
 
   class Options extends BIDMat.Opts {
