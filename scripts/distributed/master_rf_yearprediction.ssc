@@ -1,0 +1,118 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+
+var addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+  map(InetAddress.getByName(_).getHostAddress()).
+  map(new InetSocketAddress(_, 50050)).toArray
+
+val m = new Master();
+val opts = m.opts;
+opts.trace = 3;
+opts.intervalMsec = 2000;
+opts.limit = 1000000
+opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
+
+opts.machine_threshold = 0.75
+opts.min_time_to_wait_for_all = 2000
+opts.time_threshold = 3000
+
+val nmachines = addresses.length;
+val gmods = irow(nmachines);
+val gmachines = irow(0->nmachines);
+
+m.init
+m.config(gmods, gmachines, addresses)
+m.setMachineNumbers
+m.sendConfig
+
+// m.parCall((w) => { w.learner.paused = false; "done"})
+// m.parCall((w) => { w.learner.train; "not reached" }) // this will hang, just wait for it to timeout
+
+// /* later */
+
+// val remoteitrees = m.parCall((w) => { w.learner.model.asInstanceOf[RandomForest].itrees }).map(_.asInstanceOf[IMat])
+// val remoteftrees = m.parCall((w) => { w.learner.model.asInstanceOf[RandomForest].ftrees }).map(_.asInstanceOf[IMat])
+// val remotectrees = m.parCall((w) => { w.learner.model.asInstanceOf[RandomForest].ctrees }).map(_.asInstanceOf[FMat])
+// val remotevtrees = m.parCall((w) => { w.learner.model.asInstanceOf[RandomForest].vtrees }).map(_.asInstanceOf[IMat])
+// val remoteresults = m.parCall((w) => { w.learner.results }).map(_.asInstanceOf[FMat])
+
+// class xopts extends Learner.Options with MatSource.Opts with RandomForest.Opts with Batch.Opts
+// val opts = new xopts
+//
+// val mdir = "/mnt/BIDMach/data/YearPrediction/"
+// val data = loadFMat(mdir+"train.fmat.lz4");
+// val cats0 = loadFMat(mdir+"cats.fmat.lz4");
+// val cats = cats0 - mini(cats0);
+//
+// val testsize = (data.ncols / 10)
+//
+// val train = data(?, 0 -> (data.ncols - testsize));
+// val traincats = cats(?, 0 -> (data.ncols - testsize));
+// val test = data(?, (data.ncols - testsize) -> data.ncols);
+// val testcats = cats(?, (data.ncols - testsize) -> data.ncols);
+// val preds = zeros(testcats.nrows, testcats.ncols);
+//
+// val ds = new MatSource(Array(train.asInstanceOf[Mat],traincats), opts);
+//
+// val dsp = new MatSource(Array(test.asInstanceOf[Mat],preds), opts);
+//
+// val nn = new Learner(             // make a learner instance
+//     ds,                           // datasource
+//     new RandomForest(opts),       // the model
+//     null,                         // list of mixins or regularizers
+//     new Batch(opts),              // the optimization class to use
+//     null,
+//     opts)                         // pass the options to the learner as well
+//
+// val mm = new Learner(             // make a predictor
+//     dsp,                          // datasource
+//     nn.model,
+//     null,
+//     null,
+//     null,
+//     opts)                         // pass the options to the learner as well
+//
+// opts.useGPU = true
+// opts.batchSize = 20000
+// opts.depth = 10
+// opts.ntrees = 25
+// opts.ncats = 90
+//
+// opts.nsamps = 25
+// opts.nnodes = 250000
+// opts.nbits = 16
+// opts.gain = 0.001f
+// opts.regression = true
+// opts.autoReset = false
+//
+// val rf = nn.model.asInstanceOf[RandomForest]
+//
+// nn.train
+//
+// val nr = remoteitrees(0).nrows
+// val nc = remoteitrees(0).ncols
+// val totalCols = remoteitrees.map(_.ncols).reduceLeft(_ + _)
+//
+// rf.itrees = IMat(nr, totalCols)
+// rf.ftrees = IMat(nr, totalCols)
+// rf.ctrees = FMat(nr, totalCols)
+// rf.vtrees = IMat(nr, totalCols)
+// for (i <- 0 until remoteitrees.length) {
+//   rf.itrees(?, i*nc->(i+1)*nc) = remoteitrees(i)
+//   rf.ftrees(?, i*nc->(i+1)*nc) = remoteftrees(i)
+//   rf.ctrees(?, i*nc->(i+1)*nc) = remotectrees(i)
+//   rf.vtrees(?, i*nc->(i+1)*nc) = remotevtrees(i)
+// }
+// nn.results = remoteresults(0)
+//
+// opts.training=false
+// opts.putBack = 1
+//
+// mm.predict
+//
+// val rr=zeros(nn.results.ncols/opts.depth, opts.depth);
+// rr(?) = nn.results(0,?).t
+// val diffs = DMat(preds - testcats);
+// val scores = mean(rr)
+// val MSE = (diffs dotr diffs) / diffs.length;

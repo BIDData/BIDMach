@@ -101,6 +101,7 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
         }
         machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
       }
+
       model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
       model.addStep(limit.toInt, opts.doAvg);
       val t2 = toc;
@@ -163,7 +164,7 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
             val resp = new AllreduceResponse(cmd.round, cmd.dest);
             sendMaster(resp);
           }
-          
+
 
           //if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
         }
