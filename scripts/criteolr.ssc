@@ -3,16 +3,16 @@
 val mdir = "/mnt/BIDMach/data/criteo/parts/"
 
 val (nn,opts) = GLM.learnerX(List(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4"));
-opts.nend = 80;
-opts.lrate = 0.05f;
-opts.reg1weight = 0.0f;
-opts.batchSize = 5000;
-opts.npasses = 5;
-opts.links = irow(1);
-//opts.pstep = 0.001f;
-opts.aopts = opts;
-opts.texp = 0.5f;
-opts.lookahead = 0;
+opts.nend = 80
+opts.batchSize = 10000
+opts.lrate = 0.05f
+opts.texp = 0.5f
+opts.reg1weight = 0.0f
+opts.npasses = 5
+opts.useGPU = true
+opts.links = irow(1)
+opts.aopts = opts
+opts.lookahead = 0
 
 nn.train
 

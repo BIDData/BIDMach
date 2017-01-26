@@ -1,0 +1,79 @@
+import BIDMat.{CMat,CSMat,DMat,Dict,FMat,FND,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,HMat,IDict,Image,IMat,LMat,Mat,SMat,SBMat,SDMat,TMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMat.Solvers._
+import BIDMat.Plotting._
+import BIDMach.Learner
+import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
+import BIDMach.networks.{Net}
+import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
+import BIDMach.datasinks.{DataSink,MatSink}
+import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
+import BIDMach.causal.{IPTW}
+import BIDMach.allreduce.{Master,Worker,Command}
+import BIDMach.models.GLM
+
+Mat.checkMKL(false)
+Mat.checkCUDA
+
+class xopts extends Learner.Options with MatSource.Opts with RandomForest.Opts with Batch.Opts
+val opts = new xopts
+
+val mdir = "/mnt/BIDMach/data/YearPrediction/"
+val data = loadFMat(mdir+"train.fmat.lz4");
+val cats0 = loadFMat(mdir+"cats.fmat.lz4");
+val cats = cats0 - mini(cats0);
+
+val testsize = (data.ncols / 10)
+
+val train = data(?, 0 -> (data.ncols - testsize));
+val traincats = cats(?, 0 -> (data.ncols - testsize));
+val test = data(?, (data.ncols - testsize) -> data.ncols);
+val testcats = cats(?, (data.ncols - testsize) -> data.ncols);
+val preds = zeros(testcats.nrows, testcats.ncols);
+
+val ds = new MatSource(Array(train.asInstanceOf[Mat],traincats), opts);
+
+val dsp = new MatSource(Array(test.asInstanceOf[Mat],preds), opts);
+
+val nn = new Learner(             // make a learner instance
+    ds,                           // datasource
+    new RandomForest(opts),       // the model
+    null,                         // list of mixins or regularizers
+    new Batch(opts),              // the optimization class to use
+    null,
+    opts)                         // pass the options to the learner as well
+
+val mm = new Learner(             // make a predictor
+    dsp,                          // datasource
+    nn.model,
+    null,
+    null,
+    null,
+    opts)                         // pass the options to the learner as well
+
+
+opts.useGPU = true
+opts.batchSize = 20000
+opts.depth = 10
+opts.ntrees = 25
+opts.ncats = 90
+
+opts.nsamps = 25
+opts.nnodes = 250000
+opts.nbits = 16
+opts.gain = 0.001f
+opts.regression = true
+opts.autoReset = false
+
+val rf = nn.model.asInstanceOf[RandomForest]
+
+val w = new Worker()
+val wopts = w.opts
+wopts.trace = 4
+wopts.machineTrace = 1
+
+w.start(nn)
+
+nn.paused = true
