@@ -12,68 +12,62 @@ import edu.berkeley.bid.CUMACH
  *  An Efficient Minibatch Acceptance Test for Metropolis-Hastings, arXiv 2016
  *  Haoyu Chen, Daniel Seita, Xinlei Pan, John Canny
  *
- * This is a work in progress. For now assume a simple matrix as the data
- * source, or row vectors if dealing with vectors. Current issues:
+ * This is a work in progress. A couple of important notes:
  * 
- * 1. Since the update relies on minibatches, I assume we can start with the
- * minibatch provided by BIDMach on a given iteration. But how to get the next
- * one? If we can peek ahead and add the next datasource's minibatch, won't that
- * added minibatch also be what BIDMach provides as the starting minibatch for
- * the next iteration?
+ * - It will not do any sort of minibatch size incrementing here. That's for
+ * other parts of the code. This keeps track of necessary statistics for our
+ * test. If we accept, then we clear those stats. Otherwise, we update them as
+ * needed according to our minibatch.
  * 
- * 2. Where can we get information about the log likelihood of the elements? We
- * need `log p(x_i*|theta)` and `log p(x_i*|theta)` for all minibatch elements.
- * Is this model.evalfun?
+ * - An alterantive idea to utilize updatemats and to avoid a second pass
+ * through the evaluation would be to take a Taylor series expansion (see my
+ * other notes). However, let's focus on the direct method from the paper for
+ * now, but this will ignore updatemats.
  * 
- * 3. Do we ignore updatemats?
- * 
- * 4. Where can we extract information about temperature?
- * 
- * 5. Later, how to extend this to the GPU case and save on memory?
+ * - TODO later: temperature info, GPU usage, etc.
  */
 class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater {
 
-  // Put null stuff here that we initialize later. I'm not sure how much of this we need.
-  var modelmats:Array[Mat] = null
-  var updatemats:Array[Mat] = null
-  var minibatch:Array[Mat] = null
-  //var dsource:Datasource = null
+  var n2ld:DMat = null                 // X_c values for pre-selected \sigma.
+  var deltaTheta:Array[Mat] = null     // Container for Gaussian noise from proposer.
+  var proposedTheta:Array[Mat] = null  // The proposed theta.
+  var tmpTheta:Array[Mat] = null       // Backup container to hold current theta.
+  var modelmats:Array[Mat] = null      // The current theta.
+  var updatemats:Array[Mat] = null     // Contains gradients (not currently used).
 
-  var theta:Mat = null
-  var ttheta:Mat = null
-  var thetaLogL:Mat = null
-  var tthetaLogL:Mat = null
-  var diff:Mat = null
-  var thetaArrayMat:Array[Mat] = null
-
-  var delta:Mat = null
-  var n2ld:DMat = null
+  var newMinibatch:Boolean = true      // Whether we should run the proposer.
+  var mbSize:Long = 0                  // Current minibatch size.
+  var N:Long = 0                       // Maximum minibatch size (i.e. all training data).
+  var n:Float = 0f                     // The number of MBs we are using.
+  var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
+  var avgLogLLCurrent:Float = 0f       // (N/b) \sum_{i=1}^b log p(x_i* | theta)
+  var avgLogLLProposed:Float = 0f      // (N/b) \sum_{i=1}^b log p(x_i* | theta')
 
 
   /**
-   * I think we need the model to get minibatches of data.
+   * Standard initialization.
    */
   override def init(model0:Model) = {
     model = model0;
     modelmats = model.modelmats
     updatemats = model.updatemats
-    val mm = modelmats(0)
-
-    theta = mm.zeros(mm.nrows, mm.ncols)
-    ttheta = mm.zeros(mm.nrows, mm.ncols)
-    delta = mm.zeros(mm.nrows, mm.ncols)
-    thetaArrayMat = new Array[Mat](1)
 
     val norm2logdata = loadDMat("norm2log%d_20_%2.1f.txt" format 
         (opts.nn2l, opts.n2lsigma))
     n2ld = norm2logdata(?,0) \ cumsum(norm2logdata(?,1))
-    
-    //data = model.datasource
+
+    for (i <- 0 until modelmats.length) {
+      deltaTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
+      proposedTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
+      tmpTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
+    }
   }
 
 
   /**
-   * This performs the update and the MH test.
+   * This performs the update and the MH test based on a minibatch of data. The
+   * original data is split up into equal-sized minibatches in the Learner code.
+   * (The last minibatch is ignored since it generally has a different size.)
    *
    * @param ipass The current pass over the full (training) data.
    * @param step Progress within the current minibatch, indicated as a numerical
@@ -82,113 +76,95 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    *    datasource size and the number of (training) passes.
    */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
-    ttheta = proposer(theta, delta)
-    var logu = ln(rand(1,1)).v;
-    var done = false
-    var mbStep = 100 // indicates how many elements in current minibatch
-    var mbSize = 100 // indicates amount to increment minibatch size
+    
+    // Preliminary steps and data clearing/preparation.
+    if (ipass == 0) N = step 
+    if (newMinibatch) {
+      randomWalkProposer()
+      logu = ln(rand(1,1)).v
+      newMinibatch = false
+      mbSize = 0
+      n = 0
+      avgLogLLCurrent = 0f
+      avgLogLLProposed = 0f
+      for (i <- 0 until modelmats.length) {
+        tmpTheta(i) = modelmats(i)
+      }
+    }
+    mbSize += model.datasource.opts.batchSize
+    n += 1
 
-    do {
-      // Extract minibatch of data somehow. It has type Array[Mat], not Mat.
-      // extract from column indices `step` to `step+mbStep`
-      minibatch = null // TODO
-      
-      // Evaluate log likelihoods. I think `step` as third argument is OK.
-      thetaLogL = model.evalbatch(minibatch, ipass, step)
-      thetaArrayMat(0) = ttheta
-      model.setmodelmats(thetaArrayMat)
-      tthetaLogL = model.evalbatch(minibatch, ipass, step)
+    // TODO this is not completely correct.
+    // if ipass == 0, N is not yet correct. How to fix?
+    // Also, check to make sure datasource.omats is the correct one to use.
 
-      // multiply diff by (N/T) to scale for data size and temperature?
-      diff = thetaLogL - tthetaLogL
+    // Compute \Delta* (deltaStar) for the acceptance test.
+    val newC = N * (model.evalbatchg(model.datasource.omats, ipass, step)).v
+    avgLogLLCurrent = ((n-1)/n)*avgLogLLCurrent + newC/n
+    for (i <- 0 until modelmats.length) {
+      modelmats(i) = proposedTheta(i)
+    }
+    val newP = N * (model.evalbatchg(model.datasource.omats, ipass, step)).v
+    avgLogLLProposed = ((n-1)/n)*avgLogLLProposed + newP/n
+    val deltaStar = (avgLogLLProposed - avgLogLLCurrent) - logu
 
-      // Then run the test with our minibatch
-      val (moved,takeStep) = testFunction(diff, logu, false)
-      done = moved
-      
-      if (done) {
-        // TODO Record some statistics. Note that we already set the model to
-        // have the new theta, so if we don't move, revert to the old theta.
-        if (!takeStep) {
-          thetaArrayMat(0) = theta
-          model.setmodelmats(thetaArrayMat)
-        }
-      } else {
-        // Increase the minibatch size 
-        if (opts.fasterIncreaseUse) {
-          mbStep = (mbStep*opts.fasterIncreaseFactor).toInt
+    // TODO HOW DO I COMPUTE THIS (EFFICIENTLY)? This requires individual
+    // scores, but we are only given the averages in model.evalbatchg
+    val sampleVariance = 0f 
+
+    val targetVariance = opts.n2lsigma * opts.n2lsigma
+    val numStd = deltaStar / math.sqrt(sampleVariance)
+    var accept = false
+    
+    // Take care of abnormally good or bad minibatches (can probably be deleted).
+    if (math.abs(numStd) > 5.0) {
+      newMinibatch = true
+      if (numStd > 0) accept = true
+    }
+    // If sample variance is too large, we cannot run the test.
+    else if (sampleVariance >= targetVariance) {
+      if (ipass > 0 && mbSize == N) {
+        println("WARNING: test used entire dataset but variance is still too high.")
+        println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
+        if (opts.continueDespiteFull) {
+          println("Nonetheless, we will accept/reject this sample based on Delta*") 
+          newMinibatch = true
+          if (deltaStar > 0) accept = true
         } else {
-          mbStep += mbSize
+          throw new RuntimeException("Aborting program!")
         }
       }
+    } 
+    // Run the test by sampling a Gaussian and the X_c.
+    else {
+      newMinibatch = true
+      val Xn = dnormrnd(0, math.sqrt(targetVariance-sampleVariance), 1, 1).dv
+      val Xc = normlogrnd(1,1).dv
+      if (deltaStar + Xn + Xc > 0) accept = true
+    }
 
-    } while (!done)
-  }
-  
-
-  /**
-   * This will run the actual test function.
-   * 
-   * @param diff A vector containing scaled log likelihood ratios for each
-   *    element in the minibatch
-   * @param logu The \psi(u,theta,theta') term, which is log(u) for symmetric
-	 *    proposals that we use.
-	 * @param full A boolean indicating if this minibatch is equivalent to the
-	 * 		full data. This should ideally be false always.
-	 * @return A boolean (b1,b2) where b1=true means done, otherwise increase
-	 * 		minibatch size, and b2=true means we moved to the new theta, otherwise
-	 * 		stick with old theta.
-   */
-  def testFunction(diff:Mat, logu:Double, full:Boolean):(Boolean,Boolean) = {
-    val tvar = variance(diff).dv/diff.length;
-    val targvar = opts.n2lsigma * opts.n2lsigma;
-    val x = mean(diff).dv;
-    val ns = x / math.sqrt(tvar);
-    
-    if (math.abs(ns) > 5) {
-      // Get abnormally large |ns| values out of the way.
-      if (ns > 0) (true, true) else (true, false)
-    } else {
-      if (tvar >= targvar) {
-        // If tvar >= targvar, we need to decrease sample variance of data.
-        if (full) { 
-          if (opts.continueDespiteFull) {
-            println("Warning: test failed variance condition, var=%f nstd = %f" 
-                format (tvar, ns));
-            if (x > 0) (true, true) else (true, false)
-          } else {
-            throw new RuntimeException("Test failed variance condition, var=%f, nstd = %f" 
-                format (tvar, ns))
-          }
-        } else {
-          (false, false)
-        }
-      } else {
-        // Otherwise, we can run our test.
-        val xn = dnormrnd(0, math.sqrt(targvar-tvar), 1, 1).dv
-        val xc = normlogrnd(1,1).dv
-        if ((x + xn + xc) > 0) {
-          (true, true)
-        } else {
-          (true, false)
-        }
+    // Reset parameters if the proposal was rejected or if we need more data.
+    if (!accept) {
+      for (i <- 0 until modelmats.length) {
+        modelmats(i) = tmpTheta(i)
       }
     }
   }
-  
-   
+ 
+
   /**
-   * A proposer, which is currently the simple random walk but we should try and
-   * see if we can do something fancier.
-   * 
-   * @param t Our current theta.
-   * @param d Container to hold sampled noise.
+   * A random walk proposer, but we should try and see if we can do something
+   * fancier. Having the proposer as a simple \sigma*I (for identity matrix I),
+   * however, means we can safely iterate through model matrices and update
+   * independently.
    */
-  def proposer(t:Mat, d:Mat) = {
-    normrnd(0, opts.sigmaProposer, d)
-    t+d
+  def randomWalkProposer() = {
+    for (i <- 0 until modelmats.length) {
+      normrnd(0, opts.sigmaProposer, deltaTheta(i))
+      proposedTheta(i) ~ modelmats(i) + deltaTheta(i)
+    }
   }
-  
+ 
   
   /**
    * Randomly generate sample(s) from the correction distribution X_c. It
@@ -231,11 +207,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 object MHTest {
 
   trait Opts extends Updater.Opts {
-    val fasterIncreaseUse = false
-    val fasterIncreaseFactor = 2.0
-    val n2lsigma = 0.9
+    val n2lsigma = 0.9f
     val nn2l = 2000
-    val sigmaProposer = 0.05
+    val sigmaProposer = 0.05f
     val continueDespiteFull = true
   }
  
