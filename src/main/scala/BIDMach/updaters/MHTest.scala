@@ -62,7 +62,11 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         (opts.nn2l, opts.n2lsigma))
     n2ld = norm2logdata(?,0) \ cumsum(norm2logdata(?,1))
 
-    for (i <- 0 until modelmats.length) {
+    val nmats = modelmats.length;
+    deltaTheta = new Array[Mat](nmats)
+    proposedTheta = new Array[Mat](nmats)
+    tmpTheta = new Array[Mat](nmats)
+    for (i <- 0 until nmats) {
       deltaTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
       proposedTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
       tmpTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
@@ -131,6 +135,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     }
     // If sample variance is too large, we cannot run the test.
     else if (sampleVariance >= targetVariance) {
+      println("too large")
       if (ipass > 0 && b == N) {
         println("WARNING: test used entire dataset but variance is still too high.")
         println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
@@ -148,7 +153,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       newMinibatch = true
       val Xn = dnormrnd(0, math.sqrt(targetVariance-sampleVariance), 1, 1).dv
       val Xc = normlogrnd(1,1).dv
-      if (deltaStar + Xn + Xc > 0) accept = true
+      if (deltaStar + Xn + Xc > 0) {
+        accept = true
+        println("we have accepted!!")
+      } else {
+        println("reject!!")
+      }
     }
 
     // Reset parameters if the proposal was rejected or if we need more data.
@@ -216,7 +226,7 @@ object MHTest {
 
   trait Opts extends Updater.Opts {
     val N = 100000
-    val T = 1
+    val T = 1000
     val Nknown = true
     val n2lsigma = 0.9f
     val nn2l = 2000
