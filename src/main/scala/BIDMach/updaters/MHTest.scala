@@ -23,35 +23,41 @@ import edu.berkeley.bid.CUMACH
  * through the evaluation would be to take a Taylor series expansion (see my
  * other notes). However, let's focus on the direct method from the paper for
  * now, but this will ignore updatemats.
- * 
- * - TODO later: temperature info, GPU usage, etc.
  */
 class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater {
 
   var n2ld:DMat = null                 // X_c values for pre-selected \sigma.
   var deltaTheta:Array[Mat] = null     // Container for Gaussian noise from proposer.
-  var proposedTheta:Array[Mat] = null  // The proposed theta.
   var tmpTheta:Array[Mat] = null       // Backup container to hold current theta.
+  var proposedTheta:Array[Mat] = null  // The proposed theta.
   var modelmats:Array[Mat] = null      // The current theta.
   var updatemats:Array[Mat] = null     // Contains gradients (not currently used).
+  var scores0:FMat = null              // Container for (N/T)*\log p(x_i*|theta) terms.
+  var scores1:FMat = null              // Container for (N/T)*\log p(x_i*|theta') terms.
 
   var newMinibatch:Boolean = true      // Whether we should run the proposer.
-  var mbSize:Long = 0                  // Current minibatch size.
+  var b:Long = 0                       // Current minibatch size (also `b` in the paper).
   var N:Long = 0                       // Maximum minibatch size (i.e. all training data).
   var n:Float = 0f                     // The number of MBs we are using.
   var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
-  var avgLogLLCurrent:Float = 0f       // (N/b) \sum_{i=1}^b log p(x_i* | theta)
-  var avgLogLLProposed:Float = 0f      // (N/b) \sum_{i=1}^b log p(x_i* | theta')
+  var avgLogLL0:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta).
+  var avgLogLL1:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta').
+  var T:Int = opts.T                   // The temperature of the distribution.
 
 
-  /**
-   * Standard initialization.
-   */
+  /** Standard initialization. */
   override def init(model0:Model) = {
     model = model0;
     modelmats = model.modelmats
     updatemats = model.updatemats
-
+    scores0 = zeros(1,model.datasource.opts.batchSize)
+    scores1 = zeros(1,model.datasource.opts.batchSize)
+    if (opts.Nknown) {
+      N = opts.N
+    } else {
+      println("WARNING: opts.Nknown=false. (For now it should be true.)")
+    }
+    
     val norm2logdata = loadDMat("norm2log%d_20_%2.1f.txt" format 
         (opts.nn2l, opts.n2lsigma))
     n2ld = norm2logdata(?,0) \ cumsum(norm2logdata(?,1))
@@ -68,6 +74,8 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * This performs the update and the MH test based on a minibatch of data. The
    * original data is split up into equal-sized minibatches in the Learner code.
    * (The last minibatch is ignored since it generally has a different size.)
+   * 
+   * TODO Double check the case of opts.Nknown=false but I will be using true.
    *
    * @param ipass The current pass over the full (training) data.
    * @param step Progress within the current minibatch, indicated as a numerical
@@ -76,42 +84,42 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    *    datasource size and the number of (training) passes.
    */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
+    if (ipass == 0 && !opts.Nknown) N = step 
     
-    // Preliminary steps and data clearing/preparation.
-    if (ipass == 0) N = step 
+    // If we're starting a new minibatch, need to reset a bunch of values.
     if (newMinibatch) {
       randomWalkProposer()
       logu = ln(rand(1,1)).v
       newMinibatch = false
-      mbSize = 0
+      b = 0
       n = 0
-      avgLogLLCurrent = 0f
-      avgLogLLProposed = 0f
+      avgLogLL0 = 0f
+      avgLogLL1 = 0f
       for (i <- 0 until modelmats.length) {
         tmpTheta(i) = modelmats(i)
       }
     }
-    mbSize += model.datasource.opts.batchSize
-    n += 1
+    b += model.datasource.opts.batchSize
+    n += 1.0f
 
-    // TODO this is not completely correct.
-    // if ipass == 0, N is not yet correct. How to fix?
-    // Also, check to make sure datasource.omats is the correct one to use.
-
-    // Compute \Delta* (deltaStar) for the acceptance test.
-    val newC = N * (model.evalbatchg(model.datasource.omats, ipass, step)).v
-    avgLogLLCurrent = ((n-1)/n)*avgLogLLCurrent + newC/n
+    // Compute \Delta* (deltaStar) for our MH test using the current batch.
+    // Doing so requires getting scores of omats, hence model.evalbatchg.
+    // And this also has to be done twice, one for theta, one for theta'.
+    // We require the variance, hence need a vector, and will exit if not.
+    
+    scores0 = model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
+    if (scores0.length == 1) {
+      throw new RuntimeException("Need individual scores, but getting a scalar.")
+    }
     for (i <- 0 until modelmats.length) {
       modelmats(i) = proposedTheta(i)
     }
-    val newP = N * (model.evalbatchg(model.datasource.omats, ipass, step)).v
-    avgLogLLProposed = ((n-1)/n)*avgLogLLProposed + newP/n
-    val deltaStar = (avgLogLLProposed - avgLogLLCurrent) - logu
+    scores1 = model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
+    avgLogLL0 = ((n-1)/n)*avgLogLL0 + mean(scores0,2).v/n
+    avgLogLL1 = ((n-1)/n)*avgLogLL1 + mean(scores1,2).v/n
 
-    // TODO HOW DO I COMPUTE THIS (EFFICIENTLY)? This requires individual
-    // scores, but we are only given the averages in model.evalbatchg
-    val sampleVariance = 0f 
-
+    val deltaStar = (avgLogLL0-avgLogLL1) - logu
+    val sampleVariance = variance(scores1-scores0).v / scores0.length // Divide due to CLT
     val targetVariance = opts.n2lsigma * opts.n2lsigma
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
@@ -123,7 +131,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     }
     // If sample variance is too large, we cannot run the test.
     else if (sampleVariance >= targetVariance) {
-      if (ipass > 0 && mbSize == N) {
+      if (ipass > 0 && b == N) {
         println("WARNING: test used entire dataset but variance is still too high.")
         println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
         if (opts.continueDespiteFull) {
@@ -207,6 +215,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 object MHTest {
 
   trait Opts extends Updater.Opts {
+    val N = 100000
+    val T = 1
+    val Nknown = true
     val n2lsigma = 0.9f
     val nn2l = 2000
     val sigmaProposer = 0.05f
