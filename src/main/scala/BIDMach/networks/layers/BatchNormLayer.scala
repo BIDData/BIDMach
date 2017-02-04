@@ -12,7 +12,7 @@ import BIDMach.networks._
 
 
 class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts = new BatchNormNode) extends Layer(net, opts) {
-   
+
   var means:Mat = null
   var variances:Mat = null
   var sdevs:Mat = null;
