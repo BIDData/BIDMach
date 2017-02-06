@@ -74,7 +74,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     }
     lRatios = zeros(1,opts.N)
     
-    val norm2logdata = loadDMat("norm2log%d_20_%2.1f.txt" format 
+    val norm2logdata = loadDMat("data/MHTestCorrections/norm2log%d_20_%2.1f.txt" format 
         (opts.nn2l, opts.n2lsigma))
     n2ld = norm2logdata(?,0) \ cumsum(norm2logdata(?,1))
 
