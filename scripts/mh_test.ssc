@@ -52,11 +52,11 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
 
 val (mm, mopts) = learner(tr_data, tr_labels, 1)
 mopts.addConstFeat = false
-mopts.npasses = 5
+mopts.npasses = 1
 mopts.batchSize = 100
 mopts.lrate = 0.01
 mopts.matrixOfScores = true // This is required for the MH Test to work.
-mopts.verboseMH = false // Set to true if debugging.
+mopts.verboseMH = true // Set to true if debugging.
 mopts.what
 val model = mm.model.asInstanceOf[GLM]
 mm.train
@@ -76,3 +76,4 @@ te_preds(find(te_preds >= 0.5)) = 1
 
 val accuracy = (te_labels == te_preds).nnz.toFloat / (te_preds.nrows*te_preds.ncols)
 print("\nAccuracy at a decision threshold of 0.5: %.4f\n" format accuracy)
+sys.exit

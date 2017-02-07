@@ -49,7 +49,6 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   /** 
    * Standard initialization. We have:
    * 
-   * - modelmats (i.e. \theta) is initialized to a random walk
    * - n2ld loads the pre-computed X_c variable distribution
    * - {delta,proposed,tmp}Theta initialized to zeros to start
    * 
@@ -62,10 +61,6 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     scores0 = zeros(1,model.datasource.opts.batchSize)
     scores1 = zeros(1,model.datasource.opts.batchSize)
 
-    for (i <- 0 until modelmats.length) {
-      normrnd(0, opts.sigmaProposer, modelmats(i))
-    }
-    
     if (opts.Nknown) {
       N = opts.N
     } else {
@@ -96,8 +91,6 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * original data is split up into equal-sized minibatches in the Learner code.
    * (The last minibatch is ignored since it generally has a different size.)
    * 
-   * TODO Double check the case of opts.Nknown=false but I will be using true.
-   *
    * @param ipass The current pass over the full (training) data.
    * @param step Progress within the current minibatch, indicated as a numerical
    * 		index representing the starting column of this minibatch.
@@ -114,8 +107,8 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         println("\nNEW MINIBATCH!!!")
         println("after random walk, have:")
         println("\ttheta(0->10) = " +modelmats(0)(0 -> 10))
-        println("\tttheta(0->10) = " +proposedTheta(0)(0 -> 10))
         println("\tdelta_theta(0->10) = " +deltaTheta(0)(0 -> 10))
+        println("\tttheta(0->10) = " +proposedTheta(0)(0 -> 10))
       }
       logu = ln(rand(1,1)).v
       newMinibatch = false
@@ -124,7 +117,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       avgLogLL0 = 0f
       avgLogLL1 = 0f
       for (i <- 0 until modelmats.length) {
-        tmpTheta(i) = modelmats(i) + 0
+        tmpTheta(i) <-- modelmats(i)
       }
       lRatios.clear
     }
@@ -145,7 +138,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       throw new RuntimeException("Need individual scores, but getting a scalar.")
     }
     for (i <- 0 until modelmats.length) {
-      modelmats(i) = proposedTheta(i) + 0
+      modelmats(i) = proposedTheta(i)
     }
     scores1 = model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
     avgLogLL0 = ((n-1)/n)*avgLogLL0 + mean(scores0,2).v/n
@@ -215,12 +208,11 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     // Reset parameters appropriately.
     if (accept) {
       for (i <- 0 until modelmats.length) {
-        tmpTheta(i) = modelmats(i) + 0 // tmpTheta contains proposed theta
+        tmpTheta(i) <-- modelmats(i) // tmpTheta contains proposed theta
       }     
-    }
-    else{
+    } else {
       for (i <- 0 until modelmats.length) {
-        modelmats(i) = tmpTheta(i) + 0 // modelmats reset back to old theta
+        modelmats(i) = tmpTheta(i) // modelmats reset back to old theta
       }
     }
   }
@@ -237,9 +229,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       normrnd(0, opts.sigmaProposer, deltaTheta(i))
       proposedTheta(i) = modelmats(i) + deltaTheta(i)
       // I can't figure out why the following doesn't work.
-      //proposedTheta(i) ~ modelmats(i) + 0
-      //(this doesn't work either: proposedTheta(i) <-- modelmats(i) )
-      //proposedTheta(i) ~ proposedTheta(i) + deltaTheta(i)
+      // proposedTheta(i) ~ modelmats(i) + 0
+      // //proposedTheta(i) <-- modelmats(i) // this doesn't work either ??
+      // proposedTheta(i) ~ proposedTheta(i) + deltaTheta(i)
     }
   }
  
@@ -288,8 +280,8 @@ object MHTest {
     var N = 100000
     var T = 1000
     var Nknown = true
-    var n2lsigma = 0.9f
-    var nn2l = 2000
+    var n2lsigma = 1.0f
+    var nn2l = 4000
     var sigmaProposer = 0.05f
     var continueDespiteFull = true
     var verboseMH = true
