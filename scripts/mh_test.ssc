@@ -10,8 +10,9 @@
  * - CRITICAL: we don't yet have the data augmentation done correctly!
  */
 
-val tr = loadFMat("/home/daniel/data/FINAL_MNIST8M_TRAIN_100000.fmat.lz4")
-val te = loadFMat("/home/daniel/data/FINAL_MNIST8M_TEST_20000.fmat.lz4")
+// Use either the 450k or 100k for training, but adjust test set along with it.
+val tr = loadFMat("/home/daniel/data/MNIST8M/FINAL_MNIST8M_TRAIN_450000.fmat.lz4")
+val te = loadFMat("/home/daniel/data/MNIST8M/FINAL_MNIST8M_TEST_192935.fmat.lz4")
 
 val tr_data = tr(0->784,?)
 val tr_labels = tr(784,?)
@@ -53,8 +54,20 @@ mopts.addConstFeat = false
 mopts.npasses = 5
 mopts.batchSize = 100
 mopts.lrate = 0.01
-mopts.matrixOfScores = true // This is required for the MH Test to work.
-mopts.verboseMH = false // Set to true if debugging.
+
+// Some new stuff due to the MHTest opts.
+mopts.N = 450000
+mopts.T = 1000
+mopts.Nknown = true
+mopts.n2lsigma = 1.0f
+mopts.nn2l = 4000
+mopts.sigmaProposer = 0.05f
+mopts.continueDespiteFull = false
+mopts.verboseMH = false
+mopts.collectData = true // CAUTION! May save a lot!
+mopts.collectDataDir = "outputs/mhtest_data/"
+
+mopts.matrixOfScores = true  // This is actually a GLM thing.
 mopts.what
 val model = mm.model.asInstanceOf[GLM]
 mm.train

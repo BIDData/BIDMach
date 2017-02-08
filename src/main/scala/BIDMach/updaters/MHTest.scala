@@ -51,6 +51,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var avgLogLL0:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta).
   var avgLogLL1:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta').
   var T:Int = opts.T                   // The temperature of the distribution.
+  var t:Int = 0                        // The current total number of samples.
 
 
   /** 
@@ -67,6 +68,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     updatemats = model.updatemats
     scores0 = zeros(1,model.datasource.opts.batchSize)
     scores1 = zeros(1,model.datasource.opts.batchSize)
+    lRatios = zeros(1,opts.N)
 
     if (opts.Nknown) {
       N = opts.N
@@ -74,7 +76,6 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       println("WARNING: opts.Nknown=false. (For now it should be true.)")
       throw new RuntimeException("Aborting now.")
     }
-    lRatios = zeros(1,opts.N)
     
     val norm2logdata = loadDMat("data/MHTestCorrections/norm2log%d_20_%2.1f.txt" format 
         (opts.nn2l, opts.n2lsigma))
@@ -98,6 +99,14 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * original data is split up into equal-sized minibatches in the Learner code.
    * (The last minibatch is ignored since it generally has a different size.)
    * 
+   * Compute \Delta* (deltaStar) for our MH test using the current batch. Doing
+   * so requires getting scores of omats, hence model.evalbatchg. And this also
+   * has to be done twice, one for theta, one for theta'. We require the
+   * variance, hence we need a vector, and will exit if not. For variance, the
+   * workaround is to store individuals in `lRatios`. Don't forget to divide by
+   * b due to the CLT assumption of \Delta*. NOTE: scores0 and scores1 are now
+   * assigned using <-- to avoid alias.
+   * 
    * @param ipass The current pass over the full (training) data.
    * @param step Progress within the current minibatch, indicated as a numerical
    * 		index representing the starting column of this minibatch.
@@ -105,33 +114,13 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    *    datasource size and the number of (training) passes.
    */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
-    if (newMinibatch) {
-      if (opts.verboseMH) println("\n\tNew minibatch!")
-      randomWalkProposer()
-      logu = ln(rand(1,1)).v
-      newMinibatch = false
-      b = 0
-      n = 0
-      avgLogLL0 = 0f
-      avgLogLL1 = 0f
-      for (i <- 0 until modelmats.length) {
-        tmpTheta(i) <-- modelmats(i)
-      }
-      lRatios.clear
-    }
+    
+    // Do some data collection and reset values.
+    if (newMinibatch) beforeEachMinibatch()
     b += model.datasource.opts.batchSize
     n += 1.0f
 
-    /*
-     * Compute \Delta* (deltaStar) for our MH test using the current batch.
-     * Doing so requires getting scores of omats, hence model.evalbatchg.
-     * And this also has to be done twice, one for theta, one for theta'.
-     * We require the variance, hence need a vector, and will exit if not.
-     * For variance, the workaround is to store individuals in `lRatios`.
-     * Don't forget to divide by b due to the CLT assumption of \Delta*.
-     * NOTE: scores0 and scores1 are now assigned using <-- to avoid alias.
-     */
-    
+    // Now compute scores; *should* be log p(...) stuff, if not we better check.
     scores0 <-- model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
     if (scores0.length == 1) {
       throw new RuntimeException("Need individual scores, but getting a scalar.")
@@ -212,9 +201,52 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
       }
     }
+    
+    if (newMinibatch) {
+      if (accept) {
+        afterEachMinibatch(avgLogLL1)
+      } else {
+        afterEachMinibatch(avgLogLL0)
+      }
+    }
   }
- 
+  
+   
+  /** Stuff we should do before each minibatch. */
+  def beforeEachMinibatch() {
+    if (opts.verboseMH) println("\n\tNew minibatch!")
+    randomWalkProposer()
+    logu = ln(rand(1,1)).v
+    newMinibatch = false
+    b = 0
+    n = 0
+    avgLogLL0 = 0f
+    avgLogLL1 = 0f
+    for (i <- 0 until modelmats.length) {
+      tmpTheta(i) <-- modelmats(i)
+    }
+    lRatios.clear
+  }
 
+ 
+  /**
+   * Stuff we should do after each minibatch. 
+   * 
+   * @param scores The avg log likelihood of the current parameter (depends on
+   * 		whether we accepted or rejected).
+   */
+  def afterEachMinibatch(scores:Float) {
+    t += 1
+    if (opts.collectData) {
+      for (i <- 0 until modelmats.length) {
+        saveFMat(opts.collectDataDir+ "theta_%d_%04d.fmat.lz4" format (i,t), FMat(modelmats(i)))
+      }
+      val a = row(b, scores)
+      saveFMat(opts.collectDataDir+ "data_%04d.fmat.lz4" format (t), FMat(a))
+    }
+  }
+
+ 
   /**
    * A random walk proposer, but we should try and see if we can do something
    * fancier. Having the proposer as a simple \sigma*I (for identity matrix I),
@@ -233,7 +265,8 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   /**
    * Randomly generate sample(s) from the correction distribution X_c. It
    * samples values in (0,1) and then finds the x-positions (in some bounded
-   * range such as [-10,10]) corresponding to those CDF values in X_c.
+   * range such as [-10,10]) corresponding to those CDF values in X_c. This is
+   * unchanged from John Canny's original implementation.
    * 
    * @param m Number of rows of random samples.
    * @param n Number of columns of random samples.
@@ -279,6 +312,8 @@ object MHTest {
     var sigmaProposer = 0.05f
     var continueDespiteFull = true
     var verboseMH = true
+    var collectData = false
+    var collectDataDir = "tmp/"
   }
  
   class Options extends Opts {}
