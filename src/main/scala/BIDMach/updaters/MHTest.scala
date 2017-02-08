@@ -23,6 +23,13 @@ import edu.berkeley.bid.CUMACH
  * through the evaluation would be to take a Taylor series expansion (see my
  * other notes). However, let's focus on the direct method from the paper for
  * now, but this will ignore updatemats.
+ * 
+ * - Why do `IncNorm.scala` and `IncMult.scala` create new modelmats in the
+ * update method? Doesn't that allocate memory each time?
+ * 
+ * - Potental issue: assumes we can input N and T perfectly. If not it might be
+ * better to provide a generic parameter `K` for a constant that we multiply,
+ * and an estimate of the number of training data points.
  */
 class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater {
 
@@ -39,7 +46,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var newMinibatch:Boolean = true      // Whether we should run the proposer.
   var b:Long = 0                       // Current minibatch size (also `b` in the paper).
   var N:Long = 0                       // Maximum minibatch size (i.e. all training data).
-  var n:Float = 0f                     // The number of MBs we are using.
+  var n:Float = 0f                     // The *number* of MBs we are using.
   var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
   var avgLogLL0:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta).
   var avgLogLL1:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta').
@@ -98,18 +105,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    *    datasource size and the number of (training) passes.
    */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
-    if (ipass == 0 && !opts.Nknown) N = step 
-    
-    // If we're starting a new minibatch, need to reset a bunch of values.
     if (newMinibatch) {
+      if (opts.verboseMH) println("\n\tNew minibatch!")
       randomWalkProposer()
-      if (opts.verboseMH) {
-        println("\nNEW MINIBATCH!!!")
-        println("after random walk, have:")
-        println("\ttheta(0->10) = " +modelmats(0)(0 -> 10))
-        println("\tdelta_theta(0->10) = " +deltaTheta(0)(0 -> 10))
-        println("\tttheta(0->10) = " +proposedTheta(0)(0 -> 10))
-      }
       logu = ln(rand(1,1)).v
       newMinibatch = false
       b = 0
@@ -129,18 +127,20 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
      * Doing so requires getting scores of omats, hence model.evalbatchg.
      * And this also has to be done twice, one for theta, one for theta'.
      * We require the variance, hence need a vector, and will exit if not.
-     * For variance, my workaround is to store the individuals in `lRatios`.
+     * For variance, the workaround is to store individuals in `lRatios`.
      * Don't forget to divide by b due to the CLT assumption of \Delta*.
+     * NOTE: scores0 and scores1 are now assigned using <-- to avoid alias.
      */
     
-    scores0 = model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
+    scores0 <-- model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
     if (scores0.length == 1) {
       throw new RuntimeException("Need individual scores, but getting a scalar.")
     }
     for (i <- 0 until modelmats.length) {
-      modelmats(i) = proposedTheta(i)
+      modelmats(i) <-- proposedTheta(i)
     }
-    scores1 = model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
+    scores1 <-- model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
+
     avgLogLL0 = ((n-1)/n)*avgLogLL0 + mean(scores0,2).v/n
     avgLogLL1 = ((n-1)/n)*avgLogLL1 + mean(scores1,2).v/n
     val deltaStar = (avgLogLL1 - avgLogLL0) - logu
@@ -155,15 +155,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     
     if (opts.verboseMH) {
       println("b="+b+", n="+n+", logu="+logu+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
-      println("scores0(0->10) = " +scores0(0 -> 10))
-      println("scores1(0->10) = " +scores1(0 -> 10))
-      println("lRatios(0->10) = " +lRatios(0 -> 10))
       println("mean(scores0) = "+mean(scores0,2).dv+", mean(scores1) = "+mean(scores1,2).dv)
       println("avgLogLL0 = "+avgLogLL0+", avgLogLL1 = "+avgLogLL1)
       println("sampleVar = " +sampleVariance)
       println("delta* = " + deltaStar)
     }
-
+    
     // Take care of abnormally good or bad minibatches (can probably be deleted).
     if (math.abs(numStd) > 5.0) {
       if (opts.verboseMH) {
@@ -205,14 +202,14 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       }
     }
 
-    // Reset parameters appropriately.
+    // Reset parameters appropriately, using <-- to avoid alias issues.
     if (accept) {
       for (i <- 0 until modelmats.length) {
-        tmpTheta(i) <-- modelmats(i) // tmpTheta contains proposed theta
+        tmpTheta(i) <-- modelmats(i) // Now tmpTheta has proposed theta.
       }     
     } else {
       for (i <- 0 until modelmats.length) {
-        modelmats(i) = tmpTheta(i) // modelmats reset back to old theta
+        modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
       }
     }
   }
@@ -222,16 +219,13 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * A random walk proposer, but we should try and see if we can do something
    * fancier. Having the proposer as a simple \sigma*I (for identity matrix I),
    * however, means we can safely iterate through model matrices and update
-   * independently.
+   * independently. Doing it this way avoids excess memory allocation.
    */
   def randomWalkProposer() = {
     for (i <- 0 until modelmats.length) {
       normrnd(0, opts.sigmaProposer, deltaTheta(i))
-      proposedTheta(i) = modelmats(i) + deltaTheta(i)
-      // I can't figure out why the following doesn't work.
-      // proposedTheta(i) ~ modelmats(i) + 0
-      // //proposedTheta(i) <-- modelmats(i) // this doesn't work either ??
-      // proposedTheta(i) ~ proposedTheta(i) + deltaTheta(i)
+      proposedTheta(i) <-- modelmats(i)
+      proposedTheta(i) ~ proposedTheta(i) + deltaTheta(i)
     }
   }
  
