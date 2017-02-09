@@ -3,6 +3,7 @@ set -e
 
 if [[ -z $1 ]]; then
   echo 'Must supply script argument for workers to start!' 1>&2
+  echo 'Example: ./start_workers.sh distributed/worker_criteo_lr.ssc' 1>&2
   exit 1
 fi
 

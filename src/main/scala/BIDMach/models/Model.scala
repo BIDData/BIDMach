@@ -210,79 +210,45 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         omats(i) = cpu(ogmats(i));
       }
     }
-    v
+	v
   }
 
   def snapshot(len:Int, avg:Boolean) = {
-    val len0 = math.min(len, modelmats(0).ncols);
-
-    if (sendmat.asInstanceOf[AnyRef] == null) {
-      sendmat = FMat(modelmats(0).nrows + (if (avg) 1 else 0), len0)
-    }
-
-    modelmats(0).synchronized {
-      if (avg) {
-        sendmat(0, ?) = 1
-        sendmat(1 -> sendmat.nrows, ?) = cpu(modelmats(0).colslice(0, len0))
-      } else {
-        sendmat <-- cpu(modelmats(0).colslice(0, len0))
-      }
-    }
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	modelmats(0).synchronized {
+  		sendmat = cpu(modelmats(0).colslice(0, len0));
+  	}
+  	if (avg) {
+  		sendmat = ones(1, len0) on sendmat;
+  	}
   }
 
-  var maxmat:Mat = null
-  var cheadmat:Mat = null
-
   def addStep(len:Int, avg:Boolean) = {
-    val len0 = math.min(len, modelmats(0).ncols);
-    val nr = modelmats(0).nrows;
-
-    if (avg && maxmat.asInstanceOf[AnyRef] == null) {
-      maxmat = FMat(1, recvmat.ncols)
-      cheadmat = FMat(nr, recvmat.ncols)
-    }
-
-    modelmats(0).synchronized {
-      if (avg) {
-        recvmat.rowslice(0, 1, maxmat)
-        recvmat ~ recvmat / max(maxmat, 1f)
-      }
-
-      recvmat ~ recvmat - sendmat;
-
-      if (avg) recvmat.rowslice(1, nr+1, cheadmat)
-      val head = modelmats(0).view(nr, len0);
-      val chead = sendmat.view(nr, len0);
-      chead <-- head;
-      chead ~ chead + (if (avg) cheadmat else recvmat);
-      head <-- chead;
-    }
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
+  	recvmat = recvmat - sendmat;
+  	val nr = modelmats(0).nrows;
+  	modelmats(0).synchronized {
+  		val head = modelmats(0).view(nr, len0);
+  		val chead = sendmat.view(nr, len0);
+  		chead <-- head;
+  		chead ~ chead + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat);
+  		head <-- chead;
+  	}
   }
 
   def elasticStep(len:Int, avg:Boolean, ee:Float) = {
-    val len0 = math.min(len, modelmats(0).ncols);
-    val nr = modelmats(0).nrows;
-
-    if (avg && maxmat.asInstanceOf[AnyRef] == null) {
-      maxmat = FMat(1, recvmat.ncols)
-      cheadmat = FMat(nr, recvmat.ncols)
-    }
-
-    modelmats(0).synchronized {
-      if (avg) {
-        recvmat.rowslice(0, 1, maxmat)
-        recvmat ~ recvmat / max(maxmat, 1f)
-      }
-
-      recvmat ~ recvmat - sendmat;
-
-      if (avg) recvmat.rowslice(1, nr+1, cheadmat)
-      val head = modelmats(0).view(nr, len0);
-      val chead = sendmat.view(nr, len0);
-      chead <-- head;
-      chead ~ chead + (if (avg) cheadmat else recvmat);
-      head <-- chead;
-    }
+  	val len0 = math.min(len, modelmats(0).ncols);
+  	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
+  	recvmat = recvmat - sendmat;
+  	val nr = modelmats(0).nrows;
+  	modelmats(0).synchronized {
+  		val head = modelmats(0).view(nr, len0);
+  		val chead = sendmat.view(nr, len0);
+  		chead <-- head;
+  		chead ~ chead * (1 - ee) + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat) * ee;
+  		head <-- chead;
+  	}
   }
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
@@ -298,14 +264,14 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:GMat => GDMat(aa)
         	}
         } else {
-          to(i) = from(i) match {
-            case aa:FMat => GMat(aa)
-            case aa:DMat => GMat(aa)
-            case aa:IMat => GIMat(aa)
-            case aa:SMat => GSMat(aa)
-            case aa:GMat => aa
-            case aa:GDMat => GMat(aa)
-          }
+        	to(i) = from(i) match {
+        	case aa:FMat => GMat(aa)
+        	case aa:DMat => GMat(aa)
+        	case aa:IMat => GIMat(aa)
+        	case aa:SMat => GSMat(aa)
+        	case aa:GMat => aa
+        	case aa:GDMat => GMat(aa)
+        	}
         }
       } else {
       	if (useDouble) {
