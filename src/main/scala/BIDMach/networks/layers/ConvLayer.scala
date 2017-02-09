@@ -1,34 +1,29 @@
 package BIDMach.networks.layers
 
+import BIDMat.FFilter._
+import BIDMat.Filter._
+
 import BIDMach.networks._
 import java.util.Arrays
 import java.util.List
 
-
-
-
-/* Many issues to think of
-1. outDims seems to be of dimension 2, showing the output dimension (how it affects in filter?)
-  FFilter shows:
-  // The filter is stored with the output dimension major, and the other dimensions in the same order as a data tensor.
-  // so a 4D filter block would be OHWC. This matches the ordering in NVIDIA CUDNN.
-
-  But I don't see a member to store "number of output" in FFilter.
-
-  Otherwise we must use modelmats to store noutputs matrix?
-
-2. updatemats(imodel)
-
-3. How to consider bias...(maybe very difficult?)
-
+/* Many issues to think of    
+   How to consider bias...(maybe very difficult?)
 */
 
 class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode) extends ModelLayer(net, opts) {
-  // var some data
-  //var filter:FFilter = null; // Should put this is modelmats(imodel)?
 
-  def initModelMat(inDims0:IMat, outDims0:IMat, stride0:IMat, pad0:IMat, outPad0:IMat, data0:Array[Float]):Mat = {
-    val filter = FFilter(inDims0, outDims0, stride0, pad0, outPad0, data0);
+  def initModelMat(imageDim:Imat):Mat = {
+    // image should be something like - val image = FND(irow(channel_in,h,w,n));
+
+    val channel_in = imageDim(0);
+    val filter_h = opts.kernel(0); // 3;
+    val filter_w = opts.kernel(1); // 3;
+    val npad = opts.pad(0); //1;
+    val nstride = opts.stride(0); // 1;
+    val channel_out = opts.noutputs // actually # of filters;
+    
+    val filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
     filter = rand(filter)-0.5f; // How to randomize? using rand(out:FND)?
     filter;
   }
@@ -36,11 +31,9 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
   override def forward = {
     val start = toc;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-      modelmats(imodel) = convertMat(initModelMat(opts.kernel, opts.noutputs, opts.stride, opts.pad, null, null)); //Set the model
-      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).dims);  // Set the updatemats
-      // Alternative way to make updatemats(imodel) also a FFilter
-      // updatemats(imodel) = convertMat(initModelMat(opts.kernel, opts.noutputs, opts.stride, opts.pad, null, null));
-      // updatemats(imodel) = 0;
+      modelmats(imodel) = initModelMat(inputData.dims); //Set the model
+      updatemats(imodel) = initModelMat(inputData.dims);  // Set the updatemats to be another FFilter
+      updatemats(imodel) = 0;
     }
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
@@ -61,7 +54,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     // Guess: convolveT - the gradient of input data
     //        convolveM - the gradient of the current Model (Filter)
 
-    // deriv is the backwarded gradient of the following layers
+    // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
       inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
@@ -70,22 +63,11 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
       inputDeriv.asMat ~ modelmats(imodel)^*(deriv.asMat);
     }
 
-    val grad = FFilter(opts.kernel, opts.noutputs, opts.stride, opts.pad, null, null); 
-    // Make a new one because I don't want convolveM to mess up the modelmats(imodel)
-    grad.convolveM(inputData,output); // convolveM(a,b) - a is input, b should be output, grad itself should be the gradient?
-    updatemats(imodel) <-- grad;
-    // Alternatively, can we set updatemats(model) to be a FFilter, with the same parameters?
-    // So here it would be:
-
-    // updatemats(imodel).convolveM(inputData,output);
-
+    updatemats(imodel).convolveM(inputData,deriv.asMat);
 
     //Should we handle the update of updatemats(imodel)? I think it should be handled in learner?
     backwardtime += toc - start;
   }
-
-
-
 
   override def toString = {
     "convolution@" + Integer.toHexString(hashCode() % 0x10000)
