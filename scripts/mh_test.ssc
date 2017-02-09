@@ -56,27 +56,29 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
 
 val (mm, mopts) = learner(X_train, FMat(Y_train), 1)
 mopts.addConstFeat = false
-mopts.npasses = 200             // Large enough to get to desired sample count
+mopts.npasses = 200                 // Large enough to get to desired sample count
 mopts.batchSize = 100
 mopts.lrate = 0.01
 
 // Some new stuff due to the MHTest opts.
-mopts.N = 13000                 // Ideally a multiple of minibatch size
+mopts.N = 13000                     // Ideally a multiple of minibatch size
 mopts.temp = 100
 mopts.Nknown = true
-mopts.n2lsigma = 1.0f           // 1.0f by default
-mopts.nn2l = 4000               // 4000 by default
-mopts.sigmaProposer = 0.05f     // This is really sigma*Identity 
+mopts.n2lsigma = 1.0f               // 1.0f by default
+mopts.nn2l = 4000                   // 4000 by default
+mopts.sigmaProposer = 0.05f         // This is really sigma*Identity 
 mopts.continueDespiteFull = false
 mopts.verboseMH = false
-mopts.collectData = true        // CAUTION! May save a lot!
-mopts.collectDataDir = "outputs/data_mhtest/" // Clear this directory
-mopts.exitTheta = true          // breaks out of program ...
-mopts.exitThetaAmount = 10000   // means we collect this many thetas
-mopts.initThetaHere = true      // break symmetry at the start
-mopts.burnIn = 1000             // after this amount, change temp to 1
+mopts.collectData = true            // CAUTION! May save a lot!
+mopts.collectDataDir = "outputs/data_mhtest/"   // Clear this directory
+mopts.exitTheta = true              // breaks out of program ...
+mopts.exitThetaAmount = 10000       // means we collect this many thetas
+mopts.initThetaHere = true          // break symmetry at the start
+mopts.burnIn = 200                  // after this amount, change stuff
+mopts.tempAfterBurnin = 1           // after burn-in, change temp to this
+mopts.sigmaProposerAfterBurnin = 0.0005f        // After burn-in, change sigma
 
-mopts.matrixOfScores = true     // This is actually a GLM setting
+mopts.matrixOfScores = true         // This is actually a GLM setting
 mopts.what
 val model = mm.model.asInstanceOf[GLM]
 mm.train

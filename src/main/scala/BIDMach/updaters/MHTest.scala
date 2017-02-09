@@ -159,7 +159,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       println("delta* = " + deltaStar)
     }
     
-    // Take care of case when we may have full data.
+    // Take care of case when we have full data; that usually indicates a problem.
     if (ipass > 0 && b == N) {
       println("WARNING: test used entire dataset but variance is still too high.")
       println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
@@ -261,8 +261,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       sys.exit
     }
     if (t == opts.burnIn) {
-      println("ALERT: Past burn-in period. Now T=1.")
-      T = 1
+      println("ALERT: Past burn-in period. Now change temperature, proposer, etc.")
+      T = opts.tempAfterBurnin
+      opts.sigmaProposer = opts.sigmaProposerAfterBurnin
     }
   }
 
@@ -326,10 +327,12 @@ object MHTest {
   trait Opts extends Updater.Opts {
     var N = 100000
     var temp = 1
+    var tempAfterBurnin = 1
     var Nknown = true
     var n2lsigma = 1.0f
     var nn2l = 4000
     var sigmaProposer = 0.05f
+    var sigmaProposerAfterBurnin = 0.05f
     var continueDespiteFull = true
     var verboseMH = false
     var collectData = false

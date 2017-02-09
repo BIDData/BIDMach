@@ -49,8 +49,8 @@ def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
     var ll = dzeros(sig.dims(0),1)
     for (i <- 0 until sig.dims(0)) {
         val temp = sig(i, ?)
-        accuracy(i) = find(temp>0.5).dims(0) * 1.0 / temp.dims(1) * 1.0
-        ll(i) = sum(ln(temp)).dv * 1.0 / temp.dims(1) * 1.0
+        accuracy(i) = find(temp>0.5).dims(0) / temp.dims(1).dv
+        ll(i) = sum(ln(temp)).dv / temp.dims(1).dv
     }
     return (accuracy, ll)
 }
