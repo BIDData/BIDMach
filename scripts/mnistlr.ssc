@@ -1,10 +1,6 @@
 val data_dir = System.getenv("BIDMACH_DATA_HOME")+"/MNIST8M/parts/"
 val (nn, opts) = GLM.learner(data_dir+"data%02d.fmat.lz4", data_dir+"cats%02d.fmat.lz4")
 
-Mat.checkMKL
-Mat.checkCUDA
-Mat.setInline
-
 opts.useGPU = true;
 opts.nend = 70;
 opts.order = 0;
@@ -21,7 +17,7 @@ opts.lrate = 0.001;  // for logistic
 
 nn.train
 
-println("Done training! Checking training set accuracy...")
+println("Done training. Checking training set accuracy...")
 
 val randPartNum = scala.util.Random.nextInt(80)
 

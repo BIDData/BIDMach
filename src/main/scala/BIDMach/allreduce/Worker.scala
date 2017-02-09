@@ -155,7 +155,7 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
           newcmd.decode;
           if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
           allReduce(newcmd.round, newcmd.limit);
-          
+
           if(learner.done){
             val resp = new LearnerDoneResponse(cmd.round, cmd.dest);
             sendMaster(resp);
@@ -164,7 +164,7 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
             val resp = new AllreduceResponse(cmd.round, cmd.dest);
             sendMaster(resp);
           }
-          
+
 
           //if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
         }
@@ -285,7 +285,6 @@ class Worker(override val opts: Worker.Opts = new Worker.Options) extends Host {
 }
 
 object Worker {
-<<<<<<< HEAD
 
   trait Opts extends Host.Opts {
     var configTimeout = 3000;

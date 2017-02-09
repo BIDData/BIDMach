@@ -105,8 +105,8 @@ m.sendConfig
 //   val tcats = dzeros(filesize*ntest, 1)
 //   var len = 0
 //   for (i <- 0 until ntest) {
-//     val a = loadSMat(mdir + "trainsorted%02d.smat.lz4" format i + 80)
-//     val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + 80)
+//     val a = loadSMat(mdir + "trainsorted%02d.smat.lz4" format i + opts.nend)
+//     val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + opts.nend)
 //     val sc = mm * a
 //     tscores(i * filesize -> (i * filesize + sc.length), 0) = DMat(sc.t)
 //     tcats(i * filesize -> (i * filesize + sc.length), 0) = DMat(c.t)

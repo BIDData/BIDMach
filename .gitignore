@@ -1,9 +1,0 @@
-/bin/
-/lib/
-*.dylib
-*.jar
-/cbin/
-*.o
-*.exe
-*.so
-data/

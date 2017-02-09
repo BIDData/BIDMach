@@ -1,23 +1,22 @@
 :silent
-// val dir="../data/rcv1/"
-val dir="/mnt/BIDMach/data/rcv1/"
+val dir="../data/rcv1/"
 
 val a0 = loadSMat(dir + "docs.smat.lz4")
-val c0 = loadFMat(dir + "cats.fmat.lz4")(25->50,?)
+val c0 = loadFMat(dir + "cats.fmat.lz4")(0->100,?)
 val rr = rand(c0.ncols,1);
 val (ss, ii) = sort2(rr);
 val a = a0(?,ii);
 val c = c0(?,ii);
 
 val ta = loadSMat(dir + "testdocs.smat.lz4")
-val tc = loadFMat(dir + "testcats.fmat.lz4")(25->50,?)
+val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,?)
 
 setNumThreads(1)
 val (nn,opts)=GLM.learnerX(a,c,1)
 
 opts.batchSize=20000
 opts.lrate = 0.02f
-opts.npasses = 10
+opts.npasses = 4
 opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
