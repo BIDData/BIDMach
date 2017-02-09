@@ -1,31 +1,84 @@
+:silent
+
 /**
- * The MH test updater can save a lot of matrices, so this script will serve to
- * combine these all into one matrix. It also does the predicting on *each*
- * theta we have. There might be a better way to do this ... some values have to
- * be hand-assigned. This is only for logistic regression, BTW. It is designed
- * to be called *after* we run the normal logistic regression code.
- *
- * UPDATE: Yeah, let's use a fixed total, say 3000, otherwise it creates a lot
- * of headaches. This code should be run AFTER the original training. This code
- * will do the prediction. (TODO IN PROGRESS).
+ * This script is to be run *after* `./bidmach scrpts/mh_test.ssc`, i.e. the
+ * normal logistic regression code. Run that code with the settings set so that
+ * it will exit after 3000 or so iterations, so we can get an exact sample
+ * count. This will collect all the output matrices, perform **prediction** on
+ * the held-out test set, and package up the data nicely for Python.
  *
  * It saves two things: samples (the thetas) and data (everything else). The
- * colums correspond to iterations here.
+ * colums correspond to iterations here. We have 
+ * 
+ * - data(0) = minibatch sizes
+ * - data(1) = log likelihood train (on this *training* batch)
+ * - data(2) = cumulative minibatch sizes
+ * - data(3) = accuracy on full test set
+ * - data(4) = log likelihood test (on *full* test data)
  */ 
 
+
+/**
+ * Evaluates the performance of our sampled \theta values on the Logistic
+ * Regression testing dataset. It can be a little confusing at first sight but
+ * this is one way of computing the likelihood for logistic regression --
+ * assuming BINARY classification. Our classes are -1 and 1 even though we're
+ * classifying 1s and 7s (the 7s are our -1s).
+ * 
+ * @param X A matrix contining our test data, of size (784, num_test_elements),
+ *      where the 784 is because MNIST is 28x28.  
+ * @param Y A vector containing the test data labels (i.e. digits from MNIST,
+ *      then mapped to a scale of -1 or 1).
+ * @param theta A matrix of size (784, num_samples), where each column indicates
+ *      the current \theta due to MCMC sampling.
+ *
+ * @return (accuracy, ll), these are each matrices ("vectors") with the spot at
+ *      index i containing the test set accuracy (repectively, log likelihood)
+ *      based on logistic regression using the weights from theta(i).
+ */
+def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
+    val z = Y *@ (theta.t * X)
+    val sig = 1.0/ (1.0 + exp(-1.0 * z))
+    println(size(sig))
+    println(sig)
+    sys.exit
+    var accuracy = dzeros(sig.dims(0),1)
+    var ll = dzeros(sig.dims(0),1)
+    for (i <- 0 until sig.dims(0)) {
+        val temp = sig(i, ?)
+        accuracy(i) = find(temp>0.5).dims(0) * 1.0 / temp.dims(1) * 1.0
+        ll(i) = sum(ln(temp)).dv * 1.0 / temp.dims(1) * 1.0
+    }
+    return (accuracy, ll)
+}
+
+
+// Handle everything but the test set stuff.
 val total = 3000
 val datadir = "outputs/mhtest_data/"
-val samples = zeros(784,total)
-val data = zeros(3,total)
+val samples = zeros(784, total)
+val data = zeros(5, total)
 
 for (i <- 1 until (total+1)) {
-    samples(?,i-1) = loadFMat(datadir+"theta_0_%04d.fmat.lz4" format (i)).t
-    data(0->2,i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
+    samples(?, i-1) = loadFMat(datadir+"theta_0_%04d.fmat.lz4" format (i)).t
+    data(0->2, i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
 }
 val cum_size = cumsum(data(0,?))
 data(2,?) = cum_size
 
+
+// Now handle the test data. Actually, it's already -1 vs 1 so that's good.
+val test = loadFMat("/home/daniel/data/MNIST8M/FINAL_MNIST8M_TEST_192935.fmat.lz4")
+val X = test(0 until test.dims(0)-1, ?)
+val Y = test(test.dims(0)-1, ?)
+val (accuracy, ll_test) = eval_cost(X, Y, samples)
+data(3,?) = FMat(accuracy).t
+data(4,?) = FMat(ll_test).t
+
+
+// Now save everything in here.
 saveAs("outputs/results.mat", 
        samples, "samples", 
        data, "data")
+:silent
 println("done!")

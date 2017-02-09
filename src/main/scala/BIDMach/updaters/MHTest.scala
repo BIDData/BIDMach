@@ -12,7 +12,7 @@ import edu.berkeley.bid.CUMACH
  *  An Efficient Minibatch Acceptance Test for Metropolis-Hastings, arXiv 2016
  *  Haoyu Chen, Daniel Seita, Xinlei Pan, John Canny
  *
- * This is a work in progress. A couple of important notes:
+ * This should be done and working, at least for logistic regression.
  * 
  * - It will not do any sort of minibatch size incrementing here. That's for
  * other parts of the code. This keeps track of necessary statistics for our
@@ -230,7 +230,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 
  
   /**
-   * Stuff we should do after each minibatch. 
+   * Stuff we should do after each minibatch, which usually means saving stuff. 
    * 
    * @param ll The avg log likelihood of the current parameter (depends on
    * 		whether we accepted or rejected).
