@@ -10,12 +10,18 @@
  * It saves two things: samples (the thetas) and data (everything else). The
  * colums correspond to iterations here. We have 
  * 
- * - data(0) = minibatch sizes
+ * - data(0) = minibatch sizes each iteration (at the point of decision)
  * - data(1) = log likelihood train (on this *training* batch)
- * - data(2) = cumulative minibatch sizes
- * - data(3) = accuracy on full test set
- * - data(4) = log likelihood test (on *full* test data)
+ * - data(2) = cumulative minibatch sizes (computed here)
+ * - data(3) = accuracy on full test set (computed here)
+ * - data(4) = log likelihood test (on *full* test data, computed here)
  */ 
+
+// Double-check these.
+val total = 10000
+val datadir = "outputs/data_mhtest/"
+val X_test = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
 
 
 /**
@@ -50,12 +56,9 @@ def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
 }
 
 
-// Handle everything but the test set stuff.
-val total = 3000
-val datadir = "outputs/mhtest_data/"
+// Fill in the rest of `data` here.
 val samples = zeros(784, total)
 val data = zeros(5, total)
-
 for (i <- 1 until (total+1)) {
     samples(?, i-1) = loadFMat(datadir+"theta_0_%04d.fmat.lz4" format (i)).t
     data(0->2, i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
@@ -63,17 +66,11 @@ for (i <- 1 until (total+1)) {
 val cum_size = cumsum(data(0,?))
 data(2,?) = cum_size
 
-
-// Now handle the test data. Actually, it's already -1 vs 1 so that's good.
-val test = loadFMat("/home/daniel/data/MNIST8M/FINAL_MNIST8M_TEST_192935.fmat.lz4")
-val X = test(0 until test.dims(0)-1, ?)
-val Y = test(test.dims(0)-1, ?)
-val (accuracy, ll_test) = eval_cost(X, Y, samples)
+val (accuracy, ll_test) = eval_cost(X_test, DMat(Y_test), samples)
 data(3,?) = FMat(accuracy).t
 data(4,?) = FMat(ll_test).t
 
-
-// Now save everything in here.
+// Now save everything in here and RENAME the file right away.
 saveAs("outputs/results.mat", 
        samples, "samples", 
        data, "data")

@@ -50,7 +50,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
   var avgLogLL0:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta).
   var avgLogLL1:Float = 0f             // (N/(bT)) \sum_{i=1}^b log p(x_i*|theta').
-  var T:Int = opts.T                   // The temperature of the distribution.
+  var T:Int = 1                        // The temperature of the distribution.
   var t:Int = 0                        // The current total number of samples.
 
 
@@ -70,6 +70,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     scores0 = zeros(1,model.datasource.opts.batchSize)
     scores1 = zeros(1,model.datasource.opts.batchSize)
     lRatios = zeros(1,opts.N)
+    T = opts.temp
 
     if (opts.Nknown) {
       N = opts.N
@@ -95,7 +96,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 
     if (opts.initThetaHere) {
       for (i <- 0 until nmats) {
-        modelmats(i) <-- normrnd(0, 0.01f, modelmats(i).nrows, modelmats(i).ncols)
+        modelmats(i) <-- normrnd(0, 0.03f, modelmats(i).nrows, modelmats(i).ncols)
       }
     }
   }
@@ -128,14 +129,14 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     n += 1.0f
 
     // Now compute scores; *should* be log p(...) stuff, if not we better check.
-    scores0 <-- model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
+    scores0 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
     if (scores0.length == 1) {
       throw new RuntimeException("Need individual scores, but getting a scalar.")
     }
     for (i <- 0 until modelmats.length) {
       modelmats(i) <-- proposedTheta(i)
     }
-    scores1 <-- model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
+    scores1 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
 
     // Careful with updating sample variance. get correct indices into `lRatios`.
     avgLogLL0 = ((n-1)/n)*avgLogLL0 + mean(scores0,2).v/n
@@ -173,7 +174,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       if (opts.verboseMH) {
         println("\tCASE 2: sample >= target = "+targetVariance)
       }
-      if (ipass > 0 && b == N) {
+      if (ipass > 0 && b == (N % model.datasource.opts.batchSize)) {
         println("WARNING: test used entire dataset but variance is still too high.")
         println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
         if (opts.continueDespiteFull) {
@@ -319,7 +320,7 @@ object MHTest {
 
   trait Opts extends Updater.Opts {
     var N = 100000
-    var T = 1000
+    var temp = 1
     var Nknown = true
     var n2lsigma = 1.0f
     var nn2l = 4000

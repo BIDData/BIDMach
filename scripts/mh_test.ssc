@@ -4,33 +4,34 @@
  * This will test using the MH Test Updater. The code here:
  *  
  * - Loads a dataset (not on GitHub). Note: here data are 0s and 1s.
- * - Defines its own learner which uses the new updater
- * - Then runs GLM with logistic regression
+ * - Defines its own learner which uses the new updater.
+ * - Then it runs GLM with logistic regression.
  *
- * - CRITICAL: we don't yet have the data augmentation done correctly!
+ * After this, run `./bidmach scripts/analyze_mhtest_logreg.ssc`. The two
+ * scripts are designed to be run in sequence since the latter is to test
+ * **every sample of \theta** and to package it up nicely for Jupyter Notebooks.
+ * You will have to ensure that the training and testing datasets are correct.
  *
- * Note: then after this, run `./bidmach scripts/analyze_mhtest_logreg.ssc`; the
- * two scripts are designed to be run in sequence since the latter is to help
- * test it every iteration and to package it up nicely for Jupyter Notebooks. 
+ * For regular MNIST with 1s and 7s we have:
+ *
+ *  size(X_train) = (784,13007)
+ *  size(Y_train) = (1,13007)
+ *  size(X_test)  = (784,2163)
+ *  size(Y_test)  = (1,2163)
+ *
  */
 
-// Use either the 450k or 100k for training, but adjust test set along with it.
-val tr = loadFMat("/home/daniel/data/MNIST8M/FINAL_MNIST8M_TRAIN_450000.fmat.lz4")
-val te = loadFMat("/home/daniel/data/MNIST8M/FINAL_MNIST8M_TEST_192935.fmat.lz4")
-
-val tr_data = tr(0->784,?)
-val tr_labels = tr(784,?)
-tr_labels(find(tr_labels == -1)) = 0
-
-val te_data = te(0->784,?)
-val te_labels = te(784,?)
-te_labels(find(te_labels == -1)) = 0
+val X_train = loadFMat("/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
+val Y_train = loadIMat("/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
+val X_test  = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test  = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+Y_train(find(Y_train == -1)) = 0
+Y_test(find(Y_test == -1)) = 0
 
 :silent
 // Logistic regression from GLM, type=1, with test data pre-loaded.
 // mm = the training learner (model, datasource, updater), with options mopts
 // nn = the predicting learner, with options nopts
-
 import BIDMach.models.GLM._
 import BIDMach.updaters._
 
@@ -53,15 +54,15 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
     (mm, mopts)
 }
 
-val (mm, mopts) = learner(tr_data, tr_labels, 1)
+val (mm, mopts) = learner(X_train, FMat(Y_train), 1)
 mopts.addConstFeat = false
-mopts.npasses = 20              // Large enough to get 3000
+mopts.npasses = 200             // Large enough to get to desired sample count
 mopts.batchSize = 100
 mopts.lrate = 0.01
 
 // Some new stuff due to the MHTest opts.
-mopts.N = 450000
-mopts.T = 1000
+mopts.N = 13000                 // Ideally a multiple of minibatch size
+mopts.temp = 1000
 mopts.Nknown = true
 mopts.n2lsigma = 1.0f           // 1.0f by default
 mopts.nn2l = 4000               // 4000 by default
@@ -69,9 +70,9 @@ mopts.sigmaProposer = 0.05f     // This is really sigma*Identity
 mopts.continueDespiteFull = false
 mopts.verboseMH = false
 mopts.collectData = true        // CAUTION! May save a lot!
-mopts.collectDataDir = "outputs/mhtest_data/" // Clear this directory
+mopts.collectDataDir = "outputs/data_mhtest/" // Clear this directory
 mopts.exitTheta = true          // breaks out of program ...
-mopts.exitThetaAmount = 3000    // means we collect 3000 samples
+mopts.exitThetaAmount = 10000   // means we collect this many thetas
 mopts.initThetaHere = true      // break symmetry at the start
 
 mopts.matrixOfScores = true     // This is actually a GLM setting
@@ -79,9 +80,9 @@ mopts.what
 val model = mm.model.asInstanceOf[GLM]
 mm.train
 
-val (nn, nopts) = GLM.predictor(model, te_data)
+val (nn, nopts) = GLM.predictor(model, X_test)
 nopts.addConstFeat = false
-nopts.batchSize = 1000
+nopts.batchSize = X_test.ncols
 nopts.links = nopts.links
 nn.predict
 
@@ -92,6 +93,6 @@ te_preds(find(te_preds < 0.5)) = 0
 te_preds(find(te_preds >= 0.5)) = 1
 :silent
 
-val accuracy = (te_labels == te_preds).nnz.toFloat / (te_preds.nrows*te_preds.ncols)
+val accuracy = (Y_test == te_preds).nnz.toFloat / (te_preds.nrows*te_preds.ncols)
 print("\nAccuracy at a decision threshold of 0.5: %.4f\n" format accuracy)
 sys.exit
