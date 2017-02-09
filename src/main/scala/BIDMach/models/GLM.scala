@@ -187,23 +187,38 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
 
   def meval2(in:Mat, targ:Mat):FMat = meval3(in, targ, null)
 
+  /**
+   * This runs the actual score computation, typically average log likelihood. 
+   * Note that this isn't part of the super class (Regression.scala).
+   * 
+   * @param in The input matrix for this minibatch.
+   * @param targ The target matrix (usually vector) for this minibatch, if any.
+   * @param dweights The weights for this minibatch, if any (often null).
+   */
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
     val ftarg = if (targ.asInstanceOf[AnyRef] != null) full(targ) else null;
     val targs = if (targmap.asInstanceOf[AnyRef] != null && ftarg.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;
     val eta = if (hashFeatures > 0) GLM.hashMult(modelmats(0), in, opts.hashBound1, opts.hashBound2) else modelmats(0) * in;
     GLM.preds(eta, eta, mylinks, totflops);
     if (ogmats != null) {ogmats(0) = eta;}
+
     if (targs.asInstanceOf[AnyRef] != null) {
-      val v = GLM.llfun(eta, targs, mylinks, totflops);
-      if (dweights.asInstanceOf[AnyRef] != null) {
-        FMat(sum(v ∘  dweights, 2) / sum(dweights))
-      } else {
-        if (opts.doVariance) {
-          FMat(mean(v, 2)) on FMat(variance(v, 2));
-        } else {
-          FMat(mean(v, 2));
-        }
-      }
+      // A row vector of log likelihood scores.
+    	val v = GLM.llfun(eta, targs, mylinks, totflops);
+    	if (dweights.asInstanceOf[AnyRef] != null) {
+    		FMat(sum(v ∘  dweights, 2) / sum(dweights))
+    	} else {
+    	  if (opts.doVariance) {
+    	    FMat(mean(v, 2)) on FMat(variance(v, 2));
+    	  } else {
+    	    // For the MH test, we need individual scores.
+    	    if (opts.matrixOfScores) {
+    	      FMat(v) 
+    	    } else {
+    	  	  FMat(mean(v, 2));
+    	    }
+    	  }
+    	}
     } else {
       row(0)
     }
@@ -221,6 +236,7 @@ object GLM {
     var hashBound1:Int = 1000000;
     var hashBound2:Int = 1000000;
     var aopts:ADAGrad.Opts = null;
+    var matrixOfScores = false;
   }
 
   val linear = 0;

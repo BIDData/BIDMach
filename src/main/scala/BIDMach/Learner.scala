@@ -44,6 +44,7 @@ case class Learner(
   var lasti = 0;
   var bytes = 0L;
   var cacheState = false;
+  var cacheGPUstate = false;
   var debugMemState = false;
 
   def setup = {
@@ -51,8 +52,10 @@ case class Learner(
   }
 
   def init = {
-    var cacheState = Mat.useCache;
+		cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
+    cacheGPUstate = Mat.useGPUcache;
+    Mat.useGPUcache = opts.useCache;
     datasource.init;
     model.bind(datasource);
     if (datasink.asInstanceOf[AnyRef] != null) {
@@ -64,7 +67,8 @@ case class Learner(
     if (mixins != null) mixins map (_ init(model))
     if (updater != null) updater.init(model)
     Mat.useCache = cacheState;
-    useGPU = model.useGPU
+    Mat.useGPUcache = cacheGPUstate;
+    useGPU = model.useGPU;
   }
 
   def train = {
@@ -73,8 +77,10 @@ case class Learner(
 
   def retrain() = {
     flip
-    var cacheState = Mat.useCache;
+    cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
+    cacheGPUstate = Mat.useGPUcache;
+    Mat.useGPUcache = opts.useCache;
     debugMemState = Mat.debugMem;
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
@@ -100,6 +106,8 @@ case class Learner(
     if (updater != null) updater.clear;
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
+    cacheGPUstate = Mat.useGPUcache;
+    Mat.useGPUcache = opts.useCache;        
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
     flip;
@@ -172,6 +180,7 @@ case class Learner(
     model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
+    Mat.useGPUcache = cacheGPUstate;
     Mat.debugMem = debugMemState;
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
     if (opts.autoReset && useGPU) {
@@ -206,8 +215,10 @@ case class Learner(
   def repredict() = {
     flip
     useGPU = model.useGPU
-    var cacheState = Mat.useCache
+    cacheState = Mat.useCache
     Mat.useCache = opts.useCache
+    cacheGPUstate = Mat.useGPUcache;
+    Mat.useGPUcache = opts.useCache;  
     var here = 0L
     var lasti = 0
     var bytes = 0L
@@ -242,8 +253,9 @@ case class Learner(
         lasti = reslist.length
       }
     }
-    val gf = gflop
-    Mat.useCache = cacheState
+    val gf = gflop;
+    Mat.useCache = cacheState;
+    Mat.useGPUcache = cacheGPUstate;
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
@@ -539,8 +551,10 @@ case class ParLearnerx(
 
   def retrain() = {
 	  flip
-	  var cacheState = Mat.useCache
-    Mat.useCache = opts.useCache
+	  var cacheState = Mat.useCache;
+    Mat.useCache = opts.useCache;
+    var cacheGPUstate = Mat.useGPUcache;
+    Mat.useGPUcache = opts.useCache;
 	  val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
@@ -648,8 +662,9 @@ case class ParLearnerx(
       }
 	  	ipass += 1
 	  }
-	  val gf = gflop
-	  Mat.useCache = cacheState
+	  val gf = gflop;
+	  Mat.useCache = cacheState;
+    Mat.useGPUcache = cacheGPUstate;
 	  println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
 	  if (opts.autoReset && useGPU) {
 	    Learner.toCPU(modelmats)

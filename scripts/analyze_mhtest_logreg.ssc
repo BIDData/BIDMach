@@ -1,0 +1,31 @@
+/**
+ * The MH test updater can save a lot of matrices, so this script will serve to
+ * combine these all into one matrix. It also does the predicting on *each*
+ * theta we have. There might be a better way to do this ... some values have to
+ * be hand-assigned. This is only for logistic regression, BTW. It is designed
+ * to be called *after* we run the normal logistic regression code.
+ *
+ * UPDATE: Yeah, let's use a fixed total, say 3000, otherwise it creates a lot
+ * of headaches. This code should be run AFTER the original training. This code
+ * will do the prediction. (TODO IN PROGRESS).
+ *
+ * It saves two things: samples (the thetas) and data (everything else). The
+ * colums correspond to iterations here.
+ */ 
+
+val total = 3000
+val datadir = "outputs/mhtest_data/"
+val samples = zeros(784,total)
+val data = zeros(3,total)
+
+for (i <- 1 until (total+1)) {
+    samples(?,i-1) = loadFMat(datadir+"theta_0_%04d.fmat.lz4" format (i)).t
+    data(0->2,i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
+}
+val cum_size = cumsum(data(0,?))
+data(2,?) = cum_size
+
+saveAs("outputs/results.mat", 
+       samples, "samples", 
+       data, "data")
+println("done!")
