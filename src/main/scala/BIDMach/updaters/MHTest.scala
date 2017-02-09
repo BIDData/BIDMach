@@ -159,8 +159,20 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       println("delta* = " + deltaStar)
     }
     
+    // Take care of case when we may have full data.
+    if (ipass > 0 && b == N) {
+      println("WARNING: test used entire dataset but variance is still too high.")
+      println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
+      if (opts.continueDespiteFull) {
+        println("Nonetheless, we will accept/reject this sample based on Delta*") 
+        newMinibatch = true
+        if (deltaStar > 0) accept = true
+      } else {
+        throw new RuntimeException("Aborting program!")
+      }
+    }
     // Take care of abnormally good or bad minibatches (can probably be deleted).
-    if (math.abs(numStd) > 5.0) {
+    else if (math.abs(numStd) > 5.0) {
       if (opts.verboseMH) {
         println("\tCASE 1: math.abs(numStd) = " +math.abs(numStd))
       }
@@ -169,21 +181,10 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         accept = true
       }
     }
-    // If sample variance is too large, we cannot run the test.
+    // If sample variance is too large, we cannot run the test (only for debugging).
     else if (sampleVariance >= targetVariance) {
       if (opts.verboseMH) {
         println("\tCASE 2: sample >= target = "+targetVariance)
-      }
-      if (ipass > 0 && b == (N % model.datasource.opts.batchSize)) {
-        println("WARNING: test used entire dataset but variance is still too high.")
-        println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
-        if (opts.continueDespiteFull) {
-          println("Nonetheless, we will accept/reject this sample based on Delta*") 
-          newMinibatch = true
-          if (deltaStar > 0) accept = true
-        } else {
-          throw new RuntimeException("Aborting program!")
-        }
       }
     } 
     // Run the test by sampling a Gaussian and the X_c.
@@ -259,6 +260,10 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       println("Exiting code now since t=" +t)
       sys.exit
     }
+    if (t == opts.burnIn) {
+      println("ALERT: Past burn-in period. Now T=1.")
+      T = 1
+    }
   }
 
  
@@ -332,6 +337,7 @@ object MHTest {
     var exitTheta = false
     var exitThetaAmount = 3000
     var initThetaHere = false
+    var burnIn = -1
   }
  
   class Options extends Opts {}

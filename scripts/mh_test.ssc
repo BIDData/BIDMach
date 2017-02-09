@@ -62,7 +62,7 @@ mopts.lrate = 0.01
 
 // Some new stuff due to the MHTest opts.
 mopts.N = 13000                 // Ideally a multiple of minibatch size
-mopts.temp = 1000
+mopts.temp = 100
 mopts.Nknown = true
 mopts.n2lsigma = 1.0f           // 1.0f by default
 mopts.nn2l = 4000               // 4000 by default
@@ -74,6 +74,7 @@ mopts.collectDataDir = "outputs/data_mhtest/" // Clear this directory
 mopts.exitTheta = true          // breaks out of program ...
 mopts.exitThetaAmount = 10000   // means we collect this many thetas
 mopts.initThetaHere = true      // break symmetry at the start
+mopts.burnIn = 1000             // after this amount, change temp to 1
 
 mopts.matrixOfScores = true     // This is actually a GLM setting
 mopts.what
