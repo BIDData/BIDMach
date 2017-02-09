@@ -57,8 +57,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   /** 
    * Standard initialization. We have:
    * 
-   * - n2ld loads the pre-computed X_c variable distribution
-   * - {delta,proposed,tmp}Theta initialized to zeros to start
+   * - n2ld loads the pre-computed X_c variable distribution.
+   * - {delta,proposed,tmp}Theta initialized to zeros to start.
+   * - If desired, initialize modelmats with small values to break symmetry.
    * 
    * Note that the file for the norm2logdata should be in the correct directory.
    */
@@ -90,6 +91,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       deltaTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
       proposedTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
       tmpTheta(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
+    }
+
+    if (opts.initThetaHere) {
+      for (i <- 0 until nmats) {
+        modelmats(i) <-- normrnd(0, 0.01f, modelmats(i).nrows, modelmats(i).ncols)
+      }
     }
   }
 
@@ -130,6 +137,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     }
     scores1 <-- model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)
 
+    // Careful with updating sample variance. get correct indices into `lRatios`.
     avgLogLL0 = ((n-1)/n)*avgLogLL0 + mean(scores0,2).v/n
     avgLogLL1 = ((n-1)/n)*avgLogLL1 + mean(scores1,2).v/n
     val deltaStar = (avgLogLL1 - avgLogLL0) - logu
@@ -230,7 +238,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 
  
   /**
-   * Stuff we should do after each minibatch, which usually means saving stuff. 
+   * Stuff we should do after each minibatch, which usually means saving stuff.
+   * Also, we exit if we get the correct amount of iterations. Sorry for this
+   * clumsy code.
    * 
    * @param ll The avg log likelihood of the current parameter (depends on
    * 		whether we accepted or rejected).
@@ -320,6 +330,7 @@ object MHTest {
     var collectDataDir = "tmp/"
     var exitTheta = false
     var exitThetaAmount = 3000
+    var initThetaHere = false
   }
  
   class Options extends Opts {}

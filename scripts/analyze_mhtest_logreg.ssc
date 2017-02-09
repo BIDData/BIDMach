@@ -39,9 +39,6 @@
 def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
     val z = Y *@ (theta.t * X)
     val sig = 1.0/ (1.0 + exp(-1.0 * z))
-    println(size(sig))
-    println(sig)
-    sys.exit
     var accuracy = dzeros(sig.dims(0),1)
     var ll = dzeros(sig.dims(0),1)
     for (i <- 0 until sig.dims(0)) {
@@ -81,4 +78,4 @@ saveAs("outputs/results.mat",
        samples, "samples", 
        data, "data")
 :silent
-println("done!")
+sys.exit

@@ -55,7 +55,7 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
 
 val (mm, mopts) = learner(tr_data, tr_labels, 1)
 mopts.addConstFeat = false
-mopts.npasses = 10              // Large enough to get 3000
+mopts.npasses = 20              // Large enough to get 3000
 mopts.batchSize = 100
 mopts.lrate = 0.01
 
@@ -72,6 +72,7 @@ mopts.collectData = true        // CAUTION! May save a lot!
 mopts.collectDataDir = "outputs/mhtest_data/" // Clear this directory
 mopts.exitTheta = true          // breaks out of program ...
 mopts.exitThetaAmount = 3000    // means we collect 3000 samples
+mopts.initThetaHere = true      // break symmetry at the start
 
 mopts.matrixOfScores = true     // This is actually a GLM setting
 mopts.what
