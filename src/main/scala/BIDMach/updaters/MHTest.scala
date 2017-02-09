@@ -232,17 +232,21 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   /**
    * Stuff we should do after each minibatch. 
    * 
-   * @param scores The avg log likelihood of the current parameter (depends on
+   * @param ll The avg log likelihood of the current parameter (depends on
    * 		whether we accepted or rejected).
    */
-  def afterEachMinibatch(scores:Float) {
+  def afterEachMinibatch(ll:Float) {
     t += 1
     if (opts.collectData) {
       for (i <- 0 until modelmats.length) {
         saveFMat(opts.collectDataDir+ "theta_%d_%04d.fmat.lz4" format (i,t), FMat(modelmats(i)))
       }
-      val a = row(b, scores)
+      val a = row(b, ll)
       saveFMat(opts.collectDataDir+ "data_%04d.fmat.lz4" format (t), FMat(a))
+    }
+    if (t == opts.exitThetaAmount && opts.exitTheta) {
+      println("Exiting code now since t=" +t)
+      sys.exit
     }
   }
 
@@ -314,6 +318,8 @@ object MHTest {
     var verboseMH = true
     var collectData = false
     var collectDataDir = "tmp/"
+    var exitTheta = false
+    var exitThetaAmount = 3000
   }
  
   class Options extends Opts {}

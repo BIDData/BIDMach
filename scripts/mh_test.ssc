@@ -8,6 +8,10 @@
  * - Then runs GLM with logistic regression
  *
  * - CRITICAL: we don't yet have the data augmentation done correctly!
+ *
+ * Note: then after this, run `./bidmach scripts/analyze_mhtest_logreg.ssc`; the
+ * two scripts are designed to be run in sequence since the latter is to help
+ * test it every iteration and to package it up nicely for Jupyter Notebooks. 
  */
 
 // Use either the 450k or 100k for training, but adjust test set along with it.
@@ -51,7 +55,7 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
 
 val (mm, mopts) = learner(tr_data, tr_labels, 1)
 mopts.addConstFeat = false
-mopts.npasses = 5
+mopts.npasses = 10              // Large enough to get 3000
 mopts.batchSize = 100
 mopts.lrate = 0.01
 
@@ -59,15 +63,17 @@ mopts.lrate = 0.01
 mopts.N = 450000
 mopts.T = 1000
 mopts.Nknown = true
-mopts.n2lsigma = 1.0f
-mopts.nn2l = 4000
-mopts.sigmaProposer = 0.05f
+mopts.n2lsigma = 0.9f
+mopts.nn2l = 2000
+mopts.sigmaProposer = 0.05f     // This is really sigma*Identity 
 mopts.continueDespiteFull = false
 mopts.verboseMH = false
-mopts.collectData = true // CAUTION! May save a lot!
-mopts.collectDataDir = "outputs/mhtest_data/"
+mopts.collectData = true        // CAUTION! May save a lot!
+mopts.collectDataDir = "outputs/mhtest_data/" // Clear this directory
+mopts.exitTheta = true          // breaks out of program ...
+mopts.exitThetaAmount = 3000    // means we collect 3000 samples
 
-mopts.matrixOfScores = true  // This is actually a GLM thing.
+mopts.matrixOfScores = true     // This is actually a GLM setting
 mopts.what
 val model = mm.model.asInstanceOf[GLM]
 mm.train
