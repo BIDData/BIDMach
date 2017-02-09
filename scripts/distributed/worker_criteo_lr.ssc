@@ -33,8 +33,8 @@ opts.lookahead = 0
 
 val w = new Worker()
 val wopts = w.opts
-wopts.trace = 0
-wopts.machineTrace = 0
+wopts.trace = 4
+wopts.machineTrace = 1
 
 w.start(nn)
 
