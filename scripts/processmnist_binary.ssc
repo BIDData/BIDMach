@@ -5,18 +5,21 @@
  * for preparing the data for logistic regression, for instance. It will save
  * four things: train labels, train matrix, test labels, and test matrix. Make
  * sure MNIST is located in the BIDMach/data/MNIST/ directory or somewhere. Make
- * sure we keep track of `class1` and `class2`, because the SECOND class turns
- * into -1 for fast logistic regression computation (or 0 for BIDMach code).
+ * sure we keep track of `class1` and `class2`, because the first one turns into
+ * a 1 and the second turns into -1.
  *
  * Note I: the *columns* should denote instances, *rows* are dimensions.
  *
  * Note II: make sure the train/test data are scaled in [0,1].
+ *
+ * Note III: BIDMach actually requires them to be 0s, so we have to convert them
+ * *again* during our BIDMach scripts. Fun, fun fun!!
  */
 
 val class1 = 1
 val class2 = 7
-println("class1: " +class1)
-println("class2: " +class2)
+println("class1: " +class1+ " (this turns into 1)")
+println("class2: " +class2+ " (this turns into -1)")
 
 // Load the full data.
 val X_train = loadFMat("data/MNIST/train_scaled.fmat.lz4")
@@ -39,6 +42,16 @@ println("num c1 train: " +tr_mask_c1.length)
 println("num c2 train: " +tr_mask_c2.length)
 println("num c1 test: " +te_mask_c1.length)
 println("num c2 test: " +te_mask_c2.length)
+
+// Change classes to 1 and -1, for ease of use in logistic regression analysis.
+println("First few Y_train before: " +Y_train(?,0->20))
+println("First few Y_test before: " +Y_test(?,0->20))
+Y_train(?, tr_mask_c1) = 1
+Y_train(?, tr_mask_c2) = -1
+Y_test(?, te_mask_c1) = 1
+Y_test(?, te_mask_c2) = -1
+println("First few Y_train after: " +Y_train(?,0->20))
+println("First few Y_test after: " +Y_test(?,0->20))
 
 // Horizontally concatenate stuff together from these classes.
 val train_data   = X_train(?, tr_mask_c1) \ X_train(?, tr_mask_c2)
@@ -63,6 +76,8 @@ println("size(X_train_shuf) = " +size(X_train_shuf))
 println("size(X_test_shuf)  = " +size(X_test_shuf))
 println("size(Y_train_shuf) = " +size(Y_train_shuf))
 println("size(Y_test_shuf)  = " +size(Y_test_shuf))
+println("First few Y_train: " +Y_train_shuf(?,0->20))
+println("First few Y_test: " +Y_test_shuf(?,0->20))
 
 saveFMat("MNIST_Xtrain_"+class1+"_"+class2+"_shuf.fmat.lz4", X_train_shuf)
 saveFMat("MNIST_Xtest_"+class1+"_"+class2+"_shuf.fmat.lz4", X_test_shuf)
