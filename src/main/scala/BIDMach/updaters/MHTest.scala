@@ -325,7 +325,7 @@ object MHTest {
     var nn2l = 4000
     var sigmaProposer = 0.05f
     var continueDespiteFull = true
-    var verboseMH = true
+    var verboseMH = false
     var collectData = false
     var collectDataDir = "tmp/"
     var exitTheta = false

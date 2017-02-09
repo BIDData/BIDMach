@@ -1,0 +1,137 @@
+:silent
+
+/**
+ * (c) February 2017 by Daniel Seita
+ *
+ * This will serve as the analogous role to the processmnist_binary.ssc script
+ * here. I will get the MNIST8M data in a format suitable for binary
+ * classification. A few points:
+ *
+ * - Do this on BITTER, which has the MNIST8M already split into parts. I can
+ * run from my home directory: `./bidmach scripts/processmnist8m_binary.ssc`.
+ * The STOUT computer has the data but in slightly different names and I don't
+ * want to have to re-figure out what happened.
+ *
+ * - All data *should* be considered as training data or variants of it, but
+ * just to be safe, I will be ignoring the first 3 file numbers (0 1, 2) and
+ * the last three (78, 79, 80). We cannot mix training and testing here!
+ *
+ * - Do no test set data stuff here. For testing, use the true MNIST dataset.
+ *  
+ * - Due to RAM constraints, one has to run this script more than once, while
+ * commenting out stuff you don't need. See instructions at the bottom for more
+ * details.
+ *
+ * - The data that comes out of this will be shuffled so we should use this as
+ * the standard reference. I have a copy of this in my bitter repository.
+ */
+
+val dir = "/data/MNIST8M/parts/"
+val output_dir = "/home/seita/BIDMach/data/MNIST8M/"
+val class1 = 1 // class1 turns into 1
+val class2 = 7 // class2 turns into -1
+val data = zeros(784,100000) // so we don't re-allocate memory for extract_two_classes.
+println("class1: " +class1)
+println("class2: " +class2)
+
+
+/**
+ * This is the FIRST thing I ran once I figured out how John organized the
+ * MNIST8M data. There are 81 files (numbered 0 through 80) so I can run this
+ * with 0 to 20, 21 to 40, etc. Though I would rather not do the first few or
+ * last few. Note, this is inclusive at the end. After running this, there
+ * should be (at most) 162 files in the output directory. The "ones" matrices
+ * should be roughly 4.5MB, the "sevens" should be roughly 5.7MB. UPDATE: nah,
+ * with memory copying <-- I can do 3 to 77 all at once.
+ */
+def extract_two_classes(min_i:Int, max_i:Int) {
+
+    for (i <- min_i to max_i) {
+        // Load data one by one and debug for matrix sizes.
+        val cati:IMat = loadIMat(dir+ "cat%02d.imat.lz4" format i)
+        data <-- loadFMat(dir+ "data%02d.fmat.lz4" format i)
+        println("i=" +i)
+        println("cati.dims = " +cati.dims) // Should be (1,100000)
+        println("data.dims = " +data.dims) // Should be (784,100000)
+    
+        // Find the indices that correspond to 1s and 7s.
+        val mask_1_inds = find(cati == class1)
+        val mask_2_inds = find(cati == class2)
+    
+        // Now extract 1s and 7s from the data matrices.
+        val data_c1 = data(?, mask_1_inds)
+        val data_c2 = data(?, mask_2_inds)
+        println("num class1 = " +mask_1_inds.length+ ", num class2 = " +mask_2_inds.length)
+    
+        // Next, save matrices of c1 and c2 separately (combine later).
+        saveFMat(output_dir+ "data_" +class1+ "_%02d.fmat.lz4" format i, data_c1)
+        saveFMat(output_dir+ "data_" +class2+ "_%02d.fmat.lz4" format i, data_c2)
+    }
+}
+
+
+/**
+ * This is the SECOND part I ran after the first one (see code above).
+ * Concatenate this for the first class. Then the second one (in the next call
+ * to this method). Then this will form a large matrix. Rather surprisingly, I
+ * can run this once, from min_i=3 to max_i=77 on bitter!! Must be some garbage
+ * collection going on here because concatenation is expensive.
+ */
+def generate_combo_matrix(c:Int, min_i:Int, max_i:Int) {
+    var output = loadFMat(output_dir+ "data_" +c+ "_%02d.fmat.lz4" format min_i)
+    for (i <- (min_i+1) to max_i) {
+        println("i=" +i)
+        output = output \ loadFMat(output_dir+ "data_" +c+ "_%02d.fmat.lz4" format i)
+        println("size(output) now " +size(output))
+    }
+    println("size of final matrix is " +size(output))
+    saveFMat(output_dir+ "all_" +c+ ".fmat.lz4", output)
+}
+
+
+/** This is the third part. Combine all_{c1}.fmat.lz4 and all_{c2}.fmat.lz4. */
+def combine_two_classes = {
+    val c1 = loadFMat(output_dir+ "all_" +class1+ ".fmat.lz4")
+    val c2 = loadFMat(output_dir+ "all_" +class2+ ".fmat.lz4")
+    val result = c1 \ c2
+    println(size(c1)) // RECORD THIS
+    println(size(c2)) // RECORD THIS
+    println(size(result))
+    saveFMat(output_dir+ "all_" +class1+ "_" +class2+ "_inorder.fmat.lz4", result)
+}
+
+
+/** 
+ * This does our final processing on the single data matrix we have. Get labels
+ * and then shuffle. This is ONLY training data, by the way!
+ */
+def final_processing(numClass1:Int, numClass2:Int) = {
+    val fullData = loadFMat(output_dir+ "all_" +class1+ "_" +class2+ "_inorder.fmat.lz4") 
+    val labels = iones(1,numClass1) \ (-1*iones(1,numClass2)) // get -1 for second class
+    val rr = rand(1, fullData.ncols)
+    val (ss, ii) = sort2(rr);
+    val X_train = fullData(?, ii)
+    val Y_train = labels(?, ii)
+    println("size(X_train) = " +size(X_train))
+    println("size(Y_train) = " +size(Y_train))
+    println("first few ytrain: " +Y_train(0,0->20))
+    saveFMat(output_dir + "MNIST8M_Xtrain_"+class1+"_"+class2+"_shuf.fmat.lz4", X_train)
+    saveIMat(output_dir + "MNIST8M_Ytrain_"+class1+"_"+class2+"_shuf.imat.lz4", Y_train)
+}
+
+// -------------------------- //
+// USER MODIFIES THIS SECTION //
+// -------------------------- //
+
+/*
+ * Usage: Have ALL BUT ONE of these commands commented out at a time! Run these
+ * in order. For instance, this means we first run this script with everything
+ * below commented out *except* the first line. Then repeat, but with only the
+ * second line not commented out.  Repeat until all commands have been run.
+ */
+
+// extract_two_classes(3, 77)
+// generate_combo_matrix(class1, 3, 77)
+// generate_combo_matrix(class2, 3, 77)
+// combine_two_classes
+// final_processing(842750, 783125) // number of class elements should be pre-recorded
