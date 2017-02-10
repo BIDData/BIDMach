@@ -3,7 +3,7 @@
 /**
  * This will test using the MH Test Updater. The code here:
  *  
- * - Loads a dataset (not on GitHub). Note: here data are 0s and 1s.
+ * - Loads a dataset (not on GitHub). Note: *targets* will be 0s and 1s.
  * - Defines its own learner which uses the new updater.
  * - Then it runs GLM with logistic regression.
  *
@@ -22,12 +22,20 @@
  */
 
 // Our training data may change. (IF SO, CHANGE `opts.N` BELOW!!)
-val X_train = loadFMat("/data/MNIST8M/MNIST8M_Xtrain_1_7_shuf_100k.fmat.lz4")
-val Y_train = loadIMat("/data/MNIST8M/MNIST8M_Ytrain_1_7_shuf_100k.imat.lz4")
+// stout:
+val X_train = loadFMat("/home/seita/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
+val Y_train = loadIMat("/home/seita/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
+// Daniel's personal computer
+//val X_train = loadFMat("/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
+//val Y_train = loadIMat("/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
 
 // Test data should be consistent regardless of MNIST (or MNIST8M) training data.
-val X_test  = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
-val Y_test  = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+// stout:
+val X_test  = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test  = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+// Daniel's personal computer
+//val X_test  = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+//val Y_test  = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
 Y_train(find(Y_train == -1)) = 0
 Y_test(find(Y_test == -1)) = 0
 
@@ -64,8 +72,8 @@ mopts.batchSize = 100
 mopts.lrate = 0.01
 
 // Some new stuff due to the MHTest opts. CHECK THESE CAREFULLY!
-mopts.N = 100000                    // Ideally a multiple of minibatch size. CHECK THIS!
-mopts.temp = 1000
+mopts.N = 13000                     // 13000 for regular MNIST
+mopts.temp = 100
 mopts.Nknown = true
 mopts.n2lsigma = 1.0f               // 1.0f by default
 mopts.nn2l = 4000                   // 4000 by default
@@ -77,9 +85,9 @@ mopts.collectDataDir = "outputs/data_mhtest/"   // Clear this directory
 mopts.exitTheta = true              // breaks out of program ...
 mopts.exitThetaAmount = 10000       // means we collect this many thetas
 mopts.initThetaHere = true          // break symmetry at the start
-mopts.burnIn = 200                  // change stuff after this (set to -1 to ignore)
+mopts.burnIn = -1                   // change stuff after this (set to -1 to ignore)
 mopts.tempAfterBurnin = 1           // after burn-in, change temp to this
-mopts.sigmaProposerAfterBurnin = 0.00005f    // After burn-in, change sigma
+mopts.sigmaProposerAfterBurnin = 0.005f    // After burn-in, change sigma
 
 mopts.matrixOfScores = true         // This is actually a GLM setting
 mopts.what
