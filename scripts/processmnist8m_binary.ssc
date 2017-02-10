@@ -24,6 +24,9 @@
  *
  * - The data that comes out of this will be shuffled so we should use this as
  * the standard reference. I have a copy of this in my bitter repository.
+ *
+ * - UPDATE: we never re-scale this into [0,1]. I did that offline but if I need
+ * to regenerate the data, we should probably add that functionality here.
  */
 
 val dir = "/data/MNIST8M/parts/"

@@ -11,10 +11,9 @@
  * colums correspond to iterations here. We have 
  * 
  * - data(0) = minibatch sizes each iteration (at the point of decision)
- * - data(1) = log likelihood train (on this *training* batch)
- * - data(2) = cumulative minibatch sizes (computed here)
- * - data(3) = accuracy on full test set (computed here)
- * - data(4) = log likelihood test (on *full* test data, computed here)
+ * - data(1) = cumulative minibatch sizes (computed here)
+ * - data(2) = accuracy on full test set (computed here)
+ * - data(3) = log likelihood test (on *full* test data, computed here)
  */ 
 
 // Double-check these.
@@ -58,17 +57,17 @@ def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
 
 // Fill in the rest of `data` here.
 val samples = zeros(784, total)
-val data = zeros(5, total)
+val data = zeros(4, total)
 for (i <- 1 until (total+1)) {
     samples(?, i-1) = loadFMat(datadir+"theta_0_%04d.fmat.lz4" format (i)).t
-    data(0->2, i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
+    data(0->1, i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
 }
 val cum_size = cumsum(data(0,?))
-data(2,?) = cum_size
+data(1,?) = cum_size
 
 val (accuracy, ll_test) = eval_cost(X_test, DMat(Y_test), samples)
-data(3,?) = FMat(accuracy).t
-data(4,?) = FMat(ll_test).t
+data(2,?) = FMat(accuracy).t
+data(3,?) = FMat(ll_test).t
 
 // Now save everything in here and RENAME the file right away.
 saveAs("outputs/results.mat", 
