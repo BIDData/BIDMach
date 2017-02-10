@@ -22,7 +22,7 @@
  */
 
 // Our training data may change. (IF SO, CHANGE `opts.N` BELOW!!)
-// stout:
+// stout OR bitter:
 val X_train = loadFMat("/home/seita/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
 val Y_train = loadIMat("/home/seita/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
 // Daniel's personal computer
@@ -30,7 +30,7 @@ val Y_train = loadIMat("/home/seita/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
 //val Y_train = loadIMat("/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
 
 // Test data should be consistent regardless of MNIST (or MNIST8M) training data.
-// stout:
+// stout OR bitter:
 val X_test  = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
 val Y_test  = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
 // Daniel's personal computer

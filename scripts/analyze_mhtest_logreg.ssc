@@ -19,8 +19,13 @@
 // Double-check these.
 val total = 10000
 val datadir = "outputs/data_mhtest/"
-val X_test = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
-val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+
+// On stout OR bitter:
+val X_test = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+// On Daniel's personal computer:
+//val X_test = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+//val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
 
 
 /**
