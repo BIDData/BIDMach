@@ -16,9 +16,9 @@ opts.limit = 1000000
 opts.timeScaleMsec = 2e-3f
 opts.permuteAlways = false
 
-opts.machine_threshold = 0.75
-opts.min_time_to_wait_for_all = 3000
-opts.time_threshold = 5000
+opts.machineThreshold = 0.75;
+opts.minWaitTime = 3000;
+opts.timeThresholdMsec = 5000;
 
 val nmachines = addresses.length
 val gmods = irow(nmachines)
@@ -43,10 +43,8 @@ m.sendConfig
 //   "imach: %d, nstart: %d, nend: %d, nasses: %d\n" format (w.imach, nstart, nend, fgopts.npasses)
 // })
 //
-
-
 // m.parCall((w) => { w.learner.paused = true; "done"})
-// m.parCall((w) => { w.learner.train; "not reached" }) // this will hang, just wait for it to timeout
+// m.parCall((w) => { w.learner.train; "not reached" }, 2)
 // m.startLearners
 // m.startUpdates
 //

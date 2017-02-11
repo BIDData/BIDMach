@@ -43,19 +43,19 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
   }
 
   class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {
-    def run() {
-      try {
-	Thread.sleep(mtime);
-	for (i <- 0 until futures.length) {
-	  if (futures(i) != null) {
-	    if (opts.trace > 0) log("Worker cancelling thread %d" format i);
-	    futures(i).cancel(true);
+	  def run() {
+		  try {
+			  Thread.sleep(mtime);
+			  for (i <- 0 until futures.length) {
+				  if (futures(i) != null) {
+					  if (opts.trace > 0) log("Worker cancelling thread %d" format i);
+					  futures(i).cancel(true);
+				  }
+			  }
+		  } catch {
+		  case e:InterruptedException => if (opts.trace > 2) log("Worker interrupted timeout thread");
+		  }
 	  }
-	}
-      } catch {
-	case e:InterruptedException => if (opts.trace > 2) log("Worker interrupted timeout thread");
-      }
-    }
   }
 }
 
@@ -78,23 +78,22 @@ object Host {
     val p2 = (v >> 8) & 255;
     val p3 = v & 255;
     (p0,p1,p2,p3)
-  }
+   }
 
   def inetFieldsToInt(a:Int, b:Int, c:Int, d:Int):Int = {
     d + ((c + ((b + (a << 8)) << 8)) << 8);
   }
 
   def inetFieldsToString(p0:Int, p1:Int, p2:Int, p3:Int) = {
-    "%d.%d.%d.%d" format(p0,p1,p2,p3);
+	  "%d.%d.%d.%d" format(p0,p1,p2,p3);
   }
 
   def inetIntToString(v:Int) = {
-    val (p0, p1, p2, p3) = inetIntToFields(v);
-    "%d.%d.%d.%d" format(p0,p1,p2,p3);
+	  val (p0, p1, p2, p3) = inetIntToFields(v);
+	  "%d.%d.%d.%d" format(p0,p1,p2,p3);
   }
 
   def inetStringToFields(s:String):(Int, Int, Int, Int) = {
-    println(s)
     val fields = s.split("\\.");
     val ff = fields.map(_.toInt);
     (ff(0), ff(1), ff(2), ff(3))
@@ -106,7 +105,7 @@ object Host {
   }
 
   def hostPortToInet(host:Int, port:Int):InetSocketAddress = {
-    new InetSocketAddress(inetIntToString(host), port);
+	  new InetSocketAddress(inetIntToString(host), port);
   }
 
   def hostPortsToInet(hosts:IMat, ports:IMat):Array[InetSocketAddress] = {

@@ -32,19 +32,19 @@ class Response(
   val intData = byteData.asIntBuffer;
   val floatData = byteData.asFloatBuffer;
   val longData = byteData.asLongBuffer;
-
+  
   def encode() = {}
   def decode() = {}
-
+  
   def this(rtype0:Int, round0:Int, dest0:Int, clen0:Int) =
     this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0);
-
+  
   def this(rtype0:Int, round0:Int, dest0:Int) = this(rtype0, round0, dest0, 0, null, 0);
-
+  
   override def toString():String = {
     "Response %s, round %d, src %d, length %d bytes" format (Command.names(rtype), round, src, clen*4);
   }
-
+  
 }
 
 class AllreduceResponse(round0:Int, src0:Int, bytes:Array[Byte])
@@ -88,91 +88,94 @@ extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes, byt
       out.toByteArray()
     });
   }
-
+  
   override def encode ():Unit = { }
-
-  override def decode():Unit = {
-    val in = new ByteArrayInputStream(bytes);
-    val input = new ObjectInputStream(in);
-    obj = input.readObject;
-    input.close;
+  
+  override def decode():Unit = {    
+		val in = new ByteArrayInputStream(bytes);
+		val input = new ObjectInputStream(in);
+		obj = input.readObject;
+		input.close;
   }
 }
 
 class ResponseWriter(address:InetSocketAddress, resp:Response, me:Worker) extends Runnable {
 
-  def run() {
-    var socket:Socket = null;
-    try {
-      socket = new Socket();
-      socket.setReuseAddress(true);
-      socket.connect(address, me.opts.sendTimeout);
-      if (socket.isConnected()) {
-	val ostr = new DataOutputStream(socket.getOutputStream());
-	ostr.writeInt(resp.magic)
-	ostr.writeInt(resp.rtype);
-	ostr.writeInt(resp.round);
-	ostr.writeInt(resp.src);
-	ostr.writeInt(resp.clen);
+	def run() {
+		var socket:Socket = null;
+	try {
+		socket = new Socket();
+		socket.setReuseAddress(true);
+		socket.connect(address, me.opts.sendTimeout);
+		if (socket.isConnected()) {
+			val ostr = new DataOutputStream(socket.getOutputStream());
+			ostr.writeInt(resp.magic)
+			ostr.writeInt(resp.rtype);
+      ostr.writeInt(resp.round);
+			ostr.writeInt(resp.src);
+			ostr.writeInt(resp.clen);
 	ostr.writeInt(resp.blen);
 	ostr.write(resp.bytes, 0, resp.blen);
-      }
-    } catch {
-      case e:Exception =>
-	if (me.opts.trace > 0) {
-	  me.log("Master problem sending resp %s\n%s\n" format (resp.toString, Response.printStackTrace(e)));
-	}
-    } finally {
-      try { if (socket != null) socket.close(); } catch {
+		}
+	} catch {
 	case e:Exception =>
-	  if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Response.printStackTrace(e));
-      }
-    }
-  }
+	if (me.opts.trace > 0) {
+		me.log("Master problem sending resp %s\n%s\n" format (resp.toString, Response.printStackTrace(e)));
+	}
+	} finally {
+		try { if (socket != null) socket.close(); } catch {
+		case e:Exception =>
+		if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Response.printStackTrace(e));        
+		}
+	}
+	}
 }
 
 class ResponseReader(socket:Socket, me:Master) extends Runnable {
-  def run() {
-    try {
-      val istr = new DataInputStream(socket.getInputStream());
-      val magic = istr.readInt();
-      val rtype = istr.readInt();
-      val round = istr.readInt();
-      val dest = istr.readInt();
-      val clen = istr.readInt();
-      val blen = istr.readInt();
-      val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen);
-      if (me.opts.trace > 2) me.log("Master got packet %s\n" format (response.toString));
-      istr.readFully(response.bytes, 0, blen);
-      if (rtype==Command.allreduceCtype){
-        me.listener.allreduce_collected += 1;
-        me.log("allreduce_collected inside ResponseReader: %d\n" format me.listener.allreduce_collected);
-      }
-      if (rtype==Command.learnerDoneCtype){
-        me.stopUpdates();
-        me.log("Stopping allreduce update\n");
-      }
-    try {
-      socket.close();
-    } catch {
-      case e:IOException => {if (me.opts.trace > 0) me.log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
-    }
-    me.handleResponse(response);
-  } catch {
-    case e:Exception => if (me.opts.trace > 0) me.log("Master Problem reading socket "+Response.printStackTrace(e)+"\n");
-    } finally {
+    def run() {
       try {
-	if (!socket.isClosed) socket.close();
+        val istr = new DataInputStream(socket.getInputStream());
+        val magic = istr.readInt();
+        val rtype = istr.readInt();
+        val round = istr.readInt();
+        val dest = istr.readInt();
+        val clen = istr.readInt();
+        val blen = istr.readInt();
+        val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen);
+        if (me.opts.trace > 2) me.log("Master got packet %s\n" format (response.toString));
+        istr.readFully(response.bytes, 0, blen);
+
+        rtype match {
+          case Command.allreduceCtype => {
+            me.listener.allreduceCollected += 1
+          }
+          case Command.learnerDoneCtype => {
+            me.stopUpdates()
+            me.log("Stopping allreduce update!\n")
+          }
+          case _ =>
+        }
+        try {
+          socket.close();
+        } catch {
+        case e:IOException => {if (me.opts.trace > 0) me.log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
+        }
+        me.handleResponse(response);
       } catch {
-	case e:IOException => {if (me.opts.trace > 0) me.log("Master Final Problem closing socket "+Response.printStackTrace(e)+"\n")}
+      case e:Exception => if (me.opts.trace > 0) me.log("Master Problem reading socket "+Response.printStackTrace(e)+"\n");
+      } finally {
+        try {
+          if (!socket.isClosed) socket.close();
+        } catch {
+        case e:IOException => {if (me.opts.trace > 0) me.log("Master Final Problem closing socket "+Response.printStackTrace(e)+"\n")}
+        }
       }
     }
   }
-}
 
 object Response {
-  val magic = 0xa6b38734;
-
+	val magic = 0xa6b38734;
+  
   def printStackTrace(e:Exception):String = {
     val baos = new ByteArrayOutputStream();
     val ps = new PrintStream(baos);

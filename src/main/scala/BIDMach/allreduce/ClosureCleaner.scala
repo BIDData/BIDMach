@@ -147,8 +147,11 @@ class InnerClosureFinder(output: Set[Class[_]]) extends ClassVisitor(ASM5) {
  * A cleaner that renders closures serializable if they can be done so safely.
  */
 object ClosureCleaner {
+
+  val trace = 0
+
   def logDebug(str:String):Unit = {
-    println(str)
+    if (trace > 0) println(str)
   }
 
   def copyStream(in: InputStream,

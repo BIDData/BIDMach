@@ -1,5 +1,5 @@
-val data_dir = System.getenv("BIDMACH_DATA_HOME")+"/MNIST8M/parts/"
-val (nn, opts) = GLM.learner(data_dir+"data%02d.fmat.lz4", data_dir+"cats%02d.fmat.lz4")
+val dir="../data/MNIST8M/parts/"
+val (nn, opts) = GLM.learner(List(dir+"part%02d.fmat.lz4",dir+"cats%02d.fmat.lz4"))
 
 opts.useGPU = true;
 opts.nend = 70;
