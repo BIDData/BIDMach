@@ -1,7 +1,8 @@
 :silent
 
 /**
- * This will test using the MH Test Updater. The code here:
+ * This will test using the AusterityMH algorithm (i.e. from "Cutting the MH
+ * Budget" paper). The code:
  *  
  * - Loads a dataset (not on GitHub). Note: *targets* will be 0s and 1s.
  * - Defines its own learner which uses the new updater.
@@ -59,7 +60,7 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
         model, 
         mkRegularizer(mopts),
         //new Grad(mopts),
-        new MHTest(mopts), 
+        new AusterityMH(mopts), 
         null,
         mopts)
     (mm, mopts)
