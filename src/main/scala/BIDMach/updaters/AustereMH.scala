@@ -13,10 +13,11 @@ import edu.berkeley.bid.CUMACH
  *  	Anoop Korattikara, Yutian Chen, Max Welling
  *
  * TODO This is a major work in progress.
+ * 
+ * - It assumes a fixed `epsilon` within (0,1).
  */
 class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extends Updater {
 
-  var n2ld:DMat = null                 // X_c values for pre-selected \sigma.
   var deltaTheta:Array[Mat] = null     // Container for Gaussian noise from proposer.
   var tmpTheta:Array[Mat] = null       // Backup container to hold current theta.
   var proposedTheta:Array[Mat] = null  // The proposed theta (in our paper, it's theta').
@@ -30,12 +31,11 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
   var b:Long = 0                       // Current minibatch size (also `b` in the paper).
   var N:Long = 0                       // Maximum minibatch size (i.e. all training data).
   var n:Float = 0f                     // The *number* of minibatches we are using.
-  var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
+  var mu0:Float = 0f                   // log(u)/N, assuming symmetric  proposer.
   var T:Int = 1                        // The temperature of the distribution.
   var t:Int = 0                        // Current number of samples of theta.
   var sumOfValues:Float = 0f           // \sum_{i=1}^b (N/T)*log(p(x_i|theta')/p(x_i|theta)).
   var sumOfSquares:Float = 0f          // \sum_{i=1}^b ((N/T)*log(p(x_i|theta')/p(x_i|theta)))^2.
-  var targetVariance:Float = 0f        // The target variance (so we only need one X_corr).
 
 
   /** 
@@ -63,11 +63,6 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
       throw new RuntimeException("Aborting now.")
     }
     
-    val norm2logdata = loadDMat("data/MHTestCorrections/norm2log%d_20_%2.1f.txt" format 
-        (opts.nn2l, opts.n2lsigma))
-    n2ld = norm2logdata(?,0) \ cumsum(norm2logdata(?,1))
-    targetVariance = opts.n2lsigma * opts.n2lsigma
-
     val nmats = modelmats.length;
     deltaTheta = new Array[Mat](nmats)
     proposedTheta = new Array[Mat](nmats)
@@ -114,60 +109,30 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
     scores1 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
     diff ~ scores1 - scores0
 
-    // (Part 2) Update our \Delta* and sample variance of \Delta*.
+    // (Part 2) Update \bar{l} and \bar{l^2} (using the paper's notation).
     sumOfSquares += sum((diff)*@(diff)).v
     sumOfValues += sum(diff).v
-    val deltaStar = sumOfValues/b.v - logu
-    val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v
-    val numStd = deltaStar / math.sqrt(sampleVariance)
+    val lBar = sumOfValues/b.v
+    val l2Bar = sumOfSquares/b.v
+    val sampleStDev = sqrt((l2Bar - lBar*lBar) * (b/(b-1)))    
+    val stDevOfLBar = (sampleStDev/sqrt(b)) * sqrt(1 - (b.v-1)/(N-1))
+    val testStat = (lBar - mu0) / stDevOfLBar
+    if (opts.verbose) debugPrints()
+    
+    // (Part 3) Now run their test.
     var accept = false
-    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar)
-
-    // (Part 3) Run our test! 
-    // (Part 3.1) Take care of the full data case; this usually indicates a problem.
-    if (ipass > 0 && b == N) {
-      println("WARNING: test used entire dataset but variance is still too high.")
-      println("  sample variance: %f, num std = %f" format (sampleVariance, numStd))
-      if (opts.continueDespiteFull) {
-        println("Nonetheless, we will accept/reject this sample based on Delta*") 
-        newMinibatch = true
-        if (deltaStar > 0) {
-          accept = true
-        }
+    val delta = (1.0 - normcdf(abs(testStat))).dv
+    if (delta < opts.epsi) {
+      newMinibatch = true
+      if (lBar > mu0) {
+        accept = true
       } else {
-        throw new RuntimeException("Aborting program!")
+        accept = false
       }
+    } else {
+      newMinibatch = false
     }
-    // (Part 3.2) Abnormally good or bad minibatches.
-    else if (math.abs(numStd) > 5.0) {
-      if (opts.verboseMH) {
-        println("\tCASE 1: math.abs(numStd) = " +math.abs(numStd))
-      }
-      newMinibatch = true
-      if (numStd > 0) {
-        accept = true
-      }
-    }
-    // (Part 3.3) If sample variance is too large, don't do anything.
-    else if (sampleVariance >= targetVariance) {
-      if (opts.verboseMH) {
-        println("\tCASE 2: sample >= target = "+targetVariance)
-      }
-    } 
-    // (Part 3.4) Finally, we can run our test by sampling a Gaussian and X_corr.
-    else {
-      newMinibatch = true
-      val Xn = dnormrnd(0, math.sqrt(targetVariance-sampleVariance), 1, 1).dv
-      val Xc = normlogrnd(1,1).dv
-      val testStat = deltaStar + Xn + Xc
-      if (opts.verboseMH) {
-        println("\tCASE 3; with testStat = "+testStat)
-      }
-      if (testStat > 0) {
-        accept = true
-      }
-    }
-
+    
     // (Part 4) Reset parameters and use <-- to avoid alias problems.
     if (accept) {
       for (i <- 0 until modelmats.length) {
@@ -188,9 +153,9 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
    * `tmpTheta` so we can restore it later when needed.
    */
   def beforeEachMinibatch() {
-    if (opts.verboseMH) println("\n\tNew minibatch!")
+    if (opts.verbose) println("\n\tNew minibatch!")
     randomWalkProposer()
-    logu = ln(rand(1,1)).v
+    mu0 = ln(rand(1,1)).v / N
     newMinibatch = false
     b = 0
     n = 0
@@ -243,49 +208,10 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
   }
  
   
-  /**
-   * Randomly generate sample(s) from the correction distribution X_c. It
-   * samples values in (0,1) and then finds the x-positions (in some bounded
-   * range such as [-10,10]) corresponding to those CDF values in X_c. This is
-   * unchanged from John Canny's original implementation.
-   * 
-   * @param m Number of rows of random samples.
-   * @param n Number of columns of random samples.
-   */
-  def normlogrnd(m:Int, n:Int):DMat = {
-    val rr = drand(m, n)
-    var i = 0
-    while (i < rr.length) {
-      val rv = rr.data(i)
-      var top = n2ld.nrows
-      var bottom = 0
-      while (top - bottom > 1) {
-        val mid = (top + bottom) / 2
-        if (rv > n2ld(mid, 1)) {
-          bottom = mid;
-        } else {
-          top = mid
-        }
-      }
-      val y0 = n2ld(bottom, 1)
-      val y1 = n2ld(math.min(top, n2ld.nrows-1), 1)
-      val alpha = if (y1 != y0) ((rv - y0) / (y1 - y0)) else 0.0
-      val x0 = n2ld(bottom, 0)
-      val x1 = n2ld(math.min(top, n2ld.nrows-1), 0)
-      val newx = alpha * x1 + (1-alpha) * x0
-      rr.data(i) = newx
-      i += 1
-    }
-    rr
-  }
- 
-
   /** This is for debugging. */
-  def debugPrints(sampleVariance:Float, deltaStar:Float) {
-    println("b="+b+", n="+n+", logu="+logu+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
+  def debugPrints() {
+    println("b="+b+", n="+n+", mu0="+mu0+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
     println("mean(scores0) = "+mean(scores0,2).dv+", mean(scores1) = "+mean(scores1,2).dv)
-    println("sampleVar = " +sampleVariance)
-    println("delta* = " + deltaStar)
   }
   
 }
@@ -294,16 +220,16 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
 object AustereMH {
 
   trait Opts extends Updater.Opts {
+    var epsi = 0.05
+    var fixedEpsi = true
     var N = 100000
     var temp = 1
     var tempAfterBurnin = 1
     var Nknown = true
-    var n2lsigma = 1.0f
-    var nn2l = 4000
     var sigmaProposer = 0.05f
     var sigmaProposerAfterBurnin = 0.05f
     var continueDespiteFull = true
-    var verboseMH = false
+    var verbose = false
     var collectData = false
     var collectDataDir = "tmp/"
     var exitTheta = false
