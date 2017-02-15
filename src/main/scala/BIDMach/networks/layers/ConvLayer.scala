@@ -86,15 +86,15 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      filter.convolveT(deriv, inputDeriv,true) // it actually put the computation result 
+      filter.convolveT(deriv.asInstanceOf[FND], inputDeriv.asInstanceOf[FND],true) // it actually put the computation result 
       //inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
     }
     else{
-      filter.convolveT(deriv, inputDeriv,true) // Have to check whether to set doclear = true?
+      filter.convolveT(deriv.asInstanceOf[FND], inputDeriv.asInstanceOf[FND],true) // Have to check whether to set doclear = true?
       //inputDeriv.asMat ~ modelmats(imodel)^*(deriv.asMat);
     }
 
-    updateFilter.convolveM(inputData,deriv)
+    updateFilter.convolveM(inputData.asInstanceOf[FND],deriv.asInstanceOf[FND])
 
     //save back the updateFilter
     updatemats(imodel) = updateFilter.asMat
