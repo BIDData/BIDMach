@@ -1,0 +1,86 @@
+:silent
+
+/**
+ * This will process MNIST so that we pick two binary classes. This is suitable
+ * for preparing the data for logistic regression, for instance. It will save
+ * four things: train labels, train matrix, test labels, and test matrix. Make
+ * sure MNIST is located in the BIDMach/data/MNIST/ directory or somewhere. Make
+ * sure we keep track of `class1` and `class2`, because the first one turns into
+ * a 1 and the second turns into -1.
+ *
+ * Note I: the *columns* should denote instances, *rows* are dimensions.
+ *
+ * Note II: make sure the train/test data are scaled in [0,1].
+ *
+ * Note III: BIDMach actually requires them to be 0s, so we have to convert them
+ * *again* during our BIDMach scripts. Fun, fun fun!!
+ */
+
+val class1 = 1
+val class2 = 7
+println("class1: " +class1+ " (this turns into 1)")
+println("class2: " +class2+ " (this turns into -1)")
+
+// Load the full data.
+val X_train = loadFMat("data/MNIST/train_scaled.fmat.lz4")
+val X_test  = loadFMat("data/MNIST/test_scaled.fmat.lz4")
+val Y_train = loadIMat("data/MNIST/ctrain.imat.lz4")
+val Y_test  = loadIMat("data/MNIST/ctest.imat.lz4")
+
+println("size(X_train) = " +size(X_train))
+println("size(X_test)  = " +size(X_test))
+println("size(Y_train) = " +size(Y_train))
+println("size(Y_test)  = " +size(Y_test))
+
+// Find where class 1 and class 2 are located via the *labels*.
+val tr_mask_c1 = find(Y_train == class1)
+val tr_mask_c2 = find(Y_train == class2)
+val te_mask_c1 = find(Y_test == class1)
+val te_mask_c2 = find(Y_test == class2)
+
+println("num c1 train: " +tr_mask_c1.length)
+println("num c2 train: " +tr_mask_c2.length)
+println("num c1 test: " +te_mask_c1.length)
+println("num c2 test: " +te_mask_c2.length)
+
+// Change classes to 1 and -1, for ease of use in logistic regression analysis.
+println("First few Y_train before: " +Y_train(?,0->20))
+println("First few Y_test before: " +Y_test(?,0->20))
+Y_train(?, tr_mask_c1) = 1
+Y_train(?, tr_mask_c2) = -1
+Y_test(?, te_mask_c1) = 1
+Y_test(?, te_mask_c2) = -1
+println("First few Y_train after: " +Y_train(?,0->20))
+println("First few Y_test after: " +Y_test(?,0->20))
+
+// Horizontally concatenate stuff together from these classes.
+val train_data   = X_train(?, tr_mask_c1) \ X_train(?, tr_mask_c2)
+val train_labels = Y_train(?, tr_mask_c1) \ Y_train(?, tr_mask_c2)
+val test_data    = X_test(?, te_mask_c1) \ X_test(?, te_mask_c2)
+val test_labels  = Y_test(?, te_mask_c1) \ Y_test(?, te_mask_c2)
+println("size(train_data) = " +size(train_data))
+println("size(test_data) = " +size(test_data))
+
+// Now shuffle and save.
+val rr1 = rand(1, train_data.ncols)
+val (ss1, ii1) = sort2(rr1); 
+val X_train_shuf = train_data(?, ii1)
+val Y_train_shuf = train_labels(?, ii1)
+
+val rr2 = rand(1, test_data.ncols)
+val (ss2, ii2) = sort2(rr2);
+val X_test_shuf = test_data(?, ii2)
+val Y_test_shuf = test_labels(?, ii2)
+
+println("size(X_train_shuf) = " +size(X_train_shuf))
+println("size(X_test_shuf)  = " +size(X_test_shuf))
+println("size(Y_train_shuf) = " +size(Y_train_shuf))
+println("size(Y_test_shuf)  = " +size(Y_test_shuf))
+println("First few Y_train: " +Y_train_shuf(?,0->20))
+println("First few Y_test: " +Y_test_shuf(?,0->20))
+
+saveFMat("MNIST_Xtrain_"+class1+"_"+class2+"_shuf.fmat.lz4", X_train_shuf)
+saveFMat("MNIST_Xtest_"+class1+"_"+class2+"_shuf.fmat.lz4", X_test_shuf)
+saveIMat("MNIST_Ytrain_"+class1+"_"+class2+"_shuf.imat.lz4", Y_train_shuf)
+saveIMat("MNIST_Ytest_"+class1+"_"+class2+"_shuf.imat.lz4", Y_test_shuf)
+:silent

@@ -1,0 +1,82 @@
+:silent
+
+/**
+ * This script is to be run *after* `./bidmach scrpts/mh_test.ssc`, i.e. the
+ * normal logistic regression code. Run that code with the settings set so that
+ * it will exit after 3000 or so iterations, so we can get an exact sample
+ * count. This will collect all the output matrices, perform **prediction** on
+ * the held-out test set, and package up the data nicely for Python.
+ *
+ * It saves two things: samples (the thetas) and data (everything else). The
+ * colums correspond to iterations here. We have 
+ * 
+ * - data(0) = minibatch sizes each iteration (at the point of decision)
+ * - data(1) = cumulative minibatch sizes (computed here)
+ * - data(2) = accuracy on full test set (computed here)
+ * - data(3) = log likelihood test (on *full* test data, computed here)
+ */ 
+
+// Double-check these.
+val total = 10000
+val datadir = "outputs/data_mhtest/"
+
+// On stout OR bitter:
+val X_test = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+// On Daniel's personal computer:
+//val X_test = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+//val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+
+
+/**
+ * Evaluates the performance of our sampled \theta values on the Logistic
+ * Regression testing dataset. It can be a little confusing at first sight but
+ * this is one way of computing the likelihood for logistic regression --
+ * assuming BINARY classification. Our classes are -1 and 1 even though we're
+ * classifying 1s and 7s (the 7s are our -1s).
+ * 
+ * @param X A matrix contining our test data, of size (784, num_test_elements),
+ *      where the 784 is because MNIST is 28x28.  
+ * @param Y A vector containing the test data labels (i.e. digits from MNIST,
+ *      then mapped to a scale of -1 or 1).
+ * @param theta A matrix of size (784, num_samples), where each column indicates
+ *      the current \theta due to MCMC sampling.
+ *
+ * @return (accuracy, ll), these are each matrices ("vectors") with the spot at
+ *      index i containing the test set accuracy (repectively, log likelihood)
+ *      based on logistic regression using the weights from theta(i).
+ */
+def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
+    val z = Y *@ (theta.t * X)
+    val sig = 1.0/ (1.0 + exp(-1.0 * z))
+    var accuracy = dzeros(sig.dims(0),1)
+    var ll = dzeros(sig.dims(0),1)
+    for (i <- 0 until sig.dims(0)) {
+        val temp = sig(i, ?)
+        accuracy(i) = find(temp>0.5).dims(0) / temp.dims(1).dv
+        ll(i) = sum(ln(temp)).dv / temp.dims(1).dv
+    }
+    return (accuracy, ll)
+}
+
+
+// Fill in the rest of `data` here.
+val samples = zeros(784, total)
+val data = zeros(4, total)
+for (i <- 1 until (total+1)) {
+    samples(?, i-1) = loadFMat(datadir+"theta_0_%04d.fmat.lz4" format (i)).t
+    data(0->1, i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
+}
+val cum_size = cumsum(data(0,?))
+data(1,?) = cum_size
+
+val (accuracy, ll_test) = eval_cost(X_test, DMat(Y_test), samples)
+data(2,?) = FMat(accuracy).t
+data(3,?) = FMat(ll_test).t
+
+// Now save everything in here and RENAME the file right away.
+saveAs("outputs/results.mat", 
+       samples, "samples", 
+       data, "data")
+:silent
+sys.exit
