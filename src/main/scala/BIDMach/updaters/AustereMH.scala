@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 import edu.berkeley.bid.CUMACH
+import org.apache.commons.math3.distribution._
 
 /**
  * This is an approximate MH test based on the algorithm described in:
@@ -12,9 +13,10 @@ import edu.berkeley.bid.CUMACH
  *  	Austerity in MCMC Land: Cutting the Metropolis-Hastings Budget, ICML 2014
  *  	Anoop Korattikara, Yutian Chen, Max Welling
  *
- * TODO This is a major work in progress.
- * 
- * - It assumes a fixed `epsilon` within (0,1).
+ * - This assumes a fixed `epsilon` within (0,1). That's the major issue.
+ * Otherwise the algorithm should be correct, and further changes here should
+ * probably be applied to our MHTest as well. Note the difference here where, to
+ * be consistent with their paper, we divide scores0, scores1, and log(u) by N.
  */
 class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extends Updater {
 
@@ -23,19 +25,19 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
   var proposedTheta:Array[Mat] = null  // The proposed theta (in our paper, it's theta').
   var modelmats:Array[Mat] = null      // The current theta.
   var updatemats:Array[Mat] = null     // Contains gradients (currently ignored!).
-  var scores0:FMat = null              // Container for (N/T)*log p(x_i*|theta) terms.
-  var scores1:FMat = null              // Container for (N/T)*log p(x_i*|theta') terms.
+  var scores0:FMat = null              // Container for (1/T)*log p(x_i*|theta) terms.
+  var scores1:FMat = null              // Container for (1/T)*log p(x_i*|theta') terms.
   var diff:FMat = null                 // Container for scores1-scores0.
 
   var newMinibatch:Boolean = true      // If true, need to run the proposer to get theta'.
-  var b:Long = 0                       // Current minibatch size (also `b` in the paper).
+  var b:Long = 0                       // Current minibatch size (`n` or `m` in their paper !!).
   var N:Long = 0                       // Maximum minibatch size (i.e. all training data).
   var n:Float = 0f                     // The *number* of minibatches we are using.
-  var mu0:Float = 0f                   // log(u)/N, assuming symmetric  proposer.
+  var mu0:Float = 0f                   // \mu_0 = log(u)/N, assuming symmetric  proposer.
   var T:Int = 1                        // The temperature of the distribution.
   var t:Int = 0                        // Current number of samples of theta.
-  var sumOfValues:Float = 0f           // \sum_{i=1}^b (N/T)*log(p(x_i|theta')/p(x_i|theta)).
-  var sumOfSquares:Float = 0f          // \sum_{i=1}^b ((N/T)*log(p(x_i|theta')/p(x_i|theta)))^2.
+  var sumOfValues:Float = 0f           // \sum_{i=1}^b (1/T)*log(p(x_i|theta')/p(x_i|theta)).
+  var sumOfSquares:Float = 0f          // \sum_{i=1}^b ((1/T)*log(p(x_i|theta')/p(x_i|theta)))^2.
 
 
   /** 
@@ -83,9 +85,11 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
 
 
   /**
-   * This performs the update and the MH test based on a minibatch of data. The
-   * original data is split up into equal-sized minibatches in the Learner code.
-   * (The last minibatch is ignored since it generally has a different size.)
+   * This performs the update and the hypothesis test based on a minibatch of
+   * data. The original data is split up into equal-sized minibatches in the
+   * Learner code. (The last minibatch is ignored since it generally has a
+   * different size.) It's similar to our test in `MHTest.scala` except that the
+   * scores are not scaled by N (because mu0 in their paper is logu/N).
    * 
    * @param ipass The current pass over the full (training) data.
    * @param step Progress within the current minibatch, indicated as a numerical
@@ -98,15 +102,15 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
     b += model.datasource.opts.batchSize
     n += 1.0f
 
-    // (Part 1) Compute scores for theta and theta', scaled by N/T.
-    scores0 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+    // (Part 1) Compute scores for theta and theta', scaled by 1.0/T (not N/T).
+    scores0 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (1.0/T.dv))
     if (scores0.length == 1) {
       throw new RuntimeException("Need individual scores, but getting a scalar.")
     }
     for (i <- 0 until modelmats.length) {
       modelmats(i) <-- proposedTheta(i)
     }
-    scores1 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+    scores1 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (1.0/T.dv))
     diff ~ scores1 - scores0
 
     // (Part 2) Update \bar{l} and \bar{l^2} (using the paper's notation).
@@ -114,23 +118,28 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
     sumOfValues += sum(diff).v
     val lBar = sumOfValues/b.v
     val l2Bar = sumOfSquares/b.v
-    val sampleStDev = sqrt((l2Bar - lBar*lBar) * (b/(b-1)))    
-    val stDevOfLBar = (sampleStDev/sqrt(b)) * sqrt(1 - (b.v-1)/(N-1))
-    val testStat = (lBar - mu0) / stDevOfLBar
-    if (opts.verbose) debugPrints()
+    val sampleStDev = sqrt((l2Bar - lBar*lBar) * (b/(b-1.0))).v
+    val stDevOfLBar = (sampleStDev.v / sqrt(b).v) * sqrt(1 - (b.v-1.0)/(N-1.0)).v
+    val testStat = abs(lBar - mu0).v / stDevOfLBar
     
     // (Part 3) Now run their test.
     var accept = false
-    val delta = (1.0 - normcdf(abs(testStat))).dv
+    val t = new TDistribution(b - 1.0)
+    val delta = (1.0 - t.cumulativeProbability(testStat)).v
+    if (opts.verbose) debugPrints(lBar, l2Bar, sampleStDev, stDevOfLBar, testStat, delta)
+
     if (delta < opts.epsi) {
       newMinibatch = true
       if (lBar > mu0) {
         accept = true
-      } else {
-        accept = false
       }
-    } else {
-      newMinibatch = false
+    }
+
+    if (b == N) {
+      println("WARNING: the current minibatch consists of ALL training data.")
+      if (!opts.continueDespiteFull) {
+        throw new RuntimeException("Something's wrong: aborting program.")
+      }
     }
     
     // (Part 4) Reset parameters and use <-- to avoid alias problems.
@@ -209,9 +218,13 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
  
   
   /** This is for debugging. */
-  def debugPrints() {
+  def debugPrints(lBar:Float, l2Bar:Float, sampleStDev:Float, stDevOfLBar:Float, 
+                  testStat:Float, delta:Float) {
     println("b="+b+", n="+n+", mu0="+mu0+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
-    println("mean(scores0) = "+mean(scores0,2).dv+", mean(scores1) = "+mean(scores1,2).dv)
+    println("mean(scores0)="+mean(scores0,2).dv+", mean(scores1)="+mean(scores1,2).dv)
+    println("lBar="+lBar+", l2Bar="+l2Bar)
+    println("sampleStDev="+sampleStDev+", stDevOfLBar="+stDevOfLBar)
+    println("testStat="+testStat+", delta="+delta)
   }
   
 }
