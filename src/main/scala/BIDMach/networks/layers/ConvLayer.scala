@@ -4,7 +4,7 @@ import BIDMat.FFilter._
 import BIDMat.Filter._
 
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat,FFilter}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat,FFilter,FND}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -115,7 +115,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var pad:List[Integer] = null
   var kernel:List[Integer] = null
   var stride:List[Integer] = null
-  var dilation:List[Integer] = Arrays.asList(1)
+  var dilation:List[Integer] = null //was dilation:List[Integer] = Arrays.asList(1)
   var group:Int = 1
   var axis:Int = 1
   var forceND:Boolean = false
