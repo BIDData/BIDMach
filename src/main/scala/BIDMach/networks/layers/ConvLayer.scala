@@ -3,6 +3,19 @@ package BIDMach.networks.layers
 import BIDMat.FFilter._
 import BIDMat.Filter._
 
+
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMach.datasources._
+import BIDMach.updaters._
+import BIDMach.mixins._
+import BIDMach.models._
+import BIDMach._
+import edu.berkeley.bid.CPUMACH
+import edu.berkeley.bid.CUMACH
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
 import BIDMach.networks._
 import java.util.Arrays
 import java.util.List
