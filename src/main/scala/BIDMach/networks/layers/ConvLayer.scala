@@ -25,8 +25,10 @@ import BIDMach.networks._
 */
 
 class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode) extends ModelLayer(net, opts) {
+    var filter:FFilter = null;
+    var updateFilter:FFilter = null;
 
-  def initModelMat(imageDim:IMat):FFilter = {
+  def initModelMat(imageDim:IMat, initFilter:bool):Mat = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
 
     val channel_in = imageDim(0);
@@ -35,27 +37,36 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val npad = opts.pad(0); //1;
     val nstride = opts.stride(0); // 1;
     val channel_out = opts.noutputs // actually # of filters;
-    
-    var filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-    filter = rand(filter)-0.5f; // How to randomize? using rand(out:FND)?
-    filter;
+    if(initFilter){ // if true, we are initializing initFilter, not updateFilter
+      filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+      filter = rand(filter.asMat)-0.5f; // How to randomize? using rand(out:FND)?
+      filter.asMat;
+    }
+    else{
+      updateFilter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+      updateFilter.asMat;
+    }
   }
 
   override def forward = {
     val start = toc;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-      modelmats(imodel) = initModelMat(inputData.dims); //Set the model
-      updatemats(imodel) = initModelMat(inputData.dims);  // Set the updatemats to be another FFilter
+      modelmats(imodel) = initModelMat(inputData.dims,true); //Set the model
+      updatemats(imodel) = initModelMat(inputData.dims,false);  // Set the updatemats to be another FFilter
       updatemats(imodel) = 0;
     }
 
+    //Load the modelmats back to the layer's own filter
+    filter.apply(modelmats(imodel))
+    updateFilter.apply(updatemats(imodel))
+
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
-      var result = modelmats(imodel)*inputData;
+      var result = filter*inputData;
       createOutput(result.dims);
       output = result;
     }
     else{
-      output ~ modelmats(imodel)*inputData; // actually it's same as filter.convolve(inputData)
+      output ~ filter*inputData; // actually it's same as filter.convolve(inputData)
     }
     // Not considering Bias for now (probably a little bit complicated?)
     clearDeriv;
@@ -67,16 +78,26 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     // Guess: convolveT - the gradient of input data
     //        convolveM - the gradient of the current Model (Filter)
 
+    //Load the modelmats back to the layer's own filter
+    filter.apply(modelmats(imodel))
+    updateFilter.apply(updatemats(imodel))
+
+
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
+      filter.convolveT(deriv.asMat, inputDeriv.asMat) // it actually put the computation result 
+      //inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
     }
     else{
-      inputDeriv.asMat ~ modelmats(imodel)^*(deriv.asMat);
+      filter.convolveT(deriv.asMat, inputDeriv.asMat)
+      //inputDeriv.asMat ~ modelmats(imodel)^*(deriv.asMat);
     }
 
-    updatemats(imodel).convolveM(inputData,deriv.asMat);
+    updateFilter.convolveM(inputData,deriv.asMat)
+
+    //save back the updateFilter
+    updatemats(imodel) = updateFilter.asMat
 
     //Should we handle the update of updatemats(imodel)? I think it should be handled in learner?
     backwardtime += toc - start;
