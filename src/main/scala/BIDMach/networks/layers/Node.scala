@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,Conv}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -165,6 +165,8 @@ object Node {
   def splitvert(a:NodeTerm, np:Int) = new SplitVertNode{inputs(0) = a; nparts = np};
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
+
+  def convolution(a:NodeTerm) = new CoinvolutionNode{inputs(0) = a};
   
   def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm, m:String)(opts:LSTMNodeOpts) = {
     val n = new LSTMNode;
