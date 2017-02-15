@@ -49,7 +49,7 @@ import BIDMach.updaters._
 
 // Basic in-memory GLM learner with explicit target matrix and d=1 for Logistic Reg.
 def learner(mat0:Mat, targ:Mat, d:Int) = {
-    class LearnOptions extends Learner.Options with GLM.Opts with MatSource.Opts with AusterityMH.Opts with ADAGrad.Opts with L1Regularizer.Opts
+    class LearnOptions extends Learner.Options with GLM.Opts with MatSource.Opts with AustereMH.Opts with ADAGrad.Opts with L1Regularizer.Opts
     val mopts = new LearnOptions;
     if (mopts.links == null) mopts.links = izeros(1,targ.nrows)
     mopts.links.set(d)
@@ -59,7 +59,7 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
         model, 
         mkRegularizer(mopts),
         //new Grad(mopts),
-        new AusterityMH(mopts), 
+        new AustereMH(mopts), 
         null,
         mopts)
     (mm, mopts)
@@ -67,7 +67,7 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
 
 val (mm, mopts) = learner(X_train, FMat(Y_train), 1)
 mopts.addConstFeat = false
-mopts.npasses = 1               // Large enough to get to desired sample count
+mopts.npasses = 500             // Large enough to get to desired sample count
 mopts.batchSize = 100
 mopts.lrate = 0.01
 
@@ -75,11 +75,11 @@ mopts.lrate = 0.01
 mopts.N = 13000                     // 13000 for regular MNIST
 mopts.temp = 100
 mopts.Nknown = true
-mopts.epsi = 0.05                   // epsilon in their algorithm
+mopts.epsi = 0.10                   // epsilon in their algorithm
 mopts.fixedEpsi = true              // fixed epsilon or not (usually true)
 mopts.sigmaProposer = 0.05f         // This turns into sigma*Identity 
-mopts.continueDespiteFull = false
-mopts.verbose = true
+mopts.continueDespiteFull = true    // Set as true for AustereMH
+mopts.verbose = false
 mopts.collectData = true            // CAUTION! May save a lot!
 mopts.collectDataDir = "outputs/data_austeremh/"   // Clear this directory
 mopts.exitTheta = true              // breaks out of program ...

@@ -120,12 +120,12 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
     val l2Bar = sumOfSquares/b.v
     val sampleStDev = sqrt((l2Bar - lBar*lBar) * (b/(b-1.0))).v
     val stDevOfLBar = (sampleStDev.v / sqrt(b).v) * sqrt(1 - (b.v-1.0)/(N-1.0)).v
-    val testStat = abs(lBar - mu0).v / stDevOfLBar
+    val testStat = (lBar - mu0) / stDevOfLBar
     
     // (Part 3) Now run their test.
     var accept = false
     val t = new TDistribution(b - 1.0)
-    val delta = (1.0 - t.cumulativeProbability(testStat)).v
+    val delta = (1.0 - t.cumulativeProbability(abs(testStat).v)).v
     if (opts.verbose) debugPrints(lBar, l2Bar, sampleStDev, stDevOfLBar, testStat, delta)
 
     if (delta < opts.epsi) {
@@ -220,7 +220,7 @@ class AustereMH(override val opts:AustereMH.Opts = new AustereMH.Options) extend
   /** This is for debugging. */
   def debugPrints(lBar:Float, l2Bar:Float, sampleStDev:Float, stDevOfLBar:Float, 
                   testStat:Float, delta:Float) {
-    println("b="+b+", n="+n+", mu0="+mu0+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
+    println("    b="+b+", n="+n+", mu0="+mu0+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
     println("mean(scores0)="+mean(scores0,2).dv+", mean(scores1)="+mean(scores1,2).dv)
     println("lBar="+lBar+", l2Bar="+l2Bar)
     println("sampleStDev="+sampleStDev+", stDevOfLBar="+stDevOfLBar)
