@@ -166,7 +166,7 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
 
-  def convolution(a:NodeTerm) = new CoinvolutionNode{inputs(0) = a};
+  def convolution(a:NodeTerm) = new ConvolutionNode{inputs(0) = a};
   
   def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm, m:String)(opts:LSTMNodeOpts) = {
     val n = new LSTMNode;

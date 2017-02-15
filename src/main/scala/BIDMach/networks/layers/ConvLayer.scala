@@ -17,8 +17,8 @@ import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3
 import java.util.HashMap
 import BIDMach.networks._
-import java.util.Arrays
-import java.util.List
+// import java.util.Arrays
+// import java.util.List
 
 /* Many issues to think of    
    How to consider bias...(maybe very difficult?)
@@ -26,17 +26,17 @@ import java.util.List
 
 class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode) extends ModelLayer(net, opts) {
 
-  def initModelMat(imageDim:Imat):Mat = {
+  def initModelMat(imageDim:IMat):FFilter = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
 
     val channel_in = imageDim(0);
-    val filter_h = opts.kernel(0); // 3;
+    val filter_h = opts.kernel(0); // 3;0
     val filter_w = opts.kernel(1); // 3;
     val npad = opts.pad(0); //1;
     val nstride = opts.stride(0); // 1;
     val channel_out = opts.noutputs // actually # of filters;
     
-    val filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+    var filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
     filter = rand(filter)-0.5f; // How to randomize? using rand(out:FND)?
     filter;
   }
@@ -50,7 +50,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     }
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
-      val result = modelmats(imodel)*inputData;
+      var result = modelmats(imodel)*inputData;
       createOutput(result.dims);
       output = result;
     }
