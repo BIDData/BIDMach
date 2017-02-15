@@ -17,7 +17,7 @@ import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3
 import java.util.HashMap
 import BIDMach.networks._
-// import java.util.Arrays
+import java.util.Arrays
 // import java.util.List
 
 /* Many issues to think of    
@@ -28,7 +28,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     var filter:FFilter = null;
     var updateFilter:FFilter = null;
 
-  def initModelMat(imageDim:IMat, initFilter:bool):Mat = {
+  def initModelMat(imageDim:IMat, initFilter:Boolean):Mat = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
 
     val channel_in = imageDim(0);
@@ -39,7 +39,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val channel_out = opts.noutputs // actually # of filters;
     if(initFilter){ // if true, we are initializing initFilter, not updateFilter
       filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      filter = rand(filter.asMat)-0.5f; // How to randomize? using rand(out:FND)?
+      filter.apply(rand(filter.asMat)-0.5f); // How to randomize? using rand(out:FND)?
       filter.asMat;
     }
     else{
@@ -86,15 +86,15 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      filter.convolveT(deriv.asMat, inputDeriv.asMat) // it actually put the computation result 
+      filter.convolveT(deriv, inputDeriv,true) // it actually put the computation result 
       //inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
     }
     else{
-      filter.convolveT(deriv.asMat, inputDeriv.asMat)
+      filter.convolveT(deriv, inputDeriv,true) // Have to check whether to set doclear = true?
       //inputDeriv.asMat ~ modelmats(imodel)^*(deriv.asMat);
     }
 
-    updateFilter.convolveM(inputData,deriv.asMat)
+    updateFilter.convolveM(inputData,deriv)
 
     //save back the updateFilter
     updatemats(imodel) = updateFilter.asMat
