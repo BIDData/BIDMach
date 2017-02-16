@@ -24,11 +24,13 @@ import java.util.Arrays
    How to consider bias...(maybe very difficult?)
 */
 
-class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode) extends ModelLayer(net, opts) {
+class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode ) extends ModelLayer(net, opts, 2) {
     var filter:FFilter = null;
     var updateFilter:FFilter = null;
+    var bias_mat:FND = null;
+    var update_bias_mat:FND = null;
 
-  def initModelMat(imageDim:IMat, initFilter:Boolean):Mat = {
+  def initModelMat(imageDim:IMat, initFilter:Boolean, initBias:Boolean = false):Mat = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
 
     val channel_in = imageDim(0);
@@ -37,11 +39,24 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val npad = opts.pad(0); //1;
     val nstride = opts.stride(0); // 1;
     val channel_out = opts.noutputs // actually # of filters;
-    if(initFilter){ // if true, we are initializing initFilter, not updateFilter
+
+    if(initBias){
+      // initialize bias matrix, should be the size of channel_out*h*w, would be applied to n samples
+      val biasDim = Array[Float](channel_out,filter_h,filter_w)
+      if(initFilter){
+        bias_mat = FND(biasDim, new Array[Float](channel_out*filter_h*filter_w))
+        bias_mat.asMat;
+      }
+      else{
+        update_bias_mat = FND(biasDim, new Array[Float](channel_out*filter_h*filter_w))
+        update_bias_mat.asMat;
+      }
+    } 
+    else if(initFilter){ // if true, we are initializing initFilter, not updateFilter
       filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
       filter.apply(rand(filter.asMat)-0.5f); // How to randomize? using rand(out:FND)?
       filter.asMat;
-    }
+    } 
     else{
       updateFilter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
       updateFilter.asMat;
@@ -52,21 +67,31 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val start = toc;
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = initModelMat(inputData.dims,true); //Set the model
-      updatemats(imodel) = initModelMat(inputData.dims,false);  // Set the updatemats to be another FFilter
-      updatemats(imodel) = 0;
+      if(opts.hasBias) modelmats(imodel+1) = initModelMat(inputData.dims,true,true); // Set the bias in modelmats
+      updatemats(imodel) = initModelMat(inputData.dims,false);  // Set the updatemats to be another FFilter // Set it to 0?
+      if(opts.hasBias) updatemats(imodel+1) = initModelMat(inputData.dims,false,true); // Set the bias in modelmats
     }
 
     //Load the modelmats back to the layer's own filter
     filter.apply(modelmats(imodel))
     updateFilter.apply(updatemats(imodel))
 
+    if(opts.hasBias){
+      bias_mat.apply(modelmats(imodel+1))
+      update_bias_mat.apply(updatemats(imodel+1))
+    }
+
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
       var result = filter*inputData;
       createOutput(result.dims);
+      if(opts.hasBias) result+=bias_mat // We want it to broadcast on the n samples.
       output = result;
     }
     else{
-      output ~ filter*inputData; // actually it's same as filter.convolve(inputData)
+      if(opts.hasBias){
+        output ~ filter*inputData + bias_mat;
+      }
+      else output ~ filter*inputData; // actually it's same as filter.convolve(inputData)
     }
     // Not considering Bias for now (probably a little bit complicated?)
     clearDeriv;
@@ -82,6 +107,14 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     filter.apply(modelmats(imodel))
     updateFilter.apply(updatemats(imodel))
 
+    if(opts.hasBias){
+      bias_mat.apply(modelmats(imodel+1))
+      update_bias_mat.apply(updatemats(imodel+1))
+    }
+
+    //Sum the matrix along the last dimension (of sample size n), need to find the correct syntax
+    //update_bias_mat ~ deriv.sum(axis = -1)
+    //updatemats(imodel+1) = update_bias_mat
 
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
