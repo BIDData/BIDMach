@@ -1,16 +1,16 @@
-:silent
-import BIDMat.TMat
+
+val dir = "../data/MNIST/"
+
+val Xtrain = loadFMat(dir + "train.fmat.lz4")
+val ytrain = loadIMat(dir + "ctrain.imat.lz4")
+
+val Xtest = loadFMat(dir + "test.fmat.lz4")
+val ytest = loadIMat(dir + "ctest.imat.lz4")
+
+val (nn,opts) = Net.learnerX(Xtrain, ytrain);
+
 
 /* options */
-
-val opts = new Net.FDSopts;
-
-//TF is using MNIST data
-val mdir = "../data/criteo/parts/"
-val fn1 = mdir+"docs%02d.smat.lz4";
-val fn2 = mdir+"cats%02d.fmat.lz4";
-opts.fnames = List(FileSource.simpleEnum(fn1,1,0),FileSource.simpleEnum(fn2,1,0));
-
 
 // TF settings 
 //training iterations = 200000
@@ -20,65 +20,54 @@ opts.fnames = List(FileSource.simpleEnum(fn1,1,0),FileSource.simpleEnum(fn2,1,0)
 //n_classes = 10 # MNIST total classes (0-9 digits)
 //dropout = 0.75 # Dropout, probability to keep units
 
-opts.eltsPerSample = 500;
-opts.nend = 90
-opts.batchSize= 128 //same with TF
-opts.npasses = 4
-
+opts.batchSize = 128 //same with TF
+opts.npasses = 10
 opts.lrate = 0.001f //same with TF
-opts.texp = 0.3f
-opts.pstep = 0.001f
-opts.aopts = opts
-//opts.reg1weight = 0.0001
-//opts.hasBias = true
-opts.links = iones(1,1);
-opts.nweight = 1e-4f
-opts.lookahead = 0
-opts.autoReset = false
-
-
+opts.hasBias = true
+opts.links = 2*iones(10,1)
+opts.targets = mkdiag(ones(10,1)) \ zeros(10, 784)
+opts.rmask = zeros(1,10) \ ones(1, 784)
+opts.lookahead = 2
+opts.featType = 1
+opts.order = 0
 
 import BIDMach.networks.layers._
 import BIDMach.networks.layers.Node
 import BIDMach.networks.layers.Node._
+import java.util.Arrays
+
+
 
 /* neural network design */
 
-val tshape = 0.2f
-val tms = Net.powerShape(tshape)_;
-val shape = irow(200,120,80,50,1);
 val in = input;
-val dropout = 0.75; //same
 
 //convolution layer
-val conv1= new ConvolutionNode{inputs(0) = in; outdim = shape(0); hasBias = opts.hasBias; aopts = opts.aopts; tmatShape = tms};
+val conv1 = new ConvolutionNode{
+  inputs(0) = in;
+  kernel = List[Integer](5, 5);
+  noutputs = 32;
+  hasBias = opts.hasBias;
+};
 
 //convolution layer
-val conv2=convolution(conv1)(outdim = shape(1), hasBias = opts.hasBias, aopts = opts.aopts);
+val conv2 = new ConvolutionNode{
+  inputs(0) = conv1;
+  kernel = List[Integer](5, 5);
+  noutputs = 64;
+  hasBias = opts.hasBias;
+};
 
 //fully connected layer
 //reshape conv2 output to fit fully connected layer input
-var fc1 = convolution(conv2)(outdim = shape(2), hasBias = opts.hasBias, aopts = opts.aopts);
-
-//Apply Dropout
-var drop = dropout(fc1, dropout);
+var fc1 = linear(conv2)(outdim = 1024, hasBias = opts.hasBias, aopts = opts.aopts);
 
 //Output, class prediction
-val out = glm(drop)(opts.links);
-val layers = Array(in, conv1, conv2, fc1, drop, out)
+val out = glm(fc1)(opts.links);
+val layers = Array(in, conv1, conv2, fc1, out)
 
 opts.nodeset = new NodeSet(layers);
 opts.what;
-println(tshape.toString);
-println(shape.toString);
-val zzero = gzeros(1,1)
-
-val nn = new Learner(new FileSource(opts),
-		     new Net(opts),
-		     null,
-		     new Batch, 
-		     null,
-		     opts);
 
 
 /* train */
@@ -86,20 +75,19 @@ val nn = new Learner(new FileSource(opts),
 val model = nn.model.asInstanceOf[Net]
 nn.train
 
+
 /* test */
 
-val testdata = loadSMat(mdir+"trainsortedx%02d.smat.lz4" format opts.nend);
-val testlabels = loadFMat(mdir+"trainlabel%02d.fmat.lz4" format opts.nend);
-
-val (mm, mopts) = Net.predictor(model, testdata);
+val (mm, mopts) = Net.predictor(model, Xtest);
 mm.predict
+
 
 /* benchmark */
 
-val preds=FMat(mm.preds(0))
+val preds = FMat(mm.preds(0))
 
-val ll = DMat(ln(preds *@ testlabels + (1-preds) *@ (1-testlabels)))
-val rc = roc(preds, testlabels, 1-testlabels, 1000);
+val ll = DMat(ln(preds *@ ytest + (1-preds) *@ (1-ytest)))
+val rc = roc(preds, ytest, 1-ytest, 1000);
 
 :silent
 
