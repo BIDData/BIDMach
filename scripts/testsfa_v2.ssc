@@ -1,0 +1,53 @@
+:silent
+import BIDMach.models.SMF
+
+/**
+ * Test SMF code on netflix data.
+ */
+
+val dir = "/data/netflix/"
+val a = loadSMat(dir+"newtrain.smat.lz4")
+val ta = loadSMat(dir+"newtest.smat.lz4")
+val d = 256
+
+val (nn,opts) = SMF.learner1(a, d)
+
+// Daniel Seita: I'm not sure if these values are good for netflix.
+opts.batchSize = 1000
+opts.uiter = 2
+// for acceptance = 1
+opts.urate = 0.01f
+opts.lrate = 0.01f  
+// for computed acceptance
+opts.urate = 0.1f
+opts.lrate = 0.1  
+opts.npasses = 1
+
+val lambda = 4f
+opts.lambdau = lambda;
+opts.regumean = lambda;
+opts.lambdam = lambda / 500000 * 20;
+opts.regmmean = opts.lambdam
+opts.evalStep = 31
+opts.doUsers = false
+opts.lsgd = 0.010f
+opts.what
+nn.train
+
+val model = nn.model.asInstanceOf[SMF]
+val xa = (ta != 0)
+val (mm, mopts) = SMF.predictor1(model, a, xa);
+mopts.batchSize = 10000
+mopts.uiter = 6
+mopts.urate = opts.urate
+mopts.lsgd = 0.0f
+mm.predict
+
+val pa = SMat(mm.preds(1));
+min(pa.contents,5,pa.contents)
+max(pa.contents,1,pa.contents)
+val diff = ta.contents - pa.contents
+val rmse = sqrt((diff ^* diff) / diff.length)
+println("rmse = %f" format rmse.v);
+
+sys.exit

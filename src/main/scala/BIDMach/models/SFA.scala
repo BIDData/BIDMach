@@ -216,6 +216,10 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
     Minv <-- inv(50f/nfeats*FMat(mm *^ mm) + opts.lambdau * diagM); 
   }
    
+  /** 
+   *  The evalfun normally called during training. Returns -RMSE on training
+   *  data minibatch (sdata).
+   */
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
     val preds = DDS(mm, user, sdata) + (iavg + avg);
     if (ogmats != null) {
@@ -230,6 +234,10 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   	-sqrt(row(vv/sdata.nnz))
   }
   
+  /** 
+   *  The evalfun normally called during testing and predicting. Returns -RMSE
+   *  on training data minibatch (sdata).
+   */
   override def evalfun(sdata:Mat, user:Mat, preds:Mat, ipass:Int, pos:Long):FMat = {
     val spreds = DDS(mm, user, sdata) + (iavg + avg);
   	val dc = sdata.contents;
@@ -267,25 +275,6 @@ object SFA  {
   }  
   class Options extends Opts {} 
   
-  def learner(mat0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with Grad.Opts
-    val opts = new xopts
-    opts.dim = d
-    opts.putBack = -1
-    opts.npasses = 4
-    opts.lrate = 0.1
-    opts.initUval = 0f;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0:Mat), opts),
-  	    new SFA(opts), 
-  	    null,
-  	    new Grad(opts), 
-  	    null,
-  	    opts)
-    (nn, opts)
-  }
-  
   def learnerX(mat0:Mat, d:Int) = {
     class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
@@ -303,25 +292,6 @@ object SFA  {
   	    null, 
   	    null,
   	    opts);
-    (nn, opts)
-  }
-  
-  def learner(mat0:Mat, user0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with Grad.Opts
-    val opts = new xopts
-    opts.dim = d
-    opts.putBack = 1
-    opts.npasses = 4
-    opts.lrate = 0.1;
-    opts.initUval = 0f;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    val nn = new Learner(
-        new MatSource(Array(mat0, user0), opts),
-        new SFA(opts), 
-        null,
-        new Grad(opts), 
-        null,
-        opts)
     (nn, opts)
   }
   
@@ -345,28 +315,9 @@ object SFA  {
     (nn, opts)
   }
   
-   def learnerY(mat0:Mat, user0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SFA.Opts with MatSource.Opts with ADAGrad.Opts
-    val opts = new xopts
-    opts.dim = d
-    opts.putBack = 1
-    opts.npasses = 4
-    opts.lrate = 0.1;
-    opts.initUval = 0f;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    val nn = new Learner(
-        new MatSource(Array(mat0, user0), opts),
-        new SFA(opts), 
-        null,
-        new ADAGrad(opts), 
-        null,
-        opts)
-    (nn, opts)
-  }
-  
-   class PredOpts extends Learner.Options with SFA.Opts with MatSource.Opts with MatSink.Opts
+  class PredOpts extends Learner.Options with SFA.Opts with MatSource.Opts with MatSink.Opts
      	
-   def predictor(model0:Model, mat1:Mat, preds:Mat) = {
+  def predictor(model0:Model, mat1:Mat, preds:Mat) = {
     val model = model0.asInstanceOf[SFA]
     val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
