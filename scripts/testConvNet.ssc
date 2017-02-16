@@ -1,7 +1,3 @@
-/* Quanlai Li
-* 2017-02-08
-*/
-
 :silent
 import BIDMat.TMat
 
@@ -10,8 +6,9 @@ import BIDMat.TMat
 val opts = new Net.FDSopts;
 
 //TF is using MNIST data
-val fn1 = mdir+"trainsortedx%02d.smat.lz4";
-val fn2 = mdir+"trainlabel%02d.fmat.lz4";
+val mdir = "../data/criteo/parts/"
+val fn1 = mdir+"docs%02d.smat.lz4";
+val fn2 = mdir+"cats%02d.fmat.lz4";
 opts.fnames = List(FileSource.simpleEnum(fn1,1,0),FileSource.simpleEnum(fn2,1,0));
 
 
