@@ -154,7 +154,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var axis:Int = 1
   var forceND:Boolean = false
 
-  def copyOpts(opts:LinNodeOpts):LinNodeOpts = {
+  def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
       super.copyOpts(opts);
       opts.noutputs = noutputs;
       opts.hasBias = hasBias;
