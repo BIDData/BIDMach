@@ -25,9 +25,9 @@ import java.util.Arrays
 */
 
 class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode ) extends ModelLayer(net, opts, 2) {
-    var filter:FFilter = null;
+    var filter:FFilter = null; 
     var updateFilter:FFilter = null;
-    var bias_mat:FND = null;
+    var bias_mat:FND = null; // it should be size (channel_out*1*1*1), to better broadcast?
     var update_bias_mat:FND = null;
 
   def initModelMat(imageDim:IMat, initFilter:Boolean, initBias:Boolean = false):Mat = {
@@ -54,7 +54,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     } 
     else if(initFilter){ // if true, we are initializing initFilter, not updateFilter
       filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      filter.apply(rand(filter.asMat)-0.5f); // How to randomize? using rand(out:FND)?
+      filter = FFilter(rand(filter.asMat)-0.5f,filter.dims); // How to randomize? using rand(out:FND)?
       filter.asMat;
     } 
     else{
@@ -73,12 +73,13 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     }
 
     //Load the modelmats back to the layer's own filter
-    filter.apply(modelmats(imodel))
-    updateFilter.apply(updatemats(imodel))
+    // Should be something like filter = FFilter(modelmats(imodel), filter.dims)
+    filter = FFilter(modelmats(imodel),filter.dims)
+    updateFilter = FFilter(updatemats(imodel),updateFilter.dims)
 
     if(opts.hasBias){
-      bias_mat.apply(modelmats(imodel+1))
-      update_bias_mat.apply(updatemats(imodel+1))
+      bias_mat = FND(modelmats(imodel+1),bias_mat.dims)
+      update_bias_mat = FND(updatemats(imodel+1),update_bias_mat.dims)
     }
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
@@ -145,10 +146,10 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 trait ConvolutionNodeOpts extends ModelNodeOpts {
   var noutputs:Int = 0
   var hasBias:Boolean = true
-  var pad:List[Integer] = null
-  var kernel:List[Integer] = null
-  var stride:List[Integer] = null
-  var dilation:List[Integer] = null //was dilation:List[Integer] = Arrays.asList(1)
+  var pad:IMat = null
+  var kernel:IMat = null
+  var stride:IMat = null
+  var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
   var group:Int = 1
   var axis:Int = 1
   var forceND:Boolean = false
