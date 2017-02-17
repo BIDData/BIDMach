@@ -54,7 +54,8 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     } 
     else if(initFilter){ // if true, we are initializing initFilter, not updateFilter
       filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      filter = FND(rand(filter.asMat)-0.5f,filter.dims); // How to randomize? using rand(out:FND)?
+      filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,(rand(filter.asMat)-0.5f).data) // Ugly way to do
+      //filter = FND(rand(filter.asMat)-0.5f,filter.dims); // How to randomize? using rand(out:FND)?
       filter.asMat;
     } 
     else{
@@ -73,14 +74,19 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     }
 
     //Load the modelmats back to the layer's own filter
-    // Should be something like filter = FFilter(modelmats(imodel), filter.dims)
-    filter = FFilter(modelmats(imodel),filter.dims)
-    updateFilter = FFilter(updatemats(imodel),updateFilter.dims)
+    //Should be.. (need to overload ‘apply’ function in FFilter)
+    //filter = FFilter(modelmats(imodel),filter.dims)
+    //updateFilter = FFilter(updatemats(imodel),updateFilter.dims)
 
+    filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,FMat(modelmats(imodel)).data) // Ugly way to do
+    updateFilter = new FFilter(updateFilter.inDims,updateFilter.outDims,updateFilter.stride,updateFilter.pad,updateFilter.outPad,
+                            FMat(updatemats(imodel)).data) // Ugly way to do
+    /*
     if(opts.hasBias){
       bias_mat = FND(modelmats(imodel+1),bias_mat.dims)
       update_bias_mat = FND(updatemats(imodel+1),update_bias_mat.dims)
     }
+    */
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
       var result = filter*inputData;
