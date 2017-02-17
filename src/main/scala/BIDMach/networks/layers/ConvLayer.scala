@@ -153,14 +153,39 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var group:Int = 1
   var axis:Int = 1
   var forceND:Boolean = false
+
+  def copyOpts(opts:LinNodeOpts):LinNodeOpts = {
+      super.copyOpts(opts);
+      opts.noutputs = noutputs;
+      opts.hasBias = hasBias;
+      opts.pad = pad;
+      opts.kernel = kernel;
+      opts.stride = stride;
+      opts.dilation = dilation;
+      opts.group = group;
+      opts.axis = axis;
+      opts.forceND = forceND;
+      opts;
+  }
+
 }
 
 class ConvolutionNode extends Node with ConvolutionNodeOpts {
 
-  override def clone:ConvolutionNode = copyTo(new ConvolutionNode).asInstanceOf[ConvolutionNode]
+  def copyTo(opts:ConvolutionNode):ConvolutionNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
+
+  override def clone:ConvolutionNode = {
+    copyTo(new ConvolutionNode ).asInstanceOf[ConvolutionNode]
+  }
   
-  override def create(net:Net):ConvolutionLayer = ConvolutionLayer(net, this)
-  
+  override def create(net:Net):ConvolutionLayer = {
+    ConvolutionLayer(net, this)
+  }
+
   override def toString = {
     "convolution@" + Integer.toHexString(hashCode() % 0x10000)
   }
