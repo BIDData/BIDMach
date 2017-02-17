@@ -48,6 +48,8 @@ val conv1 = new ConvolutionNode{
   kernel = 5\5;
   noutputs = 32;
   hasBias = false; //opts.hasBias;
+  stride = 1;
+  pad = 1;
 };
 
 //convolution layer
@@ -56,6 +58,8 @@ val conv2 = new ConvolutionNode{
   kernel = 5\5; // define an Imat
   noutputs = 64;
   hasBias = false; //opts.hasBias;
+  stride = 1;
+  pad = 1;
 };
 
 //fully connected layer
