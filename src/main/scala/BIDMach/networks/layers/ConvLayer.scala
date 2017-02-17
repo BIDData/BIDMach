@@ -42,7 +42,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
     if(initBias){
       // initialize bias matrix, should be the size of channel_out*h*w, would be applied to n samples
-      val biasDim = Array[Float](channel_out,filter_h,filter_w)
+      val biasDim = Array[Int](channel_out,filter_h,filter_w)
       if(initFilter){
         bias_mat = FND(biasDim, new Array[Float](channel_out*filter_h*filter_w))
         bias_mat.asMat;
@@ -54,7 +54,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     } 
     else if(initFilter){ // if true, we are initializing initFilter, not updateFilter
       filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      filter = FFilter(rand(filter.asMat)-0.5f,filter.dims); // How to randomize? using rand(out:FND)?
+      filter = FND(rand(filter.asMat)-0.5f,filter.dims); // How to randomize? using rand(out:FND)?
       filter.asMat;
     } 
     else{
