@@ -25,11 +25,11 @@ opts.npasses = 10
 opts.lrate = 0.001f //same with TF
 opts.hasBias = true
 opts.links = 2*iones(10,1)
-opts.targets = mkdiag(ones(10,1)) \ zeros(10, 784)
-opts.rmask = zeros(1,10) \ ones(1, 784)
-opts.lookahead = 2
+//opts.targets = mkdiag(ones(10,1)) \ zeros(10, 784)
+//opts.rmask = zeros(1,10) \ ones(1, 784)
+//opts.lookahead = 2
 opts.featType = 1
-opts.order = 0
+//opts.order = 0
 
 import BIDMach.networks.layers._
 import BIDMach.networks.layers.Node
@@ -45,17 +45,17 @@ val in = input;
 //convolution layer
 val conv1 = new ConvolutionNode{
   inputs(0) = in;
-  kernel = List[Integer](5, 5);
+  kernel = 5\5;
   noutputs = 32;
-  hasBias = opts.hasBias;
+  hasBias = false; //opts.hasBias;
 };
 
 //convolution layer
 val conv2 = new ConvolutionNode{
   inputs(0) = conv1;
-  kernel = List[Integer](5, 5);
+  kernel = 5\5; // define an Imat
   noutputs = 64;
-  hasBias = opts.hasBias;
+  hasBias = false; //opts.hasBias;
 };
 
 //fully connected layer
