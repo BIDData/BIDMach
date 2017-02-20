@@ -29,11 +29,13 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     var updateFilter:FFilter = null;
     var bias_mat:FND = null; // it should be size (channel_out*1*1*1), to better broadcast?
     var update_bias_mat:FND = null;
+    var inputDim:IMat = null; // Should be three numbers
+    var outputDim:IMat = null; //Should be three numbers
 
-  def initModelMat(imageDim:IMat, initFilter:Boolean, initBias:Boolean = false):Mat = {
+  def initModelMat(initFilter:Boolean, initBias:Boolean = false):Mat = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
-
-    val channel_in = imageDim(0);
+    inputDim = opts.imageDim
+    val channel_in = inputDim(0);
     val filter_h = opts.kernel(0); // 3;0
     val filter_w = opts.kernel(1); // 3;
     val npad = opts.pad(0); //1;
@@ -66,11 +68,17 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
   override def forward = {
     val start = toc;
+    // Must get the real inputData.dims in  (channel_in,h,w,n)
+    var inputData_FND_dims = inputDim\inputData.ncols
+    var inputData_FND = FND(inputData,inputData_FND_dims)
+    var output_FND:FND = null
+
+
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-      modelmats(imodel) = initModelMat(inputData.dims,true); //Set the model
-      if(opts.hasBias) modelmats(imodel+1) = initModelMat(inputData.dims,true,true); // Set the bias in modelmats
-      updatemats(imodel) = initModelMat(inputData.dims,false);  // Set the updatemats to be another FFilter // Set it to 0?
-      if(opts.hasBias) updatemats(imodel+1) = initModelMat(inputData.dims,false,true); // Set the bias in modelmats
+      modelmats(imodel) = initModelMat(true); //Set the model
+      if(opts.hasBias) modelmats(imodel+1) = initModelMat(true,true); // Set the bias in modelmats
+      updatemats(imodel) = initModelMat(false);  // Set the updatemats to be another FFilter // Set it to 0?
+      if(opts.hasBias) updatemats(imodel+1) = initModelMat(false,true); // Set the bias in modelmats
     }
 
     //Load the modelmats back to the layer's own filter
@@ -88,19 +96,21 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     }
     */
 
+
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
-      var result = filter*inputData;
+      var result = filter*inputData_FND;
       createOutput(result.dims);
       if(opts.hasBias) result+=bias_mat // We want it to broadcast on the n samples.
-      output = result;
+      output_FND = result;
     }
     else{
       if(opts.hasBias){
-        output ~ filter*inputData + bias_mat;
+        output_FND ~ filter*inputData_FND + bias_mat;
       }
-      else output ~ filter*inputData; // actually it's same as filter.convolve(inputData)
+      else output_FND ~ filter*inputData_FND; // actually it's same as filter.convolve(inputData)
     }
-    // Not considering Bias for now (probably a little bit complicated?)
+    output = output_FND.asMat
+    outputDim = output_FND.dims.colslice(0,3)
     clearDeriv;
     forwardtime += toc - start;
   }
@@ -123,18 +133,24 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     //update_bias_mat ~ deriv.sum(axis = -1)
     //updatemats(imodel+1) = update_bias_mat
 
+    
+    var inputData_FND_dims = inputDim\inputData.ncols
+    var inputData_FND = FND(inputData,inputData_FND_dims)
+    var inputDeriv_FND:FND = null;
+
+    var deriv_FND_dims = outputDim\output.ncols
+    var deriv_FND = FND(deriv,deriv_FND_dims)
+
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
-    if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      filter.convolveT(deriv.asInstanceOf[FND], inputDeriv.asInstanceOf[FND],true) // it actually put the computation result 
-      //inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
-    }
-    else{
-      filter.convolveT(deriv.asInstanceOf[FND], inputDeriv.asInstanceOf[FND],true) // Have to check whether to set doclear = true?
-      //inputDeriv.asMat ~ modelmats(imodel)^*(deriv.asMat);
-    }
 
-    updateFilter.convolveM(inputData.asInstanceOf[FND],deriv.asInstanceOf[FND])
+
+    filter.convolveT(deriv_FND, inputDeriv_FND,true) // Have to check whether to set doclear = true?
+    //inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
+    inputDeriv = inputDeriv_FND.asMat
+
+
+    updateFilter.convolveM(inputData_FND,deriv_FND)
 
     //save back the updateFilter
     updatemats(imodel) = updateFilter.asMat
@@ -159,6 +175,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var group:Int = 1
   var axis:Int = 1
   var forceND:Boolean = false
+  var imageDim:IMat // it should be something like 1*28*28 for MNIST, i.e. channel_in*h*w
 
   def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
       super.copyOpts(opts);

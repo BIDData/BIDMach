@@ -50,6 +50,7 @@ val conv1 = new ConvolutionNode{
   hasBias = false; //opts.hasBias;
   stride = 1;
   pad = 1;
+  imageDim = 1\28\28
 };
 
 //convolution layer
@@ -60,6 +61,7 @@ val conv2 = new ConvolutionNode{
   hasBias = false; //opts.hasBias;
   stride = 1;
   pad = 1;
+  imageDim = 32\26\26
 };
 
 //fully connected layer
