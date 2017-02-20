@@ -99,7 +99,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
       output_FND = filter*inputData_FND;
-      outputDim = result.dims.colslice(0,3)
+      outputDim = output_FND.dims.colslice(0,3)
 
       createOutput(outputDim\inputData.ncols);
 
