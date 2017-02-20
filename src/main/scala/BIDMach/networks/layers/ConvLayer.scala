@@ -69,7 +69,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
   override def forward = {
     val start = toc;
     // Must get the real inputData.dims in  (channel_in,h,w,n)
-    var inputData_FND_dims = inputDim\inputData.ncols
+    var inputData_FND_dims = opts.imageDim\inputData.ncols
     var inputData_FND = FND(inputData.asMat.asInstanceOf[FMat],inputData_FND_dims)
     var output_FND:FND = null
 
@@ -134,7 +134,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     //updatemats(imodel+1) = update_bias_mat
 
     
-    var inputData_FND_dims = inputDim\inputData.ncols
+    var inputData_FND_dims = opts.imageDim\inputData.ncols
     var inputData_FND = FND(inputData.asMat.asInstanceOf[FMat],inputData_FND_dims)
     var inputDeriv_FND:FND = null;
 
