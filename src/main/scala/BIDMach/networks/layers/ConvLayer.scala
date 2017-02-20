@@ -98,20 +98,20 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
-      var result = filter*inputData_FND;
+      output_FND = filter*inputData_FND;
       outputDim = result.dims.colslice(0,3)
 
       createOutput(outputDim\inputData.ncols);
 
-      if(opts.hasBias) result+=bias_mat // We want it to broadcast on the n samples.
+      if(opts.hasBias) output_FND+=bias_mat // We want it to broadcast on the n samples.
     }
     else{
       if(opts.hasBias){
-        result ~ filter*inputData_FND + bias_mat;
+        output_FND ~ filter*inputData_FND + bias_mat;
       }
-      else result ~ filter*inputData_FND; // actually it's same as filter.convolve(inputData)
+      else output_FND ~ filter*inputData_FND; // actually it's same as filter.convolve(inputData)
     }
-    output = result.reshape(Array[Int](outputDim(0)*outputDim(1)*outputDim(2),inputData.ncols))
+    output = output_FND.reshape(Array[Int](outputDim(0)*outputDim(1)*outputDim(2),inputData.ncols))
     
     clearDeriv;
     forwardtime += toc - start;
