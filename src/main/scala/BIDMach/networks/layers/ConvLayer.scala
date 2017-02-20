@@ -175,7 +175,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var group:Int = 1
   var axis:Int = 1
   var forceND:Boolean = false
-  var imageDim:IMat // it should be something like 1*28*28 for MNIST, i.e. channel_in*h*w
+  var imageDim:IMat = null // it should be something like 1*28*28 for MNIST, i.e. channel_in*h*w
 
   def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
       super.copyOpts(opts);
