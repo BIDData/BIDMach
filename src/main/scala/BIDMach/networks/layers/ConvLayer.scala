@@ -70,7 +70,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val start = toc;
     // Must get the real inputData.dims in  (channel_in,h,w,n)
     var inputData_FND_dims = inputDim\inputData.ncols
-    var inputData_FND = FND(inputData,inputData_FND_dims)
+    var inputData_FND = FND(inputData.asMat,inputData_FND_dims)
     var output_FND:FND = null
 
 
@@ -135,11 +135,11 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
     
     var inputData_FND_dims = inputDim\inputData.ncols
-    var inputData_FND = FND(inputData,inputData_FND_dims)
+    var inputData_FND = FND(inputData.asMat,inputData_FND_dims)
     var inputDeriv_FND:FND = null;
 
     var deriv_FND_dims = outputDim\output.ncols
-    var deriv_FND = FND(deriv,deriv_FND_dims)
+    var deriv_FND = FND(deriv.asMat,deriv_FND_dims)
 
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
