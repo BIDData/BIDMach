@@ -68,11 +68,12 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
   override def forward = {
     val start = toc;
+    log("This is a silly debug message %d\n" format (1));
     // Must get the real inputData.dims in  (channel_in,h,w,n)
     var inputData_FND_dims = opts.imageDim\inputData.ncols
     var inputData_FND = inputData.asInstanceOf[FND].reshape(inputData_FND_dims.data)
     var output_FND:FND = null
-
+    log("This is a silly debug message %d\n" format (2));
 
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = initModelMat(true); //Set the model
