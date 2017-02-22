@@ -25,8 +25,8 @@ val gmachines = irow(0->nmachines);
 
 m.init
 m.config(gmods, gmachines, addresses)
-m.sendConfig
 m.setMachineNumbers
+m.sendConfig
 
 //m.startLearners
 //m.startUpdates

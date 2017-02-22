@@ -3,9 +3,9 @@ import BIDMach.allreduce.{Master,Worker,Command}
 
 val datadir = "/mnt/BIDMach/data/rcv1/"
 
-var addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
-  map(InetAddress.getByName(_).getHostAddress()).
-  map(new InetSocketAddress(_, 50050)).toArray
+val addresses = new Array[InetSocketAddress](2)
+addresses(0) = new InetSocketAddress("0.0.0.0", 12345)
+addresses(1) = new InetSocketAddress("0.0.0.0", 22345)
 
 val m = new Master();
 val opts = m.opts;
@@ -92,3 +92,4 @@ m.sendConfig
 // val wmean = mean(rc)*nc/sum(nc)
 // println("roc6 = %5.4f, roc weighted mean = %5.4f" format (mean(rc)(6), wmean.v))
 //
+
