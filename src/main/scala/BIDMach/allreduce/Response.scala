@@ -23,8 +23,9 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
-
-class Response(val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:Array[Byte]) {
+class Response(
+  val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:Array[Byte], val blen:Int
+) {
   val magic = Response.magic;
   var round = round0;
   val byteData = ByteBuffer.wrap(bytes);
@@ -35,9 +36,10 @@ class Response(val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:A
   def encode() = {}
   def decode() = {}
   
-  def this(rtype0:Int, round0:Int, dest0:Int, clen0:Int) = this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0));
+  def this(rtype0:Int, round0:Int, dest0:Int, clen0:Int) =
+    this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0);
   
-  def this(rtype0:Int, round0:Int, dest0:Int) = this(rtype0, round0, dest0, 0, null);
+  def this(rtype0:Int, round0:Int, dest0:Int) = this(rtype0, round0, dest0, 0, null, 0);
   
   override def toString():String = {
     "Response %s, round %d, src %d, length %d bytes" format (Command.names(rtype), round, src, clen*4);
@@ -45,21 +47,49 @@ class Response(val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:A
   
 }
 
-class ReturnObjectResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte]) extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes) {
+class AllreduceResponse(round0:Int, src0:Int, bytes:Array[Byte])
+extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4) {
+
+  def this(round0:Int, src0:Int) = this(round0, src0, new Array[Byte](1*4));
+
+  override def encode():Unit = {
+    intData.rewind();
+    intData.put(src);
+  }
+
+  override def decode():Unit = {}
+}
+
+class LearnerDoneResponse(round0:Int, src0:Int, bytes:Array[Byte])
+extends Response(Command.learnerDoneCtype, round0, src0, 1, bytes, 1*4) {
+
+  def this(round0:Int, src0:Int) = this(round0, src0, new Array[Byte](1*4));
+
+  override def encode():Unit = {
+    intData.rewind();
+    intData.put(src);
+  }
+
+  override def decode():Unit = {}
+}
+
+
+class ReturnObjectResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
+extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes, bytes.size) {
 
   var obj:AnyRef = obj0;
 
   def this(round0:Int, dest0:Int, obj0:AnyRef) = {
     this(round0, dest0, obj0, {
-    	val out  = new ByteArrayOutputStream();
-    	val output = new ObjectOutputStream(out);
-    	output.writeObject(obj0);
-    	output.close;
-    	out.toByteArray()});
+      val out  = new ByteArrayOutputStream()
+      val output = new ObjectOutputStream(out)
+      output.writeObject(obj0)
+      output.close
+      out.toByteArray()
+    });
   }
   
-  override def encode ():Unit = {
-  }
+  override def encode ():Unit = { }
   
   override def decode():Unit = {    
 		val in = new ByteArrayInputStream(bytes);
@@ -84,7 +114,8 @@ class ResponseWriter(address:InetSocketAddress, resp:Response, me:Worker) extend
       ostr.writeInt(resp.round);
 			ostr.writeInt(resp.src);
 			ostr.writeInt(resp.clen);
-			ostr.write(resp.bytes, 0, resp.clen*4);   
+	ostr.writeInt(resp.blen);
+	ostr.write(resp.bytes, 0, resp.blen);
 		}
 	} catch {
 	case e:Exception =>
@@ -109,9 +140,21 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
         val round = istr.readInt();
         val dest = istr.readInt();
         val clen = istr.readInt();
-        val response = new Response(rtype, round, dest, clen, new Array[Byte](clen*4));
+        val blen = istr.readInt();
+        val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen);
         if (me.opts.trace > 2) me.log("Master got packet %s\n" format (response.toString));
-        istr.readFully(response.bytes, 0, clen*4);
+        istr.readFully(response.bytes, 0, blen);
+
+        rtype match {
+          case Command.allreduceCtype => {
+            me.listener.allreduceCollected += 1
+          }
+          case Command.learnerDoneCtype => {
+            me.stopUpdates()
+            me.log("Stopping allreduce update!\n")
+          }
+          case _ =>
+        }
         try {
           socket.close();
         } catch {
@@ -142,8 +185,3 @@ object Response {
     str;
   }
 }
-
-
-
-
-

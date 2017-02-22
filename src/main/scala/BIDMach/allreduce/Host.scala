@@ -11,6 +11,7 @@ import java.util.concurrent.Future;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -27,22 +28,21 @@ import java.io.IOException;
 
 
 class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
-  
+
   var M = 0;
   var imach = 0;
   var round = 0;
   var gmods:IMat = null;
   var gridmachines:IMat = null;
-  var master:InetSocketAddress = null;
-  var workers:Array[InetSocketAddress] = null; 
+  var workers:Array[InetSocketAddress] = null;
   var groups:Groups = null;
-  var executor:ExecutorService = null;  
-  
+  var executor:ExecutorService = null;
+
   def log(msg:String) {
-    print(msg); 
+    print(msg);
   }
- 
-  class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {   
+
+  class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {
 	  def run() {
 		  try {
 			  Thread.sleep(mtime);
@@ -69,9 +69,9 @@ object Host {
     var responseSocketNum = 50049;
     var peerSocketNum = 50051;
   }
-  
-  class Options extends Opts {} 
-  
+
+  class Options extends Opts {}
+
   def inetIntToFields(v:Int):(Int,Int,Int,Int) = {
     val p0 = (v >> 24) & 255;
     val p1 = (v >> 16) & 255;
@@ -79,11 +79,11 @@ object Host {
     val p3 = v & 255;
     (p0,p1,p2,p3)
    }
-  
+
   def inetFieldsToInt(a:Int, b:Int, c:Int, d:Int):Int = {
     d + ((c + ((b + (a << 8)) << 8)) << 8);
   }
-  
+
   def inetFieldsToString(p0:Int, p1:Int, p2:Int, p3:Int) = {
 	  "%d.%d.%d.%d" format(p0,p1,p2,p3);
   }
@@ -92,22 +92,22 @@ object Host {
 	  val (p0, p1, p2, p3) = inetIntToFields(v);
 	  "%d.%d.%d.%d" format(p0,p1,p2,p3);
   }
-  
+
   def inetStringToFields(s:String):(Int, Int, Int, Int) = {
     val fields = s.split("\\.");
     val ff = fields.map(_.toInt);
     (ff(0), ff(1), ff(2), ff(3))
   }
-  
+
   def inetStringToInt(s:String):Int = {
     val (p0,p1,p2,p3) = inetStringToFields(s);
     inetFieldsToInt(p0,p1,p2,p3)
   }
-  
+
   def hostPortToInet(host:Int, port:Int):InetSocketAddress = {
 	  new InetSocketAddress(inetIntToString(host), port);
   }
-  
+
   def hostPortsToInet(hosts:IMat, ports:IMat):Array[InetSocketAddress] = {
     val out = new Array[InetSocketAddress](hosts.length);
     for (i <- 0 until hosts.length) {
@@ -115,7 +115,7 @@ object Host {
     }
     out;
   }
-  
+
   def printStackTrace(e:Exception):String = {
     val baos = new ByteArrayOutputStream();
     val ps = new PrintStream(baos);
@@ -124,7 +124,7 @@ object Host {
     ps.close();
     str;
   }
-  
+
   def getHosts(fname:String, defaultPort:Int = 50050):Array[InetSocketAddress] = {
     var i = 0;
     val ff = new BufferedReader(new FileReader(fname));
@@ -140,6 +140,6 @@ object Host {
     ff.close();
     hosts.toArray;
   }
-  
+
 }
 

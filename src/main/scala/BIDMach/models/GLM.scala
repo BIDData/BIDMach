@@ -244,7 +244,7 @@ object GLM {
   val maxp = 2;
   val svm = 3;
 
-  object LinearLink extends GLMlink {
+  object LinearLink extends GLMlink with Serializable {
   	def link(in:Float) = {
   		in
   	}
@@ -273,7 +273,7 @@ object GLM {
   	val fnflops = 2;
   }
 
-  object LogisticLink extends GLMlink {
+  object LogisticLink extends GLMlink with Serializable {
   	def link(in:Float) = {
   		math.log(in / (1.0f - in)).toFloat;
   	}
@@ -308,7 +308,7 @@ object GLM {
   }
 
 
-  object MaxpLink extends GLMlink {
+  object MaxpLink extends GLMlink with Serializable {
   	def link(in:Float) = {
   		math.log(in / (1.0f - in)).toFloat;
   	}
@@ -342,7 +342,7 @@ object GLM {
   	val fnflops = 20;
   }
 
-  object SVMLink extends GLMlink {
+  object SVMLink extends GLMlink with Serializable {
   	def link(in:Float) = {
   		in
   	}
@@ -372,7 +372,7 @@ object GLM {
   	val fnflops = 2;
   }
 
-  object LinkEnum extends Enumeration {
+  object LinkEnum extends Enumeration with Serializable {
   	type LinkEnum = Value;
   	val Linear, Logistic, Maxp, SVMLink = Value
   }
@@ -926,6 +926,21 @@ object GLM {
   }
   
   class GOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts 
+  class GUnboundOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with DataSource.Opts with Batch.Opts;
+
+  // A learner with no bound datasource
+  def learner():(Learner, GUnboundOptions) = {
+    val opts = new GUnboundOptions;
+    opts.lrate = 1f
+    val nn = new Learner(
+      null,
+      new GLM(opts),
+      mkRegularizer(opts),
+      new ADAGrad(opts),
+      null,
+      opts)
+    (nn, opts)
+  }
 
   // A learner that uses a general data source (e.g. a files data source). 
   // The datasource options (like batchSize) need to be set externally. 
@@ -960,16 +975,16 @@ object GLM {
   
   class FGOptions extends Learner.Options with GLM.Opts with ADAGrad.Opts with L1Regularizer.Opts with FileSource.Opts
   
-  // A learner that uses a files data source specified by a list of strings.  
-  def learner(fnames:List[String]):(Learner, FGOptions) = {
+  def learner(datafile:String, labelfile:String):(Learner, FGOptions) =
+    learner(List(FileSource.simpleEnum(datafile, 1, 0), FileSource.simpleEnum(labelfile, 1, 0)))
+
+  def learner(fnames:List[(Int)=>String]):(Learner, FGOptions) = {
     val mopts = new FGOptions;
     mopts.lrate = 1f;
-    val model = new GLM(mopts);
-    mopts.fnames = fnames.map((a:String) => FileSource.simpleEnum(a,1,0));
-    val ds = new FileSource(mopts);    
+    mopts.fnames = fnames;
     val mm = new Learner(
-        ds, 
-        model, 
+      new FileSource(mopts),
+      new GLM(mopts),
         mkRegularizer(mopts),
         new ADAGrad(mopts), 
         null,

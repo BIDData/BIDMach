@@ -1,0 +1,112 @@
+:silent
+
+/**
+ * This will test using our MH Test Updater. The code here:
+ *  
+ * - Loads a dataset (not on GitHub). Note: *targets* will be 0s and 1s.
+ * - Defines its own learner which uses the new updater.
+ * - Then it runs GLM with logistic regression.
+ *
+ * After this, run `./bidmach scripts/analyze_mhtest_logreg.ssc`. The two
+ * scripts are designed to be run in sequence since the latter is to test
+ * **every sample of \theta** and to package it up nicely for Jupyter Notebooks.
+ * You will have to ensure that the training and testing datasets are correct.
+ *
+ * For regular MNIST with 1s and 7s we have:
+ *
+ *  size(X_train) = (784,13007)
+ *  size(Y_train) = (1,13007)
+ *  size(X_test)  = (784,2163)
+ *  size(Y_test)  = (1,2163)
+ *
+ */
+
+// Our training data may change. (IF SO, CHANGE `opts.N` BELOW!!)
+// stout OR bitter:
+val X_train = loadFMat("/home/seita/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
+val Y_train = loadIMat("/home/seita/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
+// Daniel's personal computer
+//val X_train = loadFMat("/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
+//val Y_train = loadIMat("/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
+
+// Test data should be consistent regardless of MNIST (or MNIST8M) training data.
+// stout OR bitter:
+val X_test  = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test  = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+// Daniel's personal computer
+//val X_test  = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+//val Y_test  = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+Y_train(find(Y_train == -1)) = 0
+Y_test(find(Y_test == -1)) = 0
+
+:silent
+// Logistic regression from GLM, type=1, with test data pre-loaded.
+// mm = the training learner (model, datasource, updater), with options mopts
+// nn = the predicting learner, with options nopts
+import BIDMach.models.GLM._
+import BIDMach.updaters._
+
+// Basic in-memory GLM learner with explicit target matrix and d=1 for Logistic-Reg.
+// I'm going to use the MHTest(mopts) here, with mostly default settings.
+def learner(mat0:Mat, targ:Mat, d:Int) = {
+    class LearnOptions extends Learner.Options with GLM.Opts with MatSource.Opts with MHTest.Opts with ADAGrad.Opts with L1Regularizer.Opts
+    val mopts = new LearnOptions;
+    if (mopts.links == null) mopts.links = izeros(1,targ.nrows)
+    mopts.links.set(d)
+    val model = new GLM(mopts)
+    val mm = new Learner( 
+        new MatSource(Array(mat0, targ), mopts), 
+        model, 
+        mkRegularizer(mopts),
+        //new Grad(mopts),
+        new MHTest(mopts), 
+        null,
+        mopts)
+    (mm, mopts)
+}
+
+val (mm, mopts) = learner(X_train, FMat(Y_train), 1)
+mopts.addConstFeat = false
+mopts.npasses = 400               // Large enough to get to desired sample count
+mopts.batchSize = 100
+mopts.lrate = 0.01
+
+// Some new stuff due to the MHTest opts. CHECK THESE CAREFULLY!
+mopts.N = 13000                     // 13000 for regular MNIST
+mopts.temp = 100
+mopts.Nknown = true
+mopts.n2lsigma = 1.0f               // 1.0f by default
+mopts.nn2l = 4000                   // 4000 by default
+mopts.sigmaProposer = 0.05f         // This turns into sigma*Identity 
+mopts.continueDespiteFull = false
+mopts.verboseMH = false
+mopts.collectData = true            // CAUTION! May save a lot!
+mopts.collectDataDir = "outputs/data_mhtest/"   // Clear this directory
+mopts.exitTheta = true              // breaks out of program ...
+mopts.exitThetaAmount = 10000       // means we collect this many thetas
+mopts.initThetaHere = true          // break symmetry at the start
+mopts.burnIn = -1                   // change stuff after this (set to -1 to ignore)
+mopts.tempAfterBurnin = 1           // after burn-in, change temp to this
+mopts.sigmaProposerAfterBurnin = 0.005f    // After burn-in, change sigma
+
+mopts.matrixOfScores = true         // This is actually a GLM setting
+mopts.what
+val model = mm.model.asInstanceOf[GLM]
+mm.train
+
+val (nn, nopts) = GLM.predictor(model, X_test)
+nopts.addConstFeat = false
+nopts.batchSize = X_test.ncols
+nopts.links = nopts.links
+nn.predict
+
+// Now evaluate performance by setting 0.5 as the cutoff.
+:silent
+val te_preds = FMat(nn.preds(0))
+te_preds(find(te_preds < 0.5)) = 0
+te_preds(find(te_preds >= 0.5)) = 1
+:silent
+
+val accuracy = (Y_test == te_preds).nnz.toFloat / (te_preds.nrows*te_preds.ncols)
+print("\nAccuracy at a decision threshold of 0.5: %.4f\n" format accuracy)
+sys.exit

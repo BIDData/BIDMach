@@ -13,13 +13,15 @@ import java.util.concurrent.Future;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
-import scala.tools.nsc.interpreter.IMain
+import java.util.concurrent.Callable
+import javax.script.ScriptContext
 
 class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
@@ -30,9 +32,12 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var obj:AnyRef = null;
 	var str:String = null;
 	var model:Model = null;
-  var intp:ScriptEngine = null;
+	var intp:ScriptEngine = null;
+	var masterSocketAddr:InetSocketAddress = null;
+	var workerIP:InetAddress = null;
 
 	def start(learner0:Learner) = {
+	  workerIP = InetAddress.getLocalHost;
 	  learner = learner0;
 	  if (model == null && learner != null) model = learner.model;
 	  executor = Executors.newFixedThreadPool(8);
@@ -41,14 +46,19 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  intp = new ScriptEngineManager().getEngineByName("scala");
 	}
 
-  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress]) = {
+  def config(imach0: Int, gmods0: IMat, gridmachines0: IMat, workers0: Array[InetSocketAddress],
+             masterSocketAddr0: InetSocketAddress) = {
     val t1 = toc;
     imach = imach0;
     gmods = gmods0;
     gridmachines = gridmachines0;
     M = gridmachines.length;
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
-    workers = workers0;
+
+    // Add 3 so that Machine port doesn't overlap with Worker ports
+    workers = workers0.map((x) => new InetSocketAddress(x.getAddress(), x.getPort() + 3))
+
+    masterSocketAddr = masterSocketAddr0;
     if (machine != null) machine.stop;
     machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers);
     machine.configTimeout = opts.configTimeout;
@@ -89,6 +99,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		}
     		machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
     	}
+
     	model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
     	model.addStep(limit.toInt, opts.doAvg);
     	val t2 = toc;
@@ -105,7 +116,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   def stop = {
     listener.stop = true;
     listenerTask.cancel(true);
-    machine.stop;
+    if (machine != null) machine.stop;
   }
 
   def shutdown = {
@@ -121,10 +132,13 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
-    		val newcmd = new ConfigCommand(0, 0, null, null, null, null, cmd.clen, cmd.bytes);
+		val newcmd = new ConfigCommand(0, cmd.dest, null, null, null, null, -1, -1, cmd.clen, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-    		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines, Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts));
+		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines,
+		  Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts),
+		  Host.hostPortToInet(newcmd.masterIP, newcmd.masterResPort)
+		);
     		if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
     	}
     	case Command.permuteCtype => {
@@ -139,7 +153,14 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		allReduce(newcmd.round, newcmd.limit);
-    		if (opts.respond > 0) sendMaster(new Response(Command.allreduceCtype, newcmd.round, imach));
+
+		if (learner.done) {
+		  val resp = new LearnerDoneResponse(cmd.round, cmd.dest)
+		  sendMaster(resp)
+		} else {
+		  val resp = new AllreduceResponse(cmd.round, cmd.dest)
+		  sendMaster(resp)
+		}
     	}
     	case Command.permuteAllreduceCtype => {
     		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes);
@@ -193,10 +214,11 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     	case Command.callCtype => {
     		val newcmd = new CallCommand(0, cmd.dest, null, cmd.bytes);
     		newcmd.decode;
-    		obj = newcmd.callable.call;
+		obj = newcmd.func(this);
+		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
+		if (opts.trace > 3) log("Computed %s\n" format obj.toString);
     		val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
     		sendMaster(resp);
-    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     	}
     	}
     }
@@ -250,7 +272,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
 
 	def sendMaster(resp:Response):Future[_] = {
-    val cw = new ResponseWriter(master, resp, this);
+    val cw = new ResponseWriter(masterSocketAddr, resp, this);
     executor.submit(cw);
   }
 }

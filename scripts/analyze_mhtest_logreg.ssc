@@ -1,7 +1,7 @@
 :silent
 
 /**
- * This script is to be run *after* `./bidmach scrpts/mh_test.ssc`, i.e. the
+ * This script is to be run *after* `./bidmach scrpts/test_mh.ssc`, i.e. the
  * normal logistic regression code. Run that code with the settings set so that
  * it will exit after 3000 or so iterations, so we can get an exact sample
  * count. This will collect all the output matrices, perform **prediction** on
@@ -18,14 +18,14 @@
 
 // Double-check these.
 val total = 10000
-val datadir = "outputs/data_mhtest/"
+val datadir = "outputs/data_austeremh/"
 
 // On stout OR bitter:
-val X_test = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
-val Y_test = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+//val X_test = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+//val Y_test = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
 // On Daniel's personal computer:
-//val X_test = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
-//val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+val X_test = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
 
 
 /**

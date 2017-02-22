@@ -1,0 +1,15 @@
+// This script needs to be run after getmnist8m_finesplit.sh
+// from the $BIDMACH_DATA_HOME/MNIST8M/parts_fine directory
+
+for (i <- 0 until 800) {
+    val (d,c,w) = loadLibSVM("part%03d" format i, 784);
+    val fd = full(d);
+    val fc = accum(c.t \ icol(0->c.length), 1f, 10, c.length);
+    saveIMat("cat%03d.imat.lz4" format i, c);
+    saveFMat("data%03d.fmat.lz4" format i, fd);
+    saveFMat("cat_onehot%03d.fmat.lz4" format i, fc);
+    val alls = (fc * 10000f) on fd;
+    saveFMat("alls%03d.fmat.lz4" format i, alls);
+
+    println("%d / 800 processed" format i);
+}
