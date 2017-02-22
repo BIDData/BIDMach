@@ -1,5 +1,5 @@
 
-val dir = "../data/MNIST/"
+val dir = "/opt/BIDMach/data/MNIST/"
 
 :silent
 val Xtrain = loadFMat(dir + "train.fmat.lz4")

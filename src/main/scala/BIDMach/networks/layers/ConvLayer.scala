@@ -4,7 +4,7 @@ import BIDMat.FFilter._
 import BIDMat.Filter._
 
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat,FFilter,FND}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat,FFilter,FND,GND,Filter,ND}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -31,6 +31,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     var update_bias_mat:FND = null;
     var inputDim:IMat = null; // Should be three numbers
     var outputDim:IMat = null; //Should be three numbers
+    var outputND:ND = null;
 
   def initModelMat(initFilter:Boolean, initBias:Boolean = false):Mat = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
@@ -68,11 +69,10 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
   override def forward = {
     val start = toc;
+
     // Must get the real inputData.dims in  (channel_in,h,w,n)
-    var inputData_FND_dims = opts.imageDim\inputData.ncols
-    var inputData_FND = FND(FMat(inputData.asMat),inputData_FND_dims)
-    // var inputData_FND = inputData.asInstanceOf[FND].reshape(inputData_FND_dims.data)
-    var output_FND:FND = null
+    var inputData_FND_dims = opts.imageDim \ inputData.ncols
+    var inputData_FND = new FND(inputData_FND_dims.data, inputData.asInstanceOf[FMat].data)
 
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = initModelMat(true); //Set the model
@@ -97,23 +97,22 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     */
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
-      output_FND = filter*inputData_FND;
-      outputDim = output_FND.dims.colslice(0,3)
-
-      createOutput(outputDim\inputData.ncols);
-
-      if(opts.hasBias) output_FND+=bias_mat // We want it to broadcast on the n samples.
+      var outputDim2 = Filter.getOutputDims(inputData_FND.dims, filter.inDims, filter.outDims, filter.stride, filter.pad, filter.outPad)
+      outputDim = outputDim2(?, 0 -> 3)
+      //createOutput((outputDim(0)*outputDim(1)*outputDim(2)) \ inputData.ncols)
+      output = FMat.zeros((outputDim(0)*outputDim(1)*outputDim(2)), inputData.ncols)
+      outputND = new FND(outputDim2.data, output.asInstanceOf[FMat].data)
     }
-    else{
-      if(opts.hasBias){
-        output_FND ~ filter*inputData_FND + bias_mat;
-      }
-      else output_FND = filter*inputData_FND; // actually it's same as filter.convolve(inputData)
+
+    if (opts.hasBias) {
+      filter.convolve(inputData_FND, outputND, true)
+      outputND ~ outputND + bias_mat
+    } else {
+      filter.convolve(inputData_FND, outputND, true)
     }
-    output = output_FND.reshape(Array[Int](outputDim(0)*outputDim(1)*outputDim(2),inputData.ncols))
     
-    clearDeriv;
-    forwardtime += toc - start;
+    clearDeriv
+    forwardtime += toc - start
   }
 
   override def backward = {
