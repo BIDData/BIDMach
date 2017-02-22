@@ -30,6 +30,7 @@ opts.links = 2*iones(10,1)
 //opts.lookahead = 2
 opts.featType = 1
 //opts.order = 0
+//opts.useGPU = false
 
 import BIDMach.networks.layers._
 import BIDMach.networks.layers.Node
@@ -66,7 +67,7 @@ val conv2 = new ConvolutionNode{
 
 //fully connected layer
 //reshape conv2 output to fit fully connected layer input
-var fc1 = linear(conv2)(outdim = 1024, hasBias = opts.hasBias, aopts = opts.aopts);
+var fc1 = linear(conv2)(outdim = 1024, hasBias = opts.hasBias, aopts = opts.aopts )
 
 //Output, class prediction
 val out = glm(fc1)(opts.links);

@@ -47,22 +47,22 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
       val biasDim = Array[Int](channel_out,filter_h,filter_w)
       if(initFilter){
         bias_mat = FND(biasDim, new Array[Float](channel_out*filter_h*filter_w))
-        bias_mat.asMat;
+        FMat(bias_mat.asMat);
       }
       else{
         update_bias_mat = FND(biasDim, new Array[Float](channel_out*filter_h*filter_w))
-        update_bias_mat.asMat;
+        FMat(update_bias_mat.asMat);
       }
     } 
     else if(initFilter){ // if true, we are initializing initFilter, not updateFilter
       filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
       filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,(rand(filter.asMat)-0.5f).data) // Ugly way to do
       //filter = FND(rand(filter.asMat)-0.5f,filter.dims); // How to randomize? using rand(out:FND)?
-      filter.asMat;
+      FMat(filter.asMat);
     } 
     else{
       updateFilter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      updateFilter.asMat;
+      FMat(updateFilter.asMat);
     }
   }
 
@@ -71,7 +71,8 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     System.out.println("This is a silly debug message 1\n");
     // Must get the real inputData.dims in  (channel_in,h,w,n)
     var inputData_FND_dims = opts.imageDim\inputData.ncols
-    var inputData_FND = inputData.asInstanceOf[FND].reshape(inputData_FND_dims.data)
+    var inputData_FND = FND(FMat(inputData.asMat),inputData_FND_dims)
+    // var inputData_FND = inputData.asInstanceOf[FND].reshape(inputData_FND_dims.data)
     var output_FND:FND = null
     System.out.println("This is a silly debug message %d\n");
 
@@ -138,11 +139,13 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
     
     var inputData_FND_dims = opts.imageDim\inputData.ncols
-    var inputData_FND = inputData.asInstanceOf[FND].reshape(inputData_FND_dims.data)
+    var inputData_FND = FND(FMat(inputData.asMat),inputData_FND_dims)
+    //var inputData_FND = inputData.asInstanceOf[FND].reshape(inputData_FND_dims.data)
     var inputDeriv_FND:FND = null;
 
     var deriv_FND_dims = outputDim\output.ncols
-    var deriv_FND = deriv.asInstanceOf[FND].reshape(deriv_FND_dims.data)
+    var deriv_FND = FND(FMat(deriv.asMat),deriv_FND_dims)
+    //var deriv_FND = deriv.asInstanceOf[FND].reshape(deriv_FND_dims.data)
 
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
@@ -156,7 +159,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     updateFilter.convolveM(inputData_FND,deriv_FND)
 
     //save back the updateFilter
-    updatemats(imodel) = updateFilter.asMat
+    updatemats(imodel) = FMat(updateFilter.asMat)
 
     //Should we handle the update of updatemats(imodel)? I think it should be handled in learner?
     backwardtime += toc - start;
