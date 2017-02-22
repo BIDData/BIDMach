@@ -283,7 +283,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	}
       	} else {
          	to(i) = from(i) match {
-        	case aa:FMat => aa
+        	case aa:IMat => aa
+		case aa:FMat => aa
         	case aa:SMat => aa
         	case aa:DMat => FMat(aa);
         	case aa:SDMat => SMat(aa);

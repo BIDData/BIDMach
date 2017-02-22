@@ -1,11 +1,13 @@
 
 val dir = "../data/MNIST/"
 
+:silent
 val Xtrain = loadFMat(dir + "train.fmat.lz4")
-val ytrain = loadIMat(dir + "ctrain.imat.lz4")
+val ytrain = FMat(loadIMat(dir + "ctrain.imat.lz4"))
 
 val Xtest = loadFMat(dir + "test.fmat.lz4")
-val ytest = loadIMat(dir + "ctest.imat.lz4")
+val ytest = FMat(loadIMat(dir + "ctest.imat.lz4"))
+:silent
 
 val (nn,opts) = Net.learnerX(Xtrain, ytrain);
 
@@ -30,7 +32,8 @@ opts.links = 2*iones(10,1)
 //opts.lookahead = 2
 opts.featType = 1
 //opts.order = 0
-//opts.useGPU = false
+opts.useGPU = false
+opts.aopts = opts
 
 import BIDMach.networks.layers._
 import BIDMach.networks.layers.Node
@@ -67,11 +70,12 @@ val conv2 = new ConvolutionNode{
 
 //fully connected layer
 //reshape conv2 output to fit fully connected layer input
-var fc1 = linear(conv2)(outdim = 1024, hasBias = opts.hasBias, aopts = opts.aopts )
+var fc1 = linear(conv2)(outdim = 1024, hasBias = false, aopts = opts.aopts )
+var fc2 = linear(fc1)(outdim = 10, hasBias = false, aopts = opts.aopts )
 
 //Output, class prediction
-val out = glm(fc1)(opts.links);
-val layers = Array(in, conv1, conv2, fc1, out)
+val out = glm(fc2)(opts.links);
+val layers = Array(in, conv1, conv2, fc1, fc2, out)
 
 opts.nodeset = new NodeSet(layers);
 opts.what;
