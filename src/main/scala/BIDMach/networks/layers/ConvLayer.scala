@@ -121,11 +121,12 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     //        convolveM - the gradient of the current Model (Filter)
     
     //Load the modelmats back to the layer's own filter
+    filter.data = modelmats(imodel).data
     //filter = FND(modelmats(imodel),filter.dims)
-    System.arraycopy(FMat(modelmats(imodel)).data, 0, filter.data, 0, modelmats(imodel).length)    
-    System.arraycopy(FMat(updatemats(imodel)).data, 0, updateFilter.data, 0, updatemats(imodel).length)
-
-//updateFilter = FND(updatemats(imodel),updateFilter.dims)
+    //System.arraycopy(FMat(modelmats(imodel)).data, 0, filter.data, 0, modelmats(imodel).length)
+    updateFilter.data = updatemats(imodel).data
+    //System.arraycopy(FMat(updatemats(imodel)).data, 0, updateFilter.data, 0, updatemats(imodel).length)
+    //updateFilter = FND(updatemats(imodel),updateFilter.dims)
 
     if(opts.hasBias){
       bias_mat.apply(modelmats(imodel+1))
@@ -136,21 +137,22 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     //update_bias_mat ~ deriv.sum(axis = -1)
     //updatemats(imodel+1) = update_bias_mat
 
-    
-    var inputData_FND_dims = opts.imageDim\inputData.ncols
-    var inputData_FND = FND(FMat(inputData.asMat),inputData_FND_dims)
-    //var inputData_FND = inputData.asInstanceOf[FND].reshape(inputData_FND_dims.data)
+    var inputData_FND_dims = opts.imageDim \ inputData.ncols
+    var inputData_FND = new FND(inputData_FND_dims.data, inputData.asInstanceOf[FMat].data)
+
+
     var inputDeriv_FND:FND = null;
 
-    var deriv_FND_dims = outputDim\output.ncols
-    var deriv_FND = FND(FMat(deriv.asMat),deriv_FND_dims)
+    var deriv_FND_dims = outputDim \ output.ncols
+    var deriv_FND = new FND(deriv_FND_dims.data, deriv.asMat.data)
     //var deriv_FND = deriv.asInstanceOf[FND].reshape(deriv_FND_dims.data)
 
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
 
+    filter.convolveT(deriv_FND, inputDeriv_FND,true)
 
-    inputDeriv_FND = filter.convolveT(deriv_FND) // Have to check whether to set doclear = true?
+    //inputDeriv_FND = filter.convolveT(deriv_FND) // Have to check whether to set doclear = true?
     //inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
     inputDeriv = inputDeriv_FND.asMat
 
