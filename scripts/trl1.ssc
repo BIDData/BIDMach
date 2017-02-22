@@ -14,34 +14,35 @@ import BIDMach.causal.{IPTW}
 import BIDMach.allreduce.{Master,Worker,Command}
 import BIDMach.models.GLM
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
-
 Mat.checkMKL(false)
 Mat.checkCUDA
 
-val data_dir = "/mnt/BIDMach/data/MNIST8M/parts/"
-val (nn, nnopts) = GLM.learner(data_dir+"data%02d.fmat.lz4", data_dir+"cats%02d.fmat.lz4")
+val datadir = "/mnt/BIDMach/data/rcv1/"
 
-nnopts.useGPU = true;
-nnopts.nstart = 0;
-nnopts.nend = 0;
-nnopts.order = 0;
-nnopts.lookahead = 2;
-nnopts.featType = 1;
-nnopts.links = 2*iones(10,1);
-nnopts.eltsPerSample = 300;
-nnopts.targets = mkdiag(ones(10,1)) \ zeros(10, 784);
-nnopts.rmask = zeros(1,10) \ ones(1, 784);
+val a0 = loadSMat(datadir + "docs.smat.lz4")
+val c0 = loadFMat(datadir + "cats.fmat.lz4")(0->100,?)
+val rr = rand(c0.ncols,1)
+val (ss, ii) = sort2(rr)
+val a = a0(?,ii)
+val c = c0(?,ii)
 
-nnopts.batchSize = 500;
-nnopts.npasses = 1;
-nnopts.lrate = 0.001;  // for logistic
+setNumThreads(1)
+val (nn,opts)=GLM.learnerX(a,c,1)
+opts.batchSize=20000
+opts.lrate = 0.02f
+opts.npasses = 10
+opts.reg1weight = 0.0
+opts.links = iones(103,1)
+opts.addConstFeat = true
+opts.aopts = opts
+opts.doVariance = true
+opts.evalStep = 3
+opts.useGPU = true
 
-val w = new Worker();
-val wopts = w.opts;
-wopts.trace = 4;
-wopts.machineTrace = 1;
+val w = new Worker()
+val wopts = w.opts
+wopts.trace = 4
+wopts.machineTrace = 1
 wopts.commandSocketNum = 12345
 wopts.responseSocketNum = 12346
 wopts.peerSocketNum = 12347
