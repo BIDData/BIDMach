@@ -1,3 +1,5 @@
+Mat.useCache = false
+Mat.useGPUcache = true
 
 val dir = "/opt/BIDMach/data/MNIST/"
 

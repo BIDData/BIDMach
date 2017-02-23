@@ -43,27 +43,26 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val nstride = opts.stride(0); // 1;
     val channel_out = opts.noutputs // actually # of filters;
 
-    if(initBias){
+    if (initBias){
       // initialize bias matrix, should be the size of channel_out*h*w, would be applied to n samples
       val biasDim = Array[Int](channel_out,filter_h,filter_w)
       if(initFilter){
         bias_mat = FND(biasDim, new Array[Float](channel_out*filter_h*filter_w))
-        FMat(bias_mat.asMat);
+        bias_mat.asMat
       }
       else{
         update_bias_mat = FND(biasDim, new Array[Float](channel_out*filter_h*filter_w))
-        FMat(update_bias_mat.asMat);
+        update_bias_mat.asMat
       }
     } 
-    else if(initFilter){ // if true, we are initializing initFilter, not updateFilter
+    else if (initFilter) { // if true, we are initializing initFilter, not updateFilter
       filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
       filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,(rand(filter.asMat)-0.5f).data) // Ugly way to do
-      //filter = FND(rand(filter.asMat)-0.5f,filter.dims); // How to randomize? using rand(out:FND)?
-      FMat(filter.asMat);
+      filter.asMat
     } 
     else{
       updateFilter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      FMat(updateFilter.asMat);
+      updateFilter.asMat
     }
   }
 
@@ -86,9 +85,9 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     //filter = FFilter(modelmats(imodel),filter.dims)
     //updateFilter = FFilter(updatemats(imodel),updateFilter.dims)
 
-    filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,FMat(modelmats(imodel)).data) // Ugly way to do
-    updateFilter = new FFilter(updateFilter.inDims,updateFilter.outDims,updateFilter.stride,updateFilter.pad,updateFilter.outPad,
-                            FMat(updatemats(imodel)).data) // Ugly way to do
+    //filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,FMat(modelmats(imodel)).data) // Ugly way to do
+    //updateFilter = new FFilter(updateFilter.inDims,updateFilter.outDims,updateFilter.stride,updateFilter.pad,updateFilter.outPad,
+    //                        FMat(updatemats(imodel)).data) // Ugly way to do
     /*
     if(opts.hasBias){
       bias_mat = FND(modelmats(imodel+1),bias_mat.dims)
@@ -121,12 +120,13 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     //        convolveM - the gradient of the current Model (Filter)
     
     //Load the modelmats back to the layer's own filter
-    filter.data = modelmats(imodel).data
-    //filter = FND(modelmats(imodel),filter.dims)
-    //System.arraycopy(FMat(modelmats(imodel)).data, 0, filter.data, 0, modelmats(imodel).length)
-    updateFilter.data = updatemats(imodel).data
-    //System.arraycopy(FMat(updatemats(imodel)).data, 0, updateFilter.data, 0, updatemats(imodel).length)
-    //updateFilter = FND(updatemats(imodel),updateFilter.dims)
+    //filter.data = modelmats(imodel).data
+    //filter = new FND(filter.dims.data,modelmats(imodel).data)
+    
+    //filter = new FFilter(filter.inDims, filter.outDims, filter.stride, filter.pad, filter.outPad,
+    //                     modelmats(imodel).asInstanceOf[FMat].data) // Ugly way to do
+    //updateFilter = new FFilter(updateFilter.inDims,updateFilter.outDims,updateFilter.stride,updateFilter.pad,updateFilter.outPad,
+    //                           updatemats(imodel).asInstanceOf[FMat].data) // Ugly way to do
 
     if(opts.hasBias){
       bias_mat.apply(modelmats(imodel+1))
@@ -140,27 +140,21 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     var inputData_FND_dims = opts.imageDim \ inputData.ncols
     var inputData_FND = new FND(inputData_FND_dims.data, inputData.asInstanceOf[FMat].data)
 
-
-    var inputDeriv_FND:FND = null;
-
     var deriv_FND_dims = outputDim \ output.ncols
-    var deriv_FND = new FND(deriv_FND_dims.data, deriv.asMat.data)
-    //var deriv_FND = deriv.asInstanceOf[FND].reshape(deriv_FND_dims.data)
+    var deriv_FND = new FND(deriv_FND_dims.data, deriv.asMat.asInstanceOf[FMat].data)
 
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
 
-    filter.convolveT(deriv_FND, inputDeriv_FND,true)
+    if (inputDeriv.asInstanceOf[AnyRef] != null) {      
+        filter.convolveT(deriv_FND, 
+                         inputDeriv.asInstanceOf[FND].reshapeView(inputData_FND.dims.data), true)
+    }
 
-    //inputDeriv_FND = filter.convolveT(deriv_FND) // Have to check whether to set doclear = true?
-    //inputDeriv.asMat = modelmats(imodel)^*(deriv.asMat);  // ^* is actually filter.convolveT(b)
-    inputDeriv = inputDeriv_FND.asMat
-
-
-    updateFilter.convolveM(inputData_FND,deriv_FND)
+    updateFilter.convolveM(inputData_FND, deriv_FND)
 
     //save back the updateFilter
-    updatemats(imodel) = FMat(updateFilter.asMat)
+    //updatemats(imodel) = FMat(updateFilter.asMat)
 
     //Should we handle the update of updatemats(imodel)? I think it should be handled in learner?
     backwardtime += toc - start;
