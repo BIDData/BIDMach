@@ -1,6 +1,7 @@
 Mat.useCache = false
 Mat.useGPUcache = true
 
+val useGPU = true
 val dir = "/opt/BIDMach/data/MNIST/"
 
 :silent
@@ -25,7 +26,7 @@ val (nn,opts) = Net.learnerX(Xtrain, ytrain);
 //dropout = 0.75 # Dropout, probability to keep units
 
 opts.batchSize = 128 //same with TF
-opts.npasses = 10
+opts.npasses = 1
 opts.lrate = 0.001f //same with TF
 opts.hasBias = true
 opts.links = 2*iones(10,1)
@@ -34,15 +35,13 @@ opts.links = 2*iones(10,1)
 //opts.lookahead = 2
 opts.featType = 1
 //opts.order = 0
-opts.useGPU = false
+opts.useGPU = useGPU
 opts.aopts = opts
 
 import BIDMach.networks.layers._
 import BIDMach.networks.layers.Node
 import BIDMach.networks.layers.Node._
 import java.util.Arrays
-
-
 
 /* neural network design */
 
@@ -56,7 +55,8 @@ val conv1 = new ConvolutionNode{
   hasBias = false; //opts.hasBias;
   stride = 1;
   pad = 1;
-  imageDim = 1\28\28
+  imageDim = 1\28\28;
+  useGPU = useGPU;
 };
 
 //convolution layer
@@ -67,7 +67,8 @@ val conv2 = new ConvolutionNode{
   hasBias = false; //opts.hasBias;
   stride = 1;
   pad = 1;
-  imageDim = 32\26\26
+  imageDim = 32\26\26;
+  useGPU = useGPU;
 };
 
 //fully connected layer

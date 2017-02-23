@@ -1,10 +1,10 @@
 package BIDMach.networks.layers
 
 import BIDMat.FFilter._
+import BIDMat.GFilter._
 import BIDMat.Filter._
 
-
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat,FFilter,FND,GND,Filter,ND}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat,FFilter,FND,GND,Filter,ND,GFilter}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -18,20 +18,20 @@ import scala.util.hashing.MurmurHash3
 import java.util.HashMap
 import BIDMach.networks._
 import java.util.Arrays
-// import java.util.List
 
 /* Many issues to think of    
    How to consider bias...(maybe very difficult?)
 */
 
 class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode ) extends ModelLayer(net, opts, 2) {
-    var filter:FFilter = null; 
-    var updateFilter:FFilter = null;
-    var bias_mat:FND = null; // it should be size (channel_out*1*1*1), to better broadcast?
-    var update_bias_mat:FND = null;
+    var filter:Filter = null; 
+    var updateFilter:Filter = null;
+    var bias_mat:ND = null; // it should be size (channel_out*1*1*1), to better broadcast?
+    var update_bias_mat:ND = null;
     var inputDim:IMat = null; // Should be three numbers
     var outputDim:IMat = null; //Should be three numbers
     var outputND:ND = null;
+    var inputDataND:ND = null
 
   def initModelMat(initFilter:Boolean, initBias:Boolean = false):Mat = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
@@ -56,13 +56,26 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
       }
     } 
     else if (initFilter) { // if true, we are initializing initFilter, not updateFilter
-      filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,(rand(filter.asMat)-0.5f).data) // Ugly way to do
-      filter.asMat
+      if (opts.useGPU) {
+        filter = GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad)
+        filter = new GFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,
+	                     (rand(filter.asInstanceOf[GFilter].asMat)-0.5f).data)
+        filter.asInstanceOf[GFilter].asMat
+      } else {
+        filter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad)
+        filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,
+	                     (rand(filter.asInstanceOf[FFilter].asMat)-0.5f).data)
+        filter.asInstanceOf[FFilter].asMat
+      }
     } 
     else{
-      updateFilter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-      updateFilter.asMat
+      if (opts.useGPU) {
+        updateFilter = GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+        updateFilter.asInstanceOf[GFilter].asMat
+      } else {
+        updateFilter = FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+        updateFilter.asInstanceOf[FFilter].asMat
+      }
     }
   }
 
@@ -70,8 +83,15 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val start = toc;
 
     // Must get the real inputData.dims in  (channel_in,h,w,n)
-    var inputData_FND_dims = opts.imageDim \ inputData.ncols
-    var inputData_FND = new FND(inputData_FND_dims.data, inputData.asInstanceOf[FMat].data)
+    var inputDataNDdims = opts.imageDim \ inputData.ncols
+    if (inputDataND.asInstanceOf[AnyRef] == null) {
+      if (opts.useGPU) {
+        inputDataND = GND(inputDataNDdims.data)
+      } else {
+        inputDataND = FND(inputDataNDdims.data)
+      }
+    }
+    inputDataND <-- inputData
 
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = initModelMat(true); //Set the model
@@ -80,14 +100,6 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
       if(opts.hasBias) updatemats(imodel+1) = initModelMat(false,true); // Set the bias in modelmats
     }
 
-    //Load the modelmats back to the layer's own filter
-    //Should be.. (need to overload ‘apply’ function in FFilter)
-    //filter = FFilter(modelmats(imodel),filter.dims)
-    //updateFilter = FFilter(updatemats(imodel),updateFilter.dims)
-
-    //filter = new FFilter(filter.inDims,filter.outDims,filter.stride,filter.pad,filter.outPad,FMat(modelmats(imodel)).data) // Ugly way to do
-    //updateFilter = new FFilter(updateFilter.inDims,updateFilter.outDims,updateFilter.stride,updateFilter.pad,updateFilter.outPad,
-    //                        FMat(updatemats(imodel)).data) // Ugly way to do
     /*
     if(opts.hasBias){
       bias_mat = FND(modelmats(imodel+1),bias_mat.dims)
@@ -96,20 +108,25 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     */
 
     if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
-      var outputDim2 = Filter.getOutputDims(inputData_FND.dims, filter.inDims, filter.outDims, filter.stride, filter.pad, filter.outPad)
-      outputDim = outputDim2(?, 0 -> 3)
-      //createOutput((outputDim(0)*outputDim(1)*outputDim(2)) \ inputData.ncols)
-      output = FMat.zeros((outputDim(0)*outputDim(1)*outputDim(2)), inputData.ncols)
-      outputND = new FND(outputDim2.data, output.asInstanceOf[FMat].data)
+      var outputBatchDim = Filter.getOutputDims(
+        inputDataND.dims, filter.inDims, filter.outDims, filter.stride, filter.pad, filter.outPad)
+      outputDim = outputBatchDim(?, 0 -> 3)
+      if (opts.useGPU) {
+        output = GMat.zeros(outputDim.data.reduce(_*_), inputData.ncols)
+        outputND = new GND(outputBatchDim.data, output.asInstanceOf[GMat].data)
+      } else {
+        output = FMat.zeros(outputDim.data.reduce(_*_), inputData.ncols)
+        outputND = new FND(outputBatchDim.data, output.asInstanceOf[FMat].data)
+      }
     }
 
     if (opts.hasBias) {
-      filter.convolve(inputData_FND, outputND, true)
+      filter.convolve(inputDataND, outputND, true)
       outputND ~ outputND + bias_mat
     } else {
-      filter.convolve(inputData_FND, outputND, true)
+      filter.convolve(inputDataND, outputND, true)
     }
-    
+
     clearDeriv
     forwardtime += toc - start
   }
@@ -119,15 +136,6 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     // Guess: convolveT - the gradient of input data
     //        convolveM - the gradient of the current Model (Filter)
     
-    //Load the modelmats back to the layer's own filter
-    //filter.data = modelmats(imodel).data
-    //filter = new FND(filter.dims.data,modelmats(imodel).data)
-    
-    //filter = new FFilter(filter.inDims, filter.outDims, filter.stride, filter.pad, filter.outPad,
-    //                     modelmats(imodel).asInstanceOf[FMat].data) // Ugly way to do
-    //updateFilter = new FFilter(updateFilter.inDims,updateFilter.outDims,updateFilter.stride,updateFilter.pad,updateFilter.outPad,
-    //                           updatemats(imodel).asInstanceOf[FMat].data) // Ugly way to do
-
     if(opts.hasBias){
       bias_mat.apply(modelmats(imodel+1))
       update_bias_mat.apply(updatemats(imodel+1))
@@ -137,24 +145,36 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     //update_bias_mat ~ deriv.sum(axis = -1)
     //updatemats(imodel+1) = update_bias_mat
 
-    var inputData_FND_dims = opts.imageDim \ inputData.ncols
-    var inputData_FND = new FND(inputData_FND_dims.data, inputData.asInstanceOf[FMat].data)
+    var inputDataNDdims = opts.imageDim \ inputData.ncols
+    var inputDataND:ND = null
+    if (opts.useGPU) {
+      inputDataND = new GND(inputDataNDdims.data, inputData.asInstanceOf[GMat].data)
+    } else {
+      inputDataND = new FND(inputDataNDdims.data, inputData.asInstanceOf[FMat].data)
+    }
 
-    var deriv_FND_dims = outputDim \ output.ncols
-    var deriv_FND = new FND(deriv_FND_dims.data, deriv.asMat.asInstanceOf[FMat].data)
+    var derivNDdims = outputDim \ output.ncols
+    var derivND:ND = null
+    if (opts.useGPU) {
+      derivND = new GND(derivNDdims.data, deriv.asMat.asInstanceOf[GMat].data)
+    } else {
+      derivND = new FND(derivNDdims.data, deriv.asMat.asInstanceOf[FMat].data)
+    }
 
     // deriv is the backwarded gradient of the following layers (same dimension as output)
     // inputDeriv is the derivative you will compute to assign to the input
 
     if (inputDeriv.asInstanceOf[AnyRef] != null) {      
-        filter.convolveT(deriv_FND, 
-                         inputDeriv.asInstanceOf[FND].reshapeView(inputData_FND.dims.data), true)
+      if (opts.useGPU) {
+        filter.convolveT(derivND, 
+                         inputDeriv.asInstanceOf[GND].reshapeView(inputDataND.dims.data), true)
+      } else {
+        filter.convolveT(derivND, 
+                         inputDeriv.asInstanceOf[FND].reshapeView(inputDataND.dims.data), true)
+      }
     }
 
-    updateFilter.convolveM(inputData_FND, deriv_FND)
-
-    //save back the updateFilter
-    //updatemats(imodel) = FMat(updateFilter.asMat)
+    updateFilter.convolveM(inputDataND, derivND, true)
 
     //Should we handle the update of updatemats(imodel)? I think it should be handled in learner?
     backwardtime += toc - start;
@@ -177,6 +197,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var axis:Int = 1
   var forceND:Boolean = false
   var imageDim:IMat = null // it should be something like 1*28*28 for MNIST, i.e. channel_in*h*w
+  var useGPU:Boolean = true
 
   def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
       super.copyOpts(opts);
@@ -189,6 +210,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
       opts.group = group;
       opts.axis = axis;
       opts.forceND = forceND;
+      opts.useGPU = useGPU;
       opts;
   }
 
