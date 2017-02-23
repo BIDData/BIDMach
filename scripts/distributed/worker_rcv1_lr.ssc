@@ -16,6 +16,8 @@ import BIDMach.models.GLM
 
 Mat.checkMKL(false)
 Mat.checkCUDA
+Mat.useCache = false
+Mat.useGPUcache = false
 
 val datadir = "/mnt/BIDMach/data/rcv1/"
 
@@ -26,7 +28,6 @@ val (ss, ii) = sort2(rr)
 val a = a0(?,ii)
 val c = c0(?,ii)
 
-setNumThreads(1)
 val (nn,opts)=GLM.learnerX(a,c,1)
 opts.batchSize=20000
 opts.lrate = 0.02f

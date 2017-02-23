@@ -31,7 +31,7 @@ m.sendConfig
 // m.parCall((w) => {
 //   var learnSource = w.learner.datasource.asInstanceOf[MatSource];
 //   var totalNumSamples = learnSource.mats(0).ncols;
-//   var workerNumSamples = totalNumSamples / nmachines; // TODO: don't hardcode this
+//   var workerNumSamples = totalNumSamples / 4; // TODO: don't hardcode this
 //   var nstart = (w.imach*workerNumSamples);
 //   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1);
 //   learnSource.mats(0) = learnSource.mats(0)(?, nstart->nend);
@@ -39,10 +39,11 @@ m.sendConfig
 //   "done"
 // })
 // m.parCall((w) => { w.learner.paused = true; "done"})
-// m.parCall((w) => { w.learner.train; "not reached" }) // this will hang, just wait for it to timeout
-
+// m.parCall((w) => { w.learner.train; "not reached" }, 1) // this will hang, just wait for it to timeout
+//
 // m.startLearners
 // m.startUpdates
+//
 
 // /* later */
 // m.stopUpdates
