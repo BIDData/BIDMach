@@ -207,7 +207,7 @@
           <artifactId>${project.artifactId}</artifactId>
           <version>${project.version}</version>
           <classifier>gpu-${osarch}</classifier>
-        </dependency> 
+        </dependency>
       </dependencies>
     </profile>
   </profiles>
@@ -216,7 +216,7 @@
       <groupId>BIDMat</groupId>
       <artifactId>BIDMat</artifactId>
       <version>${project.version}</version>
-    </dependency> 
+    </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
@@ -310,8 +310,8 @@
 	  <exclude>*</exclude>
 	</excludes>
       </resource>
-    </resources>	
-  </build>	
+    </resources>
+  </build>
   <distributionManagement>
     <repository>
       <id>bintray-biddata-BIDData</id>
