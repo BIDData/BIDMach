@@ -22,6 +22,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.util.concurrent.Callable
 import javax.script.ScriptContext
+import java.util.concurrent.Semaphore;
 
 class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
@@ -35,6 +36,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var intp:ScriptEngine = null;
 	var masterSocketAddr:InetSocketAddress = null;
 	var workerIP:InetAddress = null;
+	var waitForConfigSema:Semaphore = new Semaphore(0)
 
 	def start(learner0:Learner) = {
 	  workerIP = InetAddress.getLocalHost;
@@ -67,7 +69,8 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     machine.recvTimeout = opts.recvTimeout;
     machine.sockBase = opts.peerSocketNum;
     machine.start(machine.maxk);
-    intp.put("$imach", imach);
+    //intp.put("$imach", imach);
+    waitForConfigSema.release()
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
   }
@@ -238,6 +241,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
 		def run() {
 			start();
+			if (opts.trace > 3) log("Started CommandListener on %s" format (localIP, socketnum));
 			while (!stop) {
 				try {
 					val scs = new CommandReader(ss.accept(), worker);
@@ -271,14 +275,46 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	}
 
 
-	def sendMaster(resp:Response):Future[_] = {
+  def sendMaster(resp:Response):Future[_] = {
     val cw = new ResponseWriter(masterSocketAddr, resp, this);
     executor.submit(cw);
+  }
+
+  def ackReady = {
+    // explicitly run on main thread
+    val rw = new ResponseWriter(masterSocketAddr, new AckReadyResponse(imach), this);
+    rw.run()
+    if (opts.trace > 2) log("Send ackReady to %s\n" format(masterSocketAddr))
+  }
+
+  def registerWorker(masterSocketAddr:InetSocketAddress) = {
+    // explicitly run on main thread
+    val registerResp = new RegisterWorkerResponse(opts.commandSocketNum)
+    registerResp.encode
+    val rw = new ResponseWriter(masterSocketAddr, registerResp, this);
+    rw.run()
+    if (opts.trace > 1) {
+      log("Sent registration to %s\n" format(masterSocketAddr))
+      log("Waiting for config on %s...\n" format(
+	new InetSocketAddress(localIP, opts.commandSocketNum)))
+    }
+    waitForConfigSema.acquire()
+    log("Recieved config! Continuing.\n")
+  }
+
+  def signalLearnerDone = {
+    // explicitly run on main thread
+    val doneResp = new LearnerDoneResponse(round, imach)
+    doneResp.encode
+    val rw = new ResponseWriter(masterSocketAddr, doneResp, this);
+    rw.run()
+    if (opts.trace > 1) log("Signaled LearnerDone")
   }
 }
 
 object Worker {
 	trait Opts extends Host.Opts{
+	        var machineSocketNum = peerSocketNum + 1;
 		var configTimeout = 3000;
 		var reduceTimeout = 3000;
 		var cmdTimeout = 1000;

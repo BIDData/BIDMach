@@ -99,8 +99,10 @@ object Command {
 	final val evalStringCtype = 10;
 	final val returnObjectCtype = 11;
 	final val callCtype = 12;
+	final val ackReadyCtype = 13;
+	final val registerWorkerCtype = 14;
 	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone",
-	    "assignObject", "sendLearner", "evalString", "returnObject", "call");
+	    "assignObject", "sendLearner", "evalString", "returnObject", "call", "ackReady", "registerWorker");
 
 
   def printStackTrace(e:Exception):String = {

@@ -37,6 +37,7 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
   var workers:Array[InetSocketAddress] = null;
   var groups:Groups = null;
   var executor:ExecutorService = null;
+  var localIP:InetAddress = InetAddress.getLocalHost
 
   def log(msg:String) {
     print(msg);

@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.io.DataInputStream;
@@ -71,6 +72,51 @@ extends Response(Command.learnerDoneCtype, round0, src0, 1, bytes, 1*4) {
   }
 
   override def decode():Unit = {}
+}
+
+
+class AckReadyResponse(round0:Int, src0:Int, bytes:Array[Byte])
+extends Response(Command.ackReadyCtype, round0, src0, 1, bytes, 1*4) {
+
+  def this(src0:Int) = this(-1, src0, new Array[Byte](1*4));
+
+  override def encode():Unit = {
+    intData.rewind();
+    intData.put(src);
+  }
+
+  override def decode():Unit = {}
+}
+
+
+class RegisterWorkerResponse(workerIP0:InetAddress, workerCmdPort0:Int, bytes:Array[Byte])
+extends Response(Command.registerWorkerCtype, -1, 0, 1, bytes, 2*4) {
+
+  var workerIP:InetAddress = workerIP0
+  var workerCmdPort:Int = workerCmdPort0
+
+  def this(bytes:Array[Byte]) =
+    this(null, -1, bytes)
+
+  def this(workerCmdPort0:Int) =
+    this(InetAddress.getLocalHost, workerCmdPort0, new Array[Byte](2*4))
+
+  override def encode():Unit = {
+    intData.rewind()
+    intData.put(Host.inetStringToInt(workerIP.getHostAddress))
+    intData.put(workerCmdPort)
+  }
+
+  override def decode():Unit = {
+    intData.rewind()
+    val intWorkerIP = intData.get()
+    workerIP = InetAddress.getByName(Host.inetIntToString(intWorkerIP))
+    workerCmdPort = intData.get()
+  }
+
+  def workerCmdSocketAddr:InetSocketAddress = {
+    return new InetSocketAddress(workerIP, workerCmdPort)
+  }
 }
 
 
@@ -148,6 +194,9 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
         rtype match {
           case Command.allreduceCtype => {
             me.listener.allreduceCollected += 1
+          }
+          case Command.ackReadyCtype => {
+            me.listener.numReady += 1
           }
           case Command.learnerDoneCtype => {
             me.stopUpdates()

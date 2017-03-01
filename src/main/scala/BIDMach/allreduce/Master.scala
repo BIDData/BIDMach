@@ -20,6 +20,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import javax.script.ScriptEngine;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Semaphore;
 
 
 class Master(override val opts:Master.Opts = new Master.Options) extends Host {
@@ -36,6 +38,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   var masterIP:InetAddress = null;
 	var nresults = 0;
   var allreduceTimer:Long = 0;
+	var numExpectedRegisteredWorkers:Int = -1
+	var numRegisteredWorkers:AtomicInteger = new AtomicInteger()
+	var allWorkersRegisteredSema:Semaphore = new Semaphore(0)
 	
 	def init() {
     masterIP = InetAddress.getLocalHost;
@@ -68,21 +73,34 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       round, 0, gmods, gridmachines, workers, masterIP, opts.responseSocketNum)
     broadcastCommand(cmd);
   }
+  def startUpdatesAfterRegistration(numExpectedWorkers:Int) {
+    numExpectedRegisteredWorkers = numExpectedWorkers
+    config(
+      irow(numExpectedWorkers),
+      irow(0->numExpectedWorkers),
+      new Array[InetSocketAddress](numExpectedWorkers)
+    )
+    executor.submit(new Registrar())
+  }
   
   def permuteNodes(seed:Long) {
     val cmd = new PermuteCommand(round, 0, seed);
     broadcastCommand(cmd);
   }
   
-  def startUpdates() {
-    reducer = new Reducer();
+  def startUpdates(waitForAck:Boolean = false) {
+    reducer = new Reducer(waitForAck);
     reduceTask = executor.submit(reducer);
   }
   
   def stopUpdates() {
-    reducer.stop = true;
-    reduceTask.cancel(true);    
-    log("Total distributed time: %.3fs\n" format ((System.currentTimeMillis-allreduceTimer) / 1000.0));
+    if (reducer != null && !reducer.stop) {
+      reducer.stop = true;
+      reduceTask.cancel(true);    
+      log("Total distributed time: %.3fs\n" format ((System.currentTimeMillis-allreduceTimer) / 1000.0));
+    } else {
+      log("Reducer wasn't running\n")
+    }
   }
   
   def startLearners() {
@@ -195,36 +213,52 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     executor.submit(cw);
   }
 
-  class Reducer() extends Runnable {
-  	var stop = false;
+  class Registrar() extends Runnable {
+    def run() {
+      if (opts.trace > 1) log("Waiting for %d workers to register...\n" format M)
+      allWorkersRegisteredSema.acquire() // block until all registrations are recieved
+      if (opts.trace > 1) log("%d workers successfully registered! Starting updates.\n" format M)
+      sendConfig
+      startUpdates()
+    }
+  }
 
-  	def run() {
-  		var limit = 0;
-  		while (!stop) {
-  			val newlimit0 = if (opts.limitFctn != null) {
-  				opts.limitFctn(round, opts.limit);
-  			} else {
-  				opts.limit;
-  			}
-  			limit = if (newlimit0 <= 0) 2000000000 else newlimit0;
-  			val cmd = if (opts.permuteAlways) {
-  				new PermuteAllreduceCommand(round, 0, round, limit);
-  			} else {
-  				new AllreduceCommand(round, 0, limit);
-  			}
+  class Reducer(waitForAck:Boolean = false) extends Runnable {
+    var stop = false
+
+    def run() {
+      var limit = 0
+      listener.numReady = 0
+      if (waitForAck) {
+	if (opts.trace > 1) log("Waiting for %d ready acks...\n" format M)
+	while (listener.numReady < M) Thread.sleep(50)
+	if (opts.trace > 1) log("Recieved all ready acks! Starting Reducer.\n" )
+      }
+      while (!stop) {
+	val newlimit0 = if (opts.limitFctn != null) {
+	  opts.limitFctn(round, opts.limit)
+	} else {
+	  opts.limit
+	}
+	limit = if (newlimit0 <= 0) 2000000000 else newlimit0
+	val cmd = if (opts.permuteAlways) {
+	  new PermuteAllreduceCommand(round, 0, round, limit)
+	} else {
+	  new AllreduceCommand(round, 0, limit)
+	}
 	listener.allreduceCollected = 0
-  			broadcastCommand(cmd);
+	broadcastCommand(cmd)
 
 	val t0 = System.currentTimeMillis
 	var t = System.currentTimeMillis
 	var delta = 0.0
-	if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M);
+	if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M)
 
 	var waiting = true
 	while (waiting) {
-	  Thread.sleep(100); // Check the result every 100 ms
+	  Thread.sleep(100) // Check the result every 100 ms
 	  t = System.currentTimeMillis
-	  if (opts.trace > 2) log("Current waiting time: %d ms\n" format t-t0);
+	  if (opts.trace > 2) log("Current waiting time: %d ms\n" format t-t0)
 	  delta = t - t0
 
 	  if (delta < opts.minWaitTime) {
@@ -236,9 +270,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  }
 	}
 
-  			round += 1;
-  		}
-  	}
+	round += 1
+      }
+    }
   }
   
     
@@ -269,7 +303,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def handleResponse(resp:Response) = {
     if (resp.magic != Response.magic) {
       if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (resp.magic));      
-    } else {
+    } else if (activeCommand != null) {
       if (resp.rtype == activeCommand.ctype && resp.round == activeCommand.round) {
     	  inctable(responses, resp.src);
       } else if ((activeCommand.ctype == Command.evalStringCtype || activeCommand.ctype == Command.callCtype)
@@ -281,6 +315,31 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       } else if (resp.rtype == Command.learnerDoneCtype) {
     	  inctable(learners, resp.src);
       } else if (opts.trace > 0) log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n" format (resp.rtype, resp.round, activeCommand.ctype, activeCommand.round)); 
+    } else {
+      // ackReady and registerWorker fall here
+      if (resp.rtype == Command.registerWorkerCtype) {
+	val registerResp = new RegisterWorkerResponse(resp.bytes)
+	registerResp.decode
+	val workerNum = numRegisteredWorkers.getAndIncrement()
+	workers(workerNum) = registerResp.workerCmdSocketAddr
+
+	// set worker number on this thread
+	if (opts.trace > 0) {
+	  log("Recieved registration from worker %d @ %s\n" format
+	    (workerNum, registerResp.workerCmdSocketAddr))
+	}
+        val setMachineCmd = new SetMachineCommand(round, 0, workerNum)
+	setMachineCmd.encode
+	(new CommandWriter(
+	  registerResp.workerCmdSocketAddr,
+	  setMachineCmd,
+	  this)).run()
+
+	if (workerNum == numExpectedRegisteredWorkers - 1) {
+	  // all expected workers registered!
+	  allWorkersRegisteredSema.release()
+	}
+      }
     }
   }
 
@@ -288,6 +347,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 		var stop = false;
 		var ss:ServerSocket = null;
     var allreduceCollected:Int = 0;
+    var numReady:Int = 0;
 
 		def start() {
 			try {
