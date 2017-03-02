@@ -2,80 +2,87 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" version="XHTML+RDFa 1.0" dir="ltr">
 
 <head profile="http://www.w3.org/1999/xhtml/vocab">
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="shortcut icon" href="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/images/favicon.ico" type="image/vnd.microsoft.icon" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="shortcut icon" href="https://eecs.berkeley.edu/sites/all/themes/eecs/favicon.ico" type="image/vnd.microsoft.icon" />
+<link rel="apple-touch-icon" href="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/images/touch-icon.png" />
+<link rel="icon" href="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/images/favicon.png" />
+<meta name="msapplication-TileImage" content="/Assets/touch-icon.png" />
+<meta name="msapplication-TileColor" content="#003262" />
+
 <!-- YOUR TITLE next -->
 
 
 <title>Resource not found | EECS UC Berkeley</title>
 
 <style type="text/css" media="all">
-@import url("https://eecs.berkeley.edu/modules/system/system.base.css?oblzkb");
-@import url("https://eecs.berkeley.edu/modules/system/system.messages.css?oblzkb");
-@import url("https://eecs.berkeley.edu/modules/system/system.theme.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/system/system.base.css?ol46l6");
+@import url("https://eecs.berkeley.edu/modules/system/system.messages.css?ol46l6");
+@import url("https://eecs.berkeley.edu/modules/system/system.theme.css?ol46l6");
 </style>
 <style type="text/css" media="all">
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_core/css/panopoly-jquery-ui-theme.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/themes/base/minified/jquery.ui.accordion.min.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_core/css/panopoly-jquery-ui-theme.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/themes/base/minified/jquery.ui.accordion.min.css?ol46l6");
 </style>
 <style type="text/css" media="all">
-@import url("https://eecs.berkeley.edu/modules/book/book.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/date/date_api/date.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/date/date_popup/themes/datepicker.1.7.css?oblzkb");
-@import url("https://eecs.berkeley.edu/modules/field/theme/field.css?oblzkb");
-@import url("https://eecs.berkeley.edu/sites/all/modules/contrib/google_cse/google_cse.css?oblzkb");
-@import url("https://eecs.berkeley.edu/modules/node/node.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_admin/panopoly-admin-navbar.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_core/css/panopoly-dropbutton.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_magic/css/panopoly-magic.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-featured.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-accordian.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-layouts.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_widgets/panopoly-widgets-spotlight.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_wysiwyg/panopoly-wysiwyg.css?oblzkb");
-@import url("https://eecs.berkeley.edu/sites/all/modules/contrib/picture/picture_wysiwyg.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/radix_layouts/radix_layouts.css?oblzkb");
-@import url("https://eecs.berkeley.edu/modules/search/search.css?oblzkb");
-@import url("https://eecs.berkeley.edu/modules/user/user.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/views/css/views.css?oblzkb");
+@import url("https://eecs.berkeley.edu/modules/book/book.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/date/date_api/date.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/date/date_popup/themes/datepicker.1.7.css?ol46l6");
+@import url("https://eecs.berkeley.edu/modules/field/theme/field.css?ol46l6");
+@import url("https://eecs.berkeley.edu/sites/all/modules/contrib/google_cse/google_cse.css?ol46l6");
+@import url("https://eecs.berkeley.edu/modules/node/node.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_admin/panopoly-admin-navbar.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_core/css/panopoly-dropbutton.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_magic/css/panopoly-magic.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-featured.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-accordian.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/css/panopoly-layouts.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_widgets/panopoly-widgets-spotlight.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_wysiwyg/panopoly-wysiwyg.css?ol46l6");
+@import url("https://eecs.berkeley.edu/sites/all/modules/contrib/picture/picture_wysiwyg.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/radix_layouts/radix_layouts.css?ol46l6");
+@import url("https://eecs.berkeley.edu/modules/search/search.css?ol46l6");
+@import url("https://eecs.berkeley.edu/modules/user/user.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/views/css/views.css?ol46l6");
 </style>
 <style type="text/css" media="all">
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/ctools/css/ctools.css?oblzkb");
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/panels/css/panels.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/ctools/css/ctools.css?ol46l6");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/panels/css/panels.css?ol46l6");
 </style>
 <style type="text/css" media="screen">
-@import url("https://eecs.berkeley.edu/sites/all/themes/kalatheme/css/tweaks.css?oblzkb");
-@import url("https://eecs.berkeley.edu/sites/all/themes/kalatheme/css/panopoly.css?oblzkb");
+@import url("https://eecs.berkeley.edu/sites/all/themes/kalatheme/css/tweaks.css?ol46l6");
+@import url("https://eecs.berkeley.edu/sites/all/themes/kalatheme/css/panopoly.css?ol46l6");
 </style>
 <style type="text/css" media="all">
-@import url("https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/styles/main.css?oblzkb");
-@import url("https://eecs.berkeley.edu/sites/all/themes/eecs/css/eecs.css?oblzkb");
+@import url("https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/styles/main.css?ol46l6");
+@import url("https://eecs.berkeley.edu/sites/all/themes/eecs/css/eecs.css?ol46l6");
 </style>
 <style type="text/css" media="all">
-@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_images/panopoly-images.css?oblzkb");
+@import url("https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_images/panopoly-images.css?ol46l6");
 </style>
 <script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/jquery/1.10/jquery.min.js?v=1.10.2"></script>
 <script type="text/javascript" src="https://eecs.berkeley.edu/misc/jquery.once.js?v=1.2"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/misc/drupal.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/misc/drupal.js?ol46l6"></script>
 <script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.core.min.js?v=1.10.2"></script>
 <script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.widget.min.js?v=1.10.2"></script>
 <script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.tabs.min.js?v=1.10.2"></script>
 <script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/contrib/jquery_update/replace/ui/ui/minified/jquery.ui.accordion.min.js?v=1.10.2"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_images/panopoly-images.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/modules/contrib/google_cse/google_cse.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_admin/panopoly-admin.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_magic/panopoly-magic.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/js/panopoly-accordion.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/libraries/jquery.imagesloaded/jquery.imagesloaded.min.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/matchHeight/jquery.matchHeight-min.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/Chart.js/Chart.min.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/js/charts.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/js/eecs.js?oblzkb"></script>
-<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/bootstrap-sass-twbs/assets/javascripts/bootstrap.min.js?oblzkb"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_images/panopoly-images.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/modules/contrib/google_cse/google_cse.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_admin/panopoly-admin.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_magic/panopoly-magic.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/modules/panopoly/panopoly_theme/js/panopoly-accordion.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/profiles/panopoly/libraries/jquery.imagesloaded/jquery.imagesloaded.min.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/matchHeight/jquery.matchHeight-min.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/Chart.js/Chart.min.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/js/charts.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/build/js/eecs.js?ol46l6"></script>
+<script type="text/javascript" src="https://eecs.berkeley.edu/sites/all/themes/eecs/kalastatic/assets/vendor/bootstrap-sass-twbs/assets/javascripts/bootstrap.min.js?ol46l6"></script>
 <script type="text/javascript">
 <!--//--><![CDATA[//><!--
-jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":{"theme":"eecs","theme_token":"3qM6wfBytIYXFHw5jXhqLM8LrQ5br364MV1PO2wURaY","js":{"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/jquery\/1.10\/jquery.min.js":1,"misc\/jquery.once.js":1,"misc\/drupal.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.core.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.widget.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.tabs.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.accordion.min.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_images\/panopoly-images.js":1,"sites\/all\/modules\/contrib\/google_cse\/google_cse.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_admin\/panopoly-admin.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_magic\/panopoly-magic.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_theme\/js\/panopoly-accordion.js":1,"profiles\/panopoly\/libraries\/jquery.imagesloaded\/jquery.imagesloaded.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/matchHeight\/jquery.matchHeight-min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/Chart.js\/Chart.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/charts.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/eecs.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/bootstrap-sass-twbs\/assets\/javascripts\/bootstrap.min.js":1}},"googleCSE":{"cx":"010464314754576911738:fu9nvbsz9t0","language":"","resultsWidth":600,"domain":"www.google.com"},"CToolsModal":{"modalSize":{"type":"scale","width":".9","height":".9","addWidth":0,"addHeight":0,"contentRight":25,"contentBottom":75},"modalOptions":{"opacity":".55","background-color":"#FFF"},"animationSpeed":"fast","modalTheme":"CToolsModalDialog","throbberTheme":"CToolsModalThrobber"},"panopoly_magic":{"pane_add_preview_mode":"single"}});
+jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":{"theme":"eecs","theme_token":"gdsTdqgAmEK61dmfgyDUoE1Jyqjw9P8XNu8hcWMmj8g","js":{"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/jquery\/1.10\/jquery.min.js":1,"misc\/jquery.once.js":1,"misc\/drupal.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.core.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.widget.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.tabs.min.js":1,"profiles\/panopoly\/modules\/contrib\/jquery_update\/replace\/ui\/ui\/minified\/jquery.ui.accordion.min.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_images\/panopoly-images.js":1,"sites\/all\/modules\/contrib\/google_cse\/google_cse.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_admin\/panopoly-admin.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_magic\/panopoly-magic.js":1,"profiles\/panopoly\/modules\/panopoly\/panopoly_theme\/js\/panopoly-accordion.js":1,"profiles\/panopoly\/libraries\/jquery.imagesloaded\/jquery.imagesloaded.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/matchHeight\/jquery.matchHeight-min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/Chart.js\/Chart.min.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/charts.js":1,"sites\/all\/themes\/eecs\/kalastatic\/build\/js\/eecs.js":1,"sites\/all\/themes\/eecs\/kalastatic\/assets\/vendor\/bootstrap-sass-twbs\/assets\/javascripts\/bootstrap.min.js":1}},"googleCSE":{"cx":"010464314754576911738:fu9nvbsz9t0","language":"","resultsWidth":600,"domain":"www.google.com"},"CToolsModal":{"modalSize":{"type":"scale","width":".9","height":".9","addWidth":0,"addHeight":0,"contentRight":25,"contentBottom":75},"modalOptions":{"opacity":".55","background-color":"#FFF"},"animationSpeed":"fast","modalTheme":"CToolsModalDialog","throbberTheme":"CToolsModalThrobber"},"panopoly_magic":{"pane_add_preview_mode":"single"}});
 //--><!]]>
 </script>
 <!-- pagehead1 file, then title element, then this file -->
@@ -117,46 +124,47 @@ jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":
   </div><!-- /.navbar-header -->
 
   <nav class="collapse navbar-collapse" role="navigation">
-        <h2 class="element-invisible">Main menu</h2><ul id="main-nav" class="nav navbar-nav links clearfix" role="menubar"><li class="mid-2018 first dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/about" class="first expanded" role="button" id="main-menu-dropdown-1" data-toggle="dropdown" aria-haspopup="true">About<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for About</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-1" aria-expanded="false"><li class="mid-2019 first" role="presentation"><a href="https://eecs.berkeley.edu/about" class="first leaf" role="menuitem">About Overview</a></li>
-<li class="mid-2016" role="presentation"><a href="https://eecs.berkeley.edu/about/by-the-numbers" class="leaf" role="menuitem">By the Numbers</a></li>
-<li class="mid-2343" role="presentation"><a href="https://eecs.berkeley.edu/about/diversity" class="collapsed" role="menuitem">Diversity</a></li>
-<li class="mid-2020" role="presentation"><a href="https://eecs.berkeley.edu/about/history" class="collapsed" role="menuitem">History</a></li>
-<li class="mid-2345 last" role="presentation"><a href="https://eecs.berkeley.edu/about/visiting" class="last collapsed" role="menuitem">Visiting</a></li>
+        <h2 class="element-invisible">Main menu</h2><ul id="main-nav" class="nav navbar-nav links clearfix"><li class="mid-2018 first dropdown clearfix"><a href="https://eecs.berkeley.edu/about" class="first expanded" id="main-menu-dropdown-1" data-toggle="dropdown" aria-haspopup="true">About<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for About</span></a><ul class="dropdown-menu" aria-labelledby="main-menu-dropdown-1" aria-expanded="false"><li class="mid-2019 first"><a href="https://eecs.berkeley.edu/about" class="first leaf">About Overview</a></li>
+<li class="mid-2016"><a href="https://eecs.berkeley.edu/about/by-the-numbers" class="leaf">By the Numbers</a></li>
+<li class="mid-2343"><a href="https://eecs.berkeley.edu/about/diversity" class="collapsed">Diversity</a></li>
+<li class="mid-2020"><a href="https://eecs.berkeley.edu/about/history" class="collapsed">History</a></li>
+<li class="mid-2345 last"><a href="https://eecs.berkeley.edu/about/visiting" class="last collapsed">Visiting</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1632 dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/academics" class="expanded" role="button" id="main-menu-dropdown-2" data-toggle="dropdown" aria-haspopup="true">Academics<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Academics</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-2" aria-expanded="false"><li class="mid-2015 first" role="presentation"><a href="https://eecs.berkeley.edu/academics" class="first leaf" role="menuitem">Academics Overview</a></li>
-<li class="mid-2353" role="presentation"><a href="https://eecs.berkeley.edu/academics/undergraduate" class="collapsed" role="menuitem">Undergraduate Admissions &amp; Programs</a></li>
-<li class="mid-2352" role="presentation"><a href="https://eecs.berkeley.edu/academics/graduate" class="collapsed" role="menuitem">Graduate Admissions &amp; Programs</a></li>
-<li class="mid-1716 last" role="presentation"><a href="https://eecs.berkeley.edu/academics/courses" class="last leaf" role="menuitem">Courses</a></li>
+<li class="mid-1632 dropdown clearfix"><a href="https://eecs.berkeley.edu/academics" class="expanded" id="main-menu-dropdown-2" data-toggle="dropdown" aria-haspopup="true">Academics<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Academics</span></a><ul class="dropdown-menu" aria-labelledby="main-menu-dropdown-2" aria-expanded="false"><li class="mid-2015 first"><a href="https://eecs.berkeley.edu/academics" class="first leaf">Academics Overview</a></li>
+<li class="mid-2353"><a href="https://eecs.berkeley.edu/academics/undergraduate" class="collapsed">Undergraduate Admissions &amp; Programs</a></li>
+<li class="mid-2352"><a href="https://eecs.berkeley.edu/academics/graduate" class="collapsed">Graduate Admissions &amp; Programs</a></li>
+<li class="mid-1716 last"><a href="https://eecs.berkeley.edu/academics/courses" class="last leaf">Courses</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1635 dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/research" class="expanded" role="button" id="main-menu-dropdown-3" data-toggle="dropdown" aria-haspopup="true">Research<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Research</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-3" aria-expanded="false"><li class="mid-2023 first" role="presentation"><a href="https://eecs.berkeley.edu/research" class="first leaf" role="menuitem">Research Overview</a></li>
-<li class="mid-2025" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/" class="leaf" role="menuitem">Areas</a></li>
-<li class="mid-2024" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf" role="menuitem">Centers &amp; Labs</a></li>
-<li class="mid-2026" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf" role="menuitem">Projects</a></li>
-<li class="mid-2027" role="presentation"><a href="https://www2.eecs.berkeley.edu/bears/" class="leaf" role="menuitem">BEARS Symposium</a></li>
-<li class="mid-2326 last" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="last leaf" role="menuitem">Colloquium</a></li>
+<li class="mid-1635 dropdown clearfix"><a href="https://eecs.berkeley.edu/research" class="expanded" id="main-menu-dropdown-3" data-toggle="dropdown" aria-haspopup="true">Research<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Research</span></a><ul class="dropdown-menu" aria-labelledby="main-menu-dropdown-3" aria-expanded="false"><li class="mid-2023 first"><a href="https://eecs.berkeley.edu/research" class="first leaf">Research Overview</a></li>
+<li class="mid-2025"><a href="https://www2.eecs.berkeley.edu/Research/Areas/" class="leaf">Areas</a></li>
+<li class="mid-2024"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf">Centers &amp; Labs</a></li>
+<li class="mid-2026"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf">Projects</a></li>
+<li class="mid-2027"><a href="https://eecs.berkeley.edu/research/bears" class="leaf">BEARS Symposium</a></li>
+<li class="mid-2326 last"><a href="https://eecs.berkeley.edu/research/colloquium" class="last leaf">Colloquium</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1634 dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/people" class="expanded" role="button" id="main-menu-dropdown-4" data-toggle="dropdown" aria-haspopup="true">People<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for People</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-4" aria-expanded="false"><li class="mid-2029 first" role="presentation"><a href="https://eecs.berkeley.edu/people" class="first leaf" role="menuitem">People Overview</a></li>
-<li class="mid-2035" role="presentation"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="leaf" role="menuitem">Directory</a></li>
-<li class="mid-2034" role="presentation"><a href="https://eecs.berkeley.edu/people/leadership" class="leaf" role="menuitem">Leadership</a></li>
-<li class="mid-2201" role="presentation"><a href="https://eecs.berkeley.edu/people/faculty" class="collapsed" role="menuitem">Faculty</a></li>
-<li class="mid-2032" role="presentation"><a href="https://eecs.berkeley.edu/people/students" class="collapsed" role="menuitem">Students</a></li>
-<li class="mid-2348" role="presentation"><a href="https://eecs.berkeley.edu/people/staff" class="collapsed" role="menuitem">Staff</a></li>
-<li class="mid-2028 last" role="presentation"><a href="https://eecs.berkeley.edu/people/alumni" class="last collapsed" role="menuitem">Alumni</a></li>
+<li class="mid-1634 dropdown clearfix"><a href="https://eecs.berkeley.edu/people" class="expanded" id="main-menu-dropdown-4" data-toggle="dropdown" aria-haspopup="true">People<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for People</span></a><ul class="dropdown-menu" aria-labelledby="main-menu-dropdown-4" aria-expanded="false"><li class="mid-2029 first"><a href="https://eecs.berkeley.edu/people" class="first leaf">People Overview</a></li>
+<li class="mid-2035"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="leaf">Directory</a></li>
+<li class="mid-2034"><a href="https://eecs.berkeley.edu/people/leadership" class="leaf">Leadership</a></li>
+<li class="mid-2201"><a href="https://eecs.berkeley.edu/people/faculty" class="leaf">Faculty</a></li>
+<li class="mid-2032"><a href="https://eecs.berkeley.edu/people/students" class="collapsed">Students</a></li>
+<li class="mid-2348"><a href="https://eecs.berkeley.edu/people/staff" class="collapsed">Staff</a></li>
+<li class="mid-2028 last"><a href="https://eecs.berkeley.edu/people/alumni" class="last collapsed">Alumni</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1633 last dropdown clearfix" role="presentation"><a href="https://eecs.berkeley.edu/connect" class="last expanded" role="button" id="main-menu-dropdown-5" data-toggle="dropdown" aria-haspopup="true">Connect<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Connect</span></a><ul class="dropdown-menu" role="menu" aria-labelledby="main-menu-dropdown-5" aria-expanded="false"><li class="mid-2203 first" role="presentation"><a href="https://eecs.berkeley.edu/connect" class="first leaf" role="menuitem">Connect Overview</a></li>
-<li class="mid-2531" role="presentation"><a href="https://eecs.berkeley.edu/connect/support" class="collapsed" role="menuitem">Support EECS</a></li>
-<li class="mid-2208" role="presentation"><a href="https://eecs.berkeley.edu/connect/k-12" class="leaf" role="menuitem">K-12 Programs</a></li>
-<li class="mid-2206 last" role="presentation"><a href="https://eecs.berkeley.edu/connect/contact" class="last leaf" role="menuitem">Contact</a></li>
+<li class="mid-1633 last dropdown clearfix"><a href="https://eecs.berkeley.edu/connect" class="last expanded" id="main-menu-dropdown-5" data-toggle="dropdown" aria-haspopup="true">Connect<span class="caret" aria-hidden="true"></span></a><span class="element-invisible">Toggle submenu for Connect</span></a><ul class="dropdown-menu" aria-labelledby="main-menu-dropdown-5" aria-expanded="false"><li class="mid-2203 first"><a href="https://eecs.berkeley.edu/connect" class="first leaf">Connect Overview</a></li>
+<li class="mid-2531"><a href="https://eecs.berkeley.edu/connect/support" class="collapsed">Support EECS</a></li>
+<li class="mid-2208"><a href="https://eecs.berkeley.edu/connect/k-12" class="leaf">K-12 Outreach</a></li>
+<li class="mid-3244"><a href="https://eecs.berkeley.edu/industry/recruit-students" class="leaf">Recruit Students</a></li>
+<li class="mid-2206 last"><a href="https://eecs.berkeley.edu/connect/contact" class="last leaf">Contact</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
 </ul>
     
-    <h2 class="element-invisible">Secondary menu</h2><ul id="utility-nav" class="nav navbar-nav secondary-links"><li class="menu-1608 first home"><a href="https://eecs.berkeley.edu/"><span class="sr-only home">Home</span></a></li>
-<li class="menu-1628 "><a href="https://eecs.berkeley.edu/resources/students" title="Information for Current Students">Students</a></li>
-<li class="menu-1629 "><a href="https://eecs.berkeley.edu/resources/faculty-staff" title="Information for Current Faculty/Staff">Faculty/Staff</a></li>
-<li class="menu-1630 "><a href="https://eecs.berkeley.edu/industry" title="Information for Industry contacts">Industry</a></li>
-<li class="menu-1631 "><a href="https://eecs.berkeley.edu/news">News</a></li>
-<li class="menu-1885 "><a href="https://eecs.berkeley.edu/events">Events</a></li>
-<li class="menu-2772 last "><a href="https://eecs.berkeley.edu/connect/support" class="highlight">Give</a></li>
+    <h2 class="element-invisible">Secondary menu</h2><ul id="utility-nav" class="nav navbar-nav secondary-links"><li class="menu-1608 first home" id="" style=""><a href="https://eecs.berkeley.edu/"><span class="sr-only home">Home</span></a></li>
+<li class="menu-1628 " id="" style=""><a href="https://eecs.berkeley.edu/resources/students" title="Information for Current Students">For Students</a></li>
+<li class="menu-1629 " id="" style=""><a href="https://eecs.berkeley.edu/resources/faculty-staff" title="Information for Current Faculty/Staff">For Faculty/Staff</a></li>
+<li class="menu-1630 " id="" style=""><a href="https://eecs.berkeley.edu/industry" title="Information for Industry contacts">Industry</a></li>
+<li class="menu-1631 " id="" style=""><a href="https://eecs.berkeley.edu/news">News</a></li>
+<li class="menu-1885 " id="" style=""><a href="https://eecs.berkeley.edu/events">Events</a></li>
+<li class="menu-2772 last " id="" style=""><a href="https://eecs.berkeley.edu/connect/support" class="highlight">Give</a></li>
 </ul>  </nav>
 
   <a href="#" aria-hidden="true" class="search-toggle" data-toggle="collapse" data-target=".search-collapse" aria-expanded="true"><span>Toggle Search</span><i class="icon search" aria-hidden="true"></i></a>
@@ -165,10 +173,10 @@ jQuery.extend(Drupal.settings, {"basePath":"\/","pathPrefix":"","ajaxPageState":
     <form class="google-cse" action="https://eecs.berkeley.edu/" method="post" id="search-block-form" accept-charset="UTF-8" role="form"><div><div class="container-inline form-inline search-collapse collapse">
       <h2 class="element-invisible">Search form</h2>
     <div class="form-item form-type-textfield form-item-search-block-form form-group">
-  <label class="element-invisible" for="edit-search-block-form--2">Search </label>
+  <label class="sr-only" for="edit-search-block-form--2">Search </label>
  <input title="Enter the terms you wish to search for." placeholder="Search" class="form-control form-text fa-on" type="text" id="edit-search-block-form--2" name="search_block_form" value="" size="15" maxlength="128" />
 </div>
-<div class="form-actions form-wrapper" id="edit-actions"><button type="submit" id="edit-submit" name="op" class="form-submit btn btn-default btn-primary"><span>Search</span><i class="icon search" aria-hidden="true"></i></button></div><input type="hidden" name="form_build_id" value="form-iR0UWt6Ht9vABZDR7tNmvcx6kzY3fffTg1R-uNRBvz4" />
+<div class="form-actions form-wrapper" id="edit-actions"><button type="submit" id="edit-submit" name="op" class="form-submit btn btn-default btn-primary"><span>Search</span><i class="icon search" aria-hidden="true"></i></button></div><input type="hidden" name="form_build_id" value="form-KStLCgy9XwSQP8XxwQIQaaoE-ksQy7rozAi0swrWacU" />
 <input type="hidden" name="form_id" value="search_block_form" />
 </div>
 </div></form>  </div>
@@ -226,7 +234,7 @@ function validate() {
 
 <dl>
 <dt>Your request was :</dt>
-<dd>http://people.eecs.berkeley.edu/~jfc/biddata/lib/dev-cuda7.0/PtPlot_Copyright.txt</dd>
+<dd>http://people.eecs.berkeley.edu/~jfc/biddata/lib/dev-cuda7.5/PtPlot_Copyright.txt</dd>
 </dl>
 
 <h2>What are you looking for?</h2>
@@ -244,9 +252,9 @@ To report problems or submit questions and comments related to the
 site, please send an email to the following email address:</p>
 
 <code style="margin: 20px; padding: 0 20px ;">
-<a href="mailto:webteam@eecs.berkeley.edu?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FPtPlot_Copyright.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FPtPlot_Copyright.txt%0AReferrer%3A%20">webteam@EECS.Berkeley.EDU</a></code>
+<a href="mailto:webteam@eecs.berkeley.edu?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FPtPlot_Copyright.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FPtPlot_Copyright.txt%0AReferrer%3A%20">webteam@EECS.Berkeley.EDU</a></code>
 </p><p>To contact the owner of the specific page you were
-   looking for send an email to:</p><code style="margin: 20px; padding: 0 20px ;"><a href="mailto:jfc AT CS.Berkeley.EDU?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FPtPlot_Copyright.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.0%2FPtPlot_Copyright.txt%0AReferrer%3A%20">jfc AT CS.Berkeley.EDU</a></code>
+   looking for send an email to:</p><code style="margin: 20px; padding: 0 20px ;"><a href="mailto:jfc AT CS.Berkeley.EDU?subject=Not Found URL: http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FPtPlot_Copyright.txt&amp;body=Link%3A%20http%3A%2F%2Fpeople.eecs.berkeley.edu%2F~jfc%2Fbiddata%2Flib%2Fdev-cuda7.5%2FPtPlot_Copyright.txt%0AReferrer%3A%20">jfc AT CS.Berkeley.EDU</a></code>
 <!-- debug info
 <dl>
 <dt><em>Debugging Info:</em></dt>
@@ -277,62 +285,64 @@ site, please send an email to the following email address:</p>
   <div class="brand navbar-brand">
     <a href="https://eecs.berkeley.edu/" title="Home" rel="home" class="logo"><span class="sr-only">Home</span></a>
   </div>
-  <ul class="nav navbar-nav footer-nav" role="menubar"><li class="mid-2039 first " role="presentation"><a href="https://eecs.berkeley.edu/about" class="first expanded" role="menuitem">About</a><ul role="menu" class="nav"><li class="mid-2199 first" role="presentation"><a href="https://eecs.berkeley.edu/about/by-the-numbers" class="first leaf" role="menuitem">By the Numbers</a></li>
-<li class="mid-2197" role="presentation"><a href="https://eecs.berkeley.edu/about/history" class="leaf" role="menuitem">History</a></li>
-<li class="mid-2344" role="presentation"><a href="https://eecs.berkeley.edu/about/diversity" class="leaf" role="menuitem">Diversity</a></li>
-<li class="mid-2346" role="presentation"><a href="https://eecs.berkeley.edu/about/visiting" class="leaf" role="menuitem">Visiting</a></li>
-<li class="mid-2758 last" role="presentation"><a href="https://eecs.berkeley.edu/about/principles-community" class="last leaf" role="menuitem">Principles of Community</a></li>
+  <ul class="nav navbar-nav footer-nav"><li class="mid-2039 first "><a href="https://eecs.berkeley.edu/about" class="first expanded">About</a><ul class="nav"><li class="mid-2199 first"><a href="https://eecs.berkeley.edu/about/by-the-numbers" class="first leaf">By the Numbers</a></li>
+<li class="mid-2197"><a href="https://eecs.berkeley.edu/about/history" class="leaf">History</a></li>
+<li class="mid-2344"><a href="https://eecs.berkeley.edu/about/diversity" class="leaf">Diversity</a></li>
+<li class="mid-2346"><a href="https://eecs.berkeley.edu/about/visiting" class="leaf">Visiting</a></li>
+<li class="mid-2758 last"><a href="https://eecs.berkeley.edu/about/principles-community" class="last leaf">Principles of Community</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1585 " role="presentation"><a href="https://eecs.berkeley.edu/academics" class="expanded" role="menuitem">Academics</a><ul role="menu" class="nav"><li class="mid-2355 first" role="presentation"><a href="https://eecs.berkeley.edu/academics/undergraduate" class="first leaf" role="menuitem">Undergrad Admissions &amp; Programs</a></li>
-<li class="mid-2354" role="presentation"><a href="https://eecs.berkeley.edu/academics/graduate" class="leaf" role="menuitem">Graduate Admissions &amp; Programs</a></li>
-<li class="mid-2041" role="presentation"><a href="https://eecs.berkeley.edu/academics/courses" class="leaf" role="menuitem">Courses</a></li>
-<li class="mid-2393 last" role="presentation"><a href="https://eecs.berkeley.edu/academics/prospective-women" class="last leaf" role="menuitem">Prospective Women Students</a></li>
+<li class="mid-1585 "><a href="https://eecs.berkeley.edu/academics" class="expanded">Academics</a><ul class="nav"><li class="mid-2355 first"><a href="https://eecs.berkeley.edu/academics/undergraduate" class="first leaf">Undergrad Admissions &amp; Programs</a></li>
+<li class="mid-2354"><a href="https://eecs.berkeley.edu/academics/graduate" class="leaf">Graduate Admissions &amp; Programs</a></li>
+<li class="mid-2041"><a href="https://eecs.berkeley.edu/academics/courses" class="collapsed">Courses</a></li>
+<li class="mid-2393 last"><a href="https://eecs.berkeley.edu/academics/prospective-women" class="last leaf">Prospective Women Students</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1588 " role="presentation"><a href="https://eecs.berkeley.edu/research" class="expanded" role="menuitem">Research</a><ul role="menu" class="nav"><li class="mid-1593 first" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/" class="first leaf" role="menuitem">Areas</a></li>
-<li class="mid-2042" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf" role="menuitem">Centers &amp; Labs</a></li>
-<li class="mid-2043" role="presentation"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf" role="menuitem">Projects</a></li>
-<li class="mid-2044" role="presentation"><a href="https://www2.eecs.berkeley.edu/bears/" class="leaf" role="menuitem">BEARS Symposium</a></li>
-<li class="mid-2045" role="presentation"><a href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/" class="leaf" role="menuitem">Technical Reports</a></li>
-<li class="mid-2046" role="presentation"><a href="https://www2.eecs.berkeley.edu/Pubs/Dissertations/" class="leaf" role="menuitem">PhD Dissertations</a></li>
-<li class="mid-2327 last" role="presentation"><a href="https://eecs.berkeley.edu/research/colloquium" class="last collapsed" role="menuitem">Colloquium</a></li>
+<li class="mid-1588 "><a href="https://eecs.berkeley.edu/research" class="expanded">Research</a><ul class="nav"><li class="mid-1593 first"><a href="https://www2.eecs.berkeley.edu/Research/Areas/" class="first leaf">Areas</a></li>
+<li class="mid-2042"><a href="https://www2.eecs.berkeley.edu/Research/Areas/Centers/" class="leaf">Centers &amp; Labs</a></li>
+<li class="mid-2043"><a href="https://www2.eecs.berkeley.edu/Research/Projects/" class="leaf">Projects</a></li>
+<li class="mid-2044"><a href="https://eecs.berkeley.edu/research/bears" class="leaf">BEARS Symposium</a></li>
+<li class="mid-2045"><a href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/" class="leaf">Technical Reports</a></li>
+<li class="mid-2046"><a href="https://www2.eecs.berkeley.edu/Pubs/Dissertations/" class="leaf">PhD Dissertations</a></li>
+<li class="mid-2327 last"><a href="https://eecs.berkeley.edu/research/colloquium" class="last collapsed">Colloquium</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1589 " role="presentation"><a href="https://eecs.berkeley.edu/people" class="expanded" role="menuitem">People</a><ul role="menu" class="nav"><li class="mid-2047 first" role="presentation"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="first leaf" role="menuitem">Directory</a></li>
-<li class="mid-1594" role="presentation"><a href="https://eecs.berkeley.edu/people/leadership" class="leaf" role="menuitem">Leadership</a></li>
-<li class="mid-2202" role="presentation"><a href="https://eecs.berkeley.edu/people/faculty" class="leaf" role="menuitem">Faculty</a></li>
-<li class="mid-2407" role="presentation"><a href="https://eecs.berkeley.edu/people/students" class="collapsed" role="menuitem">Students</a></li>
-<li class="mid-2397" role="presentation"><a href="https://eecs.berkeley.edu/people/staff" class="leaf" role="menuitem">Staff</a></li>
-<li class="mid-2051 last" role="presentation"><a href="https://eecs.berkeley.edu/people/alumni" class="last leaf" role="menuitem">Alumni</a></li>
+<li class="mid-1589 "><a href="https://eecs.berkeley.edu/people" class="expanded">People</a><ul class="nav"><li class="mid-2047 first"><a href="https://www2.eecs.berkeley.edu/Directories/directory-nostudents.html" class="first leaf">Directory</a></li>
+<li class="mid-1594"><a href="https://eecs.berkeley.edu/people/leadership" class="leaf">Leadership</a></li>
+<li class="mid-2202"><a href="https://eecs.berkeley.edu/people/faculty" class="leaf">Faculty</a></li>
+<li class="mid-2407"><a href="https://eecs.berkeley.edu/people/students" class="collapsed">Students</a></li>
+<li class="mid-2397"><a href="https://eecs.berkeley.edu/people/staff" class="collapsed">Staff</a></li>
+<li class="mid-2051 last"><a href="https://eecs.berkeley.edu/people/alumni" class="last leaf">Alumni</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1590 " role="presentation"><a href="https://eecs.berkeley.edu/resources" class="expanded" role="menuitem">Resources</a><ul role="menu" class="nav"><li class="mid-2182 first" role="presentation"><a href="https://eecs.berkeley.edu/resources/facilities/room-reservations" class="first collapsed" role="menuitem">Room Reservations</a></li>
-<li class="mid-2755" role="presentation"><a href="https://www2.eecs.berkeley.edu/deptinfo" class="leaf" role="menuitem">My EECS Info</a></li>
-<li class="mid-2409" role="presentation"><a href="https://eecs.berkeley.edu/resources/grads" class="collapsed" role="menuitem">For Grads</a></li>
-<li class="mid-2577" role="presentation"><a href="https://eecs.berkeley.edu/resources/undergrads" class="collapsed" role="menuitem">For Undergrads</a></li>
-<li class="mid-2811" role="presentation"><a href="https://eecs.berkeley.edu/resources/gsis" class="collapsed" role="menuitem">GSIs/Readers/Tutors</a></li>
-<li class="mid-2184" role="presentation"><a href="http://iris.eecs.berkeley.edu/" class="leaf" role="menuitem">IT Services</a></li>
-<li class="mid-2717" role="presentation"><a href="https://eecs.berkeley.edu/resources/facilities" class="collapsed" role="menuitem">Facilities, Safety &amp; Space</a></li>
-<li class="mid-1595" role="presentation"><a href="https://eecs.berkeley.edu/resources/faculty-staff" class="collapsed" role="menuitem">For Faculty/Staff</a></li>
-<li class="mid-2357 last" role="presentation"><a href="https://eecs.berkeley.edu/resources/visiting-scholars" class="last collapsed" role="menuitem">Visiting Scholars</a></li>
+<li class="mid-1590 "><a href="https://eecs.berkeley.edu/resources" class="expanded">Resources</a><ul class="nav"><li class="mid-2182 first"><a href="https://eecs.berkeley.edu/resources/facilities/room-reservations" class="first collapsed">Room Reservations</a></li>
+<li class="mid-2755"><a href="https://www2.eecs.berkeley.edu/deptinfo" class="leaf">My EECS Info</a></li>
+<li class="mid-2212"><a href="https://eecs.berkeley.edu/resources/students" class="collapsed">For Students</a></li>
+<li class="mid-2409"><a href="https://eecs.berkeley.edu/resources/grads" class="collapsed">For Grads</a></li>
+<li class="mid-2577"><a href="https://eecs.berkeley.edu/resources/undergrads" class="collapsed">For Undergrads</a></li>
+<li class="mid-2811"><a href="https://eecs.berkeley.edu/resources/gsis" class="collapsed">GSIs/Readers/Tutors</a></li>
+<li class="mid-2184"><a href="http://iris.eecs.berkeley.edu/" class="leaf">IT Services</a></li>
+<li class="mid-2717"><a href="https://eecs.berkeley.edu/resources/facilities" class="collapsed">Facilities, Safety &amp; Space</a></li>
+<li class="mid-1595"><a href="https://eecs.berkeley.edu/resources/faculty-staff" class="collapsed">For Faculty/Staff</a></li>
+<li class="mid-2357 last"><a href="https://eecs.berkeley.edu/resources/visiting-scholars" class="last collapsed">Visiting Scholars</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1591 " role="presentation"><a href="https://eecs.berkeley.edu/industry" class="expanded" role="menuitem">Industry</a><ul role="menu" class="nav"><li class="mid-2196 first" role="presentation"><a href="https://eecs.berkeley.edu/industry/recruit-students" class="first collapsed" role="menuitem">Recruit Students</a></li>
-<li class="mid-3036 last" role="presentation"><a href="https://eecs.berkeley.edu/industry/entrepreneurship" class="last leaf" role="menuitem">Entrepreneurship</a></li>
+<li class="mid-1591 "><a href="https://eecs.berkeley.edu/industry" class="expanded">Industry</a><ul class="nav"><li class="mid-2196 first"><a href="https://eecs.berkeley.edu/industry/recruit-students" class="first collapsed">Recruit Students</a></li>
+<li class="mid-3324 last"><a href="https://eecs.berkeley.edu/industry/entrepreneurship" class="last leaf">Start-Ups and Entrepreneurship</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
-<li class="mid-1592 last " role="presentation"><a href="https://eecs.berkeley.edu/connect" class="last expanded" role="menuitem">Connect</a><ul role="menu" class="nav"><li class="mid-2189 first" role="presentation"><a href="https://eecs.berkeley.edu/connect/support" class="first collapsed" role="menuitem">Support Us</a></li>
-<li class="mid-2207" role="presentation"><a href="https://eecs.berkeley.edu/connect/k-12" class="collapsed" role="menuitem">K-12 Programs</a></li>
-<li class="mid-2204 last" role="presentation"><a href="https://eecs.berkeley.edu/connect/contact" class="last leaf" role="menuitem">Contact</a></li>
+<li class="mid-1592 last "><a href="https://eecs.berkeley.edu/connect" class="last expanded">Connect</a><ul class="nav"><li class="mid-2189 first"><a href="https://eecs.berkeley.edu/connect/support" class="first collapsed">Support Us</a></li>
+<li class="mid-2207"><a href="https://eecs.berkeley.edu/connect/k-12" class="collapsed">K-12 Outreach</a></li>
+<li class="mid-2204 last"><a href="https://eecs.berkeley.edu/connect/contact" class="last leaf">Contact</a></li>
 </ul></li><div class='clearfix visible-xs'></div>
 </ul>
   <div class="footer-tier">
-    <ul class="nav navbar-nav links utility-nav clearfix" role="menubar"><li class="mid-1598 first " role="presentation"><a href="https://eecs.berkeley.edu/" class="first leaf" role="menuitem"><i class="fa fa-home"></i><span class="sr-only">Home</span></a></li>
-<li class="mid-1710 " role="presentation"><a href="https://ee.berkeley.edu/" class="leaf" role="menuitem">EE</a></li>
-<li class="mid-1711 " role="presentation"><a href="https://cs.berkeley.edu/" class="leaf" role="menuitem">CS</a></li>
-<li class="mid-1712 " role="presentation"><a href="http://berkeley.edu/" class="leaf" role="menuitem">UC Berkeley</a></li>
-<li class="mid-1713 " role="presentation"><a href="http://engineering.berkeley.edu/" class="leaf" role="menuitem">Berkeley Engineering</a></li>
-<li class="mid-1603 " role="presentation"><a href="https://eecs.berkeley.edu/news" class="leaf" role="menuitem">News</a></li>
-<li class="mid-2037 last " role="presentation"><a href="https://eecs.berkeley.edu/events" class="last leaf" role="menuitem">Events</a></li>
-</ul>    <ul class="nav navbar-nav links social" role="menubar"><li class="mid-1599 first last twitter" role="presentation"><a href="https://twitter.com/UCB_EECS" target="_blank" class="first last leaf" role="menuitem"><span class="sr-only">Berkley EECS on Twitter</span></a></li>
+    <ul class="nav navbar-nav links utility-nav clearfix"><li class="mid-1598 first "><a href="https://eecs.berkeley.edu/" class="first leaf"><i class="fa fa-home"></i><span class="sr-only">Home</span></a></li>
+<li class="mid-1710 "><a href="https://ee.berkeley.edu/" class="leaf">EE</a></li>
+<li class="mid-1711 "><a href="https://cs.berkeley.edu/" class="leaf">CS</a></li>
+<li class="mid-1712 "><a href="http://berkeley.edu/" class="leaf">UC Berkeley</a></li>
+<li class="mid-1713 "><a href="http://engineering.berkeley.edu/" class="leaf">Berkeley Engineering</a></li>
+<li class="mid-1603 "><a href="https://eecs.berkeley.edu/news" class="leaf">News</a></li>
+<li class="mid-2037 "><a href="https://eecs.berkeley.edu/events" class="leaf">Events</a></li>
+<li class="mid-3251 last "><a href="https://eecs.berkeley.edu/connect/contact" class="last leaf">Contact</a></li>
+</ul>    <ul class="nav navbar-nav links social"><li class="mid-1599 first last twitter"><a href="https://twitter.com/UCB_EECS" target="_blank" class="first last leaf"><span class="sr-only">Berkley EECS on Twitter</span></a></li>
 </ul>  </div>
   <div class="small-print">
-    <div class="copyright">&copy; 2016 UC Regents</div>
+    <div class="copyright">&copy; 2017 UC Regents</div>
 
     <ul class="links policies">
       <li>
