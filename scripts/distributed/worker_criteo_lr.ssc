@@ -35,8 +35,20 @@ opts.lookahead = 0
 
 val w = new Worker()
 val wopts = w.opts
-wopts.trace = 0
-wopts.machineTrace = 0
+wopts.trace = 4
+wopts.machineTrace = 1
+
+val customCommandPortStr = sys.env.get("WORKER_CMD_PORT")
+customCommandPortStr match {
+  case Some(portStr) => {
+    val port = portStr.toInt
+    println("Using WORKER_CMD_PORT=%d" format port)
+    wopts.commandSocketNum = port
+    wopts.responseSocketNum = port + 1
+    wopts.peerSocketNum = port + 2
+  }
+  case None => {}
+}
 
 w.start(nn)
 
