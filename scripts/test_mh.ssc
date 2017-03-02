@@ -19,23 +19,35 @@
  *  size(X_test)  = (784,2163)
  *  size(Y_test)  = (1,2163)
  *
+ * NOTE: Run this while saving the output log files. Having the log files makes
+ * the analysis aftewards much easier, trust me. OH, and change the seed for
+ * random-ness!!
  */
 
+val seed = 4
+println("Our seed: " +seed)
+setseed(seed)
+
 // Our training data may change. (IF SO, CHANGE `opts.N` BELOW!!)
-// stout OR bitter:
-val X_train = loadFMat("/home/seita/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
-val Y_train = loadIMat("/home/seita/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
-// Daniel's personal computer
+// Use MNIST with 100k, not the full data!
+
+// ===== stout OR bitter =====
+//val X_train = loadFMat("/home/seita/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
+//val Y_train = loadIMat("/home/seita/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
+// ===== Daniel's personal computer (CHANGE opts.N!!) =====
 //val X_train = loadFMat("/data/MNIST/MNIST_Xtrain_1_7_shuf.fmat.lz4")
 //val Y_train = loadIMat("/data/MNIST/MNIST_Ytrain_1_7_shuf.imat.lz4")
+val X_train = loadFMat("/data/MNIST8M/MNIST8M_Xtrain_1_7_shuf_100k.fmat.lz4")
+val Y_train = loadIMat("/data/MNIST8M/MNIST8M_Ytrain_1_7_shuf_100k.imat.lz4")
+println("size(X_train) = " +size(X_train))
 
 // Test data should be consistent regardless of MNIST (or MNIST8M) training data.
-// stout OR bitter:
-val X_test  = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
-val Y_test  = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
-// Daniel's personal computer
-//val X_test  = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
-//val Y_test  = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+// ===== stout OR bitter =====
+//val X_test  = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+//val Y_test  = loadIMat("/home/seita/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
+// ====== Daniel's personal computer =====
+val X_test  = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
+val Y_test  = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
 Y_train(find(Y_train == -1)) = 0
 Y_test(find(Y_test == -1)) = 0
 
@@ -58,7 +70,6 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
         new MatSource(Array(mat0, targ), mopts), 
         model, 
         mkRegularizer(mopts),
-        //new Grad(mopts),
         new MHTest(mopts), 
         null,
         mopts)
@@ -67,29 +78,30 @@ def learner(mat0:Mat, targ:Mat, d:Int) = {
 
 val (mm, mopts) = learner(X_train, FMat(Y_train), 1)
 mopts.addConstFeat = false
-mopts.npasses = 400               // Large enough to get to desired sample count
+mopts.npasses = 500               // Large enough to get to desired sample count
 mopts.batchSize = 100
 mopts.lrate = 0.01
 
 // Some new stuff due to the MHTest opts. CHECK THESE CAREFULLY!
-mopts.N = 13000                     // 13000 for regular MNIST
+mopts.N = 100000                    // 13000 for regular MNIST
 mopts.temp = 100
 mopts.Nknown = true
 mopts.n2lsigma = 1.0f               // 1.0f by default
 mopts.nn2l = 4000                   // 4000 by default
-mopts.sigmaProposer = 0.05f         // This turns into sigma*Identity 
+mopts.sigmaProposer = 0.01f         // This turns into sigma*Identity 
 mopts.continueDespiteFull = false
 mopts.verboseMH = false
 mopts.collectData = true            // CAUTION! May save a lot!
-mopts.collectDataDir = "outputs/data_mhtest/"   // Clear this directory
+mopts.collectDataDir = "mhtest_analysis/data_mhtest/"   // Clear this directory
 mopts.exitTheta = true              // breaks out of program ...
-mopts.exitThetaAmount = 10000       // means we collect this many thetas
+mopts.exitThetaAmount = 5000        // means we collect this many thetas
 mopts.initThetaHere = true          // break symmetry at the start
-mopts.burnIn = -1                   // change stuff after this (set to -1 to ignore)
+mopts.burnIn = -1                   // change stuff after this sample (set to -1 to ignore)
 mopts.tempAfterBurnin = 1           // after burn-in, change temp to this
-mopts.sigmaProposerAfterBurnin = 0.005f    // After burn-in, change sigma
+mopts.sigmaProposerAfterBurnin = 0.0005f   // After burn-in, change sigma
 
 mopts.matrixOfScores = true         // This is actually a GLM setting
+mopts.evalStep = 10000              // Reduce number of times we do validation
 mopts.what
 val model = mm.model.asInstanceOf[GLM]
 mm.train

@@ -243,9 +243,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     t += 1
     if (opts.collectData) {
       for (i <- 0 until modelmats.length) {
-        saveFMat(opts.collectDataDir+ "theta_%d_%04d.fmat.lz4" format (i,t), FMat(modelmats(i)))
+        saveFMat(opts.collectDataDir+ "theta_%d_%05d.fmat.lz4" format (i,t), FMat(modelmats(i)))
       }
-      saveFMat(opts.collectDataDir+ "data_%04d.fmat.lz4" format (t), FMat(b))
+      saveFMat(opts.collectDataDir+ "data_%05d.fmat.lz4" format (t), FMat(b))
     }
     if (t == opts.exitThetaAmount && opts.exitTheta) {
       println("Exiting code now since t=" +t)
