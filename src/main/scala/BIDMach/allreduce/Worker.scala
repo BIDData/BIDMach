@@ -67,6 +67,8 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     machine.recvTimeout = opts.recvTimeout;
     machine.sockBase = opts.peerSocketNum;
     machine.start(machine.maxk);
+    learner.sentSockHistory = machine.sentSockHistory;
+    learner.recvSockHistory = machine.recvSockHistory;
     intp.put("$imach", imach);
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))

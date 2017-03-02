@@ -15,6 +15,9 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
+import java.util.ArrayList
+import edu.berkeley.bid.comm._ //Machine and Bandwidth
+
 /**
  *  Basic sequential Learner class with a single datasource
  */
@@ -46,6 +49,9 @@ case class Learner(
   var cacheState = false;
   var cacheGPUstate = false;
   var debugMemState = false;
+
+  var sentSockHistory:ArrayList[Bandwidth] = null;
+  var recvSockHistory:ArrayList[Bandwidth] = null;
 
   def setup = {
 	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
