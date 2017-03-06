@@ -304,7 +304,7 @@ extends Command(Command.allreduceCtype, round0, dest0, 4, bytes, 4*4, tag) {
   }
 
   override def toString():String = {
-    "Command %s, tag %d, length %d words, round %d limit %d" format (
+    "Command %s, tag %s, length %d words, round %d limit %d" format (
       Command.names(ctype), tag, clen, round, limit);
   }
 }
@@ -512,7 +512,8 @@ extends Runnable {
 	ostr.writeInt(command.dest);
 	if (command.tag != null) {
 	  ostr.writeInt(command.tag.length)
-	  ostr.writeChars(command.tag)
+	  val tagBytes = command.tag.getBytes(StandardCharsets.UTF_8)
+	  ostr.write(tagBytes, 0, command.tag.length)
 	} else {
 	  ostr.writeInt(0)
 	}
@@ -521,15 +522,17 @@ extends Runnable {
 	ostr.write(command.bytes, 0, command.blen);
       }
     } catch {
-      case e:Exception =>
-      if (me.opts.trace > 0) {
-	me.log("Master problem sending command %s\n%s\n" format (command.toString, Command.printStackTrace(e)));
+      case e:Exception => if (me.opts.trace > 0) {
+	me.log("Master problem sending command %s\n%s\n" format (
+	  command.toString, Command.printStackTrace(e)));
       }
     } finally {
       try {
 	if (socket != null) socket.close();
       } catch {
-	case e:Exception => if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Command.printStackTrace(e));
+	case e:Exception => if (me.opts.trace > 0) {
+          me.log("Master problem closing socket\n%s\n" format Command.printStackTrace(e))
+	}
       }
     }
   }
@@ -547,12 +550,12 @@ class CommandReader(socket:Socket, me:Worker) extends Runnable {
       var tag:String = null
       if (tagLen > 0) {
 	val tagBuf = new Array[Byte](tagLen)
-	istr.read(tagBuf)
+	istr.readFully(tagBuf, 0, tagLen)
 	tag = new String(tagBuf, StandardCharsets.UTF_8)
       }
       val clen = istr.readInt();
       val blen = istr.readInt();
-      val cmd = new Command(ctype, round, dest, blen, tag);
+      val cmd = new Command(ctype, round, dest, clen, new Array[Byte](blen), blen, tag);
       if (me.opts.trace > 2) me.log("Worker %d got packet %s\n" format (me.imach, cmd.toString));
       istr.readFully(cmd.bytes, 0, blen);
       try {

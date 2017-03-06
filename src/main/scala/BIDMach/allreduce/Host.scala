@@ -43,18 +43,22 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
     print(msg);
   }
 
+  def logln(msg:String) {
+    println(msg);
+  }
+
   class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {
 	  def run() {
 		  try {
 			  Thread.sleep(mtime);
 			  for (i <- 0 until futures.length) {
 				  if (futures(i) != null) {
-					  if (opts.trace > 0) log("Worker cancelling thread %d" format i);
+					  if (opts.trace > 0) log("Worker cancelling thread %d\n" format i);
 					  futures(i).cancel(true);
 				  }
 			  }
 		  } catch {
-		  case e:InterruptedException => if (opts.trace > 2) log("Worker interrupted timeout thread");
+		  case e:InterruptedException => if (opts.trace > 2) log("Worker interrupted timeout thread\n");
 		  }
 	  }
   }

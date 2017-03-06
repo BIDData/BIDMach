@@ -80,7 +80,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   }
 
   def allReduce(round:Int, limit:Long) = {
-    if (model != null && model.modelmats.asInstanceOf[AnyRef] == null) {
+    if (model != null && model.modelmats.asInstanceOf[AnyRef] != null) {
       val t1=toc;
       model.snapshot(limit.toInt, opts.doAvg);
       val sendmat = model.sendmat;
@@ -92,8 +92,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
       val result = if (opts.fuseConfigReduce) {
         (indexmat, sendmat) match {
-          case (lmat:LMat, fsendmat:FMat) => machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
-          case (imat:IMat, fsendmat:FMat) => machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
+          case (lmat:LMat, fsendmat:FMat) => machine.configReduce(
+	    lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
+          case (imat:IMat, fsendmat:FMat) => machine.configReduce(
+	    imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
         }
       } else {
         (indexmat, sendmat) match {
@@ -110,7 +112,8 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
         case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;
         case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f;
       }
-      if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
+      if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (
+	nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
     } else {
       if (opts.trace > 2) log("Allreduce model is null\n")
     }

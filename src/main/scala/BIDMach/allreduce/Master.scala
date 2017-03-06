@@ -21,10 +21,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import javax.script.ScriptEngine;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.{ConcurrentHashMap, Semaphore}
 import BIDMach.models.Model
 import scala.collection.mutable.{Map => MutableMap, HashMap => MutableHashMap}
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 
 
 class Master(override val opts:Master.Opts = new Master.Options) extends Host {
@@ -46,6 +47,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	var numRegisteredWorkers:AtomicInteger = new AtomicInteger()
 	var allWorkersRegisteredSema:Semaphore = new Semaphore(0)
 	var workerModel:Model = null
+	var numModelMats:Int = -1
 	
 	def init() {
     masterIP = InetAddress.getLocalHost;
@@ -93,6 +95,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     broadcastCommand(cmd);
   }
 
+  def setNumModelMats(numModelMats0:Int) { // HACK
+    numModelMats = numModelMats0
+  }
+
   def setWorkerModel(model:Model) {
     workerModel = model
   }
@@ -100,12 +106,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def startUpdates(waitForAck:Boolean = false) {
     reducerMap = new MutableHashMap[Int, Reducer]()
     reduceTaskMap = new MutableHashMap[Int, Future[_]]()
-    var curReducer:Reducer = null
-    for (i <- 0 until workerModel.modelmats.length) { // TODO: use modelMat names instead of idx
-      curReducer = new Reducer(i, waitForAck)
-      reducerMap(i) = curReducer
-      reduceTaskMap(i) = executor.submit(curReducer)
+    for (i <- 0 until numModelMats) { // TODO: use modelMat names instead of idx
+      val reducer = new Reducer(i, waitForAck)
+      reducerMap(i) = reducer
+      val reduceTask = executor.submit(reducer)
+      reduceTaskMap(i) = reduceTask
     }
+    if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M)
   }
   
   def stopUpdates() {
@@ -203,7 +210,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     } else {
       activeCommand = cmd
     }
-    if (opts.trace > 2) log("Broadcasting cmd %s" format cmd)
+    if (opts.trace > 2) log("Broadcasting cmd %s\n" format cmd)
 
     val futures = new Array[Future[_]](M)
     responses.clear
@@ -247,11 +254,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 
   class Reducer(matIdx:Int, waitForAck:Boolean = false) extends Runnable {
     var stop = false
-    var allreduceCollected:Integer = 0
+    var allreduceCollected:Int = 0
+    var allreduceStartTime:Long = 0
     val matTag = "matIdx%d" format matIdx
 
     def run() {
-      var limit = 0
+      try {
+
       if (waitForAck) {
 	if (opts.trace > 1) log("Waiting for %d ready acks...\n" format M)
 	numAckedReady.synchronized {
@@ -259,7 +268,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	}
 	if (opts.trace > 1) log("Recieved all ready acks! Starting Reducer.\n" )
       }
-      if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M)
+      var limit = 0
       while (!stop) {
 	val newlimit0 = if (opts.limitFctn != null) {
 	  opts.limitFctn(round, opts.limit)
@@ -272,31 +281,49 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	} else {
 	  new AllreduceCommand(round, 0, limit, matTag)
 	}
-	allreduceCollected = 0
+	this.synchronized {
+	  allreduceCollected = 0
+	}
 	broadcastCommand(cmd)
 
-	val t0 = System.currentTimeMillis
-	var delta:Long = 0
-	allreduceCollected.synchronized {
-	  // First, we attempt to wait for all workers to respond until opts.minWaitTime
-	  delta = System.currentTimeMillis - t0
-	  while (delta < opts.minWaitTime && allreduceCollected < M) {
-	    allreduceCollected.wait(opts.minWaitTime - delta)
-	    delta = System.currentTimeMillis - t0
-	  }
-
-	  // Then, we attempt to wait for (opts.machineThreshold * M) workers until
-	  // opts.timeThresholdMsec
-	  delta = System.currentTimeMillis - t0
-	  while (delta < opts.timeThresholdMsec && allreduceCollected < M*opts.machineThreshold) {
-	    allreduceCollected.wait(opts.timeThresholdMsec - delta)
-	    delta = System.currentTimeMillis - t0
-	  }
-
-	  // Otherwise, we give up
-	  round += 1
+	allreduceStartTime = System.currentTimeMillis
+	this.synchronized {
+	  this.wait(opts.timeThresholdMsec)
 	}
+	if (opts.trace > 1) log("Finished round %d, workers %d/%d, time %dms\n" format(
+	  round, allreduceCollected, M, System.currentTimeMillis - allreduceStartTime))
+	round += 1
+
+	// allreduceCollected.synchronized {
+	//   // First, we attempt to wait for all workers to respond until opts.minWaitTime
+	//   delta = System.currentTimeMillis - t0
+	//   while (delta < opts.minWaitTime && allreduceCollected < M) {
+	//     allreduceCollected.wait(opts.minWaitTime - delta)
+	//     delta = System.currentTimeMillis - t0
+	//   }
+
+	//   // Then, we attempt to wait for (opts.machineThreshold * M) workers until
+	//   // opts.timeThresholdMsec
+	//   delta = System.currentTimeMillis - t0
+	//   while (delta < opts.timeThresholdMsec && allreduceCollected < M*opts.machineThreshold) {
+	//     allreduceCollected.wait(opts.timeThresholdMsec - delta)
+	//     delta = System.currentTimeMillis - t0
+	//   }
+
+	//   // Otherwise, we give up
+	//   round += 1
+	// }
       }
+    } catch {
+      case e:Exception => {
+	val baos = new ByteArrayOutputStream()
+        val ps = new PrintStream(baos)
+        e.printStackTrace(ps)
+        val str = baos.toString()
+        ps.close()
+	log("Reducer failed: %s\n" format (str))
+      }
+    }
     }
   }
   
@@ -399,13 +426,19 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
        case _ => -1
     }
 
-    if (matIdx != -1) {
-      if (opts.trace > 0) log("Master got tagged allReduce response %d with invalid tag\n" format (resp.tag))
+    if (matIdx == -1) {
+      if (opts.trace > 0)
+	logln("Master got tagged allReduce response %s with invalid tag" format (resp.tag))
     } else {
       val reducer = reducerMap(matIdx)
-      reducer.allreduceCollected.synchronized {
+      reducer.synchronized {
         reducer.allreduceCollected += 1
-	if (reducer.allreduceCollected >= M*opts.machineThreshold) reducer.notify()
+	val delta = System.currentTimeMillis - reducer.allreduceStartTime
+	if (delta < opts.minWaitTime) {
+	  if (reducer.allreduceCollected >= M) reducer.notify()
+	} else if (delta < opts.timeThresholdMsec) {
+	  if (reducer.allreduceCollected >= M*opts.machineThreshold) reducer.notify()
+	}
       }
     }
   }

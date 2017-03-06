@@ -47,7 +47,7 @@ import BIDMach._
  *                                       // returns a training learner mm, with options mopts. Also returns a prediction model nn with its own options.
  *                                       // typically set options, then do mm.train; nn.predict with results in pc.  
  * val (mm, opts) = learner(ds)          // Build a learner for a general datasource ds (e.g. a files data source). 
- * }}}                                   
+ * }}}
  */
 
 class GLM(opts:GLM.Opts) extends RegressionModel(opts) {

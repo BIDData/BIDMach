@@ -170,11 +170,12 @@ extends Runnable {
         ostr.writeInt(resp.rtype);
         ostr.writeInt(resp.round);
         ostr.writeInt(resp.src);
-	if (resp.tag == null) {
-	  ostr.writeInt(resp.tag.length);
-	  ostr.writeChars(resp.tag);
+	if (resp.tag != null) {
+	  ostr.writeInt(resp.tag.length)
+          val tagBytes = resp.tag.getBytes(StandardCharsets.UTF_8)
+	  ostr.write(tagBytes, 0, resp.tag.length)
 	} else {
-	  ostr.writeInt(0);
+	  ostr.writeInt(0)
 	}
         ostr.writeInt(resp.clen);
         ostr.writeInt(resp.blen);
@@ -206,7 +207,7 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
 	var tag:String = null
         if (tagLen > 0) {
           val tagBuf = new Array[Byte](tagLen)
-          istr.read(tagBuf)
+          istr.readFully(tagBuf, 0, tagLen)
           tag = new String(tagBuf, StandardCharsets.UTF_8)
         }
         val clen = istr.readInt();
