@@ -55,10 +55,8 @@ m.setNumModelMats(1)
 //     w.imach, nstart, nend, fgopts.npasses)
 // })
 //
-// m.parCall((w) => { w.learner.paused = true; "done"})
-// m.parCall((w) => { w.learner.train; "not reached" }, 2)
-// m.startLearners
-// m.startUpdates(false)
+// m.startLearners(blocking = true)
+// m.startUpdates()
 //
 
 /*Later*/

@@ -46,10 +46,10 @@ class Response (
     this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0, null);
   
   def this(rtype0:Int, round0:Int, dest0:Int, tag:String) =
-    this(rtype0, round0, dest0, 0, null, 0, tag);
+    this(rtype0, round0, dest0, 0, new Array[Byte](0), 0, tag);
 
   def this(rtype0:Int, round0:Int, dest0:Int) =
-    this(rtype0, round0, dest0, 0, null, 0, null);
+    this(rtype0, round0, dest0, 0, new Array[Byte](0), 0, null);
   
   override def toString():String = {
     "Response %s, tag %s, round %d, src %d, length %d bytes" format (

@@ -51,5 +51,3 @@ customCommandPortStr match {
 }
 
 w.start(nn)
-
-nn.paused = true

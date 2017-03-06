@@ -34,6 +34,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	var listenerTask:Future[_] = null;
 	var reducerMap:MutableMap[Int, Reducer] = null
 	var reduceTaskMap:MutableMap[Int, Future[_]] = null
+	var numLearnersStarted:Integer = 0
 	var numAckedReady:Integer = 0
 	var activeCommand:Command = null;
 	var activeTaggedCommands:ConcurrentHashMap[String, Command] =
@@ -114,6 +115,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
     if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M)
   }
+
+  def startUpdates:Unit = startUpdates(false)
   
   def stopUpdates() {
     var stoppedSomething = false
@@ -127,15 +130,22 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     if (!stoppedSomething) {
       if (opts.trace > 2) log("No reducer was running\n")
     } else {
-      log("Total distributed time: %.3fs\n" format ((System.currentTimeMillis-allreduceTimer) / 1000.0))
+      logln("Stopped allreduce!")
+      logln("Total distributed time: %.3fs" format (
+	(System.currentTimeMillis-allreduceTimer) / 1000.0))
     }
   }
   
-  def startLearners() {
+  def startLearners(blocking:Boolean = false) {
     val cmd = new StartLearnerCommand(round, 0);
     broadcastCommand(cmd);
     allreduceTimer = System.currentTimeMillis;
+    if (blocking) {
+      this.synchronized { this.wait() }
+    }
   }
+
+  def startLearners:Unit = startLearners(false)
   
   def permuteAllreduce(round:Int, limit:Int) {
   	val cmd = new PermuteAllreduceCommand(round, 0, round, limit, null);
@@ -370,15 +380,24 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     } else if (activeCommand != null) {
       if (resp.rtype == activeCommand.ctype && resp.round == activeCommand.round) {
     	inctable(responses, resp.src);
+	resp.rtype match {
+	  case Command.startLearnerCtype => {
+	    this.synchronized {
+              numLearnersStarted += 1
+	      if (numLearnersStarted >= M) this.notify()
+	    }
+	  }
+	  case Command.learnerDoneCtype => {
+            stopUpdates()
+	  }
+	}
+
       } else if ((activeCommand.ctype == Command.evalStringCtype || activeCommand.ctype == Command.callCtype)
 	         && resp.rtype == Command.returnObjectCtype && resp.round == activeCommand.round) {
         val newresp = new ReturnObjectResponse(resp.round, resp.src, null, resp.bytes);
-    		newresp.decode;
-    		addObj(newresp.obj, resp.src)
-    		if (opts.trace > 2) log("Received %s\n" format newresp.toString);
-      } else if (resp.rtype == Command.learnerDoneCtype) {
-        stopUpdates()
-	log("Stopping allreduce update!\n")
+	newresp.decode;
+	addObj(newresp.obj, resp.src)
+	if (opts.trace > 2) log("Received %s\n" format newresp.toString);
       } else if (opts.trace > 0) {
 	log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n"
 	    format (resp.rtype, resp.round, activeCommand.ctype, activeCommand.round))

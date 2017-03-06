@@ -41,7 +41,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	def start(learner0:Learner) = {
 	  workerIP = InetAddress.getLocalHost;
 	  learner = learner0;
-	  if (model == null && learner != null) model = learner.model;
+	  if (learner != null) model = learner.model;
 	  executor = Executors.newFixedThreadPool(8);
 	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
@@ -188,9 +188,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		if (learner != null) {
-    		  learner.paused = false;
+		  learner.init
+    		  sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach))
+		  learner.train
     		}
-    		if (opts.respond > 0) sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach));
     	}
     	case Command.sendLearnerCtype => {
     		val newcmd = new SendLearnerCommand(0, cmd.dest, null, cmd.bytes);
