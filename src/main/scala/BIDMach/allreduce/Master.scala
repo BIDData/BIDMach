@@ -35,6 +35,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	var reducerMap:MutableMap[Int, Reducer] = null
 	var reduceTaskMap:MutableMap[Int, Future[_]] = null
 	var numLearnersStarted:Integer = 0
+	var numLearnersFinished:Integer = 0
 	var numAckedReady:Integer = 0
 	var activeCommand:Command = null;
 	var activeTaggedCommands:ConcurrentHashMap[String, Command] =
@@ -131,6 +132,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       if (opts.trace > 2) log("No reducer was running\n")
     } else {
       logln("Stopped allreduce!")
+    }
+    numLearnersFinished.synchronized {
+      numLearnersFinished += 1
+      if (numLearnersFinished == M)
       logln("Total distributed time: %.3fs" format (
 	(System.currentTimeMillis-allreduceTimer) / 1000.0))
     }
@@ -304,35 +309,12 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  round, allreduceCollected, M, System.currentTimeMillis - allreduceStartTime))
 	round += 1
 
-	// allreduceCollected.synchronized {
-	//   // First, we attempt to wait for all workers to respond until opts.minWaitTime
-	//   delta = System.currentTimeMillis - t0
-	//   while (delta < opts.minWaitTime && allreduceCollected < M) {
-	//     allreduceCollected.wait(opts.minWaitTime - delta)
-	//     delta = System.currentTimeMillis - t0
-	//   }
-
-	//   // Then, we attempt to wait for (opts.machineThreshold * M) workers until
-	//   // opts.timeThresholdMsec
-	//   delta = System.currentTimeMillis - t0
-	//   while (delta < opts.timeThresholdMsec && allreduceCollected < M*opts.machineThreshold) {
-	//     allreduceCollected.wait(opts.timeThresholdMsec - delta)
-	//     delta = System.currentTimeMillis - t0
-	//   }
-
-	//   // Otherwise, we give up
-	//   round += 1
-	// }
       }
     } catch {
-      case e:Exception => {
-	val baos = new ByteArrayOutputStream()
-        val ps = new PrintStream(baos)
-        e.printStackTrace(ps)
-        val str = baos.toString()
-        ps.close()
-	log("Reducer failed: %s\n" format (str))
+      case e:InterruptedException => {
+	if (!stop) logln("Reducer failed: %s" format Host.printStackTrace(e))
       }
+      case e:Exception => logln("Reducer failed: %s" format Host.printStackTrace(e))
     }
     }
   }
@@ -366,6 +348,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     if (resp.magic != Response.magic) {
       if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (resp.magic));
 
+    } else if (resp.rtype == Command.learnerDoneCtype) {
+      stopUpdates()
+
     } else if (resp.tag != null && activeTaggedCommands.get(resp.tag) != null) {
       val activeTaggedCmd = activeTaggedCommands.get(resp.tag)
       if ((resp.rtype == Command.allreduceCtype || resp.rtype == Command.permuteAllreduceCtype)
@@ -386,9 +371,6 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
               numLearnersStarted += 1
 	      if (numLearnersStarted >= M) this.notify()
 	    }
-	  }
-	  case Command.learnerDoneCtype => {
-            stopUpdates()
 	  }
 	}
 

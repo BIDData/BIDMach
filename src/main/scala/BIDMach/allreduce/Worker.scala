@@ -159,14 +159,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		allReduce(newcmd.round, newcmd.limit);
-
-		if (learner.done) {
-		  val resp = new LearnerDoneResponse(cmd.round, cmd.dest)
-		  sendMaster(resp)
-		} else {
-		  val resp = new AllreduceResponse(cmd.round, cmd.dest, cmd.tag)
-		  sendMaster(resp)
-		}
+		sendMaster(new AllreduceResponse(cmd.round, cmd.dest, cmd.tag))
     	}
     	case Command.permuteAllreduceCtype => {
     		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes, cmd.tag);
@@ -191,7 +184,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 		  learner.init
     		  sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach))
 		  learner.train
-    		}
+    		  sendMaster(new Response(Command.learnerDoneCtype, -1, imach))
+    		} else {
+		  logln("Recieved startLearner Command but learner == null")
+		}
     	}
     	case Command.sendLearnerCtype => {
     		val newcmd = new SendLearnerCommand(0, cmd.dest, null, cmd.bytes);
@@ -308,7 +304,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
   def signalLearnerDone = {
     // explicitly run on main thread
-    val doneResp = new LearnerDoneResponse(round, imach)
+    val doneResp = new Response(Command.learnerDoneCtype, -1, imach)
     doneResp.encode
     val rw = new ResponseWriter(masterSocketAddr, doneResp, this);
     rw.run()

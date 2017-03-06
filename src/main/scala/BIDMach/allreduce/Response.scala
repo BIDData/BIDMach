@@ -72,19 +72,6 @@ extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4, tag) {
   override def decode():Unit = {}
 }
 
-class LearnerDoneResponse(round0:Int, src0:Int, bytes:Array[Byte])
-extends Response(Command.learnerDoneCtype, round0, src0, 1, bytes, 1*4) {
-
-  def this(round0:Int, src0:Int) = this(round0, src0, new Array[Byte](1*4));
-
-  override def encode():Unit = {
-    intData.rewind();
-    intData.put(src);
-  }
-
-  override def decode():Unit = {}
-}
-
 
 class AckReadyResponse(round0:Int, src0:Int, bytes:Array[Byte])
 extends Response(Command.ackReadyCtype, round0, src0, 1, bytes, 1*4) {

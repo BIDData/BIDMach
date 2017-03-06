@@ -27,8 +27,8 @@ opts.timeScaleMsec = 2e-3f
 opts.permuteAlways = false
 
 opts.machineThreshold = 0.75;
-opts.minWaitTime = 3000;
-opts.timeThresholdMsec = 5000;
+opts.minWaitTime = 400;
+opts.timeThresholdMsec = 600;
 
 val nmachines = addresses.length
 val gmods = irow(nmachines)
@@ -43,9 +43,10 @@ m.setNumModelMats(1)
 
 // m.parCall((w) => {
 //   var fgopts = w.learner.opts.asInstanceOf[GLM.FGOptions]
+//   fgopts.npasses = 2
 //   var totalNumSamples = fgopts.nend
 //   totalNumSamples = 20
-//   var numWorkers = 2; // TODO: don't hardcode this
+//   var numWorkers = 4; // TODO: don't hardcode this
 //   var workerNumSamples = totalNumSamples / numWorkers
 //   var nstart = (w.imach*workerNumSamples)
 //   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples)
