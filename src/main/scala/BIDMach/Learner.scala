@@ -107,7 +107,7 @@ case class Learner(
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;        
+    Mat.useGPUcache = opts.useCache;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
     flip;
@@ -218,7 +218,7 @@ case class Learner(
     cacheState = Mat.useCache
     Mat.useCache = opts.useCache
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;  
+    Mat.useGPUcache = opts.useCache;
     var here = 0L
     var lasti = 0
     var bytes = 0L
@@ -265,6 +265,7 @@ case class Learner(
     datasource.close;
     if (datasink != null) datasink.close;
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
+    results
   }
 
   def datamats = datasource.asInstanceOf[MatSource].mats;

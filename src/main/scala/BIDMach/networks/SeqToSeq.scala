@@ -335,6 +335,27 @@ object SeqToSeq {
   	    opts)
     (nn, opts)
   }
+
+  class MatPredOpts extends Learner.Options with SeqToSeq.Opts with MatSource.Opts with MatSink.Opts
+
+  def embed(model:SeqToSeq, src:Mat):(Learner, MatPredOpts) = {
+    val opts = new MatPredOpts
+    opts.copyFrom(model.opts)
+    opts.embed = true
+
+    val newmod = new SeqToSeq(opts)
+    newmod.refresh = false
+    model.copyTo(newmod)
+
+    val nn = new Learner(
+        new MatSource(Array(src), opts),
+        newmod,
+        null,
+        null,
+        new MatSink(opts),
+        opts);
+    (nn, opts)
+  }
   
   def load(fname:String):SeqToSeq = {
   	val mm = new SeqToSeq;
