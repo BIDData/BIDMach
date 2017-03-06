@@ -28,12 +28,12 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
-	var reduceTask:Future[_] = null;
-	var reducer:Reducer = null;
-	var sendTiming = false;
+	var reducerMap:Map[Int, Reducer] = null
+	var reduceTaskMap:Map[Int, Future[_]] = null
+	var numAckedReady:Integer = 0
 	var activeCommand:Command = null;
+	var activeTaggedCommands:collection.mutable.SynchronizedMap[String, Command] = Map()
 	var responses:IMat = null;
-	var learners:IMat = null;
 	var results:Array[AnyRef] = null;
   var masterIP:InetAddress = null;
 	var nresults = 0;
@@ -41,6 +41,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	var numExpectedRegisteredWorkers:Int = -1
 	var numRegisteredWorkers:AtomicInteger = new AtomicInteger()
 	var allWorkersRegisteredSema:Semaphore = new Semaphore(0)
+	var workerModel:Model = null
 	
 	def init() {
     masterIP = InetAddress.getLocalHost;
@@ -63,7 +64,6 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     workers = workers0;
     M = workers.length;
     responses = izeros(1,M+1);
-    learners = izeros(1,M+1);
     results = new Array[AnyRef](M);
     nresults = 0;
   }
@@ -73,6 +73,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       round, 0, gmods, gridmachines, workers, masterIP, opts.responseSocketNum)
     broadcastCommand(cmd);
   }
+
   def startUpdatesAfterRegistration(numExpectedWorkers:Int) {
     numExpectedRegisteredWorkers = numExpectedWorkers
     config(
@@ -87,19 +88,35 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     val cmd = new PermuteCommand(round, 0, seed);
     broadcastCommand(cmd);
   }
+
+  def setWorkerModel(model:Model) {
+    workerModel = model
+  }
   
   def startUpdates(waitForAck:Boolean = false) {
-    reducer = new Reducer(waitForAck);
-    reduceTask = executor.submit(reducer);
+    reducerMap = scala.collection.mutable.Map[Int, Reducer]()
+    reducerTaskMap = scala.collection.mutable.Map[Int, Future[_]]()
+    var curReducer = null
+    for (i <- 0 until workerModel.modelmats.length) {
+      curReducer = new Reducer(i, waitForAck)
+      reducerMap(i) = curReducer
+      reduceTaskMap(i) = executor.submit(curReducer)
+    }
   }
   
   def stopUpdates() {
-    if (reducer != null && !reducer.stop) {
-      reducer.stop = true;
-      reduceTask.cancel(true);    
-      log("Total distributed time: %.3fs\n" format ((System.currentTimeMillis-allreduceTimer) / 1000.0));
+    var stoppedSomething = false
+    for ((i, reducer) <- reducerMap) {
+      if (reducer != null && !reducer.stop) {
+	stoppedSomething = true
+	reducer.stop = true
+	reduceTaskMap(i).cancel(true)
+      }
+    }
+    if (!stoppedSomething) {
+      if (opts.trace > 2) log("No reducer was running\n")
     } else {
-      log("Reducer wasn't running\n")
+      log("Total distributed time: %.3fs\n" format ((System.currentTimeMillis-allreduceTimer) / 1000.0))
     }
   }
   
@@ -156,7 +173,6 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def setMachineNumbers {
   	if (opts.trace > 2) log("Broadcasting setMachineNumbers\n");
   	val futures = new Array[Future[_]](M);
-  	sendTiming = true;
   	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
   	for (imach <- 0 until M) {
   	  val cmd = new SetMachineCommand(round, 0, imach);
@@ -173,34 +189,36 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd setMachineNumbers\n" format (imach));
   		}
   	}
-  	sendTiming = false;
   	timeout.cancel(true);
   }
     
-  def broadcastCommand(cmd:Command) {
-  	cmd.encode;
-  	activeCommand = cmd;
-  	if (opts.trace > 2) log("Broadcasting cmd %s\n" format cmd);
-  	val futures = new Array[Future[_]](M);
-  	responses.clear;
-  	sendTiming = true;
-  	val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures));
-  	for (imach <- 0 until M) {
-      val newcmd = new Command(cmd.ctype, round, imach, cmd.clen, cmd.bytes, cmd.blen);
-  		futures(imach) = send(newcmd, workers(imach));   
-  	}
-  	for (imach <- 0 until M) {
-  		try {
-  			futures(imach).get() 
-  		} catch {
-  		case e:Exception => {}
-  		}
-  		if (futures(imach).isCancelled()) {
-  			if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd %s\n" format (imach, cmd));
-  		}
-  	}
-  	sendTiming = false;
-  	timeout.cancel(true);
+  def broadcastCommand(cmd:Command, tag:String = null) {
+    cmd.encode
+    if (tag) {
+      activeTaggedCommands(tag) = cmd
+    } else {
+      activeCommand = cmd
+    }
+    if (opts.trace > 2) log("Broadcasting cmd %s tag %s" format (cmd, tag))
+
+    val futures = new Array[Future[_]](M)
+    responses.clear
+    val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures))
+    for (imach <- 0 until M) {
+      val newcmd = new Command(cmd.ctype, round, imach, cmd.clen, cmd.bytes, cmd.blen)
+      futures(imach) = send(newcmd, workers(imach))
+    }
+    for (imach <- 0 until M) {
+      try {
+        futures(imach).get()
+      } catch {
+        case e:Exception => {}
+      }
+      if (futures(imach).isCancelled()) {
+        if (opts.trace > 0) log("Broadcast to machine %d timed out, cmd %s\n" format (imach, cmd))
+      }
+    }
+    timeout.cancel(true)
   }
   
   def almostDone(threshold:Float = 0.75f):Boolean = {
@@ -223,17 +241,20 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
   }
 
-  class Reducer(waitForAck:Boolean = false) extends Runnable {
+  class Reducer(matIdx:Int, waitForAck:Boolean = false) extends Runnable {
     var stop = false
+    var allreduceCollected:Integer = 0
 
     def run() {
       var limit = 0
-      listener.numReady = 0
       if (waitForAck) {
 	if (opts.trace > 1) log("Waiting for %d ready acks...\n" format M)
-	while (listener.numReady < M) Thread.sleep(50)
+	numAckedReady.synchronized {
+	  if (numAckedReady < M) numAckedReady.wait()
+	}
 	if (opts.trace > 1) log("Recieved all ready acks! Starting Reducer.\n" )
       }
+      if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M)
       while (!stop) {
 	val newlimit0 = if (opts.limitFctn != null) {
 	  opts.limitFctn(round, opts.limit)
@@ -246,13 +267,12 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	} else {
 	  new AllreduceCommand(round, 0, limit)
 	}
-	listener.allreduceCollected = 0
-	broadcastCommand(cmd)
+	allreduceCollected = 0
+	broadcastCommand(cmd, "matIdx%d" format matIdx)
 
 	val t0 = System.currentTimeMillis
 	var t = System.currentTimeMillis
 	var delta = 0.0
-	if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M)
 
 	var waiting = true
 	while (waiting) {
@@ -302,10 +322,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   
   def handleResponse(resp:Response) = {
     if (resp.magic != Response.magic) {
-      if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (resp.magic));      
+      if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (resp.magic));
     } else if (activeCommand != null) {
       if (resp.rtype == activeCommand.ctype && resp.round == activeCommand.round) {
-    	  inctable(responses, resp.src);
+    	inctable(responses, resp.src);
       } else if ((activeCommand.ctype == Command.evalStringCtype || activeCommand.ctype == Command.callCtype)
 	         && resp.rtype == Command.returnObjectCtype && resp.round == activeCommand.round) {
         val newresp = new ReturnObjectResponse(resp.round, resp.src, null, resp.bytes);
@@ -313,8 +333,12 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     		addObj(newresp.obj, resp.src)
     		if (opts.trace > 2) log("Received %s\n" format newresp.toString);
       } else if (resp.rtype == Command.learnerDoneCtype) {
-    	  inctable(learners, resp.src);
-      } else if (opts.trace > 0) log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n" format (resp.rtype, resp.round, activeCommand.ctype, activeCommand.round)); 
+        master.stopUpdates()
+	master.log("Stopping allreduce update!\n")
+      } else if (opts.trace > 0) {
+	log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n"
+	    format (resp.rtype, resp.round, activeCommand.ctype, activeCommand.round))
+      }
     } else {
       // ackReady and registerWorker fall here
       if (resp.rtype == Command.registerWorkerCtype) {
@@ -339,62 +363,71 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  // all expected workers registered!
 	  allWorkersRegisteredSema.release()
 	}
+      } else if (resp.rtype == Command.ackReadyCtype) {
+	numAckedReady.synchronized {
+	  numAckedReady += 1
+	  if (numAckedReady >= M) {
+	    numAckedReady.notifyAll()
+	  }
+	}
       }
     }
   }
 
-	class ResponseListener(val socketnum:Int, me:Master) extends Runnable {
-		var stop = false;
-		var ss:ServerSocket = null;
-    var allreduceCollected:Int = 0;
-    var numReady:Int = 0;
+class ResponseListener(val socketnum:Int, me:Master) extends Runnable {
+  var stop = false;
+  var ss:ServerSocket = null;
+  var allreduceCollected:Int = 0;
 
-		def start() {
-			try {
-				ss = new ServerSocket(socketnum);
-			} catch {
-	case e:BindException => throw e
-			case e:Exception => {if (opts.trace > 0) log("Problem in ResponseListener\n%s" format Response.printStackTrace(e));}
-			}
-		}
+  def start() {
+    try {
+      ss = new ServerSocket(socketnum);
+    } catch {
+      case e:BindException => throw e
+      case e:Exception => {
+        if (opts.trace > 0)
+	  log("Problem in ResponseListener\n%s" format Response.printStackTrace(e))
+      }
+    }
+  }
 
-		def run() {
-			start();
-			while (!stop) {
-				try {
-					val scs = new ResponseReader(ss.accept(), me);
-					if (opts.trace > 2) log("Command Listener got a message\n");
-					val fut = executor.submit(scs);
-	  if (opts.trace > 2) log(" %d allreduce responses collected.\n" format allreduceCollected);
-				} catch {
-				case e:SocketException => {
-				  if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Response.printStackTrace(e));
-				}
-				// This is probably due to the server shutting to. Don't do anything.
-				case e:Exception => {
-	    if (opts.trace > 0) {
-	      log("Master Response listener had a problem\n%s" format Response.printStackTrace(e));
-	      Thread.`sleep`(1000)
-	    }
-				}
-				}
-			}
-		}
+  def run() {
+    start();
+    while (!stop) {
+      try {
+	val scs = new ResponseReader(ss.accept(), me);
+	if (opts.trace > 2) log("Command Listener got a message\n");
+	val fut = executor.submit(scs);
+      if (opts.trace > 2) log(" %d allreduce responses collected.\n" format allreduceCollected);
+      } catch {
+        case e:SocketException => {
+          if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Response.printStackTrace(e));
+        }
+        // This is probably due to the server shutting to. Don't do anything.
+        case e:Exception => {
+          if (opts.trace > 0) {
+            log("Master Response listener had a problem\n%s" format Response.printStackTrace(e));
+            Thread.`sleep`(1000)
+          }
+        }
+      }
+    }
+  }
 
-		def stop(force:Boolean) {
-			stop = true;
-			if (force) {
-				try {
-					stop = true;
-					ss.close();
-				} catch {
-				case e:Exception => {
-					if (opts.trace > 0) log("Master trouble closing response listener\n%s" format ( Response.printStackTrace(e)));
-				}
-				}			
-			}
-		}
+  def stop(force:Boolean) {
+    stop = true;
+    if (force) {
+      try {
+	stop = true;
+	ss.close();
+      } catch {
+	case e:Exception => {
+	  if (opts.trace > 0) log("Master trouble closing response listener\n%s" format ( Response.printStackTrace(e)));
 	}
+      }
+    }
+  }
+}
 }
 
 object Master {

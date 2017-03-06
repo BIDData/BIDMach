@@ -80,41 +80,41 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   }
 
   def allReduce(round:Int, limit:Long) = {
-    if (model != null) {
+    if (model != null && model.modelmats.asInstanceOf[AnyRef] == null) {
       val t1=toc;
-    	model.snapshot(limit.toInt, opts.doAvg);
-    	val sendmat = model.sendmat;
-    	val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
-    		model.indexmat
-    	} else {
-    		irow(0 -> sendmat.ncols)
-    	}
+      model.snapshot(limit.toInt, opts.doAvg);
+      val sendmat = model.sendmat;
+      val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
+        model.indexmat
+      } else {
+        irow(0 -> sendmat.ncols)
+      }
 
-    	val result = if (opts.fuseConfigReduce) {
-    		(indexmat, sendmat) match {
-    		case (lmat:LMat, fsendmat:FMat) =>  machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
-    		case (imat:IMat, fsendmat:FMat) =>  machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
-    		}
-    	} else {
-    		(indexmat, sendmat) match {
-    		case (lmat:LMat, fsendmat:FMat) =>  machine.config(lmat.data, lmat.data, round);
-    		case (imat:IMat, fsendmat:FMat) =>  machine.config(imat.data, imat.data, round);
-    		}
-    		machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
-    	}
+      val result = if (opts.fuseConfigReduce) {
+        (indexmat, sendmat) match {
+          case (lmat:LMat, fsendmat:FMat) => machine.configReduce(lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
+          case (imat:IMat, fsendmat:FMat) => machine.configReduce(imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
+        }
+      } else {
+        (indexmat, sendmat) match {
+	  case (lmat:LMat, fsendmat:FMat) => machine.config(lmat.data, lmat.data, round);
+          case (imat:IMat, fsendmat:FMat) => machine.config(imat.data, imat.data, round);
+        }
+        machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
+      }
 
-    	model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
-    	model.addStep(limit.toInt, opts.doAvg);
-    	val t2 = toc;
-    	val nbytes = indexmat match {
-    	  case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;
-    	  case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f;
-    	}
-    	if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
+      model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
+      model.addStep(limit.toInt, opts.doAvg);
+      val t2 = toc;
+      val nbytes = indexmat match {
+        case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;
+        case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f;
+      }
+      if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
     } else {
       if (opts.trace > 2) log("Allreduce model is null\n")
     }
-	}
+  }
 
   def stop = {
     listener.stop = true;

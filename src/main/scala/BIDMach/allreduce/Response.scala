@@ -195,19 +195,12 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
           case Command.allreduceCtype => {
             me.listener.allreduceCollected += 1
           }
-          case Command.ackReadyCtype => {
-            me.listener.numReady += 1
-          }
-          case Command.learnerDoneCtype => {
-            me.stopUpdates()
-            me.log("Stopping allreduce update!\n")
-          }
           case _ =>
         }
         try {
           socket.close();
         } catch {
-        case e:IOException => {if (me.opts.trace > 0) me.log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
+          case e:IOException => {if (me.opts.trace > 0) me.log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
         }
         me.handleResponse(response);
       } catch {

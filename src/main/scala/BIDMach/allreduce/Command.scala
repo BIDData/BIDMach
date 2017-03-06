@@ -72,37 +72,85 @@ class Command(val ctype:Int, round0:Int, dest0:Int, val clen:Int, val bytes:Arra
   val intData = byteData.asIntBuffer;
   val floatData = byteData.asFloatBuffer;
   val longData = byteData.asLongBuffer;
+  val clen = blen / tsize
 
-  def encode() = {}
-  def decode() = {}
+  def encode() = {
+    intData.rewind()
+    intData.put(tagLen)
+    if (tagLen > 0) {
+      byteData.position(4)
+      byteData.put(tag.getBytes(StandardCharsets.UTF_8))
+    }
+    setBufferPos(4 + tagLen)
+    subclsEncode()
+  }
+
+  def decode() = {
+    intData.rewind()
+    tagLen = intData.get()
+    if (tagLen > 0) {
+      var tagBuffer = new Array[Byte](tagLen)
+      byteData.position(4)
+      byteData.get(tagBuffer)
+      tag = new String(tagBuffer, StandardCharsets.UTF_8)
+    }
+    setBufferPos(4 + tagLen)
+    subclsDecode()
+  }
+
+  def setBufferPos(bPos:Int) {
+    byteData.position(bPos)
+    intData = byteData.asIntBuffer
+    floatData = byteData.asFloatBuffer
+    longData = byteData.asLongBuffer
+  }
+
+  abstract def subclsEncode() {}
+  abstract def subclsDecode() {}
 
   def this(ctype0:Int, round0:Int, dest0:Int, clen0:Int) =
     this(ctype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0);
 
+  def this(ctype0:Int, round0:Int, dest0:Int, clen0:Int, tag:String, tagLen:Int) =
+    this(ctype0, round0, dest0, clen0, new Array[Byte](tagLen + 4*clen0), 4*clen0, tag, tagLen);
+
   override def toString():String = {
-    "Command %s, length %d bytes" format (Command.names(ctype), blen);
+    "Command %s, tag %s, length %d bytes" format (Command.names(ctype), tag, blen);
   }
 
 }
 
 object Command {
-	val magic = 0xa6b38734;
-	final val configCtype = 1;
-	final val permuteCtype = 2;
-	final val allreduceCtype = 3;
-	final val permuteAllreduceCtype = 4;
-	final val setMachineCtype = 5;
-	final val startLearnerCtype = 6;
-	final val learnerDoneCtype = 7;
-	final val assignObjectCtype = 8;
-	final val sendLearnerCtype = 9;
-	final val evalStringCtype = 10;
-	final val returnObjectCtype = 11;
-	final val callCtype = 12;
-	final val ackReadyCtype = 13;
-	final val registerWorkerCtype = 14;
-	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone",
-	    "assignObject", "sendLearner", "evalString", "returnObject", "call", "ackReady", "registerWorker");
+    final val magic = 0xa6b38734;
+    final val configCtype = 1;
+    final val permuteCtype = 2;
+    final val allreduceCtype = 3;
+    final val permuteAllreduceCtype = 4;
+    final val setMachineCtype = 5;
+    final val startLearnerCtype = 6;
+    final val learnerDoneCtype = 7;
+    final val assignObjectCtype = 8;
+    final val sendLearnerCtype = 9;
+    final val evalStringCtype = 10;
+    final val returnObjectCtype = 11;
+    final val callCtype = 12;
+    final val ackReadyCtype = 13;
+    final val registerWorkerCtype = 14;
+    final val names = Array[String]("",
+      "config",
+      "permute",
+      "allreduce",
+      "permuteAllreduce",
+      "setMachine",
+      "startLearner",
+      "learnerDone",
+      "assignObject",
+      "sendLearner",
+      "evalString",
+      "returnObject",
+      "call",
+      "ackReady",
+      "registerWorker");
 
 
   def printStackTrace(e:Exception):String = {
