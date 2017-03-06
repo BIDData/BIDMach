@@ -1,0 +1,14 @@
+cbin
+lib/*.jar
+*.rej
+*.so
+target
+*.o
+*.incl
+
+data
+!data/rcv1_fmt.txt
+!data/uci_fmt.txt
+!data/uci_wfmt.txt
+!data/factorNet
+!data/MHTestCorrections
