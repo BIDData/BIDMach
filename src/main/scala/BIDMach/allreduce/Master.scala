@@ -22,22 +22,26 @@ import java.io.IOException;
 import javax.script.ScriptEngine;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ConcurrentHashMap;
+import BIDMach.models.Model
+import scala.collection.mutable.{Map => MutableMap, HashMap => MutableHashMap}
 
 
 class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
-	var reducerMap:Map[Int, Reducer] = null
-	var reduceTaskMap:Map[Int, Future[_]] = null
+	var reducerMap:MutableMap[Int, Reducer] = null
+	var reduceTaskMap:MutableMap[Int, Future[_]] = null
 	var numAckedReady:Integer = 0
 	var activeCommand:Command = null;
-	var activeTaggedCommands:collection.mutable.SynchronizedMap[String, Command] = Map()
+	var activeTaggedCommands:ConcurrentHashMap[String, Command] =
+	  new ConcurrentHashMap[String, Command]()
 	var responses:IMat = null;
 	var results:Array[AnyRef] = null;
-  var masterIP:InetAddress = null;
+        var masterIP:InetAddress = null;
 	var nresults = 0;
-  var allreduceTimer:Long = 0;
+        var allreduceTimer:Long = 0;
 	var numExpectedRegisteredWorkers:Int = -1
 	var numRegisteredWorkers:AtomicInteger = new AtomicInteger()
 	var allWorkersRegisteredSema:Semaphore = new Semaphore(0)
@@ -94,10 +98,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
   
   def startUpdates(waitForAck:Boolean = false) {
-    reducerMap = scala.collection.mutable.Map[Int, Reducer]()
-    reducerTaskMap = scala.collection.mutable.Map[Int, Future[_]]()
-    var curReducer = null
-    for (i <- 0 until workerModel.modelmats.length) {
+    reducerMap = new MutableHashMap[Int, Reducer]()
+    reduceTaskMap = new MutableHashMap[Int, Future[_]]()
+    var curReducer:Reducer = null
+    for (i <- 0 until workerModel.modelmats.length) { // TODO: use modelMat names instead of idx
       curReducer = new Reducer(i, waitForAck)
       reducerMap(i) = curReducer
       reduceTaskMap(i) = executor.submit(curReducer)
@@ -127,7 +131,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
   
   def permuteAllreduce(round:Int, limit:Int) {
-  	val cmd = new PermuteAllreduceCommand(round, 0, round, limit);
+  	val cmd = new PermuteAllreduceCommand(round, 0, round, limit, null);
   	broadcastCommand(cmd);
   }
   
@@ -192,21 +196,21 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   	timeout.cancel(true);
   }
     
-  def broadcastCommand(cmd:Command, tag:String = null) {
+  def broadcastCommand(cmd:Command) {
     cmd.encode
-    if (tag) {
-      activeTaggedCommands(tag) = cmd
+    if (cmd.tag != null) {
+      activeTaggedCommands.put(cmd.tag, cmd)
     } else {
       activeCommand = cmd
     }
-    if (opts.trace > 2) log("Broadcasting cmd %s tag %s" format (cmd, tag))
+    if (opts.trace > 2) log("Broadcasting cmd %s" format cmd)
 
     val futures = new Array[Future[_]](M)
     responses.clear
     val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures))
     for (imach <- 0 until M) {
-      val newcmd = new Command(cmd.ctype, round, imach, cmd.clen, cmd.bytes, cmd.blen)
-      futures(imach) = send(newcmd, workers(imach), tag)
+      val newcmd = new Command(cmd.ctype, round, imach, cmd.clen, cmd.bytes, cmd.blen, cmd.tag)
+      futures(imach) = send(newcmd, workers(imach))
     }
     for (imach <- 0 until M) {
       try {
@@ -226,8 +230,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     c >= M * threshold;
   }
   
-  def send(cmd:Command, address:InetSocketAddress, tag:String = null):Future[_] = {
-    val cw = new CommandWriter(address, cmd, this, tag);
+  def send(cmd:Command, address:InetSocketAddress):Future[_] = {
+    val cw = new CommandWriter(address, cmd, this);
     executor.submit(cw);
   }
 
@@ -244,6 +248,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   class Reducer(matIdx:Int, waitForAck:Boolean = false) extends Runnable {
     var stop = false
     var allreduceCollected:Integer = 0
+    val matTag = "matIdx%d" format matIdx
 
     def run() {
       var limit = 0
@@ -263,34 +268,34 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	}
 	limit = if (newlimit0 <= 0) 2000000000 else newlimit0
 	val cmd = if (opts.permuteAlways) {
-	  new PermuteAllreduceCommand(round, 0, round, limit)
+	  new PermuteAllreduceCommand(round, 0, round, limit, matTag)
 	} else {
-	  new AllreduceCommand(round, 0, limit)
+	  new AllreduceCommand(round, 0, limit, matTag)
 	}
 	allreduceCollected = 0
-	broadcastCommand(cmd, "matIdx%d" format matIdx)
+	broadcastCommand(cmd)
 
 	val t0 = System.currentTimeMillis
-	var t = System.currentTimeMillis
-	var delta = 0.0
-
-	var waiting = true
-	while (waiting) {
-	  Thread.sleep(100) // Check the result every 100 ms
-	  t = System.currentTimeMillis
-	  if (opts.trace > 2) log("Current waiting time: %d ms\n" format t-t0)
-	  delta = t - t0
-
-	  if (delta < opts.minWaitTime) {
-	    if (listener.allreduceCollected >= M) waiting = false
-	  } else if (delta < opts.timeThresholdMsec) {
-	    if (listener.allreduceCollected >= opts.machineThreshold*M) waiting = false
-	  } else {
-	    waiting = false
+	var delta:Long = 0
+	allreduceCollected.synchronized {
+	  // First, we attempt to wait for all workers to respond until opts.minWaitTime
+	  delta = System.currentTimeMillis - t0
+	  while (delta < opts.minWaitTime && allreduceCollected < M) {
+	    allreduceCollected.wait(opts.minWaitTime - delta)
+	    delta = System.currentTimeMillis - t0
 	  }
-	}
 
-	round += 1
+	  // Then, we attempt to wait for (opts.machineThreshold * M) workers until
+	  // opts.timeThresholdMsec
+	  delta = System.currentTimeMillis - t0
+	  while (delta < opts.timeThresholdMsec && allreduceCollected < M*opts.machineThreshold) {
+	    allreduceCollected.wait(opts.timeThresholdMsec - delta)
+	    delta = System.currentTimeMillis - t0
+	  }
+
+	  // Otherwise, we give up
+	  round += 1
+	}
       }
     }
   }
@@ -323,6 +328,18 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def handleResponse(resp:Response) = {
     if (resp.magic != Response.magic) {
       if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (resp.magic));
+
+    } else if (resp.tag != null && activeTaggedCommands.get(resp.tag) != null) {
+      val activeTaggedCmd = activeTaggedCommands.get(resp.tag)
+      if ((resp.rtype == Command.allreduceCtype || resp.rtype == Command.permuteAllreduceCtype)
+	  && resp.round == activeTaggedCmd.round) {
+	handleAllReduceResponse(resp)
+
+      } else if (opts.trace > 0) {
+	log("Master got tagged response %d with bad type/round (%d,%d), should be (%d,%d)\n"
+	    format (resp.tag, resp.rtype, resp.round, activeCommand.ctype, activeCommand.round))
+      }
+
     } else if (activeCommand != null) {
       if (resp.rtype == activeCommand.ctype && resp.round == activeCommand.round) {
     	inctable(responses, resp.src);
@@ -333,12 +350,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     		addObj(newresp.obj, resp.src)
     		if (opts.trace > 2) log("Received %s\n" format newresp.toString);
       } else if (resp.rtype == Command.learnerDoneCtype) {
-        master.stopUpdates()
-	master.log("Stopping allreduce update!\n")
+        stopUpdates()
+	log("Stopping allreduce update!\n")
       } else if (opts.trace > 0) {
 	log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n"
 	    format (resp.rtype, resp.round, activeCommand.ctype, activeCommand.round))
       }
+
     } else {
       // ackReady and registerWorker fall here
       if (resp.rtype == Command.registerWorkerCtype) {
@@ -374,10 +392,27 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
   }
 
+  def handleAllReduceResponse(resp:Response) {
+    val matIdxPat = """matIdx(\d+)""".r
+    val matIdx = resp.tag match {
+       case matIdxPat(matIdx) => matIdx.toInt
+       case _ => -1
+    }
+
+    if (matIdx != -1) {
+      if (opts.trace > 0) log("Master got tagged allReduce response %d with invalid tag\n" format (resp.tag))
+    } else {
+      val reducer = reducerMap(matIdx)
+      reducer.allreduceCollected.synchronized {
+        reducer.allreduceCollected += 1
+	if (reducer.allreduceCollected >= M*opts.machineThreshold) reducer.notify()
+      }
+    }
+  }
+
 class ResponseListener(val socketnum:Int, me:Master) extends Runnable {
   var stop = false;
   var ss:ServerSocket = null;
-  var allreduceCollected:Int = 0;
 
   def start() {
     try {
@@ -398,7 +433,6 @@ class ResponseListener(val socketnum:Int, me:Master) extends Runnable {
 	val scs = new ResponseReader(ss.accept(), me);
 	if (opts.trace > 2) log("Command Listener got a message\n");
 	val fut = executor.submit(scs);
-      if (opts.trace > 2) log(" %d allreduce responses collected.\n" format allreduceCollected);
       } catch {
         case e:SocketException => {
           if (opts.trace > 0) log("Problem starting a socket reader\n%s" format Response.printStackTrace(e));

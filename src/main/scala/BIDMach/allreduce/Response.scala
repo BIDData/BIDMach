@@ -23,9 +23,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.charset.StandardCharsets
 
-class Response(
-  val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:Array[Byte], val blen:Int
+class Response (
+  val rtype:Int, round0:Int, val src:Int, val clen:Int, val bytes:Array[Byte], val blen:Int,
+  val tag:String = null
 ) {
   val magic = Response.magic;
   var round = round0;
@@ -37,21 +39,30 @@ class Response(
   def encode() = {}
   def decode() = {}
   
+  def this(rtype0:Int, round0:Int, dest0:Int, clen0:Int, tag:String) =
+    this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0, tag);
+
   def this(rtype0:Int, round0:Int, dest0:Int, clen0:Int) =
-    this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0);
+    this(rtype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0, null);
   
-  def this(rtype0:Int, round0:Int, dest0:Int) = this(rtype0, round0, dest0, 0, null, 0);
+  def this(rtype0:Int, round0:Int, dest0:Int, tag:String) =
+    this(rtype0, round0, dest0, 0, null, 0, tag);
+
+  def this(rtype0:Int, round0:Int, dest0:Int) =
+    this(rtype0, round0, dest0, 0, null, 0, null);
   
   override def toString():String = {
-    "Response %s, round %d, src %d, length %d bytes" format (Command.names(rtype), round, src, clen*4);
+    "Response %s, tag %s, round %d, src %d, length %d bytes" format (
+      Command.names(rtype), tag, round, src, clen*4);
   }
   
 }
 
-class AllreduceResponse(round0:Int, src0:Int, bytes:Array[Byte])
-extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4) {
+class AllreduceResponse(round0:Int, src0:Int, bytes:Array[Byte], tag:String)
+extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4, tag) {
 
-  def this(round0:Int, src0:Int) = this(round0, src0, new Array[Byte](1*4));
+  def this(round0:Int, src0:Int, tag:String) =
+    this(round0, src0, new Array[Byte](1*4), tag);
 
   override def encode():Unit = {
     intData.rewind();
@@ -145,36 +156,42 @@ extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes, byt
   }
 }
 
-class ResponseWriter(address:InetSocketAddress, resp:Response, me:Worker) extends Runnable {
-
-	def run() {
-		var socket:Socket = null;
-	try {
-		socket = new Socket();
-		socket.setReuseAddress(true);
-		socket.connect(address, me.opts.sendTimeout);
-		if (socket.isConnected()) {
-			val ostr = new DataOutputStream(socket.getOutputStream());
-			ostr.writeInt(resp.magic)
-			ostr.writeInt(resp.rtype);
-      ostr.writeInt(resp.round);
-			ostr.writeInt(resp.src);
-			ostr.writeInt(resp.clen);
-	ostr.writeInt(resp.blen);
-	ostr.write(resp.bytes, 0, resp.blen);
-		}
-	} catch {
-	case e:Exception =>
-	if (me.opts.trace > 0) {
-		me.log("Master problem sending resp %s\n%s\n" format (resp.toString, Response.printStackTrace(e)));
+class ResponseWriter(address:InetSocketAddress, resp:Response, me:Worker)
+extends Runnable {
+  def run() {
+    var socket:Socket = null;
+    try {
+      socket = new Socket();
+      socket.setReuseAddress(true);
+      socket.connect(address, me.opts.sendTimeout);
+      if (socket.isConnected()) {
+        val ostr = new DataOutputStream(socket.getOutputStream());
+        ostr.writeInt(resp.magic)
+        ostr.writeInt(resp.rtype);
+        ostr.writeInt(resp.round);
+        ostr.writeInt(resp.src);
+	if (resp.tag == null) {
+	  ostr.writeInt(resp.tag.length);
+	  ostr.writeChars(resp.tag);
+	} else {
+	  ostr.writeInt(0);
 	}
-	} finally {
-		try { if (socket != null) socket.close(); } catch {
-		case e:Exception =>
-		if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Response.printStackTrace(e));        
-		}
-	}
-	}
+        ostr.writeInt(resp.clen);
+        ostr.writeInt(resp.blen);
+        ostr.write(resp.bytes, 0, resp.blen);
+      }
+    } catch {
+      case e:Exception => if (me.opts.trace > 0) {
+        me.log("Master problem sending resp %s\n%s\n" format (resp.toString, Response.printStackTrace(e)));
+      }
+    } finally {
+      try {
+        if (socket != null) socket.close();
+      } catch {
+        case e:Exception => if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Response.printStackTrace(e));
+      }
+    }
+  }
 }
 
 class ResponseReader(socket:Socket, me:Master) extends Runnable {
@@ -185,18 +202,19 @@ class ResponseReader(socket:Socket, me:Master) extends Runnable {
         val rtype = istr.readInt();
         val round = istr.readInt();
         val dest = istr.readInt();
+	val tagLen = istr.readInt()
+	var tag:String = null
+        if (tagLen > 0) {
+          val tagBuf = new Array[Byte](tagLen)
+          istr.read(tagBuf)
+          tag = new String(tagBuf, StandardCharsets.UTF_8)
+        }
         val clen = istr.readInt();
         val blen = istr.readInt();
-        val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen);
+        val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen, tag);
         if (me.opts.trace > 2) me.log("Master got packet %s\n" format (response.toString));
         istr.readFully(response.bytes, 0, blen);
 
-        rtype match {
-          case Command.allreduceCtype => {
-            me.listener.allreduceCollected += 1
-          }
-          case _ =>
-        }
         try {
           socket.close();
         } catch {

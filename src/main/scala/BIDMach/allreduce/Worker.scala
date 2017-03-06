@@ -152,7 +152,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		if (opts.respond > 0) sendMaster(new Response(Command.permuteCtype, newcmd.round, imach));
     	}
     	case Command.allreduceCtype => {
-    		val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes);
+    		val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes, cmd.tag);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		allReduce(newcmd.round, newcmd.limit);
@@ -161,12 +161,12 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 		  val resp = new LearnerDoneResponse(cmd.round, cmd.dest)
 		  sendMaster(resp)
 		} else {
-		  val resp = new AllreduceResponse(cmd.round, cmd.dest)
+		  val resp = new AllreduceResponse(cmd.round, cmd.dest, cmd.tag)
 		  sendMaster(resp)
 		}
     	}
     	case Command.permuteAllreduceCtype => {
-    		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes);
+    		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes, cmd.tag);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		permute(newcmd.seed);

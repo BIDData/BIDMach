@@ -64,7 +64,10 @@ class SocketClassLoader(parent:ClassLoader) extends ClassLoader(parent) {
 
 
 
-class Command(val ctype:Int, round0:Int, dest0:Int, val clen:Int, val bytes:Array[Byte], val blen:Int) {
+class Command(
+  val ctype:Int, round0:Int, dest0:Int,val clen:Int, val bytes:Array[Byte], val blen:Int,
+  val tag:String = null
+) {
   val magic = Command.magic;
   var dest = dest0;
   var round = round0;
@@ -72,47 +75,15 @@ class Command(val ctype:Int, round0:Int, dest0:Int, val clen:Int, val bytes:Arra
   val intData = byteData.asIntBuffer;
   val floatData = byteData.asFloatBuffer;
   val longData = byteData.asLongBuffer;
-  val clen = blen / tsize
 
-  def encode() = {
-    intData.rewind()
-    intData.put(tagLen)
-    if (tagLen > 0) {
-      byteData.position(4)
-      byteData.put(tag.getBytes(StandardCharsets.UTF_8))
-    }
-    setBufferPos(4 + tagLen)
-    subclsEncode()
-  }
+  def encode() = {}
+  def decode() = {}
 
-  def decode() = {
-    intData.rewind()
-    tagLen = intData.get()
-    if (tagLen > 0) {
-      var tagBuffer = new Array[Byte](tagLen)
-      byteData.position(4)
-      byteData.get(tagBuffer)
-      tag = new String(tagBuffer, StandardCharsets.UTF_8)
-    }
-    setBufferPos(4 + tagLen)
-    subclsDecode()
-  }
-
-  def setBufferPos(bPos:Int) {
-    byteData.position(bPos)
-    intData = byteData.asIntBuffer
-    floatData = byteData.asFloatBuffer
-    longData = byteData.asLongBuffer
-  }
-
-  abstract def subclsEncode() {}
-  abstract def subclsDecode() {}
+  def this(ctype0:Int, round0:Int, dest0:Int, clen0:Int, tag:String) =
+    this(ctype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0, tag);
 
   def this(ctype0:Int, round0:Int, dest0:Int, clen0:Int) =
-    this(ctype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0);
-
-  def this(ctype0:Int, round0:Int, dest0:Int, clen0:Int, tag:String, tagLen:Int) =
-    this(ctype0, round0, dest0, clen0, new Array[Byte](tagLen + 4*clen0), 4*clen0, tag, tagLen);
+    this(ctype0, round0, dest0, clen0, new Array[Byte](4*clen0), 4*clen0, null);
 
   override def toString():String = {
     "Command %s, tag %s, length %d bytes" format (Command.names(ctype), tag, blen);
@@ -307,12 +278,13 @@ extends Command(Command.startLearnerCtype, round0, dest0, 1, bytes, 1*4) {
   }
 }
 
-class AllreduceCommand(round0:Int, dest0:Int, limit0:Long, bytes:Array[Byte])
-extends Command(Command.allreduceCtype, round0, dest0, 4, bytes, 4*4) {
+class AllreduceCommand(round0:Int, dest0:Int, limit0:Long, bytes:Array[Byte], tag:String)
+extends Command(Command.allreduceCtype, round0, dest0, 4, bytes, 4*4, tag) {
 
   var limit:Long = limit0;
 
-  def this(round0:Int, dest0:Int, limit0:Long) = this(round0, dest0, limit0, new Array[Byte](4*4));
+  def this(round0:Int, dest0:Int, limit0:Long, tag:String) =
+    this(round0, dest0, limit0, new Array[Byte](4*4), tag);
 
   def setFields(round0:Int, limit0:Long) {
     round = round0;
@@ -320,30 +292,32 @@ extends Command(Command.allreduceCtype, round0, dest0, 4, bytes, 4*4) {
   }
 
   override def encode():Unit = {
-  	longData.rewind();
-  	longData.put(round);
-  	longData.put(limit);
+    longData.rewind();
+    longData.put(round);
+    longData.put(limit);
   }
 
   override def decode():Unit = {
-  	longData.rewind();
-  	round = longData.get().toInt;
+    longData.rewind();
+    round = longData.get().toInt;
     limit = longData.get();
   }
 
   override def toString():String = {
-     "Command %s, length %d words, round %d limit %d" format (Command.names(ctype), clen, round, limit);
+    "Command %s, tag %d, length %d words, round %d limit %d" format (
+      Command.names(ctype), tag, clen, round, limit);
   }
 }
 
-class PermuteAllreduceCommand(round0:Int, dest0:Int, seed0:Long, limit0:Long, bytes:Array[Byte])
-extends Command(Command.permuteAllreduceCtype, round0, dest0, 6, bytes, 6*4) {
+class PermuteAllreduceCommand(
+  round0:Int, dest0:Int, seed0:Long, limit0:Long, bytes:Array[Byte], tag:String
+) extends Command(Command.permuteAllreduceCtype, round0, dest0, 6, bytes, 6*4, tag) {
 
   var seed:Long = seed0;
   var limit:Long = limit0;
 
-  def this(round0:Int, dest0:Int, seed0:Long, limit0:Long) =
-    this(round0, dest0, seed0, limit0, new Array[Byte](6*4));
+  def this(round0:Int, dest0:Int, seed0:Long, limit0:Long, tag:String) =
+    this(round0, dest0, seed0, limit0, new Array[Byte](6*4), tag);
 
   def setFields(round0:Int, seed0:Long, limit0:Long) {
     round = round0;
@@ -352,21 +326,22 @@ extends Command(Command.permuteAllreduceCtype, round0, dest0, 6, bytes, 6*4) {
   }
 
   override def encode():Unit = {
-  	longData.rewind();
-  	longData.put(round);
-  	longData.put(seed);
-  	longData.put(limit);
+    longData.rewind();
+    longData.put(round);
+    longData.put(seed);
+    longData.put(limit);
   }
 
   override def decode():Unit = {
-  	longData.rewind();
-  	round = longData.get().toInt;
-  	seed = longData.get();
+    longData.rewind();
+    round = longData.get().toInt;
+    seed = longData.get();
     limit = longData.get();
   }
 
   override def toString():String = {
-     "Command %s, length %d words, round %d seed %d limit %d" format (Command.names(ctype), clen, round, seed, limit);
+    "Command %s, tag %s, length %d words, round %d seed %d limit %d" format (
+      Command.names(ctype), tag, clen, round, seed, limit);
   }
 }
 
@@ -521,7 +496,7 @@ extends Command(Command.callCtype, round0, dest0, bytes.size, bytes, bytes.size)
 }
 
 
-class CommandWriter(address:InetSocketAddress, command:Command, me:Master, tag:String = null)
+class CommandWriter(address:InetSocketAddress, command:Command, me:Master)
 extends Runnable {
   def run() {
     var socket:Socket = null;
@@ -535,8 +510,12 @@ extends Runnable {
 	ostr.writeInt(command.ctype);
 	ostr.writeInt(command.round);
 	ostr.writeInt(command.dest);
-	ostr.writeInt(tag.length);
-	ostr.writeChars(tag);
+	if (command.tag != null) {
+	  ostr.writeInt(command.tag.length)
+	  ostr.writeChars(command.tag)
+	} else {
+	  ostr.writeInt(0)
+	}
 	ostr.writeInt(command.clen);
 	ostr.writeInt(command.blen);
 	ostr.write(command.bytes, 0, command.blen);
@@ -565,7 +544,12 @@ class CommandReader(socket:Socket, me:Worker) extends Runnable {
       val round = istr.readInt();
       val dest = istr.readInt();
       val tagLen = istr.readInt();
-      val tag = istr.readChars(tagLen);
+      var tag:String = null
+      if (tagLen > 0) {
+	val tagBuf = new Array[Byte](tagLen)
+	istr.read(tagBuf)
+	tag = new String(tagBuf, StandardCharsets.UTF_8)
+      }
       val clen = istr.readInt();
       val blen = istr.readInt();
       val cmd = new Command(ctype, round, dest, blen, tag);
