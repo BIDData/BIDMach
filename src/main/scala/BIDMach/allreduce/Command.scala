@@ -521,64 +521,70 @@ extends Command(Command.callCtype, round0, dest0, bytes.size, bytes, bytes.size)
 }
 
 
-class CommandWriter(address:InetSocketAddress, command:Command, me:Master) extends Runnable {
-	def run() {
-		var socket:Socket = null;
-	  try {
-	  	socket = new Socket();
-	  	socket.setReuseAddress(true);
-	  	socket.connect(address, me.opts.sendTimeout);
-	  	if (socket.isConnected()) {
-	  		val ostr = new DataOutputStream(socket.getOutputStream());
-	  		ostr.writeInt(command.magic);
-	  		ostr.writeInt(command.ctype);
-	  		ostr.writeInt(command.round);
-	  		ostr.writeInt(command.dest);
-	  		ostr.writeInt(command.clen);
-			ostr.writeInt(command.blen);
-			ostr.write(command.bytes, 0, command.blen);
-	  	}
-	  }	catch {
-	  case e:Exception =>
-	  if (me.opts.trace > 0) {
-	  	me.log("Master problem sending command %s\n%s\n" format (command.toString, Command.printStackTrace(e)));
-	  }
-	  } finally {
-	  	try { if (socket != null) socket.close(); } catch {
-	  	case e:Exception =>
-	  	if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Command.printStackTrace(e));
-	  	}
-	  }
-	}
+class CommandWriter(address:InetSocketAddress, command:Command, me:Master, tag:String = null)
+extends Runnable {
+  def run() {
+    var socket:Socket = null;
+    try {
+      socket = new Socket();
+      socket.setReuseAddress(true);
+      socket.connect(address, me.opts.sendTimeout);
+      if (socket.isConnected()) {
+	val ostr = new DataOutputStream(socket.getOutputStream());
+	ostr.writeInt(command.magic);
+	ostr.writeInt(command.ctype);
+	ostr.writeInt(command.round);
+	ostr.writeInt(command.dest);
+	ostr.writeInt(tag.length);
+	ostr.writeChars(tag);
+	ostr.writeInt(command.clen);
+	ostr.writeInt(command.blen);
+	ostr.write(command.bytes, 0, command.blen);
+      }
+    } catch {
+      case e:Exception =>
+      if (me.opts.trace > 0) {
+	me.log("Master problem sending command %s\n%s\n" format (command.toString, Command.printStackTrace(e)));
+      }
+    } finally {
+      try {
+	if (socket != null) socket.close();
+      } catch {
+	case e:Exception => if (me.opts.trace > 0) me.log("Master problem closing socket\n%s\n" format Command.printStackTrace(e));
+      }
+    }
+  }
 }
 
 class CommandReader(socket:Socket, me:Worker) extends Runnable {
-	def run() {
-		try {
-			val istr = new DataInputStream(socket.getInputStream());
-			val magic = istr.readInt();
-			val ctype = istr.readInt();
-			val round = istr.readInt();
-			val dest = istr.readInt();
-			val clen = istr.readInt();
-			val blen = istr.readInt();
-			val cmd = new Command(ctype, round, dest, clen, new Array[Byte](blen), blen);
-			if (me.opts.trace > 2) me.log("Worker %d got packet %s\n" format (me.imach, cmd.toString));
-			istr.readFully(cmd.bytes, 0, blen);
-			try {
-				socket.close();
-			} catch {
-			case e:IOException => {if (me.opts.trace > 0) me.log("Worker %d Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach))}
-			}
-			me.handleCMD(cmd);
-		} catch {
-		case e:Exception =>	if (me.opts.trace > 0) me.log("Worker %d Problem reading socket "+Command.printStackTrace(e)+"\n" format (me.imach));
-		} finally {
-			try {
-				if (!socket.isClosed) socket.close();
-			} catch {
-			case e:IOException => {if (me.opts.trace > 0) me.log("Worker %d Final Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach))}
-			}
-		}
-	}
+  def run() {
+    try {
+      val istr = new DataInputStream(socket.getInputStream());
+      val magic = istr.readInt();
+      val ctype = istr.readInt();
+      val round = istr.readInt();
+      val dest = istr.readInt();
+      val tagLen = istr.readInt();
+      val tag = istr.readChars(tagLen);
+      val clen = istr.readInt();
+      val blen = istr.readInt();
+      val cmd = new Command(ctype, round, dest, blen, tag);
+      if (me.opts.trace > 2) me.log("Worker %d got packet %s\n" format (me.imach, cmd.toString));
+      istr.readFully(cmd.bytes, 0, blen);
+      try {
+        socket.close();
+      } catch {
+        case e:IOException => if (me.opts.trace > 0) me.log("Worker %d Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach));
+      }
+      me.handleCMD(cmd);
+    } catch {
+      case e:Exception => if (me.opts.trace > 0) me.log("Worker %d Problem reading socket "+Command.printStackTrace(e)+"\n" format (me.imach));
+    } finally {
+      try {
+        if (!socket.isClosed) socket.close();
+      } catch {
+        case e:IOException => if (me.opts.trace > 0) me.log("Worker %d Final Problem closing socket "+Command.printStackTrace(e)+"\n" format (me.imach));
+      }
+    }
+  }
 }

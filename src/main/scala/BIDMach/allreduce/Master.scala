@@ -206,7 +206,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     val timeout = executor.submit(new TimeoutThread(opts.sendTimeout, futures))
     for (imach <- 0 until M) {
       val newcmd = new Command(cmd.ctype, round, imach, cmd.clen, cmd.bytes, cmd.blen)
-      futures(imach) = send(newcmd, workers(imach))
+      futures(imach) = send(newcmd, workers(imach), tag)
     }
     for (imach <- 0 until M) {
       try {
@@ -226,8 +226,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     c >= M * threshold;
   }
   
-  def send(cmd:Command, address:InetSocketAddress):Future[_] = {
-    val cw = new CommandWriter(address, cmd, this);
+  def send(cmd:Command, address:InetSocketAddress, tag:String = null):Future[_] = {
+    val cw = new CommandWriter(address, cmd, this, tag);
     executor.submit(cw);
   }
 
