@@ -66,7 +66,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 		gridmachines = allmachinecodes(0->M, M-1);
 	}
   
-  def config(gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress]) {
+  def config(gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress], numModelMats0:Int) {
     gmods = gmods0;
     gridmachines = gridmachines0;
     workers = workers0;
@@ -74,11 +74,12 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     responses = izeros(1,M+1);
     results = new Array[AnyRef](M);
     nresults = 0;
+    numModelMats = numModelMats0
   }
   
   def sendConfig() {
     val cmd = new ConfigCommand(
-      round, 0, gmods, gridmachines, workers, masterIP, opts.responseSocketNum)
+      round, 0, gmods, gridmachines, workers, masterIP, opts.responseSocketNum, numModelMats)
     broadcastCommand(cmd);
   }
 
@@ -87,7 +88,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     config(
       irow(numExpectedWorkers),
       irow(0->numExpectedWorkers),
-      new Array[InetSocketAddress](numExpectedWorkers)
+      new Array[InetSocketAddress](numExpectedWorkers),
+      1 // TODO
     )
     executor.submit(new Registrar())
   }
@@ -147,6 +149,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     allreduceTimer = System.currentTimeMillis;
     if (blocking) {
       this.synchronized { this.wait() }
+      Thread.`sleep`(250)
     }
   }
 

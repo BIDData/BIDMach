@@ -28,7 +28,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
 	var listener:CommandListener = null;
 	var listenerTask:Future[_] = null;
-	var machine:Machine = null;
+	var machineArr:Array[Machine] = null;
 	var learner:Learner = null;
 	var obj:AnyRef = null;
 	var str:String = null;
@@ -36,7 +36,6 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var intp:ScriptEngine = null;
 	var masterSocketAddr:InetSocketAddress = null;
 	var workerIP:InetAddress = null;
-	var waitForConfigSema:Semaphore = new Semaphore(0)
 
 	def start(learner0:Learner) = {
 	  workerIP = InetAddress.getLocalHost;
@@ -48,65 +47,90 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  intp = new ScriptEngineManager().getEngineByName("scala");
 	}
 
-  def config(imach0: Int, gmods0: IMat, gridmachines0: IMat, workers0: Array[InetSocketAddress],
-             masterSocketAddr0: InetSocketAddress) = {
+  def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress],
+             masterSocketAddr0:InetSocketAddress, numModelMats0:Int) = {
     val t1 = toc;
     imach = imach0;
     gmods = gmods0;
     gridmachines = gridmachines0;
     M = gridmachines.length;
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
-
-    // Add 3 so that Machine port doesn't overlap with Worker ports
-    workers = workers0.map((x) => new InetSocketAddress(x.getAddress(), x.getPort() + 3))
-
     masterSocketAddr = masterSocketAddr0;
-    if (machine != null) machine.stop;
-    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers);
-    machine.configTimeout = opts.configTimeout;
-    machine.reduceTimeout = opts.reduceTimeout;
-    machine.sendTimeout = opts.sendTimeout;
-    machine.recvTimeout = opts.recvTimeout;
-    machine.sockBase = opts.peerSocketNum;
-    machine.start(machine.maxk);
-    //intp.put("$imach", imach);
-    waitForConfigSema.release()
+
+    var machineOffset = 3
+    if (machineArr == null) machineArr = new Array[Machine](numModelMats0)
+    for (mmi <- 0 until numModelMats0) {
+      val workerMachineAddrs = workers0.map(
+	x => new InetSocketAddress(x.getAddress(), x.getPort() + machineOffset))
+      if (machineArr(mmi) != null) machineArr(mmi).stop
+      // TODO: dynamic bufsize
+      val machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false,
+	opts.machineTrace, opts.replicate, workerMachineAddrs);
+      machineArr(mmi) = machine
+      machine.configTimeout = opts.configTimeout;
+      machine.reduceTimeout = opts.reduceTimeout;
+      machine.sendTimeout = opts.sendTimeout;
+      machine.recvTimeout = opts.recvTimeout;
+      machine.sockBase = opts.peerSocketNum;
+      machine.start(machine.maxk);
+
+      machineOffset += 1
+    }
+
+    this.synchronized { this.notify() } // config complete
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
   }
 
   def permute(seed:Long) = {
-    machine.groups.permute(seed.toInt);
+    machineArr(0).groups.permute(seed.toInt);
   }
 
-  def allReduce(round:Int, limit:Long) = {
+  def allReduce(round:Int, limit:Long, tag:String):Unit = {
+    val matIdxPat = """matIdx(\d+)""".r
+    val matIdx = tag match {
+       case matIdxPat(istr) => istr.toInt
+       case _ => -1
+    }
+
+    if (matIdx == -1) {
+      if (opts.trace > 0)
+	logln("Worker got tagged allReduce response %s with invalid tag" format (tag))
+    } else {
+      allReduce(round, limit, matIdx)
+    }
+  }
+
+  def allReduce(round:Int, limit:Long, matIdx:Int = 0) = {
     if (model != null && model.modelmats.asInstanceOf[AnyRef] != null) {
       val t1=toc;
-      model.snapshot(limit.toInt, opts.doAvg);
-      val sendmat = model.sendmat;
-      val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
-        model.indexmat
-      } else {
-        irow(0 -> sendmat.ncols)
-      }
+      model.snapshot(limit.toInt, opts.doAvg, matIdx);
+      val sendmat = model.sendmats(matIdx);
+      val indexmat =
+	if (model.indexmats != null && model.indexmats(matIdx).asInstanceOf[AnyRef] != null) {
+          model.indexmats(matIdx)
+        } else {
+          irow(0 -> sendmat.ncols)
+        }
 
       val result = if (opts.fuseConfigReduce) {
         (indexmat, sendmat) match {
-          case (lmat:LMat, fsendmat:FMat) => machine.configReduce(
+          case (lmat:LMat, fsendmat:FMat) => machineArr(matIdx).configReduce(
 	    lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
-          case (imat:IMat, fsendmat:FMat) => machine.configReduce(
+          case (imat:IMat, fsendmat:FMat) => machineArr(matIdx).configReduce(
 	    imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
         }
       } else {
         (indexmat, sendmat) match {
-	  case (lmat:LMat, fsendmat:FMat) => machine.config(lmat.data, lmat.data, round);
-          case (imat:IMat, fsendmat:FMat) => machine.config(imat.data, imat.data, round);
+	  case (lmat:LMat, fsendmat:FMat) => machineArr(matIdx).config(lmat.data, lmat.data, round);
+          case (imat:IMat, fsendmat:FMat) => machineArr(matIdx).config(imat.data, imat.data, round);
         }
-        machine.reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
+        machineArr(matIdx).reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
       }
 
-      model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
-      model.addStep(limit.toInt, opts.doAvg);
+      if (model.recvmats == null) model.recvmats = new Array[Mat](model.modelmats.length)
+      model.recvmats(matIdx) = new FMat(sendmat.nrows, sendmat.ncols, result);
+      model.addStep(limit.toInt, opts.doAvg, matIdx);
       val t2 = toc;
       val nbytes = indexmat match {
         case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;
@@ -120,9 +144,11 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   }
 
   def stop = {
-    listener.stop = true;
-    listenerTask.cancel(true);
-    if (machine != null) machine.stop;
+    listener.stop = true
+    listenerTask.cancel(true)
+    if (machineArr != null) {
+      for (m <- machineArr) if (m != null) m.stop
+    }
   }
 
   def shutdown = {
@@ -138,13 +164,13 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
-		val newcmd = new ConfigCommand(0, cmd.dest, null, null, null, null, -1, -1, cmd.clen, cmd.bytes);
+		val newcmd = new ConfigCommand(0, cmd.dest, null, null, null, null, -1, -1, -1, cmd.clen, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
 		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines,
 		  Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts),
-		  Host.hostPortToInet(newcmd.masterIP, newcmd.masterResPort)
-		);
+		  Host.hostPortToInet(newcmd.masterIP, newcmd.masterResPort),
+		  newcmd.numModelMats);
     		if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
     	}
     	case Command.permuteCtype => {
@@ -158,7 +184,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes, cmd.tag);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-    		allReduce(newcmd.round, newcmd.limit);
+    		allReduce(newcmd.round, newcmd.limit, newcmd.tag);
 		sendMaster(new AllreduceResponse(cmd.round, cmd.dest, cmd.tag))
     	}
     	case Command.permuteAllreduceCtype => {
@@ -298,7 +324,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
       log("Waiting for config on %s...\n" format(
 	new InetSocketAddress(localIP, opts.commandSocketNum)))
     }
-    waitForConfigSema.acquire()
+    this.synchronized { this.wait() }
     log("Recieved config! Continuing.\n")
   }
 
