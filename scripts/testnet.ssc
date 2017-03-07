@@ -2,6 +2,7 @@
 import BIDMach.networks.Net
 
 val dir="../data/rcv1/"
+val dir="/mnt/BIDMach/data/rcv1/"
 
 val a0 = loadSMat(dir + "docs.smat.lz4")(0->100000,?)
 val c0 = loadFMat(dir + "cats.fmat.lz4")(0->100,?)
@@ -22,10 +23,9 @@ opts.npasses = 2
 opts.hasBias = true
 opts.links = iones(100,1);
 opts.lrate = 0.4f // best for 6-layer
-opts.lrate = 0.01f 
+opts.lrate = 0.01f
 opts.texp = 0.3f
 opts.nweight = 1e-4f
-//opts.useGPU = false
 
 val net = Net.dnodes4(2,500,0.5f,100,opts,2);
 opts.nodeset = net
@@ -47,4 +47,3 @@ val rc = roc2(pc, tc, 1-tc, 1000)
 val counts = sum(tc,2);
 :silent
 println("auc6 = %5.4f, auc weighted mean = %5.4f" format (mean(rc)(6), (mean(rc) * counts / sum(counts)).dv));
-

@@ -32,8 +32,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   
   var listener:ResponseListener = null;
 	var listenerTask:Future[_] = null;
-	var reducerMap:MutableMap[Int, Reducer] = null
-	var reduceTaskMap:MutableMap[Int, Future[_]] = null
+	var reducer:Reducer = null
+	var reduceTask:Future[_] = null
 	var numLearnersStarted:Integer = 0
 	var numLearnersFinished:Integer = 0
 	var numAckedReady:Integer = 0
@@ -48,8 +48,6 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	var numExpectedRegisteredWorkers:Int = -1
 	var numRegisteredWorkers:AtomicInteger = new AtomicInteger()
 	var allWorkersRegisteredSema:Semaphore = new Semaphore(0)
-	var workerModel:Model = null
-	var numModelMats:Int = -1
 	
 	def init() {
     masterIP = InetAddress.getLocalHost;
@@ -96,48 +94,28 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     val cmd = new PermuteCommand(round, 0, seed);
     broadcastCommand(cmd);
   }
-
-  def setNumModelMats(numModelMats0:Int) { // HACK
-    numModelMats = numModelMats0
-  }
-
-  def setWorkerModel(model:Model) {
-    workerModel = model
-  }
   
   def startUpdates(waitForAck:Boolean = false) {
-    reducerMap = new MutableHashMap[Int, Reducer]()
-    reduceTaskMap = new MutableHashMap[Int, Future[_]]()
-    for (i <- 0 until numModelMats) { // TODO: use modelMat names instead of idx
-      val reducer = new Reducer(i, waitForAck)
-      reducerMap(i) = reducer
-      val reduceTask = executor.submit(reducer)
-      reduceTaskMap(i) = reduceTask
-    }
+    reducer = new Reducer(waitForAck)
+    reduceTask = executor.submit(reducer)
     if (opts.trace > 2) log("Machine threshold: %5.2f\n" format opts.machineThreshold*M)
   }
 
   def startUpdates:Unit = startUpdates(false)
   
   def stopUpdates() {
-    var stoppedSomething = false
-    for ((i, reducer) <- reducerMap) {
-      if (reducer != null && !reducer.stop) {
-	stoppedSomething = true
-	reducer.stop = true
-	reduceTaskMap(i).cancel(true)
-      }
-    }
-    if (!stoppedSomething) {
-      if (opts.trace > 2) log("No reducer was running\n")
+    if (reducer == null || reducer.stop) {
+      if (opts.trace > 2) logln("Reducer was not running\n")
     } else {
+      reducer.stop = true
+      reduceTask.cancel(true)
       logln("Stopped allreduce!")
     }
     numLearnersFinished.synchronized {
       numLearnersFinished += 1
       if (numLearnersFinished == M)
       logln("Total distributed time: %.3fs" format (
-	(System.currentTimeMillis-allreduceTimer) / 1000.0))
+	(System.currentTimeMillis - allreduceTimer) / 1000.0))
     }
   }
   
@@ -267,11 +245,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
   }
 
-  class Reducer(matIdx:Int, waitForAck:Boolean = false) extends Runnable {
+  class Reducer(waitForAck:Boolean = false) extends Runnable {
     var stop = false
     var allreduceCollected:Int = 0
     var allreduceStartTime:Long = 0
-    val matTag = "matIdx%d" format matIdx
 
     def run() {
       try {
@@ -292,9 +269,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	}
 	limit = if (newlimit0 <= 0) 2000000000 else newlimit0
 	val cmd = if (opts.permuteAlways) {
-	  new PermuteAllreduceCommand(round, 0, round, limit, matTag)
+	  new PermuteAllreduceCommand(round, 0, round, limit, "foo")
 	} else {
-	  new AllreduceCommand(round, 0, limit, matTag)
+	  new AllreduceCommand(round, 0, limit, "foo")
 	}
 	this.synchronized {
 	  allreduceCollected = 0
@@ -358,7 +335,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	handleAllReduceResponse(resp)
 
       } else if (opts.trace > 0) {
-	log("Master got tagged response %d with bad type/round (%d,%d), should be (%d,%d)\n"
+	log("Master got tagged response %s with bad type/round (%d,%d), should be (%d,%d)\n"
 	    format (resp.tag, resp.rtype, resp.round, activeCommand.ctype, activeCommand.round))
       }
 
@@ -422,16 +399,16 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 
   def handleAllReduceResponse(resp:Response) {
     val matIdxPat = """matIdx(\d+)""".r
-    val matIdx = resp.tag match {
-       case matIdxPat(matIdx) => matIdx.toInt
-       case _ => -1
-    }
+    // val matIdx = resp.tag match {
+    //    case matIdxPat(matIdx) => matIdx.toInt
+    //    case _ => -1
+    // }
+    val matIdx = 0
 
     if (matIdx == -1) {
       if (opts.trace > 0)
 	logln("Master got tagged allReduce response %s with invalid tag" format (resp.tag))
     } else {
-      val reducer = reducerMap(matIdx)
       reducer.synchronized {
         reducer.allreduceCollected += 1
 	val delta = System.currentTimeMillis - reducer.allreduceStartTime

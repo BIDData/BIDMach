@@ -1,8 +1,6 @@
 import java.net.{InetAddress,InetSocketAddress}
 import BIDMach.allreduce.{Master,Worker,Command}
 
-val datadir = "/mnt/BIDMach/data/criteo/parts/"
-
 var addresses:Array[InetSocketAddress] = null
 val customLocalWorkerPortsStr = sys.env.get("MASTER_LOCAL_WORKER_PORTS")
 customLocalWorkerPortsStr match {
@@ -27,8 +25,8 @@ opts.timeScaleMsec = 2e-3f
 opts.permuteAlways = false
 
 opts.machineThreshold = 0.75;
-opts.minWaitTime = 400;
-opts.timeThresholdMsec = 600;
+opts.minWaitTime = 700;
+opts.timeThresholdMsec = 1400;
 
 val nmachines = addresses.length
 val gmods = irow(nmachines)
@@ -38,7 +36,6 @@ m.init
 m.config(gmods, gmachines, addresses)
 m.setMachineNumbers
 m.sendConfig
-m.setNumModelMats(1)
 
 
 // m.parCall((w) => {

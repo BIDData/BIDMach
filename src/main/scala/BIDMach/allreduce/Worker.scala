@@ -82,7 +82,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   def allReduce(round:Int, limit:Long) = {
     if (model != null && model.modelmats.asInstanceOf[AnyRef] != null) {
       val t1=toc;
-      model.snapshot(limit.toInt, opts.doAvg);
+
+      val ilimits = irow(Array.fill[Int](model.modelmats.length)(limit.toInt))
+
+      model.snapshot(ilimits, opts.doAvg);
       val sendmat = model.sendmat;
       val indexmat = if (model.indexmat.asInstanceOf[AnyRef] != null) {
         model.indexmat
@@ -106,7 +109,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
       }
 
       model.recvmat = new FMat(sendmat.nrows, sendmat.ncols, result);
-      model.addStep(limit.toInt, opts.doAvg);
+      model.addStep(ilimits, opts.doAvg);
       val t2 = toc;
       val nbytes = indexmat match {
         case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;

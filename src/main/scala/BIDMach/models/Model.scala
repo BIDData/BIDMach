@@ -213,28 +213,44 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	v
   }
 
-  def snapshot(len:Int, avg:Boolean) = {
-  	val len0 = math.min(len, modelmats(0).ncols);
-  	modelmats(0).synchronized {
-  		sendmat = cpu(modelmats(0).colslice(0, len0));
-  	}
-  	if (avg) {
-  		sendmat = ones(1, len0) on sendmat;
-  	}
+  def snapshot(lens0:IMat, avg:Boolean) = {
+    val lens = (0 until modelmats.length).map(i => math.min(lens0(i), modelmats(i).ncols))
+    val totalCols = lens.reduce(_+_)
+    val maxRows = modelmats.foldLeft(0)((a:Int, b:Mat) => math.max(a, b.nrows))
+
+    val avgOffset = if (avg) 1 else 0
+    sendmat = zeros(maxRows + avgOffset, totalCols)
+    if (avg) sendmat(0, ?) = 1
+
+    var iterCols = 0
+    modelmats.synchronized {
+      for ((mm, i) <- modelmats.zipWithIndex) {
+        sendmat(avgOffset -> (mm.nrows + avgOffset), iterCols -> (iterCols + lens(i))) =
+          cpu(mm(?, 0 -> lens(i)))
+        iterCols += lens(i)
+      }
+    }
   }
 
-  def addStep(len:Int, avg:Boolean) = {
-  	val len0 = math.min(len, modelmats(0).ncols);
-  	if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
-  	recvmat = recvmat - sendmat;
-  	val nr = modelmats(0).nrows;
-  	modelmats(0).synchronized {
-  		val head = modelmats(0).view(nr, len0);
-  		val chead = sendmat.view(nr, len0);
-  		chead <-- head;
-  		chead ~ chead + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat);
-  		head <-- chead;
-  	}
+  def addStep(lens0:IMat, avg:Boolean) = {
+    if (avg) recvmat = recvmat / max(recvmat(0,?), 1f)
+    recvmat = recvmat - sendmat
+    val lens = (0 until modelmats.length).map(i => math.min(lens0(i), modelmats(i).ncols))
+    var iterCols = 0
+    modelmats.synchronized {
+      for ((mm, i) <- modelmats.zipWithIndex) {
+    	val head = mm.view(mm.nrows, lens(i))
+    	val chead = sendmat.view(mm.nrows, lens(i))
+    	chead <-- head
+        if (avg) {
+          chead ~ chead + recvmat(1 -> (mm.nrows + 1), iterCols -> (iterCols + lens(i)))
+        } else {
+          chead ~ chead + recvmat(0 -> mm.nrows, iterCols -> (iterCols + lens(i)))
+        }
+    	head <-- chead
+        iterCols += lens(i)
+      }
+    }
   }
 
   def elasticStep(len:Int, avg:Boolean, ee:Float) = {
