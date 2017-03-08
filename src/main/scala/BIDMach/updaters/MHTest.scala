@@ -131,19 +131,28 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
     if (newMinibatch) beforeEachMinibatch()
-    b += model.datasource.opts.batchSize
     n += 1.0f
 
     // (Part 1) Compute scores for theta and theta', scaled by N/T.
-    scores0 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+    if (opts.smf) {
+      scores0 = (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+    } else {
+      scores0 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+    }
+    b += scores0.length // With SMF, using scores0.length as the MB size generalizes better.
     if (scores0.length == 1) {
       throw new RuntimeException("Need individual scores, but getting a scalar.")
     }
     for (i <- 0 until modelmats.length) {
       modelmats(i) <-- proposedTheta(i)
     }
-    scores1 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
-    diff ~ scores1 - scores0
+    if (opts.smf) {
+      scores1 = (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+      diff = scores1 - scores0
+    } else {
+      scores1 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+      diff ~ scores1 - scores0
+    }
 
     // (Part 2) Update our \Delta* and sample variance of \Delta*.
     sumOfSquares += sum((diff)*@(diff)).v
@@ -152,7 +161,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
-    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar)
+    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd)
 
     // (Part 3) Run our test! 
     // (Part 3.1) Take care of the full data case; this usually indicates a problem.
@@ -312,11 +321,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
  
 
   /** This is for debugging. */
-  def debugPrints(sampleVariance:Float, deltaStar:Float) {
-    println("b="+b+", n="+n+", logu="+logu+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
-    println("mean(scores0) = "+mean(scores0,2).dv+", mean(scores1) = "+mean(scores1,2).dv)
-    println("sampleVar = " +sampleVariance)
-    println("delta* = " + deltaStar)
+  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double) {
+    val s1 = mean(scores1).dv
+    val s0 = mean(scores0).dv
+    println("b="+b+", n="+n+", logu="+logu)
+    println("mean(scores1) = "+s1+" - mean(scores0) = "+s0+" = "+(s1-s0))
+    println("sampleVar = " +sampleVariance+ ", delta* = " +deltaStar+ ", numStd = " +numStd)
   }
   
 }
@@ -341,6 +351,7 @@ object MHTest {
     var exitThetaAmount = 3000
     var initThetaHere = false
     var burnIn = -1
+    var smf = false
   }
  
   class Options extends Opts {}

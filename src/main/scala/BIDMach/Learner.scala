@@ -137,7 +137,12 @@ case class Learner(
           if (mixins != null) mixins map (_ compute(mats, here));
           if (updater != null) updater.update(ipass, here, gprogress);
         }
-        val scores = model.evalbatchg(mats, ipass, here);
+        
+        // Daniel: I needed to change the following line to the one after it:
+        // val scores = model.evalbatchg(mats, ipass, here);
+        val scores = mean(model.evalbatchg(mats, ipass, here)).v;
+        // in orer for the MH test to work with different-sized minibatches.
+        
         if (datasink != null) datasink.put;
         reslist.append(scores.newcopy)
         samplist.append(here)
@@ -879,7 +884,6 @@ object Learner {
 
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
     if (reslist.length == 0) return zeros(0, 0)
-
     val out = FMat(reslist(0).nrows, reslist.length)
     var i = 0;
     while (i < reslist.length) {
