@@ -79,6 +79,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * Note that the file for the norm2logdata should be in the correct directory.
    */
   override def init(model0:Model) = {
+    setseed(1)
     model = model0;
     modelmats = model.modelmats
     updatemats = model.updatemats
@@ -218,7 +219,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
       }
     }
-    if (newMinibatch && accept) afterEachMinibatch()
+    if (newMinibatch) afterEachMinibatch()
   }
   
    

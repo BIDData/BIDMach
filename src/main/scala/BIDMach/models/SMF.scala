@@ -241,12 +241,10 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
    * if we're assuming a Gaussian error distribution. 
    * 
    * Note: it looks scary to  subtract iavg+avg from sdata0, but we don't add
-   * that to preds so we can still directly compare sdata and preds. I'll leave
-   * it here since John may have had a reason or doing that.
+   * that to preds so we can still directly compare sdata and preds.
    */
-  def evalfun(sdata0:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
-  	val sdata = sdata0 - (iavg + avg);
-    val preds = DDS(mm, user, sdata);
+  def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
+    val preds = DDS(mm, user, sdata) + (iavg + avg);
     if (ogmats != null) {
       ogmats(0) = user;
       if (ogmats.length > 1) {
@@ -255,11 +253,17 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     }
   	val dc = sdata.contents
   	val pc = preds.contents
-  	val diff = dc - pc;
+  	val diff = DMat(dc - pc);
   	if (opts.matrixOfScores) {
   	  // TODO Temporary but should be OK for now (b/c we almost never increment MB).
   	  val sigma_sq = variance(diff).dv
-  	  -(1.0f/(2*sigma_sq)).v * (diff ddot diff)
+
+  	  //println("evalfun, sdata.contents.length = " +dc.length)
+  	  //println("mean of squared diffs = " +(diff ddot diff)/diff.length)
+  	  //println("sigma_sq = " +sigma_sq)
+  	  //println("result = " +mean(-(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)))
+
+  	  -(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
   	} else {
   	  val vv = diff ddot diff;
   	  -sqrt(row(vv/sdata.nnz))
@@ -284,6 +288,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
         ogmats(1) = xpreds;
       }
     }
+  	println("TESTING evalfun, spreds.nnz="+spreds.nnz+", xpreds.nnz="+xpreds.nnz)
   	preds.contents <-- xpreds.contents;
   	-sqrt(row(vv/sdata.nnz))
   }
