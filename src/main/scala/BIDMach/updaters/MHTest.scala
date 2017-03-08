@@ -209,7 +209,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
       }
     }
-    if (newMinibatch && accept) afterEachMinibatch()
+    if (newMinibatch) afterEachMinibatch()
   }
   
    
