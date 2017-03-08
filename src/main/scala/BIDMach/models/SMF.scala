@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMach.datasources._
+import BIDMach.datasinks._
 import BIDMach.updaters._
 import BIDMach.Learner
 
@@ -75,6 +76,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   override def init() = {
     mats = datasource.next;
   	datasource.reset;
+  	println("size(mats(0))="+size(mats(0)))
 	  nfeats = mats(0).nrows;
 	  val batchSize = mats(0).ncols;
     val d = opts.dim;
@@ -232,15 +234,65 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
 	  	}
   }
   
-  def evalfun(sdata0:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
-  	val sdata = sdata0 - (iavg + avg);
-    val preds = DDS(mm, user, sdata);
+  /** 
+   * The evalfun normally called during training. Returns -RMSE on training data
+   * minibatch (sdata0). It has an extra option to return a matrix of scores,
+   * which will be useful for minibatch MH test updaters. We need a 1/(2*sigma^2) 
+   * if we're assuming a Gaussian error distribution. 
+   * 
+   * Note: it looks scary to  subtract iavg+avg from sdata0, but we don't add
+   * that to preds so we can still directly compare sdata and preds.
+   */
+  def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
+    val preds = DDS(mm, user, sdata) + (iavg + avg);
+    if (ogmats != null) {
+      ogmats(0) = user;
+      if (ogmats.length > 1) {
+        ogmats(1) = preds;
+      }
+    }
   	val dc = sdata.contents
   	val pc = preds.contents
-  	val diff = dc - pc;
-  	val vv = diff ddot diff;
+  	val diff = DMat(dc - pc);
+  	if (opts.matrixOfScores) {
+  	  // TODO Temporary but should be OK for now (b/c we almost never increment MB).
+  	  val sigma_sq = variance(diff).dv
+
+  	  //println("evalfun, sdata.contents.length = " +dc.length)
+  	  //println("mean of squared diffs = " +(diff ddot diff)/diff.length)
+  	  //println("sigma_sq = " +sigma_sq)
+  	  //println("result = " +mean(-(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)))
+
+  	  -(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
+  	} else {
+  	  val vv = diff ddot diff;
+  	  -sqrt(row(vv/sdata.nnz))
+  	}
+  }
+
+  /** 
+   * The evalfun normally called during testing and predicting. Returns -RMSE on
+   * training data minibatch (sdata). We do not need the matrix of scores here.
+   * - `sdata` matrix is the predictor input data (we've used train, but could be test)
+   * - `preds` matrix should indicate the non-zero *testing* data points.
+   */
+  override def evalfun(sdata:Mat, user:Mat, preds:Mat, ipass:Int, pos:Long):FMat = {
+    val spreds = DDS(mm, user, sdata) + (iavg + avg);
+  	val dc = sdata.contents;
+  	val pc = spreds.contents;
+  	val vv = (dc - pc) ddot (dc - pc);
+  	val xpreds = DDS(mm, user, preds) + (iavg + avg);
+  	if (ogmats != null) {
+      ogmats(0) = user;
+      if (ogmats.length > 1) {
+        ogmats(1) = xpreds;
+      }
+    }
+  	println("TESTING evalfun, spreds.nnz="+spreds.nnz+", xpreds.nnz="+xpreds.nnz)
+  	preds.contents <-- xpreds.contents;
   	-sqrt(row(vv/sdata.nnz))
   }
+   
 }
 
 object SMF {
@@ -260,8 +312,9 @@ object SMF {
   	var aopts:ADAGrad.Opts = null;
   	var minv = 1f;
   	var maxv = 5f;
-  	
+  	var matrixOfScores = false;
   }  
+
   class Options extends Opts {} 
   
   def learner(mat0:Mat, d:Int) = {
@@ -282,27 +335,56 @@ object SMF {
   	    opts)
     (nn, opts)
   }
-  
-  def learnerX(mat0:Mat, d:Int) = {
+
+  /** 
+   * Learner with single (training data) matrix as datasource, and ADAGrad Opts.
+   * We will benchmark this with the learner using MHTest.
+   */
+  def learner1(mat0:Mat, d:Int) = { 
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts
     val opts = new xopts
-    opts.dim = d
+    opts.dim = d 
     opts.putBack = -1
-    opts.npasses = 4
-    opts.lrate = 0.1;
-    opts.initUval = 0f;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
-    opts.aopts = opts;
-  	val nn = new Learner(
-  	    new MatSource(Array(mat0:Mat), opts),
-  	    new SMF(opts), 
-  	    null,
-  	    null, 
-  	    null,
-  	    opts);
+    opts.npasses = 4 
+    opts.lrate = 0.1 
+    opts.initUval = 0f; 
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.aopts = opts
+    val nn = new Learner(
+      new MatSource(Array(mat0:Mat), opts),
+      new SMF(opts), 
+      null,
+      new ADAGrad(opts), 
+      null,
+      opts)
     (nn, opts)
   }
-  
+
+  /**
+   * Learner with single (training data) matrix as datasource, and using our
+   * MHTest updater. Use this for running experiments to benchmark with default
+   * ADAGrad.
+   */
+  def learner2(mat0:Mat, d:Int) = { 
+    class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts with MHTest.Opts
+    val opts = new xopts
+    opts.dim = d 
+    opts.putBack = -1
+    opts.npasses = 4 
+    opts.lrate = 0.1 
+    opts.initUval = 0f; 
+    opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
+    opts.aopts = opts
+    val nn = new Learner(
+      new MatSource(Array(mat0:Mat), opts),
+      new SMF(opts), 
+      null,
+      new MHTest(opts), 
+      null,
+      opts)
+    (nn, opts)
+  } 
+
   def learner(mat0:Mat, user0:Mat, d:Int) = {
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with Grad.Opts
     val opts = new xopts
@@ -322,27 +404,7 @@ object SMF {
     (nn, opts)
   }
   
-  def learnerX(mat0:Mat, user0:Mat, d:Int) = {
-    class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts
-    val opts = new xopts
-    opts.dim = d
-    opts.putBack = 1
-    opts.npasses = 4
-    opts.lrate = 0.1;
-    opts.initUval = 0f;
-    opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
-    opts.aopts = opts;
-    val nn = new Learner(
-        new MatSource(Array(mat0, user0), opts),
-        new SMF(opts), 
-        null,
-        null, 
-        null,
-        opts)
-    (nn, opts)
-  }
-  
-   def predictor(model0:Model, mat1:Mat, preds:Mat) = {
+  def predictor(model0:Model, mat1:Mat, preds:Mat) = {
   	class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with Grad.Opts
     val model = model0.asInstanceOf[SMF]
     val nopts = new xopts;
@@ -369,6 +431,42 @@ object SMF {
         nopts)
     (nn, nopts)
    }
+  
+  /** A class for one of the SMF predictors. */
+  class PredOpts extends Learner.Options with SMF.Opts with MatSource.Opts with MatSink.Opts with Grad.Opts with ADAGrad.Opts
+
+  /** 
+   * A predictor which will store the predictions in the predictor model
+   * matrices. It forms an empty matrix to be populated by the `user` matrices,
+   * which turns into the second factor matrix. It mirrors an SFA predictor code
+   * which also forms this empty matrix into the matrix datasource, with the
+   * only difference being the lack of an Minv option for `newmod`.
+   */
+  def predictor1(model0:Model, mat1:Mat, preds:Mat) = { 
+    val model = model0.asInstanceOf[SMF]
+    val nopts = new PredOpts;
+    nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
+    nopts.putBack = -1
+    val newmod = new SMF(nopts);
+    newmod.refresh = false
+    newmod.copyFrom(model);
+    val mopts = model.opts.asInstanceOf[SMF.Opts];
+    nopts.dim = mopts.dim;
+    nopts.uconvg = mopts.uconvg;
+    nopts.miter = mopts.miter;
+    nopts.lambdau = mopts.lambdau;
+    nopts.lambdam = mopts.lambdam;
+    nopts.regumean = mopts.regumean;
+    nopts.doUsers = mopts.doUsers;
+    nopts.weightByUser = mopts.weightByUser;
+    nopts.nmats = 2;
+    val nn = new Learner(
+        new MatSource(Array(mat1, zeros(mopts.dim, mat1.ncols), preds), nopts), 
+        newmod, 
+        null,
+        null,
+        new MatSink(nopts),
+        nopts)
+    (nn, nopts)
+  } 
 }
-
-
