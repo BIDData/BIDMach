@@ -76,6 +76,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   override def init() = {
     mats = datasource.next;
   	datasource.reset;
+  	println("size(mats(0))="+size(mats(0)))
 	  nfeats = mats(0).nrows;
 	  val batchSize = mats(0).ncols;
     val d = opts.dim;
@@ -235,9 +236,13 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   
   /** 
    * The evalfun normally called during training. Returns -RMSE on training data
-   * minibatch (sdata). It has an extra option to return a matrix of scores,
+   * minibatch (sdata0). It has an extra option to return a matrix of scores,
    * which will be useful for minibatch MH test updaters. We need a 1/(2*sigma^2) 
-   * if we're assuming a Gaussian error distribution.
+   * if we're assuming a Gaussian error distribution. 
+   * 
+   * Note: it looks scary to  subtract iavg+avg from sdata0, but we don't add
+   * that to preds so we can still directly compare sdata and preds. I'll leave
+   * it here since John may have had a reason or doing that.
    */
   def evalfun(sdata0:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
   	val sdata = sdata0 - (iavg + avg);
@@ -254,7 +259,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   	if (opts.matrixOfScores) {
   	  // TODO Temporary but should be OK for now (b/c we almost never increment MB).
   	  val sigma_sq = variance(diff).dv
-  	  -(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
+  	  -(1.0f/(2*sigma_sq)).v * (diff ddot diff)
   	} else {
   	  val vv = diff ddot diff;
   	  -sqrt(row(vv/sdata.nnz))
@@ -264,6 +269,8 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   /** 
    * The evalfun normally called during testing and predicting. Returns -RMSE on
    * training data minibatch (sdata). We do not need the matrix of scores here.
+   * - `sdata` matrix is the predictor input data (we've used train, but could be test)
+   * - `preds` matrix should indicate the non-zero *testing* data points.
    */
   override def evalfun(sdata:Mat, user:Mat, preds:Mat, ipass:Int, pos:Long):FMat = {
     val spreds = DDS(mm, user, sdata) + (iavg + avg);
