@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -299,10 +299,6 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   	Model.convertMat(a, useGPU, opts.useDouble).asInstanceOf[Mat];
   }
 
-  def convertMat(a:ND):ND = {
-  	Model.convertMat(a, useGPU, opts.useDouble);
-  }
-
   def combineModels(ipass:Int, model: Model):Model = this;
   def combineModels(model: Model):Model = combineModels(0, model);
 
@@ -327,7 +323,7 @@ object Model {
 
 	class Options extends Opts {}
 
-  def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {
+  def convertMat(a:Mat, useGPU:Boolean, useDouble:Boolean):Mat = {
 	   a match {
       case f:FMat =>
       if (useGPU) {
@@ -387,16 +383,6 @@ object Model {
       	} else {
       		SMat(g);
       	}
-      }
-      case g:FND => if (useGPU) {
-      	GND(g);
-      } else {
-      	g
-      }
-      case g:GND => if (useGPU) {
-      	g
-      } else {
-      	FND(g)
       }
       case tt:TMat => new TMat(tt.nrows, tt.ncols, tt.y, tt.x, tt.tiles.map(convertMat(_, useGPU, useDouble).asInstanceOf[Mat]));
     }

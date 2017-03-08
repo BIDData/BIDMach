@@ -21,7 +21,7 @@ class OnehotLayer(override val net:Net, override val opts:OnehotNodeOpts = new O
 
   override def forward = {
 		  val start = toc;
-		  output = oneHot(inputData.asMat);
+		  output = oneHot(inputData);
 		  forwardtime += toc - start;
   }
   

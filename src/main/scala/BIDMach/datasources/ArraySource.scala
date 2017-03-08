@@ -1,5 +1,5 @@
 package BIDMach.datasources
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,ND,FND,GND}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.MatIOtrait
@@ -34,11 +34,11 @@ class ArraySource(override val opts:ArraySource.Opts = new ArraySource.Options) 
     val marr = dataArray(iblock)
     marr match {
       case (key:AnyRef,v:MatIOtrait) => {inMats = v.get}
-      case m:ND => {
-        if (inMats == null) inMats = Array[ND](1);
+      case m:Mat => {
+        if (inMats == null) inMats = Array[Mat](1);
         inMats(0) = m;
       }
-      case ma:Array[ND] => inMats = ma;
+      case ma:Array[Mat] => inMats = ma;
     }
   }
 }

@@ -183,7 +183,7 @@ object LayerMat {
   
     def apply(nr:Int, nc:Int):LayerMat = new LayerMat(nr, nc, new Array[Layer](nr*nc))
 
-    def apply(a:DenseMat[Layer]):LayerMat = new LayerMat(a.nrows, a.ncols, a.data) 
+    def apply(a:DenseMat[Layer]):LayerMat = new LayerMat(a.nrows, a.ncols, a._data) 
     
     def apply(a:List[Layer]) = new LayerMat(1, a.length, a.toArray)
     

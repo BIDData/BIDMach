@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,ND,SBMat,CMat,CSMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,SMat,SDMat}
+import BIDMat.{Mat,ND,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -19,8 +19,8 @@ import edu.berkeley.bid.CUMACH;
 
 class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts = new LSTMfusedNode) extends Layer(net, opts) {
 	override val _inputs = new Array[LayerTerm](5);
-	override val _outputs = new Array[ND](2);
-	override val _derivs = new Array[ND](2);
+	override val _outputs = new Array[Mat](2);
+	override val _derivs = new Array[Mat](2);
   
   override def toString = {
     "LSTMcoa@"+Integer.toHexString(hashCode % 0x10000).toString
@@ -30,7 +30,7 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
 	  createOutput(inputData.dims);
 	  (inputData(0), inputData(1), inputData(2), inputData(3), inputData(4), outputs(0), outputs(1)) match {
 	    case (i0:GMat, i1:GMat, i2:GMat, i3:GMat, i4:GMat, out0:GMat, out1:GMat) => {
-	      CUMACH.LSTMfwd(i0.data, i1.data, i2.data, i3.data, i4.data, out0.data, out1.data, i0.length);
+	      CUMACH.LSTMfwd(i0.pdata, i1.pdata, i2.pdata, i3.pdata, i4.pdata, out0.pdata, out1.pdata, i0.length);
 	    }
 	    case (i0:FMat, i1:FMat, i2:FMat, i3:FMat, i4:FMat, out0:FMat, out1:FMat) => {
 	      LSTMfusedLayer.LSTMforward(i0, i1, i2, i3, i4, out0, out1);
@@ -42,7 +42,7 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
   override def backward = {
 	  (inputData(0), inputData(1), inputData(2), inputData(3), inputData(4), deriv(0), deriv(1), inputDeriv(0), inputDeriv(1), inputDeriv(2), inputDeriv(3), inputDeriv(4)) match {
 	    case (inC:GMat, lin1:GMat, lin2:GMat, lin3:GMat, lin4:GMat, doutC:GMat, doutH:GMat, dinC:GMat, dlin1:GMat, dlin2:GMat, dlin3:GMat, dlin4:GMat) => {
-	      CUMACH.LSTMbwd(inC.data, lin1.data, lin2.data, lin3.data, lin4.data, doutC.data, doutH.data, dinC.data, dlin1.data, dlin2.data, dlin3.data, dlin4.data, inC.length);	      
+	      CUMACH.LSTMbwd(inC.pdata, lin1.pdata, lin2.pdata, lin3.pdata, lin4.pdata, doutC.pdata, doutH.pdata, dinC.pdata, dlin1.pdata, dlin2.pdata, dlin3.pdata, dlin4.pdata, inC.length);	      
 	    }
 	    case (inC:FMat, lin1:FMat, lin2:FMat, lin3:FMat, lin4:FMat, doutC:FMat, doutH:FMat, dinC:FMat, dlin1:FMat, dlin2:FMat, dlin3:FMat, dlin4:FMat) => {
 	      LSTMfusedLayer.LSTMbackward(inC, lin1, lin2, lin3, lin4, doutC, doutH, dinC, dlin1, dlin2, dlin3, dlin4);	      

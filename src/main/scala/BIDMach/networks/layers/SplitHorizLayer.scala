@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,ND,SBMat,CMat,DMat,FMat,FND,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -15,17 +15,17 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 class SplitHorizLayer(override val net:Net, override val opts:SplitHorizNodeOpts = new SplitHorizNode) extends Layer(net, opts) {
-  override val _outputs = new Array[ND](opts.nparts);
-  override val _derivs = new Array[ND](opts.nparts);
+  override val _outputs = new Array[Mat](opts.nparts);
+  override val _derivs = new Array[Mat](opts.nparts);
   var nblock:Int = 0;
-  var colranges = new Array[Mat](opts.nparts);
+  var colranges = new Array[IMat](opts.nparts);
   
   override def forward = {
 		  val start = toc;
 		  if (output.asInstanceOf[AnyRef] == null) {
 			  nblock = inputData.ncols / opts.nparts;
 			  for (i <- 0 until opts.nparts) {
-				  colranges(i) = convertMat(irow((i*nblock)->((i+1)*nblock)));
+				  colranges(i) = int(convertMat(irow((i*nblock)->((i+1)*nblock))));
 			  }
 		  }
 		  for (i <- 0 until opts.nparts) {

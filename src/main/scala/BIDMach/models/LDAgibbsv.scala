@@ -146,7 +146,7 @@ object LDAgibbsv {
         A.nrows != AN.nrows || A.ncols != AN.ncols || B.nrows != BN.nrows || B.ncols != BN.ncols) {
       throw new RuntimeException("LDAgibbs dimensions mismatch")
     }
-    var err = CUMACH.LDAgibbsv(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, C.data, nsamps.data)
+    var err = CUMACH.LDAgibbsv(A.nrows, C.nnz, A.pdata, B.pdata, AN.pdata, BN.pdata, C.pir, C.pic, C.pdata, nsamps.pdata)
     if (err != 0) throw new RuntimeException(("GPU %d LDAgibbsv kernel error "+cudaGetErrorString(err)) format getGPU)
     Mat.nflops += 12L * C.nnz * A.nrows   // Charge 10 for Poisson RNG
    

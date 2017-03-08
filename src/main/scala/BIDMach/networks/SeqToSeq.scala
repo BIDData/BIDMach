@@ -192,9 +192,9 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       	row(score/(dstxn-1));
       } else {
       	if (ogmats != null) {
-      	  var embedding = srcGrid(height+preamble_rows-1, srcGrid.ncols-1).output.asMat;
+      	  var embedding = srcGrid(height+preamble_rows-1, srcGrid.ncols-1).output;
       	  for (j <- 1 until opts.nembed) {
-      	    embedding = embedding on srcGrid(height-j+preamble_rows-1, srcGrid.ncols-1).output.asMat;
+      	    embedding = embedding on srcGrid(height-j+preamble_rows-1, srcGrid.ncols-1).output;
       	  }
       		ogmats(0) = embedding;
       	}

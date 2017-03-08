@@ -411,12 +411,12 @@ object GLM {
       }
       case (geta:GMat, gilinks:GIMat, gout:GMat) => {
         Mat.nflops += totflops * geta.ncols
-        CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        CUMACH.applypreds(geta.pdata, gilinks.pdata, gout.pdata, geta.nrows, geta.ncols)
         out
       }
       case (geta:GDMat, gilinks:GIMat, gout:GDMat) => {
         Mat.nflops += totflops * geta.ncols
-        CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        CUMACH.applydpreds(geta.pdata, gilinks.pdata, gout.pdata, geta.nrows, geta.ncols)
         out
       }
     }
@@ -433,13 +433,13 @@ object GLM {
       case (geta:GMat, gilinks:GIMat) => {
         val gout = GMat.newOrCheckGMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
         Mat.nflops += totflops * geta.ncols
-        CUMACH.applypreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        CUMACH.applypreds(geta.pdata, gilinks.pdata, gout.pdata, geta.nrows, geta.ncols)
         gout
       }
       case (geta:GDMat, gilinks:GIMat) => {
       	val gout = GDMat.newOrCheckGDMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
         Mat.nflops += totflops * geta.ncols
-        CUMACH.applydpreds(geta.data, gilinks.data, gout.data, geta.nrows, geta.ncols)
+        CUMACH.applydpreds(geta.pdata, gilinks.pdata, gout.pdata, geta.nrows, geta.ncols)
         gout
       }
     }
@@ -465,13 +465,13 @@ object GLM {
       case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         val out = (gpred + 3f)
-        CUMACH.applylls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
+        CUMACH.applylls(gpred.pdata, gtarg.pdata, gilinks.pdata, out.pdata, gpred.nrows, gpred.ncols)
         out
       }
       case (gpred:GDMat, gtarg:GDMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
         val out = (gpred + 3f)
-        CUMACH.applydlls(gpred.data, gtarg.data, gilinks.data, out.data, gpred.nrows, gpred.ncols)
+        CUMACH.applydlls(gpred.pdata, gtarg.pdata, gilinks.pdata, out.pdata, gpred.nrows, gpred.ncols)
         out
       }
     }
@@ -495,12 +495,12 @@ object GLM {
       }
       case (gpred:GMat, gtarg:GMat, gout:GMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
-        CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        CUMACH.applyderivs(gpred.pdata, gtarg.pdata, gilinks.pdata, gout.pdata, gpred.nrows, gpred.ncols)
         gout
       }
       case (gpred:GDMat, gtarg:GDMat, gout:GDMat, gilinks:GIMat) => {
         Mat.nflops += totflops * gpred.ncols
-        CUMACH.applydderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        CUMACH.applydderivs(gpred.pdata, gtarg.pdata, gilinks.pdata, gout.pdata, gpred.nrows, gpred.ncols)
         gout
       }
     }
@@ -526,13 +526,13 @@ object GLM {
       case (gpred:GMat, gtarg:GMat, gilinks:GIMat) => {
       	val gout = GMat.newOrCheckGMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
         Mat.nflops += totflops * gpred.ncols
-        CUMACH.applyderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        CUMACH.applyderivs(gpred.pdata, gtarg.pdata, gilinks.pdata, gout.pdata, gpred.nrows, gpred.ncols)
         gout
       }
       case (gpred:GDMat, gtarg:GDMat, gilinks:GIMat) => {
         val gout = GDMat.newOrCheckGDMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
         Mat.nflops += totflops * gpred.ncols
-        CUMACH.applydderivs(gpred.data, gtarg.data, gilinks.data, gout.data, gpred.nrows, gpred.ncols)
+        CUMACH.applydderivs(gpred.pdata, gtarg.pdata, gilinks.pdata, gout.pdata, gpred.nrows, gpred.ncols)
         gout
       }
     }
@@ -543,7 +543,7 @@ object GLM {
     c.clear;
     val npercol = b.nnz / b.ncols;
     Mat.nflops += 1L * a.nrows * npercol * b.nnz;
-    CUMACH.hashMult(a.nrows, a.ncols, b.ncols, bound1, bound2, a.data, b.data, b.ir, b.jc, c.data, 0);
+    CUMACH.hashMult(a.nrows, a.ncols, b.ncols, bound1, bound2, a.pdata, b.pdata, b.pir, b.pjc, c.pdata, 0);
     c
   }
   
@@ -559,7 +559,7 @@ object GLM {
     c.clear;
     val npercol = b.nnz / b.ncols;
     Mat.nflops += 1L * a.nrows * npercol * b.nnz;
-    CUMACH.hashMult(a.nrows, nfeats, b.ncols, bound1, bound2, a.data, b.data, b.ir, b.jc, c.data, 1);
+    CUMACH.hashMult(a.nrows, nfeats, b.ncols, bound1, bound2, a.pdata, b.pdata, b.pir, b.pjc, c.pdata, 1);
     c
   }
   
@@ -574,7 +574,7 @@ object GLM {
     val npercol = b.nnz / b.ncols;
     Mat.nflops += 1L * a.nrows * npercol * b.nnz;
     d.clear;
-    CUMACH.hashCross(a.nrows, a.ncols, b.ncols, a.data, b.data, b.ir, b.jc, c.data, c.ir, c.jc, d.data, 0);
+    CUMACH.hashCross(a.nrows, a.ncols, b.ncols, a.pdata, b.pdata, b.pir, b.pjc, c.pdata, c.pir, c.pjc, d.pdata, 0);
     d
   }
   
@@ -589,7 +589,7 @@ object GLM {
     val npercol = b.nnz / b.ncols;
     Mat.nflops += 1L * a.nrows * npercol * b.nnz;
     d.clear;
-    CUMACH.hashCross(a.nrows, nfeats, b.ncols, a.data, b.data, b.ir, b.jc, c.data, c.ir, c.jc, d.data, 1);
+    CUMACH.hashCross(a.nrows, nfeats, b.ncols, a.pdata, b.pdata, b.pir, b.pjc, c.pdata, c.pir, c.pjc, d.pdata, 1);
     d
   }
   
@@ -607,10 +607,10 @@ object GLM {
     } else {
       Mat.nflops += 2L * nr * b.nnz; 
       val err = CUMACH.pairMultTile(nr, bnc, kk, kk,
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
-          b.data, b.ir, b.jc, broff, bcoff, 
-          c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
+          a.pdata.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
+          a.pdata.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
+          b.pdata, b.pir, b.pjc, broff, bcoff, 
+          c.pdata.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
           0);
       if (err != 0) {
         throw new RuntimeException("CUMAT.pairMult error " + cudaGetErrorString(err))
@@ -627,10 +627,10 @@ object GLM {
     } else {
       Mat.nflops += 2L * nr * b.nnz * kk / b.ncols;
       val err = CUMACH.pairMultTile(nr, kk, cnc, cnc,  
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
-          a.data.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
-          b.data, b.ir, b.jc, broff, bcoff, 
-          c.data.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
+          a.pdata.withByteOffset(Sizeof.FLOAT.toLong*(aroff+acoff*2*a.nrows)), a.nrows*2, 
+          a.pdata.withByteOffset(Sizeof.FLOAT.toLong*(aroff+(acoff*2+1)*a.nrows)), a.nrows*2, 
+          b.pdata, b.pir, b.pjc, broff, bcoff, 
+          c.pdata.withByteOffset(Sizeof.FLOAT.toLong*(croff+ccoff*c.nrows)), c.nrows, 
           1);
       if (err != 0) {
         throw new RuntimeException("CUMAT.pairMultNT error " + cudaGetErrorString(err))

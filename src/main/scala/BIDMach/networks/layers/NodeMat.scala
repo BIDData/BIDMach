@@ -150,7 +150,7 @@ object NodeMat {
   
     def apply(nr:Int, nc:Int):NodeMat = new NodeMat(nr, nc, new Array[Node](nr*nc))
 
-    def apply(a:DenseMat[Node]):NodeMat = new NodeMat(a.nrows, a.ncols, a.data) 
+    def apply(a:DenseMat[Node]):NodeMat = new NodeMat(a.nrows, a.ncols, a._data) 
     
     def apply(a:List[Node]) = new NodeMat(1, a.length, a.toArray)
     

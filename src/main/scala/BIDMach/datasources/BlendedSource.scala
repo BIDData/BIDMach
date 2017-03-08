@@ -75,7 +75,6 @@ class BlendedSource(val s1:DataSource, val s2:DataSource,
         if (iptr1 >= mats1(0).ncols) {
           mats1 = s1.next
           iptr1 = 0
-          rand(0, 1f, opts.samp1)
         }
         val jptr1 = math.min(mats1(0).ncols, iptr1 + math.min(bBlock, math.min(blockSize, omats(0).ncols) - xptr))
         copycol(mats1, iptr1, jptr1,  omats, xptr)
@@ -86,7 +85,6 @@ class BlendedSource(val s1:DataSource, val s2:DataSource,
       	if (iptr2 >= mats2(0).ncols) {
           mats2 = s2.next
           iptr2 = 0
-          rand(0, 1f, opts.samp2)
         }
         val jptr2 = math.min(mats1(0).ncols, iptr2 + math.min(bBlock, math.min(blockSize, omats(0).ncols) - xptr))
         copycol(mats1, iptr2, jptr2,  omats, xptr)
@@ -132,7 +130,7 @@ object BlendedSource {
   	var bBlock = 1000
   	var afrac = 0.5f
   	var samp1 = 1f
-  	var samp2 = 1f 
+  	var samp2 = 1f
   }
   
   class Options extends Opts {}
