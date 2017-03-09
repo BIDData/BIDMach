@@ -297,14 +297,14 @@ object LayerFn {
     Mat.nflops += 1L * a.length * fwdflops(ifn);
     checkdims(a.dims, out.dims);
     a match {
-      case af:FMat => {
-        val oMat = FMat.newOrCheckFMat(a.dims, out, a.GUID, ifn, "LayerFn".##);
-        CPUMACH.applyfwd(af.data, oMat.data, ifn, a.length, Mat.numThreads);
-        oMat
-      }
       case ag:GMat => {
         val oMat = GMat.newOrCheckGMat(a.dims, out, a.GUID, ifn, "LayerFn".##);
         CUMACH.applyfwd(ag.pdata, oMat.pdata, ifn, a.length);
+        oMat
+      }
+      case af:FMat => {
+        val oMat = FMat.newOrCheckFMat(a.dims, out, a.GUID, ifn, "LayerFn".##);
+        CPUMACH.applyfwd(af.data, oMat.data, ifn, a.length, Mat.numThreads);
         oMat
       }
     }
@@ -316,14 +316,14 @@ object LayerFn {
 	  Mat.nflops += 1L * a.length * bwdflops(ifn);
 	  checkdims(a.dims, b.dims);
     (a, b) match {
-      case (af:FMat, bf:FMat) => {
-        val oMat = FMat.newOrCheckFMat(a.dims, out, a.GUID, ifn, "LayerFn".##);
-        CPUMACH.applyderiv(af.data, bf.data, oMat.data, ifn, a.length, Mat.numThreads);
-        oMat
-      }
       case (ag:GMat, bg:GMat) => {
         val oMat = GMat.newOrCheckGMat(a.dims, out, a.GUID, ifn, "LayerFn".##);
         CUMACH.applyderiv(ag.pdata, bg.pdata, oMat.pdata, ifn, a.length);
+        oMat
+      }
+      case (af:FMat, bf:FMat) => {
+        val oMat = FMat.newOrCheckFMat(a.dims, out, a.GUID, ifn, "LayerFn".##);
+        CPUMACH.applyderiv(af.data, bf.data, oMat.data, ifn, a.length, Mat.numThreads);
         oMat
       }
     }

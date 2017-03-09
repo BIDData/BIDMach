@@ -269,6 +269,22 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val t0 = toc;
     //    var blockv0:SVec = null;
     data match {
+      case (gdata:GMat) => {
+        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false);
+        t1 = toc; runtimes(0) += t1 - t0;
+        cats match {
+          case (gicats:GIMat) => {
+            gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
+          }
+          case (gfcats:GMat) => {
+            gout = gtreePack(gdata, gtnodes, gfcats, gout, seed);
+          }
+        }
+        t2 = toc; runtimes(1) += t2 - t1;
+        gpsort(gout);
+        t3 = toc; runtimes(2) += t3 - t2;
+        blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
+      }
       case (fdata:FMat) => {
         val nnodes = if (gmats.length > 2) gmats(2).asInstanceOf[IMat] else izeros(ntrees, data.ncols);
         if (gmats.length > 2) {
@@ -290,22 +306,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         Mat.nflops += lout.length * math.log(lout.length).toLong;
         t3 = toc; runtimes(2) += t3 - t2;
         blockv = makeV(lout);
-      }
-      case (gdata:GMat) => {
-        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false);
-        t1 = toc; runtimes(0) += t1 - t0;
-        cats match {
-          case (gicats:GIMat) => {
-            gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
-          }
-          case (gfcats:GMat) => {
-            gout = gtreePack(gdata, gtnodes, gfcats, gout, seed);
-          }
-        }
-        t2 = toc; runtimes(1) += t2 - t1;
-        gpsort(gout);
-        t3 = toc; runtimes(2) += t3 - t2;
-        blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
       }
       case _ => {
         throw new RuntimeException("RandomForest dobatch types dont match %s %s" format (data.mytype, cats.mytype))
@@ -329,6 +329,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
     val fnodes:FMat = zeros(ntrees, data.ncols);
     data match {
+      case gdata:GMat => {
+        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, depth, true);
+        val gff = new GMat(fnodes.nrows, fnodes.ncols, gfnodes.pdata, gfnodes.realsize);
+        fnodes <-- gff;
+      }
       case fdata:FMat => {
         if (nnodes.asInstanceOf[AnyRef] != null) {
           val nn = nnodes.asInstanceOf[IMat];
@@ -336,11 +341,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         } else {
           treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, depth, true);
         }
-      }
-      case gdata:GMat => {
-        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, depth, true);
-        val gff = new GMat(fnodes.nrows, fnodes.ncols, gfnodes.pdata, gfnodes.realsize);
-        fnodes <-- gff;
       }
     }
     ynodes = fnodes;

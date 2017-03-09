@@ -32,5 +32,6 @@
 	<classpathentry kind="lib" path="lib/jcurand-0.8.0.jar"/>
 	<classpathentry kind="lib" path="lib/jcurand-natives-0.8.0-linux-x86_64.jar"/>
 	<classpathentry kind="lib" path="lib/jcusparse-0.8.0.jar"/>
+	<classpathentry kind="lib" path="lib/protobuf-java-3.1.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

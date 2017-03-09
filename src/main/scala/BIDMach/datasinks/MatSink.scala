@@ -30,10 +30,10 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
     	for (i <- 0 until nmats) {
     		val nrows = imats(i).nrows;
     		val nnz0 = imats(i) match {
-    		case i:SMat => i.nnz;
     		case i:GSMat => i.nnz;
-    		case i:SDMat => i.nnz;
     		case i:GSDMat => i.nnz;
+    		case i:SDMat => i.nnz;
+    		case i:SMat => i.nnz;
     		case _ => -1;
     		}
     		mats(i) = if (nnz0 >= 0) {
@@ -72,18 +72,18 @@ object MatSink {
   
   def makeCPUmat(m:Mat,nr:Int, nc:Int):Mat = {
   	m match {
+    	case g:GMat => zeros(nr,nc);
+    	case g:GDMat => dzeros(nr,nc);  
+    	case gi:GIMat => izeros(nr,nc);
+    	case l:GLMat => lzeros(nr,nc);
+    	case s:GSMat => SMat(nr,nc,s.nnz);
+    	case s:GSDMat => SDMat(nr,nc,s.nnz);
   		case f:FMat => zeros(nr,nc);
-  		case g:GMat => zeros(nr,nc);
   		case f:DMat => dzeros(nr,nc);
-  		case g:GDMat => dzeros(nr,nc);
   		case i:IMat => izeros(nr,nc);
-  		case gi:GIMat => izeros(nr,nc);
   		case l:LMat => lzeros(nr,nc);
-  		case l:GLMat => lzeros(nr,nc);
   		case s:SMat => SMat(nr,nc,s.nnz);
-  		case s:GSMat => SMat(nr,nc,s.nnz);
   		case s:SDMat => SDMat(nr,nc,s.nnz);
-  		case s:GSDMat => SDMat(nr,nc,s.nnz);
   	}
   }
 }

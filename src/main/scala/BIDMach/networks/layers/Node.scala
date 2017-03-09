@@ -177,6 +177,6 @@ object Node {
     n
   }
   
-  implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n);
+//  implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n);
 
 }

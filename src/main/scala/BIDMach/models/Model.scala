@@ -256,21 +256,21 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       if (useGPU) {
         if (useDouble) {
          	to(i) = from(i) match {
+        	case aa:GDMat => aa
+        	case aa:GMat => GDMat(aa)
         	case aa:FMat => GDMat(aa)
         	case aa:IMat => GIMat(aa)
         	case aa:DMat => GDMat(aa)
         	case aa:SMat => GSDMat(aa)
-        	case aa:GDMat => aa
-        	case aa:GMat => GDMat(aa)
         	}
         } else {
         	to(i) = from(i) match {
+        	case aa:GMat => aa
+        	case aa:GDMat => GMat(aa)
         	case aa:FMat => GMat(aa)
         	case aa:DMat => GMat(aa)
         	case aa:IMat => GIMat(aa)
         	case aa:SMat => GSMat(aa)
-        	case aa:GMat => aa
-        	case aa:GDMat => GMat(aa)
         	}
         }
       } else {
@@ -325,26 +325,6 @@ object Model {
 
   def convertMat(a:Mat, useGPU:Boolean, useDouble:Boolean):Mat = {
 	   a match {
-      case f:FMat =>
-      if (useGPU) {
-      	if (useDouble) {
-      		GDMat(f);
-      	} else {
-      		GMat(f);
-      	}
-      } else {
-      	if (useDouble) {
-      		DMat(f);
-      	} else {
-      		f
-      	}
-      }
-      case i:IMat =>
-      if (useGPU) {
-        GIMat(i);
-      } else {
-        i;
-      }
       case g:GMat => if (useGPU) {
       	if (useDouble) {
       		GDMat(g);
@@ -383,6 +363,26 @@ object Model {
       	} else {
       		SMat(g);
       	}
+      }
+      case f:FMat =>
+      if (useGPU) {
+      	if (useDouble) {
+      		GDMat(f);
+      	} else {
+      		GMat(f);
+      	}
+      } else {
+      	if (useDouble) {
+      		DMat(f);
+      	} else {
+      		f
+      	}
+      }
+      case i:IMat =>
+      if (useGPU) {
+        GIMat(i);
+      } else {
+        i;
       }
       case tt:TMat => new TMat(tt.nrows, tt.ncols, tt.y, tt.x, tt.tiles.map(convertMat(_, useGPU, useDouble).asInstanceOf[Mat]));
     }

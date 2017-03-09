@@ -4,13 +4,15 @@ import BIDMat.IMat
 import BIDMat.DenseMat
 import scala.collection.mutable.HashMap;
 
-case class NodeMat(override val nrows:Int, override val ncols:Int, override val data:Array[Node]) extends DenseMat[Node](nrows, ncols, data) {	
+case class NodeMat(override val nrows:Int, override val ncols:Int, override val _data:Array[Node]) extends DenseMat[Node](nrows, ncols, _data) {	
   
   var nodeMap:HashMap[Node,Int] = null;
 	
 	override def t:NodeMat = NodeMat(gt(null))
 	
 	override def mytype = "NodeMat"
+	
+	def data:Array[Node] = _data
 	
 	def horzcat(b: NodeMat) = NodeMat(ghorzcat(b))
 	
@@ -25,12 +27,6 @@ case class NodeMat(override val nrows:Int, override val ncols:Int, override val 
 	override def apply(a:Int, b:IMat):NodeMat = NodeMat(gapply(a, b))	
 		
 	override def apply(a:IMat, b:Int):NodeMat = NodeMat(gapply(a, b))	
-		  
-  override def apply(a:Mat, b:Mat):NodeMat = NodeMat(gapply(a.asInstanceOf[IMat], b.asInstanceOf[IMat]))
-  
-  override def apply(a:Mat, b:Int):NodeMat = NodeMat(gapply(a.asInstanceOf[IMat], b))
-  
-  override def apply(a:Int, b:Mat):NodeMat = NodeMat(gapply(a, b.asInstanceOf[IMat]))
   
   
   def update(i:Int, b:Node):Node = _update(i, b)
@@ -57,14 +53,7 @@ case class NodeMat(override val nrows:Int, override val ncols:Int, override val 
   override def update(iv:IMat, j:Int, b:Mat):NodeMat = NodeMat(_update(iv, IMat.ielem(j), b.asInstanceOf[NodeMat]))
 
   override def update(i:Int, jv:IMat, b:Mat):NodeMat = NodeMat(_update(IMat.ielem(i), jv, b.asInstanceOf[NodeMat]))
-   
-  override def update(iv:Mat, b:Mat):NodeMat = NodeMat(_update(iv.asInstanceOf[IMat], b.asInstanceOf[NodeMat]))
-  
-  override def update(iv:Mat, jv:Mat, b:Mat):NodeMat = NodeMat(_update(iv.asInstanceOf[IMat], jv.asInstanceOf[IMat], b.asInstanceOf[NodeMat]))
 
-  override def update(iv:Mat, j:Int, b:Mat):NodeMat = NodeMat(_update(iv.asInstanceOf[IMat], IMat.ielem(j), b.asInstanceOf[NodeMat]))
-
-  override def update(i:Int, jv:Mat, b:Mat):NodeMat = NodeMat(_update(IMat.ielem(i), jv.asInstanceOf[IMat], b.asInstanceOf[NodeMat]))
   
   def update(iv:Mat, b:Node):NodeMat = NodeMat(_update(iv.asInstanceOf[IMat], b))
   

@@ -18,8 +18,8 @@ import scala.collection.mutable.HashMap;
 
 class LSTMLayer(override val net:Net, override val opts:LSTMNode = new LSTMNode) extends CompoundLayer(net, opts) {
 	override val _inputs = new Array[LayerTerm](3);
-	override val _outputs = new Array[ND](2);
-	override val _derivs = new Array[ND](2);
+	override val _outputs = new Array[Mat](2);
+	override val _derivs = new Array[Mat](2);
   
   override def toString = {
     "LSTM@"+Integer.toHexString(hashCode % 0x10000).toString

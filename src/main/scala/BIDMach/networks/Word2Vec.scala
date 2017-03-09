@@ -403,13 +403,6 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nwords = words.ncols;
     Mat.nflops += 6L * nwords * nskip * nrows;
     (words, lbound, ubound) match {
-      case (w:IMat, lb:IMat, ub:IMat) => if (Mat.useMKL) {
-      	CPUMACH.word2vecPosSlice(nrows, nwords, nskip, w.data, lb.data, ub.data, fmm, lrate, vexp, Mat.numThreads, 
-          islice, opts.nSlices, maxCols, opts.nHeadTerms, if (opts.dualMode) 1 else 0, opts.doHead);
-      } else {
-      	Word2Vec.procPosCPUslice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, lrate, vexp, Mat.numThreads, 
-          islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
-      }
       case (w:GIMat, lb:GIMat, ub:GIMat) => if (opts.dualMode) {
       	val m0 = modelmats(0).asInstanceOf[GMat];
       	val m1 = modelmats(1).asInstanceOf[GMat];
@@ -423,7 +416,14 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       			islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
       } else {
         throw new RuntimeException("Use dualMode to use the GPU with multi-part models")
-      }        
+      }    
+      case (w:IMat, lb:IMat, ub:IMat) => if (Mat.useMKL) {
+      	CPUMACH.word2vecPosSlice(nrows, nwords, nskip, w.data, lb.data, ub.data, fmm, lrate, vexp, Mat.numThreads, 
+          islice, opts.nSlices, maxCols, opts.nHeadTerms, if (opts.dualMode) 1 else 0, opts.doHead);
+      } else {
+      	Word2Vec.procPosCPUslice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, lrate, vexp, Mat.numThreads, 
+          islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
+      }
     }
   }
   
@@ -434,13 +434,6 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val nwords = wordsa.ncols;
     Mat.nflops += 6L * nwords * nwa * nwb * nrows;
     (wordsa, wordsb) match {
-    case (wa:IMat, wb:IMat) => if (Mat.useMKL) {
-    	CPUMACH.word2vecNegSlice(nrows, nwords, nwa, nwb, wa.data, wb.data, fmm, lrate, vexp, Mat.numThreads, 
-    			islice, opts.nSlices, maxCols, opts.nHeadTerms, if (opts.dualMode) 1 else 0, opts.doHead);
-    } else {
-    	Word2Vec.procNegCPUslice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, lrate, vexp, Mat.numThreads, 
-    			islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
-    }
     case (wa:GIMat, wb:GIMat) => {
     	if (opts.dualMode) {
     		val m0 = modelmats(0).asInstanceOf[GMat];
@@ -456,6 +449,13 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	} else {
     		throw new RuntimeException("Use dualMode to use the GPU with multi-part models")
     	}
+    }
+    case (wa:IMat, wb:IMat) => if (Mat.useMKL) {
+    	CPUMACH.word2vecNegSlice(nrows, nwords, nwa, nwb, wa.data, wb.data, fmm, lrate, vexp, Mat.numThreads, 
+    			islice, opts.nSlices, maxCols, opts.nHeadTerms, if (opts.dualMode) 1 else 0, opts.doHead);
+    } else {
+    	Word2Vec.procNegCPUslice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, lrate, vexp, Mat.numThreads, 
+    			islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
     }
     }
   }
