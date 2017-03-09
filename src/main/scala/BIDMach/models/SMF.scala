@@ -76,11 +76,14 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   override def init() = {
     mats = datasource.next;
   	datasource.reset;
+  	println("Inside SMF initialization:")
   	println("size(mats(0))="+size(mats(0)))
+  	println("mats.length="+mats.length)
 	  nfeats = mats(0).nrows;
 	  val batchSize = mats(0).ncols;
     val d = opts.dim;
     if (refresh) {
+      println("Inside refresh")
     	mm = normrnd(0,0.01f,d,nfeats);
     	mm = convertMat(mm);
     	avg = mm.zeros(1,1)
@@ -239,9 +242,6 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
    * minibatch (sdata0). It has an extra option to return a matrix of scores,
    * which will be useful for minibatch MH test updaters. We need a 1/(2*sigma^2) 
    * if we're assuming a Gaussian error distribution. 
-   * 
-   * Note: it looks scary to  subtract iavg+avg from sdata0, but we don't add
-   * that to preds so we can still directly compare sdata and preds.
    */
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
     val preds = DDS(mm, user, sdata) + (iavg + avg);
@@ -257,12 +257,6 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   	if (opts.matrixOfScores) {
   	  // TODO Temporary but should be OK for now (b/c we almost never increment MB).
   	  val sigma_sq = variance(diff).dv
-
-  	  //println("evalfun, sdata.contents.length = " +dc.length)
-  	  //println("mean of squared diffs = " +(diff ddot diff)/diff.length)
-  	  //println("sigma_sq = " +sigma_sq)
-  	  //println("result = " +mean(-(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)))
-
   	  -(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
   	} else {
   	  val vv = diff ddot diff;
@@ -273,23 +267,26 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   /** 
    * The evalfun normally called during testing and predicting. Returns -RMSE on
    * training data minibatch (sdata). We do not need the matrix of scores here.
-   * - `sdata` matrix is the predictor input data (we've used train, but could be test)
+   * - `sdata` matrix is the predictor input data, i.e. a minibatch of the
+   * training (or testing!) data.
    * - `preds` matrix should indicate the non-zero *testing* data points.
+   * The predictions on the TEST set are stored in ogmats(1) which turns into
+   * the `preds(1)` matrix that we can access outside BIDMach.
    */
   override def evalfun(sdata:Mat, user:Mat, preds:Mat, ipass:Int, pos:Long):FMat = {
+    // Predict on *training* then *testing*, filtered by sdata and preds.
     val spreds = DDS(mm, user, sdata) + (iavg + avg);
+  	val xpreds = DDS(mm, user, preds) + (iavg + avg);
   	val dc = sdata.contents;
   	val pc = spreds.contents;
   	val vv = (dc - pc) ddot (dc - pc);
-  	val xpreds = DDS(mm, user, preds) + (iavg + avg);
   	if (ogmats != null) {
       ogmats(0) = user;
       if (ogmats.length > 1) {
         ogmats(1) = xpreds;
       }
     }
-  	println("TESTING evalfun, spreds.nnz="+spreds.nnz+", xpreds.nnz="+xpreds.nnz)
-  	preds.contents <-- xpreds.contents;
+  	preds.contents <-- xpreds.contents; // This doesn't seem necessary.
   	-sqrt(row(vv/sdata.nnz))
   }
    
