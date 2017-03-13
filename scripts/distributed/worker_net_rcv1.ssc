@@ -8,25 +8,26 @@ val cmdPort = sys.env.get("WORKER_CMD_PORT") match {
     portStr.toInt
   }
   case None => {
-    import BIDMat.{CMat,CSMat,DMat,Dict,FMat,FND,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,HMat,IDict,Image,IMat,LMat,Mat,SMat,SBMat,SDMat,TMat}
-    import BIDMat.MatFunctions._
-    import BIDMat.SciFunctions._
-    import BIDMat.Solvers._
-    import BIDMat.Plotting._
-    import BIDMach.Learner
-    import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
-    import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
-    import BIDMach.datasinks.{DataSink,MatSink}
-    import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
-    import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
-    import BIDMach.causal.{IPTW}
-    import BIDMach.allreduce.{Master,Worker,Command}
-    Mat.checkMKL(false)
-    Mat.checkCUDA
-    50049
+    println("No WORKER_CMD_PORT specified, using 50050")
+    50050
   }
 }
 
+import BIDMat.{CMat,CSMat,DMat,Dict,FMat,FND,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,HMat,IDict,Image,IMat,LMat,Mat,SMat,SBMat,SDMat,TMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMat.Solvers._
+import BIDMat.Plotting._
+import BIDMach.Learner
+import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
+import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
+import BIDMach.datasinks.{DataSink,MatSink}
+import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
+import BIDMach.causal.{IPTW}
+import BIDMach.allreduce.{Master,Worker,Command}
+Mat.checkMKL(false)
+Mat.checkCUDA
 Mat.useCache = false
 Mat.useGPUcache = true
 
@@ -65,9 +66,5 @@ wopts.machineTrace = 1
 wopts.commandSocketNum = cmdPort
 wopts.responseSocketNum = cmdPort + 1
 wopts.peerSocketNum = cmdPort + 2
-
-// val mmMaxCols = nn.modelmats.foldLeft(0)((a:Int, b:Mat) => math.max(a, b.ncols))
-// val mmMaxRows = nn.modelmats.foldLeft(0)((a:Int, b:Mat) => math.max(a, b.nrows))
-// wopts.bufsize = mmMaxCols * (mmMaxRows + 1)
 
 w.start(nn)
