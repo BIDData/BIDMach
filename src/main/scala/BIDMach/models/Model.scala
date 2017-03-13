@@ -46,6 +46,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   var sendmats:Array[Mat] = null;
 
   var recvmats:Array[Mat] = null;
+  var maxmats:Array[Mat] = null;
 
   var mats:Array[Mat] = null;
 
@@ -215,27 +216,52 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   def snapshot(len:Int, avg:Boolean, matIdx:Int = 0) = {
     if (sendmats == null) sendmats = new Array[Mat](modelmats.length)
-    val len0 = math.min(len, modelmats(matIdx).ncols);
-    modelmats(matIdx).synchronized {
-      sendmats(matIdx) = cpu(modelmats(matIdx).colslice(0, len0));
-    }
-    if (avg) {
-      sendmats(matIdx) = ones(1, len0) on sendmats(matIdx);
+
+    val mm = modelmats(matIdx)
+    val mmnr = mm.nrows
+    val mmnc = mm.ncols
+    val avgOffset = if (avg) 1 else 0
+      // TODO: do more than just default to FMat
+    if (sendmats(matIdx) == null) sendmats(matIdx) = FMat(mmnr + avgOffset, mmnc)
+    val len0 = math.min(len, mmnc)
+    val sendmat = sendmats(matIdx).view(mmnr + avgOffset, len0)
+    val smnr = sendmat.nrows
+    val smnc = sendmat.ncols
+
+    if (avg) sendmat(0, ?) = 1
+    mm.synchronized {
+      sendmat(avgOffset -> smnr, ?) = cpu(mm(?, 0 -> len0))
     }
   }
 
   def addStep(len:Int, avg:Boolean, matIdx:Int = 0) = {
     if (recvmats == null) recvmats = new Array[Mat](modelmats.length)
-    val len0 = math.min(len, modelmats(matIdx).ncols);
-    if (avg) recvmats(matIdx) = recvmats(matIdx) / max(recvmats(matIdx)(0,?), 1f);
-    recvmats(matIdx) = recvmats(matIdx) - sendmats(matIdx);
-    val nr = modelmats(matIdx).nrows;
-    modelmats(matIdx).synchronized {
-      val head = modelmats(matIdx).view(nr, len0);
-      val chead = sendmats(matIdx).view(nr, len0);
-      chead <-- head;
-      chead ~ chead + (if (avg) recvmats(matIdx)(1 -> (nr+1), ?) else recvmats(matIdx));
-      head <-- chead;
+    if (avg && maxmats == null) maxmats = new Array[Mat](modelmats.length)
+
+    val mm = modelmats(matIdx)
+    val mmnr = mm.nrows
+    val mmnc = mm.ncols
+    val avgOffset = if (avg) 1 else 0
+    // TODO: do more than just default to FMat
+    if (recvmats(matIdx) == null) recvmats(matIdx) = FMat(mmnr + avgOffset, mmnc)
+    if (avg && maxmats(matIdx) == null) maxmats(matIdx) = FMat(1, mmnc)
+    val len0 = math.min(len, mmnc);
+    val recvmat = recvmats(matIdx).view(mmnr + avgOffset, len0)
+    val rmnr = recvmat.nrows
+    val rmnc = recvmat.ncols
+    val sendmat = sendmats(matIdx).view(mmnr + avgOffset, len0)
+
+    if (avg) {
+      val maxmat = maxmats(matIdx)
+      recvmat.rowslice(0, 1, maxmat)
+      recvmat ~ recvmat / max(maxmat, 1f)
+    }
+    recvmat ~ recvmat - sendmat
+    val smview = sendmat.view(mmnr, len0)
+    recvmat.rowslice(avgOffset, mmnr+avgOffset, smview)
+    mm.synchronized {
+      val mmview = mm.view(mmnr, len0)
+      mmview ~ mmview + smview
     }
   }
 

@@ -58,8 +58,6 @@ opts.nweight = 1e-4f
 val net = Net.dnodes4(2,500,0.5f,100,opts,2);
 opts.nodeset = net
 
-nn.init
-
 val w = new Worker()
 val wopts = w.opts
 wopts.trace = 4
@@ -68,8 +66,8 @@ wopts.commandSocketNum = cmdPort
 wopts.responseSocketNum = cmdPort + 1
 wopts.peerSocketNum = cmdPort + 2
 
-val mmMaxCols = nn.modelmats.foldLeft(0)((a:Int, b:Mat) => math.max(a, b.ncols))
-val mmMaxRows = nn.modelmats.foldLeft(0)((a:Int, b:Mat) => math.max(a, b.nrows))
-wopts.bufsize = mmMaxCols * (mmMaxRows + 1)
+// val mmMaxCols = nn.modelmats.foldLeft(0)((a:Int, b:Mat) => math.max(a, b.ncols))
+// val mmMaxRows = nn.modelmats.foldLeft(0)((a:Int, b:Mat) => math.max(a, b.nrows))
+// wopts.bufsize = mmMaxCols * (mmMaxRows + 1)
 
 w.start(nn)

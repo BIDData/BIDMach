@@ -40,7 +40,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	def start(learner0:Learner) = {
 	  workerIP = InetAddress.getLocalHost;
 	  learner = learner0;
-	  if (learner != null) model = learner.model;
+	  if (learner != null) {
+	    model = learner.model
+	    if (learner.modelmats == null) learner.init
+	  }
 	  executor = Executors.newFixedThreadPool(8);
 	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
@@ -63,8 +66,16 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
       val workerMachineAddrs = workers0.map(
 	x => new InetSocketAddress(x.getAddress(), x.getPort() + machineOffset))
       if (machineArr(mmi) != null) machineArr(mmi).stop
-      // TODO: dynamic bufsize
-      val machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false,
+
+      val bufsize = if (opts.bufsizes != null && opts.bufsizes.length > mmi) {
+	opts.bufsizes(mmi)
+      } else if (model != null && model.modelmats != null) {
+	model.modelmats(mmi).size + model.modelmats(mmi).ncols
+      } else {
+	Worker.DEFAULT_BUFSIZE
+      }
+
+      val machine = new Machine(null, groups, imach, M, opts.useLong, bufsize, false,
 	opts.machineTrace, opts.replicate, workerMachineAddrs);
       machineArr(mmi) = machine
       machine.configTimeout = opts.configTimeout;
@@ -339,18 +350,20 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 }
 
 object Worker {
-	trait Opts extends Host.Opts{
-	        var machineSocketNum = peerSocketNum + 1;
-		var configTimeout = 3000;
-		var reduceTimeout = 3000;
-		var cmdTimeout = 1000;
-		var fuseConfigReduce = false;
-		var doAvg = true;
-		var useLong = false;
-		var replicate = 1;
-		var bufsize = 10*1000000;
-		var respond = 0;
+  val DEFAULT_BUFSIZE = 10*1000000
+
+  trait Opts extends Host.Opts {
+    var machineSocketNum = peerSocketNum + 1;
+    var configTimeout = 3000;
+    var reduceTimeout = 3000;
+    var cmdTimeout = 1000;
+    var fuseConfigReduce = false;
+    var doAvg = true;
+    var useLong = false;
+    var replicate = 1;
+    var bufsizes:Array[Int] = null;
+    var respond = 0;
   }
 
-	class Options extends Opts {}
+  class Options extends Opts {}
 }
