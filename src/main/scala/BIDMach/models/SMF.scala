@@ -72,39 +72,44 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   var epsilon = 0f;
   var aopts:ADAGrad.Opts = null;
 
-  
   override def init() = {
+    // Get dimensions; for Netflix, size(mats(0)) = (17770,batchSize).
     mats = datasource.next;
-  	datasource.reset;
-  	println("Inside SMF initialization:")
-  	println("size(mats(0))="+size(mats(0)))
-  	println("mats.length="+mats.length)
-	  nfeats = mats(0).nrows;
-	  val batchSize = mats(0).ncols;
+    datasource.reset;
+    nfeats = mats(0).nrows;
+    val batchSize = mats(0).ncols;
     val d = opts.dim;
+
     if (refresh) {
+      // Randomly drawing mm, iavg, and avg (the three respective model
+      // matrices). Note that nfeats is the number of items (e.g. movies).
       println("Inside refresh")
-    	mm = normrnd(0,0.01f,d,nfeats);
-    	mm = convertMat(mm);
-    	avg = mm.zeros(1,1)
-    	iavg = mm.zeros(nfeats,1);
-    	itemsum = mm.zeros(nfeats, 1);
-    	itemcount = mm.zeros(nfeats, 1);
-    	setmodelmats(Array(mm, iavg, avg));
+      mm = normrnd(0,0.01f,d,nfeats);
+      mm = convertMat(mm);
+      avg = mm.zeros(1,1)
+      iavg = mm.zeros(nfeats,1);
+      itemsum = mm.zeros(nfeats, 1);
+      itemcount = mm.zeros(nfeats, 1);
+      setmodelmats(Array(mm, iavg, avg));
     } 
+
+    // Handle brief logic with GPUs. Careful with aliasing as well!!
     useGPU = opts.useGPU && Mat.hasCUDA > 0;    
-	  if (useGPU || useDouble) {
-	    gmats = new Array[Mat](mats.length);
-	  } else {
-	    gmats = mats;
-	  }  
-	  
-	  modelmats(0) = convertMat(modelmats(0));
-	  modelmats(1) = convertMat(modelmats(1));
-	  modelmats(2) = convertMat(modelmats(2));
-	  mm = modelmats(0);
+    if (useGPU || useDouble) {
+      gmats = new Array[Mat](mats.length);
+    } else {
+      gmats = mats;
+    }  
+    modelmats(0) = convertMat(modelmats(0));
+    modelmats(1) = convertMat(modelmats(1));
+    modelmats(2) = convertMat(modelmats(2));
+    mm = modelmats(0);
     iavg = modelmats(1);
     avg = modelmats(2);
+
+    // Here's some confusing stuff. Seems to be "small" stuff about constants.
+    // uscale, an internal ADAGrad parameter but we use it (!!!).
+    // cscale, an internal ADAGrad parameter but we ignore it.
     lamu = mm.ones(d, 1) ∘ opts.lambdau 
     if (opts.doUsers) lamu(0) = opts.regumean;
     slm = mm.ones(1,1) ∘ (opts.lambdam * batchSize);
@@ -114,12 +119,18 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     cscale = mm.ones(d, 1);
     cscale(0,0) = 0.0001f;
     if (opts.doUsers) mm(0,?) = 1f
+
+    // The updatemats is the same length as the model matrices.
     updatemats = new Array[Mat](3);
     updatemats(2) = mm.zeros(1,1);
+
+    // Set this to null to avoid the internal ADAGrad updater making updates.
     if (opts.aopts != null) initADAGrad(d, nfeats);
-    vexp = convertMat(row(0.5f));
+    vexp = convertMat(row(0.5f)); // External ADAGrad parameter, OK here.
   }
+
   
+  /** An internal ADAGrad updater. Ignore this for our current experiments. */
   def initADAGrad(d:Int, m:Int) = {
   	aopts = opts.asInstanceOf[ADAGrad.Opts]
     firststep = -1f;
@@ -132,116 +143,152 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     waitsteps = aopts.waitsteps;
     epsilon = aopts.epsilon;
   }
- 
-  def uupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit =  { 
-  	if (firststep <= 0) firststep = pos.toFloat;
-  	val step = (pos + firststep)/firststep;
-  	val texp = if (opts.asInstanceOf[Grad.Opts].texp.asInstanceOf[AnyRef] != null) {
-  	  opts.asInstanceOf[Grad.Opts].texp.dv
-  	} else {
-  	  opts.asInstanceOf[Grad.Opts].pexp.dv
-  	}
-  	uscale.set(opts.urate * math.pow(ipass+1, - texp).toFloat) 
-    val sdata = sdata0 - (iavg + avg);
-	  if (putBack < 0) {
-	  	user.clear
-	  }
-	  val b = mm * sdata;
-	  val ucounts = sum(sdata0 != 0f);
-	  val uci = (ucounts + 1f) ^ (- vexp);
-	  for (i <- 0 until opts.uiter) {
-	  	val preds = DDS(mm, user, sdata);
-	  	val deriv = b - mm * preds - (user ∘ lamu);
-	  	val du = (deriv ∘ uscale ∘ uci);
-	  	if (opts.lsgd >= 0) {
-	  		val dpreds = DDS(mm, du, sdata);
-	  	  accept(sdata, user, du, preds, dpreds, uscale, lamu, false);
-	  	} else {
-	  		user ~ user + du;
-	  	}
 
-	  	if (opts.traceConverge) {
-	  		println("step %d, loss %f" format (i, ((norm(sdata.contents - preds.contents) ^ 2f) + (sum(user dot (user ∘ lamu)))).dv/sdata.nnz));
-	  	}
-	  }
+
+  /**
+   * Performs some number of passes over the minibatch to update the user
+   * matrix. Try to understand how the user matrix gets updated ... note that
+   * putBack = -1 by default. I think this is the user matrix update, so we're
+   * holding the item matrix fixed (it's actually the model matrix, but the same
+   * point holds) while updating the user by stochastic gradient descent.
+   * 
+   * We subtract biases, so predictions can be done with DDS(mm,user,sdata)
+   * *without* re-adding biases. Also, we *do* clear out user here. is this
+   * because John said we can't really save the entire *full* user matrix (the
+   * one with size (dim,480189))?  ucounts sums up the number of nonzeros in
+   * each columns of sdata0, then uci is something else on it. b might make
+   * sense in some way, because the derivative term later is mm*(sdata-preds)
+   * and the sdata-preds is supposed to be close to each other.
+   *
+   * We then update the user matrix several times based on current predictions.
+   * Actually, this update makes sense because the normal SGD update for x_u
+   * (user vectors) is x_u minus the following term:
+   *
+   *     alpha*(data-prediction)*item_vector + lambda*user_vector
+   *
+   * and that's what we have here! QUESTION, though, uscale is an integrated
+   * ADAGrad value. Do we want it here? I'm also not sure why we need du to
+   * have uscale and uci there ...
+   * 
+   * NOTE: Upon further inspection, it seems that `user` starts out as a matrix
+   * of all zeros. So the user.clear with putBack<0 is un-necessary as it is
+   * already cleared. I suppose in theory we should have some putBack mechanism
+   * (that way, the user matrix value is stored from prior iterations) but John
+   * said there's little reason to do that. Also, even with putBack=1, I can't
+   * get the user matrix's values carried over. Hmmm ...
+   *
+   * @param sdata0 Training data minibatch of size (nitems, batchSize).
+   * @param user Second matrix for computing predictions, of size (dim, batchSize).
+   */ 
+  def uupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit =  { 
+    if (firststep <= 0) firststep = pos.toFloat;
+    val step = (pos + firststep)/firststep;
+    val texp = if (opts.asInstanceOf[Grad.Opts].texp.asInstanceOf[AnyRef] != null) {
+      opts.asInstanceOf[Grad.Opts].texp.dv
+    } else {
+      opts.asInstanceOf[Grad.Opts].pexp.dv
+    }
+    uscale.set(opts.urate * math.pow(ipass+1, - texp).toFloat) 
+
+    val sdata = sdata0 - (iavg + avg);
+    if (putBack < 0) {
+      user.clear
+    }
+    val b = mm * sdata;
+    val ucounts = sum(sdata0 != 0f);
+    val uci = (ucounts + 1f) ^ (- vexp);
+
+    for (i <- 0 until opts.uiter) {
+      val preds = DDS(mm, user, sdata);
+      val deriv = b - mm * preds - (user ∘ lamu);
+      val du = (deriv ∘ uscale ∘ uci);
+      user ~ user + du;
+      if (opts.traceConverge) {
+        println("step %d, loss %f" format (i, ((norm(sdata.contents - preds.contents) ^ 2f) + (sum(user dot (user ∘ lamu)))).dv/sdata.nnz));
+      }
+    }
   }
-  
+
+
+  /**
+   * Computes updates to the updatemats. Note again that we subtract (iavg+avg)
+   * from the sdata, so that predictions are done with DDS(mm,user,sdata), and
+   * the differences (for gradient update later) are stored. This is for
+   * updating the item matrix, so we hold the user matrix fixed (it's updated in
+   * uupdate) and compute updates for the item matrix (and the bias terms,
+   * actually). Also, this might be why we don't use a user bias term. Note that
+   * we call predictions once here, since mm and user are fixed for this method;
+   * ideally, some other updater will use the updatemats we compute (i.e. the
+   * gradients) to update the item matrix. The item matrix, if it wasn't clear,
+   * is modelmats(0).
+   * 
+   * Note that there's some extra work with ipass < 1, I think to get reasonable
+   * initialization values for our bias terms. Here, avg is the average rating
+   * across the entire nonzeros of sdata0 (hence, our global bias), and iavg is
+   * some (scaled) estimate of how much we should boost each individal item. The
+   * iavg should be smaller since the avg already scales stuff to roughly 3.6.
+   * 
+   * During predictions, this method is NOT called, hence the biases aren't
+   * updated.
+   *
+   * @param sdata0 Training data minibatch of size (nitems, batchSize).
+   * @param user Second matrix for computing predictions, of size (dim,
+   * 		batchSize). The matrix has the same values as the user matrix updated
+   * 		from the most recent uupdate method call.
+   */ 
   def mupdate(sdata0:Mat, user:Mat, ipass:Int, pos:Long):Unit = {
     val sdata = sdata0 - (iavg + avg);
     // values to be accumulated
     val preds = DDS(mm, user, sdata);
-    val diffs = sdata + 2f;
+    val diffs = sdata + 2f; // I THINK 2f is only for avoiding aliasing, but why not 0f?
     diffs.contents ~ sdata.contents - preds.contents;
+
     if (ipass < 1) {
-    	itemsum ~ itemsum + sum(sdata0, 2);
-    	itemcount ~ itemcount + sum(sdata0 != 0f, 2);
-    	avg ~ sum(itemsum) / sum(itemcount);
-    	iavg ~ ((itemsum + avg) / (itemcount + 1)) - avg;
+      itemsum ~ itemsum + sum(sdata0, 2); // sum horizontally
+      itemcount ~ itemcount + sum(sdata0 != 0f, 2); // count #nonzeros horizontally 
+      avg ~ sum(itemsum) / sum(itemcount);
+      iavg ~ ((itemsum + avg) / (itemcount + 1)) - avg;
     } 
+    
+    // Compute gradient updates for the biases, and set wuser=user unless we're weighing.
     val icomp = sdata0 != 0f
     val icount = sum(sdata0 != 0f, 2);
     updatemats(1) = (sum(diffs,2) - iavg*mlm) / (icount + 1f);   // per-item term estimator
     updatemats(2) ~ sum(diffs.contents) / (diffs.contents.length + 1f);
     val wuser = if (opts.weightByUser) {
-    	val iwt = 100f / max(sum(sdata != 0f), 100f); 
+      val iwt = 100f / max(sum(sdata != 0f), 100f); 
       user ∘ iwt;
     } else {
       user;
     }
     if (firststep <= 0) firststep = pos.toFloat;
+
+    // I get it! This derivative is virtually the same as what we had with the
+    // user update, except user and mm swap locations, which is expected.
     if (opts.lsgd >= 0 || opts.aopts == null) {
-    	updatemats(0) = (wuser *^ diffs - (mm ∘ slm)) / ((icount + 1).t ^ vexp);   // simple derivative
-    	if (opts.lsgd >= 0) {
-    		val step = (pos + firststep)/firststep;
-    		uscale.set((lrate.dv * math.pow(step, - texp.dv)).toFloat);
-    		val dm = updatemats(0) ∘ uscale ∘ cscale;
-    	  val dpreds = DDS(dm, user, sdata);
-    	  accept(sdata, mm, dm, preds, dpreds, uscale, slm, true);
-    	}
+      updatemats(0) = (wuser *^ diffs - (mm ∘ slm)) / ((icount + 1).t ^ vexp);   // simple derivative
     } else {
-    	if (texp.asInstanceOf[AnyRef] != null) {
-    		val step = (pos + firststep)/firststep;
-    		ADAGrad.multUpdate(wuser, diffs, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
-    	} else {
-    		ADAGrad.multUpdate(wuser, diffs, modelmats(0), sumsq, null, lrate, pexp, vexp, epsilon, ipass + 1, waitsteps);
-    	}
+      if (texp.asInstanceOf[AnyRef] != null) {
+        val step = (pos + firststep)/firststep;
+        ADAGrad.multUpdate(wuser, diffs, modelmats(0), sumsq, null, lrate, texp, vexp, epsilon, step, waitsteps);
+      } else {
+        ADAGrad.multUpdate(wuser, diffs, modelmats(0), sumsq, null, lrate, pexp, vexp, epsilon, ipass + 1, waitsteps);
+      }
     }
     if (opts.doUsers) mm(0,?) = 1f;
   }
   
-   def accept(sdata:Mat, mmod:Mat, du:Mat, preds:Mat, dpreds:Mat, scale:Mat, lambda:Mat, flip:Boolean) = {
- // 	println("sdata " + FMat(sdata.contents)(0->5,0).t)
-    	val diff1 = preds + 0f;
-	  	diff1.contents ~ sdata.contents - preds.contents;
-//	  	println("sdata %d %s" format (if (flip) 1 else 0, FMat(sdata.contents)(0->5,0).t.toString));
-//	  	println("preds %d %s" format (if (flip) 1 else 0, FMat(preds.contents)(0->5,0).t.toString));
-//	  	println("diff %d %s" format (if (flip) 1 else 0, FMat(diff1.contents)(0->5,0).t.toString));
-//	  	println("sdata "+FMat(sdata.contents)(0->5,0).t.toString);
-	  	val diff2 = diff1 + 0f;
-	  	diff2.contents ~ diff1.contents - dpreds.contents;
-	  	diff1.contents ~ diff1.contents ∘ diff1.contents;
-	  	diff2.contents ~ diff2.contents ∘ diff2.contents;
-	  	val rmmod = mmod + 1f;
-	  	normrnd(0, opts.lsgd, rmmod);
-	  	val mmod2 = mmod + du + rmmod ∘ scale;
-	  	val loss1 = (if (flip) sum(diff1,2).t else sum(diff1)) + (mmod dot (mmod ∘ lambda));
-	  	val loss2 = (if (flip) sum(diff2,2).t else sum(diff2)) + (mmod2 dot (mmod2 ∘ lambda));
-	  	
-	  	val accprob = erfc((loss2 - loss1) /scale);	  	
-	  	val rsel = accprob + 0f;
-	  	rand(rsel);
-	  	val selector = rsel < accprob;
-	  	mmod ~ (mmod2 ∘ selector) + (mmod ∘ (1f - selector));
-	  	if (opts.traceConverge) {
-	  	  println("accepted %d %f %f %f" format (if (flip) 1 else 0, mean(selector).dv, mean(loss1).dv, mean(loss2).dv));
-	  	}
-  }
-  
+
   /** 
    * The evalfun normally called during training. Returns -RMSE on training data
    * minibatch (sdata0). It has an extra option to return a matrix of scores,
    * which will be useful for minibatch MH test updaters. We need a 1/(2*sigma^2) 
    * if we're assuming a Gaussian error distribution. 
+   *
+   * @param sdata Training data minibatch of size (nitems, batchSize).
+   * @param user Second matrix for computing predictions, of size (dim,
+   * 		batchSize). The values here are based on the values computed in the most
+   * 		recent uupdate call.
    */
   def evalfun(sdata:Mat, user:Mat, ipass:Int, pos:Long):FMat = {
     val preds = DDS(mm, user, sdata) + (iavg + avg);
@@ -251,58 +298,58 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
         ogmats(1) = preds;
       }
     }
-  	val dc = sdata.contents
-  	val pc = preds.contents
-  	val diff = DMat(dc - pc);
-  	if (opts.matrixOfScores) {
-  	  // TODO Temporary but should be OK for now (b/c we almost never increment MB).
-  	  val sigma_sq = variance(diff).dv
-  	  -(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
-  	} else {
-  	  val vv = diff ddot diff;
-  	  -sqrt(row(vv/sdata.nnz))
-  	}
+    val dc = sdata.contents
+    val pc = preds.contents
+    val diff = DMat(dc - pc);
+    if (opts.matrixOfScores) {
+      // TODO Temporary but should be OK for now (b/c we almost never increment MB).
+      val sigma_sq = variance(diff).dv
+      //println(sqrt((diff ddot diff)/diff.length))
+      -(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
+    } else {
+      val vv = diff ddot diff;
+      -sqrt(row(vv/sdata.nnz))
+    }
   }
 
+
   /** 
-   * The evalfun normally called during testing and predicting. Returns -RMSE on
-   * training data minibatch (sdata). We do not need the matrix of scores here.
-   * - `sdata` matrix is the predictor input data, i.e. a minibatch of the
-   * training (or testing!) data.
-   * - `preds` matrix should indicate the non-zero *testing* data points.
-   * The predictions on the TEST set are stored in ogmats(1) which turns into
-   * the `preds(1)` matrix that we can access outside BIDMach.
+   * The evalfun normally called during TESTING (i.e. PREDICTION). Returns -RMSE
+   * on the TRAINING minibatch in `sdata`. We should also store predictions in
+   * `ogmats(1)`, which is what we can access externally via `preds(1)`. Thus,
+   * it's predicting based on both training and testing.
+   * 
+   * @param sdata Training data minibatch of size (nitems, batchSize).
+   * @param user Second matrix for computing predictions, size (dim, batchSize).
+   * @param preds Matrix indicating the non-zero TESTING data points.
    */
   override def evalfun(sdata:Mat, user:Mat, preds:Mat, ipass:Int, pos:Long):FMat = {
-    // Predict on *training* then *testing*, filtered by sdata and preds.
     val spreds = DDS(mm, user, sdata) + (iavg + avg);
-  	val xpreds = DDS(mm, user, preds) + (iavg + avg);
-  	val dc = sdata.contents;
-  	val pc = spreds.contents;
-  	val vv = (dc - pc) ddot (dc - pc);
-  	if (ogmats != null) {
+    val xpreds = DDS(mm, user, preds) + (iavg + avg);
+    val dc = sdata.contents;
+    val pc = spreds.contents;
+    val vv = (dc - pc) ddot (dc - pc);
+    if (ogmats != null) {
       ogmats(0) = user;
       if (ogmats.length > 1) {
         ogmats(1) = xpreds;
       }
     }
-  	preds.contents <-- xpreds.contents; // This doesn't seem necessary.
-  	-sqrt(row(vv/sdata.nnz))
+    //preds.contents <-- xpreds.contents; // This doesn't seem necessary.
+    -sqrt(row(vv/sdata.nnz))
   }
-   
 }
+
 
 object SMF {
   trait Opts extends FactorModel.Opts {
   	var ueps = 1e-10f
   	var uconvg = 1e-3f
-  	var miter = 5
   	var lambdau = 5f
   	var lambdam = 5f
   	var regumean = 0f
   	var regmmean = 0f
   	var urate = 0.1f
-  	var lsgd = 0.1f
   	var traceConverge = false
   	var doUsers = true
   	var weightByUser = false
@@ -310,6 +357,7 @@ object SMF {
   	var minv = 1f;
   	var maxv = 5f;
   	var matrixOfScores = false;
+    var lsgd = 0f;
   }  
 
   class Options extends Opts {} 
@@ -334,8 +382,9 @@ object SMF {
   }
 
   /** 
-   * Learner with single (training data) matrix as datasource, and ADAGrad Opts.
-   * We will benchmark this with the learner using MHTest.
+   * Learner with single (training data) matrix as datasource, and an
+   * **EXTERNAL** ADAGrad Opts. We will benchmark this with the learner using
+   * an external MHTest. No internal ADAGrad updater.
    */
   def learner1(mat0:Mat, d:Int) = { 
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts
@@ -346,7 +395,7 @@ object SMF {
     opts.lrate = 0.1 
     opts.initUval = 0f; 
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    opts.aopts = opts
+    opts.aopts = null
     val nn = new Learner(
       new MatSource(Array(mat0:Mat), opts),
       new SMF(opts), 
@@ -360,7 +409,8 @@ object SMF {
   /**
    * Learner with single (training data) matrix as datasource, and using our
    * MHTest updater. Use this for running experiments to benchmark with default
-   * ADAGrad.
+   * ADAGrad. For our experiments, we should NOT be using opts.aopts, which is
+   * the internal ADAGrad updater. So that should be null ...
    */
   def learner2(mat0:Mat, d:Int) = { 
     class xopts extends Learner.Options with SMF.Opts with MatSource.Opts with ADAGrad.Opts with MHTest.Opts
@@ -371,7 +421,7 @@ object SMF {
     opts.lrate = 0.1 
     opts.initUval = 0f; 
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
-    opts.aopts = opts
+    opts.aopts = null
     val nn = new Learner(
       new MatSource(Array(mat0:Mat), opts),
       new SMF(opts), 
@@ -413,7 +463,6 @@ object SMF {
     val mopts = model.opts.asInstanceOf[SMF.Opts];
     nopts.dim = mopts.dim;
     nopts.uconvg = mopts.uconvg;
-    nopts.miter = mopts.miter;
     nopts.lambdau = mopts.lambdau;
     nopts.lambdam = mopts.lambdam;
     nopts.regumean = mopts.regumean;
@@ -438,19 +487,23 @@ object SMF {
    * which turns into the second factor matrix. It mirrors an SFA predictor code
    * which also forms this empty matrix into the matrix datasource, with the
    * only difference being the lack of an Minv option for `newmod`.
+   * 
+   * @param mat1 The TRAINING DATA matrix. NOT THE TESTING DATA!!! NOT THE
+   * 		TESTING DATA!!!
+   * @param preds The non-zeros of the TESTING data (not training).
    */
   def predictor1(model0:Model, mat1:Mat, preds:Mat) = { 
     val model = model0.asInstanceOf[SMF]
     val nopts = new PredOpts;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.putBack = -1
+    nopts.initUval = 0f // Daniel: for consistency with training update.
     val newmod = new SMF(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);
     val mopts = model.opts.asInstanceOf[SMF.Opts];
     nopts.dim = mopts.dim;
     nopts.uconvg = mopts.uconvg;
-    nopts.miter = mopts.miter;
     nopts.lambdau = mopts.lambdau;
     nopts.lambdam = mopts.lambdam;
     nopts.regumean = mopts.regumean;

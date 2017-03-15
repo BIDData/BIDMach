@@ -208,7 +208,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         accept = true
       }
     }
-    
+
     // (Part 4) Reset parameters and use <-- to avoid alias problems.
     if (accept) {
       for (i <- 0 until modelmats.length) {

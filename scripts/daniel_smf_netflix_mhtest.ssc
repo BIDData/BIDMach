@@ -25,6 +25,8 @@ import BIDMach.models.SMF
  * (ta == 5).nnz = 2318400
  * mean (of nonzeros) = 3.6046705
  * sqrt((diff ddot diff) / diff.nn) = 1.0851 // Test RMSE using mean predictor
+ *
+ * BTW: (a *@ ta).nnz = 0, which shows that they are completely distinct.
  */
 
 // Get random seed set up.
@@ -55,11 +57,10 @@ opts.exitTheta = false
 opts.initThetaHere = false
 opts.burnIn = -1
 
-// For the SMF
-opts.matrixOfScores = true
-
 // Daniel Seita: actually, a batch size of 2000 means we may get 100k "elements"
 // due to the sparsity. So I'm thinking we stick to batch sizes of 1000 or less.
+// Also, the four items here that start with `lambda` or `reg` represent priors.
+opts.matrixOfScores = true
 opts.batchSize = 1000
 opts.npasses = 1
 opts.uiter = 5
@@ -72,13 +73,12 @@ opts.lambdam = lambda / 500000 * 20
 opts.regmmean = opts.lambdam
 opts.evalStep = 31
 opts.doUsers = false
-opts.lsgd = 0.010f; // Daniel: what is this?
 opts.what
 nn.train
 
 val model = nn.model.asInstanceOf[SMF]
 val xa = (ta != 0)
-val (mm, mopts) = SMF.predictor1(model, a, xa) // a or ta as input?
+val (mm, mopts) = SMF.predictor1(model, a, xa)
 
 mopts.batchSize = 10000
 mopts.uiter = 5
@@ -94,5 +94,3 @@ val rmse = sqrt((diff ddot diff) / diff.length)
 println("rmse = %f" format rmse.v)
 println("size(mm.preds(0)) = " +size(mm.preds(0)))
 println("size(mm.preds(1)) = " +size(pa))
-saveFMat("user.fmat.lz4", FMat(mm.preds(0)))
-saveSMat("preds.smat.lz4", pa)

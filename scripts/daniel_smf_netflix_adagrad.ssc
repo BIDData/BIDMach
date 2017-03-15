@@ -18,11 +18,11 @@ val d = 256
 val (nn,opts) = SMF.learner1(a, d)
 
 // Daniel Seita: I'm not sure if these values are good for netflix.
-opts.batchSize = 2000
+opts.batchSize = 1000
 opts.uiter = 5
 opts.urate = 0.05f
 opts.lrate = 0.05f  
-opts.npasses = 2
+opts.npasses = 1
 val lambda = 4f
 opts.lambdau = lambda
 opts.regumean = lambda
