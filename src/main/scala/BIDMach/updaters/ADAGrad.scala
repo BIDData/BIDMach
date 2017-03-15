@@ -12,6 +12,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Updater {
   
+  // Three other sets of matrices (sumSq, momentum, and randmat) all have (if
+  // initialized) same length and sizes as the modelmats and updatemats. Is the
+  // `mu` here a momentum term as well?
   var firstStep = 0f
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null  
@@ -19,14 +22,22 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   var stepn:Mat = null
   var mask:Mat = null
   var momentum:Array[Mat] = null;
-  var ve:Mat = null
-  var pe:Mat = null
-  var te:Mat = null
+  var ve:Mat = null // opts.vexp, an ADAGrad parameter (see BIDMach wiki)
+  var pe:Mat = null // Similar to opts.texp? Some exponent like the others?
+  var te:Mat = null // opts.texp, an ADAGrad parameter (see BIDMach wiki)
   var lrate:Mat = null
   var mu:Mat = null
   var one:Mat = null
   var randmat:Array[Mat] = null
 
+
+  /**
+   * Initialize ADAGrad model. Note the conditions required to create momentum
+   * and randmats. I just created opts.momentum = FMat(0) since that's an easy
+   * way to do it. But we ignore that when initializing `momentum` so it's
+   * confusing. But I also see later in the code that we *do* use opts.momentum,
+   * so what's the difference? Same thing with opts.nesterov vs nesterov mats???
+   */
   override def init(model0:Model) = {
     model = model0
     modelmats = model.modelmats;
@@ -57,7 +68,13 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     ve <-- opts.vexp;
     te <-- opts.texp;
   } 
+
   
+  /** 
+   * Daniel: I don't know what this is supposed to do. However, there is *no*
+   * mention of any `update2` in the entire BIDMach repository --- I did a
+   * search. Hence, I think tihs method can be safely ignored.
+   */
   def update2(ipass:Int, step:Long):Unit = {
   	modelmats = model.modelmats;
   	updatemats = model.updatemats;
@@ -99,7 +116,17 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
       um.clear;
   	}
   }
+
 	
+  /**
+   * Whew, the major heavy-hitting for ADAGrad. Let's try to digest this slowly ...
+   * 
+   * First, it looks like John is defining nsteps and tscale. Not sure what
+   * these mean...
+   * 
+   * Second is the heavy-duty part, looping over each model matrix and the other
+   * matrices involved. What is opts.policies? I'm confused.
+   */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = { 
     val start = toc;
     modelmats = model.modelmats
@@ -121,7 +148,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     }
     val nw = stepn;
     val nmats = math.min(modelmats.length, updatemats.length);
-//    println("u sumsq %g" format mini(sumSq(0)).dv)
+    
+    // Does something for each model matrix.
     for (i <- 0 until nmats) {
     	if (opts.policies.asInstanceOf[AnyRef] != null) {
     		if (opts.policies.length > 1) {

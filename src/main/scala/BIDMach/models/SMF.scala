@@ -129,7 +129,7 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     vexp = convertMat(row(0.5f)); // External ADAGrad parameter, OK here.
   }
 
-  
+ 
   /** An internal ADAGrad updater. Ignore this for our current experiments. */
   def initADAGrad(d:Int, m:Int) = {
   	aopts = opts.asInstanceOf[ADAGrad.Opts]
@@ -335,7 +335,6 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
         ogmats(1) = xpreds;
       }
     }
-    //preds.contents <-- xpreds.contents; // This doesn't seem necessary.
     -sqrt(row(vv/sdata.nnz))
   }
 }

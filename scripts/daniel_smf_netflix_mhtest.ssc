@@ -42,7 +42,6 @@ println("size(a)="+size(a)+", with a.nnz="+a.nnz)
 
 // Daniel Seita: stuff for the MH Test updater. OH ... and our N is going to be
 // super-large. Ahhhh... we may need temperature then.
-opts.smf = true // IMPORTANT, this affects some of the code.
 opts.N = a.nnz
 opts.temp = a.nnz / 1000
 opts.Nknown = true
@@ -56,6 +55,13 @@ opts.collectDataDir = "tmp/"
 opts.exitTheta = false
 opts.initThetaHere = false
 opts.burnIn = -1
+
+// IMPORTANT
+opts.smf = true
+opts.useInternalADAGrad = true
+opts.momentum = true
+opts.nesterov = true
+opts.langevin = 0.3f
 
 // Daniel Seita: actually, a batch size of 2000 means we may get 100k "elements"
 // due to the sparsity. So I'm thinking we stick to batch sizes of 1000 or less.

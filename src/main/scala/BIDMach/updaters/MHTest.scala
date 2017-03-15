@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,TM
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
+import BIDMach.models.Model._
 import edu.berkeley.bid.CUMACH
 
 /**
@@ -68,6 +69,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var sumOfSquares:Float = 0f          // \sum_{i=1}^b ((N/T)*log(p(x_i|theta')/p(x_i|theta)))^2.
   var targetVariance:Float = 0f        // The target variance (so we only need one X_corr).
 
+  // Daniel: experimental, not sure if that belongs.
+  var aopts:ADAGrad.Opts = null;
+
 
   /** 
    * Standard initialization. We have:
@@ -75,6 +79,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * - n2ld loads the pre-computed X_c variable distribution.
    * - {delta,proposed,tmp}Theta initialized to zeros with correct dimensions.
    * - If desired, initialize modelmats with small values to break symmetry.
+   * - If desired, initialize an internal ADAGrad updater.
    * 
    * Note that the file for the norm2logdata should be in the correct directory.
    */
@@ -116,8 +121,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
         modelmats(i) <-- normrnd(0, 0.03f, modelmats(i).nrows, modelmats(i).ncols)
       }
     }
+    
+    // Experimental ... not sure if this is right ...
+    // val adagrad = new ADAGrad(opts.asInstanceOf[ADAGrad.Opts])
+    // adagrad.init(model)
   }
-
+  
 
   /**
    * This performs the update and the MH test based on a minibatch of data. The
@@ -354,6 +363,7 @@ object MHTest {
     var initThetaHere = false
     var burnIn = -1
     var smf = false
+    var useInternalADAGrad = false
   }
  
   class Options extends Opts {}
