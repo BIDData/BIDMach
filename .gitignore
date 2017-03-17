@@ -20,5 +20,6 @@
 !/data/factorNet
 !/data/MHTestCorrections
 /logs/
+/jupyter/
 /project/
 /target/
