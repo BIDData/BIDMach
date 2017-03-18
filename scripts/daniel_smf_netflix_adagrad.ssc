@@ -2,58 +2,64 @@
 import BIDMach.models.SMF
 
 /**
- * Test SMF code on netflix data. This will use default ADAGrad, which already
- * gets roughly 0.845 RMSE so I assume we have to beat that. We'll also need to
- * run this with different random seeds.
+ * Test SMF code on netflix data. This will use default ADAGrad. In general,
+ * RMSEs of roughly 0.83 to 0.85 are "good".
  */
 
-// Get random seed set up.
-// TODO random seed code
-
-// Now get back to the real netflix data. First, load data and set things up:
 val dir = "/data/netflix/"
 val a = loadSMat(dir+"newtrain.smat.lz4")
 val ta = loadSMat(dir+"newtest.smat.lz4")
 val d = 256
-val (nn,opts) = SMF.learner1(a, d)
+val lrates = row(0.0001, 0.001, 0.01, 0.1)
+val momens = row(0.5, 0.75, 0.9, 0.95)
+var bestrmse = 10.0;
 
-// Daniel Seita: I'm not sure if these values are good for netflix.
-opts.batchSize = 1000
-opts.npasses = 1
-opts.uiter = 5
-opts.urate = 0.05f
-opts.lrate = 0.05f  
-val lambda = 4f
-opts.lambdau = lambda
-opts.regumean = lambda
-opts.lambdam = lambda / 500000 * 20
-opts.regmmean = opts.lambdam
-opts.evalStep = 31
-opts.doUsers = false
+for (i <- 0 until lrates.length) {
+    for (j <- 0 until momens.length) {
+        val (nn,opts) = SMF.learner1(a, d)
+        opts.batchSize = 1000
+        opts.npasses = 2
+        opts.momentum = momens(j)
+        opts.nesterov = null
+        opts.langevin = 0.0f
+        
+        opts.uiter = 5
+        opts.urate = 0.05f
+        opts.lrate = lrates(i)
+        val lambda = 4f
+        opts.lambdau = lambda
+        opts.regumean = lambda
+        opts.lambdam = lambda / 500000 * 20
+        opts.regmmean = opts.lambdam
+        opts.evalStep = 31
+        opts.doUsers = false
+        opts.what
+        nn.train
+        
+        val model = nn.model.asInstanceOf[SMF]
+        val xa = (ta != 0)
+        val (mm, mopts) = SMF.predictor1(model, a, xa)
+        mopts.batchSize = 10000
+        mopts.uiter = 5
+        mopts.urate = opts.urate
+        mopts.lsgd = 0.0f
+        mm.predict
+        
+        val pa = SMat(mm.preds(1));
+        println("Note: max(pa)="+maxi(maxi(pa))+" and min(pa)="+mini(mini(pa)))
+        val diff = ta.contents - pa.contents
+        val rmse = sqrt((diff ^* diff) / diff.length)
+        println("\nrmse = %f" format rmse.v)
+        min(pa.contents,5,pa.contents)
+        max(pa.contents,1,pa.contents)
+        val diff2 = ta.contents - pa.contents
+        val rmse2 = sqrt((diff2 ^* diff2) / diff2.length)
+        println("rmse (w/clipping) = %f\n" format rmse2.v)
+        if (rmse2.v < bestrmse) {
+            bestrmse = rmse2.v
+        }
+    }
+}
 
-opts.momentum = FMat(0.5)
-opts.nesterov = null
-opts.langevin = 0.0f
-
-opts.what
-nn.train
-
-val model = nn.model.asInstanceOf[SMF]
-val xa = (ta != 0)
-val (mm, mopts) = SMF.predictor1(model, a, xa)
-mopts.batchSize = 10000
-mopts.uiter = 5
-mopts.urate = opts.urate
-mopts.lsgd = 0.0f
-mm.predict
-
-val pa = SMat(mm.preds(1));
-println("Note: max(pa)="+maxi(maxi(pa))+" and min(pa)="+mini(mini(pa)))
-val diff = ta.contents - pa.contents
-val rmse = sqrt((diff ^* diff) / diff.length)
-println("rmse = %f" format rmse.v)
-min(pa.contents,5,pa.contents)
-max(pa.contents,1,pa.contents)
-val diff2 = ta.contents - pa.contents
-val rmse2 = sqrt((diff2 ^* diff2) / diff2.length)
-println("rmse (w/clipping) = %f" format rmse2.v)
+println("Best RMSE: "+bestrmse)
+sys.exit
