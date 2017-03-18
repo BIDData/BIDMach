@@ -339,9 +339,10 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     val pc = spreds.contents;
     val vv = (dc - pc) ddot (dc - pc);
 
-    println("mean values: "+mean(dc)+" "+mean(pc)+" "+mean(vv))
-    println("max values: "+maxi(dc)+" "+maxi(pc))
-    println("min values: "+mini(dc)+" "+mini(pc))
+    println("mean values (train/t.pred): "+mean(dc)+" "+mean(pc))
+    println("std. values (train/t.pred): "+sqrt(variance(dc))+" "+sqrt(variance(pc)))
+    println("max. values (train/t.pred): "+maxi(dc)+" "+maxi(pc))
+    println("min. values (train/t.pred): "+mini(dc)+" "+mini(pc))
 
     if (ogmats != null) {
       ogmats(0) = user;

@@ -19,10 +19,10 @@ val (nn,opts) = SMF.learner1(a, d)
 
 // Daniel Seita: I'm not sure if these values are good for netflix.
 opts.batchSize = 1000
+opts.npasses = 1
 opts.uiter = 5
 opts.urate = 0.05f
 opts.lrate = 0.05f  
-opts.npasses = 1
 val lambda = 4f
 opts.lambdau = lambda
 opts.regumean = lambda
@@ -30,9 +30,11 @@ opts.lambdam = lambda / 500000 * 20
 opts.regmmean = opts.lambdam
 opts.evalStep = 31
 opts.doUsers = false
-opts.lsgd = 0.010f
+
 opts.momentum = FMat(0.5)
+opts.nesterov = null
 opts.langevin = 0.0f
+
 opts.what
 nn.train
 
@@ -46,9 +48,12 @@ mopts.lsgd = 0.0f
 mm.predict
 
 val pa = SMat(mm.preds(1));
-min(pa.contents,5,pa.contents)
-max(pa.contents,1,pa.contents)
+println("Note: max(pa)="+maxi(maxi(pa))+" and min(pa)="+mini(mini(pa)))
 val diff = ta.contents - pa.contents
 val rmse = sqrt((diff ^* diff) / diff.length)
 println("rmse = %f" format rmse.v)
-//sys.exit
+min(pa.contents,5,pa.contents)
+max(pa.contents,1,pa.contents)
+val diff2 = ta.contents - pa.contents
+val rmse2 = sqrt((diff2 ^* diff2) / diff2.length)
+println("rmse (w/clipping) = %f" format rmse2.v)

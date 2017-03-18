@@ -69,7 +69,7 @@ opts.saveAcceptRate = true
 // Also, the four items here that start with `lambda` or `reg` represent priors.
 opts.matrixOfScores = true
 opts.batchSize = 1000
-opts.npasses = 4
+opts.npasses = 3
 opts.uiter = 5
 opts.urate = 0.05f
 opts.lrate = 0.05f  
