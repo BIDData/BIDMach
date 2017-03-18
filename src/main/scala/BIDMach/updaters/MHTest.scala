@@ -69,9 +69,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var sumOfSquares:Float = 0f          // \sum_{i=1}^b ((N/T)*log(p(x_i|theta')/p(x_i|theta)))^2.
   var targetVariance:Float = 0f        // The target variance (so we only need one X_corr).
 
-  // Daniel: experimental, not sure if that belongs.
-  var aopts:ADAGrad.Opts = null;
-
+  // Daniel: experimental, for the SMF.
+  var adagrad:ADAGrad = null;
+  var tmpMomentum:Array[Mat] = null
 
   /** 
    * Standard initialization. We have:
@@ -84,7 +84,6 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * Note that the file for the norm2logdata should be in the correct directory.
    */
   override def init(model0:Model) = {
-    setseed(1)
     model = model0;
     modelmats = model.modelmats
     updatemats = model.updatemats
@@ -122,9 +121,15 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       }
     }
     
-    // Experimental ... not sure if this is right ...
-    // val adagrad = new ADAGrad(opts.asInstanceOf[ADAGrad.Opts])
-    // adagrad.init(model)
+    if (opts.smf) {
+      // This should force adagrad.momentum(i) = momentum(i) in the rest of this code.
+      adagrad = new ADAGrad(opts.asInstanceOf[ADAGrad.Opts])
+      adagrad.init(model)
+      tmpMomentum = new Array[Mat](nmats)
+      for (i <- 0 until nmats) {
+        tmpMomentum(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
+      }
+    }
   }
   
 
@@ -140,7 +145,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    *    datasource size and the number of (training) passes.
    */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
-    if (newMinibatch) beforeEachMinibatch()
+    if (newMinibatch) beforeEachMinibatch(ipass, step, gprogress)
     n += 1.0f
 
     // (Part 1) Compute scores for theta and theta', scaled by N/T.
@@ -168,7 +173,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     sumOfSquares += sum((diff)*@(diff)).v
     sumOfValues += sum(diff).v
     val deltaStar = sumOfValues/b.v - logu
-    val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v
+    val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v    
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
     if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd)
@@ -226,6 +231,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     } else {
       for (i <- 0 until modelmats.length) {
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
+        if (opts.smf) {
+          adagrad.momentum(i) <-- tmpMomentum(i) // Revert ADAGrad momentum.
+        }
       }
     }
     
@@ -236,20 +244,48 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   /**
    * Stuff we should do before each minibatch. This involves calling the
    * proposer, resetting some values, and saving the current model matrix into
-   * `tmpTheta` so we can restore it later when needed.
+   * `tmpTheta` so we can restore it later when needed. Here, we want to set the
+   * proposer matrices, so that when we continue in uupdate, we have the current
+   * and proposed model matrices stored in modelmats and proposedTheta,
+   * respectively.
+   * 
+   * Also, we have a different (i.e. better!) proposer with ADAGrad. The update
+   * *should* affect all of the modelmats(i) due to aliasing (since it changes
+   * adagrad.modelmats(i)). However, this doesn't put it in proposedTheta, so
+   * here's a workaround: get the modelmats stored into tmpTheta. Then do the
+   * update, which will update modelmats to the proposed matrices. Then copy
+   * those into propsoedTheta, and then get current modelmats back to tmpTheta
+   * (i.e. so modelmats remains the same before and after, and it's just the
+   * proposedTheta which changes). With momentum, fortunately it's simpler, we
+   * have that in adagrad.momentum and simply copy the old state into
+   * tmpMomentum.
    */
-  def beforeEachMinibatch() {
+  def beforeEachMinibatch(ipass:Int, step:Long, gprogress:Float) {
     if (opts.verboseMH) println("\n\tNew minibatch!")
-    randomWalkProposer()
+
+    for (i <- 0 until modelmats.length) {
+      tmpTheta(i) <-- modelmats(i)
+      if (opts.smf) {
+        tmpMomentum(i) <-- adagrad.momentum(i)
+      }
+    } 
+
+    if (opts.smf) {
+      adagrad.update(ipass, step, gprogress)
+      for (i <- 0 until modelmats.length) {
+        proposedTheta(i) <-- adagrad.modelmats(i) // adagrad.modelmats(i) = modelmats(i)
+        modelmats(i) <-- tmpTheta(i) // Should make adagrad.modelmats(i) back to what it was before.
+      } 
+    } else {
+      randomWalkProposer()
+    }
+
     logu = ln(rand(1,1)).v
     newMinibatch = false
     b = 0
     n = 0
     sumOfValues = 0f
     sumOfSquares = 0f
-    for (i <- 0 until modelmats.length) {
-      tmpTheta(i) <-- modelmats(i)
-    }
   }
 
  
@@ -337,6 +373,8 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     val s0 = mean(scores0).dv
     println("b="+b+", n="+n+", logu="+logu)
     println("mean(scores1) = "+s1+" - mean(scores0) = "+s0+" = "+(s1-s0))
+    println("maxi(scores1) = "+maxi(scores1)+", maxi(scores0) = "+maxi(scores0))
+    println("mini(scores1) = "+mini(scores1)+", mini(scores0) = "+mini(scores0))
     println("sampleVar = " +sampleVariance+ ", delta* = " +deltaStar+ ", numStd = " +numStd)
   }
   
@@ -363,7 +401,6 @@ object MHTest {
     var initThetaHere = false
     var burnIn = -1
     var smf = false
-    var useInternalADAGrad = false
   }
  
   class Options extends Opts {}

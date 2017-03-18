@@ -33,10 +33,17 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 
   /**
    * Initialize ADAGrad model. Note the conditions required to create momentum
-   * and randmats. I just created opts.momentum = FMat(0) since that's an easy
-   * way to do it. But we ignore that when initializing `momentum` so it's
-   * confusing. But I also see later in the code that we *do* use opts.momentum,
-   * so what's the difference? Same thing with opts.nesterov vs nesterov mats???
+   * and randmats. We have opts.momentum but also momentum mats, similar thing
+   * with nesterov. I would *guess* that opts.momentum is that hyper-parameter,
+   * while the momemtum mats gives the update for each parameter (i.e. component
+   * wise). But then what's the hyperparameter for Nesterov? There isn't any?
+   * BTW for both opts.momentum and opts.nesterov, we can set them to be one
+   * value or a vector with one per modelmat. If just one value, then it's
+   * repeated across all modelmats. ALSO, what value to set for opts.langevin?
+   * 
+   * EDIT: figured it out, opts.nesterov is the same as opts.momentum, assuming
+   * that we choose to run one of momentum and nesterov's (and not both, which
+   * wouldn't make sense).
    */
   override def init(model0:Model) = {
     model = model0
@@ -125,7 +132,16 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
    * these mean...
    * 
    * Second is the heavy-duty part, looping over each model matrix and the other
-   * matrices involved. What is opts.policies? I'm confused.
+   * matrices involved. What is opts.policies? I'm confused. Anyway, look at the
+   * CPU version of the case methods. The other version is the GPU, which I'll
+   * ignore now. 
+   * 
+   * The CPU version is more readable. First, it deals with some logic regarding
+   * the sum of squares (?). Second, it applies the Langevin dynamics. Third,
+   * and the crucial part, it applies either momentum updates or nesterov 
+   * updates. I don't *think* we should be using both momentum or nesterov, at
+   * least based on this code logic. OH, I see the learning rate applied, then
+   * momentum (or nesterov) and indeed it matches the algorithm formulation.
    */
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = { 
     val start = toc;
@@ -149,7 +165,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     val nw = stepn;
     val nmats = math.min(modelmats.length, updatemats.length);
     
-    // Does something for each model matrix.
+    // This is applied to each model matrix separately.
+    // NOTE!! I changed momentum to be momentum(i); see my GitHub issue.
     for (i <- 0 until nmats) {
     	if (opts.policies.asInstanceOf[AnyRef] != null) {
     		if (opts.policies.length > 1) {
@@ -170,10 +187,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	  case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
           if (opts.momentum.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.momentum.length > 1) opts.momentum(i) else opts.momentum(0);
-            ADAGrad.ADAGradm(gmm, gum, gss, momentum.asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+            ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           } else if (opts.nesterov.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.nesterov.length > 1) opts.nesterov(i) else opts.nesterov(0);
-            ADAGrad.ADAGradn(gmm, gum, gss, momentum.asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+            ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           } else {
         	  ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           }

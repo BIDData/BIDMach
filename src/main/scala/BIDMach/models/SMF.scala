@@ -303,9 +303,14 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     val diff = DMat(dc - pc);
     if (opts.matrixOfScores) {
       // TODO Temporary but should be OK for now (b/c we almost never increment MB).
+      // The FMat(diff *@ diff) will make a vector, hence the broadcasting.
+      // Also, I was getting a handful of *really* negative scores where log
+      // p(.) went to -10000 or so. To prevent that, set a threshold at -15.
+      //println(sqrt((diff ddot diff)/diff.length)) // Use for debugging and sanity checks.
       val sigma_sq = variance(diff).dv
-      //println(sqrt((diff ddot diff)/diff.length))
-      -(1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
+      val scores = -ln(sqrt(2*math.Pi*sigma_sq)).v - (1.0f/(2*sigma_sq)).v * FMat(diff *@ diff)
+      max(scores, -15f, scores)
+      scores
     } else {
       val vv = diff ddot diff;
       -sqrt(row(vv/sdata.nnz))

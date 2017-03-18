@@ -31,6 +31,8 @@ opts.regmmean = opts.lambdam
 opts.evalStep = 31
 opts.doUsers = false
 opts.lsgd = 0.010f
+opts.momentum = FMat(0.5)
+opts.langevin = 0.0f
 opts.what
 nn.train
 

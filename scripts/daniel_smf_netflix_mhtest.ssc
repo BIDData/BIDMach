@@ -43,7 +43,7 @@ println("size(a)="+size(a)+", with a.nnz="+a.nnz)
 // Daniel Seita: stuff for the MH Test updater. OH ... and our N is going to be
 // super-large. Ahhhh... we may need temperature then.
 opts.N = a.nnz
-opts.temp = a.nnz / 1000
+opts.temp = a.nnz / 10000
 opts.Nknown = true
 opts.n2lsigma = 1.0f
 opts.nn2l = 4000
@@ -53,22 +53,22 @@ opts.verboseMH = false
 opts.collectData = false
 opts.collectDataDir = "tmp/"
 opts.exitTheta = false
-opts.initThetaHere = false
+opts.initThetaHere = true
 opts.burnIn = -1
 
-// IMPORTANT
+// IMPORTANT. setting opts.smf=true means we create an ADAGrad class inside.
+// We also want to compare with additive random noise, i.e. Langevin stuff.
 opts.smf = true
-opts.useInternalADAGrad = true
-opts.momentum = true
-opts.nesterov = true
-opts.langevin = 0.3f
+opts.langevin = 0.0f
+opts.momentum = FMat(0.5)
+opts.nesterov = null
 
 // Daniel Seita: actually, a batch size of 2000 means we may get 100k "elements"
 // due to the sparsity. So I'm thinking we stick to batch sizes of 1000 or less.
 // Also, the four items here that start with `lambda` or `reg` represent priors.
 opts.matrixOfScores = true
 opts.batchSize = 1000
-opts.npasses = 1
+opts.npasses = 3
 opts.uiter = 5
 opts.urate = 0.05f
 opts.lrate = 0.05f  
