@@ -62,13 +62,14 @@ opts.smf = true
 opts.langevin = 0.0f
 opts.momentum = FMat(0.5)
 opts.nesterov = null
+opts.saveAcceptRate = true
 
-// Daniel Seita: actually, a batch size of 2000 means we may get 100k "elements"
+// Daniel Seita: actually, a batch size of 2000 means we may get 300k "elements"
 // due to the sparsity. So I'm thinking we stick to batch sizes of 1000 or less.
 // Also, the four items here that start with `lambda` or `reg` represent priors.
 opts.matrixOfScores = true
 opts.batchSize = 1000
-opts.npasses = 3
+opts.npasses = 4
 opts.uiter = 5
 opts.urate = 0.05f
 opts.lrate = 0.05f  
@@ -93,10 +94,12 @@ mopts.lsgd = 0.0f
 mm.predict
 
 val pa = SMat(mm.preds(1));
-min(pa.contents,5,pa.contents)
-max(pa.contents,1,pa.contents)
+println("Note: max(pa)="+maxi(maxi(pa))+" and min(pa)="+mini(mini(pa)))
 val diff = ta.contents - pa.contents
 val rmse = sqrt((diff ddot diff) / diff.length)
 println("rmse = %f" format rmse.v)
-println("size(mm.preds(0)) = " +size(mm.preds(0)))
-println("size(mm.preds(1)) = " +size(pa))
+min(pa.contents,5,pa.contents)
+max(pa.contents,1,pa.contents)
+val diff2 = ta.contents - pa.contents
+val rmse2 = sqrt((diff2 ddot diff2) / diff2.length)
+println("rmse (w/clipping) = %f" format rmse2.v)

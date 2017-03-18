@@ -72,12 +72,16 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
   var epsilon = 0f;
   var aopts:ADAGrad.Opts = null;
 
+  // Daniel: doing this to set MB sizes in MHTest code.
+  var numNonzerosMB:Int = -1
+  
   override def init() = {
     // Get dimensions; for Netflix, size(mats(0)) = (17770,batchSize).
     mats = datasource.next;
     datasource.reset;
     nfeats = mats(0).nrows;
     val batchSize = mats(0).ncols;
+    numNonzerosMB = mats(0).nnz
     val d = opts.dim;
 
     if (refresh) {
@@ -334,6 +338,11 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     val dc = sdata.contents;
     val pc = spreds.contents;
     val vv = (dc - pc) ddot (dc - pc);
+
+    println("mean values: "+mean(dc)+" "+mean(pc)+" "+mean(vv))
+    println("max values: "+maxi(dc)+" "+maxi(pc))
+    println("min values: "+mini(dc)+" "+mini(pc))
+
     if (ogmats != null) {
       ogmats(0) = user;
       if (ogmats.length > 1) {
@@ -342,6 +351,14 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     }
     -sqrt(row(vv/sdata.nnz))
   }
+  
+  
+  /** So I can set the MHTest container size appropriately. */
+  def getNonzeros():Int = {
+    return numNonzerosMB
+  }
+
+
 }
 
 

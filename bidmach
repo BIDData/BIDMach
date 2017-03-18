@@ -2,7 +2,7 @@
 # export JAVA_HOME="" # Set here if not set in environment
 # export CUDA_PATH="" # Set here if not set in environment
 
-MEMSIZE="-Xmx14G"
+MEMSIZE="-Xmx40G"
 export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8" # Set as much memory as possible
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then

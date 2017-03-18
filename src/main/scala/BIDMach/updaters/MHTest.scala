@@ -70,8 +70,10 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var targetVariance:Float = 0f        // The target variance (so we only need one X_corr).
 
   // Daniel: experimental, for the SMF.
+  var currentSizeSMF:Int = -1;
   var adagrad:ADAGrad = null;
   var tmpMomentum:Array[Mat] = null
+  var acceptanceRate:Mat = null
 
   /** 
    * Standard initialization. We have:
@@ -87,9 +89,21 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     model = model0;
     modelmats = model.modelmats
     updatemats = model.updatemats
-    scores0 = zeros(1,model.datasource.opts.batchSize)
-    scores1 = zeros(1,model.datasource.opts.batchSize)
-    diff = zeros(1,model.datasource.opts.batchSize)
+    acceptanceRate = zeros(1, opts.exitThetaAmount * 10)
+    if (opts.smf) {
+      val numnnz = model.asInstanceOf[SMF].getNonzeros()
+      if (numnnz < 0) {
+        println("Something wrong happened, numnnz="+numnnz)
+        sys.exit
+      }
+      scores0 = zeros(1, numnnz*10)
+      scores1 = zeros(1, numnnz*10)
+      diff = zeros(1, numnnz*10)
+    } else {
+      scores0 = zeros(1, model.datasource.opts.batchSize)
+      scores1 = zeros(1, model.datasource.opts.batchSize)
+      diff = zeros(1, model.datasource.opts.batchSize)
+    }
     T = opts.temp
 
     if (opts.Nknown) {
@@ -138,6 +152,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * original data is split up into equal-sized minibatches in the Learner code.
    * (The last minibatch is ignored since it generally has a different size.)
    * 
+   * SMF.scala necessitates extra cases to handle the varying batch sizes. They
+   * differ across "minibatches" so the scores at "the end" have to be cleared
+   * (but since scores are only for current MB, just call "clear"), the number
+   * of nonzeros have to be computed, and then the scores are copied to the
+   * appropriate interval. EDIT: ugh, never mind, doesn't work ...
+   * 
    * @param ipass The current pass over the full (training) data.
    * @param step Progress within the current minibatch, indicated as a numerical
    * 		index representing the starting column of this minibatch.
@@ -150,28 +170,39 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 
     // (Part 1) Compute scores for theta and theta', scaled by N/T.
     if (opts.smf) {
-      scores0 = (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+      currentSizeSMF = model.datasource.omats(0).nnz
+      b += currentSizeSMF
+      scores0.clear
+      scores0(0 -> currentSizeSMF) = (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)).t
     } else {
       scores0 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
+      b += scores0.length
     }
-    b += scores0.length // With SMF, using scores0.length as the MB size generalizes better.
     if (scores0.length == 1) {
       throw new RuntimeException("Need individual scores, but getting a scalar.")
     }
+
     for (i <- 0 until modelmats.length) {
       modelmats(i) <-- proposedTheta(i)
     }
     if (opts.smf) {
-      scores1 = (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
-      diff = scores1 - scores0
+      scores1.clear
+      scores1(0 -> currentSizeSMF) = (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv)).t
+      diff.clear
+      diff(0 -> currentSizeSMF) = scores1(0 -> currentSizeSMF) - scores0(0 -> currentSizeSMF)
     } else {
       scores1 <-- (model.evalbatchg(model.datasource.omats, ipass, step) * (N/T.dv))
       diff ~ scores1 - scores0
     }
 
     // (Part 2) Update our \Delta* and sample variance of \Delta*.
-    sumOfSquares += sum((diff)*@(diff)).v
-    sumOfValues += sum(diff).v
+    if (opts.smf) {
+      sumOfSquares += sum((diff(0 -> currentSizeSMF)) *@ (diff(0 -> currentSizeSMF))).v
+      sumOfValues += sum(diff(0 -> currentSizeSMF)).v
+    } else {
+      sumOfSquares += sum((diff)*@(diff)).v
+      sumOfValues += sum(diff).v
+    }
     val deltaStar = sumOfValues/b.v - logu
     val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v    
     val numStd = deltaStar / math.sqrt(sampleVariance)
@@ -227,7 +258,8 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     if (accept) {
       for (i <- 0 until modelmats.length) {
         tmpTheta(i) <-- modelmats(i) // Now tmpTheta has proposed theta.
-      }     
+      }
+      acceptanceRate(t) = 1
     } else {
       for (i <- 0 until modelmats.length) {
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
@@ -235,6 +267,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
           adagrad.momentum(i) <-- tmpMomentum(i) // Revert ADAGrad momentum.
         }
       }
+      acceptanceRate(t) = 0
     }
     
     if (newMinibatch) afterEachMinibatch()
@@ -312,6 +345,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       T = opts.tempAfterBurnin
       opts.sigmaProposer = opts.sigmaProposerAfterBurnin
     }
+    if (opts.saveAcceptRate) {
+      saveMat("acceptRate.mat.lz4", acceptanceRate)
+    }
   }
 
  
@@ -369,12 +405,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 
   /** This is for debugging. */
   def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double) {
-    val s1 = mean(scores1).dv
-    val s0 = mean(scores0).dv
+    val s1 = mean(scores1(0 -> b.toInt)).dv
+    val s0 = mean(scores0(0 -> b.toInt)).dv
     println("b="+b+", n="+n+", logu="+logu)
     println("mean(scores1) = "+s1+" - mean(scores0) = "+s0+" = "+(s1-s0))
-    println("maxi(scores1) = "+maxi(scores1)+", maxi(scores0) = "+maxi(scores0))
-    println("mini(scores1) = "+mini(scores1)+", mini(scores0) = "+mini(scores0))
+    println("maxi(scores1) = "+maxi(scores1(0 -> b.toInt))+", maxi(scores0) = "+maxi(scores0(0 -> b.toInt)))
+    println("mini(scores1) = "+mini(scores1(0 -> b.toInt))+", mini(scores0) = "+mini(scores0(0 -> b.toInt)))
     println("sampleVar = " +sampleVariance+ ", delta* = " +deltaStar+ ", numStd = " +numStd)
   }
   
@@ -401,6 +437,7 @@ object MHTest {
     var initThetaHere = false
     var burnIn = -1
     var smf = false
+    var saveAcceptRate = false
   }
  
   class Options extends Opts {}
