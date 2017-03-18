@@ -14,10 +14,14 @@ import BIDMach.causal.{IPTW}
 import BIDMach.allreduce.{Master,Worker,Command}
 import BIDMach.networks.SeqToSeq
 
+Mat.checkMKL(false)
+Mat.checkCUDA
+//Mat.useCache = false
+Mat.useGPUcache = true
+
 val mdir = "/mnt/BIDMach/data/MNT2015/models/"
 val datadir = "/mnt/BIDMach/data/MNT2015/data/"
 
-:silent
 val batchSize = 128
 var src = loadSMat(datadir+"news-commentary-v10.fr-en.fr.smat.lz4")
 var dst = loadSMat(datadir+"news-commentary-v10.fr-en.en.smat.lz4")
@@ -28,7 +32,6 @@ var srcFull = full(src)
 var dstFull = full(src)
 srcFull ~ srcFull + -1 * (srcFull == 0)
 dstFull ~ dstFull + -1 * (dstFull == 0)
-:silent
 
 val (nn, opts) = SeqToSeq.learner(srcFull, dstFull)
 val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
@@ -77,4 +80,4 @@ customCommandPortStr match {
   case None => {}
 }
 
-w.start(nn)
+//w.start(nn)

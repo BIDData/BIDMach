@@ -78,10 +78,12 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
       val machine = new Machine(null, groups, imach, M, opts.useLong, bufsize, false,
 	opts.machineTrace, opts.replicate, workerMachineAddrs);
       machineArr(mmi) = machine
+
       machine.configTimeout = opts.configTimeout;
       machine.reduceTimeout = opts.reduceTimeout;
       machine.sendTimeout = opts.sendTimeout;
       machine.recvTimeout = opts.recvTimeout;
+
       machine.sockBase = opts.peerSocketNum;
       machine.start(machine.maxk);
 
@@ -218,9 +220,9 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
     		if (learner != null) {
-		  learner.init
+		  if (learner.modelmats == null) learner.init
     		  sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach))
-		  learner.train
+		  learner.train(false)
     		  sendMaster(new Response(Command.learnerDoneCtype, -1, imach))
     		} else {
 		  logln("Recieved startLearner Command but learner == null")

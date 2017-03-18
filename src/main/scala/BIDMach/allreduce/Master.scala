@@ -26,6 +26,8 @@ import BIDMach.models.Model
 import scala.collection.mutable.{Map => MutableMap, HashMap => MutableHashMap}
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
+import java.io.File
+import java.io.FileOutputStream
 
 
 class Master(override val opts:Master.Opts = new Master.Options) extends Host {
@@ -107,11 +109,11 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     workerModel = model
   }
   
-  def startUpdates(waitForAck:Boolean = false) {
+  def startUpdates(waitForAck:Boolean = false, logLocation:String = null) {
     reducerMap = new MutableHashMap[Int, Reducer]()
     reduceTaskMap = new MutableHashMap[Int, Future[_]]()
     for (i <- 0 until numModelMats) { // TODO: use modelMat names instead of idx
-      val reducer = new Reducer(i, waitForAck)
+      val reducer = new Reducer(i, waitForAck, logLocation)
       reducerMap(i) = reducer
       val reduceTask = executor.submit(reducer)
       reduceTaskMap(i) = reduceTask
@@ -270,55 +272,61 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
   }
 
-  class Reducer(matIdx:Int, waitForAck:Boolean = false) extends Runnable {
+  class Reducer(matIdx:Int, waitForAck:Boolean = false, var logLocation:String = null) extends Runnable {
     var stop = false
     var allreduceCollected:Int = 0
     var allreduceStartTime:Long = 0
     val matTag = "matIdx%d" format matIdx
 
     def run() {
+      if (logLocation != null) {
+	logLocation = logLocation format (matTag)
+	val logFileStream = new PrintStream(new FileOutputStream(logLocation, false), true)
+	logln("Reducer %s logging to %s" format (matTag, logLocation))
+	setThreadLogStream(logFileStream)
+	setThreadLogStream(logFileStream, matTag)
+      }
+
       try {
+	if (waitForAck) {
+	  if (opts.trace > 1) log("Waiting for %d ready acks...\n" format M)
+	  numAckedReady.synchronized {
+	    if (numAckedReady < M) numAckedReady.wait()
+	  }
+	  if (opts.trace > 1) log("Recieved all ready acks! Starting Reducer.\n" )
+	}
+	var limit = 0
+	while (!stop) {
+	  val newlimit0 = if (opts.limitFctn != null) {
+	    opts.limitFctn(round, opts.limit)
+	  } else {
+	    opts.limit
+	  }
+	  limit = if (newlimit0 <= 0) 2000000000 else newlimit0
+	  val cmd = if (opts.permuteAlways) {
+	    new PermuteAllreduceCommand(round, 0, round, limit, matTag)
+	  } else {
+	    new AllreduceCommand(round, 0, limit, matTag)
+	  }
+	  this.synchronized {
+	    allreduceCollected = 0
+	  }
+	  broadcastCommand(cmd)
 
-      if (waitForAck) {
-	if (opts.trace > 1) log("Waiting for %d ready acks...\n" format M)
-	numAckedReady.synchronized {
-	  if (numAckedReady < M) numAckedReady.wait()
+	  allreduceStartTime = System.currentTimeMillis
+	  this.synchronized {
+	    this.wait(opts.timeThresholdMsec)
+	  }
+	  if (opts.trace > 1) log("%s: Finished round %d, workers %d/%d, time %dms\n" format(
+	    matTag, round, allreduceCollected, M, System.currentTimeMillis - allreduceStartTime))
+	  round += 1
 	}
-	if (opts.trace > 1) log("Recieved all ready acks! Starting Reducer.\n" )
+      } catch {
+	case e:InterruptedException => {
+	  if (!stop) logln("Reducer failed: %s" format Host.printStackTrace(e))
+	}
+	case e:Exception => logln("Reducer failed: %s" format Host.printStackTrace(e))
       }
-      var limit = 0
-      while (!stop) {
-	val newlimit0 = if (opts.limitFctn != null) {
-	  opts.limitFctn(round, opts.limit)
-	} else {
-	  opts.limit
-	}
-	limit = if (newlimit0 <= 0) 2000000000 else newlimit0
-	val cmd = if (opts.permuteAlways) {
-	  new PermuteAllreduceCommand(round, 0, round, limit, matTag)
-	} else {
-	  new AllreduceCommand(round, 0, limit, matTag)
-	}
-	this.synchronized {
-	  allreduceCollected = 0
-	}
-	broadcastCommand(cmd)
-
-	allreduceStartTime = System.currentTimeMillis
-	this.synchronized {
-	  this.wait(opts.timeThresholdMsec)
-	}
-	if (opts.trace > 1) log("Finished round %d, workers %d/%d, time %dms\n" format(
-	  round, allreduceCollected, M, System.currentTimeMillis - allreduceStartTime))
-	round += 1
-
-      }
-    } catch {
-      case e:InterruptedException => {
-	if (!stop) logln("Reducer failed: %s" format Host.printStackTrace(e))
-      }
-      case e:Exception => logln("Reducer failed: %s" format Host.printStackTrace(e))
-    }
     }
   }
   
@@ -437,6 +445,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       val reducer = reducerMap(matIdx)
       reducer.synchronized {
         reducer.allreduceCollected += 1
+	if (opts.trace > 2) {
+	  logln("Collected response %d/%d from src %d" format (
+	    reducer.allreduceCollected, M, resp.src), resp.tag)
+	}
 	val delta = System.currentTimeMillis - reducer.allreduceStartTime
 	if (delta < opts.minWaitTime) {
 	  if (reducer.allreduceCollected >= M) reducer.notify()

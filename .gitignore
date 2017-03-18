@@ -5,6 +5,7 @@ lib/*.jar
 target
 *.o
 *.incl
+logs
 
 data
 !data/rcv1_fmt.txt

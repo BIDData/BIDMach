@@ -3,6 +3,7 @@ import BIDMach.allreduce.{Master,Worker,Command}
 
 var addresses:Array[InetSocketAddress] = null
 val customLocalWorkerPortsStr = sys.env.get("MASTER_LOCAL_WORKER_PORTS")
+println("####################")
 customLocalWorkerPortsStr match {
   case Some(workerPortsStr) => {
     addresses = workerPortsStr.split(",").map(_.toInt).map(new InetSocketAddress("0.0.0.0", _))
@@ -12,10 +13,11 @@ customLocalWorkerPortsStr match {
     addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
       map(InetAddress.getByName(_).getHostAddress()).
       map(new InetSocketAddress(_, 50050)).toArray
-    prinln("Using spark slaves:")
+    println("Using spark slaves:")
   }
 }
 for (a <- addresses) println(a)
+println("####################")
 
 val m = new Master()
 val opts = m.opts
@@ -34,28 +36,26 @@ val gmods = irow(nmachines)
 val gmachines = irow(0->nmachines)
 
 m.init
-m.config(gmods, gmachines, addresses)
+m.config(gmods, gmachines, addresses, 7)
 m.setMachineNumbers
 m.sendConfig
 
 
 // m.parCall((w) => {
-//   var fgopts = w.learner.opts.asInstanceOf[GLM.FGOptions]
-//   fgopts.npasses = 2
-//   var totalNumSamples = fgopts.nend
-//   totalNumSamples = 20
-//   var numWorkers = 4; // TODO: don't hardcode this
+//   var learnSource = w.learner.datasource.asInstanceOf[MatSource]
+//   var totalNumSamples = learnSource.mats(0).ncols
+//   var numWorkers = 4 // TODO: don't hardcode this
 //   var workerNumSamples = totalNumSamples / numWorkers
 //   var nstart = (w.imach*workerNumSamples)
-//   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples)
-//   fgopts.nstart = nstart
-//   fgopts.nend = nend
-//   "imach: %d, nstart: %d, nend: %d, nasses: %d\n" format (
-//     w.imach, nstart, nend, fgopts.npasses)
+//   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1)
+//   learnSource.mats(0) = learnSource.mats(0)(?, nstart->nend)
+//   learnSource.mats(1) = learnSource.mats(1)(?, nstart->nend)
+//   "imach: %d, nstart: %d, nend: %d\n" format (
+//     w.imach, nstart, nend)
 // })
 //
 // m.startLearners(blocking = true)
-// m.startUpdates()
+// m.startUpdates(logLocation = "/opt/BIDMach/logs/master_sts_2015-news-commentary-v10-fr-en/%s.log")
 //
 
 /*Later*/

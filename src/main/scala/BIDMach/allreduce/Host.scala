@@ -22,10 +22,7 @@ import java.io.FileReader;
 import java.io.BufferedReader;
 import scala.collection.mutable.ArrayBuffer;
 import java.io.IOException;
-
-
-import java.io.IOException;
-
+import scala.collection.mutable.{Map => MutableMap, HashMap => MutableHashMap}
 
 class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
 
@@ -39,12 +36,39 @@ class Host(val opts:Host.Opts = new Host.Options) extends Serializable {
   var executor:ExecutorService = null;
   var localIP:InetAddress = InetAddress.getLocalHost
 
-  def log(msg:String) {
-    print(msg);
+  var threadPrintStreams:MutableMap[String, PrintStream] =
+    new MutableHashMap[String, PrintStream]
+
+  def setThreadLogStream(stream:PrintStream, threadName0:String = null) = {
+    val threadName = if (threadName0 != null) {
+      threadName0
+    } else {
+      Thread.currentThread().getName()
+    }
+    threadPrintStreams.synchronized {
+      threadPrintStreams(threadName) = stream
+    }
   }
 
-  def logln(msg:String) {
-    println(msg);
+  def getThreadLogStream(threadName0:String = null):PrintStream = {
+    val threadName = if (threadName0 != null) {
+      threadName0
+    } else {
+      Thread.currentThread().getName()
+    }
+    var stream:PrintStream = null
+    threadPrintStreams.synchronized {
+      stream = threadPrintStreams.getOrElseUpdate(threadName, System.out)
+    }
+    stream
+  }
+
+  def log(msg:String, threadName:String = null) {
+    getThreadLogStream(threadName).print(msg)
+  }
+
+  def logln(msg:String, threadName:String = null) {
+    getThreadLogStream(threadName).println(msg)
   }
 
   class TimeoutThread(mtime:Int, futures:Array[Future[_]]) extends Runnable {
