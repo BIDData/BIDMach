@@ -183,6 +183,7 @@ case class Learner(
   }
 
   def wrapUp(ipass:Int) {
+    if (opts.checkPointFile != null) model.save(opts.checkPointFile format lastCheckPoint)
     model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
@@ -194,11 +195,11 @@ case class Learner(
       resetGPUs
       Mat.clearCaches
     }
-
     datasource.close;
     if (datasink != null) datasink.close;
     if (model.opts.logDataSink.asInstanceOf[AnyRef] != null) model.opts.logDataSink.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList);
+
     done = true;
   }
 

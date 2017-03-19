@@ -197,8 +197,15 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		val newcmd = new AllreduceCommand(0, cmd.dest, 0, cmd.bytes, cmd.tag);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
-    		allReduce(newcmd.round, newcmd.limit, newcmd.tag);
-		sendMaster(new AllreduceResponse(cmd.round, cmd.dest, cmd.tag))
+		try {
+		  allReduce(newcmd.round, newcmd.limit, newcmd.tag)
+		  sendMaster(AllreduceResponse.success(cmd.round, cmd.dest, cmd.tag))
+		} catch {
+		  case e:Exception => {
+		    if (opts.trace > 0) log("Allreduce failed:\n%s" format Command.printStackTrace(e));
+		    // sendMaster(AllreduceResponse.failure(cmd.round, cmd.dest, cmd.tag))
+		  }
+		}
     	}
     	case Command.permuteAllreduceCtype => {
     		val newcmd = new PermuteAllreduceCommand(0, cmd.dest, 0, 0, cmd.bytes, cmd.tag);

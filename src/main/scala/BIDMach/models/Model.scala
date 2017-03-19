@@ -126,7 +126,6 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     output.close;
     for (i <- 0 until modelmats.length) {
       val mat = modelmats(i);
-      val f = new File(fname+"modelmat%02d.lz4" format i);
       saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
     }
     saveMetaData(fname);

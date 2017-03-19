@@ -27,18 +27,17 @@ opts.timeScaleMsec = 2e-3f
 opts.permuteAlways = false
 
 opts.machineThreshold = 0.75;
-opts.minWaitTime = 400;
-opts.timeThresholdMsec = 600;
+opts.minWaitTime = 3000;
+opts.timeThresholdMsec = 5000;
 
 val nmachines = addresses.length
 val gmods = irow(nmachines)
 val gmachines = irow(0->nmachines)
 
 m.init
-m.config(gmods, gmachines, addresses)
+m.config(gmods, gmachines, addresses, 1)
 m.setMachineNumbers
 m.sendConfig
-m.setNumModelMats(1)
 
 
 // m.parCall((w) => {

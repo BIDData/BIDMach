@@ -274,9 +274,14 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 
   class Reducer(matIdx:Int, waitForAck:Boolean = false, var logLocation:String = null) extends Runnable {
     var stop = false
-    var allreduceCollected:Int = 0
+    var allreduceSuccess:Int = 0
+    var allreduceFailure:Int = 0
     var allreduceStartTime:Long = 0
     val matTag = "matIdx%d" format matIdx
+
+    def allreduceCollected:Int = {
+      return allreduceSuccess + allreduceFailure
+    }
 
     def run() {
       if (logLocation != null) {
@@ -309,7 +314,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	    new AllreduceCommand(round, 0, limit, matTag)
 	  }
 	  this.synchronized {
-	    allreduceCollected = 0
+	    allreduceSuccess = 0
+	    allreduceFailure = 0
 	  }
 	  broadcastCommand(cmd)
 
@@ -317,8 +323,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  this.synchronized {
 	    this.wait(opts.timeThresholdMsec)
 	  }
-	  if (opts.trace > 1) log("%s: Finished round %d, workers %d/%d, time %dms\n" format(
-	    matTag, round, allreduceCollected, M, System.currentTimeMillis - allreduceStartTime))
+	  if (opts.trace > 1) log("%s: Finished round %d, workers %d/%d, %d success, time %dms\n" format(
+	    matTag, round, allreduceCollected, M, allreduceSuccess, System.currentTimeMillis - allreduceStartTime))
 	  round += 1
 	}
       } catch {
@@ -366,10 +372,11 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       val activeTaggedCmd = activeTaggedCommands.get(resp.tag)
       if ((resp.rtype == Command.allreduceCtype || resp.rtype == Command.permuteAllreduceCtype)
 	  && resp.round == activeTaggedCmd.round) {
-	handleAllReduceResponse(resp)
+        val newresp = new AllreduceResponse(resp.round, resp.src, false, resp.bytes, resp.tag)
+	handleAllreduceResponse(newresp)
 
       } else if (opts.trace > 0) {
-	log("Master got tagged response %d with bad type/round (%d,%d), should be (%d,%d)\n"
+	log("Master got tagged response %s with bad type/round (%d,%d), should be (%d,%d)\n"
 	    format (resp.tag, resp.rtype, resp.round, activeCommand.ctype, activeCommand.round))
       }
 
@@ -431,7 +438,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
   }
 
-  def handleAllReduceResponse(resp:Response) {
+  def handleAllreduceResponse(resp:AllreduceResponse) {
     val matIdxPat = """matIdx(\d+)""".r
     val matIdx = resp.tag match {
        case matIdxPat(matIdx) => matIdx.toInt
@@ -441,13 +448,19 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     if (matIdx == -1) {
       if (opts.trace > 0)
 	logln("Master got tagged allReduce response %s with invalid tag" format (resp.tag))
+
     } else {
       val reducer = reducerMap(matIdx)
       reducer.synchronized {
-        reducer.allreduceCollected += 1
+	if (resp.success) {
+	  reducer.allreduceSuccess += 1
+	} else {
+	  reducer.allreduceFailure += 1
+	}
 	if (opts.trace > 2) {
-	  logln("Collected response %d/%d from src %d" format (
-	    reducer.allreduceCollected, M, resp.src), resp.tag)
+	  logln("%s: Collected response %d/%d from src %d%s" format (
+	    resp.tag, reducer.allreduceCollected, M, resp.src, if (!resp.success) " (FAILURE)"),
+	    resp.tag)
 	}
 	val delta = System.currentTimeMillis - reducer.allreduceStartTime
 	if (delta < opts.minWaitTime) {

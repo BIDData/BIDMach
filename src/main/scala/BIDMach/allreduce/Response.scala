@@ -58,18 +58,25 @@ class Response (
   
 }
 
-class AllreduceResponse(round0:Int, src0:Int, bytes:Array[Byte], tag:String)
+class AllreduceResponse(round0:Int, src0:Int, var success:Boolean, bytes:Array[Byte], tag:String)
 extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4, tag) {
 
-  def this(round0:Int, src0:Int, tag:String) =
-    this(round0, src0, new Array[Byte](1*4), tag);
+  def this(round0:Int, src0:Int, success:Boolean, tag:String) =
+    this(round0, src0, success, new Array[Byte](1*4), tag)
 
   override def encode():Unit = {
-    intData.rewind();
-    intData.put(src);
+    intData.rewind()
+    intData.put(if (success) 1 else 0)
   }
 
-  override def decode():Unit = {}
+  override def decode():Unit = {
+    intData.rewind()
+    success = (intData.get() == 1)
+  }
+}
+object AllreduceResponse {
+  def success(round:Int, src:Int, tag:String) = new AllreduceResponse(round, src, true, tag)
+  def failure(round:Int, src:Int, tag:String) = new AllreduceResponse(round, src, false, tag)
 }
 
 
