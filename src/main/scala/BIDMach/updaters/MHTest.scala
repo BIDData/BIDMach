@@ -6,6 +6,7 @@ import BIDMat.SciFunctions._
 import BIDMach.models._
 import BIDMach.models.Model._
 import edu.berkeley.bid.CUMACH
+import BIDMach.Learner
 
 /**
  * Our fast MH test. See:
@@ -64,7 +65,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var n:Float = 0f                     // The *number* of minibatches we are using.
   var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
   var T:Int = 1                        // The temperature of the distribution.
-  var t:Int = 0                        // Current number of samples of theta.
+  var _t:Int = 0                       // Current number of samples of theta.
   var sumOfValues:Float = 0f           // \sum_{i=1}^b (N/T)*log(p(x_i|theta')/p(x_i|theta)).
   var sumOfSquares:Float = 0f          // \sum_{i=1}^b ((N/T)*log(p(x_i|theta')/p(x_i|theta)))^2.
   var targetVariance:Float = 0f        // The target variance (so we only need one X_corr).
@@ -259,7 +260,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       for (i <- 0 until modelmats.length) {
         tmpTheta(i) <-- modelmats(i) // Now tmpTheta has proposed theta.
       }
-      acceptanceRate(t) = 1
+      acceptanceRate(_t) = 1
     } else {
       for (i <- 0 until modelmats.length) {
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
@@ -267,10 +268,10 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
           adagrad.momentum(i) <-- tmpMomentum(i) // Revert ADAGrad momentum.
         }
       }
-      acceptanceRate(t) = 0
+      acceptanceRate(_t) = 0
     }
     
-    if (newMinibatch) afterEachMinibatch()
+    if (newMinibatch) afterEachMinibatch(ipass, gprogress)
   }
   
    
@@ -328,25 +329,32 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * logic about the burn-in period, and also exit the program if we reach the
    * desired number of samples.
    */
-  def afterEachMinibatch() {
-    t += 1
+  def afterEachMinibatch(ipass:Int, gprogress:Float) {
+    _t += 1
     if (opts.collectData) {
       for (i <- 0 until modelmats.length) {
-        saveFMat(opts.collectDataDir+ "theta_%d_%04d.fmat.lz4" format (i,t), FMat(modelmats(i)))
+        saveFMat(opts.collectDataDir+ "theta_%d_%04d.fmat.lz4" format (i,_t), FMat(modelmats(i)))
       }
-      saveFMat(opts.collectDataDir+ "data_%04d.fmat.lz4" format (t), FMat(b))
+      saveFMat(opts.collectDataDir+ "data_%04d.fmat.lz4" format (_t), FMat(b))
     }
-    if (t == opts.exitThetaAmount && opts.exitTheta) {
-      println("Exiting code now since t=" +t)
+    if (_t == opts.exitThetaAmount && opts.exitTheta) {
+      println("Exiting code now since t=" +_t)
       sys.exit
     }
-    if (t == opts.burnIn) {
+    if (_t == opts.burnIn) {
       println("ALERT: Past burn-in period. Now change temperature, proposer, etc.")
       T = opts.tempAfterBurnin
       opts.sigmaProposer = opts.sigmaProposerAfterBurnin
     }
-    if (opts.saveAcceptRate) {
-      saveMat("acceptRate.mat.lz4", acceptanceRate)
+    if (opts.smf) {
+      if (opts.saveAcceptRate && (ipass+1) == opts.asInstanceOf[Learner.Options].npasses
+          && gprogress > 0.99) {
+        val mom = adagrad.opts.momentum(0).v
+        val lr = adagrad.opts.lrate.v
+        val lang = adagrad.opts.langevin(0).v
+        saveMat(opts.acceptRateDir+"arate_%1.3f_%1.4f_%1.3f.mat.lz4" format (mom,lr,lang), 
+            acceptanceRate(0 -> _t))
+      }
     }
   }
 
@@ -438,6 +446,7 @@ object MHTest {
     var burnIn = -1
     var smf = false
     var saveAcceptRate = false
+    var acceptRateDir = "tmp/"
   }
  
   class Options extends Opts {}

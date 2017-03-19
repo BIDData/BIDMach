@@ -29,77 +29,90 @@ import BIDMach.models.SMF
  * BTW: (a *@ ta).nnz = 0, which shows that they are completely distinct.
  */
 
-// Get random seed set up.
-// TODO random seed code
-
-// Now get back to the real netflix data. First, load data and set things up:
+// Same code as in the ADAGrad-only script.
+setseed(0)
 val dir = "/data/netflix/"
 val a = loadSMat(dir+"newtrain.smat.lz4")
 val ta = loadSMat(dir+"newtest.smat.lz4")
 val d = 256
-val (nn,opts) = SMF.learner2(a, d)
-println("size(a)="+size(a)+", with a.nnz="+a.nnz)
+val lrates = row(0.0001, 0.001, 0.01)
+val momens = row(0.5, 0.75, 0.9, 0.95, 0.99)
+val langs = row(0.0, 0.05, 0.5)
+var bestrmse = 10.0;
+var prettystring = "moment.  lrate  lang.  rmse\n"
 
-// Daniel Seita: stuff for the MH Test updater. OH ... and our N is going to be
-// super-large. Ahhhh... we may need temperature then.
-opts.N = a.nnz
-opts.temp = a.nnz / 10000
-opts.Nknown = true
-opts.n2lsigma = 1.0f
-opts.nn2l = 4000
-opts.sigmaProposer = 0.01f
-opts.continueDespiteFull = false
-opts.verboseMH = false
-opts.collectData = false
-opts.collectDataDir = "tmp/"
-opts.exitTheta = false
-opts.initThetaHere = true
-opts.burnIn = -1
+for (i <- 0 until lrates.length) {
+    for (j <- 0 until momens.length) {
+        for (k <- 0 until langs.length) {
+            val (nn,opts) = SMF.learner2(a, d)
 
-// IMPORTANT. setting opts.smf=true means we create an ADAGrad class inside.
-// We also want to compare with additive random noise, i.e. Langevin stuff.
-opts.smf = true
-opts.langevin = 0.0f
-opts.momentum = FMat(0.5)
-opts.nesterov = null
-opts.saveAcceptRate = true
+            // Common parameters with the ADAGrad version.
+            opts.batchSize = 1000
+            opts.npasses = 2
+            opts.momentum = momens(j)
+            opts.nesterov = null
+            opts.langevin = langs(k).v
 
-// Daniel Seita: actually, a batch size of 2000 means we may get 300k "elements"
-// due to the sparsity. So I'm thinking we stick to batch sizes of 1000 or less.
-// Also, the four items here that start with `lambda` or `reg` represent priors.
-opts.matrixOfScores = true
-opts.batchSize = 1000
-opts.npasses = 3
-opts.uiter = 5
-opts.urate = 0.05f
-opts.lrate = 0.05f  
-val lambda = 4f
-opts.lambdau = lambda
-opts.regumean = lambda
-opts.lambdam = lambda / 500000 * 20
-opts.regmmean = opts.lambdam
-opts.evalStep = 31
-opts.doUsers = false
-opts.what
-nn.train
+            opts.uiter = 5
+            opts.urate = 0.05f
+            opts.lrate = lrates(i).v
+            val lambda = 4f       
+            opts.lambdau = lambda
+            opts.regumean = lambda
+            opts.lambdam = lambda / 500000 * 20
+            opts.regmmean = opts.lambdam
+            opts.evalStep = 31
+            opts.doUsers = false
 
-val model = nn.model.asInstanceOf[SMF]
-val xa = (ta != 0)
-val (mm, mopts) = SMF.predictor1(model, a, xa)
+            // Now some stuff specific for the MHTest+ADAGrad.
+            opts.smf = true
+            opts.saveAcceptRate = true
+            opts.acceptRateDir = "tmp/"
+            opts.N = a.nnz
+            opts.temp = a.nnz / 10000
+            opts.Nknown = true
+            opts.n2lsigma = 1.0f
+            opts.nn2l = 4000
+            opts.sigmaProposer = 0.01f
+            opts.continueDespiteFull = false
+            opts.verboseMH = false
+            opts.collectData = false
+            opts.collectDataDir = "tmp/"
+            opts.exitTheta = false
+            opts.initThetaHere = true
+            opts.burnIn = -1
+            opts.matrixOfScores = true
+            opts.what
+            nn.train
+            
+            val model = nn.model.asInstanceOf[SMF]
+            val xa = (ta != 0)
+            val (mm, mopts) = SMF.predictor1(model, a, xa)
+            mopts.batchSize = 10000
+            mopts.uiter = 5
+            mopts.urate = opts.urate
+            mopts.aopts = null
+            mm.predict
+            
+            val pa = SMat(mm.preds(1));
+            println("Note: max(pa)="+maxi(maxi(pa))+" and min(pa)="+mini(mini(pa)))
+            val diff = ta.contents - pa.contents
+            val rmse = sqrt((diff ddot diff) / diff.length)
+            println("\nrmse = %f" format rmse.v)
+            min(pa.contents,5,pa.contents)
+            max(pa.contents,1,pa.contents)
+            val diff2 = ta.contents - pa.contents
+            val rmse2 = sqrt((diff2 ddot diff2) / diff2.length)
+            println("rmse (w/clipping) = %f\n" format rmse2.v)
 
-mopts.batchSize = 10000
-mopts.uiter = 5
-mopts.urate = opts.urate
-mopts.lsgd = 0.0f
-mm.predict
+            if (rmse2.v < bestrmse) {
+                bestrmse = rmse2.v
+            }   
+            prettystring += "%1.3f  %1.5f  %1.3f  %1.4f\n" format (momens(j).v,lrates(i).v,langs(k).v,rmse2.v)
+        }
+    }
+}
 
-val pa = SMat(mm.preds(1));
-println("Note: max(pa)="+maxi(maxi(pa))+" and min(pa)="+mini(mini(pa)))
-val diff = ta.contents - pa.contents
-val rmse = sqrt((diff ddot diff) / diff.length)
-println("rmse = %f" format rmse.v)
-min(pa.contents,5,pa.contents)
-max(pa.contents,1,pa.contents)
-val diff2 = ta.contents - pa.contents
-val rmse2 = sqrt((diff2 ddot diff2) / diff2.length)
-println("rmse (w/clipping) = %f" format rmse2.v)
+println("\nBest RMSE: "+bestrmse+ "\n")
+println(prettystring)
+sys.exit
