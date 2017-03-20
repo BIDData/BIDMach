@@ -50,8 +50,8 @@ case class Learner(
   var cacheGPUstate = false;
   var debugMemState = false;
 
-  var sentSockHistory:ArrayList[Bandwidth] = null;
-  var recvSockHistory:ArrayList[Bandwidth] = null;
+  var sentSockHistory:Bandwidth = null;
+  var recvSockHistory:Bandwidth = null;
 
   def setup = {
 	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
@@ -168,6 +168,12 @@ case class Learner(
           print(", GPUmem=%3.6f" format GPUmem._1)
         }
         println;
+
+        print("Sent: %d MB, Recv: %d MB" format (
+          sentSockHistory.totalSize/1024/1024,
+          recvSockHistory.totalSize/1024/1024))
+        println;
+
         lasti = reslist.length;
       }
       if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
@@ -256,6 +262,12 @@ case class Learner(
               print(", GPUmem=%3.2f" format GPUmem._1)
             }
         println
+
+        print("Sent: %d MB, Recv: %d MB" format (
+          sentSockHistory.totalSize/1024/1024,
+          recvSockHistory.totalSize/1024/1024))
+        println;
+
         lasti = reslist.length
       }
     }
