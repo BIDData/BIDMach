@@ -52,6 +52,9 @@ case class Learner(
 
   var sentSockHistory:Bandwidth = null;
   var recvSockHistory:Bandwidth = null;
+  var prevSentBandwidth = 0;
+  var prevRecvBandwidth = 0;
+  var prevTimeStamp : Long = 0;
 
   def setup = {
 	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
@@ -167,11 +170,18 @@ case class Learner(
         if (useGPU) {
           print(", GPUmem=%3.6f" format GPUmem._1)
         }
-        println;
+        //println;
 
-        print("Sent: %d MB, Recv: %d MB" format (
-          sentSockHistory.totalSize/1024/1024,
-          recvSockHistory.totalSize/1024/1024))
+        var sentBandwidthIncrement = sentSockHistory.totalSize - prevSentBandwidth;
+        var recvBandwidthIncrement = recvSockHistory.totalSize - prevRecvBandwidth;
+        prevSentBandwidth = sentSockHistory.totalSize;
+        prevRecvBandwidth = recvSockHistory.totalSize;
+        var currTimeStamp : Long = System.currentTimeMillis;
+        var spentTime =currTimeStamp - prevTimeStamp; // in ms
+
+        print("Sent: %.2f MB/s, Recv: %.2f MB/s" format (
+          sentBandwidthIncrement/1024.0/1024/(spentTime/1000.0),
+          recvBandwidthIncrement/1024.0/1024/(spentTime/1000.0))
         println;
 
         lasti = reslist.length;
@@ -261,12 +271,20 @@ case class Learner(
             if (useGPU) {
               print(", GPUmem=%3.2f" format GPUmem._1)
             }
-        println
+        //println
 
-        print("Sent: %d MB, Recv: %d MB" format (
-          sentSockHistory.totalSize/1024/1024,
-          recvSockHistory.totalSize/1024/1024))
-        println;
+        var sentBandwidthIncrement = sentSockHistory.totalSize - prevSentBandwidth;
+        var recvBandwidthIncrement = recvSockHistory.totalSize - prevRecvBandwidth;
+        prevSentBandwidth = sentSockHistory.totalSize;
+        prevRecvBandwidth = recvSockHistory.totalSize;
+        var currTimeStamp : Long = System.currentTimeMillis;
+        var spentTime =currTimeStamp - prevTimeStamp; // in ms
+
+        print("Sent: %.2f MB/s, Recv: %.2f MB/s" format (
+          sentBandwidthIncrement/1024.0/1024/(spentTime/1000.0),
+          recvBandwidthIncrement/1024.0/1024/(spentTime/1000.0))
+        )
+          println;
 
         lasti = reslist.length
       }
