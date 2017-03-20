@@ -129,6 +129,10 @@ object CaffeIO {
         // TODO: implement base, shift, scale for the following two
         case "Exp" => nodeSet(i) = new ExpNode
         case "Log" => nodeSet(i) = new LnNode
+        case "Scale" => {
+          val scaleParam = layer.getScaleParam()
+          nodeSet(i) = new ScaleNode { hasBias = scaleParam.getBiasTerm() }
+        }
       }
       for (t <- caffeBuilder.getLayer(i).getTopList()) {
         nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer).append(nodeSet(i))
