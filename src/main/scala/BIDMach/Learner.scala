@@ -167,7 +167,7 @@ case class Learner(
         if (useGPU) {
           print(", GPUmem=%3.6f" format GPUmem._1)
         }
-        println;
+        //println;
 
         print("Sent: %d MB, Recv: %d MB" format (
           sentSockHistory.totalSize/1024/1024,
@@ -261,7 +261,7 @@ case class Learner(
             if (useGPU) {
               print(", GPUmem=%3.2f" format GPUmem._1)
             }
-        println
+        //println
 
         print("Sent: %d MB, Recv: %d MB" format (
           sentSockHistory.totalSize/1024/1024,
