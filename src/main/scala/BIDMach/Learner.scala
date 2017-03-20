@@ -178,10 +178,12 @@ case class Learner(
         prevRecvBandwidth = recvSockHistory.totalSize;
         var currTimeStamp : Long = System.currentTimeMillis;
         var spentTime =currTimeStamp - prevTimeStamp; // in ms
+        prevTimeStamp = currTimeStamp;
 
-        print("Sent: %.2f MB/s, Recv: %.2f MB/s" format (
+        print(" Sent: %.2f MB/s, Recv: %.2f MB/s" format (
           sentBandwidthIncrement/1024.0/1024/(spentTime/1000.0),
           recvBandwidthIncrement/1024.0/1024/(spentTime/1000.0))
+        )
         println;
 
         lasti = reslist.length;
@@ -279,8 +281,9 @@ case class Learner(
         prevRecvBandwidth = recvSockHistory.totalSize;
         var currTimeStamp : Long = System.currentTimeMillis;
         var spentTime =currTimeStamp - prevTimeStamp; // in ms
+        prevTimeStamp = currTimeStamp;
 
-        print("Sent: %.2f MB/s, Recv: %.2f MB/s" format (
+        print(" Sent: %.2f MB/s, Recv: %.2f MB/s" format (
           sentBandwidthIncrement/1024.0/1024/(spentTime/1000.0),
           recvBandwidthIncrement/1024.0/1024/(spentTime/1000.0))
         )
