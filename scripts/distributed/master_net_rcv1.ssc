@@ -3,18 +3,21 @@ import BIDMach.allreduce.{Master,Worker,Command}
 
 var addresses:Array[InetSocketAddress] = null
 val customLocalWorkerPortsStr = sys.env.get("MASTER_LOCAL_WORKER_PORTS")
+println("####################")
 customLocalWorkerPortsStr match {
   case Some(workerPortsStr) => {
     addresses = workerPortsStr.split(",").map(_.toInt).map(new InetSocketAddress("0.0.0.0", _))
-    println("using local worker addresses:")
-    for (a <- addresses) println(a)
+    println("Using local worker addresses:")
   }
   case None => {
     addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
       map(InetAddress.getByName(_).getHostAddress()).
       map(new InetSocketAddress(_, 50050)).toArray
+    println("Using spark slaves:")
   }
 }
+for (a <- addresses) println(a)
+println("####################")
 
 val m = new Master()
 val opts = m.opts
@@ -25,16 +28,19 @@ opts.timeScaleMsec = 2e-3f
 opts.permuteAlways = false
 
 opts.machineThreshold = 0.75;
-opts.minWaitTime = 5000;
-opts.timeThresholdMsec = 7500;
+opts.minWaitTime = 4500;
+opts.timeThresholdMsec = 6000;
 
 val nmachines = addresses.length
 val gmods = irow(nmachines)
 val gmachines = irow(0->nmachines)
 
 m.init
+Thread.sleep(500L)
 m.config(gmods, gmachines, addresses, 2)
+Thread.sleep(500L)
 m.setMachineNumbers
+Thread.sleep(500L)
 m.sendConfig
 // m.setNumModelMats(2) // HACK
 
@@ -47,8 +53,8 @@ m.sendConfig
 //   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1)
 //   learnSource.mats(0) = learnSource.mats(0)(?, nstart->nend)
 //   learnSource.mats(1) = learnSource.mats(1)(?, nstart->nend)
-//   "imach: %d, nstart: %d, nend: %d, bufsize: %d\n" format (
-//     w.imach, nstart, nend, w.opts.bufsize)
+//   "imach: %d, nstart: %d, nend: %d\n" format (
+//     w.imach, nstart, nend)
 // })
 //
 // m.parCall((w) => {
@@ -56,5 +62,5 @@ m.sendConfig
 // })
 //
 // m.startLearners(blocking = true)
-// m.startUpdates()
+// m.startUpdates(logLocation = "/opt/BIDMach/logs/master_net_rcv1/%s.log")
 //

@@ -286,7 +286,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     def run() {
       if (logLocation != null) {
 	logLocation = logLocation format (matTag)
-	val logFileStream = new PrintStream(new FileOutputStream(logLocation, false), true)
+	val logFile = new File(logLocation)
+	val logDir = logFile.getParentFile()
+	logDir.mkdirs()
+	val logFileStream = new PrintStream(new FileOutputStream(logFile, false), true)
 	logln("Reducer %s logging to %s" format (matTag, logLocation))
 	setThreadLogStream(logFileStream)
 	setThreadLogStream(logFileStream, matTag)

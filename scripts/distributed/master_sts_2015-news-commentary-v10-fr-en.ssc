@@ -23,13 +23,13 @@ val m = new Master()
 val opts = m.opts
 opts.trace = 3
 opts.intervalMsec = 2000
-opts.limit = 1000000
+opts.limit = Int.MaxValue
 opts.timeScaleMsec = 2e-3f
 opts.permuteAlways = false
 
 opts.machineThreshold = 0.75;
-opts.minWaitTime = 20000;
-opts.timeThresholdMsec = 30000;
+opts.minWaitTime = 4500;
+opts.timeThresholdMsec = 6000;
 
 val nmachines = addresses.length
 val gmods = irow(nmachines)

@@ -293,7 +293,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
 		def run() {
 			start();
-			if (opts.trace > 3) log("Started CommandListener on %s" format (localIP, socketnum));
+			if (opts.trace > 3) log("Started CommandListener on %s:%d\n" format (localIP, socketnum));
 			while (!stop) {
 				try {
 					val scs = new CommandReader(ss.accept(), worker);
