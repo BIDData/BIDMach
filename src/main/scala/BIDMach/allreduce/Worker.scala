@@ -22,7 +22,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.util.concurrent.Callable
 import javax.script.ScriptContext
-import java.util.concurrent.Semaphore;
+import java.util.Arrays
 
 class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
@@ -116,38 +116,44 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
   def allReduce(round:Int, limit:Long, matIdx:Int = 0) = {
     if (model != null && model.modelmats.asInstanceOf[AnyRef] != null) {
-      val t1=toc;
-      model.snapshot(limit.toInt, opts.doAvg, matIdx);
-      val sendmat = model.sendmats(matIdx);
+      val t1 = toc
+      model.snapshot(limit.toInt, opts.doAvg, matIdx)
+      val mm = model.modelmats(matIdx)
+      val sendmatFull = model.sendmats(matIdx)
+      val sendmat = sendmatFull.view(sendmatFull.nrows, math.min(limit.toInt, sendmatFull.ncols))
       val indexmat =
 	if (model.indexmats != null && model.indexmats(matIdx).asInstanceOf[AnyRef] != null) {
           model.indexmats(matIdx)
         } else {
           irow(0 -> sendmat.ncols)
         }
+      val machine = machineArr(matIdx)
 
+      if (opts.trace > 3) logln("Starting allreduce for mm %d with dims %s datalen %d" format (
+	matIdx, Arrays.toString(sendmat.dims.data), sendmat.size))
       val result = if (opts.fuseConfigReduce) {
         (indexmat, sendmat) match {
-          case (lmat:LMat, fsendmat:FMat) => machineArr(matIdx).configReduce(
-	    lmat.data, lmat.data, fsendmat.data, sendmat.nrows, round);
-          case (imat:IMat, fsendmat:FMat) => machineArr(matIdx).configReduce(
-	    imat.data, imat.data, fsendmat.data, sendmat.nrows, round);
+          case (lmat:LMat, fsendmat:FMat) => machine.configReduce(
+	    lmat.data, lmat.data, fsendmat.data, fsendmat.size, fsendmat.nrows, round)
+          case (imat:IMat, fsendmat:FMat) => machine.configReduce(
+	    imat.data, imat.data, fsendmat.data, fsendmat.size, fsendmat.nrows, round)
         }
       } else {
         (indexmat, sendmat) match {
-	  case (lmat:LMat, fsendmat:FMat) => machineArr(matIdx).config(lmat.data, lmat.data, round);
-          case (imat:IMat, fsendmat:FMat) => machineArr(matIdx).config(imat.data, imat.data, round);
+	  case (lmat:LMat, fsendmat:FMat) => machine.config(lmat.data, lmat.data, round)
+          case (imat:IMat, fsendmat:FMat) => machine.config(imat.data, imat.data, round)
         }
-        machineArr(matIdx).reduce(sendmat.asInstanceOf[FMat].data, sendmat.nrows, round);
+	val fsendmat = sendmat.asInstanceOf[FMat]
+        machine.reduce(fsendmat.data, fsendmat.size, fsendmat.nrows, round)
       }
 
-      if (model.recvmats == null) model.recvmats = new Array[Mat](model.modelmats.length)
-      model.recvmats(matIdx) = new FMat(sendmat.nrows, sendmat.ncols, result);
-      model.addStep(limit.toInt, opts.doAvg, matIdx);
-      val t2 = toc;
+      if (model.recvmats == null) model.recvmats = new Array[FMat](model.modelmats.length)
+      model.recvmats(matIdx) = new FMat(sendmat.nrows, mm.ncols, result)
+      model.addStep(limit.toInt, opts.doAvg, matIdx)
+      val t2 = toc
       val nbytes = indexmat match {
-        case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f;
-        case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f;
+        case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f
+        case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f
       }
       if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (
 	nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))

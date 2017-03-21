@@ -44,7 +44,7 @@ m.sendConfig
 //   var fgopts = w.learner.opts.asInstanceOf[GLM.FGOptions]
 //   fgopts.npasses = 2
 //   var totalNumSamples = fgopts.nend
-//   totalNumSamples = 20
+//   totalNumSamples = 80
 //   var numWorkers = 4; // TODO: don't hardcode this
 //   var workerNumSamples = totalNumSamples / numWorkers
 //   var nstart = (w.imach*workerNumSamples)

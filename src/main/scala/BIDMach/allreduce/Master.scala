@@ -373,6 +373,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       if ((resp.rtype == Command.allreduceCtype || resp.rtype == Command.permuteAllreduceCtype)
 	  && resp.round == activeTaggedCmd.round) {
         val newresp = new AllreduceResponse(resp.round, resp.src, false, resp.bytes, resp.tag)
+	newresp.decode
 	handleAllreduceResponse(newresp)
 
       } else if (opts.trace > 0) {
@@ -459,7 +460,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	}
 	if (opts.trace > 2) {
 	  logln("%s: Collected response %d/%d from src %d%s" format (
-	    resp.tag, reducer.allreduceCollected, M, resp.src, if (!resp.success) " (FAILURE)"),
+	    resp.tag, reducer.allreduceCollected, M, resp.src, if (!resp.success) " (FAILURE)" else ""),
 	    resp.tag)
 	}
 	val delta = System.currentTimeMillis - reducer.allreduceStartTime

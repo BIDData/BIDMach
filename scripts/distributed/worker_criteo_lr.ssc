@@ -35,8 +35,8 @@ opts.lookahead = 0
 
 val w = new Worker()
 val wopts = w.opts
-wopts.trace = 4
-wopts.machineTrace = 1
+wopts.trace = 0
+wopts.machineTrace = 0
 
 val customCommandPortStr = sys.env.get("WORKER_CMD_PORT")
 customCommandPortStr match {

@@ -75,8 +75,16 @@ extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4, tag) {
   }
 }
 object AllreduceResponse {
-  def success(round:Int, src:Int, tag:String) = new AllreduceResponse(round, src, true, tag)
-  def failure(round:Int, src:Int, tag:String) = new AllreduceResponse(round, src, false, tag)
+  def success(round:Int, src:Int, tag:String) = {
+    val resp = new AllreduceResponse(round, src, true, tag)
+    resp.encode
+    resp
+  }
+  def failure(round:Int, src:Int, tag:String) = {
+    val resp = new AllreduceResponse(round, src, false, tag)
+    resp.encode
+    resp
+  }
 }
 
 
