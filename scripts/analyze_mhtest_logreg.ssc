@@ -17,7 +17,7 @@
  */ 
 
 // Double-check these.
-val total = 5000
+val total = 3000
 val datadir = "mhtest_analysis/data_mhtest/"
 
 // On stout OR bitter:

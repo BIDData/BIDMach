@@ -21,7 +21,7 @@ import edu.berkeley.bid.CUMACH
  * 
  * - In particular, we need \Delta* and Var(\Delta*). Since \Delta* is of the form:
  * 
- * 		\Delta* = - log(u) + (1/b)\sum_{i=1}^b Y_i 
+ * 		\Delta* = -\psi + (1/b)\sum_{i=1}^b Y_i 
  * 
  * for IID random variables Y_i, which represent a log of a probability ratio,
  * it suffices to compute the statistics as follows:
@@ -61,7 +61,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var b:Long = 0                       // Current minibatch size (also `b` in the paper).
   var N:Long = 0                       // Maximum minibatch size (i.e. all training data).
   var n:Float = 0f                     // The *number* of minibatches we are using.
-  var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
+  var psi:Float = 0f                   // \psi = log (1 * prop_ratio * prior_ratio)
   var T:Int = 1                        // The temperature of the distribution.
   var t:Int = 0                        // Current number of samples of theta.
   var sumOfValues:Float = 0f           // \sum_{i=1}^b (N/T)*log(p(x_i|theta')/p(x_i|theta)).
@@ -148,7 +148,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     // (Part 2) Update our \Delta* and sample variance of \Delta*.
     sumOfSquares += sum((diff)*@(diff)).v
     sumOfValues += sum(diff).v
-    val deltaStar = sumOfValues/b.v - logu
+    val deltaStar = sumOfValues/b.v - psi
     val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
@@ -221,7 +221,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   def beforeEachMinibatch() {
     if (opts.verboseMH) println("\n\tNew minibatch!")
     randomWalkProposer()
-    logu = ln(rand(1,1)).v
+    psi = ln(1).v // WARNING, symmetric proposals ONLY, since \psi(1,\theta,theta')=0.
     newMinibatch = false
     b = 0
     n = 0
@@ -313,7 +313,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 
   /** This is for debugging. */
   def debugPrints(sampleVariance:Float, deltaStar:Float) {
-    println("b="+b+", n="+n+", logu="+logu+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
+    println("b="+b+", n="+n+", psi="+psi+ ", b-mbSize="+(b - model.datasource.opts.batchSize).toInt)
     println("mean(scores0) = "+mean(scores0,2).dv+", mean(scores1) = "+mean(scores1,2).dv)
     println("sampleVar = " +sampleVariance)
     println("delta* = " + deltaStar)

@@ -24,7 +24,7 @@
  * random-ness!!
  */
 
-val seed = 4
+val seed = 69
 println("Our seed: " +seed)
 setseed(seed)
 
@@ -94,7 +94,7 @@ mopts.verboseMH = false
 mopts.collectData = true            // CAUTION! May save a lot!
 mopts.collectDataDir = "mhtest_analysis/data_mhtest/"   // Clear this directory
 mopts.exitTheta = true              // breaks out of program ...
-mopts.exitThetaAmount = 5000        // means we collect this many thetas
+mopts.exitThetaAmount = 3000        // means we collect this many thetas
 mopts.initThetaHere = true          // break symmetry at the start
 mopts.burnIn = -1                   // change stuff after this sample (set to -1 to ignore)
 mopts.tempAfterBurnin = 1           // after burn-in, change temp to this
