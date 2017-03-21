@@ -35,9 +35,9 @@ val dir = "/data/netflix/"
 val a = loadSMat(dir+"newtrain.smat.lz4")
 val ta = loadSMat(dir+"newtest.smat.lz4")
 val d = 256
-val lrates = row(0.0001, 0.001, 0.01)
-val momens = row(0.5, 0.75, 0.9, 0.95, 0.99)
-val langs = row(0.0, 0.05, 0.5)
+val lrates = row(0.01)
+val momens = row(0.95)
+val langs = row(0.05)
 var bestrmse = 10.0;
 var prettystring = "moment.  lrate  lang.  rmse\n"
 
@@ -47,7 +47,7 @@ for (i <- 0 until lrates.length) {
             val (nn,opts) = SMF.learner2(a, d)
 
             // Common parameters with the ADAGrad version.
-            opts.batchSize = 1000
+            opts.batchSize = 10
             opts.npasses = 2
             opts.momentum = momens(j)
             opts.nesterov = null
@@ -66,16 +66,16 @@ for (i <- 0 until lrates.length) {
 
             // Now some stuff specific for the MHTest+ADAGrad.
             opts.smf = true
-            opts.saveAcceptRate = true
+            opts.saveAcceptRate = false
             opts.acceptRateDir = "tmp/"
             opts.N = a.nnz
-            opts.temp = a.nnz / 10000
+            opts.temp = a.nnz / 1000
             opts.Nknown = true
             opts.n2lsigma = 1.0f
             opts.nn2l = 4000
             opts.sigmaProposer = 0.01f
             opts.continueDespiteFull = false
-            opts.verboseMH = false
+            opts.verboseMH = true
             opts.collectData = false
             opts.collectDataDir = "tmp/"
             opts.exitTheta = false

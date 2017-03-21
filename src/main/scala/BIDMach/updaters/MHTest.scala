@@ -208,7 +208,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v    
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
-    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd)
+    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd, sumOfValues/b.v)
 
     // (Part 3) Run our test! 
     // (Part 3.1) Take care of the full data case; this usually indicates a problem.
@@ -226,7 +226,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       }
     }
     // (Part 3.2) Abnormally good or bad minibatches.
-    else if (math.abs(numStd) > 5.0) {
+    else if (math.abs(numStd) > 10.0) {
       if (opts.verboseMH) {
         println("\tCASE 1: math.abs(numStd) = " +math.abs(numStd))
       }
@@ -248,7 +248,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       val Xc = normlogrnd(1,1).dv
       val testStat = deltaStar + Xn + Xc
       if (opts.verboseMH) {
-        println("\tCASE 3; with testStat = "+testStat)
+        println("\tCASE 3; with testStat = %1.4f (Xn = %1.4f, Xc = %1.4f)" format (testStat, Xn, Xc))
       }
       if (testStat > 0) {
         accept = true
@@ -257,11 +257,13 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
 
     // (Part 4) Reset parameters and use <-- to avoid alias problems.
     if (accept) {
+      if (opts.verboseMH) println("\tACCEPT")
       for (i <- 0 until modelmats.length) {
         tmpTheta(i) <-- modelmats(i) // Now tmpTheta has proposed theta.
       }
       acceptanceRate(_t) = 1
     } else {
+      if (opts.verboseMH) println("\treject")
       for (i <- 0 until modelmats.length) {
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
         if (opts.smf) {
@@ -412,14 +414,15 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
  
 
   /** This is for debugging. */
-  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double) {
+  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double, sumDivB:Float) {
     val s1 = mean(scores1(0 -> b.toInt)).dv
     val s0 = mean(scores0(0 -> b.toInt)).dv
-    println("b="+b+", n="+n+", logu="+logu)
-    println("mean(scores1) = "+s1+" - mean(scores0) = "+s0+" = "+(s1-s0))
+    println("b = %d, n = %d, logu = %1.4f" format (b, n.toInt, logu))
+    println("mean(scores1) (%1.4f) - mean(scores0) (%1.4f) = %1.4f" format (s1, s0, s1-s0))
     println("maxi(scores1) = "+maxi(scores1(0 -> b.toInt))+", maxi(scores0) = "+maxi(scores0(0 -> b.toInt)))
     println("mini(scores1) = "+mini(scores1(0 -> b.toInt))+", mini(scores0) = "+mini(scores0(0 -> b.toInt)))
-    println("sampleVar = " +sampleVariance+ ", delta* = " +deltaStar+ ", numStd = " +numStd)
+    println("delta^* (%1.4f) = sumDivB (%1.4f) - logu (%1.4f)" format (deltaStar, sumDivB, logu))
+    println("sampleVar = %1.4f, numStd = %1.4f" format (sampleVariance, numStd))
   }
   
 }
