@@ -205,11 +205,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       sumOfSquares += sum((diff)*@(diff)).v
       sumOfValues += sum(diff).v
     }
-    val deltaStar = sumOfValues/b.v - psi
+    val extraOffset = getExtraOffset()
+    val deltaStar = sumOfValues/b.v - psi + extraOffset
     val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v    
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
-    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd)
+    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd, sumOfValues/b.v, extraOffset)
 
     // (Part 3) Run our test! 
     // (Part 3.1) Take care of the full data case; this usually indicates a problem.
@@ -267,16 +268,35 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       if (opts.verboseMH) println("\treject")
       for (i <- 0 until modelmats.length) {
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
-        if (opts.smf) {
-          adagrad.momentum(i) <-- tmpMomentum(i) // Revert ADAGrad momentum.
-        }
+        //if (opts.smf) {
+        //  adagrad.momentum(i) <-- tmpMomentum(i) // Revert ADAGrad momentum.
+        //}
       }
       acceptanceRate(_t) = 0
     }
-    
+
     if (newMinibatch) afterEachMinibatch(ipass, gprogress)
   }
   
+  
+  /** For the ADAGrad updater. */
+  def getExtraOffset():Float = {
+    if (opts.smf) {
+      var fullSum = 0f
+      //for (i <- 0 until modelmats.length) {
+      //  // TODO check that this is right ... I'm really concerned. 
+      //  // Then we have to *invert* all of this, right? I do that by dividing by mass ...
+      //  val mass = (adagrad.sumSq(i)^adagrad.ve + adagrad.opts.epsilon) / (adagrad.tscale * adagrad.lrate)
+      //  val momCurrSq = tmpMomentum(i) *@ tmpMomentum(i)
+      //  val momPropSq = adagrad.momentum(i) *@ adagrad.momentum(i)
+      //  val thisSum = sum(sum((momCurrSq-momPropSq)/mass))
+      //  fullSum += 0.5f * FMat(thisSum).v
+      //}
+      fullSum
+    } else {
+      0f
+    }
+  }
    
   /**
    * Stuff we should do before each minibatch. This involves calling the
@@ -294,17 +314,17 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * those into propsoedTheta, and then get current modelmats back to tmpTheta
    * (i.e. so modelmats remains the same before and after, and it's just the
    * proposedTheta which changes). With momentum, fortunately it's simpler, we
-   * have that in adagrad.momentum and simply copy the old state into
-   * tmpMomentum.
+   * have that in adagrad.momentum (that's the "proposed" momentum) and simply
+   * keep the "current" one in tmpMomentum.
    */
   def beforeEachMinibatch(ipass:Int, step:Long, gprogress:Float) {
     if (opts.verboseMH) println("\n\tNew minibatch!")
 
     for (i <- 0 until modelmats.length) {
       tmpTheta(i) <-- modelmats(i)
-      if (opts.smf) {
-        tmpMomentum(i) <-- adagrad.momentum(i)
-      }
+      //if (opts.smf) {
+      //  tmpMomentum(i) <-- adagrad.momentum(i)
+      //}
     } 
 
     if (opts.smf) {
@@ -352,10 +372,9 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     if (opts.smf) {
       if (opts.saveAcceptRate && (ipass+1) == opts.asInstanceOf[Learner.Options].npasses
           && gprogress > 0.99) {
-        val mom = adagrad.opts.momentum(0).v
         val lr = adagrad.opts.lrate.v
         val lang = adagrad.opts.langevin(0).v
-        saveMat(opts.acceptRateDir+"arate_%1.3f_%1.4f_%1.3f.mat.lz4" format (mom,lr,lang), 
+        saveMat(opts.acceptRateDir+"arate_%1.4f_%1.3f.mat.lz4" format (lr,lang), 
             acceptanceRate(0 -> _t))
       }
     }
@@ -415,14 +434,19 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
  
 
   /** This is for debugging. */
-  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double) {
+  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double, sumDivB:Float, extraOffset:Float) {
     val s1 = mean(scores1(0 -> b.toInt)).dv
     val s0 = mean(scores0(0 -> b.toInt)).dv
     println("b = %d, n = %d" format (b, n.toInt))
     println("mean(scores1) (%1.4f) - mean(scores0) (%1.4f) = %1.4f" format (s1, s0, s1-s0))
     println("maxi(scores1) = "+maxi(scores1(0 -> b.toInt))+", maxi(scores0) = "+maxi(scores0(0 -> b.toInt)))
     println("mini(scores1) = "+mini(scores1(0 -> b.toInt))+", mini(scores0) = "+mini(scores0(0 -> b.toInt)))
-    println("delta^* = %1.4f, sampleVar = %1.4f, numStd = %1.4f" format (deltaStar, sampleVariance, numStd))
+    if (opts.smf) {
+      println("delta^* (%1.4f) = sumDivB (%1.4f) + extraOffset (%1.4f)" format (deltaStar, sumDivB, extraOffset))
+      println("sampleVar = %1.4f, numStd = %1.4f" format (sampleVariance, numStd))
+    } else {
+      println("delta^* = %1.4f, sampleVar = %1.4f, numStd = %1.4f" format (deltaStar, sampleVariance, numStd))
+    }
   }
   
 }

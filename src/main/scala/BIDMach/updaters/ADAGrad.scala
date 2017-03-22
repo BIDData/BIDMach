@@ -26,6 +26,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   var pe:Mat = null // Similar to opts.texp? Some exponent like the others?
   var te:Mat = null // opts.texp, an ADAGrad parameter (see BIDMach wiki)
   var lrate:Mat = null
+  var tscale:Mat = null // Daniel: I had to add this to make it accessible to MHTest.
   var mu:Mat = null
   var one:Mat = null
   var randmat:Array[Mat] = null
@@ -46,6 +47,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
    * wouldn't make sense).
    */
   override def init(model0:Model) = {
+    tscale = 1 // Daniel: and had to do this here to make it non-null to start.
     model = model0
     modelmats = model.modelmats;
     updatemats = model.updatemats;
@@ -155,7 +157,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
       	step / firstStep;
       }
     }
-    val tscale = if (opts.texp.asInstanceOf[AnyRef] != 0) {
+    // Daniel: had to change this to make it accessible
+    var tscale = if (opts.texp.asInstanceOf[AnyRef] != 0) {
       stepn.set(1/(nsteps+1));
       stepn ^ te;
     } else {
