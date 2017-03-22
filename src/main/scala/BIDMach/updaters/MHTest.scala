@@ -63,7 +63,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var b:Long = 0                       // Current minibatch size (also `b` in the paper).
   var N:Long = 0                       // Maximum minibatch size (i.e. all training data).
   var n:Float = 0f                     // The *number* of minibatches we are using.
-  var logu:Float = 0f                  // log u, since we assume a symmetric proposer.
+  var psi:Float = 0f                   // \psi = log (1 * prop_ratio * prior_ratio)
   var T:Int = 1                        // The temperature of the distribution.
   var _t:Int = 0                       // Current number of samples of theta.
   var sumOfValues:Float = 0f           // \sum_{i=1}^b (N/T)*log(p(x_i|theta')/p(x_i|theta)).
@@ -75,6 +75,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var adagrad:ADAGrad = null;
   var tmpMomentum:Array[Mat] = null
   var acceptanceRate:Mat = null
+
 
   /** 
    * Standard initialization. We have:
@@ -204,11 +205,11 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       sumOfSquares += sum((diff)*@(diff)).v
       sumOfValues += sum(diff).v
     }
-    val deltaStar = sumOfValues/b.v - logu
+    val deltaStar = sumOfValues/b.v - psi
     val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v    
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
-    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd, sumOfValues/b.v)
+    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd)
 
     // (Part 3) Run our test! 
     // (Part 3.1) Take care of the full data case; this usually indicates a problem.
@@ -316,7 +317,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       randomWalkProposer()
     }
 
-    logu = ln(rand(1,1)).v
+    psi = ln(1).v // WARNING, symmetric proposals ONLY, since \psi(1,\theta,theta')=0.
     newMinibatch = false
     b = 0
     n = 0
@@ -414,15 +415,14 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
  
 
   /** This is for debugging. */
-  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double, sumDivB:Float) {
+  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double) {
     val s1 = mean(scores1(0 -> b.toInt)).dv
     val s0 = mean(scores0(0 -> b.toInt)).dv
-    println("b = %d, n = %d, logu = %1.4f" format (b, n.toInt, logu))
+    println("b = %d, n = %d" format (b, n.toInt))
     println("mean(scores1) (%1.4f) - mean(scores0) (%1.4f) = %1.4f" format (s1, s0, s1-s0))
     println("maxi(scores1) = "+maxi(scores1(0 -> b.toInt))+", maxi(scores0) = "+maxi(scores0(0 -> b.toInt)))
     println("mini(scores1) = "+mini(scores1(0 -> b.toInt))+", mini(scores0) = "+mini(scores0(0 -> b.toInt)))
-    println("delta^* (%1.4f) = sumDivB (%1.4f) - logu (%1.4f)" format (deltaStar, sumDivB, logu))
-    println("sampleVar = %1.4f, numStd = %1.4f" format (sampleVariance, numStd))
+    println("delta^* = %1.4f, sampleVar = %1.4f, numStd = %1.4f" format (deltaStar, sampleVariance, numStd))
   }
   
 }
