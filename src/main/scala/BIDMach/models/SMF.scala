@@ -192,8 +192,8 @@ class SMF(override val opts:SMF.Opts = new SMF.Options) extends FactorModel(opts
     } else {
       opts.asInstanceOf[Grad.Opts].pexp.dv
     }
-    uscale.set(opts.urate * math.pow(ipass+1, - texp).toFloat) 
 
+    uscale.set(opts.urate * math.pow(ipass+1, - texp).toFloat) 
     val sdata = sdata0 - (iavg + avg);
     if (putBack < 0) {
       user.clear

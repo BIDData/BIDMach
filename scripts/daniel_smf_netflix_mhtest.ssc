@@ -35,13 +35,13 @@ val dir = "/data/netflix/"
 val a = loadSMat(dir+"newtrain.smat.lz4")
 val ta = loadSMat(dir+"newtest.smat.lz4")
 val d = 256
-val lrates = row(0.01)
-val langs = row(0.0)
+val lrates = row(0.005)
+val langs = sqrt(2f * lrates) // NEW! MALA so it's sqrt(2 * lr).
 var bestrmse = 10.0;
 var prettystring = "lrate  lang.  arate  rmse\n"
 
 for (i <- 0 until lrates.length) {
-    for (k <- 0 until langs.length) {
+    for (k <- 0 until 1) {
         val (nn,opts) = SMF.learner2(a, d)
 
         // Common parameters with the ADAGrad version.

@@ -75,7 +75,21 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   var adagrad:ADAGrad = null;
   var tmpMomentum:Array[Mat] = null
   var acceptanceRate:Mat = null
+  var currentUpdatemats:Array[Mat] = null
+  var proposedUpdatemats:Array[Mat] = null
 
+  var sdata0:GSMat = null
+  var user:Mat = null
+  var mm:Mat = null
+  var iavg:Mat = null
+  var avg:Mat = null
+  var uscale:Mat = null
+  var vexp:Mat = null
+  var lamu:Mat = null
+  var slm:Mat = null
+  var mlm:Mat = null
+  var firststep = -1f
+  
 
   /** 
    * Standard initialization. We have:
@@ -141,10 +155,24 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       // This should force adagrad.momentum(i) = momentum(i) in the rest of this code.
       adagrad = new ADAGrad(opts.asInstanceOf[ADAGrad.Opts])
       adagrad.init(model)
-      tmpMomentum = new Array[Mat](nmats)
+      currentUpdatemats = new Array[Mat](nmats)
+      proposedUpdatemats = new Array[Mat](nmats)
       for (i <- 0 until nmats) {
-        tmpMomentum(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
+        currentUpdatemats(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
+        proposedUpdatemats(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols)
       }
+      
+      sdata0 = GSMat(model.datasource.omats(0).asInstanceOf[SMat])
+      user = FactorModel.reuseuser(sdata0, model.opts.dim, 0f)
+      mm = proposedTheta(0)
+      iavg = proposedTheta(1)
+      avg = proposedTheta(2)
+      uscale = mm.zeros(1,1)
+      vexp = GMat(row(0.5f))
+      lamu = mm.ones(opts.asInstanceOf[SMF.Opts].dim, 1) ∘ opts.asInstanceOf[SMF.Opts].lambdau 
+      slm = mm.ones(1,1) ∘ (opts.asInstanceOf[SMF.Opts].lambdam * sdata0.ncols);
+      mlm = mm.ones(1,1) ∘ (opts.asInstanceOf[SMF.Opts].regmmean * sdata0.ncols);
+      firststep = -1f
     }
   }
   
@@ -205,12 +233,11 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       sumOfSquares += sum((diff)*@(diff)).v
       sumOfValues += sum(diff).v
     }
-    val extraOffset = getExtraOffset()
-    val deltaStar = sumOfValues/b.v - psi + extraOffset
+    val deltaStar = sumOfValues/b.v - psi
     val sampleVariance = (sumOfSquares/b.v - ((sumOfValues/b.v)*(sumOfValues/b.v))) / b.v    
     val numStd = deltaStar / math.sqrt(sampleVariance)
     var accept = false
-    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd, sumOfValues/b.v, extraOffset)
+    if (opts.verboseMH) debugPrints(sampleVariance, deltaStar, numStd, sumOfValues/b.v, psi)
 
     // (Part 3) Run our test! 
     // (Part 3.1) Take care of the full data case; this usually indicates a problem.
@@ -268,9 +295,6 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       if (opts.verboseMH) println("\treject")
       for (i <- 0 until modelmats.length) {
         modelmats(i) <-- tmpTheta(i) // Now modelmats back to old theta.
-        //if (opts.smf) {
-        //  adagrad.momentum(i) <-- tmpMomentum(i) // Revert ADAGrad momentum.
-        //}
       }
       acceptanceRate(_t) = 0
     }
@@ -279,25 +303,6 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   }
   
   
-  /** For the ADAGrad updater. */
-  def getExtraOffset():Float = {
-    if (opts.smf) {
-      var fullSum = 0f
-      //for (i <- 0 until modelmats.length) {
-      //  // TODO check that this is right ... I'm really concerned. 
-      //  // Then we have to *invert* all of this, right? I do that by dividing by mass ...
-      //  val mass = (adagrad.sumSq(i)^adagrad.ve + adagrad.opts.epsilon) / (adagrad.tscale * adagrad.lrate)
-      //  val momCurrSq = tmpMomentum(i) *@ tmpMomentum(i)
-      //  val momPropSq = adagrad.momentum(i) *@ adagrad.momentum(i)
-      //  val thisSum = sum(sum((momCurrSq-momPropSq)/mass))
-      //  fullSum += 0.5f * FMat(thisSum).v
-      //}
-      fullSum
-    } else {
-      0f
-    }
-  }
-   
   /**
    * Stuff we should do before each minibatch. This involves calling the
    * proposer, resetting some values, and saving the current model matrix into
@@ -317,27 +322,86 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
    * have that in adagrad.momentum (that's the "proposed" momentum) and simply
    * keep the "current" one in tmpMomentum.
    */
-  def beforeEachMinibatch(ipass:Int, step:Long, gprogress:Float) {
+  def beforeEachMinibatch(ipass:Int, pos:Long, gprogress:Float) {
     if (opts.verboseMH) println("\n\tNew minibatch!")
-
     for (i <- 0 until modelmats.length) {
       tmpTheta(i) <-- modelmats(i)
-      //if (opts.smf) {
-      //  tmpMomentum(i) <-- adagrad.momentum(i)
-      //}
+      currentUpdatemats(i) <-- updatemats(i)
     } 
 
+    // Important, update the model matrices. Also, compute \psi(1,theta,theta').
+    // Did computation by hand. A lot of this depends on whether it's SMF or not.
     if (opts.smf) {
-      adagrad.update(ipass, step, gprogress)
+
+      // Now modelmats is DIFFERENT! modelmats is now the proposed stuff. Note
+      // that this does not change the updatemats; that came from SMF.scala. We
+      // then make proposedTheta contain the proposed stuff! Think of this  as
+      // only providing us with proposedTheta (and keeping modelmats unchanged).
+      adagrad.update(ipass, pos, gprogress) 
       for (i <- 0 until modelmats.length) {
         proposedTheta(i) <-- adagrad.modelmats(i) // adagrad.modelmats(i) = modelmats(i)
         modelmats(i) <-- tmpTheta(i) // Should make adagrad.modelmats(i) back to what it was before.
-      } 
-    } else {
+      }
+      
+      // Next, with proposedTheta, we now compute the proposed log gradient. I
+      // think it's easier to copy the relevant mupdate code here. This is very
+      // specific to SMF.scala, sorry. I actually have to REDO the calls here
+      // ... oh boy. But fortunately, the `user` matrix gets reset to 0 each
+      // time for the real SMF, so I can do it here. ALSO, make sure I don't
+      // update the biases as I would with a call to mupdate in ipass=0.
+
+      sdata0 = GSMat(model.datasource.omats(0).asInstanceOf[SMat]) 
+      user <-- FactorModel.reuseuser(sdata0, model.opts.dim, 0f)
+      mm <-- proposedTheta(0)
+      iavg <-- proposedTheta(1)
+      avg <-- proposedTheta(2)           
+
+      // UUPDATE, which means (for instance) predictions are based on *proposed* theta.
+      if (firststep <= 0) firststep = pos.toFloat;
+      val step = (pos + firststep)/firststep;
+      val texp = if (opts.asInstanceOf[Grad.Opts].texp.asInstanceOf[AnyRef] != null) {
+        opts.asInstanceOf[Grad.Opts].texp.dv
+      } else {
+        opts.asInstanceOf[Grad.Opts].pexp.dv
+      }
+      uscale.set(opts.asInstanceOf[SMF.Opts].urate * math.pow(ipass+1, - texp).toFloat) 
+      val sdata = sdata0 - GMat(iavg+avg);
+      val b = mm * sdata;
+      val ucounts = sum(sdata0 != 0f);
+      val uci = (ucounts + 1f) ^ (- vexp);
+      for (i <- 0 until opts.asInstanceOf[SMF.Opts].uiter) {
+        val preds = DDS(mm, user, sdata);
+        val deriv = b - mm * preds - (user ∘ lamu);
+        val du = (deriv ∘ uscale ∘ uci);
+        user ~ user + du;
+      }
+    
+      // MUPDATE
+      val preds = DDS(proposedTheta(0), user, sdata);
+      val diffs = sdata + 2f;
+      diffs.contents ~ sdata.contents - preds.contents;
+      val icomp = sdata0 != 0f
+      val icount = sum(sdata0 != 0f, 2);
+      proposedUpdatemats(1) = (sum(diffs,2) - iavg*mlm) / (icount + 1f);   
+      proposedUpdatemats(2) ~ sum(diffs.contents) / (diffs.contents.length + 1f);
+      if (firststep <= 0) firststep = pos.toFloat;
+      proposedUpdatemats(0) = (user *^ diffs - (mm ∘ slm)) / ((icount + 1).t ^ vexp);
+
+      // Finally, we can get the psi terms.
+      psi = 0f
+      val tau = FMat(adagrad.lrate).v
+      for (i <- 0 until modelmats.length) {
+        val term1 = modelmats(i) - proposedTheta(i) - tau*proposedUpdatemats(i)
+        val term2 = proposedTheta(i) - modelmats(i) - tau*currentUpdatemats(i)
+        psi += (0.25f*tau) * ((term1 ddot term1) - (term2 ddot term2)).v
+      }
+    } 
+    else {
+      // Otherwise, it's easy, just do a random walk and set psi = ln(1) = 0.
       randomWalkProposer()
+      psi = 0f
     }
 
-    psi = ln(1).v // WARNING, symmetric proposals ONLY, since \psi(1,\theta,theta')=0.
     newMinibatch = false
     b = 0
     n = 0
@@ -434,7 +498,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
  
 
   /** This is for debugging. */
-  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double, sumDivB:Float, extraOffset:Float) {
+  def debugPrints(sampleVariance:Float, deltaStar:Float, numStd:Double, sumDivB:Float, psi:Float) {
     val s1 = mean(scores1(0 -> b.toInt)).dv
     val s0 = mean(scores0(0 -> b.toInt)).dv
     println("b = %d, n = %d" format (b, n.toInt))
@@ -442,7 +506,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
     println("maxi(scores1) = "+maxi(scores1(0 -> b.toInt))+", maxi(scores0) = "+maxi(scores0(0 -> b.toInt)))
     println("mini(scores1) = "+mini(scores1(0 -> b.toInt))+", mini(scores0) = "+mini(scores0(0 -> b.toInt)))
     if (opts.smf) {
-      println("delta^* (%1.4f) = sumDivB (%1.4f) + extraOffset (%1.4f)" format (deltaStar, sumDivB, extraOffset))
+      println("delta^* (%1.4f) = sumDivB (%1.4f) - psi (%1.4f)" format (deltaStar, sumDivB, psi))
       println("sampleVar = %1.4f, numStd = %1.4f" format (sampleVariance, numStd))
     } else {
       println("delta^* = %1.4f, sampleVar = %1.4f, numStd = %1.4f" format (deltaStar, sampleVariance, numStd))
