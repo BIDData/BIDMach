@@ -366,12 +366,12 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       }
       uscale.set(opts.asInstanceOf[SMF.Opts].urate * math.pow(ipass+1, - texp).toFloat) 
       val sdata = sdata0 - GMat(iavg+avg);
-      val b = mm * sdata;
+      val bb = mm * sdata;
       val ucounts = sum(sdata0 != 0f);
       val uci = (ucounts + 1f) ^ (- vexp);
       for (i <- 0 until opts.asInstanceOf[SMF.Opts].uiter) {
         val preds = DDS(mm, user, sdata);
-        val deriv = b - mm * preds - (user ∘ lamu);
+        val deriv = bb - mm * preds - (user ∘ lamu);
         val du = (deriv ∘ uscale ∘ uci);
         user ~ user + du;
       }
@@ -390,10 +390,11 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
       // Finally, we can get the psi terms.
       psi = 0f
       val tau = FMat(adagrad.lrate).v
+      val sigma = FMat(adagrad.opts.langevin).v
       for (i <- 0 until modelmats.length) {
         val term1 = modelmats(i) - proposedTheta(i) - tau*proposedUpdatemats(i)
         val term2 = proposedTheta(i) - modelmats(i) - tau*currentUpdatemats(i)
-        psi += (0.25f*tau) * ((term1 ddot term1) - (term2 ddot term2)).v
+        psi += (1f/(2*sigma*sigma)) * ((term1 ddot term1) - (term2 ddot term2)).v
       }
     } 
     else {

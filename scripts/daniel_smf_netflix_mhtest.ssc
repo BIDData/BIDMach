@@ -35,10 +35,10 @@ val dir = "/data/netflix/"
 val a = loadSMat(dir+"newtrain.smat.lz4")
 val ta = loadSMat(dir+"newtest.smat.lz4")
 val d = 256
-val lrates = row(0.005)
+val lrates = row(0.01)
 val langs = sqrt(2f * lrates) // NEW! MALA so it's sqrt(2 * lr).
 var bestrmse = 10.0;
-var prettystring = "lrate  lang.  arate  rmse\n"
+var prettystring = "lrate   lang.   arate   rmse\n"
 
 for (i <- 0 until lrates.length) {
     for (k <- 0 until 1) {
@@ -46,7 +46,7 @@ for (i <- 0 until lrates.length) {
 
         // Common parameters with the ADAGrad version.
         opts.batchSize = 1000
-        opts.npasses = 2
+        opts.npasses = 1
         opts.nesterov = null
         opts.langevin = langs(k).v
         opts.momentum = null
@@ -67,7 +67,7 @@ for (i <- 0 until lrates.length) {
         opts.saveAcceptRate = true
         opts.acceptRateDir = "tmp/"
         opts.N = a.nnz
-        opts.temp = a.nnz / 10000
+        opts.temp = a.nnz / 1000
         opts.Nknown = true
         opts.n2lsigma = 1.0f
         opts.nn2l = 4000
@@ -109,7 +109,7 @@ for (i <- 0 until lrates.length) {
         if (rmse2.v < bestrmse) {
             bestrmse = rmse2.v
         }   
-        prettystring += "%1.5f  %1.3f  %1.3f  %1.4f\n" format (lrates(i).v,langs(k).v,arate,rmse2.v)
+        prettystring += "%1.5f  %1.3f  %1.4f  %1.4f\n" format (lrates(i).v,langs(k).v,arate,rmse2.v)
     }
 }
 
