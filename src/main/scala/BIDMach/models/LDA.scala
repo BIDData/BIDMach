@@ -105,7 +105,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
     ud ~ ud ∘ mm
     ud ~ ud + opts.beta
   	updatemats(0) <-- ud  
-  	sum(ud, 2, updatemats(1))
+  	sum(ud, 2, updatemats(1));
   }
   
   /** 

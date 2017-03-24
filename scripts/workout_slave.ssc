@@ -5,7 +5,9 @@ val ta = loadSMat(dir+"/data/rcv1/testdocs.smat.lz4")
 val tc = loadFMat(dir+"/data/rcv1/testcats.fmat.lz4")
 
 println("\n<<<<<<< Testing GLM on RCV1 (2 passes) >>>>>>>")
-val (mm1,opts1) = GLM.learner(a,c,1)
+val (mm1,opts1) = GLM.learnerX(a,c,1)
+opts1.batchSize=10000
+opts1.lrate = 0.02f
 opts1.useGPU=useGPU
 mm1.train
 

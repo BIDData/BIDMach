@@ -21,8 +21,9 @@ opts.reg1weight = 0.0
 opts.links = iones(103,1)
 opts.addConstFeat=true;
 opts.aopts = opts;
-opts.doVariance = true;
+//opts.doVariance = true;
 opts.evalStep = 3;
+//opts.debugMem = true
 //opts.useGPU = false
 //Mat.useMKL = false
 
