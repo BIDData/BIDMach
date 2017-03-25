@@ -22,15 +22,12 @@
 	<classpathentry kind="lib" path="lib/ptplotapplication-1.0.jar"/>
 	<classpathentry kind="lib" path="lib/scala-arm_2.11-1.4.jar"/>
 	<classpathentry kind="lib" path="lib/scala-compiler-2.11.0-M8.jar"/>
-	<classpathentry kind="lib" path="lib/BIDMat-1.9.0-cuda8.0alpha-cpu-linux-x86_64.jar"/>
-	<classpathentry kind="lib" path="lib/BIDMat-1.9.0-cuda8.0alpha-gpu-linux-x86_64.jar"/>
 	<classpathentry kind="lib" path="lib/BIDMat-1.9.0-cuda8.0alpha.jar"/>
 	<classpathentry kind="lib" path="lib/jcublas-0.8.0.jar"/>
 	<classpathentry kind="lib" path="lib/jcuda-0.8.0.jar"/>
 	<classpathentry kind="lib" path="lib/jcudnn-0.8.0.jar"/>
 	<classpathentry kind="lib" path="lib/jcufft-0.8.0.jar"/>
 	<classpathentry kind="lib" path="lib/jcurand-0.8.0.jar"/>
-	<classpathentry kind="lib" path="lib/jcurand-natives-0.8.0-linux-x86_64.jar"/>
 	<classpathentry kind="lib" path="lib/jcusparse-0.8.0.jar"/>
 	<classpathentry kind="lib" path="lib/protobuf-java-3.1.0.jar"/>
 	<classpathentry kind="output" path="bin"/>

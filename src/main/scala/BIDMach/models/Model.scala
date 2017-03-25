@@ -278,8 +278,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
          	to(i) = from(i) match {
         	case aa:FMat => DMat(aa)
         	case aa:SMat => SDMat(aa)
-        	case aa:DMat => aa;
-        	case aa:SDMat => aa;
+        	case aa:DMat => DMat(aa);
+        	case aa:SDMat => SDMat(aa);
+        	case aa:IMat => IMat(aa);
+        	case aa:LMat => LMat(aa);
         	}
       	} else {
          	to(i) = from(i) match {
@@ -287,6 +289,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SMat => aa
         	case aa:DMat => FMat(aa);
         	case aa:SDMat => SMat(aa);
+        	case aa:IMat => IMat(aa);
+        	case aa:LMat => LMat(aa);
         	}
       	}
       }

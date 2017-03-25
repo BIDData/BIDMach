@@ -11,7 +11,8 @@ opts.nnodes = 300000
 opts.nbits = 16
 opts.gain = 0.001f
 opts.ncats = 10
-opts.what
+//opts.useGPU = false
+//opts.what
 
 val rf = nn.model.asInstanceOf[RandomForest]
 
