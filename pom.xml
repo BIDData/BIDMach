@@ -285,6 +285,26 @@
           </execution>
 	</executions>
       </plugin>
+      <plugin>
+	<artifactId>maven-clean-plugin</artifactId>
+	<version>3.0.0</version>
+	<configuration>
+	  <filesets>
+            <fileset>
+              <directory>lib</directory>
+              <includes>
+		<include>*.jar</include>
+              </includes>
+              <excludes>
+		<exclude>*.txt</exclude>
+		<exclude>*.scala</exclude>
+		<exclude>*.html</exclude>
+              </excludes>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+	  </filesets>
+	</configuration>
+      </plugin>  
     </plugins>
     <resources>
       <resource>
