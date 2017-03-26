@@ -6,11 +6,13 @@ import BIDMat.IMat
 import BIDMat.DenseMat
 import scala.collection.mutable.HashMap
 
-case class LayerMat(override val nrows:Int, override val ncols:Int, override val data:Array[Layer]) extends DenseMat[Layer](nrows, ncols, data) {	
+case class LayerMat(override val nrows:Int, override val ncols:Int, override val _data:Array[Layer]) extends DenseMat[Layer](nrows, ncols, _data) {	
 	
 	override def t:LayerMat = LayerMat(gt(null))
 	
 	override def mytype = "LayerMat"
+	
+	def data:Array[Layer] = _data
 	
 	def horzcat(b: LayerMat) = LayerMat(ghorzcat(b))
 	
@@ -25,12 +27,6 @@ case class LayerMat(override val nrows:Int, override val ncols:Int, override val
 	override def apply(a:Int, b:IMat):LayerMat = LayerMat(gapply(a, b))	
 		
 	override def apply(a:IMat, b:Int):LayerMat = LayerMat(gapply(a, b))	
-		  
-  override def apply(a:Mat, b:Mat):LayerMat = LayerMat(gapply(a.asInstanceOf[IMat], b.asInstanceOf[IMat]))
-  
-  override def apply(a:Mat, b:Int):LayerMat = LayerMat(gapply(a.asInstanceOf[IMat], b))
-  
-  override def apply(a:Int, b:Mat):LayerMat = LayerMat(gapply(a, b.asInstanceOf[IMat]))
   
   
   def update(i:Int, b:Layer):Layer = _update(i, b)
@@ -57,14 +53,6 @@ case class LayerMat(override val nrows:Int, override val ncols:Int, override val
   override def update(iv:IMat, j:Int, b:Mat):LayerMat = LayerMat(_update(iv, IMat.ielem(j), b.asInstanceOf[LayerMat]))
 
   override def update(i:Int, jv:IMat, b:Mat):LayerMat = LayerMat(_update(IMat.ielem(i), jv, b.asInstanceOf[LayerMat]))
-   
-  override def update(iv:Mat, b:Mat):LayerMat = LayerMat(_update(iv.asInstanceOf[IMat], b.asInstanceOf[LayerMat]))
-  
-  override def update(iv:Mat, jv:Mat, b:Mat):LayerMat = LayerMat(_update(iv.asInstanceOf[IMat], jv.asInstanceOf[IMat], b.asInstanceOf[LayerMat]))
-
-  override def update(iv:Mat, j:Int, b:Mat):LayerMat = LayerMat(_update(iv.asInstanceOf[IMat], IMat.ielem(j), b.asInstanceOf[LayerMat]))
-
-  override def update(i:Int, jv:Mat, b:Mat):LayerMat = LayerMat(_update(IMat.ielem(i), jv.asInstanceOf[IMat], b.asInstanceOf[LayerMat]))
   
   
   
@@ -183,7 +171,7 @@ object LayerMat {
   
     def apply(nr:Int, nc:Int):LayerMat = new LayerMat(nr, nc, new Array[Layer](nr*nc))
 
-    def apply(a:DenseMat[Layer]):LayerMat = new LayerMat(a.nrows, a.ncols, a.data) 
+    def apply(a:DenseMat[Layer]):LayerMat = new LayerMat(a.nrows, a.ncols, a._data) 
     
     def apply(a:List[Layer]) = new LayerMat(1, a.length, a.toArray)
     

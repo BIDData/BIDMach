@@ -269,6 +269,22 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val t0 = toc;
     //    var blockv0:SVec = null;
     data match {
+      case (gdata:GMat) => {
+        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false);
+        t1 = toc; runtimes(0) += t1 - t0;
+        cats match {
+          case (gicats:GIMat) => {
+            gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
+          }
+          case (gfcats:GMat) => {
+            gout = gtreePack(gdata, gtnodes, gfcats, gout, seed);
+          }
+        }
+        t2 = toc; runtimes(1) += t2 - t1;
+        gpsort(gout);
+        t3 = toc; runtimes(2) += t3 - t2;
+        blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
+      }
       case (fdata:FMat) => {
         val nnodes = if (gmats.length > 2) gmats(2).asInstanceOf[IMat] else izeros(ntrees, data.ncols);
         if (gmats.length > 2) {
@@ -290,22 +306,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         Mat.nflops += lout.length * math.log(lout.length).toLong;
         t3 = toc; runtimes(2) += t3 - t2;
         blockv = makeV(lout);
-      }
-      case (gdata:GMat) => {
-        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, ipass, false);
-        t1 = toc; runtimes(0) += t1 - t0;
-        cats match {
-          case (gicats:GIMat) => {
-            gout = gtreePack(gdata, gtnodes, gicats, gout, seed);
-          }
-          case (gfcats:GMat) => {
-            gout = gtreePack(gdata, gtnodes, gfcats, gout, seed);
-          }
-        }
-        t2 = toc; runtimes(1) += t2 - t1;
-        gpsort(gout);
-        t3 = toc; runtimes(2) += t3 - t2;
-        blockv = gmakeV(gout, gpiones, gtmpinds, gtmpcounts);
       }
       case _ => {
         throw new RuntimeException("RandomForest dobatch types dont match %s %s" format (data.mytype, cats.mytype))
@@ -329,6 +329,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val nnodes:Mat = if (gmats.length > 2) gmats(2) else null;
     val fnodes:FMat = zeros(ntrees, data.ncols);
     data match {
+      case gdata:GMat => {
+        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, depth, true);
+        val gff = new GMat(fnodes.nrows, fnodes.ncols, gfnodes.pdata, gfnodes.realsize);
+        fnodes <-- gff;
+      }
       case fdata:FMat => {
         if (nnodes.asInstanceOf[AnyRef] != null) {
           val nn = nnodes.asInstanceOf[IMat];
@@ -336,11 +341,6 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
         } else {
           treeWalk(fdata, null, fnodes, itrees, ftrees, vtrees, ctrees, depth, true);
         }
-      }
-      case gdata:GMat => {
-        gtreeWalk(gdata, gtnodes, gfnodes, gitrees, gftrees, gvtrees, gctrees, depth, true);
-        val gff = new GMat(fnodes.nrows, fnodes.ncols, gfnodes.data, gfnodes.realsize);
-        fnodes <-- gff;
       }
     }
     ynodes = fnodes;
@@ -647,7 +647,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val nrows = fdata.nrows;
     val ncols = fdata.ncols;
     Mat.nflops += 1L * ncols * ntrees * depth;
-    val err = CUMACH.treeWalk(fdata.data, tnodes.data, fnodes.data, itrees.data, ftrees.data, vtrees.data, ctrees.data,
+    val err = CUMACH.treeWalk(fdata.pdata, tnodes.pdata, fnodes.pdata, itrees.pdata, ftrees.pdata, vtrees.pdata, ctrees.pdata,
       nrows, ncols, ntrees, nnodes, if (getcat) 1 else 0, nbits, depth);
     if (err != 0) {throw new RuntimeException("gtreeWalk: error " + cudaGetErrorString(err))}
   }
@@ -780,13 +780,13 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     Mat.nflops += 1L * nxvals;
     val gdata = GMat(fdata);
     val gcats = GIMat(icats);
-    cudaMemcpy(gtnodes.data, Pointer.to(tnodes.data), ncols*ntrees*Sizeof.INT, cudaMemcpyHostToDevice)
+    cudaMemcpy(gtnodes.pdata, Pointer.to(tnodes.data), ncols*ntrees*Sizeof.INT, cudaMemcpyHostToDevice)
     cudaDeviceSynchronize();
     var err = cudaGetLastError
     if (err != 0) {throw new RuntimeException("fgtreePack: error " + cudaGetErrorString(err))}
-    err= CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
+    err= CUMACH.treePack(gdata.pdata, gtnodes.pdata, gcats.pdata, gout.pdata, gfieldlengths.pdata, nrows, ncols, ntrees, nsamps, seed)
   if (err != 0) {throw new RuntimeException("fgtreePack: error " + cudaGetErrorString(err))}
-  new GLMat(1, nxvals, gout.data, gout.realsize);
+  new GLMat(1, nxvals, gout.pdata, gout.realsize);
   }
 
   def gtreePack(gdata:GMat, gtnodes:GIMat, gcats:GIMat, gout:GLMat, seed:Int):GLMat ={
@@ -794,9 +794,9 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val ncols = gdata.ncols
     val nxvals = ncols * ntrees * nsamps;
     Mat.nflops += 1L * nxvals;
-    val err= CUMACH.treePack(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
+    val err= CUMACH.treePack(gdata.pdata, gtnodes.pdata, gcats.pdata, gout.pdata, gfieldlengths.pdata, nrows, ncols, ntrees, nsamps, seed)
     if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
-    new GLMat(1, nxvals, gout.data, gout.realsize);
+    new GLMat(1, nxvals, gout.pdata, gout.realsize);
   }
 
   def gtreePack(gdata:GMat, gtnodes:GIMat, gcats:GMat, gout:GLMat, seed:Int):GLMat ={
@@ -804,15 +804,15 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
     val ncols = gdata.ncols
     val nxvals = ncols * ntrees * nsamps;
     Mat.nflops += 1L * nxvals;
-    val err= CUMACH.treePackfc(gdata.data, gtnodes.data, gcats.data, gout.data, gfieldlengths.data, nrows, ncols, ntrees, nsamps, seed)
+    val err= CUMACH.treePackfc(gdata.pdata, gtnodes.pdata, gcats.pdata, gout.pdata, gfieldlengths.pdata, nrows, ncols, ntrees, nsamps, seed)
     if (err != 0) {throw new RuntimeException("gtreePack: error " + cudaGetErrorString(err))}
-    new GLMat(1, nxvals, gout.data, gout.realsize);
+    new GLMat(1, nxvals, gout.pdata, gout.realsize);
   }
 
   def gpsort(gout:GLMat) = {
     val nxvals = gout.length;
     Mat.nflops += 2L * nxvals * math.log(nxvals).toInt;
-    val err = CUMAT.lsort(gout.data, nxvals, 1);
+    val err = CUMAT.lsort(gout.pdata, nxvals, 1);
     if (err != 0) {throw new RuntimeException("gpsort: error " + cudaGetErrorString(err))}
     cudaDeviceSynchronize()
   }
@@ -835,11 +835,11 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
 
   def gjfeatsToIfeats(itree:Int, inodes:IMat, ifeats:IMat, seed:Int, gitree:GIMat, gftree:GIMat) {
     val len = inodes.length;
-    val gi = new GIMat(inodes.nrows, inodes.ncols, gitree.data, gitree.realsize);
-    val gf = new GIMat(ifeats.nrows, ifeats.ncols, gftree.data, gftree.realsize);
+    val gi = new GIMat(inodes.nrows, inodes.ncols, gitree.pdata, gitree.realsize);
+    val gf = new GIMat(ifeats.nrows, ifeats.ncols, gftree.pdata, gftree.realsize);
     gi <-- inodes;
     gf <-- ifeats;
-    val err = CUMACH.jfeatsToIfeats(itree, gi.data, gf.data, gf.data, len, nfeats, seed);
+    val err = CUMACH.jfeatsToIfeats(itree, gi.pdata, gf.pdata, gf.pdata, len, nfeats, seed);
     if (err != 0) {throw new RuntimeException("gjfeatsToIfeats: error " + cudaGetErrorString(err))}
     ifeats <-- gf;
   }
@@ -1529,7 +1529,7 @@ object RandomForest {
 
   def floatToInt(in:GMat, out:Mat, nbits:Int):GIMat = {
     val omat = GIMat.newOrCheckGIMat(in.nrows, in.ncols, out, in.GUID, "floatToInt".##)
-    edu.berkeley.bid.CUMACH.floatToInt(in.length, in.data, omat.data, nbits)
+    edu.berkeley.bid.CUMACH.floatToInt(in.length, in.pdata, omat.pdata, nbits)
     omat
   }
 

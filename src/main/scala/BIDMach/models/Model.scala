@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -256,21 +256,21 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       if (useGPU) {
         if (useDouble) {
          	to(i) = from(i) match {
+        	case aa:GDMat => aa
+        	case aa:GMat => GDMat(aa)
         	case aa:FMat => GDMat(aa)
         	case aa:IMat => GIMat(aa)
         	case aa:DMat => GDMat(aa)
         	case aa:SMat => GSDMat(aa)
-        	case aa:GDMat => aa
-        	case aa:GMat => GDMat(aa)
         	}
         } else {
         	to(i) = from(i) match {
+        	case aa:GMat => aa
+        	case aa:GDMat => GMat(aa)
         	case aa:FMat => GMat(aa)
         	case aa:DMat => GMat(aa)
         	case aa:IMat => GIMat(aa)
         	case aa:SMat => GSMat(aa)
-        	case aa:GMat => aa
-        	case aa:GDMat => GMat(aa)
         	}
         }
       } else {
@@ -278,8 +278,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
          	to(i) = from(i) match {
         	case aa:FMat => DMat(aa)
         	case aa:SMat => SDMat(aa)
-        	case aa:DMat => aa;
-        	case aa:SDMat => aa;
+        	case aa:DMat => DMat(aa);
+        	case aa:SDMat => SDMat(aa);
+        	case aa:IMat => IMat(aa);
+        	case aa:LMat => LMat(aa);
         	}
       	} else {
          	to(i) = from(i) match {
@@ -287,6 +289,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SMat => aa
         	case aa:DMat => FMat(aa);
         	case aa:SDMat => SMat(aa);
+        	case aa:IMat => IMat(aa);
+        	case aa:LMat => LMat(aa);
         	}
       	}
       }
@@ -297,10 +301,6 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   def convertMat(a:Mat):Mat = {
   	Model.convertMat(a, useGPU, opts.useDouble).asInstanceOf[Mat];
-  }
-
-  def convertMat(a:ND):ND = {
-  	Model.convertMat(a, useGPU, opts.useDouble);
   }
 
   def combineModels(ipass:Int, model: Model):Model = this;
@@ -327,28 +327,8 @@ object Model {
 
 	class Options extends Opts {}
 
-  def convertMat(a:ND, useGPU:Boolean, useDouble:Boolean):ND = {
+  def convertMat(a:Mat, useGPU:Boolean, useDouble:Boolean):Mat = {
 	   a match {
-      case f:FMat =>
-      if (useGPU) {
-      	if (useDouble) {
-      		GDMat(f);
-      	} else {
-      		GMat(f);
-      	}
-      } else {
-      	if (useDouble) {
-      		DMat(f);
-      	} else {
-      		f
-      	}
-      }
-      case i:IMat =>
-      if (useGPU) {
-        GIMat(i);
-      } else {
-        i;
-      }
       case g:GMat => if (useGPU) {
       	if (useDouble) {
       		GDMat(g);
@@ -388,15 +368,25 @@ object Model {
       		SMat(g);
       	}
       }
-      case g:FND => if (useGPU) {
-      	GND(g);
+      case f:FMat =>
+      if (useGPU) {
+      	if (useDouble) {
+      		GDMat(f);
+      	} else {
+      		GMat(f);
+      	}
       } else {
-      	g
+      	if (useDouble) {
+      		DMat(f);
+      	} else {
+      		f
+      	}
       }
-      case g:GND => if (useGPU) {
-      	g
+      case i:IMat =>
+      if (useGPU) {
+        GIMat(i);
       } else {
-      	FND(g)
+        i;
       }
       case tt:TMat => new TMat(tt.nrows, tt.ncols, tt.y, tt.x, tt.tiles.map(convertMat(_, useGPU, useDouble).asInstanceOf[Mat]));
     }

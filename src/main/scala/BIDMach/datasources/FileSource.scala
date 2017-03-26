@@ -125,7 +125,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
     initbase
     omats = new Array[Mat](fnames.size)
     for (i <- 0 until fnames.size) {
-      var mm = HMat.loadMat(fnames(i)(nstart));
+      var mm = loadMat(fnames(i)(nstart));
       val (nr, nc) = if (opts.dorows) (blockSize, mm.ncols) else (mm.nrows, blockSize);
       omats(i) = mm match {
         case mf:FMat => FMat.newOrCheckFMat(nr, nc, null, GUID, i, ((nr*1L) << 32) + nc, "FileSource_FMat".##);
@@ -211,9 +211,9 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 
   def lazyTranspose(a:Mat) = {
     a match {
-      case af:FMat => FMat(a.ncols, a.nrows, af.data)
-      case ad:DMat => DMat(a.ncols, a.nrows, ad.data)
-      case ai:IMat => IMat(a.ncols, a.nrows, ai.data)
+      case af:FMat => new FMat(a.ncols, a.nrows, af.data)
+      case ad:DMat => new DMat(a.ncols, a.nrows, ad.data)
+      case ai:IMat => new IMat(a.ncols, a.nrows, ai.data)
       case _ => throw new RuntimeException("laztTranspose cant deal with "+a.getClass.getName)
     }
   }
@@ -245,7 +245,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
               }
               if (opts.traceFileSource > 0) println("prefetch %d %d pnew %d reading %d %s" format (ifilex, fileno, pnew, i, fname));
               val newmat:Mat = try {
-                HMat.loadMat(fname, oldmat);
+                loadMat(fname, oldmat);
               } catch {
                 case e:Exception => {println(stackTraceString(e)); null}
                 case _:Throwable => null
@@ -294,7 +294,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
           //          HMat.saveMat(lastFname(i), lastMat(i));
         }
         matqueue(0)(i) = if (fexists) {
-          val tmp = HMat.loadMat(fnames(i)(pnew), matqueue(0)(i));
+          val tmp = loadMat(fnames(i)(pnew), matqueue(0)(i));
           lastFname(i) = fnames(i)(pnew);
           lastMat(i) = tmp;
           tmp;

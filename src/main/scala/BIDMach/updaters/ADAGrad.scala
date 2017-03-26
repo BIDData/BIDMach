@@ -268,23 +268,43 @@ object ADAGrad {
     val nbr = b.nrows;
     val biasv = if (hasBias) 1 else 0;
     (a, b, mm, sumSq, lrate, vexp, texp) match {
+      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
+      	Mat.nflops += 20L * nr * b.nnz;
+        val gmask0 = mask.asInstanceOf[GMat];
+        val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.pdata else new jcuda.Pointer();
+        val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
+        val err = CUMACH.multADAGrad(nr, nc, b.nnz, ga.pdata, gsb.pdata, gsb.pir, gsb.pic, gmm.pdata, gssq.pdata, gmaskdata, masknr,
+            glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps, biasv, nbr);
+        if (err > 0) {
+          throw new RuntimeException("multADAgrad error " + cudaGetErrorString(err))
+        }
+      }
+      case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
+      	Mat.nflops += 20L * nr * b.nnz;
+//	println("istep=%f" format istep);
+        val gmask0 = mask.asInstanceOf[GMat];
+        val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.pdata else new jcuda.Pointer();
+        val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
+        for (i <- 0 until gmm.tiles.length) {
+          val mmtile = gmm.tiles(i).asInstanceOf[GMat];
+          val ssqtile = gssq.tiles(i).asInstanceOf[GMat];
+          val nr = mmtile.nrows;
+          val nc = mmtile.ncols;
+          val y = gmm.y(i);
+          val x = gmm.x(i);
+          val err = CUMACH.multADAGradTile(nr, nc, y, x, gsb.nnz, ga.pdata, ga.nrows, gsb.pdata, gsb.pir, gsb.pic, mmtile.pdata, ssqtile.pdata, gmaskdata, masknr,
+          		glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps, biasv, nbr);
+          if (err > 0) {
+          throw new RuntimeException("multADAgrad error " + cudaGetErrorString(err))
+        }
+        }
+      } 
       case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
         val fmask = mask.asInstanceOf[FMat];
         val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
         CPUMACH.multADAGrad(nr, nc, b.nnz, fa.data, sb.data, sb.ir, sb.jc, fmm.data, fssq.data, if (fmask != null) fmask.data else null, masknr, 
             flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
-      }
-      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
-      	Mat.nflops += 20L * nr * b.nnz;
-        val gmask0 = mask.asInstanceOf[GMat];
-        val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
-        val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
-        val err = CUMACH.multADAGrad(nr, nc, b.nnz, ga.data, gsb.data, gsb.ir, gsb.ic, gmm.data, gssq.data, gmaskdata, masknr,
-            glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr);
-        if (err > 0) {
-          throw new RuntimeException("multADAgrad error " + cudaGetErrorString(err))
-        }
       }
       case (fa:FMat, sb:SMat, fmm:TMat, fssq:TMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
@@ -301,26 +321,6 @@ object ADAGrad {
         			flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
         }
       }
-      case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
-      	Mat.nflops += 20L * nr * b.nnz;
-//	println("istep=%f" format istep);
-        val gmask0 = mask.asInstanceOf[GMat];
-        val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
-        val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
-        for (i <- 0 until gmm.tiles.length) {
-          val mmtile = gmm.tiles(i).asInstanceOf[GMat];
-          val ssqtile = gssq.tiles(i).asInstanceOf[GMat];
-          val nr = mmtile.nrows;
-          val nc = mmtile.ncols;
-          val y = gmm.y(i);
-          val x = gmm.x(i);
-          val err = CUMACH.multADAGradTile(nr, nc, y, x, gsb.nnz, ga.data, ga.nrows, gsb.data, gsb.ir, gsb.ic, mmtile.data, ssqtile.data, gmaskdata, masknr,
-          		glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps, biasv, nbr);
-          if (err > 0) {
-          throw new RuntimeException("multADAgrad error " + cudaGetErrorString(err))
-        }
-        }
-      } 
       case _ => {
         val grad0 = mm match {
           case tmm:TMat => mm + 0f;
@@ -358,9 +358,9 @@ object ADAGrad {
     	if (nr != mm.nrows || nc != b.ncols) {
     	  throw new RuntimeException("pairMultUpdate: dimensions mismatch");
     	}
-    	val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].data, mask.length) else (null, 0);
-    	val err = CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, nr, 0, 0, gsb.data, gsb.ir, gsb.jc, 0, 0, 1, gmm.data, mm.nrows, 
-    	    gssq.data, gmdata, masklen, glrate.data, lrate.length, gvexp.data, vexp.length, gtexp.data, texp.length,
+    	val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].pdata, mask.length) else (null, 0);
+    	val err = CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.pdata, nr, 0, 0, gsb.pdata, gsb.pir, gsb.pjc, 0, 0, 1, gmm.pdata, mm.nrows, 
+    	    gssq.pdata, gmdata, masklen, glrate.pdata, lrate.length, gvexp.pdata, vexp.length, gtexp.pdata, texp.length,
     	    istep, 1, eps);
     	if (err > 0) {
           throw new RuntimeException("pairMultADAgrad error " + cudaGetErrorString(err))
@@ -379,10 +379,10 @@ object ADAGrad {
     		if (y < 0 || y + nr > a.nrows || x < 0 || nc > b.ncols) {
     		  throw new RuntimeException("pairMultUpdate: tile strays outside matrix dimensions");
     		}
-    		val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].data, mask.length) else (null, 0);
-    		val err = CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.data, a.nrows, y, 0, gsb.data, gsb.ir, gsb.jc, x, 0, 1, 
-    		    mmtile.data, mmtile.nrows, ssqtile.data, gmdata, masklen, glrate.data, lrate.length, 
-    		    gvexp.data, vexp.length, gtexp.data, texp.length,	istep, 1, eps);
+    		val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].pdata, mask.length) else (null, 0);
+    		val err = CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.pdata, a.nrows, y, 0, gsb.pdata, gsb.pir, gsb.pjc, x, 0, 1, 
+    		    mmtile.pdata, mmtile.nrows, ssqtile.pdata, gmdata, masklen, glrate.pdata, lrate.length, 
+    		    gvexp.pdata, vexp.length, gtexp.pdata, texp.length,	istep, 1, eps);
     		if (err > 0) {
           throw new RuntimeException("pairMultADAgrad error " + cudaGetErrorString(err))
     	}
@@ -437,6 +437,16 @@ object ADAGrad {
     val npc = b.nnz / b.ncols;
     Mat.nflops += 2L * nr * b.nnz * npc;
     (a, b, mm, sumSq, lrate, vexp, texp) match {
+      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
+        val gmask0 = mask.asInstanceOf[GMat];
+        val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.pdata else new jcuda.Pointer();
+        val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
+        val err = CUMACH.hashmultADAGrad(nr, nfeats, nc, bound1,  bound2, ga.pdata, gsb.pdata, gsb.pir, gsb.pjc, transpose,
+        		gmm.pdata, gssq.pdata, gmaskdata, masknr, glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps);
+        if (err != 0) {
+        	throw new RuntimeException("hashMultUpdate error " + jcuda.runtime.JCuda.cudaGetErrorString(err));
+        }
+      }
       case (fa:FMat, sb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
         val fmask = mask.asInstanceOf[FMat];
       	if (1L*nr*b.nnz > 100000L && Mat.numThreads > 1) {
@@ -446,35 +456,25 @@ object ADAGrad {
     			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, fvexp, ftexp, istep, addgrad, eps, 0, 1);
     		}
       }
-      case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
-        val gmask0 = mask.asInstanceOf[GMat];
-        val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.data else new jcuda.Pointer();
-        val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
-        val err = CUMACH.hashmultADAGrad(nr, nfeats, nc, bound1,  bound2, ga.data, gsb.data, gsb.ir, gsb.jc, transpose,
-            gmm.data, gssq.data, gmaskdata, masknr, glrate.data, lrate.nrows, gvexp.data, vexp.nrows, gtexp.data, texp.nrows, istep, addgrad, eps)
-	if (err != 0) {
-	    throw new RuntimeException("hashMultUpdate error " + jcuda.runtime.JCuda.cudaGetErrorString(err));
-	}
-      }
     }    
   }
   
   def ADAGradx(mm:GMat, um:GMat, ss:GMat, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
-  	val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.data, mask.nrows);
-  	CUMACH.ADAGrad(mm.nrows, mm.ncols, mm.data, um.data, ss.data, gmask, maskr, nw, ve.data, ve.nrows,
-  			ts.data, ts.nrows, lrate.data, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
+  	val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
+  	CUMACH.ADAGrad(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, gmask, maskr, nw, ve.pdata, ve.nrows,
+  			ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
   
   def ADAGradm(mm:GMat, um:GMat, ss:GMat, momentum:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
-    val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.data, mask.nrows);
-    CUMACH.ADAGradm(mm.nrows, mm.ncols, mm.data, um.data, ss.data, momentum.data, mu, gmask, maskr, nw, ve.data, ve.nrows,
-        ts.data, ts.nrows, lrate.data, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
+    val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
+    CUMACH.ADAGradm(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, momentum.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
+        ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
     
   def ADAGradn(mm:GMat, um:GMat, ss:GMat, momentum:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
-    val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.data, mask.nrows);
-    CUMACH.ADAGradn(mm.nrows, mm.ncols, mm.data, um.data, ss.data, momentum.data, mu, gmask, maskr, nw, ve.data, ve.nrows,
-        ts.data, ts.nrows, lrate.data, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
+    val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
+    CUMACH.ADAGradn(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, momentum.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
+        ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
 }
 

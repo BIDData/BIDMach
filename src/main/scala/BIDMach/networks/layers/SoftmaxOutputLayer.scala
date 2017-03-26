@@ -20,41 +20,41 @@ import BIDMach.networks._
  */
 
 class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNodeOpts = new SoftmaxOutputNode) extends Layer(net, opts) with OutputLayer { 
-  var coloffsets:Mat = null;
+  var coloffsets:IMat = null;
   var zero:Mat = null;
 
   override def forward = {
 		  val start = toc;
       createOutput;
-      output.asMat ~ inputData.asMat - maxi(inputData.asMat)
-      exp(output.asMat, output.asMat);  // ensures sum(exps) is between 1 and nfeats
-      output.asMat ~ output.asMat / sum(output.asMat);
+      output ~ inputData - maxi(inputData)
+      exp(output, output);  // ensures sum(exps) is between 1 and nfeats
+      output ~ output / sum(output);
       clearDeriv;
       forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
-		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
+		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
-        deriv.asMat ~ zero - output.asMat;
-        val inds = target + coloffsets;
-			  deriv.asMat(inds) = deriv.asMat(inds) + 1f;               // deriv = target - preds
+        deriv ~ zero - output;
+        val inds = int(target) + coloffsets;
+			  deriv(inds) = deriv(inds) + 1f;               // deriv = target - preds
         inputDeriv ~ inputDeriv + deriv; 
       }
 		  backwardtime += toc - start;
   }
   
   override def score:FMat = {
-    if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = convertMat(irow(0->output.ncols)*output.nrows);
-    val inds = target + coloffsets;
+    if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
+    val inds = int(target) + coloffsets;
     if (opts.scoreType == 1) {
       if (opts.doVariance) {
-        val matches = (output(inds) == maxi(output.asMat));
+        val matches = (output(inds) == maxi(output));
         FMat(mean(matches)) on FMat(variance(matches));
       } else {
-      	FMat(mean(output(inds) == maxi(output.asMat)));
+      	FMat(mean(output(inds) == maxi(output)));
       }
     } else {
     	if (opts.doVariance) {

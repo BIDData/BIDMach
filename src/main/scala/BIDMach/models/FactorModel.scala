@@ -78,12 +78,12 @@ object FactorModel {
   
   def reuseuser(a:Mat, dim:Int, ival:Float):Mat = {
     val out = a match {
-      case aa:SMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "SMat.reuseuser".##)
-      case aa:FMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "FMat.reuseuser".##)
       case aa:GSMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GSMat.reuseuser".##)
       case aa:GMat => GMat.newOrCheckGMat(dim, a.ncols, null, a.GUID, "GMat.reuseuser".##)
       case aa:GDMat => GDMat.newOrCheckGDMat(dim, a.ncols, null, a.GUID, "GDMat.reuseuser".##)
       case aa:GSDMat => GDMat.newOrCheckGDMat(dim, a.ncols, null, a.GUID, "GSDMat.reuseuser".##)
+      case aa:SMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "SMat.reuseuser".##)
+      case aa:FMat => FMat.newOrCheckFMat(dim, a.ncols, null, a.GUID, "FMat.reuseuser".##)
     }
     out.set(ival)
     out

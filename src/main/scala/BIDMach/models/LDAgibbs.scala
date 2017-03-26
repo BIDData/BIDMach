@@ -155,9 +155,9 @@ object LDAgibbs  {
       throw new RuntimeException("LDAgibbs dimensions mismatch")
     }
     var err = if (doBino) {
-      CUMACH.LDAgibbsBino(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, D.data, C.data, nsamps.toInt)
+      CUMACH.LDAgibbsBino(A.nrows, C.nnz, A.pdata, B.pdata, AN.pdata, BN.pdata, C.pir, C.pic, D.pdata, C.pdata, nsamps.toInt)
     } else {
-      CUMACH.LDAgibbs(A.nrows, C.nnz, A.data, B.data, AN.data, BN.data, C.ir, C.ic, C.data, nsamps)
+      CUMACH.LDAgibbs(A.nrows, C.nnz, A.pdata, B.pdata, AN.pdata, BN.pdata, C.pir, C.pic, C.pdata, nsamps)
     }
     if (err != 0) throw new RuntimeException(("GPU %d LDAgibbs kernel error "+cudaGetErrorString(err)) format getGPU)
     Mat.nflops += (if (doBino) 40L else 12L) * C.nnz * A.nrows   // Charge 10 for Poisson RNG

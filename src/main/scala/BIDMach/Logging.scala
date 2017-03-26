@@ -14,7 +14,7 @@ object Logging{
       for(i<-0 until m.length){
           res(i) = sum(snorm(m(i))).dv.toFloat
       }
-      Array(FMat(m.length,1,res))
+      Array(new FMat(m.length,1,res))
     }
   
     def logGradientL1Norm(model:Model,data:Array[Mat]):Array[Mat] = {
@@ -23,7 +23,7 @@ object Logging{
       for(i<-0 until m.length){
           res(i) = sum(sum(abs(m(i)))).dv.toFloat
       }
-      Array(FMat(m.length,1,res))
+      Array(new FMat(m.length,1,res))
     }
     
     def getResults(model:Model): Array[Mat] = {

@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,GFunctions,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
@@ -128,7 +128,7 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
     } else {
       val smat = dd.copy
       val imat = icol(0->nsamps)*iones(1,nsamps)
-      GMat.sortGPU(smat, imat)
+      GFunctions.sortGPU(smat, imat)
       (smat, imat)
     }
   }
