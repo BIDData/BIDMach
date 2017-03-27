@@ -169,10 +169,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     for (i <- 0 until M) results(i) = null;
     nresults = 0;
     broadcastCommand(cmd);
-    var tmsec = 0;
-    while (nresults < M && tmsec < timesecs * 1000) {
-      Thread.`sleep`(10);
-      tmsec += 10;
+    results.synchronized {
+      results.wait(timesecs * 1000)
     }
     results.clone
   }
@@ -182,10 +180,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     for (i <- 0 until M) results(i) = null;
     nresults = 0;
     broadcastCommand(cmd); 
-    var tmsec = 0;
-    while (nresults < M && tmsec < timesecs * 1000) {
-      Thread.`sleep`(10);
-      tmsec += 10;
+    results.synchronized {
+      results.wait(timesecs * 1000)
     }
     results.clone
   }
@@ -195,10 +191,8 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     for (i <- 0 until M) results(i) = null;
     nresults = 0;
     broadcastCommand(cmd); 
-    var tmsec = 0;
-    while (nresults < M && tmsec < timesecs * 1000) {
-      Thread.`sleep`(10);
-      tmsec += 10;
+    results.synchronized {
+      results.wait(timesecs * 1000)
     }
     results.clone
   }
@@ -385,6 +379,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     results.synchronized {
     	results(src) = obj;
     	nresults += 1;
+	if (nresults >= M) {
+	  results.notify()
+	}
     }
   }
   
