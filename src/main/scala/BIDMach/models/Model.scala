@@ -213,7 +213,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	v
   }
 
-  def snapshot(len0:Int, avg:Boolean, matIdx:Int = 0) = {
+  def snapshot(len0:Int, avg:Boolean, matIdx:Int) = {
     if (sendmats == null) sendmats = new Array[Mat](modelmats.length)
 
     val mm = modelmats(matIdx)
@@ -232,7 +232,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
   }
 
-  def addStep(len0:Int, avg:Boolean, matIdx:Int = 0) = {
+  def addStep(len0:Int, avg:Boolean, matIdx:Int) = {
     if (avg && maxmats == null) maxmats = new Array[Mat](modelmats.length)
 
     val mm = modelmats(matIdx)
@@ -256,24 +256,54 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     recvmat.rowslice(avgOffset, mmnr+avgOffset, smview)
     mm.synchronized {
       val mmview = mm.view(mmnr, len)
+
+      var prenorm:Double = 0.0
+      if (opts.trace > 2) prenorm = norm(mmview)
+
       mmview ~ mmview + smview
+
+      if (opts.trace > 2) println("mat %d: pre-mm norm: %f, smview norm: %f, new-mm norm: %f" format (
+        matIdx, prenorm, norm(smview), norm(mmview)))
     }
   }
 
-  def elasticStep(len:Int, avg:Boolean, ee:Float) = {
-    // TODO
-  	// val len0 = math.min(len, modelmats(0).ncols);
-  	// if (avg) recvmat = recvmat / max(recvmat(0,?), 1f);
-  	// recvmat = recvmat - sendmat;
-  	// val nr = modelmats(0).nrows;
-  	// modelmats(0).synchronized {
-  	// 	val head = modelmats(0).view(nr, len0);
-  	// 	val chead = sendmat.view(nr, len0);
-  	// 	chead <-- head;
-  	// 	chead ~ chead * (1 - ee) + (if (avg) recvmat(1 -> (nr+1), ?) else recvmat) * ee;
-  	// 	head <-- chead;
-  	// }
+  def elasticStep(len0:Int, avg:Boolean, alpha:Float, matIdx:Int) = {
+    if (avg && maxmats == null) maxmats = new Array[Mat](modelmats.length)
+
+    val mm = modelmats(matIdx)
+    val mmnr = mm.nrows
+    val mmnc = mm.ncols
+    val avgOffset = if (avg) 1 else 0
+    if (avg && maxmats(matIdx) == null) maxmats(matIdx) = FMat(1, mmnc)
+    val len = math.min(len0, mmnc);
+    val recvmat = recvmats(matIdx).view(mmnr + avgOffset, len)
+    val rmnr = recvmat.nrows
+    val rmnc = recvmat.ncols
+    val sendmat = sendmats(matIdx).view(mmnr + avgOffset, len)
+
+    if (avg) {
+      val maxmat = maxmats(matIdx).view(1, len)
+      recvmat.rowslice(0, 1, maxmat)
+      recvmat ~ recvmat / max(maxmat, 1f)
+    }
+    recvmat ~ recvmat - sendmat
+    val smview = sendmat.view(mmnr, len)
+    recvmat.rowslice(avgOffset, mmnr+avgOffset, smview)
+    mm.synchronized {
+      val mmview = mm.view(mmnr, len)
+
+      var prenorm:Double = 0.0
+      if (opts.trace > 2) prenorm = norm(mmview)
+
+      mmview ~ mmview + alpha*smview
+
+      if (opts.trace > 2) println("mat %d: alpha %f, pre-mm norm: %f, smview norm: %f, new-mm norm: %f" format (
+        matIdx, alpha, prenorm, norm(smview), norm(mmview)))
+    }
   }
+
+  def elasticStep(len0:Int, avg:Boolean, ee:Double, matIdx:Int):Unit =
+    elasticStep(len0, avg, ee.toFloat, matIdx)
 
   def copyMats(from:Array[Mat], to:Array[Mat]) = {
     for (i <- 0 until from.length) {
@@ -347,6 +377,7 @@ object Model {
 	  var doAllReduce = false;
 	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
 	  var logDataSink : DataSink = null;
+      var trace = 0
   }
 
 	class Options extends Opts {}

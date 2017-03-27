@@ -1355,7 +1355,6 @@ object RandomForest {
     var seed = 1;
     var useIfeats = false; // explicitly save Ifeat indices (vs. compute them)
     var MAE = true;
-    var trace = 0;
   }
 
   class Options extends Opts {}

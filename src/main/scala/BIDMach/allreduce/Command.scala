@@ -107,6 +107,7 @@ object Command {
     final val callCtype = 12;
     final val ackReadyCtype = 13;
     final val registerWorkerCtype = 14;
+    final val workerExceptionCtype = 15;
     final val names = Array[String]("",
       "config",
       "permute",
@@ -121,7 +122,8 @@ object Command {
       "returnObject",
       "call",
       "ackReady",
-      "registerWorker");
+      "registerWorker",
+      "workerException");
 
 
   def printStackTrace(e:Exception):String = {

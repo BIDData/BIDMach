@@ -183,7 +183,6 @@ case class Learner(
   }
 
   def wrapUp(ipass:Int) {
-    if (opts.checkPointFile != null) model.save(opts.checkPointFile format lastCheckPoint)
     model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
@@ -201,6 +200,7 @@ case class Learner(
     results = Learner.scores2FMat(reslist) on row(samplist.toList);
 
     done = true;
+    if (opts.checkPointFile != null) model.save(opts.checkPointFile format lastCheckPoint)
   }
 
   def predict() = {

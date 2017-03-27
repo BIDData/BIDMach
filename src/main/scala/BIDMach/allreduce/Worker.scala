@@ -42,6 +42,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  learner = learner0;
 	  if (learner != null) {
 	    model = learner.model
+		model.opts.trace = opts.trace
 	    if (learner.modelmats == null) learner.init
 	  }
 	  executor = Executors.newFixedThreadPool(8);
@@ -127,11 +128,34 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
         } else {
           irow(0 -> sendmat.ncols)
         }
-      val machine = machineArr(matIdx)
 
       if (opts.trace > 3) logln("Starting allreduce for mm %d with dims %s datalen %d" format (
 	matIdx, Arrays.toString(sendmat.dims.data), sendmat.size))
-      val result = if (opts.fuseConfigReduce) {
+      val result = machineAllreduce(machineArr(matIdx), indexmat, sendmat, opts.fuseConfigReduce)
+
+      if (model.recvmats == null) model.recvmats = new Array[FMat](model.modelmats.length)
+      model.recvmats(matIdx) = new FMat(sendmat.nrows, mm.ncols, result)
+	  if (opts.doElastic) {
+		model.elasticStep(limit.toInt, opts.doAvg, opts.elasticAlpha, matIdx)
+	  } else {
+        model.addStep(limit.toInt, opts.doAvg, matIdx)
+	  }
+      val t2 = toc
+      val nbytes = indexmat match {
+        case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f
+        case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f
+      }
+      if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (
+	nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
+    } else {
+      if (opts.trace > 2) log("Allreduce model is null\n")
+    }
+  }
+
+  def machineAllreduce(
+    machine:Machine, indexmat:Mat, sendmat:Mat, configReduce:Boolean
+  ):Array[Float] = {
+      return if (configReduce) {
         (indexmat, sendmat) match {
           case (lmat:LMat, fsendmat:FMat) => machine.configReduce(
 	    lmat.data, lmat.data, fsendmat.data, fsendmat.size, fsendmat.nrows, round)
@@ -146,20 +170,6 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	val fsendmat = sendmat.asInstanceOf[FMat]
         machine.reduce(fsendmat.data, fsendmat.size, fsendmat.nrows, round)
       }
-
-      if (model.recvmats == null) model.recvmats = new Array[FMat](model.modelmats.length)
-      model.recvmats(matIdx) = new FMat(sendmat.nrows, mm.ncols, result)
-      model.addStep(limit.toInt, opts.doAvg, matIdx)
-      val t2 = toc
-      val nbytes = indexmat match {
-        case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f
-        case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f
-      }
-      if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (
-	nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
-    } else {
-      if (opts.trace > 2) log("Allreduce model is null\n")
-    }
   }
 
   def stop = {
@@ -176,6 +186,19 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   }
 
   def handleCMD(cmd:Command) = {
+    try {
+      _handleCMD(cmd)
+    } catch {
+      case e:Exception => {
+        val expresp = new WorkerExceptionResponse(cmd.round, cmd.dest, Command.printStackTrace(e))
+	expresp.encode
+	sendMaster(expresp)
+	throw e
+      }
+    }
+  }
+
+  def _handleCMD(cmd:Command) = {
     if (cmd.magic != Command.magic) {
       if (opts.trace > 0) log("Machine %d got message with bad magic number %d\n" format (imach, cmd.magic));
     }  else if (cmd.dest != imach) {
@@ -209,7 +232,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 		} catch {
 		  case e:Exception => {
 		    if (opts.trace > 0) log("Allreduce failed:\n%s" format Command.printStackTrace(e));
-		    // sendMaster(AllreduceResponse.failure(cmd.round, cmd.dest, cmd.tag))
+		    sendMaster(AllreduceResponse.failure(cmd.round, cmd.dest, cmd.tag))
 		  }
 		}
     	}
@@ -235,7 +258,9 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		if (learner != null) {
 		  if (learner.modelmats == null) learner.init
     		  sendMaster(new Response(Command.startLearnerCtype, newcmd.round, imach))
+		  if (opts.trace > 0) logln("Worker starting training.")
 		  learner.train(false)
+		  if (opts.trace > 0) logln("Worker training finished! Responding to Master.")
     		  sendMaster(new Response(Command.learnerDoneCtype, -1, imach))
     		} else {
 		  logln("Recieved startLearner Command but learner == null")
@@ -373,8 +398,10 @@ object Worker {
     var reduceTimeout = 3000;
     var cmdTimeout = 1000;
     var fuseConfigReduce = false;
-    var doAvg = true;
-    var useLong = false;
+    var doAvg = true
+    var doElastic = false
+    var elasticAlpha = 0.9 / 4
+    var useLong = false
     var replicate = 1;
     var bufsizes:Array[Int] = null;
     var respond = 0;

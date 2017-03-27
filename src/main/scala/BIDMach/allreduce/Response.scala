@@ -158,6 +158,32 @@ extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes, byt
   }
 }
 
+class WorkerExceptionResponse(round0:Int, src0:Int, var msg:String, bytes:Array[Byte])
+extends Response(Command.workerExceptionCtype, round0, src0, 4+msg.length, bytes, 4+msg.length) {
+
+  def this(round0:Int, src0:Int, msg0:String) =
+    this(round0, src0, msg0, new Array[Byte](4+msg0.length))
+
+  override def encode():Unit = {
+    intData.rewind()
+    byteData.rewind()
+    val msgBytes = msg.getBytes(StandardCharsets.UTF_8)
+    intData.put(msgBytes.length)
+    byteData.position(4)
+    byteData.put(msgBytes, 0, msgBytes.length)
+  }
+
+  override def decode():Unit = {
+    intData.rewind()
+    byteData.rewind()
+    val msgLength = intData.get()
+    val msgBytes = new Array[Byte](msgLength)
+    byteData.position(4)
+    byteData.get(msgBytes, 0, msgLength)
+    msg = new String(msgBytes, StandardCharsets.UTF_8)
+  }
+}
+
 class ResponseWriter(address:InetSocketAddress, resp:Response, me:Worker)
 extends Runnable {
   def run() {

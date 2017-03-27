@@ -21,7 +21,7 @@ println("####################")
 
 val m = new Master()
 val opts = m.opts
-opts.trace = 3
+opts.trace = 2
 opts.intervalMsec = 2000
 opts.limit = Int.MaxValue
 opts.timeScaleMsec = 2e-3f
@@ -50,8 +50,9 @@ m.sendConfig
 //   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1)
 //   learnSource.mats(0) = learnSource.mats(0)(?, nstart->nend)
 //   learnSource.mats(1) = learnSource.mats(1)(?, nstart->nend)
-//   "imach: %d, nstart: %d, nend: %d\n" format (
-//     w.imach, nstart, nend)
+//   learnSource.init
+//   "imach: %d, nstart: %d, nend: %d, elastic: %b, alpha: %f\n" format (
+//     w.imach, nstart, nend, w.opts.doElastic, w.opts.elasticAlpha)
 // })
 //
 // m.startLearners(blocking = true)

@@ -42,7 +42,7 @@ m.sendConfig
 
 // m.parCall((w) => {
 //   var fgopts = w.learner.opts.asInstanceOf[GLM.FGOptions]
-//   fgopts.npasses = 2
+//   fgopts.npasses = 1
 //   var totalNumSamples = fgopts.nend
 //   totalNumSamples = 80
 //   var numWorkers = 4; // TODO: don't hardcode this

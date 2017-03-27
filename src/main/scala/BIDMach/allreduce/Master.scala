@@ -52,6 +52,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	var allWorkersRegisteredSema:Semaphore = new Semaphore(0)
 	var workerModel:Model = null
 	var numModelMats:Int = -1
+	var finishedReducers:Int = 0
 	
 	def init() {
     masterIP = InetAddress.getLocalHost;
@@ -110,10 +111,11 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
   
   def startUpdates(waitForAck:Boolean = false, logLocation:String = null) {
+	finishedReducers = 0
     reducerMap = new MutableHashMap[Int, Reducer]()
     reduceTaskMap = new MutableHashMap[Int, Future[_]]()
     for (i <- 0 until numModelMats) { // TODO: use modelMat names instead of idx
-      val reducer = new Reducer(i, waitForAck, logLocation)
+      val reducer = new Reducer(this, i, waitForAck, logLocation)
       reducerMap(i) = reducer
       val reduceTask = executor.submit(reducer)
       reduceTaskMap(i) = reduceTask
@@ -272,7 +274,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     }
   }
 
-  class Reducer(matIdx:Int, waitForAck:Boolean = false, var logLocation:String = null) extends Runnable {
+  class Reducer(
+	val master:Master,
+	val matIdx:Int,
+	val waitForAck:Boolean = false,
+	var logLocation:String = null
+  ) extends Runnable {
+
     var stop = false
     var allreduceSuccess:Int = 0
     var allreduceFailure:Int = 0
@@ -282,6 +290,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
     def allreduceCollected:Int = {
       return allreduceSuccess + allreduceFailure
     }
+
+	def allreduceReset:Unit = {
+	  this.synchronized {
+	    allreduceSuccess = 0
+	    allreduceFailure = 0
+	  }
+	}
 
     def run() {
       if (logLocation != null) {
@@ -316,10 +331,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  } else {
 	    new AllreduceCommand(round, 0, limit, matTag)
 	  }
-	  this.synchronized {
-	    allreduceSuccess = 0
-	    allreduceFailure = 0
-	  }
+	  allreduceReset
+
+	  if (opts.trace > 1) log("%s: Starting round %d\n" format(matTag, round))
 	  broadcastCommand(cmd)
 
 	  allreduceStartTime = System.currentTimeMillis
@@ -328,7 +342,17 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  }
 	  if (opts.trace > 1) log("%s: Finished round %d, workers %d/%d, %d success, time %dms\n" format(
 	    matTag, round, allreduceCollected, M, allreduceSuccess, System.currentTimeMillis - allreduceStartTime))
-	  round += 1
+
+	  master.synchronized {
+		finishedReducers += 1
+		if (finishedReducers >= numModelMats) {
+		  round += 1
+		  finishedReducers = 0
+		  master.notifyAll()
+		} else {
+		  master.wait()
+		}
+	  }
 	}
       } catch {
 	case e:InterruptedException => {
@@ -367,6 +391,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   def handleResponse(resp:Response) = {
     if (resp.magic != Response.magic) {
       if (opts.trace > 0) log("Master got response with bad magic number %d\n" format (resp.magic));
+
+    } else if (resp.rtype == Command.workerExceptionCtype) {
+      val expresp = new WorkerExceptionResponse(resp.round, resp.src, "", resp.bytes)
+      expresp.decode
+      if (opts.trace > 0) logln("Worker %d (round %d) threw exception:\n%s" format (
+	resp.src, resp.round, expresp.msg))
+
 
     } else if (resp.rtype == Command.learnerDoneCtype) {
       stopUpdates()
@@ -462,9 +493,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  reducer.allreduceFailure += 1
 	}
 	if (opts.trace > 2) {
-	  logln("%s: Collected response %d/%d from src %d%s" format (
-	    resp.tag, reducer.allreduceCollected, M, resp.src, if (!resp.success) " (FAILURE)" else ""),
-	    resp.tag)
+	  log((if (resp.success) "." else "F"), resp.tag)
+	  // logln("%s: Collected response %d/%d from src %d%s" format (
+	  //   resp.tag, reducer.allreduceCollected, M, resp.src, if (!resp.success) " (FAILURE)" else ""),
+	  //   resp.tag)
 	}
 	val delta = System.currentTimeMillis - reducer.allreduceStartTime
 	if (delta < opts.minWaitTime) {

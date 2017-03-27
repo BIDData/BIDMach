@@ -38,7 +38,7 @@ val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
 
 opts.lrate = 0.03f                       // Learning rate
 opts.nvocab = 20000                      // Vocabulary limit
-opts.npasses = 10                         // Number of passes over the dataset
+opts.npasses = 1                         // Number of passes over the dataset
 opts.height = 2                          // Height of the network
 opts.dim = 256                           // Dimension of LSTM units
 opts.batchSize = batchSize               // Batch size
@@ -65,13 +65,16 @@ opts.texp = 0.3f
 
 val w = new Worker()
 val wopts = w.opts
-wopts.trace = 0
+wopts.trace = 1
 wopts.machineTrace = 0
 wopts.configTimeout = 6000
 wopts.reduceTimeout = 6000
 wopts.sendTimeout = 2000
 wopts.recvTimeout = 2000
 wopts.cmdTimeout = 2000
+
+wopts.doElastic = true
+wopts.elasticAlpha = 0.9 / 4
 
 val customCommandPortStr = sys.env.get("WORKER_CMD_PORT")
 customCommandPortStr match {
