@@ -216,7 +216,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val words = if (opts.iflip) wordsens(1,?) else wordsens(0,?);
     val wgood = words < opts.vocabSize;                                        // Find OOV words 
     addTime(1);
-    
+
     rand(randsamp);                                                            // Take a random sample
     val wrat = float(words+1) * salpha;
     wrat ~ sqrt(wrat) + wrat;
@@ -228,7 +228,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     val ubrand = min(opts.nskip, int(ubound * opts.nskip) + 1);
     val lbrand = - ubrand;
     addTime(3);
-    
+
     val sentencenum = if (opts.iflip) wordsens(0,?) else wordsens(1,?);        // Get the nearest sentence boundaries
     val lbsentence = - cumsumByKey(allones, sentencenum) + 1;
     val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
@@ -237,7 +237,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     test3 = lb
     test4 = ub
     addTime(4);
-    
+
     val (trandwords, contextwords) = (words, lb, ub) match {
       case (giwords:GIMat, gilb:GIMat, giub:GIMat) => {
 
