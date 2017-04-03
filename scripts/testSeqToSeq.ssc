@@ -12,7 +12,7 @@ val (nn, opts) = SeqToSeq.learner(dir + "src%04d.smat.lz4", dir + "dst%04d.smat.
 val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
 
 opts.lrate = 0.03f;                       // Learning rate
-opts.nvocab = 100000;                     // Vocabulary limit
+opts.nvocab = 10000;                     // Vocabulary limit
 opts.npasses = 1;                         // Number of passes over the dataset
 opts.height = 2;                          // Height of the network
 opts.dim = 256;                           // Dimension of LSTM units
