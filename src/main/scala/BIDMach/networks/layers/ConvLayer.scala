@@ -89,22 +89,18 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
   override def backward = {
     val start = toc;
-    // Guess: convolveT - the gradient of input data
-    //        convolveM - the gradient of the current Model (Filter)
     val ndims = output.dims.length;
     
     if(opts.hasBias){
       update_bias_mat ~ update_bias_mat + (deriv.sum(irow(ndims - 1)) / inputData.ncols);
     }
 
-
     if (inputDeriv.asInstanceOf[AnyRef] != null) {      
-        ffilter.convolveT(deriv, inputDeriv, true)
+        ffilter.convolveT(deriv, inputDeriv, false)
     }
 
-    updateFFilter.convolveM(inputData, deriv, true)
+    updateFFilter.convolveM(inputData, deriv, false)
 
-    //Should we handle the update of updatemats(imodel)? I think it should be handled in learner?
     backwardtime += toc - start;
   }
 
