@@ -47,8 +47,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
       FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
     }
     ffilter = filter.asInstanceOf[Filter];
-    rand(filter);
-    filter ~ filter - 0.5f;
+    ffilter.xavier(1f);;
     updateFilter = filter.copy;
     updateFFilter = updateFilter.asInstanceOf[Filter];
     if (opts.hasBias) {
