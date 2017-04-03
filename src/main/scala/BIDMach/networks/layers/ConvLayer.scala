@@ -52,7 +52,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     updateFFilter = updateFilter.asInstanceOf[Filter];
     if (opts.hasBias) {
       // initialize bias matrix, should be the size of channel_out*h*w, would be applied to n samples
-      val biasDim = irow(channel_out,filter_h,filter_w);
+      val biasDim = irow(channel_out,filter_h,filter_w,1);
       bias_mat = filter.zeros(biasDim);
       update_bias_mat = filter.zeros(biasDim);
     } 
