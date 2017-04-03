@@ -32,7 +32,6 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
   def initModelMats = {
     // image should be something like - val image = FND(irow(channel_in,h,w,n));
-    inputDim = opts.imageDim
     val channel_in = inputDim(0);
     val filter_h = opts.kernel(0); // 3;0
     val filter_w = opts.kernel(1); // 3;
@@ -41,7 +40,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val channel_out = opts.noutputs; // actually # of filters;
 
     
-    filter = if (opts.useGPU) {
+    filter = if (net.opts.useGPU) {
     	GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
     } else {
       FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
@@ -72,14 +71,12 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
       }
     }
 
-    // Create the output tensor if needed
-    if (output.asInstanceOf[AnyRef] == null){ // if output not exist, should make a result to know the exact dimension of output
+    if (output.asInstanceOf[AnyRef] == null){ 
     	var outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
     	output = filter.zeros(outputBatchDim)
     }
     
-    output ~ filter * inputData;
-
+    ffilter.convolve(inputData, output, true);
     if (opts.hasBias) output ~ output + bias_mat;
 
     clearDeriv
@@ -116,11 +113,8 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var kernel:IMat = null
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
-  var group:Int = 1
-  var axis:Int = 1
-  var forceND:Boolean = false
-  var imageDim:IMat = null // it should be something like 1*28*28 for MNIST, i.e. channel_in*h*w
-  var useGPU:Boolean = true
+//  var group:Int = 1
+//  var axis:Int = 1
 
   def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
       super.copyOpts(opts);
@@ -130,10 +124,8 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
       opts.kernel = kernel;
       opts.stride = stride;
       opts.dilation = dilation;
-      opts.group = group;
-      opts.axis = axis;
-      opts.forceND = forceND;
-      opts.useGPU = useGPU;
+//      opts.group = group;
+//      opts.axis = axis;
       opts;
   }
 

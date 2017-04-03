@@ -1349,15 +1349,18 @@ object Word2Vec  {
   // Write a Google Word2Vec model file in binary or text format. 
   
   def saveGoogleW2V(dict:CSMat, mod:FMat, fname:String, binary:Boolean = false) = {
+    val nwords = if (mod.ncols < dict.length) {
+      mod.ncols;
+    } else {
+      println("Warning: dictionary is smaller than model word count - you should reduce vocabSize in the Word2Vec model");
+      dict.length;
+    }
   	val outs = HMat.getOutputStream(fname, 0);
   	val dout = new DataOutputStream(outs);
-//  	val fout = new PrintWriter(dout);
   	val cr = String.format("\n");
-//  	fout.print(mod.ncols.toString + " " + mod.nrows.toString + cr); fout.flush;
-	dout.writeBytes(mod.ncols.toString + " " + mod.nrows.toString + cr);
+  	dout.writeBytes(nwords.toString + " " + mod.nrows.toString + cr);
   	var i = 0;
-  	while (i < mod.ncols) {
-//  		fout.print(dict(i)+ " "); fout.flush;
+  	while (i < nwords) {
 		dout.writeBytes(dict(i)+ " ");
   		var nwritten = 0;
   		var j = 0;
