@@ -1351,14 +1351,14 @@ object Word2Vec  {
   def saveGoogleW2V(dict:CSMat, mod:FMat, fname:String, binary:Boolean = false) = {
   	val outs = HMat.getOutputStream(fname, 0);
   	val dout = new DataOutputStream(outs);
-  	val fout = new PrintWriter(dout);
+//  	val fout = new PrintWriter(dout);
   	val cr = String.format("\n");
-  	fout.print(mod.ncols.toString + " " + mod.nrows.toString + cr);
-  	fout.flush;
+//  	fout.print(mod.ncols.toString + " " + mod.nrows.toString + cr); fout.flush;
+	dout.writeBytes(mod.ncols.toString + " " + mod.nrows.toString + cr);
   	var i = 0;
   	while (i < mod.ncols) {
-  		fout.print(dict(i)+ " ");
-  		fout.flush;
+//  		fout.print(dict(i)+ " "); fout.flush;
+		dout.writeBytes(dict(i)+ " ");
   		var nwritten = 0;
   		var j = 0;
   		while (j < mod.nrows) {
