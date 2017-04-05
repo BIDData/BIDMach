@@ -3,6 +3,7 @@ package BIDMach.allreduce
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMat.JSON
 import edu.berkeley.bid.comm._
 import scala.collection.parallel._
 import scala.util.control.Breaks._
@@ -28,6 +29,7 @@ import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.io.File
 import java.io.FileOutputStream
+import scala.reflect.ClassTag
 
 
 class Master(override val opts:Master.Opts = new Master.Options) extends Host {
@@ -158,6 +160,34 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
 
   def startLearners:Unit = startLearners(false)
+
+  def collectModelParts:(Array[String], Array[Array[Mat]]) = {
+    val mopts = this.parCall((w) => {
+      JSON.toJSON(w.model.opts, true)
+    }).map(_.asInstanceOf[String])
+    val mmats = this.parCall((w) => {
+      w.model.modelmats
+    }).map(_.asInstanceOf[Array[Mat]])
+    return (mopts, mmats)
+  }
+
+  def collectModels[T <: Model](implicit mcls: ClassTag[T]):Array[T] = {
+    val (mopts, mmats) = collectModelParts
+
+    val optscls = Class.forName("%s$Options" format (mcls.runtimeClass.getName))
+    val models = new Array[T](mopts.length)
+    for (i <- 0 until models.length) {
+      // Source: http://stackoverflow.com/a/40272062
+      models(i) = mcls.runtimeClass.getConstructors.head
+	.newInstance(optscls.newInstance.asInstanceOf[Model.Opts])
+	.asInstanceOf[T]
+      val mm = models(i)
+      mm.setmodelmats(mmats(i))
+      mm.opts.copyFrom(JSON.fromJSON(mopts(i)).asInstanceOf[BIDMat.Opts])
+    }
+
+    return models
+  }
   
   def permuteAllreduce(round:Int, limit:Int) {
   	val cmd = new PermuteAllreduceCommand(round, 0, round, limit, null);

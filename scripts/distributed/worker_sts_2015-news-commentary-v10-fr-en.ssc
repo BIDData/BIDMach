@@ -21,6 +21,7 @@ Mat.useGPUcache = true
 
 val mdir = "/mnt/BIDMach/data/MNT2015/models/"
 val datadir = "/mnt/BIDMach/data/MNT2015/data/"
+val PADsym = 1
 
 val batchSize = 128
 var src = loadSMat(datadir+"news-commentary-v10.fr-en.fr.smat.lz4")
@@ -30,8 +31,8 @@ dst = dst(?, 0 -> (dst.ncols - (dst.ncols % batchSize)))
 
 var srcFull = full(src)
 var dstFull = full(src)
-srcFull ~ srcFull + -1 * (srcFull == 0)
-dstFull ~ dstFull + -1 * (dstFull == 0)
+srcFull ~ srcFull + PADsym * (srcFull == 0)
+dstFull ~ dstFull + PADsym * (dstFull == 0)
 
 val (nn, opts) = SeqToSeq.learner(srcFull, dstFull)
 val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
@@ -53,15 +54,11 @@ opts.outwidth = 30                       // Max output sentence length (truncate
 opts.hasBias = true                      // Use bias terms in linear layers
 opts.pstep = 0.005f                      // How often to print
 opts.cumScore = 3                        // Accumulate scores for less-noisy printing
-opts.PADsym = -1                         // The padding symbol
-opts.OOVsym = 1                          // The OOV symbol
+opts.PADsym = PADsym                     // The padding symbol
+opts.OOVsym = 2                          // The OOV symbol
 opts.STARTsym = 0
 opts.reg1weight = 1e-9f                  // L1 regularization weight
 opts.texp = 0.3f
-
-//net.opts.debug = 1
-//opts.useGPU = false
-//Mat.useMKL = false
 
 val w = new Worker()
 val wopts = w.opts
@@ -89,3 +86,28 @@ customCommandPortStr match {
 }
 
 w.start(nn)
+
+
+// Prediction
+// val s2s = SeqToSeq.load("/mnt/BIDMach/data/MNT2015/models/local/")
+// val (nn, opts) = SeqToSeq.predict(s2s, srcFull)
+//
+// opts.nvocab = 20000
+// opts.height = 2
+// opts.dim = 256
+// opts.batchSize = batchSize
+//
+// opts.kind = 1
+// opts.netType = 0
+// opts.scoreType = 1
+// opts.inwidth = 30
+// opts.outwidth = 30
+// opts.hasBias = true
+// opts.pstep = 0.005f
+// opts.cumScore = 3
+// opts.PADsym = PADsym
+// opts.OOVsym = 2
+// opts.STARTsym = 0
+//
+// nn.predict
+//

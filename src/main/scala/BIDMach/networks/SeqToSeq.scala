@@ -180,16 +180,23 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       	val maxcol = dstxn;
       	assignTargets(gmats, ipass, pos);
       	dstGrid.forward(0, maxcol-1, opts.debug);     
-      	if (putBack >= 0) {
-      		output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));
-      	}
-      	var score = 0f;
-      	var j = 0;
-      	while (j < dstxn-1) {
-      		score += output_layers(j).score.v;
-      		j += 1;
-      	}
-      	row(score/(dstxn-1));
+	if (ogmats != null) {
+	  ogmats(0) = GMat(opts.outwidth, batchSize)
+	  for (j <- 0 until opts.outwidth) {
+	    ogmats(0)(j, ?) = GMat(maxi2(output_layers(j).output.asMat, 1)._2)
+	  }
+	}
+	zeros(1, 1)
+      	// if (putBack >= 0) {\
+      	// 	output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));\
+      	// }\
+      	// var score = 0f;\
+      	// var j = 0;\
+      	// while (j < dstxn-1) {\
+      	// 	score += output_layers(j).score.v;\
+      	// 	j += 1;\
+      	// }\
+      	// row(score/(dstxn-1));\
       } else {
       	if (ogmats != null) {
       	  var embedding = srcGrid(height+preamble_rows-1, srcGrid.ncols-1).output.asMat;
@@ -338,17 +345,19 @@ object SeqToSeq {
 
   class MatPredOpts extends Learner.Options with SeqToSeq.Opts with MatSource.Opts with MatSink.Opts
 
-  def embed(model:SeqToSeq, src:Mat):(Learner, MatPredOpts) = {
+  def predict(model:SeqToSeq, src:Mat):(Learner, MatPredOpts) = {
     val opts = new MatPredOpts
     opts.copyFrom(model.opts)
-    opts.embed = true
 
     val newmod = new SeqToSeq(opts)
     newmod.refresh = false
     model.copyTo(newmod)
 
+    val dst = zeros(opts.outwidth, src.ncols)
+    opts.putBack = 1
+
     val nn = new Learner(
-        new MatSource(Array(src), opts),
+        new MatSource(Array(src, dst), opts),
         newmod,
         null,
         null,

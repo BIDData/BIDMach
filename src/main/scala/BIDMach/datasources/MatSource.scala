@@ -5,36 +5,36 @@ import BIDMat.SciFunctions._
 import java.io._
 
 
-class MatSource(var mats:Array[Mat], override val opts:MatSource.Opts = new MatSource.Options) extends DataSource(opts) { 
-  var sizeMargin = 0f 
+class MatSource(var mats:Array[Mat], override val opts:MatSource.Opts = new MatSource.Options) extends DataSource(opts) {
+  var sizeMargin = 0f
   var here = 0
   var there = 0
   var blockSize = 0
   var totalSize = 0
   var umat:Mat = null;
-  
+
   def init = {
     sizeMargin = opts.sizeMargin
     blockSize = opts.batchSize
     if (opts.addConstFeat) {
-      mats(0) = mats(0) on sparse(ones(1, mats(0).ncols)) 
+      mats(0) = mats(0) on sparse(ones(1, mats(0).ncols))
     }
     if (opts.featType == 0) {
-      mats(0).contents.set(1)     
+      mats(0).contents.set(1)
     }
     here = -blockSize
     totalSize = mats(0).ncols
     omats = new Array[Mat](mats.length)
     endmats = new Array[Mat](mats.length)
-    fullmats = new Array[Mat](mats.length)   
+    fullmats = new Array[Mat](mats.length)
   }
-  
+
   def nmats = omats.length
-  
+
   def reset = {
     here = -blockSize
   }
-  
+
   def next:Array[Mat] = {
     here = math.min(here+blockSize, mats(0).ncols)
     there = math.min(here+blockSize, mats(0).ncols)
@@ -44,16 +44,16 @@ class MatSource(var mats:Array[Mat], override val opts:MatSource.Opts = new MatS
   	    omats(i) = fullmats(i)
   	  } else {
   	    endmats(i) = mats(i).colslice(here, there, endmats(i))
-  	    omats(i) = endmats(i) 	    
+  	    omats(i) = endmats(i)
   	  }
   	}
   	omats
   }
-  
+
   def hasNext:Boolean = {
     here + blockSize < mats(0).ncols
   }
-  
+
   override def setupPutBack(n:Int, dim:Int):Unit = {
     if (mats.length <= n || mats(n).asInstanceOf[AnyRef] == null || mats(n).nrows != dim) {
       val newmats = new Array[Mat](n+1)
@@ -64,14 +64,14 @@ class MatSource(var mats:Array[Mat], override val opts:MatSource.Opts = new MatS
       	newmats(i) = zeros(dim, mats(0).ncols)
       }
       mats = newmats
-    } 
+    }
   }
-  
+
   override def putBack(tmats:Array[Mat],n:Int):Unit = {
     for (i <- 1 to n)
     	tmats(i).colslice(0, tmats(i).ncols, mats(i), here, true);
   }
-  
+
   def progress = {
     math.min((here+blockSize)*1f/totalSize, 1f)
   }
@@ -81,8 +81,8 @@ class MatSource(var mats:Array[Mat], override val opts:MatSource.Opts = new MatS
 object MatSource {
     trait Opts extends DataSource.Opts {
   }
-  
-  class Options extends Opts {   
+
+  class Options extends Opts {
   }
 }
 

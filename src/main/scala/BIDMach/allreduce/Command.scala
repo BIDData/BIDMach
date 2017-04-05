@@ -3,6 +3,7 @@ package BIDMach.allreduce
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMat.JSON
 import BIDMach.Learner
 import edu.berkeley.bid.comm._
 import scala.collection.parallel._
