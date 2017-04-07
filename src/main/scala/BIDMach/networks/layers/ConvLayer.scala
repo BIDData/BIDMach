@@ -49,11 +49,15 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     ffilter.xavier(1f);;
     updateFilter = filter.copy;
     updateFFilter = updateFilter.asInstanceOf[Filter];
+    modelmats(imodel) = filter;
+    updatemats(imodel) = updateFilter;
     if (opts.hasBias) {
       // initialize bias matrix, should be the size of channel_out*h*w, would be applied to n samples
       val biasDim = irow(channel_out,filter_h,filter_w,1);
       bias_mat = filter.zeros(biasDim);
       update_bias_mat = filter.zeros(biasDim);
+      modelmats(imodel+1) = bias_mat;
+      updatemats(imodel+1) = update_bias_mat;
     } 
   }
 
@@ -61,16 +65,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val start = toc;
     
     // Create filter model, filter update and bias model if needed
-    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-      initModelMats
-      modelmats(imodel) = filter;
-      updatemats(imodel) = updateFilter;
-      if (opts.hasBias) {
-        modelmats(imodel+1) = bias_mat;
-        updatemats(imodel+1) = update_bias_mat;
-      }
-    }
-
+    if (modelmats(imodel).asInstanceOf[AnyRef] == null) initModelMats;
     if (output.asInstanceOf[AnyRef] == null){ 
     	var outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
     	output = filter.zeros(outputBatchDim)
