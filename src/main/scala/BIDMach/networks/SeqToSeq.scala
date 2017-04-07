@@ -49,7 +49,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     layers = srcGrid.data.filter(_ != null);
     for (i <- 0 until height) srcGrid(i+preamble_rows, 0).setInputs(leftEdge, leftEdge);
     
-    if (! opts.embed) {
+    if (!opts.embed) {
     	dstGridOpts = new LSTMNode.GridOpts;
     	dstGridOpts.copyFrom(opts);
     	dstGridOpts.modelName = "dst_level%d";
@@ -124,8 +124,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
-	  val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
-	  val dstyn0 = dsty.nnz/dsty.ncols;
+    val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
+    val dstyn0 = dsty.nnz/dsty.ncols;
     if (dstyn0*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn0, batchSize).t);
     mapOOV(dstydata);
@@ -326,6 +326,27 @@ object SeqToSeq {
     val opts = new FEopts;
     opts.copyFrom(model.opts);
     opts.fnames = List(FileSource.simpleEnum(ifname,1,0));
+    opts.ofnames = List(FileSource.simpleEnum(ofname,1,0));
+    opts.embed = true;
+    val newmod = new SeqToSeq(opts);
+    newmod.refresh = false;
+    model.copyTo(newmod);
+    implicit val threads = threadPool(4);
+    val ds = new FileSource(opts)
+  	val nn = new Learner(
+  			new FileSource(opts), 
+  	    newmod, 
+  	    null,
+  	    null,
+  	    new FileSink(opts),
+  	    opts)
+    (nn, opts)
+  }
+
+  def predict(model:SeqToSeq, ifname:String, ofname:String):(Learner, FEopts) = {   
+    val opts = new FEopts;
+    opts.copyFrom(model.opts);
+    opts.fnames = List(FileSource.simpleEnum(ifname,1,0), FileSource.simpleEnum(ofname,1,0));
     opts.ofnames = List(FileSource.simpleEnum(ofname,1,0));
     opts.embed = true;
     val newmod = new SeqToSeq(opts);
