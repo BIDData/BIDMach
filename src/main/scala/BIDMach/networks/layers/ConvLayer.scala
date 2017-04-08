@@ -40,7 +40,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val channel_out = opts.noutputs; // actually # of filters;
 
     
-    filter = if (net.opts.useGPU) {
+    filter = if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
     	GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
     } else {
       FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
@@ -96,7 +96,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
   }
 
   override def toString = {
-    "convolution@" + Integer.toHexString(hashCode() % 0x10000)
+    "conv@" + Integer.toHexString(hashCode() % 0x10000)
   }
 
 }
@@ -143,7 +143,7 @@ class ConvolutionNode extends Node with ConvolutionNodeOpts {
   }
 
   override def toString = {
-    "convolution@" + Integer.toHexString(hashCode() % 0x10000)
+    "conv@" + Integer.toHexString(hashCode() % 0x10000)
   }
 
 }

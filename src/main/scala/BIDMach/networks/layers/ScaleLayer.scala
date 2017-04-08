@@ -28,22 +28,32 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
   var batchDim:IMat = null;
   
   def initModelMats = {
-    val dims = inputData.dims.copy;
-    dims(dims.length-1) = 1;
-    batchDim = irow(dims.length-1);
-    scaleMat = convertMat(ones(dims));
-    biasMat = convertMat(zeros(dims));
-    updateScaleMat = convertMat(zeros(dims));
-    updateBiasMat = convertMat(zeros(dims));
-    modelmats(imodel) = scaleMat;
-    modelmats(imodel+1) = biasMat;
-    updatemats(imodel) = updateScaleMat;
-    updatemats(imodel+1) = updateBiasMat;
+    val bdims = inputData.dims.copy;
+    opts.batchNormMode match {
+      case BatchNormLayer.SPATIAL => {
+      	batchDim = irow(inputData.dims.length-1);
+      	bdims(bdims.length-1) = 1;
+      }
+      case BatchNormLayer.PER_ACTIVATION => {
+      	batchDim = irow(1->inputData.dims.length);
+      	bdims(1->bdims.length) = 1;
+      }
+    }
+    if (modelmats(imodel) == null) {
+    	modelmats(imodel) = convertMat(ones(bdims));
+    	modelmats(imodel+1) = convertMat(zeros(bdims));
+    	updatemats(imodel) = convertMat(zeros(bdims));
+    	updatemats(imodel+1) = convertMat(zeros(bdims));
+    }
+    scaleMat = modelmats(imodel);
+    biasMat = modelmats(imodel+1);
+    updateScaleMat = updatemats(imodel);
+    updateBiasMat = updatemats(imodel+1);
   }
 
   override def forward = {
     val start = toc;
-    if (scaleMat.asInstanceOf[AnyRef] == null) initModelMats;
+    if (batchDim.asInstanceOf[AnyRef] == null) initModelMats;
     createOutput;
     
     output ~ scaleMat *@ inputData
@@ -72,6 +82,7 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
 
 trait ScaleNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = true;
+  var batchNormMode = BatchNormLayer.SPATIAL;
   
   def copyOpts(opts:ScaleNodeOpts):ScaleNodeOpts = {
   		super.copyOpts(opts);
