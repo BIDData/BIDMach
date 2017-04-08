@@ -249,6 +249,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
           meansGMat.pdata, variancesGMat.pdata)
 
     } finally {
+      
       if (scaleBiasDiffDesc != null) cudnnDestroyTensorDescriptor(scaleBiasDiffDesc);
       if (dxDesc != null) cudnnDestroyTensorDescriptor(dxDesc);
       if (dyDesc != null) cudnnDestroyTensorDescriptor(dyDesc);
