@@ -10,6 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._ 
@@ -31,12 +33,13 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
     val bdims = inputData.dims.copy;
     opts.batchNormMode match {
       case BatchNormLayer.SPATIAL => {
-      	batchDim = irow(inputData.dims.length-1);
-      	bdims(bdims.length-1) = 1;
-      }
-      case BatchNormLayer.PER_ACTIVATION => {
       	batchDim = irow(1->inputData.dims.length);
       	bdims(1->bdims.length) = 1;
+     
+      }
+      case BatchNormLayer.PER_ACTIVATION => {
+      	batchDim = irow(inputData.dims.length-1);
+      	bdims(bdims.length-1) = 1;
       }
     }
     if (modelmats(imodel) == null) {
@@ -52,6 +55,10 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
   }
 
   override def forward = {
+    val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
+    if (opts.batchNormMode == BatchNormLayer.SPATIAL && cuTensorFormat == cudnnTensorFormat.CUDNN_TENSOR_NCHW) {
+      throw new RuntimeException("Spatial ScaleBias with NCHW tensors requires CUDNN fused BatchNormScaleLayer");
+    }
     val start = toc;
     if (batchDim.asInstanceOf[AnyRef] == null) initModelMats;
     createOutput;
@@ -83,10 +90,13 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
 trait ScaleNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = true;
   var batchNormMode = BatchNormLayer.SPATIAL;
+  var tensorFormat:Int = Net.UseNetFormat;
   
   def copyOpts(opts:ScaleNodeOpts):ScaleNodeOpts = {
   		super.copyOpts(opts);
   		opts.hasBias = hasBias;
+  		opts.batchNormMode = batchNormMode;
+  		opts.tensorFormat = tensorFormat;
   		opts;
   }
 }

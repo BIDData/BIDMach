@@ -28,10 +28,10 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     var bias_mat:FMat = null; // it should be size (channel_out*1*1*1), to better broadcast?
     var update_bias_mat:FMat = null;
     var inputDim:IMat = null; // Should be three numbers
-    var outputDim:IMat = null; //Should be three numbers
+//    var outputDim:IMat = null; //Should be three numbers
 
   def initModelMats = {
-    // image should be something like - val image = FND(irow(channel_in,h,w,n));
+    inputDim = inputData.dims;
     val channel_in = inputDim(0);
     val filter_h = opts.kernel(0); // 3;0
     val filter_w = opts.kernel(1); // 3;
@@ -40,32 +40,36 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val channel_out = opts.noutputs; // actually # of filters;
 
     
-    filter = if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
-    	GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
-    } else {
-      FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+    	modelmats(imodel) = if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
+    		val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
+    		x.setTensorFormat(Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat));
+    		x;
+    	} else {
+    		FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+    	}
+    	modelmats(imodel).asInstanceOf[Filter].xavier(1f);   	
+    	updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).dims);
+    	
+    	val biasDim = irow(channel_out,filter_w,filter_h,1);
+    	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
+    	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
+    	
     }
+    filter = modelmats(imodel).asInstanceOf[FMat];
     ffilter = filter.asInstanceOf[Filter];
-    ffilter.xavier(1f);;
-    updateFilter = filter.copy;
+    updateFilter = updatemats(imodel).asInstanceOf[FMat];
     updateFFilter = updateFilter.asInstanceOf[Filter];
-    modelmats(imodel) = filter;
-    updatemats(imodel) = updateFilter;
-    if (opts.hasBias) {
-      // initialize bias matrix, should be the size of channel_out*h*w, would be applied to n samples
-      val biasDim = irow(channel_out,filter_h,filter_w,1);
-      bias_mat = filter.zeros(biasDim);
-      update_bias_mat = filter.zeros(biasDim);
-      modelmats(imodel+1) = bias_mat;
-      updatemats(imodel+1) = update_bias_mat;
-    } 
+    
+    bias_mat = modelmats(imodel+1).asInstanceOf[FMat];
+    update_bias_mat = updatemats(imodel+1).asInstanceOf[FMat];
   }
 
   override def forward = {
     val start = toc;
     
     // Create filter model, filter update and bias model if needed
-    if (modelmats(imodel).asInstanceOf[AnyRef] == null) initModelMats;
+    if (inputDim.asInstanceOf[AnyRef] == null) initModelMats;
     if (output.asInstanceOf[AnyRef] == null){ 
     	var outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
     	output = filter.zeros(outputBatchDim)
@@ -108,8 +112,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var kernel:IMat = null
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
-//  var group:Int = 1
-//  var axis:Int = 1
+  var tensorFormat:Int = Net.UseNetFormat;
 
   def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
       super.copyOpts(opts);
@@ -119,8 +122,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
       opts.kernel = kernel;
       opts.stride = stride;
       opts.dilation = dilation;
-//      opts.group = group;
-//      opts.axis = axis;
+      opts.tensorFormat = tensorFormat;
       opts;
   }
 

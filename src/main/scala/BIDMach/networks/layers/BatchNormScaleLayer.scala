@@ -31,14 +31,15 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
   def initModelMats = {
     val bdims = inputData.dims.copy;
     opts.batchNormMode match {
-      case BatchNormLayer.SPATIAL => {
-      	batchDim = irow(inputData.dims.length-1);
-      	bdims(bdims.length-1) = 1;
-      }
-      case BatchNormLayer.PER_ACTIVATION => {
-      	batchDim = irow(1->inputData.dims.length);
-      	bdims(1->bdims.length) = 1;
-      }
+    case BatchNormLayer.SPATIAL => {
+    	batchDim = irow(1->inputData.dims.length);
+    	bdims(1->bdims.length) = 1;
+
+    }
+    case BatchNormLayer.PER_ACTIVATION => {
+    	batchDim = irow(inputData.dims.length-1);
+    	bdims(bdims.length-1) = 1;
+    }
     }
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
     	modelmats(imodel) = convertMat(ones(bdims));
@@ -140,6 +141,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     var yDesc:cudnnTensorDescriptor = null;
     var scaleBiasMeanVarDesc:cudnnTensorDescriptor = null;
     
+    val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
     val xdims = inputData.dims;
 
     if (means.asInstanceOf[AnyRef] == null) {
@@ -166,12 +168,12 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     try {
       xDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(xDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val xSetStatus = cudnnSetTensor4dDescriptor(xDesc, tensor_format, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
+      val xSetStatus = cudnnSetTensor4dDescriptor(xDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
       if (xSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm forward");
       
       yDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(yDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, tensor_format, data_type, xdims(3), xdims(0), xdims(2), xdims(1))
+      val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1))
       if (ySetStatus > 0) throw new CUDAException(ySetStatus, "Error creating y tensor for batch norm forward");
       
       scaleBiasMeanVarDesc = new cudnnTensorDescriptor();
@@ -201,11 +203,19 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 
   
   def backwardCUDNN = {
-    val xdims = inputData.dims;
     var xDesc:cudnnTensorDescriptor = null
     var dyDesc:cudnnTensorDescriptor = null
     var dxDesc:cudnnTensorDescriptor = null
     var scaleBiasDiffDesc:cudnnTensorDescriptor = null
+    
+    val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
+    val xdims = cuTensorFormat match {
+      case cudnnTensorFormat.CUDNN_TENSOR_NHWC => inputData.dims;
+      case cudnnTensorFormat.CUDNN_TENSOR_NCHW => {
+        val ydims = inputData.dims;
+        irow(ydims(1), ydims(2), ydims(0), ydims(3));
+      }
+    }
     
     val inputGMat = inputData.asInstanceOf[GMat];
     val meansGMat = means.asInstanceOf[GMat];
@@ -225,17 +235,17 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     try {
       xDesc = new cudnnTensorDescriptor()
       if (cudnnCreateTensorDescriptor(xDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val xSetStatus = cudnnSetTensor4dDescriptor(xDesc, tensor_format, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
+      val xSetStatus = cudnnSetTensor4dDescriptor(xDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
       if (xSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm backward");
       
       dyDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(dyDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val dySetStatus = cudnnSetTensor4dDescriptor(dyDesc, tensor_format, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
+      val dySetStatus = cudnnSetTensor4dDescriptor(dyDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
       if (dySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm backward");
       
       dxDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(dxDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val dxSetStatus = cudnnSetTensor4dDescriptor(dxDesc, tensor_format, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
+      val dxSetStatus = cudnnSetTensor4dDescriptor(dxDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
       if (dxSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm backward");
       
       scaleBiasDiffDesc = new cudnnTensorDescriptor()
@@ -264,12 +274,29 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 
 trait BatchNormScaleNodeOpts extends ModelNodeOpts {
   var hasBias:Boolean = true;
-  var expAvgFactor = 1.0f;                  
+  var expAvgFactor:Float = 1.0f;                  
   var epsilon:Float = 1e-5f;
-  var batchNormMode = BatchNormLayer.SPATIAL;
+  var batchNormMode:Int = BatchNormLayer.SPATIAL;
+  var tensorFormat:Int = Net.UseNetFormat;
+  
+   def copyOpts(opts:BatchNormScaleNodeOpts):BatchNormScaleNodeOpts = {
+      super.copyOpts(opts);
+      opts.hasBias = hasBias;
+      opts.expAvgFactor = expAvgFactor;
+      opts.epsilon = epsilon;
+      opts.batchNormMode = batchNormMode;
+      opts.tensorFormat = tensorFormat;
+      opts;
+  }
 }
 
 class BatchNormScaleNode extends Node with BatchNormScaleNodeOpts {
+  
+	def copyTo(opts:ConvolutionNode):ConvolutionNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
   override def clone:BatchNormScaleNode = copyTo(new BatchNormScaleNode).asInstanceOf[BatchNormScaleNode]
 
   override def create(net:Net) = BatchNormScaleLayer(net, this)
@@ -281,7 +308,6 @@ class BatchNormScaleNode extends Node with BatchNormScaleNodeOpts {
 
 object BatchNormScaleLayer {
   
-  val tensor_format = cudnnTensorFormat.CUDNN_TENSOR_NHWC;
   val data_type = cudnnDataType.CUDNN_DATA_FLOAT;
   
   val ONE = Pointer.to(Array(1.0f));

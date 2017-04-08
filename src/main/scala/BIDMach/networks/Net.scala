@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GFilter,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -10,6 +10,8 @@ import BIDMach.mixins._
 import BIDMach.models._
 import BIDMach._
 import BIDMach.networks.layers._
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 
@@ -230,11 +232,27 @@ object Net  {
     var nodeset:NodeSet = null;
     var withInteractions = false;
     var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
+    var tensorFormat:Int = Net.TensorNHWC;
   }
   
-  class Options extends Opts {}
+  class Options extends Opts {} 
+    
+  final val UseNetFormat = 0;
+  final val TensorNCHW = 1;
+  final val TensorNHWC = 2;
   
-  
+  def getCUDNNformat(layerFormat:Int, netFormat:Int):Int = {
+    layerFormat match {
+      case TensorNCHW => cudnnTensorFormat.CUDNN_TENSOR_NCHW;
+      case TensorNHWC => cudnnTensorFormat.CUDNN_TENSOR_NHWC;
+      case UseNetFormat => {
+        netFormat match {
+        case TensorNCHW => cudnnTensorFormat.CUDNN_TENSOR_NCHW;
+        case TensorNHWC => cudnnTensorFormat.CUDNN_TENSOR_NHWC;         
+        }
+      }
+    }
+  }
   /**
    * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
    * Intermediate nodes are Linear followed by nonlinear, starting and ending with Linear. 
