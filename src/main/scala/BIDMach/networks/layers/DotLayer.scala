@@ -35,9 +35,10 @@ class DotLayer(override val net:Net, override val opts:DotNodeOpts = new DotNode
 
 	override def backward = {
       val start = toc;
-			(0 until 2).map((i:Int) => {
-				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + (deriv *@ inputDatas(1-i));
-			});
+      
+      if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv *@ inputDatas(1));
+      if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + (deriv *@ inputData);
+
 			backwardtime += toc - start;
 	}
   
