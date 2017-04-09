@@ -14,7 +14,9 @@ import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
 /*
- * Designed to map linear integer feature arrays to sparse matrices. Doesnt deal with derivatives.
+ * Select Layer. First argument is a dense matrix A, second should be a single-row IMat, indx. 
+ * Outputs a single-row matrix whose i'th element is A(indx(i),i);
+ * 
  */
 
 class SelectLayer(override val net:Net, override val opts:SelectNodeOpts = new SelectNode) extends Layer(net, opts) {

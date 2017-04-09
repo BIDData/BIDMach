@@ -16,7 +16,7 @@ import BIDMach.networks._
 
 
 /**
- * Computes the element-wise sum of input layers. 
+ * Computes the column-wise dot products of two input layers.
  */
 
 class DotLayer(override val net:Net, override val opts:DotNodeOpts = new DotNode) extends Layer(net, opts) { 
