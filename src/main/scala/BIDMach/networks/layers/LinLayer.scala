@@ -121,6 +121,8 @@ trait LinNodeOpts extends ModelNodeOpts {
   		opts.hasBias = hasBias;
   		opts.aopts = aopts;
   		opts.outdim = outdim;
+  		opts.tmatShape = tmatShape;
+  		opts.withInteractions = withInteractions;
   		opts;
   }
 }

@@ -155,6 +155,7 @@ trait NegsampOutputNodeOpts extends ModelNodeOpts {
 			opts.outdim = outdim;
 			opts.expt = expt;
 			opts.scoreType = scoreType;
+			opts.docorrect = docorrect;
 			opts;
 	}
 }

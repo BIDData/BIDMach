@@ -142,6 +142,11 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   	deriv.clear;
   }
   
+  def clearDerivLazy = {
+  	if (deriv.asInstanceOf[AnyRef] == null && inputDeriv.asInstanceOf[AnyRef] != null) deriv = output.zeros(output.dims);
+  	deriv.clear;
+  }
+  
   def clearDerivs = {
     if (deriv.asInstanceOf[AnyRef] == null) {
       for (i <- 0 until _outputs.length) {
@@ -194,6 +199,19 @@ object Layer {
   def input(a:LayerTerm) = new InputLayer(null){inputs(0) = a;};
   
   def input = new InputLayer(null);
+  
+    
+  def crop(a:LayerTerm)(sizes:IMat, offsets:IMat=null) = {
+    val csizes = sizes;
+    val coffsets = offsets;
+    new CropLayer(null, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}
+  }
+  
+  def format(a:LayerTerm)(net:Net, conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
+    val con = conversion;
+    val fmt = inputFormat;
+    new TensorFormatLayer(net, new TensorFormatNode{conversion = con; inputFormat = fmt;}){inputs(0) = a;}
+  }
      
   def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {

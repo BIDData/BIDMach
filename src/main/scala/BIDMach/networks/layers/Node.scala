@@ -90,11 +90,26 @@ object Node {
   
   def glm_(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
   
-  def glm(a:NodeTerm)(links:IMat) = {val ilinks = links; new GLMNode{inputs(0) = a; links = ilinks}};
+  def glm(a:NodeTerm)(links:IMat) = {
+    val ilinks = links; 
+    new GLMNode{inputs(0) = a; links = ilinks}
+    };
   
   def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
   
-  def input = new InputNode
+  def input = new InputNode;
+  
+  def crop(a:NodeTerm)(sizes:IMat, offsets:IMat=null) = {
+    val csizes = sizes;
+    val coffsets = offsets;
+    new CropNode{inputs(0) = a; sizes = csizes; offsets = coffsets};
+  }
+  
+  def format(a:NodeTerm)(conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
+    val con = conversion;
+    val fmt = inputFormat;
+    new TensorFormatNode{inputs(0) = a; conversion = con; inputFormat = fmt;}
+  }
   
   def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {

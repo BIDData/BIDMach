@@ -115,15 +115,15 @@ trait ConvNodeOpts extends ModelNodeOpts {
   var tensorFormat:Int = Net.UseNetFormat;
 
   def copyOpts(opts:ConvNodeOpts):ConvNodeOpts = {
-      super.copyOpts(opts);
-      opts.noutputs = noutputs;
-      opts.hasBias = hasBias;
-      opts.pad = pad;
-      opts.kernel = kernel;
-      opts.stride = stride;
-      opts.dilation = dilation;
-      opts.tensorFormat = tensorFormat;
-      opts;
+  		super.copyOpts(opts);
+  		opts.noutputs = noutputs;
+  		opts.hasBias = hasBias;
+  		opts.pad = pad;
+  		opts.kernel = kernel;
+  		opts.stride = stride;
+  		opts.dilation = dilation;
+  		opts.tensorFormat = tensorFormat;
+  		opts;
   }
 
 }

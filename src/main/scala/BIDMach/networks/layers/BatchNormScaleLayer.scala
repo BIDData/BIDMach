@@ -267,20 +267,20 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 }
 
 trait BatchNormScaleNodeOpts extends ModelNodeOpts {
-  var hasBias:Boolean = true;
+	var hasBias:Boolean = true;
   var expAvgFactor:Float = 1.0f;                  
   var epsilon:Float = 1e-5f;
   var batchNormMode:Int = BatchNormLayer.SPATIAL;
   var tensorFormat:Int = Net.UseNetFormat;
-  
-   def copyOpts(opts:BatchNormScaleNodeOpts):BatchNormScaleNodeOpts = {
-      super.copyOpts(opts);
-      opts.hasBias = hasBias;
-      opts.expAvgFactor = expAvgFactor;
-      opts.epsilon = epsilon;
-      opts.batchNormMode = batchNormMode;
-      opts.tensorFormat = tensorFormat;
-      opts;
+
+  def copyOpts(opts:BatchNormScaleNodeOpts):BatchNormScaleNodeOpts = {
+		super.copyOpts(opts);
+		opts.hasBias = hasBias;
+		opts.expAvgFactor = expAvgFactor;
+		opts.epsilon = epsilon;
+		opts.batchNormMode = batchNormMode;
+		opts.tensorFormat = tensorFormat;
+		opts;
   }
 }
 
