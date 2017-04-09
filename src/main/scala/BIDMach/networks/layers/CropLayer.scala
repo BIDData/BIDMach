@@ -63,8 +63,8 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 }
 
 trait CropNodeOpts extends NodeOpts {
-  var sizes:IMat = irow(0, 224, 224, 0)
-  var offsets:IMat = null;
+  var sizes:IMat = irow(3, 224, 224, 0)
+  var offsets:IMat = irow(0, -1, -1, -1)
   def copyOpts(opts:CropNodeOpts):CropNodeOpts = {
   		super.copyOpts(opts);
   		opts.sizes = sizes;
