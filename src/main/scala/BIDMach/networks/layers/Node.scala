@@ -61,28 +61,28 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
   
   def node = _node;
   
-  def + (a:NodeTerm) = {val n=this; new AddNode{inputs(0)=n; inputs(1)=a}};
+  def +    (a:NodeTerm) = {val n=this; new AddNode{inputs(0)=n; inputs(1)=a}};
   
-  def - (a:NodeTerm) = {val n=this; new SubNode{inputs(0)=n; inputs(1)=a}};
+  def -    (a:NodeTerm) = {val n=this; new SubNode{inputs(0)=n; inputs(1)=a}};
 
-  def *@ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
+  def *@   (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
     
-  def ∘ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
+  def ∘    (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
   
-  def dot (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
+  def dot  (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
   
-  def ∙ (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
+  def ∙    (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
         
   def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
   
-  def apply (a:NodeTerm) = {val n=this; new SelectNode{inputs(0)=n; inputs(1)=a;}};
+  def apply(a:NodeTerm) = {val n=this; new SelectNode{inputs(0)=n; inputs(1)=a;}};
 }
 
 object Node {
   
   def copy(a:NodeTerm) = new CopyNode{inputs(0) = a;}
 
-  def copy = new CopyNode
+  def copy() = new CopyNode
   
   def dropout(a:NodeTerm, frac:Float) = new DropoutNode{inputs(0) = a; frac = frac}
   
