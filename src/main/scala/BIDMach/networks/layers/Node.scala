@@ -99,6 +99,10 @@ object Node {
   
   def input = new InputNode;
   
+  def constant(v:Mat) = {
+    new ConstantNode{value = v;}
+  }
+  
   def crop(a:NodeTerm)(sizes:IMat, offsets:IMat=null) = {
     val csizes = sizes;
     val coffsets = offsets;

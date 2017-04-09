@@ -200,7 +200,10 @@ object Layer {
   
   def input = new InputLayer(null);
   
-    
+  def constant(v:Mat)(net:Net) = {
+    new ConstantLayer(net, new ConstantNode{value = v;})
+  }
+  
   def crop(a:LayerTerm)(sizes:IMat, offsets:IMat=null) = {
     val csizes = sizes;
     val coffsets = offsets;
