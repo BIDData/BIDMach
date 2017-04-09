@@ -160,6 +160,25 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   }
 }
 
+class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
+  def layer = _layer;
+  
+  def + (a:LayerTerm) = {val n=this; new AddLayer(null){inputs(0)=n; inputs(1)=a}};
+  
+  def - (a:LayerTerm) = {val n=this; new SubLayer(null){inputs(0)=n; inputs(1)=a}};
+
+  def *@ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+    
+  def ∘ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def dot (a:LayerTerm) = {val n=this; new DotLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def ∙ (a:LayerTerm) = {val n=this; new DotLayer(null){inputs(0)=n; inputs(1)=a;}};
+        
+  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def apply (a:LayerTerm) = {val n=this; new SelectLayer(null){inputs(0)=n; inputs(1)=a;}};
+}
 
 object Layer {  
   def copy(a:LayerTerm) = new CopyLayer(null){inputs(0) = a;}
@@ -175,8 +194,7 @@ object Layer {
   def input(a:LayerTerm) = new InputLayer(null){inputs(0) = a;};
   
   def input = new InputLayer(null);
-  
-    
+     
   def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
@@ -211,6 +229,30 @@ object Layer {
   }
   
   def norm(a:LayerTerm)(implicit opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
+  
+  def conv(a:LayerTerm)(net:Net, name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true) = {
+    val str = stride;
+    val pd = pad;
+    val hb = hasBias;
+    val mname = name;
+    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; stride=str; pad=pd; hasBias=hb}){inputs(0)=a;};
+  }
+  
+  def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
+    new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
+  }
+  
+  def batchNormScale(a:LayerTerm)(net:Net, name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  	val hb = hasBias;
+  	val mname = name;
+    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}
+  }
+  
+  def scale(a:LayerTerm)(net:Net, name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  	val hb = hasBias;
+  	val mname = name;
+    new ScaleLayer(net, new ScaleNode{modelName = mname; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}   
+  }
   
   def oneHot(a:LayerTerm) = new OnehotLayer(null){inputs(0) = a};
   
@@ -250,17 +292,6 @@ object Layer {
   
 }
 
-class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
-  def layer = _layer;
-  
-  def + (a:LayerTerm) = {val n=this; new AddLayer(null){inputs(0)=n; inputs(1)=a}};
-
-  def *@ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
-    
-  def ∘ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
-        
-  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
-}
 
 trait OutputLayer {}
 

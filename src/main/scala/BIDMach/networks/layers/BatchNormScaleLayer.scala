@@ -209,13 +209,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     var scaleBiasDiffDesc:cudnnTensorDescriptor = null
     
     val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
-    val xdims = cuTensorFormat match {
-      case cudnnTensorFormat.CUDNN_TENSOR_NHWC => inputData.dims;
-      case cudnnTensorFormat.CUDNN_TENSOR_NCHW => {
-        val ydims = inputData.dims;
-        irow(ydims(1), ydims(2), ydims(0), ydims(3));
-      }
-    }
+    val xdims = inputData.dims;
     
     val inputGMat = inputData.asInstanceOf[GMat];
     val meansGMat = means.asInstanceOf[GMat];
@@ -292,7 +286,7 @@ trait BatchNormScaleNodeOpts extends ModelNodeOpts {
 
 class BatchNormScaleNode extends Node with BatchNormScaleNodeOpts {
   
-	def copyTo(opts:ConvolutionNode):ConvolutionNode = {
+	def copyTo(opts:BatchNormScaleNode):BatchNormScaleNode = {
     this.asInstanceOf[Node].copyTo(opts);
     copyOpts(opts);
     opts

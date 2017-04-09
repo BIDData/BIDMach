@@ -20,7 +20,7 @@ import java.util.Arrays
    How to consider bias...(maybe very difficult?)
 */
 
-class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode ) extends ModelLayer(net, opts, 2) {
+class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvNode ) extends ModelLayer(net, opts, 2) {
     var filter:FMat = null; 
     var ffilter:Filter = null;
     var updateFilter:FMat = null;
@@ -105,7 +105,7 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
 
 }
 
-trait ConvolutionNodeOpts extends ModelNodeOpts {
+trait ConvNodeOpts extends ModelNodeOpts {
   var noutputs:Int = 0
   var hasBias:Boolean = true
   var pad:IMat = null
@@ -114,7 +114,7 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
   var tensorFormat:Int = Net.UseNetFormat;
 
-  def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
+  def copyOpts(opts:ConvNodeOpts):ConvNodeOpts = {
       super.copyOpts(opts);
       opts.noutputs = noutputs;
       opts.hasBias = hasBias;
@@ -128,20 +128,20 @@ trait ConvolutionNodeOpts extends ModelNodeOpts {
 
 }
 
-class ConvolutionNode extends Node with ConvolutionNodeOpts {
+class ConvNode extends Node with ConvNodeOpts {
 
-  def copyTo(opts:ConvolutionNode):ConvolutionNode = {
+  def copyTo(opts:ConvNode):ConvNode = {
     this.asInstanceOf[Node].copyTo(opts);
     copyOpts(opts);
     opts
   }
 
-  override def clone:ConvolutionNode = {
-    copyTo(new ConvolutionNode ).asInstanceOf[ConvolutionNode]
+  override def clone:ConvNode = {
+    copyTo(new ConvNode ).asInstanceOf[ConvNode]
   }
   
-  override def create(net:Net):ConvolutionLayer = {
-    ConvolutionLayer(net, this)
+  override def create(net:Net):ConvLayer = {
+    ConvLayer(net, this)
   }
 
   override def toString = {
@@ -150,10 +150,10 @@ class ConvolutionNode extends Node with ConvolutionNodeOpts {
 
 }
 
-object ConvolutionLayer {
+object ConvLayer {
   
-  def apply(net:Net) = new ConvolutionLayer(net, new ConvolutionNode)
+  def apply(net:Net) = new ConvLayer(net, new ConvNode)
   
-  def apply(net:Net, opts:ConvolutionNodeOpts) = new ConvolutionLayer(net, opts)
+  def apply(net:Net, opts:ConvNodeOpts) = new ConvLayer(net, opts)
 
 }
