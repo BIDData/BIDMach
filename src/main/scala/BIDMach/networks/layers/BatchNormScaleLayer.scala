@@ -262,7 +262,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
   }
   
   override def toString = {
-    "batchnormscale@" + Integer.toHexString(hashCode() % 0x10000)
+    "bns@" + Integer.toHexString(hashCode() % 0x10000)
   }
 }
 
@@ -296,7 +296,7 @@ class BatchNormScaleNode extends Node with BatchNormScaleNodeOpts {
   override def create(net:Net) = BatchNormScaleLayer(net, this)
   
   override def toString = {
-    "batchnormscale@" + Integer.toHexString(hashCode() % 0x10000)
+    "bns@" + Integer.toHexString(hashCode() % 0x10000)
   }
 }
 

@@ -27,28 +27,28 @@ val diff2 = crop2 - means1;
 val fmt2 = format(diff2);
 
 val conv3 = conv(fmt2)(w=7,h=7,nch=64,stride=4,pad=3);
-val bn3 = batchNormScale(conv3);
-val relu3 = relu(bn3);
+val bns3 = batchNormScale(conv3);
+val relu3 = relu(bns3);
 
 val conv4 = conv(relu3)(w=5,h=5,nch=256,stride=2,pad=2);
-val bn4 = batchNormScale(conv4);
-val relu4 = relu(bn4);
+val bns4 = batchNormScale(conv4);
+val relu4 = relu(bns4);
 
 val conv5 = conv(relu4)(w=3,h=3,nch=256,stride=1,pad=1);
-val bn5 = batchNormScale(conv5);
-val relu5 = relu(bn5);
+val bns5 = batchNormScale(conv5);
+val relu5 = relu(bns5);
 
 val conv6 = conv(relu5)(w=5,h=5,nch=1024,stride=2,pad=2);
-val bn6 = batchNormScale(conv6);
-val relu6 = relu(bn6);
+val bns6 = batchNormScale(conv6);
+val relu6 = relu(bns6);
 
 val conv7 = conv(relu6)(w=3,h=3,nch=1024,stride=1,pad=1);
-val bn7 = batchNormScale(conv7);
-val relu7 = relu(bn7);
+val bns7 = batchNormScale(conv7);
+val relu7 = relu(bns7);
 
 val conv8 = conv(relu7)(w=3,h=3,nch=1024,stride=1,pad=1);
-val bn8 = batchNormScale(conv8);
-val relu8 = relu(bn8);
+val bns8 = batchNormScale(conv8);
+val relu8 = relu(bns8);
 
 val fc9 = lin(relu8)(outdim=4096);
 val relu9 = relu(fc8);
@@ -60,12 +60,11 @@ val fc11 = lin(relu10)(outdim=1000);
 val out = glm(fc11)(opts.links);
 
 val nodes = in     \ diff2   \ conv3  \ conv4  \ conv5  \ conv6  \ conv7  \ conv8  \ fc9    \ fc10    \ fc11 on
-            crop1  \ fmt2    \ bn3    \ bn4    \ bn5    \ bn6    \ bn7    \ bn8    \ relu9  \ relu10  \ out  on
-            means1 \ null    \ relu3  \ relu4  \ relu5  \ relu6  \ relu7  \ relu8  \ null   \ null    \ null
+            crop1  \ fmt2    \ bns3   \ bns4   \ bns5   \ bns6   \ bns7   \ bns8   \ relu9  \ relu10  \ out  on
+            means1 \ null    \ relu3  \ relu4  \ relu5  \ relu6  \ relu7  \ relu8  \ null   \ null    \ null;
 
 
-
-opts.nodeset = new NodeSet(nodes);
+opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
 nn.train;
 

@@ -16,7 +16,8 @@ import BIDMach.networks._
 
 
 /**
- * Constant layer outputs its value argument
+ * Constant layer outputs its value argument. The argument matrix "value" can be changed outside the model,
+ * and the output will be updated, unless opts.cache is true. 
  */
 
 class ConstantLayer(override val net:Net, override val opts:ConstantNodeOpts = new ConstantNode) extends Layer(net, opts) {
@@ -24,9 +25,9 @@ class ConstantLayer(override val net:Net, override val opts:ConstantNodeOpts = n
   override def forward = {
   		val start = toc;
 			
-			if (output.asInstanceOf[AnyRef] == null) {
+  		if (output.asInstanceOf[AnyRef] == null || ! opts.cache) {
 			  output = net.convertMat(opts.value);
-			}
+  		}
 			
 			forwardtime += toc - start;
 	}
@@ -38,6 +39,7 @@ class ConstantLayer(override val net:Net, override val opts:ConstantNodeOpts = n
 
 trait ConstantNodeOpts extends NodeOpts {
   var value:Mat = null;
+  var cache:Boolean = false;
 }
 
 class ConstantNode extends Node with ConstantNodeOpts {
@@ -45,6 +47,7 @@ class ConstantNode extends Node with ConstantNodeOpts {
   def copyTo(opts:ConstantNode):ConstantNode = {
     super.copyTo(opts);
     opts.value = value;
+    opts.cache = cache;
     opts;
   }
     

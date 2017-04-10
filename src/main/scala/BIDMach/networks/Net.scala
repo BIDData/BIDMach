@@ -26,6 +26,7 @@ import java.util.HashMap;
 
 class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var layers:Array[Layer] = null;
+  var layermat:LayerMat = null;
   var output_layers:Array[Layer] = null;
   var targmap:Mat = null;
   var mask:Mat = null;
@@ -70,19 +71,52 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
   
   def createLayers = {
-    val nodes = opts.nodeset.nodes;
-    layers = new Array[Layer](opts.nodeset.nnodes);
-    for (i <- 0 until opts.nodeset.nnodes) {
-      layers(i) = nodes(i).create(this);
-      nodes(i).myLayer = layers(i);
-    }
-    for (i <- 0 until opts.nodeset.nnodes) {
-    	for (j <- 0 until nodes(i).inputs.length) {
-    		if (nodes(i).inputs(j) != null) {
-    			val nodeTerm = nodes(i).inputs(j);
-    			layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+    if (opts.nodeset.asInstanceOf[AnyRef] != null) {   // create the layers from the nodeset
+    	val nodes = opts.nodeset.nodes;
+    	layers = new Array[Layer](opts.nodeset.nnodes);
+    	for (i <- 0 until opts.nodeset.nnodes) {
+    		layers(i) = nodes(i).create(this);
+    		nodes(i).myLayer = layers(i);
+    	}
+    	for (i <- 0 until opts.nodeset.nnodes) {
+    		for (j <- 0 until nodes(i).inputs.length) {
+    			if (nodes(i).inputs(j) != null) {
+    				val nodeTerm = nodes(i).inputs(j);
+    				layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+    			}
+    		}
+    	}
+    } else {                                           // create a LayerMat that mirrors the NodeMat
+      val nrows = opts.nodemat.nrows;
+      val ncols = opts.nodemat.ncols;
+      layermat = LayerMat(nrows, ncols);
+      var nnodes = opts.nodemat.data.map((x:Node) => if (x.asInstanceOf[AnyRef] == null) 0 else 1).reduce(_+_); // count non-null nodes
+      layers = new Array[Layer](nnodes);
+      var nnlayers = 0;
+      for (i <- 0 until ncols) {
+        for (j <- 0 until nrows) {
+          val node = opts.nodemat(j, i);
+          if (node.asInstanceOf[AnyRef] != null) {
+            layermat(j, i) = node.create(this);
+            node.myLayer = layermat(j, i);
+            layers(nnlayers) = layermat(j, i);
+            nnlayers += 1;
+          }
         }
     	}
+      for (i <- 0 until ncols) {
+        for (j <- 0 until nrows) {
+          val node = opts.nodemat(j, i);
+          if (node.asInstanceOf[AnyRef] != null) {
+          	for (k <- 0 until node.inputs.length) {
+          		if (node.inputs(k) != null) {
+          			val nodeTerm = node.inputs(k);
+          			layermat(j, i).setInput(k, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+          		}
+          	}
+          }
+        }
+      }
     }
   }
   
@@ -230,6 +264,7 @@ object Net  {
     var aopts:ADAGrad.Opts = null;
     var nmodelmats = 0;
     var nodeset:NodeSet = null;
+    var nodemat:NodeMat = null;
     var withInteractions = false;
     var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
     var tensorFormat:Int = Net.TensorNHWC;
