@@ -75,7 +75,7 @@ class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts =
 
 trait BatchNormNodeOpts extends ModelNodeOpts {
 	var expAvgFactor:Float = 1f;
-  var epsilon:Float = 1e-5f;
+  var epsilon:Float = 1e-4f;
   var batchNormMode = BatchNormLayer.SPATIAL;
   var tensorFormat:Int = Net.UseNetFormat;
   
