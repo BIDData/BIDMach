@@ -12,8 +12,9 @@ import BIDMach.networks._
 
 
 class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScaleNodeOpts = new BatchNormScaleNode) extends ModelLayer(net, opts, 2) {
-  import BatchNormScaleLayer._
    
+  val data_type = cudnnDataType.CUDNN_DATA_FLOAT;
+  
   var means:Mat = null;
   var variances:Mat = null;
   var runningMeans:Mat = null;
@@ -181,8 +182,8 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       val sbmvDeriveStatus = cudnnDeriveBNTensorDescriptor(scaleBiasMeanVarDesc, xDesc, normMode);
       if (sbmvDeriveStatus == cudnnStatus.CUDNN_STATUS_BAD_PARAM) throw new CUDAException(sbmvDeriveStatus, "Error creating scale/bias/mean/var tensor for batch norm forward")
 
-      var err = cudnnBatchNormalizationForwardTraining(getHandle, normMode,
-        ONE, ZERO, xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata,
+      var err = cudnnBatchNormalizationForwardTraining(BatchNormScaleLayer.getHandle, normMode,
+        BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata,
         biasGMat.pdata, opts.expAvgFactor, runningMeansGMat.pdata, runningVariancesGMat.pdata, opts.epsilon, meansGMat.pdata, variancesGMat.pdata);
       
       cudaDeviceSynchronize();
@@ -248,7 +249,8 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       if (sbmvDeriveStatus == cudnnStatus.CUDNN_STATUS_BAD_PARAM) throw new CUDAException(sbmvDeriveStatus, "Error creating scale/bias diff tensor for batch norm backward")
       
       cudnnBatchNormalizationBackward(BatchNormScaleLayer.getHandle, normMode,
-          ONE, ZERO, ONE, ZERO, xDesc, inputGMat.pdata, dyDesc, derivGMat.pdata, dxDesc, inputDerivGMat.pdata,
+          BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
+          xDesc, inputGMat.pdata, dyDesc, derivGMat.pdata, dxDesc, inputDerivGMat.pdata,
           scaleBiasDiffDesc, scaleGMat.pdata, updateScaleGMat.pdata, updateBiasGMat.pdata, opts.epsilon,
           meansGMat.pdata, variancesGMat.pdata)
 
@@ -269,7 +271,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 trait BatchNormScaleNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = true;
   var expAvgFactor:Float = 1.0f;                  
-  var epsilon:Float = 1e-5f;
+  var epsilon:Float = 1e-4f;
   var batchNormMode:Int = BatchNormLayer.SPATIAL;
   var tensorFormat:Int = Net.UseNetFormat;
 
@@ -301,8 +303,6 @@ class BatchNormScaleNode extends Node with BatchNormScaleNodeOpts {
 }
 
 object BatchNormScaleLayer {
-  
-  val data_type = cudnnDataType.CUDNN_DATA_FLOAT;
   
   val ONE = Pointer.to(Array(1.0f));
   val ZERO = Pointer.to(Array(0.0f));
