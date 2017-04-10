@@ -204,7 +204,7 @@ object Layer {
     new ConstantLayer(net, new ConstantNode{value = v;})
   }
   
-  def crop(a:LayerTerm)(sizes:IMat, offsets:IMat=null) = {
+  def crop(a:LayerTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
     val csizes = sizes;
     val coffsets = offsets;
     new CropLayer(null, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}

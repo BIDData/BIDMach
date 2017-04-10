@@ -103,7 +103,7 @@ object Node {
     new ConstantNode{value = v;}
   }
   
-  def crop(a:NodeTerm)(sizes:IMat, offsets:IMat=null) = {
+  def crop(a:NodeTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
     val csizes = sizes;
     val coffsets = offsets;
     new CropNode{inputs(0) = a; sizes = csizes; offsets = coffsets};
