@@ -199,6 +199,8 @@ object Node {
   
   def rect(a:NodeTerm) = new RectNode{inputs(0) = a};
   
+  def relu(a:NodeTerm) = new RectNode{inputs(0) = a};
+  
   def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
   
   def σ(a:NodeTerm) = new SigmoidNode{inputs(0) = a};

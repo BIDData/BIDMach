@@ -279,6 +279,8 @@ object Layer {
   
   def rect(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
   
+  def relu(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
+  
   def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
   
   def σ(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
