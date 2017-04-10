@@ -48,18 +48,26 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	} else {
     		FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
     	}
-    	modelmats(imodel).asInstanceOf[Filter].xavier(1f);   	
-    	updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).dims);
+    	filter = modelmats(imodel).asInstanceOf[FMat];
+    	ffilter = modelmats(imodel).asInstanceOf[Filter];   	
+    	updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
     	
-    	val biasDim = irow(channel_out,filter_w,filter_h,1);
+    	ffilter.xavier(1f);
+    	
+    	if (output.asInstanceOf[AnyRef] == null) { 
+    		val outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
+    		output = filter.zeros(outputBatchDim);
+    	};
+    	
+    	val biasDim = irow(output.dims(0), output.dims(1), output.dims(2), 1);
     	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	
     }
     filter = modelmats(imodel).asInstanceOf[FMat];
-    ffilter = filter.asInstanceOf[Filter];
-    updateFFilter = ffilter.copy;
-    updateFilter = updateFFilter.asInstanceOf[FMat];
+    ffilter = modelmats(imodel).asInstanceOf[Filter];
+    updateFilter = updatemats(imodel).asInstanceOf[FMat];
+    updateFFilter = updatemats(imodel).asInstanceOf[Filter];
     updateFilter.clear;
     
     bias_mat = modelmats(imodel+1).asInstanceOf[FMat];
@@ -71,10 +79,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     
     // Create filter model, filter update and bias model if needed
     if (inputDim.asInstanceOf[AnyRef] == null) initModelMats;
-    if (output.asInstanceOf[AnyRef] == null){ 
-    	var outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
-    	output = filter.zeros(outputBatchDim)
-    }
+ 
     
     ffilter.convolve(inputData, output, true);
     if (opts.hasBias) output ~ output + bias_mat;
