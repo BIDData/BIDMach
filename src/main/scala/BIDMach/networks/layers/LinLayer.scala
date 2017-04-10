@@ -35,10 +35,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     if (opts.tmatShape != null) {
       val (y, x, h, w) = opts.tmatShape(nr, nc);
       val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
-      out.tiles.foreach((x:Mat) => {rand(x); x ~ x - 0.5f})
+      out.tiles.foreach((x:Mat) => {rand(x); x ~ x - 0.5f; x ~ x *@ opts.initv})
       out;
     } else {
-    	rand(nr, nc) - 0.5f;
+    	(rand(nr, nc) - 0.5f) *@ opts.initv;
     }
   }
 
@@ -115,6 +115,7 @@ trait LinNodeOpts extends ModelNodeOpts {
   var outdim = 0;
   var tmatShape:(Int, Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
   var withInteractions = false;
+  var initv:Float = 1f;
   
   def copyOpts(opts:LinNodeOpts):LinNodeOpts = {
   		super.copyOpts(opts);
@@ -123,6 +124,7 @@ trait LinNodeOpts extends ModelNodeOpts {
   		opts.outdim = outdim;
   		opts.tmatShape = tmatShape;
   		opts.withInteractions = withInteractions;
+  		opts.initv = initv;
   		opts;
   }
 }

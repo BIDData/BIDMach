@@ -216,7 +216,7 @@ object Layer {
     new TensorFormatLayer(net, new TensorFormatNode{conversion = con; inputFormat = fmt;}){inputs(0) = a;}
   }
      
-  def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
+  def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, initv:Float = 1f, aopts:ADAGrad.Opts=null, 
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -224,7 +224,8 @@ object Layer {
     val mname = name;
     val tms = tmatShape;
     val wi = withInteractions;
-    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
+    val initv0 = initv;
+    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; initv=initv0; aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
   }
   
   def linear_(a:LayerTerm)(implicit net:Net, opts:LinNodeOpts) = {
@@ -251,12 +252,13 @@ object Layer {
   
   def norm(a:LayerTerm)(implicit opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
   
-  def conv(a:LayerTerm)(net:Net, name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true) = {
+  def conv(a:LayerTerm)(net:Net, name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true) = {
     val str = stride;
     val pd = pad;
     val hb = hasBias;
     val mname = name;
-    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; stride=str; pad=pd; hasBias=hb}){inputs(0)=a;};
+    val initv0 = initv;
+    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; initv=initv0; stride=str; pad=pd; hasBias=hb}){inputs(0)=a;};
   }
   
   def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {

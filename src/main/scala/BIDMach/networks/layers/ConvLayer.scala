@@ -52,7 +52,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	ffilter = modelmats(imodel).asInstanceOf[Filter];   	
     	updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
     	
-    	ffilter.xavier(1f);
+    	ffilter.xavier(opts.initv);
     	
     	if (output.asInstanceOf[AnyRef] == null) { 
     		val outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
@@ -119,6 +119,7 @@ trait ConvNodeOpts extends ModelNodeOpts {
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
   var tensorFormat:Int = Net.UseNetFormat;
+  var initv:Float = 1f;
 
   def copyOpts(opts:ConvNodeOpts):ConvNodeOpts = {
   		super.copyOpts(opts);
@@ -129,6 +130,7 @@ trait ConvNodeOpts extends ModelNodeOpts {
   		opts.stride = stride;
   		opts.dilation = dilation;
   		opts.tensorFormat = tensorFormat;
+  		opts.initv = initv;
   		opts;
   }
 

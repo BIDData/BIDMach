@@ -115,7 +115,7 @@ object Node {
     new TensorFormatNode{inputs(0) = a; conversion = con; inputFormat = fmt;}
   }
   
-  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
+  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, initv:Float=1f,
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -123,7 +123,8 @@ object Node {
     val mname = name;
     val wi = withInteractions;
     val tms = tmatShape; 
-    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts; withInteractions = wi; tmatShape = tms};
+    val initv0 = initv;
+    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; initv=initv0; aopts=aaopts; withInteractions = wi; tmatShape = tms};
   }
   
   def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {
@@ -174,25 +175,29 @@ object Node {
     n
   }
   
-  def conv(a:NodeTerm)(w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true) = {
+  def conv(a:NodeTerm)(name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true) = {
     val str = stride;
     val pd = pad;
     val hb = hasBias;
-    new ConvNode{inputs(0)=a; kernel=irow(w,h); noutputs=nch; stride=str; pad=pd; hasBias=hb}
+    val initv0 = initv;
+    val mname = name;
+    new ConvNode{inputs(0)=a; modelName=mname; kernel=irow(w,h); noutputs=nch; initv = initv0; stride=str; pad=pd; hasBias=hb}
   }
   
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
   }
   
-  def batchNormScale(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
   	val hb = hasBias;
-    new BatchNormScaleNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}    
+  	val mname = name;
+    new BatchNormScaleNode{inputs(0)=a; modelName=mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}    
   }
   
-  def scale(a:NodeTerm)(normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
   	val hb = hasBias;
-    new ScaleNode{inputs(0)=a; batchNormMode=normMode; hasBias=hb}    
+  	val mname = name;
+    new ScaleNode{inputs(0)=a; modelName=mname; batchNormMode=normMode; hasBias=hb}    
   }
   
   def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a};
