@@ -21,16 +21,23 @@ class OnehotLayer(override val net:Net, override val opts:OnehotNodeOpts = new O
 
   override def forward = {
 		  val start = toc;
-		  output = oneHot(inputData.asMat);
+		  var hot = if (opts.length != null) {
+		    oneHot(inputData.asMat, opts.length)
+		  } else {
+		    oneHot(inputData.asMat)
+		  }
+		  output = if (opts.full) full(hot) else hot
 		  forwardtime += toc - start;
   }
-  
+
   override def toString = {
     "onehot@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
-trait OnehotNodeOpts extends NodeOpts {  
+trait OnehotNodeOpts extends NodeOpts {
+  var length:Integer = null
+  var full:Boolean = false
 }
 
 class OnehotNode extends Node with OnehotNodeOpts {
@@ -38,15 +45,15 @@ class OnehotNode extends Node with OnehotNodeOpts {
 	override def clone:OnehotNode = {copyTo(new OnehotNode).asInstanceOf[OnehotNode];}
 
   override def create(net:Net):OnehotLayer = {OnehotLayer(net, this);}
-  
+
   override def toString = {
     "onehot@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
-object OnehotLayer {  
-  
+object OnehotLayer {
+
   def apply(net:Net) = new OnehotLayer(net, new OnehotNode);
-  
+
   def apply(net:Net, opts:OnehotNode) = new OnehotLayer(net, opts);
 }

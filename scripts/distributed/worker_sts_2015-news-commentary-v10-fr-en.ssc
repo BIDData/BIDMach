@@ -89,13 +89,35 @@ w.start(nn)
 
 
 // Prediction
-// val s2s = SeqToSeq.load("/mnt/BIDMach/data/MNT2015/models/local/")
+// import BIDMach.networks.SeqToSeq
+//
+// val mdir = "/mnt/BIDMach/data/MNT2015/models/"
+// val datadir = "/mnt/BIDMach/data/MNT2015/data/"
+// val PADsym = 1
+//
+// val batchSize = 128
+// var src = loadSMat(datadir+"news-commentary-v10.fr-en.fr.smat.lz4")
+// var dst = loadSMat(datadir+"news-commentary-v10.fr-en.en.smat.lz4")
+// src = src(?, 0 -> (src.ncols - (src.ncols % batchSize)))
+// dst = dst(?, 0 -> (dst.ncols - (dst.ncols % batchSize)))
+//
+// var srcFull = full(src)
+// var dstFull = full(src)
+// srcFull ~ srcFull + PADsym * (srcFull == 0)
+// dstFull ~ dstFull + PADsym * (dstFull == 0)
+//
+// // val s2s = SeqToSeq.load("/mnt/BIDMach/data/MNT2015/models/local/")
+// val s2s = new SeqToSeq
+// s2s.setmodelmats(new Array[Mat](7))
+// for (i <- 0 until 7) {
+//   s2s.modelmats(i) = loadMat("/mnt/BIDMach/data/MNT2015/models/local/modelmat%02d.lz4" format i)
+// }
 // val (nn, opts) = SeqToSeq.predict(s2s, srcFull)
 //
 // opts.nvocab = 20000
 // opts.height = 2
 // opts.dim = 256
-// opts.batchSize = batchSize
+// opts.batchSize = 128
 //
 // opts.kind = 1
 // opts.netType = 0
@@ -108,6 +130,8 @@ w.start(nn)
 // opts.PADsym = PADsym
 // opts.OOVsym = 2
 // opts.STARTsym = 0
+//
+// opts.debug = 1
 //
 // nn.predict
 //

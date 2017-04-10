@@ -20,6 +20,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var OOVelem:Mat = null;
   var leftEdge:Layer = null;
   var leftStart:Mat = null;
+  var decoderTokens:Array[Layer] = null; // TODO: LayerMat
   var dstxdata:Mat = null;
   var dstxdata0:Mat = null;
   var srcGrid:LayerMat = null;
@@ -49,7 +50,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     layers = srcGrid.data.filter(_ != null);
     for (i <- 0 until height) srcGrid(i+preamble_rows, 0).setInputs(leftEdge, leftEdge);
     
-    if (! opts.embed) {
+    if (!opts.embed || opts.prediction) {
     	dstGridOpts = new LSTMNode.GridOpts;
     	dstGridOpts.copyFrom(opts);
     	dstGridOpts.modelName = "dst_level%d";
@@ -57,10 +58,27 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     	dstGridOpts.outdim = opts.nvocab;
     	dstGrid = LSTMLayer.grid(this, height, outwidth, dstGridOpts);
 
-    	srcGrid link dstGrid;
-    	layers = layers ++ dstGrid.data.filter(_ != null);
-    	output_layers = new Array[Layer](outwidth);
-    	for (i <- 0 until outwidth) output_layers(i) = dstGrid(dstGrid.nrows-1, i);
+        if (opts.prediction) {
+          val predictDstGrid = LayerMat(dstGrid.nrows + 2, dstGrid.ncols)
+          predictDstGrid(0, ?) = dstGrid(0, ?)
+          predictDstGrid(3->predictDstGrid.nrows, ?) = dstGrid(1->dstGrid.nrows, ?)
+
+          predictDstGrid(1, 0) = Layer.copy(predictDstGrid(0, 0))
+          predictDstGrid(2, 0) = Layer.copy(predictDstGrid(1, 0))
+          predictDstGrid(3, 0).setInput(0, predictDstGrid(2, 0))
+          for (j <- 1 until dstGrid.ncols) {
+            predictDstGrid(1, j) = new MaxIndexLayer(this){inputs(0)=predictDstGrid(0, j)}
+            predictDstGrid(2, j) = new OnehotLayer(this, new OnehotNode{length=opts.nvocab; full=true}){inputs(0)=predictDstGrid(1, j)}
+            predictDstGrid(3, j).setInput(0, predictDstGrid(2, 0))
+          }
+
+          dstGrid = predictDstGrid
+        }
+
+        srcGrid link dstGrid;
+        layers = layers ++ dstGrid.data.filter(_ != null);
+        output_layers = new Array[Layer](outwidth);
+        for (i <- 0 until outwidth) output_layers(i) = dstGrid(dstGrid.nrows-1, i);
     }
   }
   
@@ -88,7 +106,15 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       leftEdge.output = convertMat(zeros(opts.dim \ batchSize));
     }
     
-    if (! opts.embed) {
+    if (opts.prediction) {
+       leftStart = iones(batchSize, 1) * opts.STARTsym
+       val dst0mat = full(oneHot(leftStart.contents, opts.nvocab))
+
+       dstGrid(0, 0).output = dst0mat
+       for (i <- 1 until dstGrid.ncols) {
+         dstGrid(0, i).output = dstGrid(dstGrid.nrows-1, i-1).output
+       }
+    } else if (!opts.embed) {
     	val dstx = gmats(1);
     	val dstxn0 = dstx.nnz/dstx.ncols;
     	if (dstxn0*dstx.ncols != dstx.nnz) throw new RuntimeException("SeqToSeq dstx batch not fixed length"); 
@@ -124,8 +150,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   }
   
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
-	  val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
-	  val dstyn0 = dsty.nnz/dsty.ncols;
+    val dsty = if (gmats.length > 2) gmats(2) else gmats(1);
+    val dstyn0 = dsty.nnz/dsty.ncols;
     if (dstyn0*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn0, batchSize).t);
     mapOOV(dstydata);
@@ -176,36 +202,39 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       }
       val mincol = inwidth - srcn; 
       srcGrid.forward(mincol, inwidth-1, opts.debug);
-      if (! opts.embed) {
-      	val maxcol = dstxn;
-      	assignTargets(gmats, ipass, pos);
-      	dstGrid.forward(0, maxcol-1, opts.debug);     
-	if (ogmats != null) {
-	  ogmats(0) = GMat(opts.outwidth, batchSize)
-	  for (j <- 0 until opts.outwidth) {
-	    ogmats(0)(j, ?) = GMat(maxi2(output_layers(j).output.asMat, 1)._2)
-	  }
-	}
-	zeros(1, 1)
-      	// if (putBack >= 0) {\
-      	// 	output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));\
-      	// }\
-      	// var score = 0f;\
-      	// var j = 0;\
-      	// while (j < dstxn-1) {\
-      	// 	score += output_layers(j).score.v;\
-      	// 	j += 1;\
-      	// }\
-      	// row(score/(dstxn-1));\
-      } else {
+      if (opts.embed) {
       	if (ogmats != null) {
       	  var embedding = srcGrid(height+preamble_rows-1, srcGrid.ncols-1).output.asMat;
       	  for (j <- 1 until opts.nembed) {
       	    embedding = embedding on srcGrid(height-j+preamble_rows-1, srcGrid.ncols-1).output.asMat;
       	  }
-      		ogmats(0) = embedding;
+          ogmats(0) = embedding
       	}
       	zeros(1,1);
+      } else if (opts.prediction) {
+        if (ogmats != null) {
+          dstGrid.forward(0, outwidth, opts.debug)
+          var predictedSeq = dstGrid(dstGrid.nrows-1, 0).output.asMat
+          for (j <- 1 until dstGrid.ncols) {
+            predictedSeq = predictedSeq \ dstGrid(dstGrid.nrows-1, j).output.asMat
+          }
+          ogmats(0) = FMat(maxi2(predictedSeq, 1)._2)
+        }
+        zeros(1, 1)
+      } else {
+      	val maxcol = dstxn;
+      	assignTargets(gmats, ipass, pos);
+      	dstGrid.forward(0, maxcol-1, opts.debug);
+      	if (putBack >= 0) {
+      		output_layers(dstxn-1).output.colslice(0, gmats(0).ncols, gmats(1));
+      	}
+      	var score = 0f;
+      	var j = 0;
+      	while (j < dstxn-1) {
+      		score += output_layers(j).score.v;
+      		j += 1;
+      	}
+      	row(score/(dstxn-1));
       }
     } else {
       zeros(1, 1);
@@ -231,6 +260,7 @@ object SeqToSeq {
     var expt = 0.8f;     // Negative sampling exponent (tail boost)
     var embed = false;   // Whether to compute an embedding (vs. a model)
     var nembed = 1;      // number of layers (counted from the top) to use for the embedding
+    var prediction = false;
     
   }
   
@@ -343,6 +373,28 @@ object SeqToSeq {
     (nn, opts)
   }
 
+  def predict(model:SeqToSeq, ifname:String, ofname:String):(Learner, FEopts) = {
+    val opts = new FEopts
+    opts.copyFrom(model.opts)
+    opts.fnames = List(FileSource.simpleEnum(ifname,1,0), FileSource.simpleEnum(ofname,1,0))
+    opts.ofnames = List(FileSource.simpleEnum(ofname,1,0))
+    opts.embed = false
+    opts.prediction = true
+    val newmod = new SeqToSeq(opts)
+    newmod.refresh = false
+    model.copyTo(newmod)
+    implicit val threads = threadPool(4)
+    val ds = new FileSource(opts)
+    val nn = new Learner(
+        new FileSource(opts),
+        newmod,
+        null,
+        null,
+        new FileSink(opts),
+        opts)
+    (nn, opts)
+  }
+
   class MatPredOpts extends Learner.Options with SeqToSeq.Opts with MatSource.Opts with MatSink.Opts
 
   def predict(model:SeqToSeq, src:Mat):(Learner, MatPredOpts) = {
@@ -353,11 +405,11 @@ object SeqToSeq {
     newmod.refresh = false
     model.copyTo(newmod)
 
-    val dst = zeros(opts.outwidth, src.ncols)
-    opts.putBack = 1
+    opts.embed = false
+    opts.prediction = true
 
     val nn = new Learner(
-        new MatSource(Array(src, dst), opts),
+        new MatSource(Array(src), opts),
         newmod,
         null,
         null,

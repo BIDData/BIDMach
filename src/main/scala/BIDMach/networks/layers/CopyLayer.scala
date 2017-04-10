@@ -34,13 +34,13 @@ class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyN
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv;
 		  backwardtime += toc - start;
   }
-  
+
   override def toString = {
     "copy@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
-trait CopyNodeOpts extends NodeOpts {  
+trait CopyNodeOpts extends NodeOpts {
 }
 
 class CopyNode extends Node with CopyNodeOpts {
@@ -48,15 +48,15 @@ class CopyNode extends Node with CopyNodeOpts {
 	override def clone:CopyNode = {copyTo(new CopyNode).asInstanceOf[CopyNode];}
 
   override def create(net:Net):CopyLayer = {CopyLayer(net, this);}
-  
+
   override def toString = {
     "copy@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
-object CopyLayer {  
-  
+object CopyLayer {
+
   def apply(net:Net) = new CopyLayer(net, new CopyNode);
-  
+
   def apply(net:Net, opts:CopyNode) = new CopyLayer(net, opts);
 }
