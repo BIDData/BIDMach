@@ -33,7 +33,7 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
         ? 
       } else {
         val gap = dims(i) - opts.sizes(i);
-        val offset = if (opts.offsets.asInstanceOf[AnyRef] != null || opts.offsets(i) >= 0) {
+        val offset = if (opts.offsets.asInstanceOf[AnyRef] != null && opts.offsets(i) >= 0) {
           math.min(opts.offsets(i), gap);
         } else {
           gap/2;
