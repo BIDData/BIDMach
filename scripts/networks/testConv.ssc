@@ -5,17 +5,17 @@ val testdir = "../../data/ImageNet/test/";
 
 val means = loadFMat(traindir + "means.fmat.lz4");
 
-val (nn,opts) = Net.learner(traindir+"part%04d.fmat.lz4",traindir+"labels%04d.fmat.lz4");
+val (nn,opts) = Net.learner(traindir+"part%04d.fmat.lz4",traindir+"label%04d.imat.lz4");
 
-opts.nend = 100
+opts.nend = 4
 opts.batchSize= 128
-opts.npasses = 4
-opts.lrate = 0.01f 
+opts.npasses = 1
+opts.lrate = 1e-4f 
 opts.texp = 0.3f
 opts.pstep = 0.001f
-opts.links = iones(1,1);
-opts.nweight = 1e-4f;
 opts.lookahead = 0;
+opts.autoReset = false;
+opts.tensorFormat = Net.TensorNCHW;
 
 import BIDMach.networks.layers.Node._;
 
@@ -26,38 +26,38 @@ val means1 = constant(means);
 val diff2 = crop1 - means1;
 val fmt2 = format(diff2)();
 
-val conv3 = conv(fmt2)(w=7,h=7,nch=64,stride=4,pad=3);
+val conv3 = conv(fmt2)(w=7,h=7,nch=64,stride=4,pad=3,initv=0.01f);  // image is 64x56x56
 val bns3 = batchNormScale(conv3)();
 val relu3 = relu(bns3);
 
-val conv4 = conv(relu3)(w=5,h=5,nch=256,stride=2,pad=2);
+val conv4 = conv(relu3)(w=5,h=5,nch=128,stride=2,pad=2);      // image is 128x28x28
 val bns4 = batchNormScale(conv4)();
 val relu4 = relu(bns4);
 
-val conv5 = conv(relu4)(w=3,h=3,nch=256,stride=1,pad=1);
+val conv5 = conv(relu4)(w=3,h=3,nch=128,stride=1,pad=1); 
 val bns5 = batchNormScale(conv5)();
 val relu5 = relu(bns5);
 
-val conv6 = conv(relu5)(w=5,h=5,nch=1024,stride=2,pad=2);
+val conv6 = conv(relu5)(w=5,h=5,nch=256,stride=2,pad=2);      // image is 256x14x14
 val bns6 = batchNormScale(conv6)();
 val relu6 = relu(bns6);
 
-val conv7 = conv(relu6)(w=3,h=3,nch=1024,stride=1,pad=1);
+val conv7 = conv(relu6)(w=3,h=3,nch=256,stride=1,pad=1);
 val bns7 = batchNormScale(conv7)();
 val relu7 = relu(bns7);
 
-val conv8 = conv(relu7)(w=3,h=3,nch=1024,stride=1,pad=1);
+val conv8 = conv(relu7)(w=5,h=5,nch=512,stride=2,pad=2);     // image is 512x7x7
 val bns8 = batchNormScale(conv8)();
 val relu8 = relu(bns8);
 
-val fc9 = linear(relu8)(outdim=4096);
+val fc9 = linear(relu8)(outdim=4096,initv=5e-3f);
 val relu9 = relu(fc9);
 
-val fc10 = linear(relu9)(outdim=4096);
+val fc10 = linear(relu9)(outdim=4096,initv=1e-2f);
 val relu10 = relu(fc10);
 
-val fc11 = linear(relu10)(outdim=1000);
-val out = glm(fc11)(opts.links);
+val fc11 = linear(relu10)(outdim=1000,initv=1e-2f);
+val out = softmaxout(fc11)();
 
 val nodes = (in     \ diff2   \ conv3  \ conv4  \ conv5  \ conv6  \ conv7  \ conv8  \ fc9    \ fc10    \ fc11  on 
              crop1  \ fmt2    \ bns3   \ bns4   \ bns5   \ bns6   \ bns7   \ bns8   \ relu9  \ relu10  \ out   on
