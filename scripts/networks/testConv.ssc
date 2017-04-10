@@ -5,7 +5,7 @@ val testdir = "../../data/ImageNet/test/";
 
 val means = loadFMat(traindir + "means.fmat.lz4");
 
-val (nn,opts) = Net.learner(traindir+"parts%04d.fmat.lz4",traindir+"labels%04d.fmat.lz4");
+val (nn,opts) = Net.learner(traindir+"part%04d.fmat.lz4",traindir+"labels%04d.fmat.lz4");
 
 opts.nend = 100
 opts.batchSize= 128
@@ -23,7 +23,7 @@ val in = input;
 val crop1 = crop(in);
 val means1 = constant(means);
 
-val diff2 = crop2 - means1;
+val diff2 = crop1 - means1;
 val fmt2 = format(diff2);
 
 val conv3 = conv(fmt2)(w=7,h=7,nch=64,stride=4,pad=3);
