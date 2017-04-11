@@ -11,6 +11,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3
 import java.util.HashMap
 import BIDMach.networks._
@@ -50,6 +52,9 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	}
     	filter = modelmats(imodel).asInstanceOf[FMat];
     	ffilter = modelmats(imodel).asInstanceOf[Filter];   	
+    	ffilter match {
+    	  case aa:GFilter => aa.convType = opts.convType;
+    	}
     	updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
     	
     	ffilter.xavier(opts.initv);
@@ -119,6 +124,7 @@ trait ConvNodeOpts extends ModelNodeOpts {
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
   var tensorFormat:Int = Net.UseNetFormat;
+  var convType:Int = cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
   var initv:Float = 1f;
 
   def copyOpts(opts:ConvNodeOpts):ConvNodeOpts = {
@@ -130,6 +136,7 @@ trait ConvNodeOpts extends ModelNodeOpts {
   		opts.stride = stride;
   		opts.dilation = dilation;
   		opts.tensorFormat = tensorFormat;
+  		opts.convType = convType;
   		opts.initv = initv;
   		opts;
   }

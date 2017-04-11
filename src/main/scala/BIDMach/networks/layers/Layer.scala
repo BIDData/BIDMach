@@ -254,18 +254,20 @@ object Layer {
   
   def norm(a:LayerTerm)(implicit opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
   
-  def conv(a:LayerTerm)(net:Net, name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true) = {
+  def conv(a:LayerTerm)(net:Net, name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
+      hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
     val str = stride;
     val pd = pad;
     val hb = hasBias;
     val mname = name;
     val initv0 = initv;
-    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; initv=initv0; stride=str; pad=pd; hasBias=hb}){inputs(0)=a;};
+    val ct = convType;
+    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; initv=initv0; stride=str; pad=pd; hasBias=hb; convType=ct}){inputs(0)=a;};
   }
   
    def pool(a:LayerTerm)(net:Net, h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
       poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
-      poolingNaN:Int = cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
+      poolingNaN:Int=cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
       tensorFormat:Int = Net.UseNetFormat) = {
   	val hh = h;
   	val ww = w;
