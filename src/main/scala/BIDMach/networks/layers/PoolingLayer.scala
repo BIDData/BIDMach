@@ -242,18 +242,18 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       
       yDesc = new cudnnTensorDescriptor()
       if (cudnnCreateTensorDescriptor(yDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val ySetStatus = cudnnSetTensor4dDescriptor(xDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
+      val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
       if (ySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating y tensor for pooling backward");
-      
-      dyDesc = new cudnnTensorDescriptor();
-      if (cudnnCreateTensorDescriptor(dyDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val dySetStatus = cudnnSetTensor4dDescriptor(dyDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
-      if (dySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for pooling backward");
       
       dxDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(dxDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
       val dxSetStatus = cudnnSetTensor4dDescriptor(dxDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
       if (dxSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for pooling backward");
+ 
+      dyDesc = new cudnnTensorDescriptor();
+      if (cudnnCreateTensorDescriptor(dyDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
+      val dySetStatus = cudnnSetTensor4dDescriptor(dyDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
+      if (dySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for pooling backward");
       
       pDesc = new cudnnPoolingDescriptor;
       cudnnCreatePoolingDescriptor(pDesc);
