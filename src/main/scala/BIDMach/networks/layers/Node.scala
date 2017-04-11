@@ -11,6 +11,8 @@ import BIDMach.networks.layers._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3;
 import scala.language.implicitConversions
 import java.util.HashMap;
@@ -184,6 +186,20 @@ object Node {
     new ConvNode{inputs(0)=a; modelName=mname; kernel=irow(w,h); noutputs=nch; initv = initv0; stride=str; pad=pd; hasBias=hb}
   }
   
+  def pool(a:NodeTerm)(h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
+      poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
+      poolingNaN:Int = cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
+      tensorFormat:Int = Net.UseNetFormat) = {
+  	val hh = h;
+  	val ww = w;
+  	val str = stride;
+  	val ppad = pad;
+  	val pm = poolingMode;
+  	val pn = poolingNaN;
+  	val tf = tensorFormat;
+    new PoolingNode{inputs(0)=a; h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}; 
+  }
+  
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
   }
@@ -212,7 +228,10 @@ object Node {
 
   def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
   
-  def softmaxout(a:NodeTerm)(scoreTyp:Int=0, doVar:Boolean=false) =  new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; doVariance = doVar}
+  def softmaxout(a:NodeTerm)(scoreType:Int=0, doVar:Boolean=false) =  {
+    val scoreTyp = scoreType;
+    new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; doVariance = doVar}
+  }
   
   def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = a};
   

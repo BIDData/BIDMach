@@ -10,6 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
@@ -259,6 +261,20 @@ object Layer {
     val mname = name;
     val initv0 = initv;
     new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; initv=initv0; stride=str; pad=pd; hasBias=hb}){inputs(0)=a;};
+  }
+  
+   def pool(a:LayerTerm)(net:Net, h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
+      poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
+      poolingNaN:Int = cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
+      tensorFormat:Int = Net.UseNetFormat) = {
+  	val hh = h;
+  	val ww = w;
+  	val str = stride;
+  	val ppad = pad;
+  	val pm = poolingMode;
+  	val pn = poolingNaN;
+  	val tf = tensorFormat;
+    new PoolingLayer(net, new PoolingNode{h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
   }
   
   def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
