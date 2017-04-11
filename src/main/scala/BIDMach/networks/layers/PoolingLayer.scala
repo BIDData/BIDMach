@@ -168,6 +168,7 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
     
     val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
     val xdims = inputData.dims;
+    val ydims = output.dims;
 
     val inputGMat = inputData.asInstanceOf[GMat];
     val outputGMat = output.asInstanceOf[GMat];
@@ -187,7 +188,7 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       
       yDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(yDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1))
+      val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1))
       if (ySetStatus > 0) throw new CUDAException(ySetStatus, "Error creating y tensor for pooling forward");
       
       pDesc = new cudnnPoolingDescriptor;
