@@ -545,11 +545,11 @@ object Net  {
   
   class PredOptions extends Learner.Options with Net.Opts with MatSource.Opts with MatSink.Opts;
   
-  def predictor(model0:Model, mat0:Mat):(Learner, PredOptions) = {
+  def predictor(model0:Model, data0:Mat, labels0:Mat):(Learner, PredOptions) = {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
     val opts = new PredOptions;
-    opts.batchSize = math.min(10000, mat0.ncols/30 + 1);
+    opts.batchSize = math.min(10000, data0.ncols/30 + 1);
     opts.links = mopts.links;
     opts.nodeset = mopts.nodeset;
     opts.nodemat = mopts.nodemat;
@@ -566,7 +566,7 @@ object Net  {
     newmod.refresh = false;
     newmod.copyFrom(model)
     val nn = new Learner(
-        new MatSource(Array(mat0), opts), 
+        new MatSource(Array(data0, labels0), opts), 
         newmod, 
         null,
         null, 
