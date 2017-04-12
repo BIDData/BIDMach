@@ -551,8 +551,14 @@ object Net  {
     val opts = new PredOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1);
     opts.links = mopts.links;
-    opts.nodeset = mopts.nodeset.clone;
-    opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    opts.nodeset = mopts.nodeset;
+    opts.nodemat = mopts.nodemat;
+    if (opts.nodeset.asInstanceOf[AnyRef] != null) {
+    	opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    }
+    if (opts.nodemat.asInstanceOf[AnyRef] != null) {
+    	opts.nodemat.data.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    }
     opts.hasBias = mopts.hasBias;
     opts.dropout = 1f;
     
