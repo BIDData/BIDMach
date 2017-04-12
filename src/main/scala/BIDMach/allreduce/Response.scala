@@ -47,6 +47,33 @@ class Response(
   
 }
 
+class WorkerProgressResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
+  extends Response(Command.workerProgressCommand, round0, src0, bytes.size, bytes, bytes.size) {
+
+  var obj:AnyRef = obj0;
+
+  // round0 and dest0 are discarded
+  def this(obj0:AnyRef) = {
+    this(0, 0, obj0, {
+      val out  = new ByteArrayOutputStream()
+      val output = new ObjectOutputStream(out)
+      output.writeObject(obj0)
+      output.close
+      out.toByteArray()
+    });
+  }
+
+  override def encode ():Unit = { }
+
+  override def decode():Unit = {
+    val in = new ByteArrayInputStream(bytes);
+    val input = new ObjectInputStream(in);
+    obj = input.readObject;
+    input.close;
+  }
+}
+
+
 class AllreduceResponse(round0:Int, src0:Int, bytes:Array[Byte])
 extends Response(Command.allreduceCtype, round0, src0, 1, bytes, 1*4) {
 
@@ -132,46 +159,46 @@ class ResponseWriter(address:InetSocketAddress, resp:Response, me:Worker) extend
 }
 
 class ResponseReader(socket:Socket, me:Master) extends Runnable {
-    def run() {
-      try {
-        val istr = new DataInputStream(socket.getInputStream());
-        val magic = istr.readInt();
-        val rtype = istr.readInt();
-        val round = istr.readInt();
-        val dest = istr.readInt();
-        val clen = istr.readInt();
-        val blen = istr.readInt();
-        val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen);
-        if (me.opts.trace > 2) me.log("Master got packet %s\n" format (response.toString));
-        istr.readFully(response.bytes, 0, blen);
+  def run() {
+    try {
+      val istr = new DataInputStream(socket.getInputStream());
+      val magic = istr.readInt();
+      val rtype = istr.readInt();
+      val round = istr.readInt();
+      val dest = istr.readInt();
+      val clen = istr.readInt();
+      val blen = istr.readInt();
+      val response = new Response(rtype, round, dest, clen, new Array[Byte](blen), blen);
+      if (me.opts.trace > 2) me.log("Master got packet %s\n" format (response.toString));
+      istr.readFully(response.bytes, 0, blen);
 
-        rtype match {
-          case Command.allreduceCtype => {
-            me.listener.allreduceCollected += 1
-          }
-          case Command.learnerDoneCtype => {
-            me.stopUpdates()
-            me.log("Stopping allreduce update!\n")
-          }
-          case _ =>
+      rtype match {
+        case Command.allreduceCtype => {
+          me.listener.allreduceCollected += 1
         }
-        try {
-          socket.close();
-        } catch {
-        case e:IOException => {if (me.opts.trace > 0) me.log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
+        case Command.learnerDoneCtype => {
+          me.stopUpdates()
+          me.log("Stopping allreduce update!\n")
         }
-        me.handleResponse(response);
+        case _ =>
+      }
+      try {
+        socket.close();
       } catch {
+        case e:IOException => {if (me.opts.trace > 0) me.log("Master Problem closing socket "+Response.printStackTrace(e)+"\n")}
+      }
+      me.handleResponse(response);
+    } catch {
       case e:Exception => if (me.opts.trace > 0) me.log("Master Problem reading socket "+Response.printStackTrace(e)+"\n");
-      } finally {
-        try {
-          if (!socket.isClosed) socket.close();
-        } catch {
+    } finally {
+      try {
+        if (!socket.isClosed) socket.close();
+      } catch {
         case e:IOException => {if (me.opts.trace > 0) me.log("Master Final Problem closing socket "+Response.printStackTrace(e)+"\n")}
-        }
       }
     }
   }
+}
 
 object Response {
 	val magic = 0xa6b38734;

@@ -1,32 +1,14 @@
 package BIDMach.allreduce
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
-import BIDMat.MatFunctions._
-import BIDMat.SciFunctions._
-import BIDMach.Learner;
-import BIDMach.models.Model;
-import edu.berkeley.bid.comm._
-import scala.collection.parallel._
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import java.util.concurrent.Callable
-import javax.script.ScriptContext
+import BIDMach.Learner
+import BIDMach.models.Model
 
 class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
 	var listener:CommandListener = null;
 	var listenerTask:Future[_] = null;
+  var progressRecorder:ProgressRecorder = null;
+  var progressRecorderTask:Future[_] = null;
 	var machine:Machine = null;
 	var learner:Learner = null;
 	var obj:AnyRef = null;
@@ -43,6 +25,8 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  executor = Executors.newFixedThreadPool(8);
 	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
+    progressRecorder = new ProgressRecorder();
+    progressRecorderTask = executor.submit(progressRecorder);
 	  intp = new ScriptEngineManager().getEngineByName("scala");
 	}
 
@@ -118,6 +102,8 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   def stop = {
     listener.stop = true;
     listenerTask.cancel(true);
+    progressRecorder.stop = true;
+    progressRecorderTask.cancel(true);
     if (machine != null) machine.stop;
   }
 
@@ -277,7 +263,28 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     val cw = new ResponseWriter(masterSocketAddr, resp, this);
     executor.submit(cw);
   }
+
+  class ProgressRecorder extends Runnable {
+    val stop = false;
+
+//    def start() {
+//    }
+
+    def run() {
+//      start();
+      while(!stop){
+        //loop and send workerprogress to master, every 2 seconds
+        Thread.sleep(2000);
+        val progressResp = new ReturnObjectResponse(learner.sentSockHistory);
+        sendMaster(progressResp);
+      }
+    }
+
+//    def stop() {
+//    }
+  }
 }
+
 
 object Worker {
 	trait Opts extends Host.Opts{

@@ -33,6 +33,9 @@ import org.apache.commons.io.IOUtils;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+//TODO
+import edu.berkeley.bid.comm._ //Machine and WorkerProgress
+
 
 class SocketClassLoader(parent:ClassLoader) extends ClassLoader(parent) {
   val classMap = new HashMap[String, (Class[_], Array[Byte])]
@@ -99,6 +102,10 @@ object Command {
 	final val evalStringCtype = 10;
 	final val returnObjectCtype = 11;
 	final val callCtype = 12;
+
+  //TODO
+  final val workerProgressCtype = 13;
+
 	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone",
 	    "assignObject", "sendLearner", "evalString", "returnObject", "call");
 
@@ -112,6 +119,40 @@ object Command {
     str;
   }
 }
+
+//TODO
+class WorkerProgressCommand(
+    round0:Int, dest0:Int, workerProgress0:Bandwidth, bytes:Array[Byte])
+  extends Command(
+    Command.workerProgressCommand, round0, dest0, bytes.size, bytes, bytes.size) {
+
+  var obj:AnyRef = obj0;
+
+  def this(round0:Int, dest0:Int, workerProgress0:Bandwidth) = {
+    this(round0, dest0, obj0, {
+      val out  = new ByteArrayOutputStream()
+      val output = new ObjectOutputStream(out)
+      output.writeObject(obj0)
+      output.close
+      out.toByteArray()
+    });
+  }
+
+  override def encode():Unit = {}
+
+  override def decode():Unit = {
+    val in = new ByteArrayInputStream(bytes);
+    val input = new ObjectInputStream(in);
+    obj = input.readObject.asInstanceOf[Bandwidth];
+    input.close;
+  }
+
+  override def toString():String = {
+    "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
+  }
+
+}
+
 
 class ConfigCommand(
   round0:Int, dest0:Int, gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat, workerPorts0:IMat,
