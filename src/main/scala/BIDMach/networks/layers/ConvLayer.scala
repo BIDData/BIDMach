@@ -71,9 +71,10 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     }
     filter = modelmats(imodel).asInstanceOf[FMat];
     ffilter = modelmats(imodel).asInstanceOf[Filter];
+    
     updateFilter = updatemats(imodel).asInstanceOf[FMat];
-    updateFFilter = updatemats(imodel).asInstanceOf[Filter];
-    updateFilter.clear;
+    updateFFilter = updatemats(imodel).asInstanceOf[Filter];  
+    if (updateFilter.asInstanceOf[AnyRef] != null) updateFilter.clear;
     
     bias_mat = modelmats(imodel+1).asInstanceOf[FMat];
     update_bias_mat = updatemats(imodel+1).asInstanceOf[FMat];
