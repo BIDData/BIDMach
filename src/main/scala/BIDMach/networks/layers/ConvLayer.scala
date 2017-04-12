@@ -59,7 +59,8 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	
     	ffilter.xavier(opts.initv);
     	
-    	val biasDim = irow(output.dims(0), output.dims(1), output.dims(2), 1);
+    	val outDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
+    	val biasDim = irow(outDim(0), outDim(1), outDim(2), 1);
     	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	
