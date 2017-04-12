@@ -20,27 +20,25 @@ val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
 opts.batchSize= 64
-//opts.nesterov = 0.9f
-opts.npasses = 8
-opts.lrate = 1e-5f 
-opts.texp = 0.0f
+opts.npasses = 10
+
+opts.lrate = 1e-3f 
+opts.texp = 0.3f
 opts.pstep = 0.1f
 opts.hasBias = true;
-//opts.lookahead = 0;
-opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
 
 import BIDMach.networks.layers.Node._;
 
 val in = input;
 
-val conv1 = conv(in)(w=5,h=5,nch=20,stride=2,pad=2,initv=0.01f,convType=convt);
-val relu1 = relu(conv1);
+val conv1 = conv(in)(w=5,h=5,nch=20,stride=1,pad=0,initv=0.01f,convType=convt);
+val pool1 = pool(conv1)(w=2,h=2,stride=2);
 
-val conv2 = conv(relu1)(w=5,h=5,nch=20,stride=2,pad=2,convType=convt);
-val relu2 = relu(conv2);
+val conv2 = conv(pool1)(w=5,h=5,nch=20,stride=1,pad=0,convType=convt);
+val pool2 = pool(conv2)(w=2,h=2,stride=2);
 
-val fc3 = linear(relu2)(outdim=500,initv=3e-2f);
+val fc3 = linear(pool2)(outdim=500,initv=3e-2f);
 val relu3 = relu(fc3);
 
 val fc4 = linear(relu3)(outdim=10,initv=5e-2f);
@@ -48,8 +46,8 @@ val fc4 = linear(relu3)(outdim=10,initv=5e-2f);
 val out = softmaxout(fc4)(scoreType=1); 
 
 val nodes = (in     \ null   on
-             conv1  \ relu1  on
-             conv2  \ relu2  on
+             conv1  \ pool1  on
+             conv2  \ pool2  on
              fc3    \ relu3  on
              fc4    \ out    ).t
 
@@ -60,7 +58,7 @@ val model = nn.model.asInstanceOf[Net];
 nn.train;
 
 val (mm, mopts) =  Net.predictor(model, test, testlabels);
-mopts.autoReset = false;
+mopts.batchSize = 100;
 val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 
