@@ -17,7 +17,7 @@ import BIDMach.networks._
 class StackLayer(override val net:Net, override val opts:StackNodeOpts = new StackNode) extends Layer(net, opts) {
   override val _inputs = new Array[LayerTerm](opts.ninputs);
 
-  var colranges = new Array[Mat](opts.ninputs);
+  var colranges = new Array[IMat](opts.ninputs);
   
   override def forward = {
 		  val start = toc;
@@ -25,13 +25,13 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 			  var orows = 0;
 			  for (i <- 0 until opts.ninputs) {
 				  val thisrow = inputDatas(i).nrows;
-				  colranges(i) = convertMat(irow(orows -> (orows + thisrow)));
+				  colranges(i) = int(convertMat(irow(orows -> (orows + thisrow))));
 				  orows += thisrow;
 			  }
 			  output = convertMat(zeros(orows \ inputData.ncols));
 		  }
 		  for (i <- 0 until opts.ninputs) {
-			  output.asMat(colranges(i), ?) = inputDatas(i).asMat;
+			  output(colranges(i), ?) = inputDatas(i);
 		  }
 		  clearDeriv;
 		  forwardtime += toc - start;
@@ -41,7 +41,7 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  val start = toc;
 		  for (i <- 0 until opts.ninputs) {
 			  if (inputDerivs(i).asInstanceOf[AnyRef] != null) {
-				  inputDerivs(i) <-- deriv.asMat(colranges(i), ?)
+				  inputDerivs(i) <-- deriv(colranges(i), ?)
 			  }
 		  }  
 		  backwardtime += toc - start;

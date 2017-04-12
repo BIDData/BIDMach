@@ -15,7 +15,7 @@ import BIDMach._
  */
 class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends Net(opts) {
   
-  var shiftedInds:Mat = null;
+  var shiftedInds:IMat = null;
   var leftedge:Layer = null;
   var height = 0;
   var width = 0;
@@ -101,7 +101,7 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
   override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	val nr = batchSize / opts.width;
   	val in0 = gmats(0);
-  	if (shiftedInds.asInstanceOf[AnyRef] == null) shiftedInds = convertMat(irow(1->in0.ncols) \ (in0.ncols-1));
+  	if (shiftedInds.asInstanceOf[AnyRef] == null) shiftedInds = int(convertMat(irow(1->in0.ncols) \ (in0.ncols-1)));
   	val inshift = in0(0, shiftedInds);
     val in = inshift.view(opts.width, nr).t;
     if (opts.allout) {

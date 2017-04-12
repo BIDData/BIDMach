@@ -1,5 +1,5 @@
 package BIDMach.caffe
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GIMat,GSMat,HMat,Image,IMat,ND,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GIMat,GSMat,HMat,Image,IMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -34,7 +34,7 @@ class Classifier {
      
   }
     
-  def classify(im:Image):FND = {
+  def classify(im:Image):FMat = {
   	val fnd = net.preprocess(im)
   	net.clear_inputs
   	net.add_input(fnd, 0, 0)

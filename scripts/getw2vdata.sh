@@ -2,6 +2,7 @@
 
 SCRIPTDIR=`pwd`
 
+mkdir -p ../data/word2vec/raw
 cd ../data/word2vec/raw
 
 if [ ! -e 1-billion-word-language-modeling-benchmark-r13output.tar.gz ]; then

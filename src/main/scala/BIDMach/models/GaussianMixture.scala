@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GDMat,GIMat,GSMat,GSDMat,GND,HMat,IMat,JSON,LMat,ND,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._

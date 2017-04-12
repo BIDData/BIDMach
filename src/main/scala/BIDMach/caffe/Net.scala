@@ -1,5 +1,5 @@
 package BIDMach.caffe
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FND,GMat,GIMat,GSMat,HMat,Image,IMat,ND,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GIMat,GSMat,HMat,Image,IMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -17,17 +17,17 @@ class Net () {
   val _net = new NET
   
   def initIO = {
-    input_data = new Array[FND](num_inputs)
+    input_data = new Array[FMat](num_inputs)
    	for (i <- 0 until num_inputs) {
    	  val iblob = _net.input_blob(i)
-   	  input_data(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
-   	  input_diff(i) = FND(iblob.width, iblob.height, iblob.channels, iblob.num)
+   	  input_data(i) = zeros(iblob.width \ iblob.height \ iblob.channels \ iblob.num)
+   	  input_diff(i) = zeros(iblob.width \ iblob.height \ iblob.channels \ iblob.num)
    	}
-   	output_data = new Array[FND](num_outputs)
+   	output_data = new Array[FMat](num_outputs)
    	for (i <- 0 until num_outputs) {
    	  val oblob = _net.output_blob(i)
-   	  output_data(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
-   	  output_diff(i) = FND(oblob.width, oblob.height, oblob.channels, oblob.num)
+   	  output_data(i) = zeros(oblob.width \ oblob.height \ oblob.channels \ oblob.num)
+   	  output_diff(i) = zeros(oblob.width \ oblob.height \ oblob.channels \ oblob.num)
    	}
   }
   
@@ -59,22 +59,22 @@ class Net () {
   
   def num = _net.input_blob(0).num
   
-  def blobs:TreeMap[String,FND] = {
-    val out = new TreeMap[String, FND]
+  def blobs:TreeMap[String,FMat] = {
+    val out = new TreeMap[String, FMat]
     for (bname <- _net.blob_names) {
-    	out.insert(bname, BLOBtoFND(_net.blob_by_name(bname)))
+    	out.insert(bname, BLOBtoFMat(_net.blob_by_name(bname)))
     }
     out
   }
   
-  def params:TreeMap[String,Array[FND]] = {
-    val out = new TreeMap[String, Array[FND]]
+  def params:TreeMap[String,Array[FMat]] = {
+    val out = new TreeMap[String, Array[FMat]]
     for (lname <- _net.layer_names) {
       val layer = _net.layer_by_name(lname)
       val nblobs = layer.num_blobs
       if (nblobs > 0) {
-      	val bb = new Array[FND](nblobs);
-      	for (i <- 0 until nblobs) bb(i) = BLOBtoFND(layer.blob(i));
+      	val bb = new Array[FMat](nblobs);
+      	for (i <- 0 until nblobs) bb(i) = BLOBtoFMat(layer.blob(i));
       	out.insert(lname, bb);
       }
     }
@@ -82,10 +82,10 @@ class Net () {
   }
   
   def set_mean(mfile:String, varname:String = "image_mean") = {
-    var meanf:FND = load(mfile, varname)                                   // Matlab means file is W < H < D, BGR
+    var meanf:FMat = load(mfile, varname)                                   // Matlab means file is W < H < D, BGR
     if (meanf.dims(0) != _image_dims(0) || meanf.dims(1) != _image_dims(1)) {
     	meanf = meanf.transpose(2, 0, 1)                                     // First go to resizing order D < W < H
-    	meanf = Image(meanf).resize(inwidth, inheight).toFND                 // Resize if needed
+    	meanf = Image(meanf).resize(inwidth, inheight).toFMat                 // Resize if needed
     	meanf = meanf.transpose(1, 2, 0)                                     // Now back to W < H < D
     }
     meanf = crop(meanf)
@@ -104,14 +104,14 @@ class Net () {
     pull_outputs
   }
   
-  def forward(outputs:TreeMap[String,FND]) = {
+  def forward(outputs:TreeMap[String,FMat]) = {
     push_inputs
     _net.forward
     pull_outputs
     if (outputs != null) pull(outputs)
   }
   
-  def forward(outputs:TreeMap[String,FND], inputs:TreeMap[String,FND]) = {
+  def forward(outputs:TreeMap[String,FMat], inputs:TreeMap[String,FMat]) = {
     if (inputs != null) {
       push(inputs)
     } else {
@@ -127,69 +127,69 @@ class Net () {
     pull_input_diffs
   }
   
-  def backward(output_diffs:TreeMap[String,FND]) = {
+  def backward(output_diffs:TreeMap[String,FMat]) = {
     push_inputs
     _net.backward
     pull_input_diffs
     if (output_diffs != null) pull_diffs(output_diffs)
   }
   
-  def update_params(params:TreeMap[String,Array[FND]]) = {
-    params.foreach((x:Tuple2[String,Array[FND]]) => {
+  def update_params(params:TreeMap[String,Array[FMat]]) = {
+    params.foreach((x:Tuple2[String,Array[FMat]]) => {
       val layer = _net.layer_by_name(x._1)
       val nblobs = layer.num_blobs
       if (nblobs > 0) {
       	val bb = x._2
       	for (i <- 0 until nblobs) {
       	  val blob = layer.blob(i)
-      	  val fnd = bb(i)
-      	  checkBlobDims(blob, fnd, "update params blob dim mismatch");
-      	  blob.put_data(fnd.data);
+      	  val FMat = bb(i)
+      	  checkBlobDims(blob, FMat, "update params blob dim mismatch");
+      	  blob.put_data(FMat.data);
       	}
       }
     });
   }
   
-  def checkBlobDims(blob:BLOB, fnd:FND, fname:String) {
-    if (blob.width != fnd.dims(0) || blob.height != fnd.dims(1) || blob.channels != fnd.dims(2) || blob.num != fnd.dims(3)) {
+  def checkBlobDims(blob:BLOB, FMat:FMat, fname:String) {
+    if (blob.width != FMat.dims(0) || blob.height != FMat.dims(1) || blob.channels != FMat.dims(2) || blob.num != FMat.dims(3)) {
       throw new RuntimeException(fname+": checkBlobDims failed")
     }
   }
   
-  def pull(blobs:Iterable[(String,FND)]) = {
-    blobs.foreach((x:Tuple2[String,FND]) => {
+  def pull(blobs:Iterable[(String,FMat)]) = {
+    blobs.foreach((x:Tuple2[String,FMat]) => {
       val bname = x._1;
-      val fnd = x._2;
+      val FMat = x._2;
       val blob = _net.blob_by_name(bname);
-      checkBlobDims(blob, fnd, "pull blob data");
-      blob.get_data(fnd.data);
+      checkBlobDims(blob, FMat, "pull blob data");
+      blob.get_data(FMat.data);
     })
   }
   
-  def pull_diffs(blobs:Iterable[(String,FND)]) = {
-    blobs.foreach((x:Tuple2[String,FND]) => {
+  def pull_diffs(blobs:Iterable[(String,FMat)]) = {
+    blobs.foreach((x:Tuple2[String,FMat]) => {
       val bname = x._1;
-      val fnd = x._2;
+      val FMat = x._2;
       val blob = _net.blob_by_name(bname);
-      checkBlobDims(blob, fnd, "pull blob diffs");
-      blob.get_diff(fnd.data);
+      checkBlobDims(blob, FMat, "pull blob diffs");
+      blob.get_diff(FMat.data);
     })
   }
   
-  def push(blobs:Iterable[(String,FND)]) = {
-    blobs.foreach((x:Tuple2[String,FND]) => {
+  def push(blobs:Iterable[(String,FMat)]) = {
+    blobs.foreach((x:Tuple2[String,FMat]) => {
       val bname = x._1;
-      val fnd = x._2;
+      val FMat = x._2;
       val blob = _net.blob_by_name(bname);
-      checkBlobDims(blob, fnd, "push blob data");
-      blob.put_data(fnd.data);
+      checkBlobDims(blob, FMat, "push blob data");
+      blob.put_data(FMat.data);
     })
   }
   
-  def preprocess(im:Image):FND = {                                          // Preprocess a D < W < H image
-    var cafimg = im.toFND;
+  def preprocess(im:Image):FMat = {                                          // Preprocess a D < W < H image
+    var cafimg = im.toFMat;
     if (cafimg.dims(1) != _image_dims(0) || cafimg.dims(2) != _image_dims(1)) {
-      cafimg = Image(cafimg).resize(_image_dims(0), _image_dims(1)).toFND;
+      cafimg = Image(cafimg).resize(_image_dims(0), _image_dims(1)).toFMat;
     }
     if (_scale != 1f) {
       cafimg = cafimg *@ _scale;
@@ -205,7 +205,7 @@ class Net () {
     cafimg;
   }
   
-  def crop(im:FND):FND = {                                                  // Image should be D < W < H
+  def crop(im:FMat):FMat = {                                                  // Image should be D < W < H
     if (im.dims(0) > inwidth || im.dims(1) > inheight) { 
       val x0 = (im.dims(0) - inwidth)/2;
       val y0 = (im.dims(1) - inheight)/2;
@@ -223,7 +223,7 @@ class Net () {
   	}
   }
   
-  def add_input(im:FND, i:Int, j:Int) = {
+  def add_input(im:FMat, i:Int, j:Int) = {
     val inblob = _net.input_blob(0)
     if (im.dims(0) != inblob.width || im.dims(1) != inblob.height || im.dims(2) != inblob.channels) {
       throw new RuntimeException("add_input dimensions mismatch")
@@ -251,14 +251,14 @@ class Net () {
   	}
   }
   
-  def BLOBtoFND(b:BLOB):FND = {
-    val out = FND(b.width, b.height, b.channels, b.num)
+  def BLOBtoFMat(b:BLOB):FMat = {
+    val out = zeros(b.width \ b.height \ b.channels \ b.num)
     b.put_data(out.data)
     out
   }
     
   
-  private var _mean:FND = null
+  private var _mean:FMat = null
   
   private var _scale:Float = 1f
   
@@ -266,13 +266,13 @@ class Net () {
   
   private var _image_dims:Array[Int] = null
   
-  var input_data:Array[FND] = null
+  var input_data:Array[FMat] = null
   
-  var input_diff:Array[FND] = null
+  var input_diff:Array[FMat] = null
   
-  var output_data:Array[FND] = null
+  var output_data:Array[FMat] = null
   
-  var output_diff:Array[FND] = null
+  var output_diff:Array[FMat] = null
   
 }
 

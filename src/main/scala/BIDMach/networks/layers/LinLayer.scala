@@ -54,11 +54,11 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     createOutput(mm.nrows \ inputData.ncols);
     if (opts.withInteractions) {
-      GLM.pairMult(mm, inputData.asMat, output.asMat);
+      GLM.pairMult(mm, inputData, output);
     } else {
-    	output.asMat ~ mm * inputData.asMat; 
+    	output ~ mm * inputData; 
     }
-    if (opts.hasBias) output.asMat ~ output.asMat + modelmats(imodel).colslice(modelcols, modelcols+1);
+    if (opts.hasBias) output ~ output + modelmats(imodel).colslice(modelcols, modelcols+1);
     clearDeriv;
     forwardtime += toc - start;
   }
@@ -68,20 +68,20 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
 	  val modelcols = inputData.nrows;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      mm.madd(deriv.asMat, inputDeriv.asMat, true, false);
+      mm.madd(deriv, inputDeriv, true, false);
     }
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
       val step = (pos + firststep)/firststep;
       if (opts.withInteractions) {
-      	ADAGrad.pairMultUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);        
+      	ADAGrad.pairMultUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);        
       } else {
-      	ADAGrad.multUpdate(deriv.asMat, inputData.asMat, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
+      	ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
       }
     } else {
     	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols) else updatemats(imodel);
-    	deriv.asMat.madd(inputData.asMat, um, false, true);
-      if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv.asMat,2)
+    	deriv.madd(inputData, um, false, true);
+      if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv,2)
     }
     backwardtime += toc - start;
   }

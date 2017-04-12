@@ -17,8 +17,8 @@
  */ 
 
 // Double-check these.
-val total = 10000
-val datadir = "outputs/data_austeremh/"
+val total = 3000
+val datadir = "mhtest_analysis/data_mhtest/"
 
 // On stout OR bitter:
 //val X_test = loadFMat("/home/seita/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
@@ -26,7 +26,6 @@ val datadir = "outputs/data_austeremh/"
 // On Daniel's personal computer:
 val X_test = loadFMat("/data/MNIST/MNIST_Xtest_1_7_shuf.fmat.lz4")
 val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
-
 
 /**
  * Evaluates the performance of our sampled \theta values on the Logistic
@@ -48,7 +47,7 @@ val Y_test = loadIMat("/data/MNIST/MNIST_Ytest_1_7_shuf.imat.lz4")
  */
 def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
     val z = Y *@ (theta.t * X)
-    val sig = 1.0/ (1.0 + exp(-1.0 * z))
+    val sig = DMat(max( 1/(1 + exp(-1.0 * z)) , 1e-20)) // Numerically robust
     var accuracy = dzeros(sig.dims(0),1)
     var ll = dzeros(sig.dims(0),1)
     for (i <- 0 until sig.dims(0)) {
@@ -64,8 +63,8 @@ def eval_cost(X:DMat, Y:DMat, theta:DMat): (DMat, DMat) = {
 val samples = zeros(784, total)
 val data = zeros(4, total)
 for (i <- 1 until (total+1)) {
-    samples(?, i-1) = loadFMat(datadir+"theta_0_%04d.fmat.lz4" format (i)).t
-    data(0->1, i-1) = loadFMat(datadir+"data_%04d.fmat.lz4" format (i)).t
+    samples(?, i-1) = loadFMat(datadir+"theta_0_%05d.fmat.lz4" format (i)).t
+    data(0->1, i-1) = loadFMat(datadir+"data_%05d.fmat.lz4" format (i)).t
 }
 val cum_size = cumsum(data(0,?))
 data(1,?) = cum_size
@@ -75,7 +74,7 @@ data(2,?) = FMat(accuracy).t
 data(3,?) = FMat(ll_test).t
 
 // Now save everything in here and RENAME the file right away.
-saveAs("outputs/results.mat", 
+saveAs("mhtest_analysis/results.mat", 
        samples, "samples", 
        data, "data")
 :silent

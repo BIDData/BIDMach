@@ -12,6 +12,7 @@ import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3;
+import scala.language.implicitConversions
 import java.util.HashMap;
 import BIDMach.networks._
 

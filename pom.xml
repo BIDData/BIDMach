@@ -6,7 +6,7 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>1.1.1-cuda8.0</version>
+  <version>2.0.0-cuda8.0beta</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
@@ -296,6 +296,26 @@
           </execution>
 	</executions>
       </plugin>
+      <plugin>
+	<artifactId>maven-clean-plugin</artifactId>
+	<version>3.0.0</version>
+	<configuration>
+	  <filesets>
+            <fileset>
+              <directory>lib</directory>
+              <includes>
+		<include>*.jar</include>
+              </includes>
+              <excludes>
+		<exclude>*.txt</exclude>
+		<exclude>*.scala</exclude>
+		<exclude>*.html</exclude>
+              </excludes>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+	  </filesets>
+	</configuration>
+      </plugin>  
     </plugins>
     <resources>
       <resource>
