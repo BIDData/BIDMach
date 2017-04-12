@@ -21,7 +21,12 @@ class OnehotLayer(override val net:Net, override val opts:OnehotNodeOpts = new O
 
   override def forward = {
 		  val start = toc;
-		  output = oneHot(inputData);
+		  var hot = if (opts.length != null) {
+		    oneHot(inputData, opts.length)
+		  } else {
+		    oneHot(inputData)
+		  }
+		  output = if (opts.full) full(hot) else hot
 		  forwardtime += toc - start;
   }
   
@@ -31,6 +36,8 @@ class OnehotLayer(override val net:Net, override val opts:OnehotNodeOpts = new O
 }
 
 trait OnehotNodeOpts extends NodeOpts {  
+  var length:Integer = null
+  var full:Boolean = false
 }
 
 class OnehotNode extends Node with OnehotNodeOpts {

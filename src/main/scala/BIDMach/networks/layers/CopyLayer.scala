@@ -22,7 +22,11 @@ class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyN
 		  val start = toc;
 		  if (output.asInstanceOf[AnyRef] == null) {
 			  val io = inputData;
-			  output = io.zeros(io.dims);
+			  output = io match {
+			    case s:SMat => io.zeros(io.nrows, io.ncols, io.nnz)
+			    case s:IMat => io.izeros(io.dims)
+			    case m:Mat => io.zeros(io.dims)
+			  }
 		  }
 		  output <-- inputData;
 		  clearDeriv;

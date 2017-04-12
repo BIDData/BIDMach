@@ -314,6 +314,7 @@ object LSTMNode {
   final val gridTypeNoOutput = 0;
   final val gridTypeSoftmaxOutput = 1;
   final val gridTypeNegsampOutput = 2;
+  final val gridTypeSoftmax = 3;
   
   def apply() = {
     val n = new LSTMNode;
@@ -339,6 +340,7 @@ object LSTMNode {
       case `gridTypeNoOutput` => 0;
       case `gridTypeNegsampOutput` => 1;
       case `gridTypeSoftmaxOutput` => 2;
+      case `gridTypeSoftmax` => 2;
     }
     val gr = NodeMat(nrows + nlin + nsoft, ncols);
     
@@ -376,6 +378,12 @@ object LSTMNode {
       case `gridTypeNegsampOutput` => {
         for (k <- 0 until ncols) {
           gr(nrows + nlin, k) = negsamp(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias=opts.hasBias, scoreType=opts.scoreType)
+        }
+      }
+      case `gridTypeSoftmax` => {
+        for (k <- 0 until ncols) {
+          gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias = opts.hasBias)
+          gr(nrows + nlin + 1, k) = softmax(gr(nrows + nlin, k))
         }
       }
     }
