@@ -1,0 +1,140 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+
+val datadir = "/mnt/BIDMach/data/criteo/parts/"
+
+var addresses:Array[InetSocketAddress] = null
+val customLocalWorkerPortsStr = sys.env.get("MASTER_LOCAL_WORKER_PORTS")
+customLocalWorkerPortsStr match {
+  case Some(workerPortsStr) => {
+    addresses = workerPortsStr.split(",").map(_.toInt).map(new InetSocketAddress("0.0.0.0", _))
+    println("using local worker addresses:")
+    for (a <- addresses) println(a)
+  }
+  case None => {
+    addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+      map(InetAddress.getByName(_).getHostAddress()).
+      map(new InetSocketAddress(_, 50050)).toArray
+  }
+}
+
+val m = new Master()
+val opts = m.opts
+opts.trace = 3
+opts.intervalMsec = 2000
+opts.limit = 1000000
+opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
+
+opts.machineThreshold = 0.75;
+opts.minWaitTime = 3000;
+opts.timeThresholdMsec = 5000;
+
+val nmachines = addresses.length
+val gmods = irow(nmachines)
+val gmachines = irow(0->nmachines)
+
+m.init
+m.config(gmods, gmachines, addresses, 1)
+m.setMachineNumbers
+m.sendConfig
+
+
+// m.parCall((w) => {
+//   var fgopts = w.learner.opts.asInstanceOf[GLM.FGOptions]
+//   fgopts.npasses = 1
+//   var totalNumSamples = fgopts.nend
+//   totalNumSamples = 80
+//   var numWorkers = 4; // TODO: don't hardcode this
+//   var workerNumSamples = totalNumSamples / numWorkers
+//   var nstart = (w.imach*workerNumSamples)
+//   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples)
+//   fgopts.nstart = nstart
+//   fgopts.nend = nend
+//   "imach: %d, nstart: %d, nend: %d, nasses: %d\n" format (
+//     w.imach, nstart, nend, fgopts.npasses)
+// })
+//
+// m.startLearners(blocking = true)
+// m.startUpdates()
+//
+
+/*Later*/
+
+// var numWorkers = 4
+// val anyrefModels = m.parCall((w) => { w.learner.modelmats(0) })
+// val matModels = anyrefModels.map(_.asInstanceOf[Mat])
+//
+// val mdir = "/mnt/BIDMach/data/criteo/parts/"
+//
+// val (nn,opts) = GLM.learner(mdir+"trainsorted%02d.smat.lz4", mdir+"trainlabel%02d.fmat.lz4")
+// val woptsMap = m.parCall((w) => {
+//   var fgopts = w.learner.opts.asInstanceOf[GLM.FGOptions]
+//   Map[String, Any](
+//    "nend" -> fgopts.nend,
+//    "lrate" -> fgopts.lrate.v,
+//    "reg1weight" -> fgopts.reg1weight.v,
+//    "batchSize" -> fgopts.batchSize,
+//    "npasses" -> fgopts.npasses,
+//    "texp" -> fgopts.texp.v)
+// })(numWorkers - 1).asInstanceOf[Map[String, Any]]
+// opts.nend = woptsMap("nend").asInstanceOf[Int]
+// opts.lrate = woptsMap("lrate").asInstanceOf[Float]
+// opts.reg1weight = woptsMap("reg1weight").asInstanceOf[Float]
+// opts.batchSize = woptsMap("batchSize").asInstanceOf[Int]
+// opts.npasses = woptsMap("npasses").asInstanceOf[Int]
+// opts.texp = woptsMap("texp").asInstanceOf[Float]
+// opts.useGPU = true
+// opts.lookahead = 0
+// opts.links = irow(1)
+// opts.aopts = opts
+//
+// nn.init
+//
+
+
+// var meanrrs = new Array[Double](numWorkers + 1)
+// var llns = new Array[Double](numWorkers + 1)
+//
+// :silent
+// for (wi <- 0 until (numWorkers + 1)) {
+//   if (wi >= numWorkers) {
+//     nn.modelmats(0) = matModels.reduceRight(_ + _) / numWorkers
+//   } else {
+//     nn.modelmats(0) = matModels(wi)
+//   }
+//
+//   val model = nn.model.asInstanceOf[GLM]
+//   val mm = FMat(model.modelmats(0))
+//
+//   val ntest = 10
+//   val filesize = 500000
+//   val tscores = dzeros(filesize*ntest, 1)
+//   val tcats = dzeros(filesize*ntest, 1)
+//   var len = 0
+//   for (i <- 0 until ntest) {
+//     val a = loadSMat(mdir + "trainsorted%02d.smat.lz4" format i + opts.nend)
+//     val c = loadFMat(mdir + "trainlabel%02d.fmat.lz4" format i + opts.nend)
+//     val sc = mm * a
+//     tscores(i * filesize -> (i * filesize + sc.length), 0) = DMat(sc.t)
+//     tcats(i * filesize -> (i * filesize + sc.length), 0) = DMat(c.t)
+//     len += c.length
+//     print(".")
+//   }
+//   val scores = tscores(0->len,0)
+//   val cats = tcats(0->len,0)
+//
+//   val rr = roc(scores, cats, 1-cats, 1000)
+//
+//   val bounds = 7.0
+//   val bscores = min(max(scores, drow(-bounds)), drow(bounds))
+//   val probs = 1/(1 + exp(-bscores))
+//   val lln = ((cats dot ln(probs)) + ((1-cats) dot ln(1-probs)))/probs.length.toDouble
+//
+//   meanrrs(wi) = mean(rr).v
+//   llns(wi) = lln.v
+//   var label = if (wi >= numWorkers) "avg" else ("%d" format wi)
+//   println("worker %s: roc area = %5.4f, ll = %5.4f" format (label, meanrrs(wi), llns(wi)))
+// }
+// :silent
+//

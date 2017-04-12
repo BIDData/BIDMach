@@ -1,0 +1,43 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+
+var addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+  map(InetAddress.getByName(_).getHostAddress()).
+  map(new InetSocketAddress(_, 50050)).toArray
+
+// addresses = addresses.slice(0, 1)
+
+val m = new Master();
+val opts = m.opts;
+opts.trace = 3;
+opts.intervalMsec = 2000;
+//opts.limitFctn = Master.powerLimitFctn
+opts.limit = 1000000
+opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
+
+opts.machine_threshold = 0.75
+opts.min_time_to_wait_for_all = 3000
+opts.time_threshold = 5000
+
+
+val nmachines = addresses.length;
+
+val gmods = irow(nmachines);
+val gmachines = irow(0->nmachines);
+
+m.init
+m.config(gmods, gmachines, addresses)
+m.setMachineNumbers
+m.sendConfig
+
+// m.parCall((w) => { w.learner.opts.npasses = 10; "done" })
+// m.parCall((w) => { w.learner.opts.asInstanceOf[GLM.FGOptions].nstart = w.imach * 20; "done"})
+// m.parCall((w) => { w.learner.opts.asInstanceOf[GLM.FGOptions].nend = (w.imach+1) * 20; "done"})
+// m.parCall((w) => { w.learner.paused = true; "done"})
+// m.parCall((w) => { w.learner.train; "not reached" }) // this will hang, just wait for it to timeout
+
+// m.startLearners
+// m.startUpdates
+
+//Testing by Max

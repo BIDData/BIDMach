@@ -395,6 +395,12 @@ object Model {
       } else {
         i;
       }
+      case s:SMat =>
+      if (useGPU) {
+        GSMat(s);
+      } else {
+        s;
+      }
       case tt:TMat => new TMat(tt.nrows, tt.ncols, tt.y, tt.x, tt.tiles.map(convertMat(_, useGPU, useDouble).asInstanceOf[Mat]));
     }
   }
