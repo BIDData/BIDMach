@@ -16,10 +16,10 @@ import BIDMach.networks._
 
 
 /**
- * Computes the element-wise sum of input layers. 
+ * Computes the element-wise difference of input layers. The first argument is added to the output, others are subtracted.
  */
 
-class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode) extends Layer(net, opts) { 
+class SubLayer(override val net:Net, override val opts:SubNodeOpts = new SubNode) extends Layer(net, opts) { 
   
   override val _inputs = new Array[LayerTerm](opts.ninputs);
 
@@ -27,49 +27,50 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
       val start = toc;
 			createOutput(inputData.dims);
 			output <-- inputData;
-			(1 until inputlength).map((i:Int) => output ~ output + inputDatas(i));
+			(1 until inputlength).map((i:Int) => output ~ output - inputDatas(i));
 			clearDeriv;
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
       val start = toc;
-			(0 until inputlength).map((i:Int) => {
-				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + deriv
+      if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv
+			(1 until inputlength).map((i:Int) => {
+				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) - deriv
 			});
 			backwardtime += toc - start;
 	}
   
   override def toString = {
-    "add@"+("%04x" format (hashCode % 0x10000));
+    "sub@"+("%04x" format (hashCode % 0x10000));
   }
 }
 
-trait AddNodeOpts extends NodeOpts {
+trait SubNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
-class AddNode extends Node with AddNodeOpts {
+class SubNode extends Node with SubNodeOpts {
 	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
-   def copyTo(opts:AddNode):AddNode = {
+   def copyTo(opts:SubNode):SubNode = {
       super.copyTo(opts);
       opts.ninputs = ninputs;
       opts;
   }
 
-	override def clone:AddNode = {copyTo(new AddNode).asInstanceOf[AddNode];}
+	override def clone:SubNode = {copyTo(new SubNode).asInstanceOf[SubNode];}
 
-	override def create(net:Net):AddLayer = {AddLayer(net, this);}
+	override def create(net:Net):SubLayer = {SubLayer(net, this);}
   
   override def toString = {
-   "add@"+("%04x" format (hashCode % 0x10000));
+   "sub@"+("%04x" format (hashCode % 0x10000));
   }
 }
 
-object AddLayer { 
+object SubLayer { 
   
-  def apply(net:Net) = new AddLayer(net, new AddNode);
+  def apply(net:Net) = new SubLayer(net, new SubNode);
   
-  def apply(net:Net, opts:AddNodeOpts) = new AddLayer(net, opts); 
+  def apply(net:Net, opts:SubNodeOpts) = new SubLayer(net, opts); 
 }

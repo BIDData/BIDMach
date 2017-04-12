@@ -11,6 +11,8 @@ import BIDMach.networks.layers._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3;
 import scala.language.implicitConversions
 import java.util.HashMap;
@@ -61,20 +63,28 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
   
   def node = _node;
   
-  def + (a:NodeTerm) = {val n=this; new AddNode{inputs(0)=n; inputs(1)=a}};
+  def +    (a:NodeTerm) = {val n=this; new AddNode{inputs(0)=n; inputs(1)=a}};
+  
+  def -    (a:NodeTerm) = {val n=this; new SubNode{inputs(0)=n; inputs(1)=a}};
 
-  def *@ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
+  def *@   (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
     
-  def ∘ (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
+  def ∘    (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
+  
+  def dot  (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
+  
+  def ∙    (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
         
   def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
+  
+  def apply(a:NodeTerm) = {val n=this; new SelectNode{inputs(0)=n; inputs(1)=a;}};
 }
 
 object Node {
   
   def copy(a:NodeTerm) = new CopyNode{inputs(0) = a;}
 
-  def copy = new CopyNode
+  def copy() = new CopyNode
   
   def dropout(a:NodeTerm, frac:Float) = new DropoutNode{inputs(0) = a; frac = frac}
   
@@ -82,13 +92,32 @@ object Node {
   
   def glm_(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};
   
-  def glm(a:NodeTerm)(links:IMat) = {val ilinks = links; new GLMNode{inputs(0) = a; links = ilinks}};
+  def glm(a:NodeTerm)(links:IMat) = {
+    val ilinks = links; 
+    new GLMNode{inputs(0) = a; links = ilinks}
+    };
   
   def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
   
-  def input = new InputNode
+  def input = new InputNode;
   
-  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
+  def constant(v:Mat) = {
+    new ConstantNode{value = v;}
+  }
+  
+  def crop(a:NodeTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
+    val csizes = sizes;
+    val coffsets = offsets;
+    new CropNode{inputs(0) = a; sizes = csizes; offsets = coffsets};
+  }
+  
+  def format(a:NodeTerm)(conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
+    val con = conversion;
+    val fmt = inputFormat;
+    new TensorFormatNode{inputs(0) = a; conversion = con; inputFormat = fmt;}
+  }
+  
+  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, initv:Float=1f,
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -96,7 +125,8 @@ object Node {
     val mname = name;
     val wi = withInteractions;
     val tms = tmatShape; 
-    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts; withInteractions = wi; tmatShape = tms};
+    val initv0 = initv;
+    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; initv=initv0; aopts=aaopts; withInteractions = wi; tmatShape = tms};
   }
   
   def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {
@@ -135,21 +165,64 @@ object Node {
     n
   }
   
-  def norm_(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
-    val n = new NormNode{inputs(0) = a;}
-    opts.copyOpts(n);
-    n
-  }
-  
   def norm(a:NodeTerm)(targetNorm:Float = 1f, weight:Float = 1f) =  {
     val tnorm = targetNorm;
     val nweight = weight;
     new NormNode{inputs(0) = a; targetNorm = tnorm; weight = nweight}
   }
   
+  def norm_(a:NodeTerm)(implicit opts:NormNodeOpts) =  {
+    val n = new NormNode{inputs(0) = a;}
+    opts.copyOpts(n);
+    n
+  }
+  
+  def conv(a:NodeTerm)(name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
+      hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
+    val str = stride;
+    val pd = pad;
+    val hb = hasBias;
+    val initv0 = initv;
+    val mname = name;
+    val ct = convType;
+    new ConvNode{inputs(0)=a; modelName=mname; kernel=irow(w,h); noutputs=nch; initv = initv0; stride=str; pad=pd; hasBias=hb; convType=ct}
+  }
+  
+  def pool(a:NodeTerm)(h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
+      poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
+      poolingNaN:Int = cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
+      tensorFormat:Int = Net.UseNetFormat) = {
+  	val hh = h;
+  	val ww = w;
+  	val str = stride;
+  	val ppad = pad;
+  	val pm = poolingMode;
+  	val pn = poolingNaN;
+  	val tf = tensorFormat;
+    new PoolingNode{inputs(0)=a; h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}; 
+  }
+  
+  def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
+    new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
+  }
+  
+  def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  	val hb = hasBias;
+  	val mname = name;
+    new BatchNormScaleNode{inputs(0)=a; modelName=mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}    
+  }
+  
+  def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  	val hb = hasBias;
+  	val mname = name;
+    new ScaleNode{inputs(0)=a; modelName=mname; batchNormMode=normMode; hasBias=hb}    
+  }
+  
   def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a};
   
   def rect(a:NodeTerm) = new RectNode{inputs(0) = a};
+  
+  def relu(a:NodeTerm) = new RectNode{inputs(0) = a};
   
   def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
   
@@ -157,7 +230,10 @@ object Node {
 
   def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
   
-  def softmaxout(a:NodeTerm)(scoreTyp:Int=0, doVar:Boolean=false) =  new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; doVariance = doVar}
+  def softmaxout(a:NodeTerm)(scoreType:Int=0, doVar:Boolean=false) =  {
+    val scoreTyp = scoreType;
+    new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; doVariance = doVar}
+  }
   
   def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = a};
   

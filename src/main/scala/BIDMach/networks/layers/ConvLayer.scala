@@ -11,6 +11,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3
 import java.util.HashMap
 import BIDMach.networks._
@@ -20,7 +22,7 @@ import java.util.Arrays
    How to consider bias...(maybe very difficult?)
 */
 
-class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOpts = new ConvolutionNode ) extends ModelLayer(net, opts, 2) {
+class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvNode ) extends ModelLayer(net, opts, 2) {
     var filter:FMat = null; 
     var ffilter:Filter = null;
     var updateFilter:FMat = null;
@@ -28,10 +30,10 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     var bias_mat:FMat = null; // it should be size (channel_out*1*1*1), to better broadcast?
     var update_bias_mat:FMat = null;
     var inputDim:IMat = null; // Should be three numbers
-    var outputDim:IMat = null; //Should be three numbers
+//    var outputDim:IMat = null; //Should be three numbers
 
   def initModelMats = {
-    // image should be something like - val image = FND(irow(channel_in,h,w,n));
+    inputDim = inputData.dims;
     val channel_in = inputDim(0);
     val filter_h = opts.kernel(0); // 3;0
     val filter_w = opts.kernel(1); // 3;
@@ -40,41 +42,49 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
     val channel_out = opts.noutputs; // actually # of filters;
 
     
-    filter = if (net.opts.useGPU) {
-    	GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
-    } else {
-      FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+    	modelmats(imodel) = if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
+    		val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
+    		x.setTensorFormat(Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat));
+    		x;
+    	} else {
+    		FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
+    	}
+    	filter = modelmats(imodel).asInstanceOf[FMat];
+    	ffilter = modelmats(imodel).asInstanceOf[Filter];   	
+    	ffilter match {
+    	  case aa:GFilter => aa.convType = opts.convType;
+    	}
+    	updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
+    	
+    	ffilter.xavier(opts.initv);
+    	
+    	if (output.asInstanceOf[AnyRef] == null) { 
+    		val outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
+    		output = filter.zeros(outputBatchDim);
+    	};
+    	
+    	val biasDim = irow(output.dims(0), output.dims(1), output.dims(2), 1);
+    	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
+    	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
+    	
     }
-    ffilter = filter.asInstanceOf[Filter];
-    ffilter.xavier(1f);;
-    updateFilter = filter.copy;
-    updateFFilter = updateFilter.asInstanceOf[Filter];
-    if (opts.hasBias) {
-      // initialize bias matrix, should be the size of channel_out*h*w, would be applied to n samples
-      val biasDim = irow(channel_out,filter_h,filter_w,1);
-      bias_mat = filter.zeros(biasDim);
-      update_bias_mat = filter.zeros(biasDim);
-    } 
+    filter = modelmats(imodel).asInstanceOf[FMat];
+    ffilter = modelmats(imodel).asInstanceOf[Filter];
+    updateFilter = updatemats(imodel).asInstanceOf[FMat];
+    updateFFilter = updatemats(imodel).asInstanceOf[Filter];
+    updateFilter.clear;
+    
+    bias_mat = modelmats(imodel+1).asInstanceOf[FMat];
+    update_bias_mat = updatemats(imodel+1).asInstanceOf[FMat];
   }
 
   override def forward = {
     val start = toc;
     
     // Create filter model, filter update and bias model if needed
-    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-      initModelMats
-      modelmats(imodel) = filter;
-      updatemats(imodel) = updateFilter;
-      if (opts.hasBias) {
-        modelmats(imodel+1) = bias_mat;
-        updatemats(imodel+1) = update_bias_mat;
-      }
-    }
-
-    if (output.asInstanceOf[AnyRef] == null){ 
-    	var outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
-    	output = filter.zeros(outputBatchDim)
-    }
+    if (inputDim.asInstanceOf[AnyRef] == null) initModelMats;
+ 
     
     ffilter.convolve(inputData, output, true);
     if (opts.hasBias) output ~ output + bias_mat;
@@ -101,62 +111,64 @@ class ConvolutionLayer(override val net:Net, override val opts:ConvolutionNodeOp
   }
 
   override def toString = {
-    "convolution@" + Integer.toHexString(hashCode() % 0x10000)
+    "conv@" + Integer.toHexString(hashCode() % 0x10000)
   }
 
 }
 
-trait ConvolutionNodeOpts extends ModelNodeOpts {
+trait ConvNodeOpts extends ModelNodeOpts {
   var noutputs:Int = 0
   var hasBias:Boolean = true
   var pad:IMat = null
   var kernel:IMat = null
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
-//  var group:Int = 1
-//  var axis:Int = 1
+  var tensorFormat:Int = Net.UseNetFormat;
+  var convType:Int = cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
+  var initv:Float = 1f;
 
-  def copyOpts(opts:ConvolutionNodeOpts):ConvolutionNodeOpts = {
-      super.copyOpts(opts);
-      opts.noutputs = noutputs;
-      opts.hasBias = hasBias;
-      opts.pad = pad;
-      opts.kernel = kernel;
-      opts.stride = stride;
-      opts.dilation = dilation;
-//      opts.group = group;
-//      opts.axis = axis;
-      opts;
+  def copyOpts(opts:ConvNodeOpts):ConvNodeOpts = {
+  		super.copyOpts(opts);
+  		opts.noutputs = noutputs;
+  		opts.hasBias = hasBias;
+  		opts.pad = pad;
+  		opts.kernel = kernel;
+  		opts.stride = stride;
+  		opts.dilation = dilation;
+  		opts.tensorFormat = tensorFormat;
+  		opts.convType = convType;
+  		opts.initv = initv;
+  		opts;
   }
 
 }
 
-class ConvolutionNode extends Node with ConvolutionNodeOpts {
+class ConvNode extends Node with ConvNodeOpts {
 
-  def copyTo(opts:ConvolutionNode):ConvolutionNode = {
+  def copyTo(opts:ConvNode):ConvNode = {
     this.asInstanceOf[Node].copyTo(opts);
     copyOpts(opts);
     opts
   }
 
-  override def clone:ConvolutionNode = {
-    copyTo(new ConvolutionNode ).asInstanceOf[ConvolutionNode]
+  override def clone:ConvNode = {
+    copyTo(new ConvNode ).asInstanceOf[ConvNode]
   }
   
-  override def create(net:Net):ConvolutionLayer = {
-    ConvolutionLayer(net, this)
+  override def create(net:Net):ConvLayer = {
+    ConvLayer(net, this)
   }
 
   override def toString = {
-    "convolution@" + Integer.toHexString(hashCode() % 0x10000)
+    "conv@" + Integer.toHexString(hashCode() % 0x10000)
   }
 
 }
 
-object ConvolutionLayer {
+object ConvLayer {
   
-  def apply(net:Net) = new ConvolutionLayer(net, new ConvolutionNode)
+  def apply(net:Net) = new ConvLayer(net, new ConvNode)
   
-  def apply(net:Net, opts:ConvolutionNodeOpts) = new ConvolutionLayer(net, opts)
+  def apply(net:Net, opts:ConvNodeOpts) = new ConvLayer(net, opts)
 
 }

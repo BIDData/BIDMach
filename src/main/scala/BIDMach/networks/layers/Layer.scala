@@ -10,6 +10,8 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
@@ -142,6 +144,11 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   	deriv.clear;
   }
   
+  def clearDerivLazy = {
+  	if (deriv.asInstanceOf[AnyRef] == null && inputDeriv.asInstanceOf[AnyRef] != null) deriv = output.zeros(output.dims);
+  	deriv.clear;
+  }
+  
   def clearDerivs = {
     if (deriv.asInstanceOf[AnyRef] == null) {
       for (i <- 0 until _outputs.length) {
@@ -160,6 +167,25 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   }
 }
 
+class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
+  def layer = _layer;
+  
+  def +    (a:LayerTerm) = {val n=this; new AddLayer(null){inputs(0)=n; inputs(1)=a}};
+  
+  def -    (a:LayerTerm) = {val n=this; new SubLayer(null){inputs(0)=n; inputs(1)=a}};
+
+  def *@   (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+    
+  def ∘    (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def dot  (a:LayerTerm) = {val n=this; new DotLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def ∙    (a:LayerTerm) = {val n=this; new DotLayer(null){inputs(0)=n; inputs(1)=a;}};
+        
+  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def apply(a:LayerTerm) = {val n=this; new SelectLayer(null){inputs(0)=n; inputs(1)=a;}};
+}
 
 object Layer {  
   def copy(a:LayerTerm) = new CopyLayer(null){inputs(0) = a;}
@@ -176,8 +202,23 @@ object Layer {
   
   def input = new InputLayer(null);
   
-    
-  def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
+  def constant(v:Mat)(net:Net) = {
+    new ConstantLayer(net, new ConstantNode{value = v;})
+  }
+  
+  def crop(a:LayerTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
+    val csizes = sizes;
+    val coffsets = offsets;
+    new CropLayer(null, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}
+  }
+  
+  def format(a:LayerTerm)(net:Net, conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
+    val con = conversion;
+    val fmt = inputFormat;
+    new TensorFormatLayer(net, new TensorFormatNode{conversion = con; inputFormat = fmt;}){inputs(0) = a;}
+  }
+     
+  def linear(a:LayerTerm)(net:Net, name:String="", outdim:Int=0, hasBias:Boolean=true, initv:Float = 1f, aopts:ADAGrad.Opts=null, 
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -185,7 +226,8 @@ object Layer {
     val mname = name;
     val tms = tmatShape;
     val wi = withInteractions;
-    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
+    val initv0 = initv;
+    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; initv=initv0; aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
   }
   
   def linear_(a:LayerTerm)(implicit net:Net, opts:LinNodeOpts) = {
@@ -212,9 +254,52 @@ object Layer {
   
   def norm(a:LayerTerm)(implicit opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
   
+  def conv(a:LayerTerm)(net:Net, name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
+      hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
+    val str = stride;
+    val pd = pad;
+    val hb = hasBias;
+    val mname = name;
+    val initv0 = initv;
+    val ct = convType;
+    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; initv=initv0; stride=str; pad=pd; hasBias=hb; convType=ct}){inputs(0)=a;};
+  }
+  
+   def pool(a:LayerTerm)(net:Net, h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
+      poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
+      poolingNaN:Int=cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
+      tensorFormat:Int = Net.UseNetFormat) = {
+  	val hh = h;
+  	val ww = w;
+  	val str = stride;
+  	val ppad = pad;
+  	val pm = poolingMode;
+  	val pn = poolingNaN;
+  	val tf = tensorFormat;
+    new PoolingLayer(net, new PoolingNode{h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
+  }
+  
+  def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
+    new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
+  }
+  
+  def batchNormScale(a:LayerTerm)(net:Net, name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  	val hb = hasBias;
+  	val mname = name;
+    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}
+  }
+  
+  def scale(a:LayerTerm)(net:Net, name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  	val hb = hasBias;
+  	val mname = name;
+    new ScaleLayer(net, new ScaleNode{modelName = mname; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}   
+  }
+  
   def oneHot(a:LayerTerm) = new OnehotLayer(null){inputs(0) = a};
   
   def rect(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
+  
+  def relu(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
   
   def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
   
@@ -250,17 +335,6 @@ object Layer {
   
 }
 
-class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
-  def layer = _layer;
-  
-  def + (a:LayerTerm) = {val n=this; new AddLayer(null){inputs(0)=n; inputs(1)=a}};
-
-  def *@ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
-    
-  def ∘ (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
-        
-  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
-}
 
 trait OutputLayer {}
 

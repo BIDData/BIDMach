@@ -49,7 +49,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
   override def score:FMat = {
     if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
     val inds = int(target) + coloffsets;
-    if (opts.scoreType == 1) {
+    if (opts.scoreType == SoftmaxOutputLayer.AccuracyLoss) {
       if (opts.doVariance) {
         val matches = (output(inds) == maxi(output));
         FMat(mean(matches)) on FMat(variance(matches));
@@ -101,6 +101,9 @@ class SoftmaxOutputNode extends Node with SoftmaxOutputNodeOpts {
 }
   
 object SoftmaxOutputLayer { 
+  
+  final val CrossEntropyLoss = 0;
+  final val AccuracyLoss = 1;
   
   def apply(net:Net) = new SoftmaxOutputLayer(net, new SoftmaxOutputNode);
   
