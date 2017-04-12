@@ -1,0 +1,57 @@
+import BIDMach.networks.SeqToSeq
+
+val mdir = "/mnt/BIDMach/data/MNT2015/models/local_10passes/model256_te0.3_02/"
+// val mdir = "/mnt/BIDMach/data/MNT2015/models/local/"
+val datadir = "/mnt/BIDMach/data/MNT2015/data/"
+
+val PADsym = 1
+
+val batchSize = 128
+var src = loadSMat(datadir+"news-commentary-v10.fr-en.fr.smat.lz4")
+var dst = loadSMat(datadir+"news-commentary-v10.fr-en.en.smat.lz4")
+
+val ncols = src.ncols
+var traincols = Math.floor(0.9*ncols).toInt
+traincols = traincols - (traincols % batchSize)
+var srcTest = src(?, traincols -> (ncols-1))
+var dstTest = dst(?, traincols -> (ncols-1))
+srcTest = srcTest(?, 0 -> (srcTest.ncols - (srcTest.ncols % batchSize)))
+dstTest = dstTest(?, 0 -> (dstTest.ncols - (dstTest.ncols % batchSize)))
+
+// var srcTestFull = full(srcTest)
+// var dstTestFull = full(dstTest)
+var srcTestFull = full(src)
+var dstTestFull = full(dst)
+srcTestFull ~ srcTestFull + PADsym * (srcTestFull == 0)
+dstTestFull ~ dstTestFull + PADsym * (dstTestFull == 0)
+
+val model = new SeqToSeq
+model.setmodelmats(new Array[Mat](7))
+for (i <- 0 until 7) {
+    model.modelmats(i) = loadMat(mdir+"modelmat%02d.lz4" format i)
+}
+
+val srcSlice = srcTestFull(?, 0 -> batchSize)
+val dstSlice = dstTestFull(?, 0 -> batchSize)
+val (nn, opts) = SeqToSeq.predict(model, srcSlice)
+
+opts.nvocab = 20000
+opts.height = 2
+opts.dim = 256
+opts.batchSize = batchSize
+
+opts.kind = 1
+opts.netType = 0
+opts.scoreType = 1
+opts.inwidth = 30
+opts.outwidth = 30
+opts.hasBias = true
+opts.pstep = 0.005f
+opts.cumScore = 3
+opts.PADsym = PADsym
+opts.OOVsym = 2
+opts.STARTsym = 0
+
+nn.predict
+
+val pred = nn.datasink.asInstanceOf[MatSink].omats(0).asInstanceOf[IMat]
