@@ -36,15 +36,19 @@ val PADsym = 1
 val batchSize = 128
 var src = loadSMat(datadir+"news-commentary-v10.fr-en.fr.smat.lz4")
 var dst = loadSMat(datadir+"news-commentary-v10.fr-en.en.smat.lz4")
-src = src(?, 0 -> (src.ncols - (src.ncols % batchSize)))
-dst = dst(?, 0 -> (dst.ncols - (dst.ncols % batchSize)))
 
-var srcFull = full(src)
-var dstFull = full(src)
-srcFull ~ srcFull + PADsym * (srcFull == 0)
-dstFull ~ dstFull + PADsym * (dstFull == 0)
+val ncols = src.ncols
+var traincols = Math.floor(0.9*ncols).toInt
+traincols = traincols - (traincols % batchSize)
+val srcTrain = src(?, 0 -> traincols)
+val dstTrain = dst(?, 0 -> traincols)
 
-val (nn, opts) = SeqToSeq.learner(srcFull, dstFull)
+var srcTrainFull = full(srcTrain)
+var dstTrainFull = full(dstTrain)
+srcTrainFull ~ srcTrainFull + PADsym * (srcTrainFull == 0)
+dstTrainFull ~ dstTrainFull + PADsym * (dstTrainFull == 0)
+
+val (nn, opts) = SeqToSeq.learner(srcTrainFull, dstTrainFull)
 val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
 
 opts.lrate = 0.03f                       // Learning rate

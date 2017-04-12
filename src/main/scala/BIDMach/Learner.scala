@@ -107,7 +107,7 @@ case class Learner(
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;        
+    Mat.useGPUcache = opts.useCache;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
     flip;
@@ -177,6 +177,7 @@ case class Learner(
   }
 
   def wrapUp(ipass:Int) {
+    if (opts.checkPointFile != null) model.save(opts.checkPointFile format lastCheckPoint)
     model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
@@ -218,7 +219,7 @@ case class Learner(
     cacheState = Mat.useCache
     Mat.useCache = opts.useCache
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;  
+    Mat.useGPUcache = opts.useCache;
     var here = 0L
     var lasti = 0
     var bytes = 0L
