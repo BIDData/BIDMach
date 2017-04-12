@@ -142,10 +142,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	  case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
           if (opts.momentum.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.momentum.length > 1) opts.momentum(i) else opts.momentum(0);
-            ADAGrad.ADAGradm(gmm, gum, gss, momentum.asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+            ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           } else if (opts.nesterov.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.nesterov.length > 1) opts.nesterov(i) else opts.nesterov(0);
-            ADAGrad.ADAGradn(gmm, gum, gss, momentum.asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+            ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           } else {
         	  ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           }
@@ -169,17 +169,20 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	  		grad ~ grad *@ (tscale *@ lrate);                                   // Basic scaled gradient
             if (opts.momentum.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.momentum.length > 1) i else 0;
-              mu <-- opts.momentum(i0);                           // Get the momentum decay rate
-              grad ~ grad + momentum(i);                            // Add momentum to the gradient
-            	momentum(i) ~ grad *@ mu;                            // update momentum using the new gradient
+              mu <-- opts.momentum(i0);                           // Get the momentum decay rate      
+              momentum(i) ~ momentum(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
+            	momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient
+            	momentum(i) ~ momentum(i) + grad;
+            	grad <-- momentum(i);
             }
             if (opts.nesterov.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.nesterov.length > 1) i else 0;
               mu <-- opts.nesterov(i0);                           // Get the momentum decay rate
-              grad ~ grad + momentum(i);                            // Add momentum to the gradient
               mm ~ mm - momentum(i);                              // A bit of algebra, remove old momentum from the model
-              momentum(i) ~ grad *@ mu;                            // Update the momentum
-              mm ~ mm + momentum(i);                              // Add the new momentum to the model;
+              momentum(i) ~ momentum(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
+            	momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient
+            	momentum(i) ~ momentum(i) + grad;        	
+              mm ~ mm + momentum(i);                               // Add the new momentum to the model;
             }
             mm ~ mm + grad;                                        // Add full gradient to the model
     	  		if (mask != null) mm ~ mm *@ mask;

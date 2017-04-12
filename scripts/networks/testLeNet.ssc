@@ -19,11 +19,12 @@ val (nn,opts) = Net.learner(train,trainlabels);
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
-opts.batchSize= 100
-opts.npasses = 4
-opts.lrate = 3e-4f 
+opts.batchSize= 32
+opts.npasses = 10
+opts.lrate = 1e-4f 
 opts.texp = 0.1f
 opts.pstep = 0.1f
+opts.hasBias = true;
 //opts.lookahead = 0;
 opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
@@ -66,11 +67,12 @@ val model = nn.model.asInstanceOf[Net];
 nn.train;
 
 val (mm, mopts) =  Net.predictor(model, test, testlabels);
-mopts.batchSize = opts.batchSize;
-mopts.tensorFormat = opts.tensorFormat;
 mopts.autoReset = false;
+
 val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 :silent
+
 

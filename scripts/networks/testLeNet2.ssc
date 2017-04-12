@@ -3,8 +3,8 @@ val traindir = "../../data/MNIST/"
 
 val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
 val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
-val test =        loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
-val testlabels =  loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
+val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
+val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
 
 val rp = randperm(60000);
 val train = train0(?,?,?,rp);
@@ -19,11 +19,13 @@ val (nn,opts) = Net.learner(train,trainlabels);
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
-opts.batchSize= 32
-opts.npasses = 20
-opts.lrate = 1e-3f 
-opts.texp = 0.1f
-opts.pstep = 0.2f
+opts.batchSize= 64
+//opts.nesterov = 0.9f
+opts.npasses = 8
+opts.lrate = 1e-5f 
+opts.texp = 0.0f
+opts.pstep = 0.1f
+opts.hasBias = true;
 //opts.lookahead = 0;
 opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
@@ -33,12 +35,10 @@ import BIDMach.networks.layers.Node._;
 val in = input;
 
 val conv1 = conv(in)(w=5,h=5,nch=20,stride=2,pad=2,initv=0.01f,convType=convt);
-val bns1 = batchNormScale(conv1)();
-val relu1 = relu(bns1);
+val relu1 = relu(conv1);
 
 val conv2 = conv(relu1)(w=5,h=5,nch=20,stride=2,pad=2,convType=convt);
-val bns2 = batchNormScale(conv2)();
-val relu2 = relu(bns2);
+val relu2 = relu(conv2);
 
 val fc3 = linear(relu2)(outdim=500,initv=3e-2f);
 val relu3 = relu(fc3);
@@ -47,11 +47,11 @@ val fc4 = linear(relu3)(outdim=10,initv=5e-2f);
 //val out = softmaxout(fc4)();
 val out = softmaxout(fc4)(scoreType=1); 
 
-val nodes = (in     \ null    \ null   on
-             conv1  \ bns1    \ relu1  on
-             conv2  \ bns2    \ relu2  on
-             fc3    \ relu3   \ null   on
-             fc4    \ out     \ null   ).t
+val nodes = (in     \ null   on
+             conv1  \ relu1  on
+             conv2  \ relu2  on
+             fc3    \ relu3  on
+             fc4    \ out    ).t
 
 
 
@@ -59,9 +59,12 @@ opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
 nn.train;
 
-val (mm, mopts) =  Net.predictor(model, test);
+val (mm, mopts) =  Net.predictor(model, test, testlabels);
+mopts.autoReset = false;
+val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 
 :silent
 
