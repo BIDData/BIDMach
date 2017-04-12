@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FFilter,IMat,HMat,GDMat,GFilter,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
@@ -843,6 +843,7 @@ object Learner {
   def toCPU(mats:Array[Mat]) {
     for (i <- 0 until mats.length) {
       mats(i) match {
+        case g:GFilter => mats(i) = FFilter(g);
         case g:GMat => mats(i) = FMat(g)
         case g:GIMat => mats(i) = IMat(g)
         case g:GDMat => mats(i) = DMat(g)
