@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,GMat,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FFilter,GMat,GFilter,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -267,6 +267,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	to(i) = from(i) match {
         	case aa:GMat => aa
         	case aa:GDMat => GMat(aa)
+        	case aa:FFilter => GFilter(aa)
         	case aa:FMat => GMat(aa)
         	case aa:DMat => GMat(aa)
         	case aa:IMat => GIMat(aa)
@@ -367,6 +368,12 @@ object Model {
       	} else {
       		SMat(g);
       	}
+      }
+      case f:FFilter =>
+      if (useGPU) {
+      	GFilter(f);
+      } else {
+      	f;
       }
       case f:FMat =>
       if (useGPU) {
