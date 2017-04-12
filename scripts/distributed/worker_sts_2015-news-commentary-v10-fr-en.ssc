@@ -19,7 +19,17 @@ Mat.checkCUDA
 Mat.useCache = false
 Mat.useGPUcache = true
 
-val mdir = "/mnt/BIDMach/data/MNT2015/models/"
+val defaultmdir = "/mnt/BIDMach/data/MNT2015/models/"
+val mdir = sys.env.get("WORKER_MODEL_DIR") match {
+  case Some(mdir0) => {
+    println("Using WORKER_MODEL_DIR=%s" format mdir0)
+    mdir0
+  }
+  case None => {
+    println("Using default model dir: %s" format defaultmdir)
+    defaultmdir
+  }
+}
 val datadir = "/mnt/BIDMach/data/MNT2015/data/"
 val PADsym = 1
 
@@ -39,7 +49,7 @@ val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
 
 opts.lrate = 0.03f                       // Learning rate
 opts.nvocab = 20000                      // Vocabulary limit
-opts.npasses = 2                         // Number of passes over the dataset
+opts.npasses = 10                        // Number of passes over the dataset
 opts.height = 2                          // Height of the network
 opts.dim = 256                           // Dimension of LSTM units
 opts.batchSize = batchSize               // Batch size
