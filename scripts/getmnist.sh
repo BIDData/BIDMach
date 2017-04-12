@@ -21,17 +21,20 @@ MNIST="${BIDMACH_SCRIPTS}/../data/MNIST"
 mkdir -p ${MNIST}
 cd ${MNIST}
 
-if [ ! -e mnist.bz2 ]; then
-    wget http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist.bz2
+if [ ! -e train-images-idx3-ubyte ]; then
+    wget http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz 
+    gunzip train-images-idx3-ubyte.gz
 fi
-if [ ! -e mnist.t.bz2 ]; then
-    wget http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist.t.bz2
+if [ ! -e train-labels-idx1-ubyte ]; then
+    wget http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz
+    gunzip train-labels-idx1-ubyte.gz
 fi
 
-bunzip2 -c mnist.bz2 > mnist.lsvm
-bunzip2 -c mnist.t.bz2 > mnist.t.lsvm
-
-../../bidmach '../../scripts/processmnist.ssc'
-
-rm mnist.lsvm
-rm mnist.t.lsvm
+if [ ! -e t10k-images-idx3-ubyte ]; then
+    wget http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz 
+    gunzip t10k-images-idx3-ubyte.gz
+fi
+if [ ! -e t10k-labels-idx1-ubyte ]; then
+    wget http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz
+    gunzip t10k-labels-idx1-ubyte.gz
+fi

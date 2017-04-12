@@ -20,7 +20,7 @@ val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
 opts.batchSize= 64
-opts.npasses = 20
+opts.npasses = 4
 opts.lrate = 3e-4f 
 opts.texp = 0.1f
 opts.pstep = 0.1f
@@ -65,7 +65,7 @@ opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
 nn.train;
 
-val (mm, mopts) =  Net.predictor(model, test);
+val (mm, mopts) =  Net.predictor(model, test, testlabels);
 mm.predict;
 
 

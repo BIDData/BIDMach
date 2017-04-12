@@ -13,3 +13,5 @@ for (i <- 0 to 80) {
 //    saveFMat("allst%02d.fmat.txt" format i, alls.t);
     print(".");
 }
+
+System.exit(0)
