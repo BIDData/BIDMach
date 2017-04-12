@@ -549,7 +549,7 @@ object Net  {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
     val opts = new PredOptions;
-    opts.batchSize = math.min(10000, data0.ncols/30 + 1);
+    opts.batchSize = mopts.asInstanceOf[DataSource.Opts].batchSize;
     opts.links = mopts.links;
     opts.nodeset = mopts.nodeset;
     opts.nodemat = mopts.nodemat;
@@ -560,6 +560,7 @@ object Net  {
     	opts.nodemat.data.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
     }
     opts.hasBias = mopts.hasBias;
+    opts.tensorFormat = mopts.tensorFormat;
     opts.dropout = 1f;
     
     val newmod = new Net(opts);
