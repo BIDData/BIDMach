@@ -1,7 +1,29 @@
 package BIDMach.allreduce
 
-import BIDMach.Learner
-import BIDMach.models.Model
+
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMach.Learner;
+import BIDMach.models.Model;
+import edu.berkeley.bid.comm._
+import scala.collection.parallel._
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import java.util.concurrent.Callable
+import javax.script.ScriptContext
+import edu.berkeley.bid.comm._ 
 
 class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
@@ -265,7 +287,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   }
 
   class ProgressRecorder extends Runnable {
-    val stop = false;
+    var stop = false;
 
 //    def start() {
 //    }
@@ -275,7 +297,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
       while(!stop){
         //loop and send workerprogress to master, every 2 seconds
         Thread.sleep(2000);
-        val progressResp = new ReturnObjectResponse(learner.sentSockHistory);
+        val progressResp = new WorkerProgressResponse(learner.sentSockHistory);
         sendMaster(progressResp);
       }
     }

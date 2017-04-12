@@ -122,13 +122,13 @@ object Command {
 
 //TODO
 class WorkerProgressCommand(
-    round0:Int, dest0:Int, workerProgress0:Bandwidth, bytes:Array[Byte])
+    round0:Int, dest0:Int, obj0:AnyRef, bytes:Array[Byte])
   extends Command(
-    Command.workerProgressCommand, round0, dest0, bytes.size, bytes, bytes.size) {
+    Command.workerProgressCtype, round0, dest0, bytes.size, bytes, bytes.size) {
 
   var obj:AnyRef = obj0;
 
-  def this(round0:Int, dest0:Int, workerProgress0:Bandwidth) = {
+  def this(round0:Int, dest0:Int, obj0:AnyRef) = {
     this(round0, dest0, obj0, {
       val out  = new ByteArrayOutputStream()
       val output = new ObjectOutputStream(out)

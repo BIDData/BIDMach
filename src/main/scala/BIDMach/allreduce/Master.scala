@@ -1,7 +1,27 @@
 package BIDMach.allreduce
 
-;
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import edu.berkeley.bid.comm._
+import scala.collection.parallel._
+import scala.util.control.Breaks._
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.BindException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import javax.script.ScriptEngine;
 
+import edu.berkeley.bid.comm._ 
 
 class Master(override val opts: Master.Opts = new Master.Options) extends Host {
 
@@ -263,10 +283,10 @@ class Master(override val opts: Master.Opts = new Master.Options) extends Host {
         if (opts.trace > 2) log("Received %s\n" format newresp.toString);
       } else if (resp.rtype == Command.learnerDoneCtype) {
         inctable(learners, resp.src);
-      } else if (resp.rtype == Command.WorkerProgressCtype) {
+      } else if (resp.rtype == Command.workerProgressCtype) {
         val newresp = new WorkerProgressResponse(resp.bytes);
         newresp.decode;
-        newresp.obj.printRecords();
+        newresp.obj.asInstanceOf[Bandwidth].printRecords();
       } else if (opts.trace > 0) log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n" format(resp.rtype, resp.round, activeCommand.ctype, activeCommand.round));
     }
   }

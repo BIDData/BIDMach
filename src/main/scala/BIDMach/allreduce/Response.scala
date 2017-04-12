@@ -48,7 +48,7 @@ class Response(
 }
 
 class WorkerProgressResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
-  extends Response(Command.workerProgressCommand, round0, src0, bytes.size, bytes, bytes.size) {
+  extends Response(Command.workerProgressCtype, round0, src0, bytes.size, bytes, bytes.size) {
 
   var obj:AnyRef = obj0;
 
