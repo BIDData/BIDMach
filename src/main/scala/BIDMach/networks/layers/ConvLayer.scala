@@ -64,12 +64,12 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	
     }
+    filter = modelmats(imodel).asInstanceOf[FMat];
+    ffilter = modelmats(imodel).asInstanceOf[Filter];
     if (output.asInstanceOf[AnyRef] == null) { 
     	val outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
     	output = filter.zeros(outputBatchDim);
     };
-    filter = modelmats(imodel).asInstanceOf[FMat];
-    ffilter = modelmats(imodel).asInstanceOf[Filter];
     
     updateFilter = updatemats(imodel).asInstanceOf[FMat];
     updateFFilter = updatemats(imodel).asInstanceOf[Filter];  
