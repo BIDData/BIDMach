@@ -59,16 +59,15 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	
     	ffilter.xavier(opts.initv);
     	
-    	if (output.asInstanceOf[AnyRef] == null) { 
-    		val outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
-    		output = filter.zeros(outputBatchDim);
-    	};
-    	
     	val biasDim = irow(output.dims(0), output.dims(1), output.dims(2), 1);
     	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	
     }
+    if (output.asInstanceOf[AnyRef] == null) { 
+    	val outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
+    	output = filter.zeros(outputBatchDim);
+    };
     filter = modelmats(imodel).asInstanceOf[FMat];
     ffilter = modelmats(imodel).asInstanceOf[Filter];
     
@@ -78,6 +77,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     
     bias_mat = modelmats(imodel+1).asInstanceOf[FMat];
     update_bias_mat = updatemats(imodel+1).asInstanceOf[FMat];
+    if (update_bias_mat.asInstanceOf[AnyRef] != null) update_bias_mat.clear;
   }
 
   override def forward = {
