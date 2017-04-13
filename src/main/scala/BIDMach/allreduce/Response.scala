@@ -63,6 +63,10 @@ class WorkerProgressResponse(round0:Int, src0:Int, bandwidth0:Bandwidth, bytes:A
     });
   }
 
+  def this(bandwidth0:Bandwidth, bytes:Array[Byte]) = {
+    this(0, 0, null, bytes);
+  }
+
   override def encode ():Unit = { }
 
   override def decode():Unit = {
