@@ -107,7 +107,7 @@ object Command {
   final val workerProgressCtype = 13;
 
 	final val names = Array[String]("", "config", "permute", "allreduce", "permuteAllreduce", "setMachine", "startLearner", "learnerDone",
-	    "assignObject", "sendLearner", "evalString", "returnObject", "call");
+	    "assignObject", "sendLearner", "evalString", "returnObject", "call", "workerProgress");
 
 
   def printStackTrace(e:Exception):String = {

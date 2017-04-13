@@ -70,10 +70,6 @@ class WorkerProgressResponse(round0:Int, src0:Int, bandwidth0:Bandwidth, bytes:A
   override def encode ():Unit = { }
 
   override def decode():Unit = {
-    val in = new ByteArrayInputStream(bytes);
-    val input = new ObjectInputStream(in);
-    bandwidth = input.readObject;
-    input.close;
   }
 }
 
@@ -123,10 +119,6 @@ extends Response(Command.returnObjectCtype, round0, src0, bytes.size, bytes, byt
   override def encode ():Unit = { }
   
   override def decode():Unit = {    
-		val in = new ByteArrayInputStream(bytes);
-		val input = new ObjectInputStream(in);
-		obj = input.readObject;
-		input.close;
   }
 }
 
