@@ -47,17 +47,17 @@ class Response(
   
 }
 
-class WorkerProgressResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte])
+class WorkerProgressResponse(round0:Int, src0:Int, bandwidth0:Bandwidth, bytes:Array[Byte])
   extends Response(Command.workerProgressCtype, round0, src0, bytes.size, bytes, bytes.size) {
 
-  var obj:AnyRef = obj0;
+  var bandwidth:Bandwidth = bandwidth0;
 
   // round0 and dest0 are discarded
-  def this(obj0:AnyRef) = {
-    this(0, 0, obj0, {
+  def this(bandwidth0:Bandwidth) = {
+    this(0, 0, bandwidth0, {
       val out  = new ByteArrayOutputStream()
       val output = new ObjectOutputStream(out)
-      output.writeObject(obj0)
+      output.writeObject(bandwidth0)
       output.close
       out.toByteArray()
     });
@@ -68,7 +68,7 @@ class WorkerProgressResponse(round0:Int, src0:Int, obj0:AnyRef, bytes:Array[Byte
   override def decode():Unit = {
     val in = new ByteArrayInputStream(bytes);
     val input = new ObjectInputStream(in);
-    obj = input.readObject;
+    bandwidth = input.readObject;
     input.close;
   }
 }

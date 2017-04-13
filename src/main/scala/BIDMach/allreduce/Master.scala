@@ -286,7 +286,7 @@ class Master(override val opts: Master.Opts = new Master.Options) extends Host {
       } else if (resp.rtype == Command.workerProgressCtype) {
         val newresp = new WorkerProgressResponse(resp.bytes);
         newresp.decode;
-        newresp.obj.asInstanceOf[Bandwidth].printRecords();
+        newresp.bandwidth.printRecords();
       } else if (opts.trace > 0) log("Master got response with bad type/round (%d,%d), should be (%d,%d)\n" format(resp.rtype, resp.round, activeCommand.ctype, activeCommand.round));
     }
   }
