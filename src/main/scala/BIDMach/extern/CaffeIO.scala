@@ -2,7 +2,6 @@ package BIDMach.extern
 
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
-import BIDMat.SciFunctions._
 import BIDMach._
 import BIDMach.networks.layers._
 import java.util.Arrays
@@ -17,7 +16,8 @@ object CaffeIO {
     val caffeBuilder = Caffe.NetParameter.newBuilder()
     TextFormat.merge(fin, caffeBuilder)
     
-    val nodeSet = new NodeSet(caffeBuilder.getLayerCount())
+    // Translate every layer and build a mapping of blobs to layers feeding into them
+    val nodes = new mutable.ArrayBuffer[Node]
     val nodesWithTop = new mutable.HashMap[String,mutable.Buffer[Node]]
     for (i <- 0 until caffeBuilder.getLayerCount()) {
       val layer = caffeBuilder.getLayer(i)
@@ -25,7 +25,7 @@ object CaffeIO {
         case "Convolution" => {
           val convParam = layer.getConvolutionParam()
           // TODO: handle null
-          nodeSet(i) = new ConvNode {
+          nodes += new ConvNode {
             noutputs = convParam.getNumOutput()
             hasBias = convParam.getBiasTerm()
             if (convParam.hasPadW()) {
@@ -49,7 +49,7 @@ object CaffeIO {
         case "Pooling" => {
           val poolingParam = layer.getPoolingParam()
           // TODO: handle null
-          nodeSet(i) = new PoolingNode {
+          nodes += new PoolingNode {
             if (poolingParam.hasPadH()) {
               pady = poolingParam.getPadH()
               padx = poolingParam.getPadW()
@@ -79,13 +79,13 @@ object CaffeIO {
           val lrnParam = layer.getLrnParam()
           // TODO: handle null
           if (lrnParam.getNormRegion() == NormRegion.WITHIN_CHANNEL) {
-            nodeSet(i) = new LRNwithinNode {
+            nodes += new LRNwithinNode {
               dim = lrnParam.getLocalSize()
               alpha = lrnParam.getAlpha()
               beta = lrnParam.getBeta()
             }
           } else {
-            nodeSet(i) = new LRNacrossNode {
+            nodes += new LRNacrossNode {
               dim = lrnParam.getLocalSize()
               alpha = lrnParam.getAlpha()
               beta = lrnParam.getBeta()
@@ -96,51 +96,61 @@ object CaffeIO {
         case "BatchNorm" => {
           val bnParam = layer.getBatchNormParam()
           // TODO: handle null
-          nodeSet(i) = new BatchNormNode {
+          nodes += new BatchNormNode {
             epsilon = bnParam.getEps()
+            expAvgFactor = bnParam.getMovingAverageFraction()
           }
         }
 
-        case "SoftmaxWithLoss" => nodeSet(i) = new SoftmaxOutputNode
-        case "HingeLoss" => nodeSet(i) = new GLMNode { links = irow(3) }
-        case "Accuracy" => nodeSet(i) = new AccuracyNode
+        case "SoftmaxWithLoss" => nodes += new SoftmaxOutputNode
+        case "HingeLoss" => nodes += new GLMNode { links = irow(3) }
+        case "Accuracy" => nodes += new AccuracyNode
 
-        case "ReLU" => nodeSet(i) = new RectNode
-        case "Sigmoid" => nodeSet(i) = new SigmoidNode
-        case "TanH" => nodeSet(i) = new TanhNode
-        case "BNLL" => nodeSet(i) = new SoftplusNode
+        case "ReLU" => nodes += new RectNode
+        case "Sigmoid" => nodes += new SigmoidNode
+        case "TanH" => nodes += new TanhNode
+        case "BNLL" => nodes += new SoftplusNode
 
-        case "Data" => nodeSet(i) = new InputNode
-        case "MemoryData" => nodeSet(i) = new InputNode
-        case "HDF5Data" => nodeSet(i) = new InputNode
+        case "Data" => nodes += new InputNode
+        case "MemoryData" => nodes += new InputNode
+        case "HDF5Data" => nodes += new InputNode
 
         case "InnerProduct" => {
           val ipp = layer.getInnerProductParam()
           // TODO: handle ipp null case
-          nodeSet(i) = new LinNode { outdim = ipp.getNumOutput(); hasBias = ipp.getBiasTerm() }
+          nodes += new LinNode {
+            outdim = ipp.getNumOutput()
+            hasBias = ipp.getBiasTerm()
+          }
         }
-        case "Split" => nodeSet(i) = new CopyNode
-        case "Softmax" => nodeSet(i) = new SoftmaxNode
+        case "Split" => nodes += new CopyNode
+        case "Softmax" => nodes += new SoftmaxNode
         case "Dropout" => {
           val dropoutParam = layer.getDropoutParam()
           // TODO: handle null
-          nodeSet(i) = new DropoutNode { frac = dropoutParam.getDropoutRatio() }
+          nodes += new DropoutNode { frac = dropoutParam.getDropoutRatio() }
         }
         // TODO: implement base, shift, scale for the following two
-        case "Exp" => nodeSet(i) = new ExpNode
-        case "Log" => nodeSet(i) = new LnNode
+        case "Exp" => nodes += new ExpNode
+        case "Log" => nodes += new LnNode
         case "Scale" => {
+          // TODO: handle null
           val scaleParam = layer.getScaleParam()
-          nodeSet(i) = new ScaleNode { hasBias = scaleParam.getBiasTerm() }
+          nodes += new ScaleNode { hasBias = scaleParam.getBiasTerm() }
         }
+        // TODO: change once we implement all layer types
+        case _ => throw new NotImplementedError("\"%s\" is not implemented yet" format layer.getType())
       }
       for (t <- caffeBuilder.getLayer(i).getTopList()) {
-        nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer).append(nodeSet(i))
+        nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer) += nodes.last
       }
     }
     
+    // Assign layer inputs based on which Caffe blobs each layer links to.
+    // When several layers reuse the same blob, order the layers in the order they were specified
+    // in the prototxt.
     val blobIterIndices = new mutable.HashMap[String,Int]
-    for (i <- 0 until caffeBuilder.getLayerCount()) {
+    for ((i, curNode) <- (0 until caffeBuilder.getLayerCount()) zip nodes) {
       val layer = caffeBuilder.getLayer(i)
       // XXX this should account for multiple bottom blobs
       if (layer.getBottomCount() >= 1) {
@@ -148,14 +158,54 @@ object CaffeIO {
         // TODO: check this code further
         if (layer.getTopList().contains(bottom)) {
           val j = blobIterIndices.getOrElse(bottom, 0)
-          nodeSet(i).inputs(0) = nodesWithTop(bottom)(j)
+          curNode.inputs(0) = nodesWithTop(bottom)(j)
           blobIterIndices(bottom) = j + 1
         } else {
-          nodeSet(i).inputs(0) = nodesWithTop(bottom)(nodesWithTop(bottom).length - 1)
+          curNode.inputs(0) = nodesWithTop(bottom)(nodesWithTop(bottom).length - 1)
         }
       }
     }
     
-    nodeSet
+    // Assign batch norm modes
+    for (node <- nodes.filter(_.isInstanceOf[BatchNormNode]).map(_.asInstanceOf[BatchNormNode])) {
+      if (node.inputs(0).isInstanceOf[ConvNode]) {
+        node.batchNormMode = BatchNormLayer.SPATIAL
+      } else {
+        node.batchNormMode = BatchNormLayer.PER_ACTIVATION
+      }
+    }
+    
+    // Create a table of forward links
+    val downstreamNodes = new mutable.HashMap[NodeTerm,mutable.Buffer[NodeTerm]]
+    for (node <- nodes) {
+      for (prevNode <- node.inputs) {
+        downstreamNodes.getOrElseUpdate(prevNode, new mutable.ArrayBuffer) += node
+      }
+    }
+    
+    // Combine batch norm layers immediately followed by scale layers
+    val newNodes = new mutable.ArrayBuffer[Node]
+    val skip = new mutable.HashSet[Node]
+    for (node <- nodes) {
+      if (node.isInstanceOf[BatchNormNode] && downstreamNodes(node).length == 1
+          && downstreamNodes(node)(0).isInstanceOf[ScaleNode]) {
+        val bnNode = node.asInstanceOf[BatchNormNode]
+        val scaleNode = downstreamNodes(node)(0).asInstanceOf[ScaleNode]
+        val combinedNode = new BatchNormScaleNode {
+          epsilon = bnNode.epsilon
+          expAvgFactor = bnNode.expAvgFactor
+          tensorFormat = bnNode.tensorFormat
+          batchNormMode = bnNode.batchNormMode
+          
+          hasBias = scaleNode.hasBias
+        }
+        newNodes += combinedNode
+        skip += scaleNode
+      } else if (!skip.contains(node)) {
+        newNodes += node
+      }
+    }
+
+    new NodeSet(newNodes.toArray)
   }
 }
