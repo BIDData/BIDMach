@@ -1,6 +1,6 @@
 //:silent
 import BIDMach.extern._
-import BIDMach.networks.layers.NodeSet
+import BIDMach.networks.layers._
 import java.io.FileReader
 
 val traindir = "../../data/MNIST/"
@@ -36,13 +36,20 @@ opts.tensorFormat = Net.TensorNCHW;
 var f:FileReader = null
 var nodeSet:NodeSet = null
 try {
-    f = new FileReader("lenet_train_test.prototxt")
-    nodeSet = CaffeIO.mkNodeSetFromProtobuf(f)
+  f = new FileReader("lenet_train_test.prototxt")
+  nodeSet = CaffeIO.mkNodeSetFromProtobuf(f)
 } finally {
-    if (f != null) {
-        f.close()
-    }
+  if (f != null) {
+    f.close()
+  }
 }
+
+// XXX this appears to be missing support in the protobuf
+nodeSet(1).asInstanceOf[ConvNode].initv = 0.01f
+nodeSet(5).asInstanceOf[LinNode].initv = 3e-2f
+nodeSet(7).asInstanceOf[LinNode].initv = 5e-2f
+nodeSet(9).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
+
 
 
 
