@@ -20,6 +20,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var OOVelem:Mat = null;
   var leftEdge:Layer = null;
   var leftStart:Mat = null;
+  var decoderTokens:Array[Layer] = null; // TODO: LayerMat
   var dstxdata:Mat = null;
   var dstxdata0:Mat = null;
   var srcGrid:LayerMat = null;

@@ -41,6 +41,10 @@ class ArraySource(override val opts:ArraySource.Opts = new ArraySource.Options) 
       case ma:Array[Mat] => inMats = ma;
     }
   }
+
+  override def close = {
+    iblock = 0
+  }
 }
 
 object ArraySource {
