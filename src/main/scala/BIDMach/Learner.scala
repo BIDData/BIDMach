@@ -71,15 +71,12 @@ case class Learner(
     useGPU = model.useGPU;
   }
 
-  def train:Unit = {
-    retrain(true)
+  def train(doInit:Boolean) = {
+    retrain(doInit)
   }
+  def train:Unit = retrain(true)
 
-  def train(init:Boolean = true) = {
-    retrain(init)
-  }
-
-  def retrain(init:Boolean = true) = {
+  def retrain(doInit:Boolean) = {
     flip
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
@@ -89,7 +86,7 @@ case class Learner(
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
-    firstPass(null, init);
+    firstPass(null, doInit);
     updateM(ipass-1)
     while (ipass < opts.npasses && ! done) {
       nextPass(null)
@@ -97,9 +94,10 @@ case class Learner(
     }
     wrapUp(ipass);
   }
+  def retrain:Unit = retrain(true)
 
-  def firstPass(iter:Iterator[(AnyRef, MatIOtrait)], init:Boolean = true):Unit = {
-    if (init) {
+  def firstPass(iter:Iterator[(AnyRef, MatIOtrait)], doInit:Boolean = true):Unit = {
+    if (doInit) {
       setup
       init
     }

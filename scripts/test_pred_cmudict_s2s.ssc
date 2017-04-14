@@ -10,7 +10,13 @@ var src = loadMat(datadir+"valid.src_grapheme.shuf.smat.lz4")
 var dst = loadMat(datadir+"valid.dst_phoneme.shuf.smat.lz4")
 :silent
 
-val model = SeqToSeq.load(modeldir+"model256_te0.3_00/")
+// val model = SeqToSeq.load(modeldir+"model256_te0.3_00/")
+val model = new SeqToSeq
+model.setmodelmats(new Array[Mat](7))
+for (i <- 0 until 7) {
+  model.modelmats(i) = loadMat(modeldir+"model256_te0.3_00/modelmat%02d.lz4" format i)
+}
+
 val (nn, opts) = SeqToSeq.predict(model, src)
 val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
 
