@@ -6,9 +6,9 @@ val testfname = "test_batch.bin";
 val traindname = "train%d.fmat.lz4";
 val trainNCHWdname = "trainNCHW%d.fmat.lz4";
 val trainlabels = "labels%d.imat.lz4";
-val testdname = "test.fmat.lz4";
-val testNCHWdname = "testNCHW.fmat.lz4";
-val testlabels = "testlabels.imat.lz4";
+val testdname = "test0.fmat.lz4";
+val testNCHWdname = "testNCHW0.fmat.lz4";
+val testlabels = "testlabels0.imat.lz4";
 
 val nparts = 5;
 val nimages = 10000;

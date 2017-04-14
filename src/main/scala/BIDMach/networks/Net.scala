@@ -581,6 +581,10 @@ object Net  {
   def predictor(model0:Model, infn:String, outfn:String):(Learner, FilePredOptions) = {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
   }
+
+  def predictor(model0:Model, infn:String, inlb:String, outfn:String):(Learner, FilePredOptions) = {
+    predictor(model0, List(FileSource.simpleEnum(infn,1,0),FileSource.simpleEnum(inlb,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
+  }
   
   def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FilePredOptions) = {
     val model = model0.asInstanceOf[Net];
@@ -589,9 +593,16 @@ object Net  {
     opts.fnames = infiles;
     opts.ofnames = outfiles;
     opts.links = mopts.links;
-    opts.nodeset = mopts.nodeset.clone;
-    opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    opts.nodeset = mopts.nodeset;
+    opts.nodemat = mopts.nodemat;
+    if (opts.nodeset.asInstanceOf[AnyRef] != null) {
+    	opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    }
+    if (opts.nodemat.asInstanceOf[AnyRef] != null) {
+    	opts.nodemat.data.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    }
     opts.hasBias = mopts.hasBias;
+    opts.tensorFormat = mopts.tensorFormat;
     opts.dropout = 1f;
     
     val newmod = new Net(opts);
