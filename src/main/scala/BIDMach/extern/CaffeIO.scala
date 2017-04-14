@@ -24,7 +24,6 @@ object CaffeIO {
       layer.getType() match {
         case "Convolution" => {
           val convParam = layer.getConvolutionParam()
-          // TODO: handle null
           nodes += new ConvNode {
             noutputs = convParam.getNumOutput()
             hasBias = convParam.getBiasTerm()
@@ -48,7 +47,6 @@ object CaffeIO {
         }
         case "Pooling" => {
           val poolingParam = layer.getPoolingParam()
-          // TODO: handle null
           nodes += new PoolingNode {
             if (poolingParam.hasPadH()) {
               pady = poolingParam.getPadH()
@@ -77,7 +75,6 @@ object CaffeIO {
         }
         case "LRN" => {
           val lrnParam = layer.getLrnParam()
-          // TODO: handle null
           if (lrnParam.getNormRegion() == NormRegion.WITHIN_CHANNEL) {
             nodes += new LRNwithinNode {
               dim = lrnParam.getLocalSize()
@@ -95,7 +92,6 @@ object CaffeIO {
         }
         case "BatchNorm" => {
           val bnParam = layer.getBatchNormParam()
-          // TODO: handle null
           nodes += new BatchNormNode {
             epsilon = bnParam.getEps()
             expAvgFactor = bnParam.getMovingAverageFraction()
@@ -117,7 +113,6 @@ object CaffeIO {
 
         case "InnerProduct" => {
           val ipp = layer.getInnerProductParam()
-          // TODO: handle ipp null case
           nodes += new LinNode {
             outdim = ipp.getNumOutput()
             hasBias = ipp.getBiasTerm()
@@ -127,14 +122,12 @@ object CaffeIO {
         case "Softmax" => nodes += new SoftmaxNode
         case "Dropout" => {
           val dropoutParam = layer.getDropoutParam()
-          // TODO: handle null
           nodes += new DropoutNode { frac = dropoutParam.getDropoutRatio() }
         }
         // TODO: implement base, shift, scale for the following two
         case "Exp" => nodes += new ExpNode
         case "Log" => nodes += new LnNode
         case "Scale" => {
-          // TODO: handle null
           val scaleParam = layer.getScaleParam()
           nodes += new ScaleNode { hasBias = scaleParam.getBiasTerm() }
         }
