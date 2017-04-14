@@ -19,8 +19,7 @@ object CaffeIO {
     // Translate every layer and build a mapping of blobs to layers feeding into them
     val nodes = new mutable.ArrayBuffer[Node]
     val nodesWithTop = new mutable.HashMap[String,mutable.Buffer[Node]]
-    for (i <- 0 until caffeBuilder.getLayerCount()) {
-      val layer = caffeBuilder.getLayer(i)
+    for (layer <- caffeBuilder.getLayerList()) {
       layer.getType() match {
         case "Convolution" => {
           val convParam = layer.getConvolutionParam()
@@ -134,7 +133,7 @@ object CaffeIO {
         // TODO: change once we implement all layer types
         case _ => throw new NotImplementedError("\"%s\" is not implemented yet" format layer.getType())
       }
-      for (t <- caffeBuilder.getLayer(i).getTopList()) {
+      for (t <- layer.getTopList()) {
         nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer) += nodes.last
       }
     }
@@ -143,8 +142,7 @@ object CaffeIO {
     // When several layers reuse the same blob, order the layers in the order they were specified
     // in the prototxt.
     val blobIterIndices = new mutable.HashMap[String,Int]
-    for ((i, curNode) <- (0 until caffeBuilder.getLayerCount()) zip nodes) {
-      val layer = caffeBuilder.getLayer(i)
+    for ((layer, curNode) <- caffeBuilder.getLayerList() zip nodes) {
       // XXX this should account for multiple bottom blobs
       if (layer.getBottomCount() >= 1) {
         val bottom = layer.getBottom(0)
