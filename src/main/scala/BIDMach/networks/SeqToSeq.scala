@@ -37,6 +37,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   var predictseqSoftmaxOutputs:Array[Mat] = null
 	
 	override def createLayers = {
+    if (opts.nvocabIn == null) opts.nvocabIn = opts.nvocab
+    if (opts.nvocabOut == null) opts.nvocabOut = opts.nvocab
     height = opts.height;
 	  inwidth = opts.inwidth; 
     outwidth = opts.outwidth;
@@ -59,7 +61,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         } else {
           LSTMNode.gridTypeSoftmaxOutput
         }
-    	dstGridOpts.outdim = opts.nvocab;
+    	dstGridOpts.outdim = opts.nvocabOut;
     	dstGrid = LSTMLayer.grid(this, height, outwidth, dstGridOpts);
 
         if (opts.predictseq) {
@@ -72,12 +74,12 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
           predictDstGrid(3, 0).setInput(0, predictDstGrid(2, 0))
           for (j <- 1 until dstGrid.ncols) {
             predictDstGrid(1, j) = new MaxIndexLayer(this){inputs(0)=predictDstGrid(0, j)}
-            predictDstGrid(2, j) = new OnehotLayer(this, new OnehotNode{length=opts.nvocab}){inputs(0)=predictDstGrid(1, j)}
+            predictDstGrid(2, j) = new OnehotLayer(this, new OnehotNode{length=opts.nvocabOut}){inputs(0)=predictDstGrid(1, j)}
             predictDstGrid(3, j).setInput(0, predictDstGrid(2, j))
           }
           dstGrid = predictDstGrid
 
-          // decoder_rows - 2 since decoder has and extra linear -> softmax at the end
+          // predictDstGrid.nrows - 2 since decoder has an extra [-> linear -> softmax] at the end
           val predictSrcGrid = LayerMat(predictDstGrid.nrows - 2, srcGrid.ncols)
           predictSrcGrid(0, ?) = srcGrid(0, ?)
           predictSrcGrid(3->predictSrcGrid.nrows, ?) = srcGrid(1->srcGrid.nrows, ?)
@@ -97,20 +99,23 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     }
   }
   
-  def mapOOV(in:Mat) = {
+  def _mapOOV(in:Mat, encoder:Boolean) = {
+    val nvocab = if (encoder) opts.nvocabIn else opts.nvocabOut
     if (OOVelem.asInstanceOf[AnyRef] == null) {
       OOVelem = convertMat(iones(1,1) * opts.OOVsym);
     }
-    in ~ in + ((in >= opts.nvocab) ∘ (OOVelem - in))
+    in ~ in + ((in >= nvocab) ∘ (OOVelem - in))
   }
+  def mapOOVEncoder(in:Mat):Mat = _mapOOV(in, true)
+  def mapOOVDecoder(in:Mat):Mat = _mapOOV(in, false)
   
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) = {
     val src = gmats(0);
     srcn = src.nnz/src.ncols;
     if (srcn*src.ncols != src.nnz) throw new RuntimeException("SeqToSeq src batch not fixed length");
     val srcdata = int(src.contents.view(srcn, batchSize).t);   // IMat with columns corresponding to word positions, with batchSize rows.
-    mapOOV(srcdata);
-    val srcmat = oneHot(srcdata.contents, opts.nvocab);
+    mapOOVEncoder(srcdata)
+    val srcmat = oneHot(srcdata.contents, opts.nvocabIn);
     srcn = math.min(srcn, opts.inwidth);
     if (srcn < inwidth) initPrevCol;
     for (i <- 0 until srcn) {
@@ -123,21 +128,18 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     
     if (opts.predictseq) {
        leftStart = iones(batchSize, 1) * opts.STARTsym
-       val startPredMat = convertMat(oneHot(leftStart.contents, opts.nvocab))
+       val startPredMat = convertMat(oneHot(leftStart, opts.nvocabOut))
        dstGrid(0, 0).output = startPredMat
 
-       if (predictseqSoftmaxOutputs == null) predictseqSoftmaxOutputs = new Array[Mat](dstGrid.ncols)
-       for (i <- 1 until dstGrid.ncols) {
-         if (predictseqSoftmaxOutputs(i-1).asInstanceOf[AnyRef] == null) {
-           predictseqSoftmaxOutputs(i-1) = if (opts.useGPU) {
-             GMat(opts.nvocab, batchSize)
-           } else {
-             FMat(opts.nvocab, batchSize)
-           }
+       if (predictseqSoftmaxOutputs == null) predictseqSoftmaxOutputs = new Array[Mat](dstGrid.ncols-1)
+       for (i <- 0 until dstGrid.ncols-1) {
+         if (predictseqSoftmaxOutputs(i).asInstanceOf[AnyRef] == null) {
+           predictseqSoftmaxOutputs(i) = GMat(opts.nvocabOut, batchSize)
          }
-         val smout = predictseqSoftmaxOutputs(i-1)
-         dstGrid(dstGrid.nrows-1, i-1).output = smout
-         dstGrid(0, i).output = smout
+         val smout = predictseqSoftmaxOutputs(i)
+         dstGrid(dstGrid.nrows-1, i).output = smout
+         dstGrid(0, i+1).output = smout
+         smout.clear
        }
 
     } else if (!opts.embed) {
@@ -150,8 +152,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     		leftStart = convertMat(iones(batchSize, 1) * opts.STARTsym);
     	}
     	val dstxdata = if (opts.addStart) (leftStart \ dstxdata0) else dstxdata0;
-    	mapOOV(dstxdata);
-    	val dstxmat = oneHot(dstxdata.contents, opts.nvocab);
+    	mapOOVDecoder(dstxdata)
+    	val dstxmat = oneHot(dstxdata.contents, opts.nvocabOut);
 
     	dstxn = math.min(dstxn, opts.outwidth);
     	for (i <- 0 until dstxn) {
@@ -180,7 +182,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
     val dstyn0 = dsty.nnz/dsty.ncols;
     if (dstyn0*dsty.ncols != dsty.nnz) throw new RuntimeException("SeqToSeq dsty batch not fixed length");
     val dstydata = int(dsty.contents.view(dstyn0, batchSize).t);
-    mapOOV(dstydata);
+    mapOOVDecoder(dstydata)
     val dstyn1 = math.min(dstyn0 - (if (opts.addStart) 0 else 1), opts.outwidth);
     for (j <- 0 until dstyn1) {
     	val incol = if (opts.addStart) dstydata.colslice(j,j+1).t else dstydata.colslice(j+1,j+2).t
@@ -227,7 +229,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
         modelmats(0) ~ modelmats(0) ∘ mask;
       }
       val mincol = inwidth - srcn; 
-        if (opts.debug > 1) println("Running encoder forward pass")
+      if (opts.debug > 1) println("Running encoder forward pass")
       srcGrid.forward(mincol, inwidth-1, opts.debug);
       if (opts.embed) {
       	if (ogmats != null) {
@@ -245,7 +247,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
           ogmats(0) = IMat(outwidth, batchSize)
           for (j <- 0 until dstGrid.ncols) {
             val cpusmj = cpu(dstGrid(dstGrid.nrows-1, j).output)
-            ogmats(0)(j, ?) = maxi2(cpusmj, 1)._2
+            val maxinds = maxi2(cpusmj, 1)._2
+            ogmats(0)(j, ?) = maxinds
           }
         }
         zeros(1, 1)
@@ -276,6 +279,8 @@ object SeqToSeq {
     var outwidth = 1;    // Max dst sentence lenth
     var height = 1;      // Number of LSTM layers vertically
     var nvocab = 100000; // Vocabulary size
+    var nvocabIn:Integer = null;  // Input (encoder) vocabulary size
+    var nvocabOut:Integer = null; // Output (decoder) Vocabulary size
     var kind = 0;        // LSTM type, see below
     var bylevel = true;  // Use different models for each level
     var netType = 0;     // Network type, 0 = softmax output, 1 = Neg Sampling output

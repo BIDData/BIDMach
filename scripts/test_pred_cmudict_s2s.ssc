@@ -1,0 +1,39 @@
+import BIDMach.networks.SeqToSeq
+
+val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
+val modeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/bidmach_models_3pass/"
+val preddir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/pred/"
+
+:silent
+var src = loadMat(datadir+"valid.src_grapheme.smat.lz4")
+var dst = loadMat(datadir+"valid.dst_phoneme.smat.lz4")
+:silent
+
+val model = SeqToSeq.load(modeldir+"model256_te0.3_00/")
+val (nn, opts) = SeqToSeq.predict(model, src)
+val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
+
+opts.nvocabIn = 31
+opts.nvocabOut = 43
+opts.npasses = 2
+opts.height = 2
+opts.dim = 512
+opts.batchSize = 64
+
+opts.kind = 1
+opts.netType = 0
+opts.scoreType = 0
+opts.inwidth = 22
+opts.outwidth = 20
+opts.hasBias = true
+opts.pstep = 0.0001f
+opts.cumScore = 3
+opts.PADsym = 1
+opts.OOVsym = 2
+opts.STARTsym = 0
+
+opts.autoReset = false
+
+nn.predict
+
+val preds = nn.preds(0)
