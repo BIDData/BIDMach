@@ -52,8 +52,10 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
   	initHandles();
     inputDim = inputData.dims;
     val channel_in = inputDim(0);
+    // XXX: handle multi-dimensional case
     val filter_h = opts.kernel(0); // 3;0
-    val filter_w = opts.kernel(1); // 3;
+    val filter_w = if (opts.kernel.length == 1) filter_h else opts.kernel(1); // 3;
+    // XXX: handle non-square or multi-dimensional pad/stride
     val npad = opts.pad(0); //1;
     val nstride = opts.stride(0); // 1;
     val channel_out = opts.noutputs; // actually # of filters;

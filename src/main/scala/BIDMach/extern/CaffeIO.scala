@@ -28,6 +28,8 @@ object CaffeIO {
             hasBias = convParam.getBiasTerm()
             if (convParam.hasPadW()) {
               pad = convParam.getPadW() \ convParam.getPadH()
+            } else if (convParam.getPadCount() == 0) {
+              pad = irow(0)
             } else {
               pad = irow(convParam.getPadList().map(_.intValue()).toList)
             }
@@ -38,6 +40,8 @@ object CaffeIO {
             }
             if (convParam.hasStrideW()) {
               stride = convParam.getStrideW() \ convParam.getStrideH()
+            } else if (convParam.getStrideCount() == 0) {
+              pad = irow(1)
             } else {
               stride = irow(convParam.getStrideList().map(_.intValue()).toList)
             }
