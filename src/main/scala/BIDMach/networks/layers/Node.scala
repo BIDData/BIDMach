@@ -595,7 +595,7 @@ object Node {
   	val pm = poolingMode;
   	val pn = poolingNaN;
   	val tf = tensorFormat;
-    new PoolingNode{inputs(0)=a; h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}; 
+    new PoolingNode{inputs(0)=a; h=hh; w=ww; stridey=str; stridex=str; pady=ppad; padx=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;};
   }
   
   def randmirror(a:NodeTerm)(prob:Float=0.5f) = {

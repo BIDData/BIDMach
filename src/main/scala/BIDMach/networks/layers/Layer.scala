@@ -781,7 +781,7 @@ object Layer {
   	val pm = poolingMode;
   	val pn = poolingNaN;
   	val tf = tensorFormat;
-    new PoolingLayer(net, new PoolingNode{h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
+    new PoolingLayer(net, new PoolingNode{h=hh; w=ww; stridey=str; stridex=str; pady=ppad; padx=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
   }
   
   def scale(a:LayerTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {

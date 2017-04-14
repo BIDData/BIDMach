@@ -32,8 +32,8 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   def initModelMats = {   
   	initHandles();
     val outdims = inputData.dims.copy;
-    val outh = (outdims(2) + 2*opts.pad - opts.h)/opts.stride + 1;
-    val outw = (outdims(1) + 2*opts.pad - opts.w)/opts.stride + 1;
+    val outh = (outdims(2) + 2*opts.pady - opts.h)/opts.stridey + 1;
+    val outw = (outdims(1) + 2*opts.padx - opts.w)/opts.stridex + 1;
     outdims(2) = outh;
     outdims(1) = outw;
     createOutput(outdims);
@@ -80,8 +80,8 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   		val inw = indims(1);
   		val outh = outdims(2);
   		val outw = outdims(1);
-  		val stridex = opts.stride;
-  		val stridey = opts.stride;
+  		val stridex = opts.stridex;
+  		val stridey = opts.stridey;
   		var iimg = 0;
   		val nbatch = in.ncols;
   		while (iimg < nbatch) {
@@ -142,8 +142,8 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   		val inw = indims(1);
   		val outh = outdims(2);
   		val outw = outdims(1);
-  		val stridex = opts.stride;
-  		val stridey = opts.stride;
+  		val stridex = opts.stridex;
+  		val stridey = opts.stridey;
   		var iimg = 0;
   		val nbatch = in.ncols;
   		while (iimg < nbatch) {
@@ -195,10 +195,10 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
     
     val h = opts.h;
     val w = opts.w;
-    val pady = opts.pad;
-    val padx = opts.pad;
-    val stridey = opts.stride;
-    val stridex = opts.stride;
+    val pady = opts.pady;
+    val padx = opts.padx;
+    val stridey = opts.stridey;
+    val stridex = opts.stridex;
     
     try {
       xDesc = new cudnnTensorDescriptor();
@@ -249,10 +249,10 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
     
     val h = opts.h;
     val w = opts.w;
-    val pady = opts.pad;
-    val padx = opts.pad;
-    val stridey = opts.stride;
-    val stridex = opts.stride;
+    val pady = opts.pady;
+    val padx = opts.padx;
+    val stridey = opts.stridey;
+    val stridex = opts.stridex;
     
     try {
       xDesc = new cudnnTensorDescriptor()
@@ -311,8 +311,10 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
 trait PoolingNodeOpts extends ModelNodeOpts {
 	var h:Int = 1;
 	var w:Int = 1;
-	var pad:Int = 1;
-	var stride:Int = 1;
+	var padx:Int = 1;
+	var pady:Int = 1;
+	var stridex:Int = 1;
+	var stridey:Int = 1;
 	var poolingMode:Int = cudnnPoolingMode.CUDNN_POOLING_MAX;
 	var poolingNaN:Int = cudnnNanPropagation.CUDNN_PROPAGATE_NAN;
 
@@ -320,8 +322,10 @@ trait PoolingNodeOpts extends ModelNodeOpts {
 		super.copyOpts(opts);
 		opts.h = h;
 		opts.w = w;
-		opts.pad = pad;
-		opts.stride = stride;
+		opts.padx = padx;
+		opts.pady = pady;
+		opts.stridex = stridex;
+		opts.stridey = stridey;
 		opts.poolingMode = poolingMode;
 		opts.poolingNaN = poolingNaN;
 		opts;
