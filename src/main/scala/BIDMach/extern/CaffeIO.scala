@@ -4,7 +4,6 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GS
 import BIDMat.MatFunctions._
 import BIDMach._
 import BIDMach.networks.layers._
-import java.util.Arrays
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import _root_.caffe.Caffe
@@ -171,10 +170,10 @@ object CaffeIO {
     }
     
     // Create a table of forward links
-    val downstreamNodes = new mutable.HashMap[NodeTerm,mutable.Buffer[NodeTerm]]
+    val downstreamNodes = new mutable.HashMap[Node,mutable.Buffer[Node]]
     for (node <- nodes) {
-      for (prevNode <- node.inputs) {
-        downstreamNodes.getOrElseUpdate(prevNode, new mutable.ArrayBuffer) += node
+      for (prevNode <- node.inputs.filter(_ != null)) {
+        downstreamNodes.getOrElseUpdate(prevNode.node, new mutable.ArrayBuffer) += node
       }
     }
     
@@ -194,6 +193,16 @@ object CaffeIO {
           
           hasBias = scaleNode.hasBias
         }
+        
+        Array.copy(bnNode.inputs, 0, combinedNode.inputs, 0, bnNode.inputs.length)
+        for (downstream <- downstreamNodes(scaleNode)) {
+          for (i <- 0 until downstream.inputs.length) {
+            if (downstream.inputs(i) == scaleNode) {
+              downstream.inputs(i) = combinedNode
+            }
+          }
+        }
+        
         newNodes += combinedNode
         skip += scaleNode
       } else if (!skip.contains(node)) {

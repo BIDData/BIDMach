@@ -1,0 +1,69 @@
+:silent
+import BIDMach.extern._
+import BIDMach.networks.layers._
+import java.io.FileReader
+
+val traindir = "../../data/MNIST/"
+
+val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
+val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
+val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
+val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
+
+val rp = randperm(60000);
+val train = train0(?,?,?,rp);
+val trainlabels = trainlabels0(?,rp);
+
+val mt = train.mean(irow(3));
+train ~ train - mt;
+test ~ test - mt;
+
+val (nn,opts) = Net.learner(train,trainlabels);
+
+val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
+
+
+opts.batchSize= 32
+opts.npasses = 10
+opts.lrate = 1e-4f 
+opts.texp = 0.1f
+opts.pstep = 0.1f
+opts.hasBias = true;
+//opts.lookahead = 0;
+opts.autoReset = false;
+opts.tensorFormat = Net.TensorNCHW;
+
+var f:FileReader = null
+var nodeSet:NodeSet = null
+try {
+  f = new FileReader("lenet_train_test_1.prototxt")
+  nodeSet = CaffeIO.mkNodeSetFromProtobuf(f)
+} finally {
+  if (f != null) {
+    f.close()
+  }
+}
+
+// XXX this appears to be missing support in the protobuf
+nodeSet(1).asInstanceOf[ConvNode].initv = 0.01f
+nodeSet(9).asInstanceOf[LinNode].initv = 4e-2f
+nodeSet(11).asInstanceOf[LinNode].initv = 1e-1f
+nodeSet(13).asInstanceOf[LinNode].initv = 1e-1f
+nodeSet(15).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
+
+
+
+opts.nodeset = nodeSet;
+val model = nn.model.asInstanceOf[Net];
+nn.train;
+
+val (mm, mopts) =  Net.predictor(model, test, testlabels);
+mopts.autoReset = false;
+
+val mmodel = mm.model.asInstanceOf[Net];
+mm.predict;
+
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+:silent
+
+
