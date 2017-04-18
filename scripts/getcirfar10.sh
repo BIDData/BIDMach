@@ -10,7 +10,7 @@ else
   alias wget='curl --retry 2 -O'
 fi
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
-cd ${BIDMACH_SCRIPTS}
+cd "${BIDMACH_SCRIPTS}"
 BIDMACH_SCRIPTS=`pwd`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 
@@ -28,3 +28,6 @@ if [ ! -e t10k-labels-idx1-ubyte ]; then
     rm -rf cifar-10-batches-bin
 fi
 
+echo "Processing CIFAR10 data"
+cd "${BIDMACH_SCRIPTS}"
+../bidmach processcifar10.ssc

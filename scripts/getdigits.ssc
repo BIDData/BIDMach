@@ -15,5 +15,5 @@ object DIGITS {
 }
 
 DIGITS.preprocess("","arabic")
-
+println("done");
 sys.exit

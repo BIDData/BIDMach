@@ -29,5 +29,5 @@ val test = sparse(ii(itest), jj(itest), vv(itest), nmovies, nusers);
 saveSMat(dir+"../train.smat.lz4", train);
 saveSMat(dir+"../test.smat.lz4", test);
 :silent
-
+println("done");
 sys.exit

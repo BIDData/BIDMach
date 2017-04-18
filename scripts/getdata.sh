@@ -1,35 +1,37 @@
 #!/bin/bash
 
-# This script should be run from the BIDMach/scripts directory
-
-BIDMACH_SCRIPTS="${BASH_SOURCE[0]}"
+BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
-  BIDMACH_SCRIPTS=`readlink -f "${BIDMACH_SCRIPTS}"`
-else 
-  while [ -L "${BIDMACH_SCRIPTS}" ]; do
-    BIDMACH_SCRIPTS=`readlink "${BIDMACH_SCRIPTS}"`
+  BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
+else
+  while [ -L "${BIDMACH_ROOT}" ]; do
+    BIDMACH_ROOT=`readlink "${BIDMACH_ROOT}"`
   done
 fi
-export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
-cd ${BIDMACH_SCRIPTS}
-BIDMACH_SCRIPTS=`pwd`
-BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
+BIDMACH_ROOT=`dirname "${BIDMACH_ROOT}"`
+BIDMACH_ROOT=`cd ${BIDMACH_ROOT}/..;pwd -P`
+BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed 's+/cygdrive/\(.\)+\1:+' )"
 
+cd "${BIDMACH_ROOT}/scripts"
 
-${BIDMACH_SCRIPTS}/getrcv1.sh
+./getrcv1.sh
 
-${BIDMACH_SCRIPTS}/getuci.sh nips
+./getuci.sh nips
 
-${BIDMACH_SCRIPTS}/getuci.sh nytimes
+./getuci.sh nytimes
+
+./getdigits.sh
+
+./getmovies.sh
+
+./getmnist.sh
+
+./getcifar10.sh
+
+./getmnist8m.sh
 
 # this one is huge, make sure you really want it
-# ${BIDMACH_SCRIPTS}/getuci.sh pubmed
-
-${BIDMACH_SCRIPTS}/getdigits.sh
-
-${BIDMACH_SCRIPTS}/getmovies.sh
-
-${BIDMACH_SCRIPTS}/getmnist8m.sh
+# ./getuci.sh pubmed
 
 
 

@@ -13,7 +13,7 @@ fi
 
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 cd ${BIDMACH_SCRIPTS}
-BIDMACH_SCRIPTS=`pwd`
+BIDMACH_SCRIPTS=`pwd -P`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 echo "Loading RCV1 v2 data"
 

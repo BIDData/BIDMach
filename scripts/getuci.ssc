@@ -13,6 +13,6 @@ object UCI {
 }
 
 UCI.preprocess("","")
-
+println("done");
 sys.exit
 

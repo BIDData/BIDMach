@@ -71,5 +71,5 @@ object RCV1 {
 }
 
 RCV1.prepare("data/rcv1/tokenized/")
-
-sys.exit
+println("done")
+System.exit(0)
