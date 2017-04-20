@@ -37,8 +37,8 @@ class StackedDS(val s1:DataSource, val s2:DataSource,
     val mats2 = s2.next;
     val fs1 = s1.asInstanceOf[FileSource];
     val fs2 = s2.asInstanceOf[FileSource];
-    if (fs1.fileno != fs2.fileno || fs1.rowno != fs2.rowno) {
-      throw new RuntimeException("Data source skew %d %d %d %d" format (fs1.fileno, fs2.fileno, fs1.rowno, fs2.rowno))
+    if (fs1.fileno != fs2.fileno || fs1.colno != fs2.colno) {
+      throw new RuntimeException("Data source skew %d %d %d %d" format (fs1.fileno, fs2.fileno, fs1.colno, fs2.colno))
     }
     for (i <- 0 until mats1.length) {
       omats(i) = mats1(i);

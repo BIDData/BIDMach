@@ -3,7 +3,7 @@
 val mdir = "../data/criteo/parts/"
 
 val (nn,opts) = GLM.learnerX(List(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4"));
-opts.nend = 80;
+opts.nend = 10;
 opts.lrate = 0.01f;
 opts.reg1weight = 1e-7f;
 opts.batchSize=5000;
@@ -12,7 +12,7 @@ opts.links = irow(1);
 //opts.pstep = 0.001f;
 opts.aopts = opts;
 opts.texp = 0.4f;
-opts.lookahead = 0;
+//opts.lookahead = 0;
 
 nn.train
 
