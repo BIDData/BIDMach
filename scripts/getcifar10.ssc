@@ -1,0 +1,56 @@
+:silent
+val inputdir = "../data/CIFAR10/";
+val outputdir = "../data/CIFAR10/parts/";
+val trainfname = "data_batch_%d.bin";
+val testfname = "test_batch.bin";
+val traindname = "train%d.fmat.lz4";
+val trainNCHWdname = "trainNCHW%d.fmat.lz4";
+val trainlabels = "labels%d.imat.lz4";
+val testdname = "test.fmat.lz4";
+val testNCHWdname = "testNCHW.fmat.lz4";
+val testlabels = "testlabels.imat.lz4";
+
+val nparts = 5;
+val nimages = 10000;
+val nimgbytes = 3 * 32 * 32;
+
+import java.io._
+
+val buffer = new Array[Byte](nimgbytes);
+val datamat = zeros(3\32\32\nimages);
+val labelmat = izeros(1, nimages);
+
+def getFile(fname:String, datamat:FMat, labelmat:IMat) {
+  val ds = new DataInputStream(new FileInputStream(fname));
+  for (j <- 0 until nimages) {
+    val label = ds.readByte();
+    labelmat(j) = label;
+    ds.readFully(buffer, 0, nimgbytes);
+    var k = 0;
+    while (k < nimgbytes) {
+      datamat.data(k + j * nimgbytes) = buffer(k) & 0xFF;
+      k += 1;
+    }
+  }
+  ds.close();
+}
+
+
+print("\nConverting CIFAR10");
+for (i <- 1 to nparts) {
+  getFile(inputdir + trainfname format i, datamat, labelmat);
+  saveFMat(outputdir+traindname format (i-1), datamat.fromNCHWtoNHWC);
+  saveFMat(outputdir+trainNCHWdname format (i-1), datamat);
+  saveFMat(outputdir+trainlabels format (i-1), labelmat);
+  print(".");
+}
+getFile(inputdir + testfname, datamat, labelmat);
+saveFMat(outputdir + testdname, datamat.fromNCHWtoNHWC);
+saveFMat(outputdir + testNCHWdname, datamat);
+saveFMat(outputdir + testlabels, labelmat);
+print(".");
+
+println();
+:silent
+println("Done");
+System.exit(0)
