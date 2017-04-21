@@ -17,7 +17,7 @@ BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )
 
 echo "Loading MNIST data"
 
-MNIST="${BIDMACH_SCRIPTS}/../data/MNIST"
+MNIST="${BIDMACH_SCRIPTS}/../../data/MNIST"
 mkdir -p ${MNIST}
 cd ${MNIST}
 
