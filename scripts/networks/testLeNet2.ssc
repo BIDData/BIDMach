@@ -27,6 +27,7 @@ opts.texp = 0.3f
 opts.pstep = 0.1f
 opts.hasBias = true;
 opts.tensorFormat = Net.TensorNCHW;
+//opts.autoReset = false;
 
 import BIDMach.networks.layers.Node._;
 
@@ -58,7 +59,7 @@ val model = nn.model.asInstanceOf[Net];
 nn.train;
 
 val (mm, mopts) =  Net.predictor(model, test, testlabels);
-mopts.batchSize = 100;
+mopts.batchSize = 64;
 val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 

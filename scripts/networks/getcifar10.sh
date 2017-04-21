@@ -16,7 +16,7 @@ BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )
 
 echo "Loading CIFAR10 data"
 
-CIFAR10="${BIDMACH_SCRIPTS}/../data/CIFAR10"
+CIFAR10="${BIDMACH_SCRIPTS}/../../data/CIFAR10"
 mkdir -p ${CIFAR10}/parts
 cd ${CIFAR10}
 
@@ -30,4 +30,4 @@ fi
 
 echo "Processing CIFAR10 data"
 cd "${BIDMACH_SCRIPTS}"
-../bidmach getcifar10.ssc
+../../bidmach getcifar10.ssc
