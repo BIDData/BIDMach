@@ -1,0 +1,90 @@
+import BIDMat.{CMat,CSMat,DMat,Dict,FMat,FND,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,HMat,IDict,Image,IMat,LMat,Mat,SMat,SBMat,SDMat,TMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMat.Solvers._
+import BIDMat.Plotting._
+import BIDMach.Learner
+import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
+import BIDMach.networks.{Net}
+import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
+import BIDMach.datasinks.{DataSink,MatSink}
+import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
+import BIDMach.causal.{IPTW}
+import BIDMach.allreduce.{Master,Worker,Command}
+import BIDMach.networks.SeqToSeq
+
+Mat.checkMKL(false)
+Mat.checkCUDA
+Mat.useCache = false
+Mat.useGPUcache = true
+
+val defaultmodeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/dist_model_10pass"
+val modeldir = sys.env.get("WORKER_MODEL_DIR") match {
+  case Some(mdir0) => {
+    println("Using WORKER_MODEL_DIR=%s" format mdir0)
+    mdir0
+  }
+  case None => {
+    println("Using default model dir: %s" format defaultmodeldir)
+    defaultmodeldir
+  }
+}
+val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
+
+val src = loadMat(datadir+"train.src_grapheme.shuf.smat.lz4")
+val dst = loadMat(datadir+"train.dst_phoneme.shuf.smat.lz4")
+
+val (nn, opts) = SeqToSeq.learner(src, dst)
+val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
+
+opts.lrate = 0.05f
+opts.nvocabIn = 31
+opts.nvocabOut = 43
+opts.npasses = 10
+opts.height = 2
+opts.dim = 512
+opts.batchSize = 64
+
+opts.checkPointInterval = 1f
+opts.checkPointFile = modeldir+"model512_te0.3_%02d/"
+opts.kind = 1
+opts.netType = 0
+opts.scoreType = 0
+opts.inwidth = 22
+opts.outwidth = 20
+opts.hasBias = true
+opts.pstep = 0.0001f
+opts.cumScore = 3
+opts.PADsym = 1
+opts.OOVsym = 2
+opts.STARTsym = 0
+opts.texp = 0.3f
+
+val w = new Worker()
+val wopts = w.opts
+wopts.trace = 1
+wopts.machineTrace = 0
+wopts.configTimeout = 3000
+wopts.reduceTimeout = 3000
+wopts.sendTimeout = 1000
+wopts.recvTimeout = 1000
+wopts.cmdTimeout = 1000
+
+val numWorkers = 4
+wopts.doElastic = true
+wopts.elasticAlpha = 0.9 / numWorkers
+
+val customCommandPortStr = sys.env.get("WORKER_CMD_PORT")
+customCommandPortStr match {
+  case Some(portStr) => {
+    val port = portStr.toInt
+    println("Using WORKER_CMD_PORT=%d" format port)
+    wopts.commandSocketNum = port
+    wopts.responseSocketNum = port + 1
+    wopts.peerSocketNum = port + 2
+  }
+  case None => {}
+}
+
+w.start(nn)

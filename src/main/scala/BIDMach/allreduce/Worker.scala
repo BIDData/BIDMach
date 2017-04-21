@@ -50,6 +50,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
 	  intp = new ScriptEngineManager().getEngineByName("scala");
+	  if (opts.trace > 0) log(s"Worker started on ${workerIP.toString}")
 	}
 
   def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress],

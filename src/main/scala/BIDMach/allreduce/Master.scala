@@ -113,7 +113,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   }
   
   def startUpdates(waitForAck:Boolean = false, logLocation:String = null) {
-	finishedReducers = 0
+    finishedReducers = 0
     reducerMap = new MutableHashMap[Int, Reducer]()
     reduceTaskMap = new MutableHashMap[Int, Future[_]]()
     for (i <- 0 until numModelMats) { // TODO: use modelMat names instead of idx
@@ -315,14 +315,14 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       return allreduceSuccess + allreduceFailure
     }
 
-	def allreduceReset:Unit = {
+	def resetAllreduceCounters:Unit = {
 	  this.synchronized {
 	    allreduceSuccess = 0
 	    allreduceFailure = 0
 	  }
 	}
 
-    def run() {
+    def configureLogStream:Unit = {
       if (logLocation != null) {
 	logLocation = logLocation format (matTag)
 	val logFile = new File(logLocation)
@@ -333,6 +333,23 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	setThreadLogStream(logFileStream)
 	setThreadLogStream(logFileStream, matTag)
       }
+    }
+
+    def waitForOtherReducers:Unit = {
+      master.synchronized {
+        finishedReducers += 1
+        if (finishedReducers >= numModelMats) {
+          round += 1
+          finishedReducers = 0
+          master.notifyAll()
+        } else {
+          master.wait()
+        }
+      }
+    }
+
+    def run() {
+      configureLogStream
 
       try {
 	if (waitForAck) {
@@ -355,7 +372,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  } else {
 	    new AllreduceCommand(round, 0, limit, matTag)
 	  }
-	  allreduceReset
+	  resetAllreduceCounters
 
 	  if (opts.trace > 1) log("%s: Starting round %d\n" format(matTag, round))
 	  broadcastCommand(cmd)
@@ -364,19 +381,13 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
 	  this.synchronized {
 	    this.wait(opts.timeThresholdMsec)
 	  }
-	  if (opts.trace > 1) log("%s: Finished round %d, workers %d/%d, %d success, time %dms\n" format(
-	    matTag, round, allreduceCollected, M, allreduceSuccess, System.currentTimeMillis - allreduceStartTime))
-
-	  master.synchronized {
-		finishedReducers += 1
-		if (finishedReducers >= numModelMats) {
-		  round += 1
-		  finishedReducers = 0
-		  master.notifyAll()
-		} else {
-		  master.wait()
-		}
+	  if (opts.trace > 1) {
+	    log("%s: Finished round %d, workers %d/%d, %d success, time %dms\n" format(
+	      matTag, round, allreduceCollected, M, allreduceSuccess,
+	      System.currentTimeMillis - allreduceStartTime))
 	  }
+
+	  waitForOtherReducers
 	}
       } catch {
 	case e:InterruptedException => {
@@ -386,7 +397,7 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
       }
     }
   }
-  
+
     
   def stop = {
     listener.stop = true;
@@ -600,6 +611,7 @@ object Master {
     var machineThreshold = 0.75;
     var minWaitTime = 3000;
     var timeThresholdMsec = 5000;
+    var softmaxReduce = false
   }
 	
 	class Options extends Opts {} 

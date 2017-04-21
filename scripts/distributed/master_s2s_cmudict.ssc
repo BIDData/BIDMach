@@ -1,0 +1,177 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+import BIDMach.networks.SeqToSeq
+import BIDMat.JSON
+
+var addresses:Array[InetSocketAddress] = null
+val customLocalWorkerPortsStr = sys.env.get("MASTER_LOCAL_WORKER_PORTS")
+println("####################")
+customLocalWorkerPortsStr match {
+  case Some(workerPortsStr) => {
+    addresses = workerPortsStr.split(",").map(_.toInt).map(new InetSocketAddress("0.0.0.0", _))
+    println("Using local worker addresses:")
+  }
+  case None => {
+    addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+      map(InetAddress.getByName(_).getHostAddress()).
+      map(new InetSocketAddress(_, 50050)).toArray
+    println("Using spark slaves:")
+  }
+}
+for (a <- addresses) println(a)
+println("####################")
+
+val m = new Master()
+val opts = m.opts
+opts.trace = 2
+opts.intervalMsec = 2000
+opts.limit = Int.MaxValue
+opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
+
+opts.machineThreshold = 0.75;
+opts.minWaitTime = 4500;
+opts.timeThresholdMsec = 6000;
+
+val nmachines = addresses.length
+val gmods = irow(nmachines)
+val gmachines = irow(0->nmachines)
+
+m.init
+m.config(gmods, gmachines, addresses, 7)
+m.setMachineNumbers
+m.sendConfig
+
+
+// m.parCall((w) => {
+//   var learnSource = w.learner.datasource.asInstanceOf[MatSource]
+//   var totalNumSamples = learnSource.mats(0).ncols
+//   var numWorkers = 4 // TODO: don't hardcode this
+//   var workerNumSamples = totalNumSamples / numWorkers
+//
+//   var batchsize = 64
+//   var nstart = (w.imach*workerNumSamples)
+//   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1)
+//   nstart = nstart - (nstart % 64)
+//   nend = nend - (nend % 64)
+//
+//   learnSource.mats(0) = learnSource.mats(0)(?, nstart->nend)
+//   learnSource.mats(1) = learnSource.mats(1)(?, nstart->nend)
+//   learnSource.init
+//   "imach: %d, nstart: %d, nend: %d, elastic: %b, alpha: %f\n" format (
+//     w.imach, nstart, nend, w.opts.doElastic, w.opts.elasticAlpha)
+// })
+//
+// m.startLearners(blocking = true)
+// m.startUpdates(logLocation = "/opt/BIDMach/logs/master_s2s_cmudict/%s.log")
+//
+
+/*Later*/
+
+
+// m.parCall((w) => {
+//   w.model = SeqToSeq.load("/mnt/BIDMach/data/phonetisaurus-cmudict-split/dist_model_10passmodel512_te0.3_00/")
+//   "done"
+// })
+//
+
+// val mopts = m.parCall((w) => {
+//   JSON.toJSON(w.model.opts, true)
+// }).map(_.asInstanceOf[String])
+// val mmats = m.parCall((w) => {
+//   w.model.modelmats
+// }).map(_.asInstanceOf[Array[Mat]])
+//
+// var numWorkers = 4
+// val wmodels = new Array[SeqToSeq](numWorkers + 1)
+// for (i <- 0 until numWorkers) {
+//   wmodels(i) = new SeqToSeq
+//   val mm = wmodels(i)
+//   mm.setmodelmats(mmats(i))
+//   mm.opts.copyFrom(JSON.fromJSON(mopts(i)).asInstanceOf[BIDMat.Opts])
+// }
+//
+// // Compute average model
+// wmodels(numWorkers) = new SeqToSeq
+// val mmavg = wmodels(numWorkers)
+//
+// val avgmodelmats = new Array[Mat](mmats(0).length)
+// for (mi <- 0 until avgmodelmats.length) {
+//   avgmodelmats(mi) = mmats(0)(mi).zeros(mmats(0)(mi).nrows, mmats(0)(mi).ncols)
+// }
+// for (wi <- 0 until numWorkers) {
+//   for (mi <- 0 until avgmodelmats.length) {
+//     avgmodelmats(mi) ~ avgmodelmats(mi) + mmats(wi)(mi)
+//   }
+// }
+// for (mi <- 0 until avgmodelmats.length) {
+//   avgmodelmats(mi) ~ avgmodelmats(mi) / numWorkers
+// }
+// mmavg.setmodelmats(avgmodelmats)
+// mmavg.opts.copyFrom(JSON.fromJSON(mopts(0)).asInstanceOf[BIDMat.Opts])
+//
+
+// import util.control.Breaks._
+// def calcWER(preds:IMat, dst:IMat):(Int, Float) = {
+//   var error = 0
+//   for (j <- 0 until preds.ncols) {
+//     breakable {
+//       for (i <- 0 until preds.nrows) {
+//         if (preds(i, j) == 1) {
+//           if (dst(i, j) > 1) error += 1 // early prediction termination
+//           break
+//         } else if (preds(i, j) != dst(i, j)) {
+//           error += 1
+//           break
+//         }
+//       }
+//     }
+//   }
+//   (error, error.toFloat/preds.ncols)
+// }
+//
+
+
+// val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
+// val preddir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/pred/"
+//
+// var src = loadMat(datadir+"valid.src_grapheme.shuf.smat.lz4")
+// var dst = loadMat(datadir+"valid.dst_phoneme.shuf.smat.lz4")
+//
+// val accs = zeros(wmodels.length, 1)
+// for (wi <- 0 until wmodels.length) {
+//   val model = wmodels(wi)
+//   val (nn, opts) = SeqToSeq.predict(model, src)
+//   val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
+//
+//   opts.nvocabIn = 31
+//   opts.nvocabOut = 43
+//   opts.height = 2
+//   opts.dim = 512
+//   opts.batchSize = 64
+//
+//   opts.kind = 1
+//   opts.netType = 0
+//   opts.scoreType = 0
+//   opts.inwidth = 22
+//   opts.outwidth = 20
+//   opts.hasBias = true
+//   opts.pstep = 0.0001f
+//   opts.cumScore = 3
+//   opts.PADsym = 1
+//   opts.OOVsym = 2
+//   opts.STARTsym = 0
+//
+//   nn.predict
+//
+//   val preds = IMat(nn.preds(0))
+//
+//   val WER = calcWER(preds, IMat(full(dst)))
+//   println(wi, WER)
+//   accs(wi, 0) = WER._2
+// }
+//
+// val (bestacc, bestidx) = mini2(accs, 1)
+// println(s"Best acc: ${bestacc}")
+// println(s"Best idx: ${bestidx}")
+//
