@@ -45,6 +45,11 @@ object CaffeIO {
               stride = irow(convParam.getStrideList().map(_.intValue()).toList)
             }
             dilation = irow(convParam.getDilationList().map(_.intValue()).toList)
+            
+            // BIDMach (currently) only supports xavier initialization
+            if (convParam.getWeightFiller().getType() != "xavier") {
+              throw new NotImplementedError("Only xavier initialization is currently implemented for convolution layers")
+            }
           }
         }
         case "Pooling" => {

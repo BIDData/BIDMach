@@ -45,9 +45,6 @@ try {
 }
 
 // XXX this appears to be missing support in the protobuf
-nodeSet(1).asInstanceOf[ConvNode].initv = 0.01f
-nodeSet(5).asInstanceOf[LinNode].initv = 3e-2f
-nodeSet(7).asInstanceOf[LinNode].initv = 5e-2f
 nodeSet(9).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
 
 
