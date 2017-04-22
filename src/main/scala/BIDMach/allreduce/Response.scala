@@ -64,15 +64,16 @@ class WorkerProgressResponse(round0:Int, src0:Int, bandwidth0:Bandwidth, bytes:A
   }
 
   def this(bandwidth0:Bandwidth, bytes:Array[Byte]) = {
-    this(0, 0, null, bytes);
+    this(0, 0, bandwidth0, bytes);
   }
 
-  override def encode ():Unit = { }
+  override def encode () { }
 
-  override def decode():Unit = {
+  override def decode() {
     val in = new ByteArrayInputStream(bytes);
     val input = new ObjectInputStream(in);
     bandwidth = input.readObject;
+    me.log("bandwidth read");
     input.close;
   }
 }
