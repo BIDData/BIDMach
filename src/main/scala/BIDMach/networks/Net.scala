@@ -132,41 +132,51 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	}
   }
   
+  def forward:Int = {
+		  if (mask.asInstanceOf[AnyRef] != null) {
+			  modelmats(0) ~ modelmats(0) ∘ mask;
+		  }
+		  var i = 0;
+		  while (i < layers.length) {
+			  if (opts.debug > 0) {
+				  println("dobatch forward %d %s" format (i, layers(i).getClass))
+			  }
+			  layers(i).forward;
+			  i += 1;
+		  }
+		  i;
+  }
+  
+  def backward(nl:Int, ipass:Int, pos:Long) = {
+    var i = nl;
+    var j = 0;
+    while (j < output_layers.length) {
+    	output_layers(j).deriv.set(1);
+    	j += 1;
+    }
+    if (opts.aopts == null) {
+    	for (j <- 0 until updatemats.length) updatemats(j).clear;
+    }
+    while (i > 1) {
+    	i -= 1;
+    	if (opts.debug > 0) {
+    		println("dobatch backward %d %s" format (i, layers(i).getClass))
+    	}
+    	layers(i).backward(ipass, pos);
+    }
+    if (mask.asInstanceOf[AnyRef] != null) {
+    	updatemats(0) ~ updatemats(0) ∘ mask;
+    }
+  }
+  
   
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
     	assignInputs(gmats, ipass, pos);
     	assignTargets(gmats, ipass, pos);
-    	if (mask.asInstanceOf[AnyRef] != null) {
-    		modelmats(0) ~ modelmats(0) ∘ mask;
-    	}
-    	var i = 0;
-    	while (i < layers.length) {
-    		if (opts.debug > 0) {
-  		    println("dobatch forward %d %s" format (i, layers(i).getClass))
-  		  }
-    		layers(i).forward;
-    		i += 1;
-    	}
-      var j = 0;
-      while (j < output_layers.length) {
-    	  output_layers(j).deriv.set(1);
-    	  j += 1;
-      }
-      if (opts.aopts == null) {
-    	  for (j <- 0 until updatemats.length) updatemats(j).clear;
-      }
-    	while (i > 1) {
-    		i -= 1;
-    		if (opts.debug > 0) {
-  		    println("dobatch backward %d %s" format (i, layers(i).getClass))
-  		  }
-    		layers(i).backward(ipass, pos);
-    	}
-    	if (mask.asInstanceOf[AnyRef] != null) {
-    		updatemats(0) ~ updatemats(0) ∘ mask;
-    	}
+    	val nl = forward;
+    	backward(nl, ipass, pos);
     }
   }
   

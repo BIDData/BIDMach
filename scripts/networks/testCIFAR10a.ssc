@@ -11,7 +11,7 @@ val (nn,opts) = Net.learner(trainfname,labelsfname);
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
-opts.batchSize= 64
+opts.batchSize= 32
 opts.npasses = 10
 opts.lrate = 1e-3f 
 opts.lrate = 1e-4f
