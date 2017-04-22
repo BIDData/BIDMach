@@ -120,15 +120,14 @@ object Command {
   }
 }
 
-//TODO
 class WorkerProgressCommand(
-    round0:Int, dest0:Int, obj0:AnyRef, bytes:Array[Byte])
+    round0:Int, dest0:Int, obj0:WorkerProgress, bytes:Array[Byte])
   extends Command(
     Command.workerProgressCtype, round0, dest0, bytes.size, bytes, bytes.size) {
 
-  var obj:AnyRef = obj0;
+  var obj:WorkerProgress = obj0;
 
-  def this(round0:Int, dest0:Int, obj0:AnyRef) = {
+  def this(round0:Int, dest0:Int, obj0:WorkerProgress) = {
     this(round0, dest0, obj0, {
       val out  = new ByteArrayOutputStream()
       val output = new ObjectOutputStream(out)
@@ -138,19 +137,18 @@ class WorkerProgressCommand(
     });
   }
 
-  override def encode():Unit = {}
+  override def encode() {}
 
-  override def decode():Unit = {
+  override def decode() {
     val in = new ByteArrayInputStream(bytes);
     val input = new ObjectInputStream(in);
-    obj = input.readObject.asInstanceOf[Bandwidth];
+    obj = input.readObject.asInstanceOf[WorkerProgress];
     input.close;
   }
 
   override def toString():String = {
     "Command %s, length %d words, machine %d" format (Command.names(ctype), clen, dest);
   }
-
 }
 
 

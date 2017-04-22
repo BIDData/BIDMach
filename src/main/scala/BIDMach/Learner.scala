@@ -16,7 +16,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.util.ArrayList
-import edu.berkeley.bid.comm._ //Machine and Bandwidth
+import edu.berkeley.bid.comm._ //Machine and WorkerProgress
 
 /**
  *  Basic sequential Learner class with a single datasource
@@ -50,10 +50,10 @@ case class Learner(
   var cacheGPUstate = false;
   var debugMemState = false;
 
-  var sentSockHistory:Bandwidth = null;
-  var recvSockHistory:Bandwidth = null;
-  var prevSentBandwidth = 0;
-  var prevRecvBandwidth = 0;
+  var sentSockHistory:WorkerProgress = null;
+  var recvSockHistory:WorkerProgress = null;
+  var prevSentWorkerProgress = 0;
+  var prevRecvWorkerProgress = 0;
   var prevTimeStamp : Long = 0;
 
   def setup = {
@@ -172,17 +172,17 @@ case class Learner(
         }
         //println;
 
-        var sentBandwidthIncrement = sentSockHistory.totalSize - prevSentBandwidth;
-        var recvBandwidthIncrement = recvSockHistory.totalSize - prevRecvBandwidth;
-        prevSentBandwidth = sentSockHistory.totalSize;
-        prevRecvBandwidth = recvSockHistory.totalSize;
+        var sentWorkerProgressIncrement = sentSockHistory.totalSize - prevSentWorkerProgress;
+        var recvWorkerProgressIncrement = recvSockHistory.totalSize - prevRecvWorkerProgress;
+        prevSentWorkerProgress = sentSockHistory.totalSize;
+        prevRecvWorkerProgress = recvSockHistory.totalSize;
         var currTimeStamp : Long = System.currentTimeMillis;
         var spentTime =currTimeStamp - prevTimeStamp; // in ms
         prevTimeStamp = currTimeStamp;
 
         print(" Sent: %.2f MB/s, Recv: %.2f MB/s" format (
-          sentBandwidthIncrement/1024.0/1024/(spentTime/1000.0),
-          recvBandwidthIncrement/1024.0/1024/(spentTime/1000.0))
+          sentWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0),
+          recvWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0))
         )
         println;
 
@@ -275,17 +275,17 @@ case class Learner(
             }
         //println
 
-        var sentBandwidthIncrement = sentSockHistory.totalSize - prevSentBandwidth;
-        var recvBandwidthIncrement = recvSockHistory.totalSize - prevRecvBandwidth;
-        prevSentBandwidth = sentSockHistory.totalSize;
-        prevRecvBandwidth = recvSockHistory.totalSize;
+        var sentWorkerProgressIncrement = sentSockHistory.totalSize - prevSentWorkerProgress;
+        var recvWorkerProgressIncrement = recvSockHistory.totalSize - prevRecvWorkerProgress;
+        prevSentWorkerProgress = sentSockHistory.totalSize;
+        prevRecvWorkerProgress = recvSockHistory.totalSize;
         var currTimeStamp : Long = System.currentTimeMillis;
         var spentTime =currTimeStamp - prevTimeStamp; // in ms
         prevTimeStamp = currTimeStamp;
 
         print(" Sent: %.2f MB/s, Recv: %.2f MB/s" format (
-          sentBandwidthIncrement/1024.0/1024/(spentTime/1000.0),
-          recvBandwidthIncrement/1024.0/1024/(spentTime/1000.0))
+          sentWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0),
+          recvWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0))
         )
           println;
 
