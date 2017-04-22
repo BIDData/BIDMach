@@ -297,8 +297,10 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
       while(!stop){
         //loop and send workerprogress to master, every 2 seconds
         Thread.sleep(2000);
-        val progressResp = new WorkerProgressResponse(learner.sentSockHistory);
-        sendMaster(progressResp);
+        if( null != masterSocketAddr){
+          val progressResp = new WorkerProgressResponse(learner.sentSockHistory);
+          sendMaster(progressResp);
+        }
       }
     }
 
