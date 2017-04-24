@@ -147,8 +147,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 		  i;
   }
   
-  def backward(nl:Int, ipass:Int, pos:Long) = {
-    var i = nl;
+  def backward(ipass:Int = 0, pos:Long = 0) {
+    var i = layers.length;
     var j = 0;
     while (j < output_layers.length) {
     	output_layers(j).deriv.set(1);
@@ -175,8 +175,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
     	assignInputs(gmats, ipass, pos);
     	assignTargets(gmats, ipass, pos);
-    	val nl = forward;
-    	backward(nl, ipass, pos);
+    	forward;
+    	backward(ipass, pos);
     }
   }
   
