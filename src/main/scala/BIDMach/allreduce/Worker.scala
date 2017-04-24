@@ -50,7 +50,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     groups = new Groups(M, gmods.data, gridmachines.data, 0);
     workers = workers0;
     if (machine != null) machine.stop;
-    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers);
+    machine = new Machine(null, groups, imach, M, opts.useLong, opts.bufsize, false, opts.machineTrace, opts.replicate, workers.map(x => x.toString()));
     machine.configTimeout = opts.configTimeout;
     machine.reduceTimeout = opts.reduceTimeout;
     machine.sendTimeout = opts.sendTimeout;
