@@ -59,13 +59,14 @@ void strtolower(char * str) {
 int checkword(char * str, strhash &htab, ivector &wcount, ivector &tokens, unhash &unh) {
   strtolower(str);
   int userno;
-  if (htab.count(str)) {
+  if (htab.count(str) > 0) {
     userno = htab[str];
-    wcount[userno-1]++;
+    wcount[userno]++;
   } else {
     try {
       char * newstr = new char[strlen(str)+1];
       strcpy(newstr, str);
+      userno = wcount.size();
       wcount.push_back(1);
       unh.push_back(newstr);
       userno = unh.size();
