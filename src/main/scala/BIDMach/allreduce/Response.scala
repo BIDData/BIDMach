@@ -72,7 +72,7 @@ class WorkerProgressResponse(round0:Int, src0:Int, progress0:WorkerProgress, byt
   override def decode() {
     val in = new ByteArrayInputStream(bytes);
     val input = new ObjectInputStream(in);
-    bandwidth = input.readObject.asInstanceOf[Bandwidth];
+    progress = input.readObject.asInstanceOf[WorkerProgress];
     input.close;
   }
 }

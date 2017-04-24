@@ -122,6 +122,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	}
 
   def stop = {
+    log ("Worker Stopping ... \n")
     listener.stop = true;
     listenerTask.cancel(true);
     progressRecorder.stop = true;
@@ -296,16 +297,15 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 //      start();
       while(!stop){
         //loop and send workerprogress to master, every 2 seconds
-        Thread.sleep(2000);
+        Thread.sleep(5000);
         if( null != masterSocketAddr){
+          log ("Sending progress to master...\n");
           val progressResp = new WorkerProgressResponse(learner.sentSockHistory);
           sendMaster(progressResp);
         }
       }
     }
 
-//    def stop() {
-//    }
   }
 }
 
