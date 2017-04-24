@@ -287,7 +287,7 @@ class Master(override val opts: Master.Opts = new Master.Options) extends Host {
         val newresp = new WorkerProgressResponse(null, resp.bytes);
         newresp.decode;
         if(null != newresp.workerProgress) {
-          newresp.workerProgress.printRecords();
+          log(newresp.workerProgress.toString());
         }else{
           log("workerProgress is null");
         }

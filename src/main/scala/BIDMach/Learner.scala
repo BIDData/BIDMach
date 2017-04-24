@@ -50,11 +50,7 @@ case class Learner(
   var cacheGPUstate = false;
   var debugMemState = false;
 
-  var sentSockHistory:WorkerProgress = null;
-  var recvSockHistory:WorkerProgress = null;
-  var prevSentWorkerProgress = 0;
-  var prevRecvWorkerProgress = 0;
-  var prevTimeStamp : Long = 0;
+  var workerProgress:WorkerProgress = null;
 
   def setup = {
 	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
@@ -172,19 +168,8 @@ case class Learner(
         }
         //println;
 
-        var sentWorkerProgressIncrement = sentSockHistory.totalSize - prevSentWorkerProgress;
-        var recvWorkerProgressIncrement = recvSockHistory.totalSize - prevRecvWorkerProgress;
-        prevSentWorkerProgress = sentSockHistory.totalSize;
-        prevRecvWorkerProgress = recvSockHistory.totalSize;
-        var currTimeStamp : Long = System.currentTimeMillis;
-        var spentTime =currTimeStamp - prevTimeStamp; // in ms
-        prevTimeStamp = currTimeStamp;
-
-        print(" Sent: %.2f MB/s, Recv: %.2f MB/s" format (
-          sentWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0),
-          recvWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0))
-        )
-        println;
+        workerProgress.addTimestamp(System.currentTimeMillis);
+        log(workerProgress.toString());
 
         lasti = reslist.length;
       }
@@ -275,19 +260,9 @@ case class Learner(
             }
         //println
 
-        var sentWorkerProgressIncrement = sentSockHistory.totalSize - prevSentWorkerProgress;
-        var recvWorkerProgressIncrement = recvSockHistory.totalSize - prevRecvWorkerProgress;
-        prevSentWorkerProgress = sentSockHistory.totalSize;
-        prevRecvWorkerProgress = recvSockHistory.totalSize;
-        var currTimeStamp : Long = System.currentTimeMillis;
-        var spentTime =currTimeStamp - prevTimeStamp; // in ms
-        prevTimeStamp = currTimeStamp;
+        workerProgress.addTimestamp(System.currentTimeMillis)
+        log(workerProgress.toString())
 
-        print(" Sent: %.2f MB/s, Recv: %.2f MB/s" format (
-          sentWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0),
-          recvWorkerProgressIncrement/1024.0/1024/(spentTime/1000.0))
-        )
-          println;
 
         lasti = reslist.length
       }
