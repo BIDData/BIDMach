@@ -1,6 +1,11 @@
 #include <jni.h>
 #include <omp.h>
 #include <math.h>
+#include <stdlib.h>
+
+#ifdef __GNUC__
+#define __forceinline __attribute__((always_inline)) inline
+#endif
 
 JNIEXPORT void JNICALL Java_edu_berkeley_bid_CPUMACH_word2vecPos
 (JNIEnv *env, jobject obj, jint nrows, jint ncols, jint skip, jintArray jW, jintArray jLB, jintArray jUB,

@@ -42,15 +42,24 @@ elif [ "$ARCH" = "amd64" ] || [ "$ARCH" = "x86_64" ] ; then
     MBITS="64"
 elif [[ "$ARCH" == armv7* ]] ; then
     ARCH="arm"
-    ARMARCH="armv7-a"
+    ARMFLAGS="-marm -march=armv7-a -mfloat-abi=hard"
     MBITS=32
-elif [ "$ARCH" = "aarch64" ] ; then
-    ARCH="arm"
-    MBITS=32
-    ARMARCH="armv8-a"
+elif [[ "$ARCH" == "aarch64" ]] ; then
+    ARCH="aarch64"
+    MBITS=64
+    
+    gcc cpuid_arm64.c -o cpuid_arm64 >/dev/null
+    if [[ $? -ne 0 ]]; then
+        echo 'failed to compile cpuid_arm64, aborting' && exit 1
+    fi
+    if [[ $(./cpuid_arm64) == "CORTEXA57" ]]; then
+        ARMFLAGS="-march=armv8-a+crc+crypto+fp+simd -mtune=cortex-a57"
+    else
+        ARMFLAGS="-march=armv8-a"
+    fi
 else
-	echo "ARCH not supported"
-	exit 1
+    echo "ARCH not supported"
+    exit 1
 fi
 
 echo "Creating config for $OS $ARCH"
@@ -117,20 +126,18 @@ if [ "$OS" = "apple" ] ; then
     INSTALL_DIR="${BIDMACH_ROOT}/src/main/resources/lib"
     CUDA_LIBS="-L${CUDA_HOME}/lib -L${LIBDIR} -lcudart -lcublas"
 elif [ "$OS" = "linux" ] ; then
-    if [ "$ARCH" = "arm" ] ; then
+    if [ "$ARCH" = "arm" ] || [[ "$ARCH" = "aarch64" ]] ; then
 	RANDSRC="RAND"
-	if [ "$QSML_ROOT" != "" ]; then
-	    BLAS_INCLUDE="-I$QSML_ROOT/include"
-	    BLAS_LIB="-L$QSML_ROOT/lib -lQSML -lsymphony-cpu"
-	else
-	    if [ "$OPENBLAS_ROOT" != "" ]; then
-		BLAS_INCLUDE="-I$OPENBLAS_ROOT/include"
-		BLAS_LIB="-L$OPENBLAS_ROOT/lib -lopenblas"
-	    else
-		BLAS_INCLUDE="-I/usr/local/include"
-		BLAS_LIB="-L/usr/local/lib -lopenblas"
-	    fi
-	fi
+        if [ "$QSML_ROOT" != "" ]; then
+            BLAS_INCLUDE="-I$QSML_ROOT/include"
+            BLAS_LIB="-L$QSML_ROOT/lib -lQSML -lsymphony-cpu"
+        elif [ "$OPENBLAS_ROOT" != "" ]; then
+            BLAS_INCLUDE="-I$OPENBLAS_ROOT/include"
+            BLAS_LIB="-L$OPENBLAS_ROOT/lib -lopenblas"
+        else
+            BLAS_INCLUDE="-I/usr/local/include"
+            BLAS_LIB="-L/usr/local/lib -lopenblas"
+        fi
 	if [ "$JAVA_HOME" = "" ]; then
 	    JAVA_HOME="/usr/java/default"
 	fi
@@ -140,14 +147,18 @@ elif [ "$OS" = "linux" ] ; then
 	CC="gcc"
 	GCC="g++"
 	NVCC="nvcc" 
-	NVCCFLAGS="-c -use_fast_math  -I$BIDMACH_ROOT/jni/include \
-          -gencode arch=compute_32,code=sm_32 \
-          -gencode arch=compute_53,code=sm_53 \
-          --machine ${MBITS}  -Xcompiler \"-fPIC -c -O2 -g -march=${ARMARCH} -DNDEBUG\""
+        if [[ "$ARCH" = "arm" ]]; then
+            NVARCH="-gencode arch=compute_32,code=sm_32"
+        else
+            NVARCH="-gencode arch=compute_53,code=sm_53 \
+                    -gencode arch=compute_53,code=compute_53"
+        fi
+	NVCCFLAGS="-c -use_fast_math  -I$BIDMACH_ROOT/jni/include ${NVARCH} \
+          --machine ${MBITS}  -Xcompiler \"-fPIC -c -O2 -g ${ARMFLAGS} -DNDEBUG\""
 	OBJ="o"
 	OUTFLG="-o "
-	CPPFLAGS="-fPIC -std=c++11 -marm -mfloat-abi=hard -march=${ARMARCH} -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include ${BLAS_INCLUDE}"
-	CFLAGS="-fPIC -fopenmp -marm -mfloat-abi=hard -march=${ARMARCH} -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include ${BLAS_INCLUDE}"
+	CPPFLAGS="-fPIC -std=c++11 ${ARMFLAGS} -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include ${BLAS_INCLUDE}"
+	CFLAGS="-fPIC -fopenmp ${ARMFLAGS} -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include ${BLAS_INCLUDE}"
 	LB="ar rc"    
 	GLD="g++ -shared"
 	LD="gcc -shared -z noexecstack"
@@ -168,7 +179,7 @@ elif [ "$OS" = "linux" ] ; then
 	fi
 	LIBDIR="${BIDMACH_ROOT}/lib"
 	INSTALL_DIR="${BIDMACH_ROOT}/src/main/resources/lib"
-	CUDA_LIBS="-L${CUDA_HOME}/lib -L${LIBDIR} -lcudart -lcublas"
+	CUDA_LIBS="-L${CUDA_HOME}/${CULIB} -L${LIBDIR} -lcudart -lcublas"
 else
 	BLAS_ROOT="/opt/intel/mkl"
 	if [ "$JAVA_HOME" = "" ]; then

@@ -81,6 +81,19 @@
       </properties>
     </profile>
     <profile>
+      <id>linux_aarch64</id>
+      <activation>
+      	<os>
+          <family>unix</family>
+          <arch>aarch64</arch>
+          <name>!mac os x</name> <!--https://issues.apache.org/jira/browse/MNG-4983-->
+      	</os>
+      </activation>
+      <properties>
+        <osarch>linux-aarch64</osarch>
+      </properties>
+    </profile>
+    <profile>
       <id>gpu</id>
       <activation>
         <property>
@@ -238,6 +251,7 @@
           </execution>
         </executions>
         <configuration>
+          <recompileMode>incremental</recompileMode>
           <jvmArgs>
             <jvmArg>-Xmx12g</jvmArg>
           </jvmArgs>
