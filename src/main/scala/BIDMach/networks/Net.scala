@@ -180,6 +180,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
   }
   
+  // no backward pass
   def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
   	if (batchSize < 0) batchSize = gmats(0).ncols;
   	if (batchSize == gmats(0).ncols) { 
