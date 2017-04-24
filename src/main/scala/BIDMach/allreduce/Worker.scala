@@ -73,8 +73,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     machine.recvTimeout = opts.recvTimeout;
     machine.sockBase = opts.peerSocketNum;
     machine.start(machine.maxk);
-    learner.sentSockHistory = machine.sentSockHistory;
-    learner.recvSockHistory = machine.recvSockHistory;
+    learner.workerProgress = machine.workerProgress;
     intp.put("$imach", imach);
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
@@ -300,7 +299,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
         Thread.sleep(5000);
         if( null != masterSocketAddr){
           log ("Sending progress to master...\n");
-          val progressResp = new WorkerProgressResponse(learner.sentSockHistory);
+          val progressResp = new WorkerProgressResponse(learner.workerProgress);
           sendMaster(progressResp);
         }
       }
