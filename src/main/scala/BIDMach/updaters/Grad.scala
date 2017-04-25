@@ -149,17 +149,17 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 
 object Grad {
   trait Opts extends Updater.Opts {
-    var lrate:FMat = 1f
-    var texp:FMat = 0.5f
-    var pexp:FMat = 0.5f
-    var waitsteps = 3
-    var mask:FMat = null
-    var policies:Array[(Float, Float)=>Float] = null
-    var momentum:FMat = null
-    var nesterov:FMat = null
+  	var lrate:FMat = 1f;
+    var texp:FMat = 0.5f;
+    var pexp:FMat = 0.5f;
+    var waitsteps = 3;
+    var mask:FMat = null;
+    var policies:Array[(Float, Float)=>Float] = null;
+    var momentum:FMat = null;
+    var nesterov:FMat = null;
     var langevin = 0f;
-    var clipByValue = -1f
-    var max_grad_norm = -1f
+    var clipByValue = -1f;
+    var max_grad_norm = -1f;
   }
   
   class Options extends Opts {}
