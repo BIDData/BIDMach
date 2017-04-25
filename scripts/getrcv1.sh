@@ -38,6 +38,12 @@ allfiles=${allfiles},lyrl2004_tokens_train.dat.gz
 # Get topic assignments
 ${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a08-topic-qrels/rcv1-v2.topics.qrels.gz
 
+# Build parsing/tokenizing executables
+pushd ${BIDMACH_SCRIPTS}/../src/main/C/newparse
+./configure
+make && make install
+popd
+
 # Tokenize the text files
 # Windows cant use an uncompression pipe so uncompress here
 if [ "$OS" = "Windows_NT" ]; then

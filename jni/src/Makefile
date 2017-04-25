@@ -48,7 +48,9 @@ $(INSTALLDIR)/$(LIBPREPEND)bidmachcuda$(LIBAPPEND): $(LIBPREPEND)bidmachcuda$(LI
 $(INSTALLDIR)/$(LIBPREPEND)bidmachcpu$(LIBAPPEND): $(LIBPREPEND)bidmachcpu$(LIBAPPEND)
 	mkdir -p $(INSTALL_DIR)
 	cp $(LIBPREPEND)bidmachcpu$(LIBAPPEND) $(INSTALL_DIR)
-	cp $(LIBDIR)/libiomp5$(LIBIOMPAPPEND)  $(INSTALL_DIR)
+	if [ -n "$(findstring liomp5,$(CPU_LIBS))" ]; then \
+	        cp $(LIBDIR)/libiomp5$(LIBIOMPAPPEND) $(INSTALL_DIR); \
+	fi
 
 jars: cudajar cpujar
 
