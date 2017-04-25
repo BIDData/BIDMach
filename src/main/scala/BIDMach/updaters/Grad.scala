@@ -13,7 +13,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null
   var sumSq:Mat = null 
-  var momentum:Array[Mat] = null;
+  var vel_decay:Array[Mat] = null;
   var stepn:Mat = null
   var mask:Mat = null
   var ve:Mat = null
@@ -32,11 +32,11 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  val mm = modelmats(0);
     stepn = mm.zeros(1,1);
     val nmats = modelmats.length;
-    val hasmomentum = (opts.momentum.asInstanceOf[AnyRef] != null || opts.nesterov.asInstanceOf[AnyRef] != null);
-    if (hasmomentum) {
-      momentum = new Array[Mat](nmats);
+    val hasvel_decay = (opts.vel_decay.asInstanceOf[AnyRef] != null || opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null);
+    if (hasvel_decay) {
+      vel_decay = new Array[Mat](nmats);
       for (i <- 0 until nmats) {
-    	  momentum(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
+    	  vel_decay(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
       }
     }
     if (opts.langevin > 0) {
@@ -125,19 +125,19 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
         	grad ~ grad + randmat(i);
         }
 	  		grad ~ grad *@ (lrate *@ tscale);
-	  		if (opts.momentum.asInstanceOf[AnyRef] != null) {
-	  			val i0 = if (opts.momentum.length > 1) i else 0;
-	  			mu <-- opts.momentum(i0);                           // Get the momentum decay rate
-	  			grad ~ grad + momentum(i);                          // Add momentum to the gradient
-	  			momentum(i) ~ grad *@ mu;                           // update momentum using the new gradient
+	  		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+	  			val i0 = if (opts.vel_decay.length > 1) i else 0;
+	  			mu <-- opts.vel_decay(i0);                           // Get the vel_decay decay rate
+	  			grad ~ grad + vel_decay(i);                          // Add vel_decay to the gradient
+	  			vel_decay(i) ~ grad *@ mu;                           // update vel_decay using the new gradient
 	  		}
-	  		if (opts.nesterov.asInstanceOf[AnyRef] != null) {
-	  			val i0 = if (opts.nesterov.length > 1) i else 0;
-	  			mu <-- opts.nesterov(i0);                           // Get the momentum decay rate
-	  			grad ~ grad + momentum(i);                          // Add momentum to the gradient
-	  			mm ~ mm - momentum(i);                              // A bit of algebra, remove old momentum from the model
-	  			momentum(i) ~ grad *@ mu;                           // Update the momentum
-	  			mm ~ mm + momentum(i);                              // Add the new momentum to the model;
+	  		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+	  			val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
+	  			mu <-- opts.nesterov_vel_decay(i0);                           // Get the vel_decay decay rate
+	  			grad ~ grad + vel_decay(i);                          // Add vel_decay to the gradient
+	  			mm ~ mm - vel_decay(i);                              // A bit of algebra, remove old vel_decay from the model
+	  			vel_decay(i) ~ grad *@ mu;                           // Update the vel_decay
+	  			mm ~ mm + vel_decay(i);                              // Add the new vel_decay to the model;
 	  		}
 	  		modelmats(i) ~ modelmats(i) + grad;
 	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
@@ -155,8 +155,8 @@ object Grad {
     var waitsteps = 3;
     var mask:FMat = null;
     var policies:Array[(Float, Float)=>Float] = null;
-    var momentum:FMat = null;
-    var nesterov:FMat = null;
+    var vel_decay:FMat = null;
+    var nesterov_vel_decay:FMat = null;
     var langevin = 0f;
     var clipByValue = -1f;
     var max_grad_norm = -1f;

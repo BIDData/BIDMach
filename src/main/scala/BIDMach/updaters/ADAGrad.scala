@@ -18,7 +18,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
   var sumSq:Array[Mat] = null 
   var stepn:Mat = null
   var mask:Mat = null
-  var momentum:Array[Mat] = null;
+  var vel_decay:Array[Mat] = null;
   var ve:Mat = null
   var pe:Mat = null
   var te:Mat = null
@@ -35,11 +35,11 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     mask = opts.mask;
     val nmats = modelmats.length;
     sumSq = new Array[Mat](nmats);
-    val hasmomentum = (opts.momentum.asInstanceOf[AnyRef] != null || opts.nesterov.asInstanceOf[AnyRef] != null);
-    if (hasmomentum) momentum = new Array[Mat](nmats);
+    val hasvel_decay = (opts.vel_decay.asInstanceOf[AnyRef] != null || opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null);
+    if (hasvel_decay) vel_decay = new Array[Mat](nmats);
     for (i <- 0 until nmats) {
     	sumSq(i) = modelmats(i).ones(modelmats(i).nrows, modelmats(i).ncols) *@ opts.initsumsq
-      if (hasmomentum) momentum(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
+      if (hasvel_decay) vel_decay(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
     }
     if (opts.langevin > 0) {
     	randmat = new Array[Mat](nmats);
@@ -71,8 +71,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     		step / firstStep;
     	}
     }
-    val tscale = if (opts.mavgG2 >= 0){
-    	stepn.set(1f - opts.mavgG2);
+    val tscale = if (opts.gsq_decay >= 0){
+    	stepn.set(1f - opts.gsq_decay);
     	stepn;
     } else if (opts.texp.asInstanceOf[AnyRef] != 0) {
     	stepn.set(1/(nsteps+1));
@@ -102,12 +102,12 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	}
     	(mm, um, ss, ve, tscale, lrate) match {
     	  case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
-          if (opts.momentum.asInstanceOf[AnyRef] != null) {
-            val mu = if (opts.momentum.length > 1) opts.momentum(i) else opts.momentum(0);
-            ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
-          } else if (opts.nesterov.asInstanceOf[AnyRef] != null) {
-            val mu = if (opts.nesterov.length > 1) opts.nesterov(i) else opts.nesterov(0);
-            ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+          if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+            val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
+            ADAGrad.ADAGradm(gmm, gum, gss, vel_decay(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+          } else if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+            val mu = if (opts.nesterov_vel_decay.length > 1) opts.nesterov_vel_decay(i) else opts.nesterov_vel_decay(0);
+            ADAGrad.ADAGradn(gmm, gum, gss, vel_decay(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           } else {
         	  ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           }
@@ -129,22 +129,22 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
             }
     	  		// if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
     	  		grad ~ grad *@ (tscale *@ lrate);                                   // Basic scaled gradient
-            if (opts.momentum.asInstanceOf[AnyRef] != null) {
-              val i0 = if (opts.momentum.length > 1) i else 0;
-              mu <-- opts.momentum(i0);                           // Get the momentum decay rate      
-              momentum(i) ~ momentum(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
-            	momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient
-            	momentum(i) ~ momentum(i) + grad;
-            	grad <-- momentum(i);
+            if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+              val i0 = if (opts.vel_decay.length > 1) i else 0;
+              mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
+              vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
+            	vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
+            	vel_decay(i) ~ vel_decay(i) + grad;
+            	grad <-- vel_decay(i);
             }
-            if (opts.nesterov.asInstanceOf[AnyRef] != null) {
-              val i0 = if (opts.nesterov.length > 1) i else 0;
-              mu <-- opts.nesterov(i0);                           // Get the momentum decay rate
-              mm ~ mm - momentum(i);                              // A bit of algebra, remove old momentum from the model
-              momentum(i) ~ momentum(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
-            	momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient
-            	momentum(i) ~ momentum(i) + grad;        	
-              mm ~ mm + momentum(i);                               // Add the new momentum to the model;
+            if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+              val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
+              mu <-- opts.nesterov_vel_decay(i0);                           // Get the momentum decay rate
+              mm ~ mm - vel_decay(i);                              // A bit of algebra, remove old vel_decay from the model
+              vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
+            	vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
+            	vel_decay(i) ~ vel_decay(i) + grad;        	
+              mm ~ mm + vel_decay(i);                               // Add the new vel_decay to the model;
             }
             mm ~ mm + grad;                                        // Add full gradient to the model
     	  		if (mask != null) mm ~ mm *@ mask;
@@ -160,7 +160,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
 object ADAGrad {
   trait Opts extends Grad.Opts {
     var vexp:FMat = 0.5f;
-    var mavgG2 = -1f;
+    var gsq_decay = -1f;
     var epsilon = 1e-5f;
     var initsumsq = 1e-5f;
   }
@@ -431,15 +431,15 @@ object ADAGrad {
   			ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
   
-  def ADAGradm(mm:GMat, um:GMat, ss:GMat, momentum:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
+  def ADAGradm(mm:GMat, um:GMat, ss:GMat, vel_decay:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
     val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
-    CUMACH.ADAGradm(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, momentum.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
+    CUMACH.ADAGradm(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, vel_decay.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
         ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
     
-  def ADAGradn(mm:GMat, um:GMat, ss:GMat, momentum:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
+  def ADAGradn(mm:GMat, um:GMat, ss:GMat, vel_decay:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
     val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
-    CUMACH.ADAGradn(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, momentum.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
+    CUMACH.ADAGradn(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, vel_decay.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
         ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
 }

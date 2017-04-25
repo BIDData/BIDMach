@@ -34,9 +34,5 @@ $(EXES): $(OBJS)
 
 gzstream.obj: gzstream.h
 
-install: $(EXES)
-	 cp *.exe ../../../../cbin
-	 cp *.exe ../../../../src/main/resources/cbin
-
 clean:
 	rm -f $(EXES) *.obj *.lxc
