@@ -71,15 +71,17 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     		step / firstStep;
     	}
     }
-    val tscale = if (opts.gsq_decay >= 0){
-    	stepn.set(1f - opts.gsq_decay);
-    	stepn;
-    } else if (opts.texp.asInstanceOf[AnyRef] != 0) {
+    val tscale = if (opts.texp.asInstanceOf[AnyRef] != 0) {
     	stepn.set(1/(nsteps+1));
     	stepn ^ te;
     } else {
     	stepn.set(1f/(ipass+1));
     	stepn ^ pe;
+    }
+    if (opts.gsq_decay >= 0){
+    	stepn.set(1f - opts.gsq_decay);
+    } else {
+    	stepn.set(1/(nsteps+1));
     }
     val nw = stepn;
     val nmats = math.min(modelmats.length, updatemats.length);

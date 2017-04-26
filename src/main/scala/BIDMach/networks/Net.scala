@@ -121,14 +121,17 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
   
   def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
-  	layers(0).output = gmats(0);
+    for (i <- 0 until (gmats.length - output_layers.length)) {
+    	layers(i).output = gmats(i);
+    }
   }
   
   def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
-  	} else if (gmats.length > 1) {
-  		layers(layers.length-1).target = full(gmats(1));
+  	} else if (gmats.length > 1 && output_layers.length > 0) {
+  	  for (i <- 0 until output_layers.length)
+  	  	output_layers(i).target = full(gmats(gmats.length-output_layers.length+i));
   	}
   }
   
