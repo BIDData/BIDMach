@@ -8,7 +8,9 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 import _root_.caffe.Caffe
 import _root_.caffe.Caffe.LRNParameter.NormRegion
+import _root_.caffe.Caffe.PoolingParameter.PoolMethod
 import com.google.protobuf.TextFormat
+import jcuda.jcudnn.cudnnPoolingMode
 
 object CaffeIO {
   def mkNodeSetFromProtobuf(fin:Readable) = {
@@ -77,6 +79,12 @@ object CaffeIO {
             } else {
               stridey = poolingParam.getStride()
               stridex = stridey
+            }
+
+            poolingMode = poolingParam.getPool() match {
+              case PoolMethod.MAX => cudnnPoolingMode.CUDNN_POOLING_MAX
+              case PoolMethod.AVE => cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
+              case PoolMethod.STOCHASTIC => throw new NotImplementedError("Stochastic pooling is not supported yet")
             }
           }
         }
