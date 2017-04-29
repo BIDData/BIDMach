@@ -37,6 +37,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var intp:ScriptEngine = null;
 	var masterSocketAddr:InetSocketAddress = null;
 	var workerIP:InetAddress = null;
+	var lastSoftmax:FMat = null
 
 	def start(learner0:Learner) = {
 	  workerIP = InetAddress.getLocalHost;
@@ -100,6 +101,14 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
   def permute(seed:Long) = {
     machineArr(0).groups.permute(seed.toInt);
+  }
+
+  def allReduceAccuracies(round:Int):FMat = {
+    val accVec = zeros(1, M)
+    accVec(0, imach) = learner.lastScoreSummary
+    val result = machineAllreduce(machineArr.last, irow(0 -> accVec.ncols), accVec, opts.fuseConfigReduce)
+    lastSoftmax = softmax(new FMat(1, M, result))
+    lastSoftmax
   }
 
   def allReduce(round:Int, limit:Long, tag:String):Unit = {

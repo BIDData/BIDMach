@@ -46,6 +46,7 @@ case class Learner(
   var cacheState = false;
   var cacheGPUstate = false;
   var debugMemState = false;
+  var lastScoreSummary = -100.0;
 
   def setup = {
 	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
@@ -155,9 +156,10 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        lastScoreSummary = Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore)
+        print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
           100f*lastp,
-          Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
+          lastScoreSummary,
           gf._1,
           gf._2,
           bytes*1e-9,
@@ -244,7 +246,7 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
             100f*lastp,
             Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
             gf._1,
@@ -421,7 +423,7 @@ case class ParLearner(
       		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
       		val gf = gflop
       		if (reslist.length > lasti) {
-      			print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+      			print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
       					100f*lastp,
       					Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
       					gf._1,
@@ -635,7 +637,7 @@ case class ParLearnerx(
 	  			while (dsProgress > lastp + opts.pstep) lastp += opts.pstep
 	  			val gf = gflop
 	  			if (reslist.length > lasti) {
-	  				print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+	  				print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
 	  						100f*lastp,
 	  						reslist.synchronized {
 	  							Learner.scoreSummary(reslist, lasti, reslist.length)
@@ -873,7 +875,7 @@ object Learner {
     }
   }
 
-  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):String = {
+  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):Double = {
     val istart = if (cumScore == 0) lasti else {if (cumScore == 1) 0 else if (cumScore == 2) len/2 else 3*len/4};
     var i = 0
     var sum = 0.0;
@@ -881,7 +883,7 @@ object Learner {
       if (i >= istart) sum += mean(scoremat(?,0)).v
       i += 1
     }
-    ("ll=%6.5f" format sum/(len - istart))
+    sum / (len - istart)
   }
 
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
