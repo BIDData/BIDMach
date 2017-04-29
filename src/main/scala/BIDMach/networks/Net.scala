@@ -150,15 +150,18 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 		  i;
   }
   
+  def cleargrad {
+  	if (opts.aopts == null) {
+  		for (j <- 0 until updatemats.length) updatemats(j).clear;
+  	}
+  }
+  
   def backward(ipass:Int = 0, pos:Long = 0) {
     var i = layers.length;
     var j = 0;
     while (j < output_layers.length) {
     	output_layers(j).deriv.set(1);
     	j += 1;
-    }
-    if (opts.aopts == null) {
-    	for (j <- 0 until updatemats.length) updatemats(j).clear;
     }
     while (i > 1) {
     	i -= 1;
@@ -179,6 +182,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	assignInputs(gmats, ipass, pos);
     	assignTargets(gmats, ipass, pos);
     	forward;
+    	cleargrad;
     	backward(ipass, pos);
     }
   }
