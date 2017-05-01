@@ -38,6 +38,8 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	var masterSocketAddr:InetSocketAddress = null;
 	var workerIP:InetAddress = null;
 	var lastSoftmax:FMat = null
+	var lastScore:Double = -10.0
+	var scaledSendmats:Array[Mat] = null
 
 	def start(learner0:Learner) = {
 	  workerIP = InetAddress.getLocalHost;
@@ -51,11 +53,11 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	  listener = new CommandListener(opts.commandSocketNum, this);
 	  listenerTask = executor.submit(listener);
 	  intp = new ScriptEngineManager().getEngineByName("scala");
-	  if (opts.trace > 0) log(s"Worker started on ${workerIP.toString}")
+	  if (opts.trace > 0) logln(s"Worker started on ${workerIP.toString}")
 	}
 
   def config(imach0:Int, gmods0:IMat, gridmachines0:IMat, workers0:Array[InetSocketAddress],
-             masterSocketAddr0:InetSocketAddress, numModelMats0:Int) = {
+             masterSocketAddr0:InetSocketAddress, numModelMats0:Int, softmaxReduce:Boolean) = {
     val t1 = toc;
     imach = imach0;
     gmods = gmods0;
@@ -65,13 +67,13 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     masterSocketAddr = masterSocketAddr0;
 
     var machineOffset = 3
-    if (machineArr == null) machineArr = new Array[Machine](numModelMats0)
+    val numMachines = numModelMats0 + (if (softmaxReduce) 1 else 0)
+    if (machineArr == null) machineArr = new Array[Machine](numMachines)
+
     for (mmi <- 0 until numModelMats0) {
-      val workerMachineAddrs = workers0.map(
-	x => new InetSocketAddress(x.getAddress(), x.getPort() + machineOffset))
       if (machineArr(mmi) != null) machineArr(mmi).stop
 
-      val bufsize = if (opts.bufsizes != null && opts.bufsizes.length > mmi) {
+      val machineBufsize = if (opts.bufsizes != null && mmi < opts.bufsizes.length) {
 	opts.bufsizes(mmi)
       } else if (model != null && model.modelmats != null) {
 	model.modelmats(mmi).length + model.modelmats(mmi).ncols
@@ -79,24 +81,42 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	Worker.DEFAULT_BUFSIZE
       }
 
-      val machine = new Machine(null, groups, imach, M, opts.useLong, bufsize, false,
-	opts.machineTrace, opts.replicate, workerMachineAddrs);
+      val machine = startMachine(workers0, machineOffset, machineBufsize)
       machineArr(mmi) = machine
-
-      machine.configTimeout = opts.configTimeout;
-      machine.reduceTimeout = opts.reduceTimeout;
-      machine.sendTimeout = opts.sendTimeout;
-      machine.recvTimeout = opts.recvTimeout;
-
-      machine.sockBase = opts.peerSocketNum;
-      machine.start(machine.maxk);
-
       machineOffset += 1
+    }
+    if (softmaxReduce) {
+      val lastIdx = machineArr.length - 1
+      if (machineArr(lastIdx) != null) machineArr(lastIdx).stop
+      val machine = startMachine(workers0, machineOffset, M+1)
+      machineArr(lastIdx) = machine
+      opts.softmaxReduce = true
+      lastSoftmax = ones(1, M) / M
     }
 
     this.synchronized { this.notify() } // config complete
     val t2 = toc
     if (opts.trace > 2) log("Machine config took %4.3f secs\n" format(t2-t1))
+  }
+
+  def startMachine(
+    workerAddrs:Array[InetSocketAddress], machineOffset:Int, bufsize:Int
+  ):Machine = {
+    val workerMachineAddrs = workerAddrs.map(
+      a => new InetSocketAddress(a.getAddress(), a.getPort() + machineOffset))
+
+    val machine = new Machine(null, groups, imach, M, opts.useLong, bufsize, false,
+      opts.machineTrace, opts.replicate, workerMachineAddrs);
+
+    machine.configTimeout = opts.configTimeout;
+    machine.reduceTimeout = opts.reduceTimeout;
+    machine.sendTimeout = opts.sendTimeout;
+    machine.recvTimeout = opts.recvTimeout;
+
+    machine.sockBase = opts.peerSocketNum;
+    machine.start(machine.maxk);
+
+    machine
   }
 
   def permute(seed:Long) = {
@@ -105,9 +125,36 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
   def allReduceAccuracies(round:Int):FMat = {
     val accVec = zeros(1, M)
-    accVec(0, imach) = learner.lastScoreSummary
-    val result = machineAllreduce(machineArr.last, irow(0 -> accVec.ncols), accVec, opts.fuseConfigReduce)
-    lastSoftmax = softmax(new FMat(1, M, result))
+
+    val reslistLen = learner.reslist.length
+    if (reslistLen > 0) {
+      var score = Learner.scoreSummary(
+	learner.reslist, Math.max(0, reslistLen - opts.accuracyAvgSteps), learner.reslist.length, 0)
+      if (score.isNaN || score.isInfinity) {
+	if (opts.trace > 0) logln("Got NaN score! reslistLen: %d, nback: %d".format(
+	  reslistLen, Math.max(0, reslistLen - opts.accuracyAvgSteps)))
+	score = lastScore
+      } else {
+	lastScore = score
+      }
+
+      accVec(0, imach) = score
+      val result = machineAllreduce(machineArr.last, irow(0 -> accVec.ncols), accVec, opts.fuseConfigReduce)
+
+      var smax = softmax(new FMat(1, M, result))
+      val smaxSum = sum(lastSoftmax)(0)
+
+      smax = if (smaxSum.isNaN || smaxSum.isInfinity) {
+	if (opts.trace > 0) logln("Got NaN in softmax! result: %s, softmax: %s".format(
+	  result, lastSoftmax))
+	lastSoftmax
+      } else {
+	lastSoftmax = smax
+	smax
+      }
+    } else {
+      lastSoftmax = ones(1, M) / M
+    }
     lastSoftmax
   }
 
@@ -129,12 +176,24 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   def allReduce(round:Int, limit:Long, matIdx:Int = 0) = {
     if (model != null && model.modelmats.asInstanceOf[AnyRef] != null) {
       val t1 = toc
-      model.snapshot(limit.toInt, opts.doAvg, matIdx)
+      val doAvg = !opts.softmaxReduce && opts.doAvg
+      model.snapshot(limit.toInt, doAvg, matIdx)
       val mm = model.modelmats(matIdx)
       val sendmatFull = model.sendmats(matIdx)
-      val sendmat = sendmatFull.view(sendmatFull.nrows, math.min(limit.toInt, sendmatFull.ncols))
+
+      val sendmat = if (!opts.softmaxReduce) {
+	sendmatFull.view(sendmatFull.nrows, math.min(limit.toInt, sendmatFull.ncols))
+      } else {
+	if (scaledSendmats == null) scaledSendmats = new Array[Mat](model.modelmats.length)
+	if (scaledSendmats(matIdx) == null) {
+	  scaledSendmats(matIdx) = FMat(sendmatFull.nrows, sendmatFull.ncols)
+	}
+	val scaledSendmat = scaledSendmats(matIdx)
+        scaledSendmat ~ sendmatFull * lastSoftmax(imach) // scale sendmat by softmax
+      }
+
       val indexmat =
-	if (model.indexmats != null && model.indexmats(matIdx).asInstanceOf[AnyRef] != null) {
+        if (model.indexmats != null && model.indexmats(matIdx).asInstanceOf[AnyRef] != null) {
           model.indexmats(matIdx)
         } else {
           irow(0 -> sendmat.ncols)
@@ -146,18 +205,18 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 
       if (model.recvmats == null) model.recvmats = new Array[FMat](model.modelmats.length)
       model.recvmats(matIdx) = new FMat(sendmat.nrows, mm.ncols, result)
-	  if (opts.doElastic) {
-		model.elasticStep(limit.toInt, opts.doAvg, opts.elasticAlpha, matIdx)
-	  } else {
-        model.addStep(limit.toInt, opts.doAvg, matIdx)
-	  }
+      if (opts.doElastic) {
+        model.elasticStep(limit.toInt, doAvg, opts.elasticAlpha, matIdx)
+      } else {
+        model.addStep(limit.toInt, doAvg, matIdx)
+      }
       val t2 = toc
       val nbytes = indexmat match {
         case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f
         case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f
       }
       if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (
-	nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
+        nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
     } else {
       if (opts.trace > 2) log("Allreduce model is null\n")
     }
@@ -217,13 +276,14 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     } else {
     	cmd.ctype match {
     	case Command.configCtype => {
-		val newcmd = new ConfigCommand(0, cmd.dest, null, null, null, null, -1, -1, -1, cmd.clen, cmd.bytes);
+		val newcmd = new ConfigCommand(0, cmd.dest, null, null, null, null, -1, -1, -1, false, cmd.clen, cmd.bytes);
     		newcmd.decode;
     		if (opts.trace > 2) log("Received %s\n" format newcmd.toString);
 		config(newcmd.dest, newcmd.gmods, newcmd.gridmachines,
 		  Host.hostPortsToInet(newcmd.workerIPs, newcmd.workerPorts),
 		  Host.hostPortToInet(newcmd.masterIP, newcmd.masterResPort),
-		  newcmd.numModelMats);
+		  newcmd.numModelMats,
+		  newcmd.softmaxReduce);
     		if (opts.respond > 0) sendMaster(new Response(Command.configCtype, newcmd.round, imach));
     	}
     	case Command.permuteCtype => {
@@ -254,6 +314,13 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		permute(newcmd.seed);
     		allReduce(newcmd.round, newcmd.limit);
     		if (opts.respond > 0) sendMaster(new Response(Command.permuteAllreduceCtype, newcmd.round, imach));
+    	}
+    	case Command.accuracyAllreduceCtype => {
+    		val newcmd = new AccuracyAllreduceCommand(0, cmd.dest, cmd.bytes)
+    		newcmd.decode
+    		if (opts.trace > 2) log("Received %s\n" format newcmd.toString)
+		allReduceAccuracies(newcmd.round)
+    		if (opts.respond > 0) sendMaster(new Response(Command.accuracyAllreduceCtype, newcmd.round, imach))
     	}
     	case Command.setMachineCtype => {
     		val newcmd = new SetMachineCommand(0, cmd.dest, 0, cmd.bytes);
@@ -416,6 +483,8 @@ object Worker {
     var replicate = 1;
     var bufsizes:Array[Int] = null;
     var respond = 0;
+    var softmaxReduce = false
+    var accuracyAvgSteps = 5
   }
 
   class Options extends Opts {}

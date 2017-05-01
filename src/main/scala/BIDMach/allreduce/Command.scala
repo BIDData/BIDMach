@@ -109,6 +109,7 @@ object Command {
     final val ackReadyCtype = 13;
     final val registerWorkerCtype = 14;
     final val workerExceptionCtype = 15;
+    final val accuracyAllreduceCtype = 16;
     final val names = Array[String]("",
       "config",
       "permute",
@@ -124,7 +125,8 @@ object Command {
       "call",
       "ackReady",
       "registerWorker",
-      "workerException");
+      "workerException",
+      "accuracyAllreduce");
 
 
   def printStackTrace(e:Exception):String = {
@@ -139,8 +141,9 @@ object Command {
 
 class ConfigCommand(
   round0:Int, dest0:Int, gmods0:IMat, gridmachines0:IMat, workerIPs0:IMat, workerPorts0:IMat,
-  masterIP0:Int, masterResPort0:Int, numModelMats0:Int, clen:Int, bytes:Array[Byte])
-extends Command(Command.configCtype, round0, dest0, clen, bytes, clen * 4) {
+  masterIP0:Int, masterResPort0:Int, numModelMats0:Int, var softmaxReduce:Boolean, clen:Int,
+  bytes:Array[Byte]
+) extends Command(Command.configCtype, round0, dest0, clen, bytes, clen * 4) {
 
   var gmods:IMat = gmods0;
   var gridmachines:IMat = gridmachines0;
@@ -151,18 +154,19 @@ extends Command(Command.configCtype, round0, dest0, clen, bytes, clen * 4) {
   var numModelMats:Int = numModelMats0
 
   def this(round0:Int, dest0:Int, clen0:Int) =
-    this(round0, dest0, null, null, null, null, -1, -1, -1, clen0, new Array[Byte](clen0*4));
+    this(round0, dest0, null, null, null, null, -1, -1, -1, false, clen0, new Array[Byte](clen0*4));
 
   def this(round0:Int, dest0:Int, gmods0:IMat, gridmachines0:IMat, workers:Array[InetSocketAddress],
-           masterIP:InetAddress, masterResPort0:Int, numModelMats0:Int) =
+           masterIP:InetAddress, masterResPort0:Int, numModelMats0:Int, softmaxReduce0:Boolean) =
     this(round0, dest0, gmods0, gridmachines0,
         new IMat(1, workers.length, workers.map((x)=>Host.inetStringToInt(x.getAddress.getHostAddress))),
         new IMat(1, workers.length, workers.map(_.getPort)),
         Host.inetStringToInt(masterIP.getHostAddress),
         masterResPort0,
 	numModelMats0,
-        1 + gmods0.length + 1 + gridmachines0.length + 1 + (2 * workers.length) + 3,
-        new Array[Byte]((1 + gmods0.length + 1 + gridmachines0.length + 1 + (2 * workers.length) + 3) * 4));
+	softmaxReduce0,
+        1 + gmods0.length + 1 + gridmachines0.length + 1 + (2 * workers.length) + 4,
+        new Array[Byte]((1 + gmods0.length + 1 + gridmachines0.length + 1 + (2 * workers.length) + 4) * 4));
 
   override def encode ():Unit = {
   	intData.rewind();
@@ -176,6 +180,7 @@ extends Command(Command.configCtype, round0, dest0, clen, bytes, clen * 4) {
         intData.put(masterIP);
         intData.put(masterResPort);
 	intData.put(numModelMats);
+	intData.put(if (softmaxReduce) 1 else 0)
   }
 
   override def decode():Unit = {
@@ -194,6 +199,7 @@ extends Command(Command.configCtype, round0, dest0, clen, bytes, clen * 4) {
     masterIP = intData.get();
     masterResPort = intData.get();
     numModelMats = intData.get()
+    softmaxReduce = (intData.get() == 1)
   }
 
   override def toString():String = {
@@ -211,6 +217,7 @@ extends Command(Command.configCtype, round0, dest0, clen, bytes, clen * 4) {
       ostring.append("%s " format Host.inetIntToString(workerIPs(i)));
     }
     ostring.append("\nNum Modelmats: %d" format numModelMats)
+    ostring.append("\nSoftmax Reduce: %b" format softmaxReduce)
     ostring.append("\n")
     ostring.toString
   }
@@ -350,6 +357,27 @@ class PermuteAllreduceCommand(
   override def toString():String = {
     "Command %s, tag %s, length %d words, round %d seed %d limit %d" format (
       Command.names(ctype), tag, clen, round, seed, limit);
+  }
+}
+
+class AccuracyAllreduceCommand(round0:Int, dest0:Int, bytes:Array[Byte])
+extends Command(Command.accuracyAllreduceCtype, round0, dest0, 2, bytes, 2*4) {
+
+  def this(round0:Int, dest0:Int) =
+    this(round0, dest0, new Array[Byte](2*4))
+
+  override def encode():Unit = {
+    longData.rewind()
+    longData.put(round)
+  }
+
+  override def decode():Unit = {
+    longData.rewind()
+    round = longData.get().toInt
+  }
+
+  override def toString():String = {
+    "Command %s, length %d words, round %d" format (Command.names(ctype), clen, round)
   }
 }
 

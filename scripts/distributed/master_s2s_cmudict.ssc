@@ -33,6 +33,8 @@ opts.machineThreshold = 0.75;
 opts.minWaitTime = 4500;
 opts.timeThresholdMsec = 6000;
 
+opts.softmaxReduce = true
+
 val nmachines = addresses.length
 val gmods = irow(nmachines)
 val gmachines = irow(0->nmachines)

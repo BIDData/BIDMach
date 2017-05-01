@@ -46,7 +46,6 @@ case class Learner(
   var cacheState = false;
   var cacheGPUstate = false;
   var debugMemState = false;
-  var lastScoreSummary = -100.0;
 
   def setup = {
 	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
@@ -156,10 +155,9 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        lastScoreSummary = Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore)
         print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
           100f*lastp,
-          lastScoreSummary,
+          Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._1,
           gf._2,
           bytes*1e-9,

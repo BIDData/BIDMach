@@ -84,8 +84,9 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
   
   def sendConfig() {
     val cmd = new ConfigCommand(
-      round, 0, gmods, gridmachines, workers, masterIP, opts.responseSocketNum, numModelMats)
-    broadcastCommand(cmd);
+      round, 0, gmods, gridmachines, workers, masterIP, opts.responseSocketNum, numModelMats,
+      opts.softmaxReduce)
+    broadcastCommand(cmd)
   }
 
   def startUpdatesAfterRegistration(numExpectedWorkers:Int) {
@@ -341,6 +342,10 @@ class Master(override val opts:Master.Opts = new Master.Options) extends Host {
         if (finishedReducers >= numModelMats) {
           round += 1
           finishedReducers = 0
+	  if (opts.softmaxReduce) {
+	    broadcastCommand(new AccuracyAllreduceCommand(round, 0))
+	    Thread.sleep(50)  // HACK: sleep for a bit to be more sure that the previous command finished
+	  }
           master.notifyAll()
         } else {
           master.wait()
