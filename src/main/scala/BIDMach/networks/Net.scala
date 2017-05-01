@@ -135,7 +135,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	}
   }
   
-  def forward:Int = {
+  def forward = {
 		  if (mask.asInstanceOf[AnyRef] != null) {
 			  modelmats(0) ~ modelmats(0) ∘ mask;
 		  }
@@ -147,7 +147,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 			  layers(i).forward;
 			  i += 1;
 		  }
-		  i;
   }
   
   def cleargrad {
@@ -156,13 +155,16 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	}
   }
   
-  def backward(ipass:Int = 0, pos:Long = 0) {
-    var i = layers.length;
+  def setderiv = {
     var j = 0;
     while (j < output_layers.length) {
     	output_layers(j).deriv.set(1);
     	j += 1;
-    }
+    }    
+  }
+  
+  def backward(ipass:Int = 0, pos:Long = 0) {
+    var i = layers.length;
     while (i > 1) {
     	i -= 1;
     	if (opts.debug > 0) {
@@ -183,6 +185,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	assignTargets(gmats, ipass, pos);
     	forward;
     	cleargrad;
+    	setderiv;
     	backward(ipass, pos);
     }
   }
