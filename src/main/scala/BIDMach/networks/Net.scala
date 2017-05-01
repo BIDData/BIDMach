@@ -155,10 +155,21 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	}
   }
   
-  def setderiv = {
+  /** 
+   *  Set the derivative of the output layer to 1's. Assumes we are maximizing likelihood. 
+   *  If todo > 0, put ones in the first todo columns and zeros elsewhere. This is to deal 
+   *  with incomplete minibatches. 
+   */
+  
+  def setderiv(todo:Int=0) = {
     var j = 0;
     while (j < output_layers.length) {
-    	output_layers(j).deriv.set(1);
+    	val deriv = output_layers(j).deriv;
+      if (todo == 0) {
+      	deriv.set(1);
+      } else {
+        deriv <-- (ones(deriv.nrows, todo) \ zeros(deriv.nrows, deriv.ncols - todo));
+      }
     	j += 1;
     }    
   }
@@ -185,7 +196,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	assignTargets(gmats, ipass, pos);
     	forward;
     	cleargrad;
-    	setderiv;
+    	setderiv();
     	backward(ipass, pos);
     }
   }
