@@ -43,7 +43,12 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
-    if (output_layers == null) output_layers = Array(layers(layers.length-1));
+    if (output_layers == null) {
+      output_layers = layers(layers.length-1) match {
+        case a:OutputLayer => Array(layers(layers.length-1));
+        case _ => Array[Layer]();
+      }
+    }
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
 	  }

@@ -21,7 +21,7 @@ import BIDMach.networks._
  * Commonly used as an output layer so includes a score method.
  */
 
-class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode) extends Layer(net, opts) {
+class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode) extends Layer(net, opts) with OutputLayer {
 	var ilinks:Mat = null;
 	var totflops = 0L;
 
