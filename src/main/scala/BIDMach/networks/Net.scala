@@ -171,7 +171,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     var j = 0;
     while (j < dolayers.length) {
     	val deriv = dolayers(j).deriv;
-      if (todo == 0) {
+      if (todo == 0 || todo == deriv.ncols) {
       	deriv.set(1);
       } else {
         deriv <-- (ones(deriv.nrows, todo) \ zeros(deriv.nrows, deriv.ncols - todo));
