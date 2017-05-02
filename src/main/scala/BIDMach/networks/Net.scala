@@ -167,9 +167,10 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
    */
   
   def setderiv(todo:Int=0) = {
+    val dolayers = if (output_layers.length > 0) output_layers else Array(layers(layers.length-1));
     var j = 0;
-    while (j < output_layers.length) {
-    	val deriv = output_layers(j).deriv;
+    while (j < dolayers.length) {
+    	val deriv = dolayers(j).deriv;
       if (todo == 0) {
       	deriv.set(1);
       } else {
