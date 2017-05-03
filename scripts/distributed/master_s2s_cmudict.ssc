@@ -4,6 +4,12 @@ import BIDMach.networks.SeqToSeq
 import BIDMat.JSON
 
 var addresses:Array[InetSocketAddress] = null
+
+val workerAddrFile = sys.env.get("WORKER_ADDR_FILE") match {
+  case Some(afile) => afile
+  case None => "/opt/spark/conf/slaves"
+}
+
 val customLocalWorkerPortsStr = sys.env.get("MASTER_LOCAL_WORKER_PORTS")
 println("####################")
 customLocalWorkerPortsStr match {
@@ -12,10 +18,10 @@ customLocalWorkerPortsStr match {
     println("Using local worker addresses:")
   }
   case None => {
-    addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+    addresses = scala.io.Source.fromFile(workerAddrFile).getLines.
       map(InetAddress.getByName(_).getHostAddress()).
       map(new InetSocketAddress(_, 50050)).toArray
-    println("Using spark slaves:")
+    println("Using addresses from %s:" format workerAddrFile)
   }
 }
 for (a <- addresses) println(a)
@@ -33,7 +39,8 @@ opts.machineThreshold = 0.75;
 opts.minWaitTime = 4500;
 opts.timeThresholdMsec = 6000;
 
-opts.softmaxReduce = true
+// opts.softmaxReduce = true
+opts.softmaxReduce = false
 
 val nmachines = addresses.length
 val gmods = irow(nmachines)
@@ -68,7 +75,9 @@ m.sendConfig
 // m.startUpdates(logLocation = "/opt/BIDMach/logs/master_s2s_cmudict/%s.log")
 //
 
-/*Later*/
+
+
+/* Benchmarking */
 
 
 // m.parCall((w) => {

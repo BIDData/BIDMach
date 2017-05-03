@@ -2,10 +2,18 @@ import com.cedarsoftware.util.io.JsonReader
 import java.nio.file.Files
 import java.nio.file.Paths
 
-val json_dir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/json_data/"
-val smat_dir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
+val json_dir = sys.env.get("CMUDICT_JSON_DIR") match {
+  case Some(jsondir0) => jsondir0
+  case None => "../data/phonetisaurus-cmudict-split/json_data/"
+}
+val smat_dir = sys.env.get("CMUDICT_SMAT_DIR") match {
+  case Some(smatdir0) => smatdir0
+  case None => "../data/phonetisaurus-cmudict-split/smat_data/"
+}
 val batchsize = 64
 val PADsym = 1
+
+println("Converting JSON data to SMat data...")
 
 val train_gr_str = new String(Files.readAllBytes(Paths.get(json_dir+"train.grapheme.json")))
 val train_ph_str = new String(Files.readAllBytes(Paths.get(json_dir+"train.phoneme.json")))
@@ -57,3 +65,6 @@ saveMat(smat_dir+"train.src_grapheme.smat.lz4", smat_train_gr)
 saveMat(smat_dir+"train.dst_phoneme.smat.lz4", smat_train_ph)
 saveMat(smat_dir+"valid.src_grapheme.smat.lz4", smat_valid_gr)
 saveMat(smat_dir+"valid.dst_phoneme.smat.lz4", smat_valid_ph)
+
+println("Done.")
+sys.exit

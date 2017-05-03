@@ -30,7 +30,17 @@ val modeldir = sys.env.get("WORKER_MODEL_DIR") match {
     defaultmodeldir
   }
 }
-val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
+val defaultdatadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
+val datadir = sys.env.get("DATA_DIR") match {
+  case Some(ddir0) => {
+    println("Using data dir: %s" format ddir0)
+    ddir0
+  }
+  case None => {
+    println("Using default data dir: %s" format defaultdatadir)
+    defaultdatadir
+  }
+}
 
 val src = loadMat(datadir+"train.src_grapheme.shuf.smat.lz4")
 val dst = loadMat(datadir+"train.dst_phoneme.shuf.smat.lz4")
