@@ -35,16 +35,24 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
 	  clearDeriv;
 	  forwardtime += toc - start;
 	}
+	
+	def squash(a:Mat, b:Mat) = {
+	  if (b.nrows == 1 && a.nrows > 1) {
+	    sum(a);
+	  } else {
+	    a;
+	  }
+	}
 
 	override def backward = {
     val start = toc;
     if (_inputs.length == 2) {
-      if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + (deriv ∘ inputDatas(1));
-      if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + (deriv ∘ inputDatas(0));
+      if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + squash(deriv ∘ inputDatas(1), inputDerivs(0));
+      if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + squash(deriv ∘ inputDatas(0), inputDerivs(1));
     } else {
 			val doutput = deriv ∘ output;
 			(0 until inputlength).map((i:Int) => {
-				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + (doutput / guardSmall(inputDatas(i), qeps));
+				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + squash(doutput / guardSmall(inputDatas(i), qeps), inputDerivs(i));
 			});
     }
     backwardtime += toc - start;

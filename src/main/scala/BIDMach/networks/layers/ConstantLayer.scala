@@ -25,9 +25,10 @@ class ConstantLayer(override val net:Net, override val opts:ConstantNodeOpts = n
   override def forward = {
   		val start = toc;
 			
-  		if (output.asInstanceOf[AnyRef] == null || ! opts.cache) {
+  		if (output.asInstanceOf[AnyRef] == null) {
 			  output = net.convertMat(opts.value);
   		}
+			if (!opts.cache) output <-- opts.value;
 			
 			forwardtime += toc - start;
 	}
