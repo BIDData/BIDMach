@@ -21,9 +21,11 @@ import BIDMach.networks._
 
 class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new SoftmaxNode) extends Layer(net, opts) { 
   var coloffsets:Mat = null;
+  var one:Mat = null;
 
 	override def forward = {
 			val start = toc;
+			if (one.asInstanceOf[AnyRef] == null) one = net.convertMat(ones(1,1));
 			createOutput;
 			val exps = exp(inputData - maxi(inputData));  // ensures sum(exps) is between 1 and nfeats
 			output ~ exps / sum(exps);
@@ -35,7 +37,7 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new
 			val start = toc;
 			val exps = exp(inputData - maxi(inputData));
 			val sumexps = sum(exps);
-			val isum = 1f / (sumexps ∘ sumexps);
+			val isum = one / (sumexps ∘ sumexps);
 			if (inputDeriv.asInstanceOf[AnyRef] != null) 
         inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))));
 			backwardtime += toc - start;
