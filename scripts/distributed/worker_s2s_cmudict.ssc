@@ -19,7 +19,7 @@ Mat.checkCUDA
 Mat.useCache = false
 Mat.useGPUcache = true
 
-val defaultmodeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/dist_model_10pass_softmaxmix"
+val defaultmodeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/dist_model_10pass_softmaxmix/"
 val modeldir = sys.env.get("WORKER_MODEL_DIR") match {
   case Some(mdir0) => {
     println("Using WORKER_MODEL_DIR=%s" format mdir0)

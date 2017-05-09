@@ -126,31 +126,31 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
   def allReduceAccuracies(round:Int):FMat = {
     val accVec = zeros(1, M)
 
-    val reslistLen = learner.reslist.length
-    if (reslistLen > 0) {
-      var score = Learner.scoreSummary(
-	learner.reslist, Math.max(0, reslistLen - opts.accuracyAvgSteps), learner.reslist.length, 0)
+    val avgEndIdx = learner.reslist.length
+    val avgStartIdx = Math.max(0, avgEndIdx - opts.accuracyAvgNBack)
+    if (avgEndIdx > 0) {
+      var score = Learner.scoreSummary(learner.reslist, avgStartIdx, avgEndIdx, 0)
       if (score.isNaN || score.isInfinity) {
-	if (opts.trace > 0) logln("Got NaN score! reslistLen: %d, nback: %d".format(
-	  reslistLen, Math.max(0, reslistLen - opts.accuracyAvgSteps)))
-	score = lastScore
+        if (opts.trace > 0) logln(
+	  s"Got NaN score! avgStartIdx: ${avgStartIdx}, avgEndIdx: ${avgEndIdx}")
+        score = lastScore
       } else {
-	lastScore = score
+        lastScore = score
       }
 
       accVec(0, imach) = score
-      val result = machineAllreduce(machineArr.last, irow(0 -> accVec.ncols), accVec, opts.fuseConfigReduce)
+      val indexMat = irow(0 -> accVec.ncols)
+      val result = machineAllreduce(machineArr.last, indexMat, accVec, opts.fuseConfigReduce)
 
       var smax = softmax(new FMat(1, M, result))
       val smaxSum = sum(lastSoftmax)(0)
 
       smax = if (smaxSum.isNaN || smaxSum.isInfinity) {
-	if (opts.trace > 0) logln("Got NaN in softmax! result: %s, softmax: %s".format(
-	  result, lastSoftmax))
-	lastSoftmax
+        if (opts.trace > 0) logln(s"Got NaN in softmax! result: ${result}, softmax: ${smax}")
+        lastSoftmax
       } else {
-	lastSoftmax = smax
-	smax
+        lastSoftmax = smax
+        smax
       }
     } else {
       lastSoftmax = ones(1, M) / M
@@ -484,7 +484,7 @@ object Worker {
     var bufsizes:Array[Int] = null;
     var respond = 0;
     var softmaxReduce = false
-    var accuracyAvgSteps = 5
+    var accuracyAvgNBack = 5
   }
 
   class Options extends Opts {}

@@ -81,7 +81,8 @@ m.sendConfig
 
 
 // m.parCall((w) => {
-//   w.model = SeqToSeq.load("/mnt/BIDMach/data/phonetisaurus-cmudict-split/dist_model_10passmodel512_te0.3_00/")
+//   val modeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split"
+//   w.model = SeqToSeq.load(s"${modeldir}/dist_model_10pass_softmaxmixmodel512_te0.3_00/")
 //   "done"
 // })
 //
@@ -101,25 +102,6 @@ m.sendConfig
 //   mm.setmodelmats(mmats(i))
 //   mm.opts.copyFrom(JSON.fromJSON(mopts(i)).asInstanceOf[BIDMat.Opts])
 // }
-//
-// // Compute average model
-// wmodels(numWorkers) = new SeqToSeq
-// val mmavg = wmodels(numWorkers)
-//
-// val avgmodelmats = new Array[Mat](mmats(0).length)
-// for (mi <- 0 until avgmodelmats.length) {
-//   avgmodelmats(mi) = mmats(0)(mi).zeros(mmats(0)(mi).nrows, mmats(0)(mi).ncols)
-// }
-// for (wi <- 0 until numWorkers) {
-//   for (mi <- 0 until avgmodelmats.length) {
-//     avgmodelmats(mi) ~ avgmodelmats(mi) + mmats(wi)(mi)
-//   }
-// }
-// for (mi <- 0 until avgmodelmats.length) {
-//   avgmodelmats(mi) ~ avgmodelmats(mi) / numWorkers
-// }
-// mmavg.setmodelmats(avgmodelmats)
-// mmavg.opts.copyFrom(JSON.fromJSON(mopts(0)).asInstanceOf[BIDMat.Opts])
 //
 
 // import util.control.Breaks._
@@ -141,17 +123,15 @@ m.sendConfig
 //   (error, error.toFloat/preds.ncols)
 // }
 //
-
-
 // val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
 // val preddir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/pred/"
 //
 // var src = loadMat(datadir+"valid.src_grapheme.shuf.smat.lz4")
 // var dst = loadMat(datadir+"valid.dst_phoneme.shuf.smat.lz4")
 //
-// val accs = zeros(wmodels.length, 1)
-// for (wi <- 0 until wmodels.length) {
-//   val model = wmodels(wi)
+// val accs = zeros(wmodels.length)
+//
+// def s2sCalcWER(model:SeqToSeq):Double = {
 //   val (nn, opts) = SeqToSeq.predict(model, src)
 //   val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
 //
@@ -178,11 +158,38 @@ m.sendConfig
 //   val preds = IMat(nn.preds(0))
 //
 //   val WER = calcWER(preds, IMat(full(dst)))
-//   println(wi, WER)
-//   accs(wi, 0) = WER._2
+//   WER._2
 // }
 //
-// val (bestacc, bestidx) = mini2(accs, 1)
+
+// for (wi <- 0 until numWorkers) {
+//   val mWER = s2sCalcWER(wmodels(wi))
+//   println(wi, mWER)
+//   accs(wi) = mWER
+// }
+//
+// // Compute weighted average model with softmax of prediction accuracies
+// val modelweights = softmax(1 - accs(0 -> numWorkers))
+// wmodels(numWorkers) = new SeqToSeq
+// val mmavg = wmodels(numWorkers)
+//
+// val avgmodelmats = new Array[Mat](mmats(0).length)
+// for (mi <- 0 until avgmodelmats.length) {
+//   avgmodelmats(mi) = mmats(0)(mi).zeros(mmats(0)(mi).nrows, mmats(0)(mi).ncols)
+// }
+// for (wi <- 0 until numWorkers) {
+//   for (mi <- 0 until avgmodelmats.length) {
+//     avgmodelmats(mi) ~ avgmodelmats(mi) + (modelweights(wi) * mmats(wi)(mi))
+//   }
+// }
+// mmavg.setmodelmats(avgmodelmats)
+// mmavg.opts.copyFrom(JSON.fromJSON(mopts(0)).asInstanceOf[BIDMat.Opts])
+//
+// val avgmWER = s2sCalcWER(wmodels(numWorkers))
+// println(numWorkers, avgmWER)
+// accs(numWorkers) = avgmWER
+//
+// val (bestacc, bestidx) = mini2(accs, 2)
 // println(s"Best acc: ${bestacc}")
 // println(s"Best idx: ${bestidx}")
 //
