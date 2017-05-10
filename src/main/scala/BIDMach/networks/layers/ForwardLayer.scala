@@ -16,7 +16,7 @@ import BIDMach.networks._
 
 
 
-class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyNode) extends Layer(net, opts) {
+class ForwardLayer(override val net:Net, override val opts:ForwardNodeOpts = new ForwardNode) extends Layer(net, opts) {
 
   override def forward = {
 		  val start = toc;
@@ -27,33 +27,30 @@ class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyN
   }
 
   override def backward = {
-		  val start = toc;
-		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv;
-		  backwardtime += toc - start;
   }
   
   override def toString = {
-    "copy@"+Integer.toHexString(hashCode % 0x10000).toString
+    "forward@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
-trait CopyNodeOpts extends NodeOpts {  
+trait ForwardNodeOpts extends NodeOpts {  
 }
 
-class CopyNode extends Node with CopyNodeOpts {
+class ForwardNode extends Node with ForwardNodeOpts {
 
-	override def clone:CopyNode = {copyTo(new CopyNode).asInstanceOf[CopyNode];}
+	override def clone:ForwardNode = {copyTo(new ForwardNode).asInstanceOf[ForwardNode];}
 
-  override def create(net:Net):CopyLayer = {CopyLayer(net, this);}
+  override def create(net:Net):ForwardLayer = {ForwardLayer(net, this);}
   
   override def toString = {
-    "copy@"+Integer.toHexString(hashCode % 0x10000).toString
+    "forward@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
-object CopyLayer {  
+object ForwardLayer {  
   
-  def apply(net:Net) = new CopyLayer(net, new CopyNode);
+  def apply(net:Net) = new ForwardLayer(net, new ForwardNode);
   
-  def apply(net:Net, opts:CopyNode) = new CopyLayer(net, opts);
+  def apply(net:Net, opts:ForwardNode) = new ForwardLayer(net, opts);
 }
