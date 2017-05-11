@@ -308,7 +308,7 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   }
 }
 
-trait PoolingNodeOpts extends ModelNodeOpts {
+trait PoolingNodeOpts extends NodeOpts {
 	var h:Int = 1;
 	var w:Int = 1;
 	var padx:Int = 1;
