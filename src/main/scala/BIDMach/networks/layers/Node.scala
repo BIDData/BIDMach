@@ -266,6 +266,8 @@ object Node {
   
   def splitvert(a:NodeTerm)(np:Int) = new SplitVertNode{inputs(0) = a; nparts = np};
   
+  def sum(a:NodeTerm) = new SumNode{inputs(0) = a;}
+  
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
   implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n);

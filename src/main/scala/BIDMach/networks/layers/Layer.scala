@@ -346,6 +346,8 @@ object Layer {
   
   def splitvert(a:LayerTerm)(np:Int) = new SplitVertLayer(null, new SplitVertNode{nparts = np}){inputs(0) = a};
   
+  def sum(a:LayerTerm) = new SumLayer(null){inputs(0) = a};
+  
   def tanh(a:LayerTerm) = new TanhLayer(null){inputs(0) = a};
   
 }
