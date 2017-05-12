@@ -1,7 +1,7 @@
 
  /**
-  * LSTM training script. 
-  * 
+  * LSTM training script.
+  *
   */
 import BIDMach.networks.SeqToSeq
 

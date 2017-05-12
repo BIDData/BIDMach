@@ -16,7 +16,11 @@ export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 cd ${BIDMACH_SCRIPTS}
 BIDMACH_SCRIPTS=`pwd`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )"
+
+echo "====================="
 echo "Downloading cleaned subset of MNT2014 Fr->En data (http://www-lium.univ-lemans.fr/~schwenk/cslm_joint_paper)"
+echo "====================="
+echo
 
 DATADIR=${DATADIR:-${BIDMACH_SCRIPTS}/../data/mnt2014_fr-en}
 mkdir -p ${DATADIR}
@@ -29,7 +33,7 @@ if [ ! -d bitexts.selected ]; then
   tar -xvf bitexts.tgz
 fi
 
-pushd pydata
+pushd h5_data
 
 # Need tqdm to run script
 sudo -H $(which python) -m pip install tqdm
