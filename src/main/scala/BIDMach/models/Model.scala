@@ -208,10 +208,11 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   }
 
   def copyFrom(mod:Model) = {
-    setmodelmats(new Array[Mat](mod.modelmats.length));
-    for (i <- 0 until modelmats.length) {
-      modelmats(i) = mod.modelmats(i);
-    }
+    copyModelMats(mod.modelmats)
+  }
+  
+  def copyModelMats(modelmats:Array[Mat]) = {
+    setmodelmats(modelmats.clone())
   }
 
   def saveMetaData(fname:String) = {}

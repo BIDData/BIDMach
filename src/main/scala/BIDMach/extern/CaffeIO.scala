@@ -6,24 +6,39 @@ import BIDMach._
 import BIDMach.networks.layers._
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import java.io.InputStream
 import _root_.caffe.Caffe
 import _root_.caffe.Caffe.LRNParameter.NormRegion
 import _root_.caffe.Caffe.PoolingParameter.PoolMethod
-import com.google.protobuf.TextFormat
+import com.google.protobuf._
 import jcuda.jcudnn.cudnnPoolingMode
 
 object CaffeIO {
-  def mkNodeSetFromProtobuf(fin:Readable) = {
+  def loadModelFromProtobuf(fin:InputStream) = {
+    val cis = CodedInputStream.newInstance(fin)
+    cis.setSizeLimit(1 << 30)
+    val netParam = Caffe.NetParameter.parseFrom(cis)
+    extractNodeSetAndModelMats(netParam)
+  }
+  
+  def mkNodeSetFromPrototxt(fin:Readable) = {
     val caffeBuilder = Caffe.NetParameter.newBuilder()
     TextFormat.merge(fin, caffeBuilder)
     
+    extractNodeSetAndModelMats(caffeBuilder)._1
+  }
+
+  def extractNodeSetAndModelMats(netParam:Caffe.NetParameterOrBuilder) = {
     // Translate every layer and build a mapping of blobs to layers feeding into them
     val nodes = new mutable.ArrayBuffer[Node]
+    // TODO: make sure that either everything is trained or nothing is
+    val modelMats = new mutable.ArrayBuffer[Mat]
     val nodesWithTop = new mutable.HashMap[String,mutable.Buffer[Node]]
-    for (layer <- caffeBuilder.getLayerList()) {
+    for (layer <- netParam.getLayerList()) {
       layer.getType() match {
         case "Convolution" => {
           val convParam = layer.getConvolutionParam()
+          
           nodes += new ConvNode {
             noutputs = convParam.getNumOutput()
             hasBias = convParam.getBiasTerm()
@@ -52,6 +67,14 @@ object CaffeIO {
             if (convParam.getWeightFiller().getType() != "xavier") {
               throw new NotImplementedError("Only xavier initialization is currently implemented for convolution layers")
             }
+          }
+          
+          if (layer.getBlobsCount() > 0) {
+            // TODO: avoid hardcoding mat count
+            if (layer.getBlobsCount() != 2) {
+              throw new IllegalArgumentException("Convolution layer needs 2 matrices")
+            }
+            blobs2Mats(modelMats, nodes.last.asInstanceOf[ModelNode], layer)
           }
         }
         case "Pooling" => {
@@ -132,6 +155,13 @@ object CaffeIO {
             outdim = ipp.getNumOutput()
             hasBias = ipp.getBiasTerm()
           }
+          if (layer.getBlobsCount() > 0) {
+            // TODO: avoid hardcoding mat count
+            if (layer.getBlobsCount() != 1) {
+              throw new IllegalArgumentException("Linear layer needs 1 matrix")
+            }
+            blobs2Mats(modelMats, nodes.last.asInstanceOf[ModelNode], layer)
+          }
         }
         case "Split" => nodes += new CopyNode
         case "Softmax" => nodes += new SoftmaxNode
@@ -149,6 +179,7 @@ object CaffeIO {
         // TODO: change once we implement all layer types
         case _ => throw new NotImplementedError("\"%s\" is not implemented yet" format layer.getType())
       }
+      
       for (t <- layer.getTopList()) {
         nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer) += nodes.last
       }
@@ -158,7 +189,7 @@ object CaffeIO {
     // When several layers reuse the same blob, order the layers in the order they were specified
     // in the prototxt.
     val blobIterIndices = new mutable.HashMap[String,Int]
-    for ((layer, curNode) <- caffeBuilder.getLayerList() zip nodes) {
+    for ((layer, curNode) <- netParam.getLayerList() zip nodes) {
       // XXX this should account for multiple bottom blobs
       if (layer.getBottomCount() >= 1) {
         val bottom = layer.getBottom(0)
@@ -205,6 +236,7 @@ object CaffeIO {
           batchNormMode = bnNode.batchNormMode
           
           hasBias = scaleNode.hasBias
+          imodel = scaleNode.imodel
         }
         
         Array.copy(bnNode.inputs, 0, combinedNode.inputs, 0, bnNode.inputs.length)
@@ -223,6 +255,27 @@ object CaffeIO {
       }
     }
 
-    new NodeSet(newNodes.toArray)
+    (new NodeSet(newNodes.toArray), modelMats.toArray)
+  }
+  
+  private def blobs2Mats(modelMats:mutable.Buffer[Mat], node:ModelNode, layer:Caffe.LayerParameter) = {
+    for (blob <- layer.getBlobsList()) {
+      val dimList = blob.getShape().getDimList()
+      val dims = if (dimList.size() == 4) {
+        // Translate from NCHW -> CWHN
+        Array(1, 3, 2, 0).map(dimList.get(_).intValue())
+      } else {
+        dimList.map(_.intValue()).toArray
+      }
+      if (blob.getDoubleDataCount() > 0) {
+        val data = blob.getDoubleDataList().map(_.doubleValue()).toArray
+        // TODO: what kind of Mat should I be instantiating
+        modelMats += new DMat(dims, data)
+      } else {
+        val data = blob.getDataList().map(_.floatValue()).toArray
+        // TODO: what kind of Mat should I be instantiating
+        modelMats += new FMat(dims, data)
+      }
+    }
   }
 }

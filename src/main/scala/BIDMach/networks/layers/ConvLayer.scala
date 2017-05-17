@@ -356,7 +356,7 @@ trait ConvNodeOpts extends ModelNodeOpts {
 
 }
 
-class ConvNode extends Node with ConvNodeOpts {
+class ConvNode extends ModelNode with ConvNodeOpts {
 
   def copyTo(opts:ConvNode):ConvNode = {
     this.asInstanceOf[Node].copyTo(opts);

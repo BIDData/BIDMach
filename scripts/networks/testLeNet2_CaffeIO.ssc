@@ -37,7 +37,7 @@ var f:FileReader = null
 var nodeSet:NodeSet = null
 try {
   f = new FileReader("lenet_train_test.prototxt")
-  nodeSet = CaffeIO.mkNodeSetFromProtobuf(f)
+  nodeSet = CaffeIO.mkNodeSetFromPrototxt(f)
 } finally {
   if (f != null) {
     f.close()

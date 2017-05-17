@@ -1,7 +1,7 @@
-:silent
+//:silent
 import BIDMach.extern._
 import BIDMach.networks.layers._
-import java.io.FileReader
+import java.io.FileInputStream
 
 val traindir = "../../data/MNIST/"
 
@@ -18,26 +18,28 @@ val mt = train.mean(irow(3));
 train ~ train - mt;
 test ~ test - mt;
 
+// TODO: eliminate need to instantiate learner first
 val (nn,opts) = Net.learner(train,trainlabels);
 
-val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
+opts.batchSize= 64
+opts.npasses = 2
 
-opts.batchSize= 32
-opts.npasses = 10
-opts.lrate = 1e-4f 
-opts.texp = 0.1f
+opts.lrate = 1e-3f 
+opts.texp = 0.3f
 opts.pstep = 0.1f
 opts.hasBias = true;
-//opts.lookahead = 0;
-opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
+//opts.autoReset = false;
 
-var f:FileReader = null
+var f:FileInputStream = null
 var nodeSet:NodeSet = null
+var modelMats:Array[Mat] = null
 try {
-  f = new FileReader("lenet_train_test_1.prototxt")
-  nodeSet = CaffeIO.mkNodeSetFromPrototxt(f)
+  f = new FileInputStream("lenet_iter_10000.caffemodel")
+  val (x, y) = CaffeIO.loadModelFromProtobuf(f)
+  nodeSet = x
+  modelMats = y
 } finally {
   if (f != null) {
     f.close()
@@ -45,21 +47,22 @@ try {
 }
 
 // XXX this appears to be missing support in the protobuf
-nodeSet(15).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
+nodeSet(8).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
+
 
 
 
 opts.nodeset = nodeSet;
 val model = nn.model.asInstanceOf[Net];
-nn.train;
+opts.nmodelmats = modelMats.length
+model.copyModelMats(modelMats)
 
-val (mm, mopts) =  Net.predictor(model, test, testlabels);
-mopts.autoReset = false;
-
+val (mm, mopts) = Net.predictor(model, test, testlabels);
+mopts.batchSize = 64;
 val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-:silent
 
+//:silent
 
