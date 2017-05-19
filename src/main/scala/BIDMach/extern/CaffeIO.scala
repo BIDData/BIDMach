@@ -207,9 +207,9 @@ object CaffeIO {
     // Assign batch norm modes
     for (node <- nodes.filter(_.isInstanceOf[BatchNormNode]).map(_.asInstanceOf[BatchNormNode])) {
       if (node.inputs(0).isInstanceOf[ConvNode]) {
-        node.batchNormMode = BatchNormLayer.SPATIAL
+        node.batchNormMode = BatchNormLayer.Spatial
       } else {
-        node.batchNormMode = BatchNormLayer.PER_ACTIVATION
+        node.batchNormMode = BatchNormLayer.PerActivation
       }
     }
     

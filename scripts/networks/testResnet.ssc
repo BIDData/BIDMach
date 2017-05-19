@@ -59,8 +59,8 @@ opts.inplace = Net.BackwardCaching;
 //opts.inplace = Net.NoInPlace;
 opts.convType = Net.CrossCorrelation;
 
-val bnMode = BatchNormLayer.SPATIAL;
-//val bnMode = BatchNormLayer.PER_ACTIVATION;
+val bnMode = BatchNormLayer.Spatial;
+//val bnMode = BatchNormLayer.PerActivation;
 val in_place = opts.inplace
 
 val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");

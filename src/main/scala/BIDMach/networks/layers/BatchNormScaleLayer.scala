@@ -47,11 +47,11 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
   	initHandles();
     val bdims = inputData.dims.copy;
     opts.batchNormMode match {
-    case BatchNormLayer.SPATIAL => {
+    case BatchNormLayer.Spatial => {
     	batchDim = irow(1->inputData.dims.length);
     	bdims(1->bdims.length) = 1;
     }
-    case BatchNormLayer.PER_ACTIVATION => {
+    case BatchNormLayer.PerActivation => {
     	batchDim = irow(inputData.dims.length-1);
     	bdims(bdims.length-1) = 1;
     }
@@ -188,8 +188,8 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     val biasGMat = bias.asInstanceOf[GMat];
     
     val normMode = opts.batchNormMode match {
-      case BatchNormLayer.SPATIAL => cudnnBatchNormMode.CUDNN_BATCHNORM_SPATIAL;
-      case BatchNormLayer.PER_ACTIVATION => cudnnBatchNormMode.CUDNN_BATCHNORM_PER_ACTIVATION;
+      case BatchNormLayer.Spatial => cudnnBatchNormMode.CUDNN_BATCHNORM_SPATIAL;
+      case BatchNormLayer.PerActivation => cudnnBatchNormMode.CUDNN_BATCHNORM_PER_ACTIVATION;
     }
     
     try {
@@ -209,11 +209,11 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       if (sbmvDeriveStatus == cudnnStatus.CUDNN_STATUS_BAD_PARAM) throw new CUDAException(sbmvDeriveStatus, "Error creating scale/bias/mean/var tensor for batch norm forward")
 
       var err = if (dotrain) {
-        cudnnBatchNormalizationForwardTraining(cudnnMainHandle, normMode, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
+        cudnnBatchNormalizationForwardTraining(cudnnMainHandle, normMode, BatchNormScaleLayer.One, BatchNormScaleLayer.Zero, 
             xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata, biasGMat.pdata, 
             opts.expAvgFactor, runningMeansGMat.pdata, runningVariancesGMat.pdata, opts.epsilon, meansGMat.pdata, variancesGMat.pdata);
       } else {
-      	cudnnBatchNormalizationForwardInference(cudnnMainHandle, normMode, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
+      	cudnnBatchNormalizationForwardInference(cudnnMainHandle, normMode, BatchNormScaleLayer.One, BatchNormScaleLayer.Zero, 
       	    xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata,
       	    biasGMat.pdata, runningMeansGMat.pdata, runningVariancesGMat.pdata, opts.epsilon);        
       }
@@ -254,8 +254,8 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     val updateBiasGMat = updateBias.asInstanceOf[GMat];
     
     val normMode = opts.batchNormMode match {
-      case BatchNormLayer.SPATIAL => cudnnBatchNormMode.CUDNN_BATCHNORM_SPATIAL;
-      case BatchNormLayer.PER_ACTIVATION => cudnnBatchNormMode.CUDNN_BATCHNORM_PER_ACTIVATION;
+      case BatchNormLayer.Spatial => cudnnBatchNormMode.CUDNN_BATCHNORM_SPATIAL;
+      case BatchNormLayer.PerActivation => cudnnBatchNormMode.CUDNN_BATCHNORM_PER_ACTIVATION;
     }
     
     try {
@@ -280,7 +280,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       if (sbmvDeriveStatus == cudnnStatus.CUDNN_STATUS_BAD_PARAM) throw new CUDAException(sbmvDeriveStatus, "Error creating scale/bias diff tensor for batch norm backward")
       
       cudnnBatchNormalizationBackward(cudnnMainHandle, normMode,
-          BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
+          BatchNormScaleLayer.One, BatchNormScaleLayer.Zero, BatchNormScaleLayer.One, BatchNormScaleLayer.Zero, 
           xDesc, inputGMat.pdata, dyDesc, derivGMat.pdata, dxDesc, inputDerivGMat.pdata,
           scaleBiasDiffDesc, scaleGMat.pdata, updateScaleGMat.pdata, updateBiasGMat.pdata, opts.epsilon,
           meansGMat.pdata, variancesGMat.pdata);
@@ -321,7 +321,7 @@ trait BatchNormScaleNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = true;
   var expAvgFactor:Float = 1.0f;                  
   var epsilon:Float = 1e-4f;
-  var batchNormMode:Int = BatchNormLayer.SPATIAL;
+  var batchNormMode:Int = BatchNormLayer.Spatial;
 
   def copyOpts(opts:BatchNormScaleNodeOpts):BatchNormScaleNodeOpts = {
 		super.copyOpts(opts);
@@ -352,8 +352,8 @@ class BatchNormScaleNode extends Node with BatchNormScaleNodeOpts {
 
 object BatchNormScaleLayer {
   
-  val ONE = Pointer.to(Array(1.0f));
-  val ZERO = Pointer.to(Array(0.0f));
+  val One = Pointer.to(Array(1.0f));
+  val Zero = Pointer.to(Array(0.0f));
 
   def apply(net:Net) = new BatchNormScaleLayer(net);
   

@@ -21,7 +21,7 @@ class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts =
 
   override def forward = {
     val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
-    if (opts.batchNormMode == BatchNormLayer.SPATIAL && cuTensorFormat == cudnnTensorFormat.CUDNN_TENSOR_NCHW) {
+    if (opts.batchNormMode == BatchNormLayer.Spatial && cuTensorFormat == cudnnTensorFormat.CUDNN_TENSOR_NCHW) {
       throw new RuntimeException("Spatial BatchNorm with NCHW tensors requires CUDNN fused BatchNormScaleLayer");
     }
     val start = toc;
@@ -29,8 +29,8 @@ class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts =
       
     if (batchDim.asInstanceOf[AnyRef] == null) {
     	batchDim = opts.batchNormMode match {
-    	case BatchNormLayer.SPATIAL => irow(1->inputData.dims.length);
-    	case BatchNormLayer.PER_ACTIVATION => irow(inputData.dims.length-1);
+    	case BatchNormLayer.Spatial => irow(1->inputData.dims.length);
+    	case BatchNormLayer.PerActivation => irow(inputData.dims.length-1);
     	}
     }
      
@@ -85,7 +85,7 @@ class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts =
 trait BatchNormNodeOpts extends ModelNodeOpts {
 	var expAvgFactor:Float = 1f;
   var epsilon:Float = 1e-4f;
-  var batchNormMode = BatchNormLayer.SPATIAL;
+  var batchNormMode = BatchNormLayer.Spatial;
   
   def copyOpts(opts:BatchNormNodeOpts):BatchNormNodeOpts = {
       super.copyOpts(opts);
@@ -113,8 +113,8 @@ class BatchNormNode extends Node with BatchNormNodeOpts {
 }
 
 object BatchNormLayer {
-  final val SPATIAL = 1;
-  final val PER_ACTIVATION = 2;
+  final val Spatial = 1;
+  final val PerActivation = 2;
 
   def apply(net:Net) = new BatchNormLayer(net)
   

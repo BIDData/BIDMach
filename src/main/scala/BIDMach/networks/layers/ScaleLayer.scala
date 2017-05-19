@@ -32,12 +32,12 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
   def initModelMats = {
     val bdims = inputData.dims.copy;
     opts.batchNormMode match {
-      case BatchNormLayer.SPATIAL => {
+      case BatchNormLayer.Spatial => {
       	batchDim = irow(1->inputData.dims.length);
       	bdims(1->bdims.length) = 1;
      
       }
-      case BatchNormLayer.PER_ACTIVATION => {
+      case BatchNormLayer.PerActivation => {
       	batchDim = irow(inputData.dims.length-1);
       	bdims(bdims.length-1) = 1;
       }
@@ -56,7 +56,7 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
 
   override def forward = {
     val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
-    if (opts.batchNormMode == BatchNormLayer.SPATIAL && cuTensorFormat == cudnnTensorFormat.CUDNN_TENSOR_NCHW) {
+    if (opts.batchNormMode == BatchNormLayer.Spatial && cuTensorFormat == cudnnTensorFormat.CUDNN_TENSOR_NCHW) {
       throw new RuntimeException("Spatial ScaleBias with NCHW tensors requires CUDNN fused BatchNormScaleLayer");
     }
     val start = toc;
@@ -99,7 +99,7 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
 
 trait ScaleNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = true;
-  var batchNormMode = BatchNormLayer.SPATIAL;
+  var batchNormMode = BatchNormLayer.Spatial;
    
   def copyOpts(opts:ScaleNodeOpts):ScaleNodeOpts = {
   		super.copyOpts(opts);

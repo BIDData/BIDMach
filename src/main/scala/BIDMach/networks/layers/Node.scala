@@ -344,11 +344,11 @@ object Node {
 	  n
 	}
   
-  def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
+  def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.Spatial) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
   }
   
-  def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
+  def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.Spatial, hasBias:Boolean = true,
       lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing) = {
   	val hb = hasBias;
   	val mname = name;
@@ -619,7 +619,7 @@ object Node {
     new ReshapeNode{inputs(0) = a; dims = dims0; addBatchDim = addbatch};
   }
   
-  def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
+  def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.Spatial, hasBias:Boolean = true,
       lr_scale:Float=1f, bias_scale:Float=1f) = {
   	val hb = hasBias;
   	val mname = name;

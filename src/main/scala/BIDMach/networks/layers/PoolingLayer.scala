@@ -216,7 +216,7 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       val cstatus = cudnnSetPooling2dDescriptor(pDesc, opts.poolingMode, opts.poolingNaN, h, w, pady, padx, stridey, stridex);
       if (cstatus > 0) throw new CUDAException(cstatus, "Error setting pooling descriptor");
 
-      var err = cudnnPoolingForward(cudnnMainHandle, pDesc, PoolingLayer.ONE, xDesc, inputGMat.pdata, PoolingLayer.ZERO, yDesc, outputGMat.pdata);
+      var err = cudnnPoolingForward(cudnnMainHandle, pDesc, PoolingLayer.One, xDesc, inputGMat.pdata, PoolingLayer.Zero, yDesc, outputGMat.pdata);
       
       cudaStreamSynchronize(cudnnMainStream);
       if (err == 0) err = cudaGetLastError();
@@ -280,8 +280,8 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       val cstatus = cudnnSetPooling2dDescriptor(pDesc, opts.poolingMode, opts.poolingNaN, h, w, pady, padx, stridey, stridex);
       if (cstatus > 0) throw new CUDAException(cstatus, "Error setting pooling descriptor");
 
-      var err = cudnnPoolingBackward(cudnnMainHandle, pDesc, PoolingLayer.ONE, yDesc, outputGMat.pdata, dyDesc, derivGMat.pdata,
-          xDesc, inputGMat.pdata, PoolingLayer.ONE, dxDesc, inputDerivGMat.pdata);
+      var err = cudnnPoolingBackward(cudnnMainHandle, pDesc, PoolingLayer.One, yDesc, outputGMat.pdata, dyDesc, derivGMat.pdata,
+          xDesc, inputGMat.pdata, PoolingLayer.One, dxDesc, inputDerivGMat.pdata);
          
       cudaStreamSynchronize(cudnnMainStream);
       if (err == 0) err = cudaGetLastError();
@@ -350,8 +350,8 @@ class PoolingNode extends Node with PoolingNodeOpts {
 
 object PoolingLayer {
   
-  val ONE = Pointer.to(Array(1.0f));
-  val ZERO = Pointer.to(Array(0.0f));
+  val One = Pointer.to(Array(1.0f));
+  val Zero = Pointer.to(Array(0.0f));
 
   def apply(net:Net) = new PoolingLayer(net);
   

@@ -86,8 +86,8 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  * 
  - AbsLayer:                     abs(y) 
  - AddLayer:                     x + y
- - BatchNormLayer:               batchnorm(x)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL)
- - BatchNormScaleLayer:          bns(x)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean=true,
+ - BatchNormLayer:               batchnorm(x)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.Spatial)
+ - BatchNormScaleLayer:          bns(x)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.Spatial, hasBias:Boolean=true,
                                         lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing)
  - ConstantLayer:                const(1e-3f)
  - ConvLayer:                    conv(x)(name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true, 
@@ -134,7 +134,7 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
                                          tensorFormat:Int = Net.UseNetFormat)
  - RandMirror:                   randmirror(x)(prob:Float=0.5f)
  - RectLayer:                    rect(x)(inplace:Int=Net.UseNetPlacing)    or    relu(x)(inplace:Int=Net.UseNetPlacing) 
- - ScaleLayer:                   scale(x)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
+ - ScaleLayer:                   scale(x)(name:String="", normMode:Int=BatchNormLayer.Spatial, hasBias:Boolean = true,
                                           lr_scale:Float=1f, bias_scale:Float=1f)
  - SelectLayer:                  x(i) 
  - SignLayer:                    sign(x)
@@ -166,7 +166,7 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  - inplace:Int                   Specifies the memory-sharing model for this node.
  - lr_scale:Float                Scale the global learning rate by this factor when updating the model for this layer. 
  - name:String                   A name for this node. Model nodes with the same name share parameters. 
- - normMode:Int                  The kind of Batch Normalization: BatchNormLayer.SPATIAL or BatchNormLayer.PER_ACTIVATION
+ - normMode:Int                  The kind of Batch Normalization: BatchNormLayer.Spatial or BatchNormLayer.PerActivation
  - nparts:Int                    Number of parts to split this layer into, for splitvert and splithoriz. 
  - tensorFormat:Int              The tensor format. Net.tensorNCHW or Net.tensorNHWC or Net.useNetFormat
  - 
@@ -566,11 +566,11 @@ object Layer {
   
   def abs(a:LayerTerm) = new AbsLayer(null){inputs(0) = a;};
   
-  def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
+  def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.Spatial) = {
     new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
   }
   
-  def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, 
+  def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.Spatial, hasBias:Boolean = true, 
       lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing, net:Net=null) = {
     val hb = hasBias;
   	val mname = name;
@@ -784,7 +784,7 @@ object Layer {
     new PoolingLayer(net, new PoolingNode{h=hh; w=ww; stridey=str; stridex=str; pady=ppad; padx=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
   }
   
-  def scale(a:LayerTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {
+  def scale(a:LayerTerm)(name:String="", normMode:Int=BatchNormLayer.Spatial, hasBias:Boolean = true, lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {
   	val hb = hasBias;
   	val mname = name;
   	val lrs = lr_scale;
