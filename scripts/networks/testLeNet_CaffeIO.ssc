@@ -33,24 +33,22 @@ opts.hasBias = true;
 opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
 
+val model = nn.model.asInstanceOf[Net]
+
 var f:FileReader = null
-var nodeSet:NodeSet = null
 try {
   f = new FileReader("lenet_train_test_1.prototxt")
-  nodeSet = CaffeIO.mkNodeSetFromPrototxt(f)
+  CaffeIO.loadUntrainedModel(f, model)
 } finally {
   if (f != null) {
     f.close()
   }
 }
-
 // XXX this appears to be missing support in the protobuf
-nodeSet(15).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
+model.opts.nodeset(15).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
 
 
 
-opts.nodeset = nodeSet;
-val model = nn.model.asInstanceOf[Net];
 nn.train;
 
 val (mm, mopts) =  Net.predictor(model, test, testlabels);

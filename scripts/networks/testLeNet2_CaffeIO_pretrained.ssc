@@ -32,30 +32,20 @@ opts.hasBias = true;
 opts.tensorFormat = Net.TensorNCHW;
 //opts.autoReset = false;
 
+val model = nn.model.asInstanceOf[Net]
+
 var f:FileInputStream = null
-var nodeSet:NodeSet = null
-var modelMats:Array[Mat] = null
 try {
   f = new FileInputStream("lenet_iter_10000.caffemodel")
-  val (x, y) = CaffeIO.loadModelFromProtobuf(f)
-  nodeSet = x
-  modelMats = y
+  CaffeIO.loadTrainedModel(f, model)
 } finally {
   if (f != null) {
     f.close()
   }
 }
-
 // XXX this appears to be missing support in the protobuf
-nodeSet(8).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyLoss
+model.opts.nodeset(8).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
 
-
-
-
-opts.nodeset = nodeSet;
-val model = nn.model.asInstanceOf[Net];
-opts.nmodelmats = modelMats.length
-model.copyModelMats(modelMats)
 
 val (mm, mopts) = Net.predictor(model, test, testlabels);
 mopts.batchSize = 64;

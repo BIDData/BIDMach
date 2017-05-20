@@ -3,6 +3,7 @@ package BIDMach.extern
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat,FFilter,Filter,GFilter}
 import BIDMat.MatFunctions._
 import BIDMach._
+import BIDMach.networks.Net
 import BIDMach.networks.layers._
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -14,21 +15,20 @@ import com.google.protobuf._
 import jcuda.jcudnn.cudnnPoolingMode
 
 object CaffeIO {
-  def loadModelFromProtobuf(fin:InputStream) = {
+  def loadUntrainedModel(fin:Readable, net:Net):Unit = {
+    val caffeBuilder = Caffe.NetParameter.newBuilder()
+    TextFormat.merge(fin, caffeBuilder)
+    parseProtobuf(caffeBuilder, net)
+  }
+  
+  def loadTrainedModel(fin:InputStream, net:Net):Unit = {
     val cis = CodedInputStream.newInstance(fin)
     cis.setSizeLimit(1 << 30)
     val netParam = Caffe.NetParameter.parseFrom(cis)
-    extractNodeSetAndModelMats(netParam)
-  }
-  
-  def mkNodeSetFromPrototxt(fin:Readable) = {
-    val caffeBuilder = Caffe.NetParameter.newBuilder()
-    TextFormat.merge(fin, caffeBuilder)
-    
-    extractNodeSetAndModelMats(caffeBuilder)._1
+    parseProtobuf(netParam, net)
   }
 
-  def extractNodeSetAndModelMats(netParam:Caffe.NetParameterOrBuilder) = {
+  private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, net:Net) = {
     // Translate every layer and build a mapping of blobs to layers feeding into them
     val nodes = new mutable.ArrayBuffer[Node]
     // TODO: make sure that either everything is trained or nothing is
@@ -81,13 +81,12 @@ object CaffeIO {
             convNode.imodel = modelMats.length
 
             // TODO: avoid duplicating code with ConvLayer here
-            // XXX: refactor CaffeIO sufficiently so that we can check net.opts.useGPU
             val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue())
             val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
-            modelMats += (if (/*net.opts.useGPU &&*/ Mat.hasCUDA > 0 && Mat.hasCUDNN) {
-              // TODO: do we need to set tensor format
+            modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
               val x = GFilter(filter)
               x.convType = convNode.convType
+              x.setTensorFormat(Net.getCUDNNformat(convNode.tensorFormat, net.opts.tensorFormat));
               x
             } else {
               filter
@@ -308,7 +307,11 @@ object CaffeIO {
       }
     }
 
-    (new NodeSet(newNodes.toArray), modelMats.toArray)
+    net.opts.nodeset = new NodeSet(newNodes.toArray)
+    if (modelMats.length > 0) {
+      net.setmodelmats(modelMats.toArray)
+      net.opts.nmodelmats = modelMats.length
+    }
   }
   
   private def blobs2Mats(modelMats:mutable.Buffer[Mat], node:ModelNode, layer:Caffe.LayerParameter) = {
