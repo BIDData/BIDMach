@@ -307,6 +307,28 @@ object Net  {
     var tensorFormat:Int = Net.TensorNHWC;
   }
   
+  var defaultNet:Net = null; 
+  var defaultLayerList:List[Layer] = null;
+  
+  def initDefault {
+    defaultNet = new Net;
+    defaultLayerList = List[Layer]();
+  }
+  
+  def addLayer(layer:Layer) = {
+    if (defaultLayerList.asInstanceOf[AnyRef] != null) {
+      defaultLayerList = layer :: defaultLayerList;
+    }
+  }
+  
+  def getDefaultNet:Net = {
+    val net = defaultNet;
+    net.layers = defaultLayerList.toArray.reverse;
+    defaultNet = null;
+    defaultLayerList = null;
+    net;
+  }
+  
   class Options extends Opts {} 
     
   final val UseNetFormat = 0;
