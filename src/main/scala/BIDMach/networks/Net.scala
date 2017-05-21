@@ -91,7 +91,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     			}
     		}
     	}
-    } else {                                           // create a LayerMat that mirrors the NodeMat
+    } else if (opts.nodemat.asInstanceOf[AnyRef] != null) {                                           // create a LayerMat that mirrors the NodeMat
       val nrows = opts.nodemat.nrows;
       val ncols = opts.nodemat.ncols;
       layermat = LayerMat(nrows, ncols);
