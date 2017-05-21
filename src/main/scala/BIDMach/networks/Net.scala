@@ -310,8 +310,8 @@ object Net  {
   var defaultNet:Net = null; 
   var defaultLayerList:List[Layer] = null;
   
-  def initDefault {
-    defaultNet = new Net;
+  def initDefault(opts:Net.Opts) {
+    defaultNet = new Net(opts);
     defaultLayerList = List[Layer]();
   }
   
