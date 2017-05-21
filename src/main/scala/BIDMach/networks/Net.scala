@@ -305,6 +305,7 @@ object Net  {
     var withInteractions = false;
     var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
     var tensorFormat:Int = Net.TensorNHWC;
+    var convType = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
   }
   
   var defaultNet:Net = null; 
