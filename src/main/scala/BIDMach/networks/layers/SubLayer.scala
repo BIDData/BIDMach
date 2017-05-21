@@ -34,7 +34,11 @@ class SubLayer(override val net:Net, override val opts:SubNodeOpts = new SubNode
 	
 	def squash(a:Mat, b:Mat) = {
 	  if (b.nrows == 1 && a.nrows > 1) {
-	    sum(a);
+	      if (b.ncols == 1 && a.ncols > 1) {
+		  sum(sum(a));
+	      } else {
+		  sum(a);
+	      }
 	  } else {
 	    a;
 	  }

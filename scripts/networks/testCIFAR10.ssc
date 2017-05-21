@@ -12,9 +12,9 @@ val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
 opts.batchSize= 100
-opts.npasses = 10
+opts.npasses = 50
+opts.lrate = 3e-4f 
 
-opts.lrate = 1e-3f 
 opts.momentum = 0.9f
 opts.texp = 0.0f
 opts.pstep = 0.1f
@@ -26,8 +26,10 @@ opts.debugMem = true;
 import BIDMach.networks.layers.Node._;
 
 val in = input;
+val scalef = constant(row(0.01f));
+val inscale = in *@ scalef
 
-val conv1 = conv(in)(w=5,h=5,nch=32,stride=1,pad=0,initv=0.01f,convType=convt);
+val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=0,initv=1f,convType=convt);
 val pool1 = pool(conv1)(w=2,h=2,stride=2);
 //val norm1 = batchNormScale(pool1)();
 val relu1 = relu(pool1);
@@ -42,7 +44,7 @@ val pool3 = pool(conv3)(w=3,h=3,stride=2);
 val fc3 =   linear(pool3)(outdim=10,initv=3e-2f);
 val out =   softmaxout(fc3)(scoreType=1); 
 
-val nodes = (in     \ null   \ null   on
+val nodes = (in     \ scalef \ inscale on
              conv1  \ pool1  \ relu1  on
              conv2  \ pool2  \ relu2  on
              conv3  \ pool3  \ null   on
