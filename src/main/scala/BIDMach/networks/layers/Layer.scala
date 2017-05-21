@@ -203,15 +203,21 @@ object Layer {
     new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
   }
   
-  def batchNormScale(a:LayerTerm)(net0:Net=null, name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
-  	val net = findNet(net0);
+  def batchNormScale(a:LayerTerm)(net:Net=null, name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  	val net0 = findNet(net);
     val hb = hasBias;
   	val mname = name;
-    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}
+    new BatchNormScaleLayer(net0, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}
   }
   
-  def constant(v:Mat) = {
-    new ConstantLayer(null, new ConstantNode{value = v;})
+  def constant(v:Mat)(net:Net=null):ConstantLayer = {
+  	val net0 = findNet(net);
+    new ConstantLayer(net0, new ConstantNode{value = v;})
+  }
+  
+  def const(v:Mat):ConstantLayer = {
+  	val net0 = findNet(null);
+    new ConstantLayer(net0, new ConstantNode{value = v;})
   }
   
   def conv(a:LayerTerm)(net:Net=null, name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
