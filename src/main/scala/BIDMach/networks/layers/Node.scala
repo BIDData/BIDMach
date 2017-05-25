@@ -71,6 +71,8 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
     
   def ∘    (a:NodeTerm) = {val n=this; new MulNode{inputs(0)=n; inputs(1)=a;}};
   
+  def /    (a:NodeTerm) = {val n=this; new DivNode{inputs(0)=n; inputs(1)=a;}};
+  
   def dot  (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
   
   def ∙    (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
@@ -133,6 +135,13 @@ object Node {
     val fwd = fwdfn;
     val bwd = bwdfn;
     new FnNode{inputs(0) = a; fwdfn=fwd; bwdfn=bwd};
+  }
+  
+  def fn2(a:NodeTerm,b:NodeTerm)(fwdfn:(Mat,Mat)=>Mat=null, bwdfn1:(Mat,Mat,Mat,Mat)=>Mat=null, bwdfn2:(Mat,Mat,Mat,Mat)=>Mat=null) = {
+    val fwd = fwdfn;
+    val bwd1 = bwdfn1;
+    val bwd2 = bwdfn2;
+    new Fn2Node{inputs(0) = a; inputs(1) = b; fwdfn=fwd; bwdfn1=bwd1; bwdfn2=bwd2};
   }
   
   def glm_(a:NodeTerm)(implicit opts:GLMNodeOpts) = new GLMNode{inputs(0) = a; links = opts.links};

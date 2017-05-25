@@ -35,11 +35,11 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new
 
 	override def backward = {
 			val start = toc;
-			val exps = exp(inputData - maxi(inputData));
-			val sumexps = sum(exps);
-			val isum = one / (sumexps ∘ sumexps);
-			if (inputDeriv.asInstanceOf[AnyRef] != null) 
-        inputDeriv ~ inputDeriv + (((exps / sumexps) ∘ deriv) - (exps ∘ (isum ∘ (exps ∙ deriv))));
+			if (inputDeriv.asInstanceOf[AnyRef] != null) {
+				val exps = exp(inputData - maxi(inputData));
+				val smax = exps / sum(exps);
+        inputDeriv ~ inputDeriv + ((smax ∘ deriv) - (smax ∘ (smax ∙ deriv)));
+			}
 			backwardtime += toc - start;
 	}
   

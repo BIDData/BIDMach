@@ -18,9 +18,6 @@ import java.util.HashMap
 import BIDMach.networks._
 import java.util.Arrays
 
-/* Many issues to think of    
-   How to consider bias...(maybe very difficult?)
-*/
 
 class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvNode ) extends ModelLayer(net, opts, 2) {
     var filter:FMat = null; 
@@ -31,6 +28,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var update_bias_mat:FMat = null;
     var inputDim:IMat = null; // Should be three numbers
 //    var outputDim:IMat = null; //Should be three numbers
+    
 
   def initModelMats = {
     inputDim = inputData.dims;

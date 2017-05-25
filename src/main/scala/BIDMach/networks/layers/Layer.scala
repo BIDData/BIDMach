@@ -179,6 +179,8 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
   def *@   (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
     
   def ∘    (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+    
+  def /    (a:LayerTerm) = {val n=this; new DivLayer(null){inputs(0)=n; inputs(1)=a;}};
   
   def dot  (a:LayerTerm) = {val n=this; new DotLayer(null){inputs(0)=n; inputs(1)=a;}};
   
@@ -256,6 +258,13 @@ object Layer {
     val fwd = fwdfn;
     val bwd = bwdfn;
     new FnLayer(null, new FnNode{fwdfn=fwd; bwdfn=bwd}){inputs(0) = a;};
+  }
+  
+  def fn2(a:LayerTerm, b:LayerTerm)(fwdfn:(Mat,Mat)=>Mat=null, bwdfn1:(Mat,Mat,Mat,Mat)=>Mat=null, bwdfn2:(Mat,Mat,Mat,Mat)=>Mat=null) = {
+    val fwd = fwdfn;
+    val bwd1 = bwdfn1;
+    val bwd2 = bwdfn2;
+    new Fn2Layer(null, new Fn2Node{fwdfn=fwd; bwdfn1=bwd1; bwdfn2=bwd2}){inputs(0) = a; inputs(1) = b;};
   }
    
   def format(a:LayerTerm)(net:Net = null, conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
