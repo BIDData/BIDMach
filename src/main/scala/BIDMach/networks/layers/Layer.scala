@@ -201,6 +201,8 @@ object Layer {
     }
   }
   
+  def abs(a:LayerTerm) = new AbsLayer(null){inputs(0) = a;};
+  
   def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
     new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
   }
@@ -356,6 +358,8 @@ object Layer {
   
   def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
   
+  def sign(a:LayerTerm) = new SignLayer(null){inputs(0) = a;};
+  
   def σ(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
 
   def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a};
@@ -367,6 +371,8 @@ object Layer {
   def splithoriz(a:LayerTerm)(np:Int) = new SplitHorizLayer(null, new SplitHorizNode{nparts = np}){inputs(0) = a};
   
   def splitvert(a:LayerTerm)(np:Int) = new SplitVertLayer(null, new SplitVertNode{nparts = np}){inputs(0) = a};
+  
+  def sqrt(a:LayerTerm) = new SqrtLayer(null){inputs(0) = a;};
   
   def sum(a:LayerTerm) = new SumLayer(null){inputs(0) = a};
   

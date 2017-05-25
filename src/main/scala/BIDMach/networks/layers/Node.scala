@@ -84,6 +84,8 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
 
 object Node {
   
+	def abs(a:NodeTerm) = new AbsNode{inputs(0) = a;};
+  
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
   }
@@ -260,6 +262,8 @@ object Node {
   
   def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
   
+  def sign(a:NodeTerm) = new SignNode{inputs(0) = a;};
+  
   def σ(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
 
   def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
@@ -274,6 +278,8 @@ object Node {
   def splithoriz(a:NodeTerm)(np:Int) = new SplitHorizNode{inputs(0) = a; nparts = np};
   
   def splitvert(a:NodeTerm)(np:Int) = new SplitVertNode{inputs(0) = a; nparts = np};
+  
+  def sqrt(a:NodeTerm) = new SqrtNode{inputs(0) = a;};
   
   def sum(a:NodeTerm) = new SumNode{inputs(0) = a;}
   

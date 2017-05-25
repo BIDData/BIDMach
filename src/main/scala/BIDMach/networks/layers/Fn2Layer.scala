@@ -42,7 +42,7 @@ class Fn2Layer(override val net:Net, override val opts:Fn2NodeOpts = new Fn2Node
   }
   
   override def toString = {
-    "fn@"+Integer.toHexString(hashCode % 0x10000).toString
+    "fn2@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
