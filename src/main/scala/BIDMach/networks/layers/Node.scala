@@ -204,6 +204,22 @@ object Node {
     }
   }
   
+  def max(a:NodeTerm,b:NodeTerm) = {
+    new MaxNode{inputs(0) = a; inputs(1) = b;};
+  }
+  
+  def min(a:NodeTerm,b:NodeTerm) = {
+    new MinNode{inputs(0) = a; inputs(1) = b;};
+  }
+  
+  def maxi(a:NodeTerm) = {
+    new MaxiNode{inputs(0) = a};
+  }
+  
+  def mini(a:NodeTerm) = {
+    new MiniNode{inputs(0) = a};
+  }
+  
   def negsamp(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
     val odim = outdim;
     val hBias = hasBias;

@@ -167,6 +167,19 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   override def toString = {
     "layer@"+(hashCode % 0x10000).toString
   }
+  
+    
+  def squash(a:Mat, b:Mat):Mat = {
+  	if (b.nrows == 1 && a.nrows > 1) {
+  		if (b.ncols == 1 && a.ncols > 1) {
+  			BIDMat.SciFunctions.sum(BIDMat.SciFunctions.sum(a));
+  		} else {
+  			BIDMat.SciFunctions.sum(a);
+  		}
+  	} else {
+  		a;
+  	}
+  }
 }
 
 class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
@@ -310,6 +323,30 @@ object Layer {
     n.setInput(1, c);
     n.setInput(2, i);
     n
+  }
+  
+  def max(a:LayerTerm, b:LayerTerm)= {
+    new MaxLayer(null){inputs(0) = a; inputs(1) = b;};
+  }
+  
+  def min(a:LayerTerm, b:LayerTerm)= {
+    new MinLayer(null){inputs(0) = a; inputs(1) = b;};
+  }
+  
+  def maxi(a:LayerTerm)= {
+    new MaxiLayer(null){inputs(0) = a};
+  }
+  
+  def mini(a:LayerTerm)= {
+    new MiniLayer(null){inputs(0) = a};
+  }
+  
+  def maxi2(a:LayerTerm)= {
+    new Maxi2Layer(null){inputs(0) = a};
+  }
+  
+  def mini2(a:LayerTerm)= {
+    new Mini2Layer(null){inputs(0) = a};
   }
 
   

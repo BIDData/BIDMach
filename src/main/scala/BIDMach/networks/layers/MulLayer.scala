@@ -35,18 +35,6 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
 	  clearDeriv;
 	  forwardtime += toc - start;
 	}
-	
-	def squash(a:Mat, b:Mat) = {
-	  if (b.nrows == 1 && a.nrows > 1) {
-	      if (b.ncols == 1 && a.ncols > 1) {
-		  sum(sum(a));
-	      } else {
-		  sum(a);
-	      }
-	  } else {
-	    a;
-	  }
-	}
 
 	override def backward = {
     val start = toc;
