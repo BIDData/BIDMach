@@ -731,8 +731,8 @@ __global__ void __ADAGradm(int nrows, int ncols, float *mm, float *um, float *ss
       grad = (umval / denom);
       if (langevin > 0) grad += curand_normal(prstate) * langevin;
       grad = grad * lrval * tsval;               // Normal gradient
-      grad += momentum[i];                       // With momentum
-      momentum[i] = mu * grad;                   // Save updated momentum
+      grad = grad + mu * (momentum[i] - grad);   // Gradient with momentum
+      momentum[i] = grad;                        // Save it
       mmval += grad;                             // Add the new gradient
       if (maskr > 0) {
         if (maskr > 1) {
@@ -776,8 +776,7 @@ __global__ void __ADAGradn(int nrows, int ncols, float *mm, float *um, float *ss
       if (langevin > 0) grad += curand_normal(prstate) * langevin;
       grad = grad * lrval * tsval;               // Normal gradient
       oldmom = momentum[i];                      // Momentum
-      grad += oldmom;                            // New gradient
-      newmom = mu * grad;                        // Compute new momentum
+      newmom = grad + mu * (oldmom - grad);      // Compute new momentum
       momentum[i] = newmom;                      // Save new momentum
       mmval += grad + newmom - oldmom;
       if (maskr > 0) {

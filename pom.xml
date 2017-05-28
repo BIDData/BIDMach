@@ -6,7 +6,7 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>2.0.1-cuda8.0beta</version>
+  <version>2.0.2-cuda8.0beta</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
@@ -78,6 +78,19 @@
       </activation>
       <properties>
         <osarch>linux-x86_64</osarch>
+      </properties>
+    </profile>
+    <profile>
+      <id>linux_aarch64</id>
+      <activation>
+      	<os>
+          <family>unix</family>
+          <arch>aarch64</arch>
+          <name>!mac os x</name> <!--https://issues.apache.org/jira/browse/MNG-4983-->
+      	</os>
+      </activation>
+      <properties>
+        <osarch>linux-aarch64</osarch>
       </properties>
     </profile>
     <profile>
@@ -248,6 +261,7 @@
           </execution>
         </executions>
         <configuration>
+          <recompileMode>incremental</recompileMode>
           <jvmArgs>
             <jvmArg>-Xmx12g</jvmArg>
           </jvmArgs>

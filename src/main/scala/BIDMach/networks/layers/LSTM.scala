@@ -158,7 +158,7 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val h_over_i = in_h over in_i;
       
       val lin = linear(h_over_i)(prefix+"LSTM_all", outdim=4*odim, hasBias=hasBias);
-      val sp = splitvert(lin, 4);
+      val sp = splitvert(lin)(4);
       
       val in_gate = σ(sp(0));
     	val out_gate = σ(sp(1));
@@ -193,9 +193,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val h_over_i = in_h over in_i;
       
       val lin1 = linear(h_over_i)(prefix+"LSTM_in_out",      outdim=2*odim, hasBias=hasBias);
-      val sp1 = splitvert(lin1, 2);
+      val sp1 = splitvert(lin1)(2);
       val lin2 = linear(h_over_i)(prefix+"LSTM_forget_tanh", outdim=2*odim, hasBias=hasBias);
-      val sp2 = splitvert(lin2, 2);
+      val sp2 = splitvert(lin2)(2);
       
       val in_gate = σ(sp1(0));
     	val out_gate = σ(sp1(1));
@@ -229,9 +229,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
       val in_i = copy;          
       
       val linh = linear(in_h)(prefix+"LSTM_h", outdim=4*odim, hasBias=hasBias);
-      val sph = splitvert(linh, 4);
+      val sph = splitvert(linh)(4);
       val lini = linear(in_i)(prefix+"LSTM_i", outdim=4*odim, hasBias=hasBias);
-      val spi = splitvert(lini, 4);
+      val spi = splitvert(lini)(4);
       
       val lin1 = sph(0) + spi(0);
       val lin2 = sph(1) + spi(1);

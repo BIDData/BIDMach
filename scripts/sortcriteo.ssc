@@ -1,7 +1,7 @@
 val ntrain = 92
 val ntest = 13
 val ndense = 2*ntest+1;
-val dir = "../data/criteo/parts/";
+val dir = "../data/criteo/parts2/";
  
 println("\nCounting features");
 val x= loadSMat(dir+"train00.smat.lz4");
@@ -9,7 +9,8 @@ val nfeats = x.nrows;
 val counts = dzeros(nfeats,1);
 val counts2 = dzeros(nfeats,1);
 
-for (i <- 0 until (ntrain+ntest)) {
+//for (i <- 0 until (ntrain+ntest)) {
+for (i <- 0 until (ntrain)) {
   val a = if (i < ntrain) { 
     loadSMat(dir+("train%02d.smat.lz4" format i));
   } else { 
@@ -18,6 +19,8 @@ for (i <- 0 until (ntrain+ntest)) {
   counts ~ counts + DMat(sum(a,2));
   print(".")
 }
+
+saveDMat(dir+"featurecounts.dmat.lz4", counts)
 
 val cmeans = counts / counts(0);
 val cscale = FMat(cmeans);

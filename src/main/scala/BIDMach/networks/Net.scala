@@ -43,7 +43,12 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
-    if (output_layers == null) output_layers = Array(layers(layers.length-1));
+    if (output_layers == null) {
+      output_layers = layers(layers.length-1) match {
+        case a:OutputLayer => Array(layers(layers.length-1));
+        case _ => Array[Layer]();
+      }
+    }
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
 	  }
@@ -86,7 +91,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     			}
     		}
     	}
-    } else {                                           // create a LayerMat that mirrors the NodeMat
+    } else if (opts.nodemat.asInstanceOf[AnyRef] != null) {                                           // create a LayerMat that mirrors the NodeMat
       val nrows = opts.nodemat.nrows;
       val ncols = opts.nodemat.ncols;
       layermat = LayerMat(nrows, ncols);
@@ -121,52 +126,85 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
 
   def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
-  	layers(0).output = gmats(0);
+    for (i <- 0 until (gmats.length - output_layers.length)) {
+    	layers(i).output = gmats(i);
+    }
   }
 
   def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
-  	} else if (gmats.length > 1) {
-  		layers(layers.length-1).target = full(gmats(1));
+  	} else if (gmats.length > 1 && output_layers.length > 0) {
+  	  for (i <- 0 until output_layers.length)
+  	  	output_layers(i).target = full(gmats(gmats.length-output_layers.length+i));
   	}
   }
-
+  
+  def forward = {
+		  if (mask.asInstanceOf[AnyRef] != null) {
+			  modelmats(0) ~ modelmats(0) ∘ mask;
+		  }
+		  var i = 0;
+		  while (i < layers.length) {
+			  if (opts.debug > 0) {
+				  println("dobatch forward %d %s" format (i, layers(i).getClass))
+			  }
+			  layers(i).forward;
+			  i += 1;
+		  }
+  }
+  
+  def cleargrad {
+  	if (opts.aopts == null) {
+  		for (j <- 0 until updatemats.length) updatemats(j).clear;
+  	}
+  }
+  
+  /** 
+   *  Set the derivative of the output layer to 1's. Assumes we are maximizing likelihood. 
+   *  If todo > 0, put ones in the first todo columns and zeros elsewhere. This is to deal 
+   *  with incomplete minibatches. 
+   */
+  
+  def setderiv(todo:Int=0) = {
+    val dolayers = if (output_layers.length > 0) output_layers else Array(layers(layers.length-1));
+    var j = 0;
+    while (j < dolayers.length) {
+    	val deriv = dolayers(j).deriv;
+      if (todo == 0 || todo == deriv.ncols) {
+      	deriv.set(1);
+      } else {
+        deriv <-- (ones(deriv.nrows, todo) \ zeros(deriv.nrows, deriv.ncols - todo));
+      }
+    	j += 1;
+    }    
+  }
+  
+  def backward(ipass:Int = 0, pos:Long = 0) {
+    var i = layers.length;
+    while (i > 1) {
+    	i -= 1;
+    	if (opts.debug > 0) {
+    		println("dobatch backward %d %s" format (i, layers(i).getClass))
+    	}
+    	layers(i).backward(ipass, pos);
+    }
+    if (mask.asInstanceOf[AnyRef] != null) {
+    	updatemats(0) ~ updatemats(0) ∘ mask;
+    }
+  }
+  
+  
 
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
     	assignInputs(gmats, ipass, pos);
     	assignTargets(gmats, ipass, pos);
-    	if (mask.asInstanceOf[AnyRef] != null) {
-    		modelmats(0) ~ modelmats(0) ∘ mask;
-    	}
-    	var i = 0;
-    	while (i < layers.length) {
-    		if (opts.debug > 0) {
-  		    println("dobatch forward %d %s" format (i, layers(i).getClass))
-  		  }
-    		layers(i).forward;
-    		i += 1;
-    	}
-      var j = 0;
-      while (j < output_layers.length) {
-    	  output_layers(j).deriv.set(1);
-    	  j += 1;
-      }
-      if (opts.aopts == null) {
-    	  for (j <- 0 until updatemats.length) updatemats(j).clear;
-      }
-    	while (i > 1) {
-    		i -= 1;
-    		if (opts.debug > 0) {
-  		    println("dobatch backward %d %s" format (i, layers(i).getClass))
-  		  }
-    		layers(i).backward(ipass, pos);
-    	}
-    	if (mask.asInstanceOf[AnyRef] != null) {
-    		updatemats(0) ~ updatemats(0) ∘ mask;
-    	}
+    	forward;
+    	cleargrad;
+    	setderiv();
+    	backward(ipass, pos);
     }
   }
 
@@ -268,6 +306,29 @@ object Net  {
     var withInteractions = false;
     var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
     var tensorFormat:Int = Net.TensorNHWC;
+    var convType = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
+  }
+  
+  var defaultNet:Net = null; 
+  var defaultLayerList:List[Layer] = null;
+  
+  def initDefault(opts:Net.Opts) {
+    defaultNet = new Net(opts);
+    defaultLayerList = List[Layer]();
+  }
+  
+  def addLayer(layer:Layer) = {
+    if (defaultLayerList.asInstanceOf[AnyRef] != null) {
+      defaultLayerList = layer :: defaultLayerList;
+    }
+  }
+  
+  def getDefaultNet:Net = {
+    val net = defaultNet;
+    net.layers = defaultLayerList.toArray.reverse;
+    defaultNet = null;
+    defaultLayerList = null;
+    net;
   }
 
   class Options extends Opts {}
@@ -582,16 +643,29 @@ object Net  {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
   }
 
-  def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FilePredOptions) = {
+
+  def predictor(model0:Model, infn:String, inlb:String, outfn:String):(Learner, FilePredOptions) = {
+    predictor(model0, List(FileSource.simpleEnum(infn,1,0),FileSource.simpleEnum(inlb,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
+  }
+  
+
+def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FilePredOptions) = {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
     val opts = new FilePredOptions;
     opts.fnames = infiles;
     opts.ofnames = outfiles;
     opts.links = mopts.links;
-    opts.nodeset = mopts.nodeset.clone;
-    opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    opts.nodeset = mopts.nodeset;
+    opts.nodemat = mopts.nodemat;
+    if (opts.nodeset.asInstanceOf[AnyRef] != null) {
+    	opts.nodeset.nodes.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    }
+    if (opts.nodemat.asInstanceOf[AnyRef] != null) {
+    	opts.nodemat.data.foreach({case nx:LinNode => nx.aopts = null; case _ => Unit})
+    }
     opts.hasBias = mopts.hasBias;
+    opts.tensorFormat = mopts.tensorFormat;
     opts.dropout = 1f;
 
     val newmod = new Net(opts);

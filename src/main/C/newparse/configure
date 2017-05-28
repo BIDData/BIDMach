@@ -1,11 +1,14 @@
 #!/bin/bash
 
+# If on Windows, fix ZLIBPATH below to point to zlib.lib. 
+
 if [[ "$1" == win* ]]; then 
+    ZLIBPATH="/LIBPATH:/code/zlib/lib/ zlib.lib"
     MYDEFS="/D WITHGZS"
     RELOPTS="/O2 /I . ${MYDEFS} /EHsc /D NDEBUG /Gd /GF /MT"
     DBGOPTS="/EHsc /I . ${MYDEFS} /D _DEBUG /Gd /GF /MTd /W4 /wd4996"
-    RELLINK="zlib-windows-x86_64.lib /MACHINE:AMD64"
-    DBGLINK="zlib-windows-x86_64.lib /NODEFAULTLIB:LIBCMT /MACHINE:AMD64"
+    RELLINK="${ZLIBPATH} /MACHINE:AMD64"
+    DBGLINK="${ZLIBPATH} /NODEFAULTLIB:LIBCMT /MACHINE:AMD64"
     CC="cl"
     CPP="cl"
     LD="link"

@@ -46,6 +46,7 @@ case class Learner(
   var cacheState = false;
   var cacheGPUstate = false;
   var debugMemState = false;
+  var debugCPUmemState = false;
 
   def setup = {
 	  Learner.setupPB(datasource, dopts.putBack, mopts.dim)
@@ -83,6 +84,7 @@ case class Learner(
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useCache;
     debugMemState = Mat.debugMem;
+    debugCPUmemState = Mat.debugCPUmem;
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
@@ -120,7 +122,9 @@ case class Learner(
 
 
   def nextPass(iter:Iterator[(AnyRef, MatIOtrait)]): Unit = {
-    if (opts.debugMem && ipass > 0) Mat.debugMem = true;
+    if (opts.debugMem && ipass > 0) {
+      Mat.debugMem = true;
+    }
     var lastp = 0f
     if (iter != null) {
       datasource.asInstanceOf[IteratorSource].opts.iter = iter;
@@ -187,6 +191,7 @@ case class Learner(
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
     Mat.debugMem = debugMemState;
+    Mat.debugCPUmem = debugCPUmemState;
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
@@ -916,4 +921,3 @@ object ParLearner {
   }
 
 }
-

@@ -1,10 +1,10 @@
 import edu.berkeley.bid.CUMACH
 
-val nr = 100;
+val nr = 1;
 val nc = 200;
-val kk = 1000;
-val nrows = nr * 2;
-val ncols = nc * 2;
+val kk = 1000000;
+val nrows = nr + 10;
+val ncols = nc + 10;
 val kcols = kk * 2;
 
 val aroff = 0;
@@ -63,11 +63,11 @@ maxi(maxi(abs(fd-d)));
 val gaa = grand(nrows, ncols)
 val aa=FMat(gaa);
 val gc = GMat(c);
-val gmod = gzeros(nrows, kcols * 2);
+val gmod = gzeros(nr, kcols);
 val gmod2 = gzeros(nrows, kcols * 2);
 val gmod3 = gzeros(nrows, kcols * 2);
-val gmode = gzeros(nrows, kcols * 2);
-val gsumsq = gones(nrows, kcols * 2);
+val gmode = gzeros(nr, kcols);
+val gsumsq = gones(nr, kcols);
 val glrate = gones(1,1);
 val gvexp = gzeros(1,1);
 val gtexp = gones(1,1);

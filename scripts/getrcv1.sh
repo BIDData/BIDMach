@@ -13,7 +13,7 @@ fi
 
 export BIDMACH_SCRIPTS=`dirname "$BIDMACH_SCRIPTS"`
 cd ${BIDMACH_SCRIPTS}
-BIDMACH_SCRIPTS=`pwd`
+BIDMACH_SCRIPTS=`pwd -P`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 echo "Loading RCV1 v2 data"
 
@@ -37,6 +37,12 @@ allfiles=${allfiles},lyrl2004_tokens_train.dat.gz
 
 # Get topic assignments
 ${WGET} http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a08-topic-qrels/rcv1-v2.topics.qrels.gz
+
+# Build parsing/tokenizing executables
+pushd ${BIDMACH_SCRIPTS}/../src/main/C/newparse
+./configure
+make && make install
+popd
 
 # Tokenize the text files
 # Windows cant use an uncompression pipe so uncompress here

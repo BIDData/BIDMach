@@ -1,0 +1,73 @@
+package BIDMach.networks.layers
+
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMach.datasources._
+import BIDMach.updaters._
+import BIDMach.mixins._
+import BIDMach.models._
+import BIDMach._
+import edu.berkeley.bid.CPUMACH
+import edu.berkeley.bid.CUMACH
+import scala.util.hashing.MurmurHash3;
+import java.util.HashMap;
+import BIDMach.networks._
+
+/**
+ * Computes the max of its input layers. 
+ */
+
+class MaxLayer(override val net:Net, override val opts:MaxNodeOpts = new MaxNode) extends Layer(net, opts) {  
+  
+	override val _inputs = new Array[LayerTerm](2);
+
+	override def forward = {
+    val start = toc;
+	  createOutput(inputData.dims);
+	  max(inputData, inputDatas(1), output);
+	  clearDeriv;
+	  forwardtime += toc - start;
+	}
+
+	override def backward = {
+    val start = toc;
+
+    max(inputData, inputDatas(1), output);
+    if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + squash((output == inputData) ∘ deriv, inputDerivs(0));
+    if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + squash((output == inputDatas(1)) ∘ deriv, inputDerivs(1));
+
+    backwardtime += toc - start;
+	}
+  
+  override def toString = {
+    "max@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
+}
+
+trait MaxNodeOpts extends NodeOpts {  
+}
+
+class MaxNode extends Node with MaxNodeOpts {
+  override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
+  
+  def copyTo(opts:MaxNode):MaxNode = {
+      super.copyTo(opts);
+      opts;
+  }
+
+	override def clone:MaxNode = {copyTo(new MaxNode).asInstanceOf[MaxNode];}
+
+	override def create(net:Net):MaxLayer = {MaxLayer(net, this);}
+  
+  override def toString = {
+    "max@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
+}
+  
+object MaxLayer {  
+  
+  def apply(net:Net) = new MaxLayer(net, new MaxNode);
+  
+  def apply(net:Net, opts:MaxNodeOpts) = new MaxLayer(net, opts); 
+}

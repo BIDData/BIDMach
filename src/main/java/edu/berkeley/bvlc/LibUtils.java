@@ -56,7 +56,7 @@ public final class LibUtils
      */
     public static enum ARCHType
     {
-        PPC, PPC_64, SPARC, X86, X86_64, ARM, MIPS, RISC, UNKNOWN
+        PPC, PPC_64, SPARC, X86, X86_64, ARM, AARCH64, MIPS, RISC, UNKNOWN
     }
     
     /**
@@ -319,6 +319,10 @@ public final class LibUtils
         if (osArch.startsWith("arm"))
         {
             return ARCHType.ARM;
+        }
+        if (osArch.startsWith("aarch64"))
+        {
+            return ARCHType.AARCH64;
         }
         if (osArch.startsWith("mips"))
         {

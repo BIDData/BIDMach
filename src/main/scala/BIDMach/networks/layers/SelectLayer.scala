@@ -30,10 +30,11 @@ class SelectLayer(override val net:Net, override val opts:SelectNodeOpts = new S
 		  
 		  val indx = inputDatas(1).asInstanceOf[IMat];
 		  if (colindx.asInstanceOf[AnyRef] == null || colindx.ncols != indx.ncols) {
-		    colindx = indx + 0;
-		    colindx <-- irow(0->indx.ncols) *@ inputData.nrows;
+		    colindx = inputDatas(1).izeros(1, indx.ncols).asInstanceOf[IMat];
+		    colindx <-- (irow(0->indx.ncols) *@ inputData.nrows);
+		    fullindx = colindx + indx;
 		  }
-		  fullindx = colindx + indx;
+		  fullindx ~ colindx + indx;
 		  
 		  output = inputData(fullindx);
 		  

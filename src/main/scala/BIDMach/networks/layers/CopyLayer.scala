@@ -49,13 +49,13 @@ trait CopyNodeOpts extends NodeOpts {
 
 class CopyNode extends Node with CopyNodeOpts {
 
-	override def clone:CopyNode = {copyTo(new CopyNode).asInstanceOf[CopyNode];}
+    override def clone:CopyNode = {copyTo(new CopyNode).asInstanceOf[CopyNode];};
 
-  override def create(net:Net):CopyLayer = {CopyLayer(net, this);}
-
-  override def toString = {
-    "copy@"+Integer.toHexString(hashCode % 0x10000).toString
-  }
+    override def create(net:Net):CopyLayer = {CopyLayer(net, this);};
+	
+    override def toString = {
+	"copy@"+Integer.toHexString(hashCode % 0x10000).toString
+    }
 }
 
 object CopyLayer {

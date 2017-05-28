@@ -34,9 +34,9 @@ class SubLayer(override val net:Net, override val opts:SubNodeOpts = new SubNode
 
 	override def backward = {
       val start = toc;
-      if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv
+      if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + squash(deriv, inputDeriv);
 			(1 until inputlength).map((i:Int) => {
-				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) - deriv
+				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) - squash(deriv, inputDerivs(i));
 			});
 			backwardtime += toc - start;
 	}
