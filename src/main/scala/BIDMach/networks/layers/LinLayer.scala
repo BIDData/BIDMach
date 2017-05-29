@@ -59,12 +59,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     } else {
     	output ~ mm * inputData;
     }
-    // println("cls(mm): %s" format (mm.getClass.getName))
-    // println("cls(inputData): %s" format (inputData.getClass.getName))
-    // println("cls(output): %s" format (output.getClass.getName))
-    val outplus = modelmats(imodel).colslice(modelcols, modelcols+1)
-    // println("cls(modelmats(imodel).colslice(modelcols, modelcols+1)): %s" format (outplus.getClass.getName))
-    if (opts.hasBias) output ~ output + outplus;
+    if (opts.hasBias) {
+        val outplus = modelmats(imodel).colslice(modelcols, modelcols+1)
+    	output ~ output + outplus;
+	}
     clearDeriv;
     forwardtime += toc - start;
   }
