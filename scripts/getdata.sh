@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
