@@ -45,6 +45,9 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       modelmats(imodel) = convertMat(normrnd(0, 1, modelrows + (if (opts.hasBias) 1 else 0), nfeats));
       updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, nfeats);  
+      if (lr_scales.asInstanceOf[AnyRef] != null) {
+      	lr_scales(imodel) = opts.lr_scale;
+      }
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     if (randwords.asInstanceOf[AnyRef] == null) randwords = convertMat(zeros(opts.nsamps + 1, inputData.ncols));

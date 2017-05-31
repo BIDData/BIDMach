@@ -117,7 +117,10 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  	} else {
 	  		lrate <-- opts.lrate;
 	  	}
-
+    	val lr_scales = model.lr_scales;
+    	if (lr_scales.asInstanceOf[AnyRef] != null) {
+    	  lrate ~ lrate *@ lr_scales(i);
+    	}
 	  	if (opts.waitsteps < nsteps) {
         val grad = updatemats(i);
         if (opts.langevin > 0) {                              // Add Langevin random permutations

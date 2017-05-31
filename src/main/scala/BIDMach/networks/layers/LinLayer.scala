@@ -33,6 +33,9 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var ADAinitialized = false;
   
   def initModelMat(nr:Int, nc:Int):Mat = {
+    if (lr_scales.asInstanceOf[AnyRef] != null) {
+    	lr_scales(imodel) = opts.lr_scale;
+    }
     if (opts.tmatShape != null) {
       val (y, x, h, w) = opts.tmatShape(nr, nc);
       val out = TMat(nr, nc, y, x, h, w, zeros(1,1));

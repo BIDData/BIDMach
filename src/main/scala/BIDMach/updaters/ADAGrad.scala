@@ -102,6 +102,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	} else {
     		lrate <-- opts.lrate;
     	}
+    	val lr_scales = model.lr_scales;
+    	if (lr_scales.asInstanceOf[AnyRef] != null) {
+    	  lrate ~ lrate *@ lr_scales(i);
+    	}
     	(mm, um, ss, ve, tscale, lrate) match {
     	  case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
           if (opts.vel_decay.asInstanceOf[AnyRef] != null) {

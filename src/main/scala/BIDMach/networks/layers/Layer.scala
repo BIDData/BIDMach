@@ -17,34 +17,122 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 /**
- * Basic Net Layer class. There are currently 17 layer types:
+ * Net Layer class. There are currently 46 layer types:
+ * 
+ - AbsLayer: Absolute value of input. 
+ - AddLayer: Sum two inputs element-wise.
+ - BatchNormLayer: Batch normalization.
+ - BatchNormScaleLayer: Batch normalization with scaling and bias.
+ - ConstantLayer: Wraps a constant or externally-set matrix (can be updated between forward steps). 
+ - ConvLayer: Convolution Layer.
+ - CopyLayer: Copies inputs forward and derivatives backward.
+ - CropLayer: Crops its input. 
+ - DivLayer: Computes the quotient of its two inputs. 
+ - DotLayer: Dot product (element-wise product followed by sum over columns).
+ - DropoutLayer: A layer that implements random dropout. No learnable params, but dropout fraction can be specified.  
+ - ExpLayer: exponential function of input.
+ - FnLayer: Applies its fwdfn argument to one input. Can also use bwdfn1 and bwdfn2 for backward data and model updates. 
+ - Fn2Layer: Applies its fwdfn argument to two inputs. Can also use bwdfn1 and bwdfn2 for backward data and model updates. 
+ - FormatLayer: Corrects Tensor Format (NCHW or NHWC)
+ - ForwardLayer: Goes forward only.
+ - GLMLayer: a one-to-one layer with GLM mappings (linear, logistic, abs-logistic and SVM). No learnable params. 
  - InputLayer: just a placeholder for the first layer which is loaded with input output blocks. No learnable params. 
  - LinLayer: Linear layer. Has a matrix of learnable params which is the input-output map. 
- - RectLayer: Rectifying one-to-one layer. No params.
- - GLMLayer: a one-to-one layer with GLM mappings (linear, logistic, abs-logistic and SVM). No learnable params. 
+ - LnLayer: natural logarithm.
+ - LSTMLayer: an LSTM layer.
+ - MaxLayer: computes the max of two inputs;
+ - MaxiLayer: computes the max element in each column;
+ - Maxi2Layer: computes the max element in each column as output(0), output(1) is a row of integer indices of the maxs.
+ - MinLayer: computes the min of two inputs;
+ - MiniLayer: computes the min element in each column;
+ - Mini2Layer: computes the min element in each column as output(0), output(1) is a row of integer indices of the mins.
+ - MulLayer: computes the product of its inputs. 
+ - NegsampOutputLayer: a negative sampling Output Layer. 
  - NormLayer: normalizing layer that adds a derivative term based on the difference between current layer norm and a target norm. 
-   No learnable params. The target norm and weight of this derivative term can be specified. 
- - DropoutLayer: A layer that implements random dropout. No learnable params, but dropout fraction can be specified. 
- - AddLayer: adds input layers element-wise.
- - MulLayer: multiplies input layers element-wise. Will also perform edge operations (one input can be a scalar). 
+ - MulLayer: multiplies input layers element-wise. Will also perform edge operations (one input can be a scalar).
+ - OnehotLayer: Converts an integer array of feature values to a sparse matrix whose columns are the instances with one non-zero in the feature position.
+ - PoolLayer: Pooling layer.
+ - RectLayer: Rectifying one-to-one layer. No params. 
+ - ScaleLayer: Scale-Bias layer, usually used with BatchNorm. 
+ - SelectLayer: Use second (integer) matrix input to select elements from columns of first input. 
  - SoftmaxLayer: a softmax (normalized exponential) layer.
- - TanhLayer: Hyperbolic tangent non-linearity.
  - SigmoidLayer: Logistic function non-linearity.
  - SoftplusLayer: smooth ReLU unit. 
- - LnLayer: natural logarithm
- - ExpLayer: exponential
- - SumLayer: column-wise sum
- - CopyLayer: copies its input to its output. 
- - OnehotLayer: Converts an integer array of feature values to a sparse matrix whose columns are the instances with one non-zero in the feature position. 
+ - SplitHorizLayer: Split the input into nparts horizontally.
+ - SplitVertLayer: Split the input into nparts vertically. 
+ - SqrtLayer: Square root layer. 
+ - StackLayer: Vertically stack its inputs. 
+ - SubLayer: Subtract inputs > 1 from first input. 
+ - SumLayer: column-wise sum.
+ - TanhLayer: Hyperbolic tangent non-linearity.
+ * 
+ * Shorthand operators and functions for Layer creation have been defined in Node.scala and Layer.scala. 
+ * They are as follows (x and y are floating point input NodeTerms or LayerTerms, i is an integer input matrix):
+ * 
+ * 
+ - AbsLayer:                     abs(y) 
+ - AddLayer:                     x + y
+ - BatchNormLayer:               batchnorm(x)
+ - BatchNormScaleLayer:          bns(x)
+ - ConstantLayer:                const(1e-3f)
+ - ConvLayer:                    conv(x)(args...)
+ - CopyLayer:                    copy(x)
+ - CropLayer:                    crop(x)(args...)
+ - DivLayer:                     x / y 
+ - DotLayer:                     x dot y     or     x ∙ y
+ - DropoutLayer:                 dropout(x) 
+ - ExpLayer:                     exp(x)
+ - FnLayer:                      fn(x)(fwdfn=fnname)
+ - Fn2Layer:                     fn2(x)(fwdfn=fnname) 
+ - FormatLayer:                  format(x)(args...)
+ - ForwardLayer:                 forward(x)
+ - GLMLayer:                     glm(x) 
+ - InputLayer:                   input 
+ - LinLayer:                     linear(x)(args...) 
+ - LnLayer:                      ln(x)
+ - LSTMLayer:                    lstm(x,y,z,name(string))
+ - MaxLayer:                     max(x, y)
+ - MaxiLayer:                    maxi(x)
+ - Maxi2Layer:                   maxi2(x)
+ - MinLayer:                     min(x,y)
+ - MiniLayer:                    mini(x)
+ - Mini2Layer:                   mini2(x)
+ - MulLayer:                     x *@ y 
+ - NegsampOutputLayer:           negsamp(x) 
+ - NormLayer:                    norm(x) 
+ - OnehotLayer:                  onehot(x)
+ - PoolLayer:                    pool(x)(args...)
+ - RectLayer:                    rect(x)    or    relu(x) 
+ - ScaleLayer:                   scale(x)
+ - SelectLayer:                  x(i) 
+ - SoftmaxLayer:                 softmax(x)
+ - SigmoidLayer:                 sigmoid(x)
+ - SoftplusLayer:                softplus(x) 
+ - SplitHorizLayer:              splithoriz(x)(nparts=...)
+ - SplitVertLayer:               splitvert(x)(nparts=...)
+ - SqrtLayer:                    sqrt(x)
+ - StackLayer:                   x on y
+ - SubLayer:                     x - y 
+ - SumLayer:                     sum(x)
+ - TanhLayer:                    tanh(x)
+ * 
+ * Many of these functions need a parent Net instance, but you can create that automatically using:
+ * 
+ * 	 import BIDMach.networks.layers.Layer._;
+ *   Net.initDefault(opts);
  *
- *
- *
- * Currently only four Layer types need params:
- - LinLayer: "outside" holds the output dimensions of the FClayer (input dimension set by previous layer). 
- - GLMLayer: "links" holds the links matrix (integer optss for loss types, see GLM), for the output of that layer. Its size should match the number of targets.
- - NormLayer: "targetNorm" holds a target per-element norm, and "weight" is the weight for this term in the derivative calculation.
- - DropoutLayer: "frac" holds the fraction of neurons to retain.
- *
+ * then define some layers using the functions above:
+ * 
+ *     val input1 = input;
+ *     val input2 = input;
+ *     val const1 = constant(5f);
+ *     val s2 =     sum(input1, input2) *@ const1;
+ *     ...          ...
+ * 
+ * Finally, to retrieve the Net instance containing these layers, do:
+ * 
+ *   val net = Net.getDefaultNet;
+ * 
  * The network topology is normally specified by opts.layers which is a sequence of "Layer.Options" objects. There is a nested Options
  * Class for each Layer class, which holds the params for defining that layer, and pointers to any input Layers via their Options classes.
  * In other words, the options classes allow construction of a mirror of the actual network topology. This allows patterns of
@@ -129,6 +217,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   var parent:Layer = null;
   lazy val modelmats = net.modelmats;
   lazy val updatemats = net.updatemats;
+  lazy val lr_scales = net.lr_scales;
   lazy val useGPU = net.useGPU;
   lazy val nopts = net.opts;
   def convertMat(mat:Mat) = {net.convertMat(mat);}

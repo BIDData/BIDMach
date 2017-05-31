@@ -61,7 +61,10 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	val biasDim = irow(outDim(0), outDim(1), outDim(2), 1);
     	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
     	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
-    	
+    }
+    if (lr_scales.asInstanceOf[AnyRef] != null) {
+    	lr_scales(imodel) = opts.lr_scale;
+    	lr_scales(imodel+1) = opts.bias_scale;
     }
     filter = modelmats(imodel).asInstanceOf[FMat];
     ffilter = modelmats(imodel).asInstanceOf[Filter];

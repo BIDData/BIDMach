@@ -20,6 +20,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   var datasink:DataSink = null;
 
   var _modelmats:Array[Mat] = null;
+  
+  var _lr_scales:FMat = null;
 
   var parent_model:Model = null;
 
@@ -32,9 +34,20 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       null
     }
   }
+  
+  def lr_scales:FMat = {
+    if (_modelmats != null) {
+      _lr_scales
+    } else if (parent_model != null) {
+      parent_model._lr_scales
+    } else {
+      null
+    }
+  }
 
   def setmodelmats(a:Array[Mat]) = {
     _modelmats = a;
+    _lr_scales = zeros(1, _modelmats.length);
   }
 
   var updatemats:Array[Mat] = null;
