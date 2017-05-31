@@ -12,11 +12,11 @@ import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
-import BIDMach.networks._ 
+import BIDMach.networks._
 
 /**
- * Linear layer. 
- * Includes a model matrix that contains the linear map. 
+ * Linear layer.
+ * Includes a model matrix that contains the linear map.
  */
 
 class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode) extends ModelLayer(net, opts) {
@@ -31,7 +31,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var waitsteps = 0;
   var epsilon = 0f;
   var ADAinitialized = false;
-  
+
   def initModelMat(nr:Int, nc:Int):Mat = {
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
@@ -52,7 +52,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
       val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
       modelmats(imodel) = convertMat(initModelMat(outdim, modelcols + (if (opts.hasBias) 1 else 0)));
-      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);  
+      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
     }
     if (opts.aopts != null && !ADAinitialized) initADAGrad;
     val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
@@ -60,9 +60,12 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     if (opts.withInteractions) {
       GLM.pairMult(mm, inputData, output);
     } else {
-    	output ~ mm * inputData; 
+    	output ~ mm * inputData;
     }
-    if (opts.hasBias) output ~ output + modelmats(imodel).colslice(modelcols, modelcols+1);
+    if (opts.hasBias) {
+        val outplus = modelmats(imodel).colslice(modelcols, modelcols+1)
+    	output ~ output + outplus;
+	}
     clearDeriv;
     forwardtime += toc - start;
   }
@@ -80,7 +83,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       if (firststep <= 0) firststep = pos.toFloat;
       val step = (pos + firststep)/firststep;
       if (opts.withInteractions) {
-      	ADAGrad.pairMultUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);        
+      	ADAGrad.pairMultUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
       } else {
       	ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
       }
@@ -95,7 +98,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
 
   def initADAGrad {
     val aopts = opts.aopts;
-    val mm = modelmats(imodel); 
+    val mm = modelmats(imodel);
     val d = mm.nrows;
     val m = mm.ncols;
     firststep = -1f;
@@ -109,7 +112,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     mask = aopts.mask;
     ADAinitialized = true;
   }
-  
+
   override def toString = {
     "linear@"+Integer.toHexString(hashCode % 0x10000).toString
   }
@@ -134,31 +137,31 @@ trait LinNodeOpts extends ModelNodeOpts {
   		opts;
   }
 }
-    
+
 class LinNode extends ModelNode with LinNodeOpts {
   def copyTo(opts:LinNode):LinNode = {
     this.asInstanceOf[Node].copyTo(opts);
     copyOpts(opts);
     opts
   }
-  
+
   override def toString = {
     "linear@"+Integer.toHexString(hashCode % 0x10000).toString
   }
-    
+
   override def clone:LinNode = {
     copyTo(new LinNode).asInstanceOf[LinNode];
   }
-  
+
   override def create(net:Net):LinLayer = {
   	LinLayer(net, this);
   }
 }
 
-object LinLayer {  
+object LinLayer {
 
   def apply(net:Net) = new LinLayer(net, new LinNode);
-  
+
   def apply(net:Net, opts:LinNodeOpts):LinLayer = new LinLayer(net, opts);
-  
+
 }

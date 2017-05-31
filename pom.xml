@@ -220,7 +220,7 @@
           <artifactId>${project.artifactId}</artifactId>
           <version>${project.version}</version>
           <classifier>gpu-${osarch}</classifier>
-        </dependency> 
+        </dependency>
       </dependencies>
     </profile>
   </profiles>
@@ -229,11 +229,21 @@
       <groupId>BIDMat</groupId>
       <artifactId>BIDMat</artifactId>
       <version>${project.version}</version>
-    </dependency> 
+    </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
       <version>3.1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm</artifactId>
+      <version>5.1</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.1</version>
     </dependency>
   </dependencies>
   <build>
@@ -260,6 +270,7 @@
             <arg>-deprecation</arg>
             <arg>-target:jvm-1.7</arg>
           </args>
+          <recompileMode>incremental</recompileMode>
         </configuration>
       </plugin>
       <plugin>
@@ -318,7 +329,7 @@
             </fileset>
 	  </filesets>
 	</configuration>
-      </plugin>  
+      </plugin>
     </plugins>
     <resources>
       <resource>
@@ -333,8 +344,8 @@
 	  <exclude>*</exclude>
 	</excludes>
       </resource>
-    </resources>	
-  </build>	
+    </resources>
+  </build>
   <distributionManagement>
     <repository>
       <id>bintray-biddata-BIDData</id>
@@ -343,8 +354,3 @@
     </repository>
   </distributionManagement>
 </project>
-
-
-
-
-

@@ -16,11 +16,11 @@ import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 
 /**
- * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks. 
+ * Basic Net class. Learns a supervised map from input blocks to output (target) data blocks.
  *
  * The network topology is specified by opts.layers which is a sequence of "NodeSet" objects. There is a NodeSet
  * Class for each Layer class, which holds the params for defining that layer. There is also an inputs parameter which points
- * to the set of Node instances that mirror the final network structure. 
+ * to the set of Node instances that mirror the final network structure.
  *
  */
 
@@ -74,7 +74,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     putBack = pb;
 //	  datasource.reset;
   }
-  
+
   def createLayers = {
     if (opts.nodeset.asInstanceOf[AnyRef] != null) {   // create the layers from the nodeset
     	val nodes = opts.nodeset.nodes;
@@ -124,13 +124,13 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
       }
     }
   }
-  
+
   def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
     for (i <- 0 until (gmats.length - output_layers.length)) {
     	layers(i).output = gmats(i);
     }
   }
-  
+
   def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
@@ -195,6 +195,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
   
   
+
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
@@ -206,10 +207,10 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	backward(ipass, pos);
     }
   }
-  
-  def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
+
+  def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {
   	if (batchSize < 0) batchSize = gmats(0).ncols;
-  	if (batchSize == gmats(0).ncols) { 
+  	if (batchSize == gmats(0).ncols) {
   		assignInputs(gmats, ipass, pos);
   		assignTargets(gmats, ipass, pos);
   		if (mask.asInstanceOf[AnyRef] != null) {
@@ -238,7 +239,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	  zeros(output_layers.length, 1);
   	}
   }
-  
+
   override def saveMetaData(fname:String) = {
     import java.io._
     val str = BIDMat.JSON.toJSON(modelMap, true);
@@ -246,7 +247,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     writer.print(str);
     writer.close;
   }
-  
+
   override def loadMetaData(fname:String) = {
     import java.io._
     val fr = new BufferedReader(new FileReader(fname+"metadata.json"));
@@ -257,11 +258,11 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
     modelMap = JSON.fromJSON(strbuf.toString).asInstanceOf[HashMap[String,Int]];
   }
-  
-  /* 
+
+  /*
    * Deal with annoying sub-sized minibatches
    */
-  
+
   def extendData(mat:Mat, batchSize:Int):Mat = {
     val nrows = mat.nrows;
     val ncols = mat.ncols;
@@ -271,7 +272,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	mat match {
     	case a:GMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = gzeros(nrows, bsize); a \ bufmat}
     	case a:GDMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = gdzeros(nrows, bsize); a \ bufmat}
-    	case a:GIMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = gizeros(nrows, bsize); a \ bufmat}   
+    	case a:GIMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = gizeros(nrows, bsize); a \ bufmat}
     	case a:GLMat => {if (bufmat.asInstanceOf[AnyRef] == null) bufmat = glzeros(nrows, bsize); a \ bufmat}
     	case a:GSMat => {val b = new GSMat(nrows, ncols, a.nnz, a.pir, a.pic, a.pjc, a.pdata, a.realnnz); b.setGUID(newGUID); b}
     	case a:GSDMat => {val b = new GSDMat(nrows, ncols, a.nnz, a.pir, a.pic, a.pjc, a.pdata, a.realnnz); b.setGUID(newGUID); b}
@@ -329,13 +330,13 @@ object Net  {
     defaultLayerList = null;
     net;
   }
-  
-  class Options extends Opts {} 
-    
+
+  class Options extends Opts {}
+
   final val UseNetFormat = 0;
   final val TensorNCHW = 1;
   final val TensorNHWC = 2;
-  
+
   def getCUDNNformat(layerFormat:Int, netFormat:Int):Int = {
     layerFormat match {
       case TensorNCHW => cudnnTensorFormat.CUDNN_TENSOR_NCHW;
@@ -343,58 +344,58 @@ object Net  {
       case UseNetFormat => {
         netFormat match {
         case TensorNCHW => cudnnTensorFormat.CUDNN_TENSOR_NCHW;
-        case TensorNHWC => cudnnTensorFormat.CUDNN_TENSOR_NHWC;         
+        case TensorNHWC => cudnnTensorFormat.CUDNN_TENSOR_NHWC;
         }
       }
     }
   }
   /**
-   * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
-   * Intermediate nodes are Linear followed by nonlinear, starting and ending with Linear. 
+   * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node.
+   * Intermediate nodes are Linear followed by nonlinear, starting and ending with Linear.
    * First Linear node width is given as an argument, then it tapers off by taper.
    */
-  
+
   def dnodes2(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
     val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
     powerNet(widths, opts, 0, nonlin);
   }
-  
+
   /**
-   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
-   * Intermediate nodes are linear, Nonlinear and Norm, starting and ending with Linear. 
+   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node.
+   * Intermediate nodes are linear, Nonlinear and Norm, starting and ending with Linear.
    * First Linear node width is given as an argument, then it tapers off by taper.
    */
-  
+
   def dnodes3(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
     val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
     powerNet(widths, opts, 1, nonlin);
   }
-  
+
   /**
-   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
-   * Intermediate nodes are Linear, Nonlinear, Norm, Dropout, starting and ending with Linear. 
+   * Build a stack of nodes. node(0) is an input node, node(n-1) is a GLM node.
+   * Intermediate nodes are Linear, Nonlinear, Norm, Dropout, starting and ending with Linear.
    * First Linear node width is given as an argument, then it tapers off by taper.
    */
-  
+
   def dnodes4(nslabs:Int, width:Int, taper:Float, ntargs:Int, opts:Opts, nonlin:Int = 1):NodeSet = {
     val widths = int(width * (taper ^ row(0 -> (nslabs-1)))) \ ntargs;
     powerNet(widths, opts, 2, nonlin);
   }
-  
+
   /**
-   * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node. 
-   * Intermediate nodes are Linear followed by Nonlinear, with optional Norm and Dropout, 
-   * starting and ending with Linear. 
-   * The widths argument specifies the sequence of output dimensions for the Linear nodes. 
-   * If a tmatShape argument is given, then that shape is used for the first linear layer. 
+   * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node.
+   * Intermediate nodes are Linear followed by Nonlinear, with optional Norm and Dropout,
+   * starting and ending with Linear.
+   * The widths argument specifies the sequence of output dimensions for the Linear nodes.
+   * If a tmatShape argument is given, then that shape is used for the first linear layer.
    */
-  
+
   def powerNet(widths:IMat, opts:Opts, addons:Int, nonlin:Int = 1):NodeSet = {
     val thickness = 2 + addons;
-    val depth = 3 + (widths.length - 1) * thickness;  
+    val depth = 3 + (widths.length - 1) * thickness;
     val nodes = new NodeSet(depth);
     nodes(0) = new InputNode;
-    nodes(1) = new LinNode{inputs(0) = nodes(0); outdim = widths(0); hasBias = opts.hasBias; aopts = opts.aopts; 
+    nodes(1) = new LinNode{inputs(0) = nodes(0); outdim = widths(0); hasBias = opts.hasBias; aopts = opts.aopts;
          withInteractions = opts.withInteractions; tmatShape = opts.tmatShape};
     for (i <- 2 until depth - 1) {
     	((i-1) % thickness) match {
@@ -431,14 +432,14 @@ object Net  {
   }
 
   def powerShape(tailHeight:Float, power:Float, leftAlign:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
-    powerShape(tailHeight, power, leftAlign, true)(headCount, nfeats);  
+    powerShape(tailHeight, power, leftAlign, true)(headCount, nfeats);
   }
 
-  def powerShape(tailHeight:Float, power:Float, leftAlign:Boolean, horizontal:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = { 
+  def powerShape(tailHeight:Float, power:Float, leftAlign:Boolean, horizontal:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
     if (horizontal) powerShapeH(tailHeight, power,leftAlign)(headCount,nfeats)
     else  powerShapeV(tailHeight, power,leftAlign)(headCount,nfeats)
   }
-  
+
   def powerShapeH(tailHeight:Float, power:Float, leftAlign:Boolean)(headCount:Int, nfeats:Int):(Array[Int], Array[Int], Array[Int], Array[Int]) = {
     var nblocks = 1;
     var tc = tailHeight;
@@ -460,7 +461,7 @@ object Net  {
     var i = 0;
     while (i < nblocks) {
     	val newx = (xmax * ratio).toInt;
-      val xmin = if (leftAlign) 0 else newx; 
+      val xmin = if (leftAlign) 0 else newx;
       val ymax = math.min(headCount, math.round(tc - 1e-5f));
       if (ymax - ymin > 0) {
       	x(i) = xmin;
@@ -510,19 +511,19 @@ object Net  {
     }
     (y, x, h, w)
   }
-  
+
   def mkNetModel(fopts:Model.Opts) = {
     new Net(fopts.asInstanceOf[Net.Opts])
   }
-  
+
   def mkUpdater(nopts:Updater.Opts) = {
     new ADAGrad(nopts.asInstanceOf[ADAGrad.Opts])
-  } 
-  
+  }
+
   def mkRegularizer(nopts:Mixin.Opts):Array[Mixin] = {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
-    
+
   class LearnOptions extends Learner.Options with Net.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, targ:Mat) = {
@@ -533,38 +534,38 @@ object Net  {
     }
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
-  	    new MatSource(Array(mat0, targ), opts), 
-  	    new Net(opts), 
+  	    new MatSource(Array(mat0, targ), opts),
+  	    new Net(opts),
   	    Array(new L1Regularizer(opts)),
-  	    new ADAGrad(opts), 
+  	    new ADAGrad(opts),
   	    null,
   	    opts)
     (nn, opts)
   }
-  
+
   def learnerX(mat0:Mat, targ:Mat) = {
     val opts = new LearnOptions;
     opts.links = izeros(1,targ.nrows);
     opts.links.set(1);
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1)
   	val nn = new Learner(
-  	    new MatSource(Array(mat0, targ), opts), 
-  	    new Net(opts), 
+  	    new MatSource(Array(mat0, targ), opts),
+  	    new Net(opts),
   	    null,
-  	    null, 
+  	    null,
   	    null,
   	    opts)
     (nn, opts)
   }
-  
+
   class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
-  
+
   def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
   		                                                                  FileSource.simpleEnum(fn2,1,0)));
-  
+
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
 
-  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {
     val opts = new FDSopts;
     opts.fnames = fnames
     opts.batchSize = 100000;
@@ -572,39 +573,39 @@ object Net  {
     implicit val threads = threadPool(4);
     val ds = new FileSource(opts)
   	val nn = new Learner(
-  			ds, 
-  	    new Net(opts), 
+  			ds,
+  	    new Net(opts),
   	    Array(new L1Regularizer(opts)),
-  	    new ADAGrad(opts), 
+  	    new ADAGrad(opts),
   	    null,
   	    opts)
     (nn, opts)
-  } 
-  
+  }
+
   def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
   		                                                                  FileSource.simpleEnum(fn2,1,0)));
-  
+
   def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0)));
-  
-  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {   
+
+  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {
     val opts = new FDSopts
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
     val ds = new FileSource(opts);
     // val net = dnodes(3, 0, 1f, opts.targmap.nrows, opts)                   // default to a 3-node network
-  	val nn = new Learner(ds, 
-  	                     new Net(opts), 
+  	val nn = new Learner(ds,
+  	                     new Net(opts),
   	                     null,
-  	                     null, 
+  	                     null,
   	                     null,
   	                     opts)
     (nn, opts)
   }
 
-  
+
   class PredOptions extends Learner.Options with Net.Opts with MatSource.Opts with MatSink.Opts;
-  
+
   def predictor(model0:Model, data0:Mat, labels0:Mat):(Learner, PredOptions) = {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
@@ -622,31 +623,33 @@ object Net  {
     opts.hasBias = mopts.hasBias;
     opts.tensorFormat = mopts.tensorFormat;
     opts.dropout = 1f;
-    
+
     val newmod = new Net(opts);
     newmod.refresh = false;
     newmod.copyFrom(model)
     val nn = new Learner(
-        new MatSource(Array(data0, labels0), opts), 
-        newmod, 
+        new MatSource(Array(data0, labels0), opts),
+        newmod,
         null,
-        null, 
+        null,
         new MatSink(opts),
         opts);
     (nn, opts)
   }
-  
+
   class FilePredOptions extends Learner.Options with Net.Opts with FileSource.Opts with FileSink.Opts;
-  
+
   def predictor(model0:Model, infn:String, outfn:String):(Learner, FilePredOptions) = {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
   }
+
 
   def predictor(model0:Model, infn:String, inlb:String, outfn:String):(Learner, FilePredOptions) = {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0),FileSource.simpleEnum(inlb,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
   }
   
-  def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FilePredOptions) = {
+
+def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, FilePredOptions) = {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
     val opts = new FilePredOptions;
@@ -664,26 +667,26 @@ object Net  {
     opts.hasBias = mopts.hasBias;
     opts.tensorFormat = mopts.tensorFormat;
     opts.dropout = 1f;
-    
+
     val newmod = new Net(opts);
     newmod.refresh = false;
     newmod.copyFrom(model);
     val dsource = new FileSource(opts);
     val dsink = new FileSink(opts);
     val nn = new Learner(
-        dsource, 
-        newmod, 
+        dsource,
+        newmod,
         null,
-        null, 
+        null,
         dsink,
         opts);
     (nn, opts)
   }
-  
+
   class LearnParOptions extends ParLearner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
-  
+
   def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)))}
-  
+
   def learnPar(fnames:List[(Int) => String]):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
     opts.batchSize = 10000;
@@ -691,10 +694,10 @@ object Net  {
     opts.fnames = fnames;
     implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
-        new FileSource(opts), 
+        new FileSource(opts),
         opts, mkNetModel _,
         opts, mkRegularizer _,
-        opts, mkUpdater _, 
+        opts, mkUpdater _,
         null, null,
         opts)
     (nn, opts)

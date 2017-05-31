@@ -1,0 +1,49 @@
+import BIDMat.{CMat,CSMat,DMat,Dict,FMat,FND,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,HMat,IDict,Image,IMat,LMat,Mat,SMat,SBMat,SDMat,TMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMat.Solvers._
+import BIDMat.Plotting._
+import BIDMach.Learner
+import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
+import BIDMach.networks.{Net}
+import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
+import BIDMach.datasinks.{DataSink,MatSink}
+import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
+import BIDMach.causal.{IPTW}
+import BIDMach.allreduce.{Master,Worker,Command}
+import BIDMach.models.GLM
+
+Mat.checkMKL(false)
+Mat.checkCUDA
+
+val datadir = "/mnt/BIDMach/data/rcv1/"
+
+val a0 = loadSMat(datadir + "docs.smat.lz4")
+val c0 = loadFMat(datadir + "cats.fmat.lz4")(0->100,?)
+val rr = rand(c0.ncols,1)
+val (ss, ii) = sort2(rr)
+val a = a0(?,ii)
+val c = c0(?,ii)
+
+setNumThreads(1)
+val (nn,opts)=GLM.learnerX(a,c,1)
+opts.batchSize=20000
+opts.lrate = 0.02f
+opts.npasses = 10
+opts.reg1weight = 0.0
+opts.links = iones(103,1)
+opts.addConstFeat = true
+opts.aopts = opts
+opts.doVariance = true
+opts.evalStep = 3
+opts.useGPU = true
+
+val w = new Worker()
+val wopts = w.opts
+wopts.trace = 4
+wopts.machineTrace = 1
+
+w.start(nn)
+
+nn.paused = true

@@ -1,0 +1,70 @@
+import com.cedarsoftware.util.io.JsonReader
+import java.nio.file.Files
+import java.nio.file.Paths
+
+val json_dir = sys.env.get("CMUDICT_JSON_DIR") match {
+  case Some(jsondir0) => jsondir0
+  case None => "../data/phonetisaurus-cmudict-split/json_data/"
+}
+val smat_dir = sys.env.get("CMUDICT_SMAT_DIR") match {
+  case Some(smatdir0) => smatdir0
+  case None => "../data/phonetisaurus-cmudict-split/smat_data/"
+}
+val batchsize = 64
+val PADsym = 1
+
+println("Converting JSON data to SMat data...")
+
+val train_gr_str = new String(Files.readAllBytes(Paths.get(json_dir+"train.grapheme.json")))
+val train_ph_str = new String(Files.readAllBytes(Paths.get(json_dir+"train.phoneme.json")))
+val valid_gr_str = new String(Files.readAllBytes(Paths.get(json_dir+"valid.grapheme.json")))
+val valid_ph_str = new String(Files.readAllBytes(Paths.get(json_dir+"valid.phoneme.json")))
+
+val train_gr_arr = JsonReader.jsonToJava(train_gr_str).asInstanceOf[Array[Object]]
+val train_ph_arr = JsonReader.jsonToJava(train_ph_str).asInstanceOf[Array[Object]]
+val valid_gr_arr = JsonReader.jsonToJava(valid_gr_str).asInstanceOf[Array[Object]]
+val valid_ph_arr = JsonReader.jsonToJava(valid_ph_str).asInstanceOf[Array[Object]]
+
+def array_to_SMat(data:Array[Object], batchsize:Int, reverse:Boolean, PADsym:Int = PADsym) = {
+  val sorted = data.sortWith(_.asInstanceOf[Array[Object]].length < _.asInstanceOf[Array[Object]].length)
+  val nrows = sorted.last.asInstanceOf[Array[Object]].length
+  val ncols = sorted.length - (sorted.length % batchsize)
+  val fmat = FMat(nrows, ncols)
+
+  for (batch <- 0 until (ncols / batchsize)) {
+    var batchlen = 0
+    for (bj <- 0 until batchsize) {
+      val j = (batch * batchsize) + bj
+      val seq = sorted(j).asInstanceOf[Array[Object]]
+      batchlen = Math.max(batchlen, seq.length)
+    }
+    val tmp = new Array[Float](batchlen)
+
+    for (bj <- 0 until batchsize) {
+      val j = (batch * batchsize) + bj
+      val seq = sorted(j).asInstanceOf[Array[Object]]
+
+      for (i <- 0 until seq.length) tmp(i) = seq(i).asInstanceOf[Long].toFloat
+      for (i <- seq.length until batchlen) tmp(i) = PADsym
+
+      for (i <- 0 until batchlen) {
+        fmat(i, j) = tmp(if (reverse) (batchlen - 1 - i) else i)
+      }
+    }
+  }
+
+  SMat(fmat)
+}
+
+val smat_train_gr = array_to_SMat(train_gr_arr, batchsize, true) // reverse for encoder
+val smat_train_ph = array_to_SMat(train_ph_arr, batchsize, false)
+val smat_valid_gr = array_to_SMat(valid_gr_arr, batchsize, true) // reverse for encoder
+val smat_valid_ph = array_to_SMat(valid_ph_arr, batchsize, false)
+
+saveMat(smat_dir+"train.src_grapheme.smat.lz4", smat_train_gr)
+saveMat(smat_dir+"train.dst_phoneme.smat.lz4", smat_train_ph)
+saveMat(smat_dir+"valid.src_grapheme.smat.lz4", smat_valid_gr)
+saveMat(smat_dir+"valid.dst_phoneme.smat.lz4", smat_valid_ph)
+
+println("Done.")
+sys.exit

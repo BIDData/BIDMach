@@ -53,7 +53,7 @@ case class Learner(
   }
 
   def init = {
-		cacheState = Mat.useCache;
+    cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useCache;
@@ -72,11 +72,12 @@ case class Learner(
     useGPU = model.useGPU;
   }
 
-  def train = {
-    retrain
+  def train(doInit:Boolean) = {
+    retrain(doInit)
   }
+  def train:Unit = retrain(true)
 
-  def retrain() = {
+  def retrain(doInit:Boolean) = {
     flip
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
@@ -87,7 +88,7 @@ case class Learner(
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
-    firstPass(null);
+    firstPass(null, doInit);
     updateM(ipass-1)
     while (ipass < opts.npasses && ! done) {
       nextPass(null)
@@ -95,10 +96,13 @@ case class Learner(
     }
     wrapUp(ipass);
   }
+  def retrain:Unit = retrain(true)
 
-  def firstPass(iter:Iterator[(AnyRef, MatIOtrait)]):Unit = {
-    setup
-    init
+  def firstPass(iter:Iterator[(AnyRef, MatIOtrait)], doInit:Boolean = true):Unit = {
+    if (doInit) {
+      setup
+      init
+    }
 
     done = false;
     ipass = 0;
@@ -109,7 +113,7 @@ case class Learner(
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;        
+    Mat.useGPUcache = opts.useCache;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
     flip;
@@ -155,7 +159,7 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
           100f*lastp,
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._1,
@@ -181,6 +185,7 @@ case class Learner(
   }
 
   def wrapUp(ipass:Int) {
+    if (opts.checkPointFile != null) model.save(opts.checkPointFile format lastCheckPoint)
     model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
@@ -193,11 +198,11 @@ case class Learner(
       resetGPUs
       Mat.clearCaches
     }
-
     datasource.close;
     if (datasink != null) datasink.close;
     if (model.opts.logDataSink.asInstanceOf[AnyRef] != null) model.opts.logDataSink.close
     results = Learner.scores2FMat(reslist) on row(samplist.toList);
+
     done = true;
   }
 
@@ -223,7 +228,7 @@ case class Learner(
     cacheState = Mat.useCache
     Mat.useCache = opts.useCache
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;  
+    Mat.useGPUcache = opts.useCache;
     var here = 0L
     var lasti = 0
     var bytes = 0L
@@ -244,7 +249,7 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
             100f*lastp,
             Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
             gf._1,
@@ -270,6 +275,7 @@ case class Learner(
     datasource.close;
     if (datasink != null) datasink.close;
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
+    results
   }
 
   def datamats = datasource.asInstanceOf[MatSource].mats;
@@ -420,7 +426,7 @@ case class ParLearner(
       		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
       		val gf = gflop
       		if (reslist.length > lasti) {
-      			print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+      			print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
       					100f*lastp,
       					Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
       					gf._1,
@@ -634,7 +640,7 @@ case class ParLearnerx(
 	  			while (dsProgress > lastp + opts.pstep) lastp += opts.pstep
 	  			val gf = gflop
 	  			if (reslist.length > lasti) {
-	  				print("%5.2f%%, %s, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+	  				print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
 	  						100f*lastp,
 	  						reslist.synchronized {
 	  							Learner.scoreSummary(reslist, lasti, reslist.length)
@@ -872,7 +878,7 @@ object Learner {
     }
   }
 
-  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):String = {
+  def scoreSummary(reslist:ListBuffer[FMat], lasti:Int, len:Int, cumScore:Int = 0):Double = {
     val istart = if (cumScore == 0) lasti else {if (cumScore == 1) 0 else if (cumScore == 2) len/2 else 3*len/4};
     var i = 0
     var sum = 0.0;
@@ -880,7 +886,7 @@ object Learner {
       if (i >= istart) sum += mean(scoremat(?,0)).v
       i += 1
     }
-    ("ll=%6.5f" format sum/(len - istart))
+    sum / (len - istart)
   }
 
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {

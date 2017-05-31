@@ -1,0 +1,55 @@
+import BIDMat.{CMat,CSMat,DMat,Dict,FMat,FND,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,GND,HMat,IDict,Image,IMat,LMat,Mat,SMat,SBMat,SDMat,TMat}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMat.Solvers._
+import BIDMat.Plotting._
+import BIDMach.Learner
+import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
+import BIDMach.networks.{Net}
+import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
+import BIDMach.datasinks.{DataSink,MatSink}
+import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
+import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping}
+import BIDMach.causal.{IPTW}
+import BIDMach.allreduce.{Master,Worker,Command}
+import BIDMach.models.GLM
+
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+
+Mat.checkMKL(false)
+Mat.checkCUDA
+
+val data_dir = "/mnt/BIDMach/data/MNIST8M/parts/"
+val (nn, nnopts) = GLM.learner(data_dir+"data%02d.fmat.lz4", data_dir+"cats%02d.fmat.lz4")
+
+nnopts.useGPU = true;
+nnopts.nstart = 0;
+nnopts.nend = 0;
+nnopts.order = 0;
+nnopts.lookahead = 2;
+nnopts.featType = 1;
+nnopts.links = 2*iones(10,1);
+nnopts.eltsPerSample = 300;
+nnopts.targets = mkdiag(ones(10,1)) \ zeros(10, 784);
+nnopts.rmask = zeros(1,10) \ ones(1, 784);
+
+nnopts.batchSize = 500;
+nnopts.npasses = 1;
+nnopts.lrate = 0.001;  // for logistic
+
+val w = new Worker();
+val wopts = w.opts;
+wopts.trace = 4;
+wopts.machineTrace = 1;
+wopts.commandSocketNum = 12345
+wopts.responseSocketNum = 12346
+wopts.peerSocketNum = 12347
+
+w.start(nn)
+
+nn.paused = true
+
+// Future {
+//   nn.train
+// }

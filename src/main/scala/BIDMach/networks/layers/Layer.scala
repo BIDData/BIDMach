@@ -141,7 +141,7 @@ import BIDMach.networks._
  * Each NodeSet instance has up to two inputs which are other NodeSet instances (or null). This graph structure can be cyclic. 
  * When the model is created, the Layer structure mimics the NodeSet structure. 
  * 
- * You can also create the Layer graph directly using the "setinput()" method in each layer. 
+ * You can also create the Layer graph directly using the "setinput()" method in each layer.
  */
 
 // Notes: 
@@ -340,7 +340,7 @@ object Layer {
   
   def copy(a:LayerTerm) = new CopyLayer(null){inputs(0) = a;}
 
-  def copy = new CopyLayer(null);
+  def copy0 = new CopyLayer(null);
   
   def crop(a:LayerTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
     val csizes = sizes;

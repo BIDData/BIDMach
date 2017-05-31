@@ -1,0 +1,65 @@
+import util.control.Breaks._
+import BIDMach.networks.SeqToSeq
+
+val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
+val modeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/bidmach_model_10pass/"
+val preddir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/pred/"
+
+:silent
+var src = loadMat(datadir+"valid.src_grapheme.shuf.smat.lz4")
+var dst = loadMat(datadir+"valid.dst_phoneme.shuf.smat.lz4")
+:silent
+
+// val model = SeqToSeq.load(modeldir+"model256_te0.3_00/")
+val model = new SeqToSeq
+model.setmodelmats(new Array[Mat](7))
+for (i <- 0 until 7) {
+  model.modelmats(i) = loadMat(modeldir+"model256_te0.3_00/modelmat%02d.lz4" format i)
+}
+
+val (nn, opts) = SeqToSeq.predict(model, src)
+val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]
+
+opts.nvocabIn = 31
+opts.nvocabOut = 43
+opts.height = 2
+opts.dim = 512
+opts.batchSize = 64
+
+opts.kind = 1
+opts.netType = 0
+opts.scoreType = 0
+opts.inwidth = 22
+opts.outwidth = 20
+opts.hasBias = true
+opts.pstep = 0.0001f
+opts.cumScore = 3
+opts.PADsym = 1
+opts.OOVsym = 2
+opts.STARTsym = 0
+
+opts.autoReset = false
+
+nn.predict
+
+val preds = IMat(nn.preds(0))
+
+def calcWER(preds:IMat, dst:IMat):(Int, Float) = {
+  var error = 0
+  for (j <- 0 until preds.ncols) {
+    breakable {
+      for (i <- 0 until preds.nrows) {
+        if (preds(i, j) == 1) {
+          if (dst(i, j) > 1) error += 1 // early prediction termination
+          break
+        } else if (preds(i, j) != dst(i, j)) {
+          error += 1
+          break
+        }
+      }
+    }
+  }
+  (error, error.toFloat/preds.ncols)
+}
+
+val WER = calcWER(preds, IMat(full(dst)))

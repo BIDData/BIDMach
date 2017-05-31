@@ -1,0 +1,118 @@
+import java.net.{InetAddress,InetSocketAddress}
+import BIDMach.allreduce.{Master,Worker,Command}
+import BIDMach.networks.SeqToSeq
+import BIDMat.JSON
+
+var addresses:Array[InetSocketAddress] = null
+val customLocalWorkerPortsStr = sys.env.get("MASTER_LOCAL_WORKER_PORTS")
+println("####################")
+customLocalWorkerPortsStr match {
+  case Some(workerPortsStr) => {
+    addresses = workerPortsStr.split(",").map(_.toInt).map(new InetSocketAddress("0.0.0.0", _))
+    println("Using local worker addresses:")
+  }
+  case None => {
+    addresses = scala.io.Source.fromFile("/opt/spark/conf/slaves").getLines.
+      map(InetAddress.getByName(_).getHostAddress()).
+      map(new InetSocketAddress(_, 50050)).toArray
+    println("Using spark slaves:")
+  }
+}
+for (a <- addresses) println(a)
+println("####################")
+
+val m = new Master()
+val opts = m.opts
+opts.trace = 2
+opts.intervalMsec = 2000
+opts.limit = Int.MaxValue
+opts.timeScaleMsec = 2e-3f
+opts.permuteAlways = false
+
+opts.machineThreshold = 0.75;
+opts.minWaitTime = 4500;
+opts.timeThresholdMsec = 6000;
+
+val nmachines = addresses.length
+val gmods = irow(nmachines)
+val gmachines = irow(0->nmachines)
+
+m.init
+m.config(gmods, gmachines, addresses, 7)
+m.setMachineNumbers
+m.sendConfig
+
+
+// m.parCall((w) => {
+//   var learnSource = w.learner.datasource.asInstanceOf[MatSource]
+//   var totalNumSamples = learnSource.mats(0).ncols
+//   var numWorkers = 4 // TODO: don't hardcode this
+//   var workerNumSamples = totalNumSamples / numWorkers
+//   var nstart = (w.imach*workerNumSamples)
+//   var nend = Math.min((w.imach+1)*workerNumSamples, totalNumSamples-1)
+//   learnSource.mats(0) = learnSource.mats(0)(?, nstart->nend)
+//   learnSource.mats(1) = learnSource.mats(1)(?, nstart->nend)
+//   learnSource.init
+//   "imach: %d, nstart: %d, nend: %d, elastic: %b, alpha: %f\n" format (
+//     w.imach, nstart, nend, w.opts.doElastic, w.opts.elasticAlpha)
+// })
+//
+// m.startLearners(blocking = true)
+// m.startUpdates(logLocation = "/opt/BIDMach/logs/master_sts_2015-news-commentary-v10-fr-en/%s.log")
+//
+
+/*Later*/
+
+
+// m.parCall((w) => {
+//   w.model = SeqToSeq.load("/mnt/BIDMach/data/MNT2015/models/model256_te0.3_00/")
+//   "done"
+// })
+//
+
+
+// val mopts = m.parCall((w) => {
+//   JSON.toJSON(w.model.opts, true)
+// }).map(_.asInstanceOf[String])
+// val mmats = m.parCall((w) => {
+//   w.model.modelmats
+// }).map(_.asInstanceOf[Array[Mat]])
+//
+// var numWorkers = 4
+// val wmodels = new Array[SeqToSeq](numWorkers)
+// for (i <- 0 until wmodels.length) {
+//   wmodels(i) = new SeqToSeq
+//   val mm = wmodels(i)
+//   mm.setmodelmats(mmats(i))
+//   mm.opts.copyFrom(JSON.fromJSON(mopts(i)).asInstanceOf[BIDMat.Opts])
+// }
+//
+
+// val basedir = "/mnt/BIDMach/data/MNT2015/"
+// val datadir = basedir+"data/"
+// val preddir = basedir+"pred/"
+// val (nn, opts) = SeqToSeq.embed(
+//   wmodels(0),
+//   datadir+"news-commentary-v10.fr-en.fr.%01d.fmat.lz4",
+//   preddir+"distributed_news-commentary-v10.fr-en.en.pred.%01d.fmat.lz4")
+//
+// opts.ofcols = 128000
+// opts.nvocab = 20000
+// opts.npasses = 2
+// opts.height = 2
+// opts.dim = 256
+// opts.batchSize = 128
+//
+// opts.kind = 1
+// opts.netType = 0
+// opts.scoreType = 1
+// opts.inwidth = 30
+// opts.outwidth = 30
+// opts.hasBias = true
+// opts.pstep = 0.005f
+// opts.cumScore = 3
+// opts.PADsym = 1
+// opts.OOVsym = 2
+// opts.STARTsym = 0
+//
+// val results = nn.predict

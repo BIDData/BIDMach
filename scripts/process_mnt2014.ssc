@@ -1,0 +1,112 @@
+import java.io.File
+
+val batchSize = 128
+val PADsym = 1
+setNumThreads(8)
+Mat.useCache = false
+Mat.useGPUcache = true
+
+val h5_dir = sys.env.get("H5_DIR") match {
+  case Some(jsondir0) => jsondir0
+  case None => "../data/mnt2014_fr-en/h5_data/"
+}
+val smat_dir = sys.env.get("SMAT_DIR") match {
+  case Some(smatdir0) => smatdir0
+  case None => "../data/mnt2014_fr-en/smat_data/"
+}
+
+def forEachWithProgress[T](xs: collection.parallel.ParSeq[T], fn:T => Unit) {
+  val total = xs.length
+  val done = new java.util.concurrent.atomic.AtomicInteger()
+  val prevMsg = Array[String]("")
+
+  xs.foreach { x =>
+    fn(x)
+    prevMsg.synchronized {
+      val curDone = done.incrementAndGet()
+      val curMsg = "%.1f%% done".format(curDone.floatValue / total * 100)
+      print("\b"*(prevMsg(0).length))
+      print(curMsg)
+      prevMsg(0) = curMsg
+    }
+  }
+  println("!")
+}
+
+import util.control.Breaks._
+def calcBatchLen(m:IMat, colStart:Int, colEnd:Int):Int = {
+  var batchLen = -1
+  val nrows = m.nrows
+  for (c <- colStart until colEnd) {
+    var colLen = -1
+    breakable {
+      for (r <- 0 until nrows) {
+        colLen = r
+        if (m(r, c) == 0) {
+          break
+        }
+      }
+    }
+    batchLen = Math.max(colLen, batchLen)
+  }
+  batchLen
+}
+
+def padToBatchLen(
+  m:IMat, batchLen:Int, reverse:Boolean, colStart:Int, colEnd:Int
+):Unit = {
+  val tmp = izeros(batchLen)
+  for (c <- colStart until colEnd) {
+    for (r <- 0 until batchLen) {
+      if (m(r, c) == 0) m(r, c) = PADsym
+    }
+    if (reverse) {
+      tmp <-- m(0 -> batchLen, c)
+      for (r <- 0 until batchLen) {
+        m(r, c) = tmp(batchLen - 1 - r)
+      }
+    }
+  }
+}
+
+def h5DenseIMatToSparse(h5_fpath:String, reverse:Boolean) = {
+  println(s"Loading ${h5_fpath}")
+  var idata:IMat = load(h5_fpath, "default")
+  val ncols = idata.ncols - (idata.ncols % batchSize)
+  idata = idata(?, 0->ncols)
+
+  print(s"Padding${if (reverse) " and reversing" else ""}: ")
+  val numBatches = ncols / batchSize
+  forEachWithProgress((0 until numBatches).toList.par, (batchi:Int) => {
+    val c = (batchi * batchSize)
+    val batchLen = calcBatchLen(idata, c, c+batchSize)
+    padToBatchLen(idata, batchLen, reverse, c, c+batchSize)
+  })
+
+  println(s"Converting to sparse")
+  sparse(idata)
+}
+
+def main():Unit = {
+  println(s"Batch size: ${batchSize}")
+
+  val h5FrenchTmpl = h5_dir+"binarized.sorted.fr-%04d.h5.gz"
+  val h5EnglishTmpl = h5_dir+"binarized.sorted.en-%04d.h5.gz"
+  val smatFrenchTmpl = smat_dir+"mnt2014.fr-en.fr.%04d.smat.lz4"
+  val smatEnglishTmpl = smat_dir+"mnt2014.fr-en.en.%04d.smat.lz4"
+
+  var i = 0
+  while ((new File(h5FrenchTmpl.format(i))).exists()) i += 1
+  val numFiles = i
+  println(s"Numbers of pairs: ${numFiles}")
+  for (i <- 0 until numFiles) {
+    saveMat(smatFrenchTmpl.format(i), h5DenseIMatToSparse(h5FrenchTmpl.format(i), true)) // reverse src
+    saveMat(smatEnglishTmpl.format(i), h5DenseIMatToSparse(h5EnglishTmpl.format(i), false))
+    println(s"--- Finished pair ${i+1}/${numFiles}")
+  }
+
+  println("Done!")
+}
+
+main()
+System.exit(0)
