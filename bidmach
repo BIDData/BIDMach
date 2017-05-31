@@ -68,16 +68,9 @@ for lib in jcuda jcublas jcufft jcurand jcusolver jcusparse jcudnn; do
     JCUDA_LIBS="${JCUDA_LIBS};${LIBDIR}/${lib}-${JCUDA_VERSION}.jar;${LIBDIR}/${lib}-natives-${JCUDA_VERSION}-${OSS}-${ARCH}.jar"
 done
 
-if [ ! -e ${LIBDIR}/IScala.jar ]; then
-    echo "Downloading Iscala jar"
-    source="http://people.eecs.berkeley.edu/~jfc/biddata"
-    curl -o ${LIBDIR}/IScala.jar ${source}/lib/IScala.jar
-fi
+TOOL_LIBS="${JAVA_HOME}/lib/tools.jar;${LIBDIR}/IScala-1.0.0.jar"
 
-TOOL_LIBS="${LIBDIR}/IScala.jar;\
-${JAVA_HOME}/lib/tools.jar"
-
-CP_LIBS="${TOOL_LIBS};\
+ALL_LIBS="${TOOL_LIBS};\
 ${JCUDA_LIBS};\
 ${BIDMACH_LIBS}"
 
@@ -88,13 +81,7 @@ if [ "$OSS" = "windows" ]; then
     fi
 else
     TOOL_LIBS=`echo "${TOOL_LIBS}" | sed 's/;/:/g'`
-    CP_LIBS=`echo "${CP_LIBS}" | sed 's/;/:/g'`
-fi
-
-if [[ $(ps -o stat= -p $$) == *+* && "$*" != *-howtorun:script* ]]; then
-  BOOTCP="-nobootcp"
-else
-  HOWTORUN="-howtorun:script"
+    ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
 fi
 
 if [ "$1" = "notebook" ]; then
@@ -106,5 +93,5 @@ if [ "$1" = "notebook" ]; then
     fi
     ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${BOOTCP} -toolcp ${TOOL_LIBS} -cp ${CP_LIBS} -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala "${HOWTORUN}" "$@"
+    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 -nobootcp -toolcp "${TOOL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  "$@"
 fi
