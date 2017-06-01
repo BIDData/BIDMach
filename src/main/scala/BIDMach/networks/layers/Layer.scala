@@ -236,8 +236,10 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   }
   
   def clearDerivLazy = {
-  	if (deriv.asInstanceOf[AnyRef] == null && inputDeriv.asInstanceOf[AnyRef] != null) deriv = output.zeros(output.dims);
-  	deriv.clear;
+    if (inputDeriv.asInstanceOf[AnyRef] != null) {
+    	if (deriv.asInstanceOf[AnyRef] == null) deriv = output.zeros(output.dims);
+    	deriv.clear;
+    }
   }
   
   def clearDerivs = {
