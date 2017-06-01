@@ -44,14 +44,36 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
   }
 
 	override def forward = {
-			val start = toc;
+  		val start = toc;
+  		val dims = inputData.dims;
+  		val sizes = opts.sizes;
 			if (blockInds.asInstanceOf[AnyRef] == null) setupInds;
-			
-			blockInds.length match {
-			  case 2 => output = inputData(blockInds(0), blockInds(1));
-			  case 3 => output = inputData(blockInds(0), blockInds(1), blockInds(2));
-			  case 4 => output = inputData(blockInds(0), blockInds(1), blockInds(2), blockInds(3));
-			  case 5 => output = inputData(blockInds(0), blockInds(1), blockInds(2), blockInds(3), blockInds(4));
+			if (net.opts.tensorFormat == Net.TensorNHWC) {
+				blockInds.length match {
+				case 2 => output = inputData(blockInds(0), blockInds(1));
+				case 3 => output = inputData(blockInds(0), blockInds(1), blockInds(2));
+				case 4 => output = inputData(blockInds(0), blockInds(1), blockInds(2), blockInds(3));
+				case 5 => output = inputData(blockInds(0), blockInds(1), blockInds(2), blockInds(3), blockInds(4));
+				}
+			} else {
+				blockInds.length match {
+				case 2 => output = inputData(blockInds(0), blockInds(1));
+				case 3 => {
+				  val reshaped = inputData.reshapeView(dims(1), dims(0), dims(2));
+				  val cropped = reshaped(blockInds(1), blockInds(0), blockInds(2));
+				  output = cropped.reshapeView(sizes(0), sizes(1), sizes(2));
+				}
+				case 4 => {
+				  val reshaped = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
+				  val cropped = reshaped(blockInds(1), blockInds(2), blockInds(0), blockInds(3));
+				  output = cropped.reshapeView(sizes(0), sizes(1), sizes(2), sizes(3));
+				}
+				case 5 => {
+				  val reshaped = inputData.reshapeView(dims(1), dims(2), dims(3), dims(0), dims(4));
+				  val cropped = reshaped(blockInds(1), blockInds(2), blockInds(3), blockInds(0), blockInds(4));
+				  output = cropped.reshapeView(sizes(0), sizes(1), sizes(2), sizes(3), sizes(4));
+				}
+				}
 			}
 
 			forwardtime += toc - start;
@@ -63,8 +85,8 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 }
 
 trait CropNodeOpts extends NodeOpts {
-  var sizes:IMat = irow(3, 224, 224, 0)
-  var offsets:IMat = irow(0, -1, -1, -1)
+  var sizes:IMat = irow(3, 224, 224, 0);
+  var offsets:IMat = irow(0, -1, -1, -1); 
   def copyOpts(opts:CropNodeOpts):CropNodeOpts = {
   		super.copyOpts(opts);
   		opts.sizes = sizes;
