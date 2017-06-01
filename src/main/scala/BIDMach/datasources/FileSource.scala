@@ -1,5 +1,5 @@
 package BIDMach.datasources
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,ND,SMat,SDMat}
+import BIDMat.{BMat,Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.util.concurrent.ExecutorService;
@@ -70,7 +70,8 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 			case mf:FMat => FMat.newOrCheckFMat(dims, null, GUID, i, hashdims, "FileSource_FMat".##);
 			case mi:IMat => IMat.newOrCheckIMat(dims, null, GUID, i, hashdims, "FileSource_IMat".##);
 			case md:DMat => DMat.newOrCheckDMat(dims, null, GUID, i, hashdims, "FileSource_DMat".##);
-			case ms:SMat => SMat.newOrCheckSMat(dims(0), dims(1), dims(1) * opts.eltsPerSample, null, GUID, i, ((dims(0)*1L) << 32) + dims(1), "FileSource_SMat".##);
+			case md:BMat => BMat.newOrCheckBMat(dims, null, GUID, i, hashdims, "FileSource_BMat".##);
+			case ms:SMat => SMat.newOrCheckSMat(dims(0), dims(1), dims(1) * opts.eltsPerSample, null, GUID, i, ((dims(0)*1L) << 32) + dims(1), "FileSource_SMat".##);		
 			}
 		}
 	}
@@ -287,6 +288,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 					case a:FMat => FMat.newOrCheckFMat(dims, null, GUID, i, hashdims, "FileSource_FMat".##);
 					case a:IMat => IMat.newOrCheckIMat(dims, null, GUID, i, hashdims, "FileSource_IMat".##);
 					case a:DMat => DMat.newOrCheckDMat(dims, null, GUID, i, hashdims, "FileSource_DMat".##);
+					case a:BMat => BMat.newOrCheckBMat(dims, null, GUID, i, hashdims, "FileSource_BMat".##);
 					case a:SMat => SMat.newOrCheckSMat(dims(0), dims(1), a.nnz, null, GUID, i, hashdims, "FileSource_SMat".##);
 					}
 				}

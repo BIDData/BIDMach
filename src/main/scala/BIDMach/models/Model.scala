@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,FFilter,GMat,GFilter,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
+import BIDMat.{BMat,Mat,SBMat,CMat,CSMat,DMat,FMat,FFilter,GMat,GFilter,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -328,6 +328,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:FMat => GDMat(aa)
         	case aa:IMat => GIMat(aa)
         	case aa:DMat => GDMat(aa)
+        	case aa:BMat => GDMat(unsignedFloat(aa))
         	case aa:SMat => GSDMat(aa)
         	}
         } else {
@@ -338,6 +339,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:FMat => GMat(aa)
         	case aa:DMat => GMat(aa)
         	case aa:IMat => GIMat(aa)
+        	case aa:BMat => GMat(unsignedFloat(aa))
         	case aa:SMat => GSMat(aa)
         	}
         }
@@ -350,6 +352,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SDMat => SDMat(aa);
         	case aa:IMat => IMat(aa);
         	case aa:LMat => LMat(aa);
+        	case aa:BMat => DMat(unsignedFloat(aa))
         	}
       	} else {
          	to(i) = from(i) match {
@@ -359,6 +362,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SDMat => SMat(aa);
         	case aa:IMat => IMat(aa);
         	case aa:LMat => LMat(aa);
+        	case aa:BMat => unsignedFloat(aa);
         	}
       	}
       }

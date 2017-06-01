@@ -1,9 +1,9 @@
-
+val doNCHW = true;
 val tt = "train";
 
 val imagenetroot = "/data/ImageNet/2012resized/"+tt+"/";
 val dataroot = "../../data/ImageNet/";
-val savefname = tt+"/part%04d.fmat.lz4";
+val savefname = if (doNCHW) tt+"/partNCHW%04d.bmat.lz4" else tt+"/part%04d.bmat.lz4";
 val labelfname = tt+"/label%04d.imat.lz4";
 val namesfname = tt+"/names%04d.csmat.txt";
 val loadtable = loadCSMat(dataroot+tt+".txt");
@@ -16,7 +16,7 @@ val fnames = loadtable(?,0);
 val alllabels = loadtable(?,1).toIMat;
 
 val perm = randperm(nimgs);
-val mat = zeros(4 \ 256 \ 256 \ bsize);
+val mat = zeros(3 \ 256 \ 256 \ bsize);
 val labels = izeros(1, bsize);
 val names = CSMat(bsize,1);
 var i = 0;
@@ -28,7 +28,7 @@ while (jin < nimgs) {
 	val indx = perm(jin);
 	try {
 	    val im = loadImage(imagenetroot+fnames(indx));
-	    mat(?,?,?,j) = im.toFMat;
+	    mat(?,?,?,j) = if (doNCHW) im.toFMat(0->3,?,?,0).fromNHWCtoNCHW else im.toFMat(0->3,?,?,0);
 	    labels(0, j) = alllabels(indx);
 	    names(j) = fnames(indx);
 	    j += 1;
