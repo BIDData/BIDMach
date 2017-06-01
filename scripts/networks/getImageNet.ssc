@@ -28,7 +28,8 @@ while (jin < nimgs) {
 	val indx = perm(jin);
 	try {
 	    val im = loadImage(imagenetroot+fnames(indx));
-	    mat(?,?,?,j) = if (doNCHW) im.toFMat(0->3,?,?,0).fromNHWCtoNCHW else im.toFMat(0->3,?,?,0);
+	    val mm = im.toFMat(0->3,?,?).reshapeView(3,256,256,1);
+	    mat(?,?,?,j) = if (doNCHW) mm.fromNHWCtoNCHW else mm;
 	    labels(0, j) = alllabels(indx);
 	    names(j) = fnames(indx);
 	    j += 1;
@@ -38,11 +39,11 @@ while (jin < nimgs) {
 	jin += 1;
     }
     if (j == bsize) {
-	saveFMat(dataroot+savefname format i, mat);
+	saveBMat(dataroot+savefname format i, BMat(mat));
 	saveIMat(dataroot+labelfname format i, labels);
 	saveCSMat(dataroot+namesfname format i, names);
     } else {
-	saveFMat(dataroot+savefname format i, mat.colslice(0,j));
+	saveBMat(dataroot+savefname format i, BMat(mat.colslice(0,j)));
 	saveIMat(dataroot+labelfname format i, labels.colslice(0,j));
 	saveCSMat(dataroot+namesfname format i, names(0->j,0));
     }
