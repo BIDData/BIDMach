@@ -336,7 +336,7 @@ object Net  {
     net;
   }
   
-  def getDetaultNet:Net = getDefault;
+  def getDefaultNet:Net = getDefault;
 
   class Options extends Opts {}
 
