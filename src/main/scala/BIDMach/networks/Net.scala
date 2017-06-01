@@ -312,12 +312,12 @@ object Net  {
   var defaultNet:Net = null; 
   var defaultLayerList:List[Layer] = null;
   
-  def initDefaultNet(opts:Net.Opts) {
+  def initDefault(opts:Net.Opts) {
     defaultNet = new Net(opts);
     defaultLayerList = List[Layer]();
   }
   
-  def initDefaultNet(net:Net) {
+  def initDefault(net:Net) {
     defaultNet = net;
     defaultLayerList = List[Layer]();
   }
@@ -328,13 +328,15 @@ object Net  {
     }
   }
   
-  def getDefaultNet:Net = {
+  def getDefault:Net = {
     val net = defaultNet;
     net.layers = defaultLayerList.toArray.reverse;
     defaultNet = null;
     defaultLayerList = null;
     net;
   }
+  
+  def getDetaultNet:Net = getDefault;
 
   class Options extends Opts {}
 
