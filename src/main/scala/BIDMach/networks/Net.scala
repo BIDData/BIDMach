@@ -312,12 +312,12 @@ object Net  {
   var defaultNet:Net = null; 
   var defaultLayerList:List[Layer] = null;
   
-  def initDefault(opts:Net.Opts) {
+  def initDefaultNet(opts:Net.Opts) {
     defaultNet = new Net(opts);
     defaultLayerList = List[Layer]();
   }
   
-  def initDefault(net:Net) {
+  def initDefaultNet(net:Net) {
     defaultNet = net;
     defaultLayerList = List[Layer]();
   }
