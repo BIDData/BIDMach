@@ -317,6 +317,11 @@ object Net  {
     defaultLayerList = List[Layer]();
   }
   
+  def initDefault(net:Net) {
+    defaultNet = net;
+    defaultLayerList = List[Layer]();
+  }
+  
   def addLayer(layer:Layer) = {
     if (defaultLayerList.asInstanceOf[AnyRef] != null) {
       defaultLayerList = layer :: defaultLayerList;

@@ -348,7 +348,7 @@ object Layer {
     new CropLayer(null, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}
   }
   
-  def dropout(a:LayerTerm)(dfrac:Float) = new DropoutLayer(null, new DropoutNode{frac = dfrac}){inputs(0) = a}
+  def dropout(a:LayerTerm)(dfrac:Float=0.5f) = new DropoutLayer(null, new DropoutNode{frac = dfrac}){inputs(0) = a}
   
   def efn(a:LayerTerm)(fwdfn:(Float)=>Float=null, bwdfn:(Float,Float,Float)=>Float=null) = {
     val fwd = fwdfn;
@@ -412,6 +412,18 @@ object Layer {
     n.setInput(1, c);
     n.setInput(2, i);
     n
+  }
+  
+  def LRNwithin(h:LayerTerm)(net:Net=null, dim:Int=5, alpha:Float=1f, beta:Float=0.5f) = {
+  	val net0 = findNet(net);
+    val node = new LRNwithinNode;
+    node.dim = dim;
+    node.alpha = alpha;
+    node.beta = beta;
+    node.constructGraph;
+    val layer = new LRNwithinLayer(net0, node);
+    layer.setInput(0, h);
+    layer
   }
   
   def max(a:LayerTerm, b:LayerTerm)= {
