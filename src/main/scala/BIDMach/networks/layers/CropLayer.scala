@@ -71,7 +71,6 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 				  val reshaped = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
 				  val cropped = reshaped(blockInds(1), blockInds(2), blockInds(0), blockInds(3));
 				  output = cropped.reshapeView(sizes(0), sizes(1), sizes(2), sizes(3));
-				  println("GUIDS %d %d %d %d" format (inputData.GUID, reshaped.GUID, cropped.GUID, output.GUID))
 				}
 				case 5 => {
 				  val reshaped = inputData.reshapeView(dims(1), dims(2), dims(3), dims(0), dims(4));
