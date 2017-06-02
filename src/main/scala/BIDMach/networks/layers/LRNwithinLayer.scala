@@ -38,6 +38,41 @@ trait LRNwithinNodeOpts extends CompoundNodeOpts {
 }
 
 class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {	
+  
+  	var xalpha:Mat = null;
+    var xbeta:Mat = null;
+    var xone:Mat = null;
+    
+    def initMats(a:Mat) = {
+  	    xalpha = a.zeros(iones(1,a.dims.length));
+  	    xalpha.set(alpha);
+  	    xbeta = a.zeros(iones(1,a.dims.length));
+  	    xbeta.set(beta);
+  	    xone = a.zeros(iones(1,a.dims.length));
+  	    xone.set(1f);      
+    }
+  
+  	def fwdLRN(a:Mat):Mat = {
+  	  if (xalpha.asInstanceOf[AnyRef] == null) {
+  	  	initMats(a);
+  	  }
+  	  val b = a *@ xalpha;
+  	  b ~ b + xone;
+  	  b ~ b ^ xbeta;
+  	  b;
+  	}
+  	
+  	def bwdLRN(in:Mat, out:Mat, d:Mat):Mat = {
+  	  if (xalpha.asInstanceOf[AnyRef] == null) {
+  	  	initMats(in);
+  	  }
+  	  val b = in *@ xalpha;
+  	  b ~ b + xone;
+  	  b ~ b ^ (xbeta - xone);
+  	  b ~ b *@ (xbeta *@ xalpha);
+  	  b ~ b *@ d;
+  	  b;
+  	}
 	  	  
 	  def constructGraph = {
     	import BIDMach.networks.layers.Node._
@@ -45,23 +80,14 @@ class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {
     	val odim = dim;
     		
     	val in =       copy;
-    	val xalpha =   constant(alpha);
-    	val xbeta =    constant(beta);
-    	val xone =     constant(1f);
-
     	val prod1 =    in *@ in;
     	val pool1 =    pool(prod1)(h=dim, w=dim, pad=dim/2, poolingMode=CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING);
-    	val scale1 =   pool1 *@ xalpha;   	
-    	val sum1 =     scale1 + xone;
     	
-      val log1 =     ln(sum1);
-      val plog1 =    log1 *@ xbeta;
-      val div1 =     exp(plog1);
+      val div1 =     fn(pool1)(fwdfn=fwdLRN, bwdfn=bwdLRN);
       val out =      in / div1;
 
-    	grid = (in     \ xalpha  \ xbeta    \ xone    on
-    	        prod1  \ pool1   \ scale1   \ sum1    on
-    	        log1   \ plog1   \ div1     \ out).t
+    	grid = (in     \ prod1  \ pool1  on
+    	        div1   \ out     \ null  ).t
     	
     	val lopts = grid.data;
     	lopts.map((x:Node) => if (x != null) x.parent = this);
