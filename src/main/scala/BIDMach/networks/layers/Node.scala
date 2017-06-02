@@ -192,6 +192,7 @@ object Node {
     n.dim = dim;
     n.alpha = alpha;
     n.beta = beta;
+    n.constructGraph;
     n.inputs(0) = h;
     n
   }
