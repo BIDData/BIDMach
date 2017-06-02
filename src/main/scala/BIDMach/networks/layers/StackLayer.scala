@@ -18,21 +18,42 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
   override val _inputs = new Array[LayerTerm](opts.ninputs);
 
   var colranges = new Array[IMat](opts.ninputs);
+  var ndims = 0;
+  var tensorFormat = Net.TensorNCHW; 
   
   override def forward = {
 		  val start = toc;
 		  if (output.asInstanceOf[AnyRef] == null) {
+		    if (net.asInstanceOf[AnyRef] != null) tensorFormat = net.opts.tensorFormat;
+		    ndims = inputData.dims.length;
 			  var orows = 0;
 			  for (i <- 0 until opts.ninputs) {
-				  val thisrow = inputDatas(i).nrows;
+				  val thisrow = if (tensorFormat == Net.TensorNCHW) inputDatas(i).dims(ndims-2) else inputDatas(i).dims(0);
 				  colranges(i) = inputData.izeros(1,thisrow).asInstanceOf[IMat];
 				  colranges(i) <-- irow(orows -> (orows + thisrow));
 				  orows += thisrow;
 			  }
-			  output = inputData.zeros(orows \ inputData.ncols);
+			  val odims = inputData.dims.copy;
+			  odims(ndims-1) = inputData.ncols;
+			  odims(if (tensorFormat == Net.TensorNCHW) (ndims-2) else 0) = orows;
+			  output = inputData.zeros(odims);
 		  }
 		  for (i <- 0 until opts.ninputs) {
-			  output(colranges(i), ?) = inputDatas(i);
+		  	if (tensorFormat == Net.TensorNCHW) {
+		  		ndims match {
+		  		case 2 => output(colranges(i), ?) = inputDatas(i);
+		  		case 3 => output(?, colranges(i), ?) = inputDatas(i);
+		  		case 4 => output(?, ?, colranges(i), ?) = inputDatas(i);
+		  		case 5 => output(?, ?, ?, colranges(i), ?) = inputDatas(i);
+		  		}
+		  	} else {
+		  	  ndims match {
+		  		case 2 => output(colranges(i), ?) = inputDatas(i);
+		  		case 3 => output(colranges(i), ?, ?) = inputDatas(i);
+		  		case 4 => output(colranges(i), ?, ?, ?) = inputDatas(i);
+		  		case 5 => output(colranges(i), ?, ?, ?, ?) = inputDatas(i);
+		  		}
+		  	}
 		  }
 		  clearDeriv;
 		  forwardtime += toc - start;
