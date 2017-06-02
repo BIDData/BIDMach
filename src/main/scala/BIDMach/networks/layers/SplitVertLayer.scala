@@ -18,18 +18,41 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
   override val _outputs = new Array[Mat](opts.nparts);
   override val _derivs = new Array[Mat](opts.nparts);
   var nblock:Int = 0;
-  var rowranges = new Array[IMat](opts.nparts);
+  var colranges = new Array[IMat](opts.nparts);
+  var ndims = 0;
+  var tensorFormat = Net.TensorNCHW; 
   
   override def forward = {
 		  val start = toc;
 		  if (output.asInstanceOf[AnyRef] == null) {
-			  nblock = inputData.nrows / opts.nparts;
-			  for (i <- 0 until opts.nparts) {
-				  rowranges(i) = int(convertMat(icol((i*nblock)->((i+1)*nblock))));
+		  	if (net.asInstanceOf[AnyRef] != null) tensorFormat = net.opts.tensorFormat;
+		    ndims = inputData.dims.length;
+			  nblock = if (tensorFormat == Net.TensorNCHW) {
+			    inputData.dims(ndims-2) / opts.nparts;
+			  } else {
+			    inputData.dims(0) / opts.nparts
+			  }
+			  for (i <- 0 until opts.nparts) {		    
+				  colranges(i) = inputData.izeros(1, nblock).asInstanceOf[IMat];
+				  colranges(i) <-- icol((i*nblock)->((i+1)*nblock));
 			  }
 		  }
 		  for (i <- 0 until opts.nparts) {
-			  setOutput(i, inputData(rowranges(i), ?));
+		  	if (tensorFormat == Net.TensorNCHW) {
+		  		ndims match {
+		  		case 2 =>	setOutput(i, inputData(colranges(i), ?));
+		  		case 3 =>	setOutput(i, inputData(?, colranges(i), ?));
+		  		case 4 =>	setOutput(i, inputData(?, ?, colranges(i), ?));
+		  		case 5 =>	setOutput(i, inputData(?, ?, ?, colranges(i), ?));
+		  		}
+		  	} else {
+		  		ndims match {
+		  		case 2 =>	setOutput(i, inputData(colranges(i), ?));
+		  		case 3 =>	setOutput(i, inputData(colranges(i), ?, ?));
+		  		case 4 =>	setOutput(i, inputData(colranges(i), ?, ?, ?));
+		  		case 5 =>	setOutput(i, inputData(colranges(i), ?, ?, ?, ?));
+		  		}		    
+		  	}
 		  }
 		  clearDerivs;
 		  forwardtime += toc - start;
@@ -39,7 +62,21 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 		  val start = toc;
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			  for (i <- 0 until opts.nparts) {
-				  inputDeriv(rowranges(i), ?) = inputDeriv(rowranges(i), ?) + derivs(i);
+			  	if (tensorFormat == Net.TensorNCHW) {
+			  		ndims match {
+			  		case 2 => inputDeriv(colranges(i), ?) = inputDeriv(colranges(i), ?) + derivs(i);
+			  		case 3 => inputDeriv(?, colranges(i), ?) = inputDeriv(?, colranges(i), ?) + derivs(i);
+			  		case 4 => inputDeriv(?, ?, colranges(i), ?) = inputDeriv(?, ?, colranges(i), ?) + derivs(i);
+			  		case 5 => inputDeriv(?, ?, ?, colranges(i), ?) = inputDeriv(?, ?, ?, colranges(i), ?) + derivs(i);
+			  		}
+			  	} else {
+			  		ndims match {
+			  		case 2 => inputDeriv(colranges(i), ?) = inputDeriv(colranges(i), ?) + derivs(i);
+			  		case 3 => inputDeriv(colranges(i), ?, ?) = inputDeriv(colranges(i), ?, ?) + derivs(i);
+			  		case 4 => inputDeriv(colranges(i), ?, ?, ?) = inputDeriv(colranges(i), ?, ?, ?) + derivs(i);
+			  		case 5 => inputDeriv(colranges(i), ?, ?, ?, ?) = inputDeriv(colranges(i), ?, ?, ?, ?) + derivs(i);
+			  		}			  	  
+			  	}
 			  }
 		  }
 		  backwardtime += toc - start;

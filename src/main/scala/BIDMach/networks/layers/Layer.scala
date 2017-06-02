@@ -315,7 +315,7 @@ object Layer {
     new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
   }
   
-  def batchNormScale(a:LayerTerm)(net:Net=null, name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, net:Net=null) = {
   	val net0 = findNet(net);
     val hb = hasBias;
   	val mname = name;
@@ -332,8 +332,8 @@ object Layer {
     new ConstantLayer(net0, new ConstantNode{value = v;})
   }
   
-  def conv(a:LayerTerm)(net:Net=null, name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
-      hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
+  def conv(a:LayerTerm)(name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
+      hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION, net:Net=null) = {
   	val net0 = findNet(net);
     val str = stride;
     val pd = pad;
@@ -348,14 +348,14 @@ object Layer {
 
   def copy0 = new CopyLayer(null);
   
-  def crop(a:LayerTerm)(net:Net=null, sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
+  def crop(a:LayerTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1), net:Net=null) = {
   	val net0 = findNet(net);
     val csizes = sizes;
     val coffsets = offsets;
     new CropLayer(net0, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}
   }
   
-  def dropout(a:LayerTerm)(net:Net=null, dfrac:Float=0.5f) = {
+  def dropout(a:LayerTerm)(dfrac:Float=0.5f, net:Net=null) = {
   	val net0 = findNet(net);
     new DropoutLayer(net0, new DropoutNode{frac = dfrac}){inputs(0) = a}
   }
@@ -381,7 +381,7 @@ object Layer {
     new Fn2Layer(null, new Fn2Node{fwdfn=fwd; bwdfn1=bwd1; bwdfn2=bwd2}){inputs(0) = a; inputs(1) = b;};
   }
    
-  def format(a:LayerTerm)(net:Net = null, conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
+  def format(a:LayerTerm)(conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC, net:Net = null) = {
   	val net0 = findNet(net);
     val con = conversion;
     val fmt = inputFormat;
@@ -396,8 +396,8 @@ object Layer {
   
   def input = new InputLayer(null);
   
-  def linear(a:LayerTerm)(net:Net = null, name:String="", outdim:Int=0, hasBias:Boolean=true, initv:Float = 1f, aopts:ADAGrad.Opts=null, 
-      withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
+  def linear(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, initv:Float = 1f, aopts:ADAGrad.Opts=null, 
+      withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null, net:Net = null) = {
   	val net0 = findNet(net);
     val odim = outdim;
     val hBias = hasBias;
@@ -411,7 +411,7 @@ object Layer {
   
   def ln(a:LayerTerm) = new LnLayer(null){inputs(0) = a};
   
-  def lstm(h:LayerTerm, c:LayerTerm, i:LayerTerm, m:String)(net:Net=null, opts:LSTMNodeOpts) = {
+  def lstm(h:LayerTerm, c:LayerTerm, i:LayerTerm, m:String)(opts:LSTMNodeOpts, net:Net=null) = {
   	val net0 = findNet(net);
     val node = new LSTMNode;
     opts.copyOpts(node);
@@ -424,7 +424,7 @@ object Layer {
     n
   }
   
-  def LRNwithin(h:LayerTerm)(net:Net=null, dim:Int=5, alpha:Float=1f, beta:Float=0.5f) = {
+  def LRNwithin(h:LayerTerm)(dim:Int=5, alpha:Float=1f, beta:Float=0.5f, net:Net=null) = {
   	val net0 = findNet(net);
     val node = new LRNwithinNode;
     node.dim = dim;
@@ -461,7 +461,8 @@ object Layer {
   }
 
   
-  def negsamp(a:LayerTerm)(net:Net=null, name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
+  def negsamp(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
+      nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true, net:Net=null) = {
   	val net0 = findNet(net);
     val odim = outdim;
     val hBias = hasBias;
@@ -478,10 +479,10 @@ object Layer {
   
   def oneHot(a:LayerTerm) = new OnehotLayer(null){inputs(0) = a};
   
-  def pool(a:LayerTerm)(net:Net=null, h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
+  def pool(a:LayerTerm)(h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
       poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
       poolingNaN:Int=cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
-      tensorFormat:Int = Net.UseNetFormat) = {
+      tensorFormat:Int = Net.UseNetFormat, net:Net=null) = {
   	val net0 = findNet(net);
   	val hh = h;
   	val ww = w;
@@ -493,7 +494,7 @@ object Layer {
     new PoolingLayer(net0, new PoolingNode{h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
   }
   
-  def scale(a:LayerTerm)(net:Net=null, name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  def scale(a:LayerTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, net:Net=null) = {
   	val net0 = findNet(net);
   	val hb = hasBias;
   	val mname = name;
@@ -512,7 +513,7 @@ object Layer {
 
   def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a};
   
-  def softmaxout(a:LayerTerm)(net:Net=null, scoreType:Int=0, doVariance:Boolean=false) =  {
+  def softmaxout(a:LayerTerm)(scoreType:Int=0, doVariance:Boolean=false, net:Net=null) =  {
   	val net0 = findNet(net);
     val scoreTyp = scoreType;
     val doVar = doVariance;
@@ -523,7 +524,10 @@ object Layer {
   
   def splithoriz(a:LayerTerm)(np:Int) = new SplitHorizLayer(null, new SplitHorizNode{nparts = np}){inputs(0) = a};
   
-  def splitvert(a:LayerTerm)(np:Int) = new SplitVertLayer(null, new SplitVertNode{nparts = np}){inputs(0) = a};
+  def splitvert(a:LayerTerm)(np:Int, net:Net=null) = {
+  	val net0 = findNet(net);
+    new SplitVertLayer(net0, new SplitVertNode{nparts = np}){inputs(0) = a};
+  }
   
   def sqrt(a:LayerTerm) = new SqrtLayer(null){inputs(0) = a;};
   
