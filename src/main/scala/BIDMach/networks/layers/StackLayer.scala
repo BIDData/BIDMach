@@ -25,10 +25,11 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 			  var orows = 0;
 			  for (i <- 0 until opts.ninputs) {
 				  val thisrow = inputDatas(i).nrows;
-				  colranges(i) = int(convertMat(irow(orows -> (orows + thisrow))));
+				  colranges(i) = inputData.izeros(1,thisrow).asInstanceOf[IMat];
+				  colranges(i) <-- irow(orows -> (orows + thisrow));
 				  orows += thisrow;
 			  }
-			  output = convertMat(zeros(orows \ inputData.ncols));
+			  output = inputData.zeros(orows \ inputData.ncols);
 		  }
 		  for (i <- 0 until opts.ninputs) {
 			  output(colranges(i), ?) = inputDatas(i);
