@@ -76,6 +76,10 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
   def dot  (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
   
   def ∙    (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};
+  
+  def ^    (a:NodeTerm) = {val n=this; new PowerNode{inputs(0)=n; inputs(1)=a;}};
+  
+  def pow  (a:NodeTerm) = {val n=this; new PowerNode{inputs(0)=n; inputs(1)=a;}};
         
   def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
   
