@@ -39,7 +39,7 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
         } else {
           gap/2;
         }
-        irow(offset->(offset + opts.sizes(i)))
+        net.convertMat(irow(offset->(offset + opts.sizes(i)))).asInstanceOf[IMat];
       } 
     }
   }
