@@ -1,5 +1,5 @@
 package BIDMach
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,FFilter,IMat,HMat,GDMat,GFilter,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat}
+import BIDMat.{BMat,Mat,SBMat,CMat,DMat,FMat,FFilter,IMat,HMat,GDMat,GFilter,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Plotting._
@@ -846,6 +846,7 @@ object Learner {
       case a:IMat => 4L * mat.length;
       case a:DMat => 8L * mat.length;
       case a:LMat => 8L * mat.length;
+      case a:BMat => 1L * mat.length;
       case a:SMat => 8L * mat.nnz;
       case a:SDMat => 12L * mat.nnz;
     }
