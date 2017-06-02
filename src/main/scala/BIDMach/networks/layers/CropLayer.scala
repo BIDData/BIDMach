@@ -23,6 +23,7 @@ import BIDMach.networks._
 
 class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropNode) extends Layer(net, opts) {
   var blockInds:Array[IMat] = null;
+  var sizes:IMat = null;
   
   def setupInds = {
     val dims = inputData.dims;
@@ -46,7 +47,10 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 	override def forward = {
   		val start = toc;
   		val dims = inputData.dims;
-  		val sizes = opts.sizes;
+  		if (sizes.asInstanceOf[AnyRef] == null) {
+  		  sizes = opts.sizes.copy;
+  		}
+  		sizes(sizes.length-1) = inputData.ncols;
 			if (blockInds.asInstanceOf[AnyRef] == null) setupInds;
 			if (net.opts.tensorFormat == Net.TensorNHWC) {
 				blockInds.length match {
