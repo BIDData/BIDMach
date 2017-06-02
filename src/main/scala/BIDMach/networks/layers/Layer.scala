@@ -355,7 +355,10 @@ object Layer {
     new CropLayer(net0, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}
   }
   
-  def dropout(a:LayerTerm)(dfrac:Float=0.5f) = new DropoutLayer(null, new DropoutNode{frac = dfrac}){inputs(0) = a}
+  def dropout(a:LayerTerm)(net:Net=null, dfrac:Float=0.5f) = {
+  	val net0 = findNet(net);
+    new DropoutLayer(net0, new DropoutNode{frac = dfrac}){inputs(0) = a}
+  }
   
   def efn(a:LayerTerm)(fwdfn:(Float)=>Float=null, bwdfn:(Float,Float,Float)=>Float=null) = {
     val fwd = fwdfn;
