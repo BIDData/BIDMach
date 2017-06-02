@@ -294,7 +294,7 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
   
   def pow  (a:LayerTerm) = {val n=this; new PowerLayer(null){inputs(0)=n; inputs(1)=a;}};
         
-  def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
+  def over (a:LayerTerm) = {val n=this; new StackLayer(Layer.findNet(null)){inputs(0)=n; inputs(1)=a;}};
   
   def apply(a:LayerTerm) = {val n=this; new SelectLayer(null){inputs(0)=n; inputs(1)=a;}};
 }

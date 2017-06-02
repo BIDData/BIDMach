@@ -62,8 +62,22 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
   override def backward = {
 		  val start = toc;
 		  for (i <- 0 until opts.ninputs) {
-			  if (inputDerivs(i).asInstanceOf[AnyRef] != null) {
-				  inputDerivs(i) <-- deriv(colranges(i), ?)
+		  	if (inputDerivs(i).asInstanceOf[AnyRef] != null) {
+		  		if (tensorFormat == Net.TensorNCHW) {
+		  			ndims match {
+		  			case 2 => inputDerivs(i) <-- deriv(colranges(i), ?);
+		  			case 3 => inputDerivs(i) <-- deriv(?, colranges(i), ?);
+		  			case 4 => inputDerivs(i) <-- deriv(?, ?, colranges(i), ?);
+		  			case 5 => inputDerivs(i) <-- deriv(?, ?, ?, colranges(i), ?);
+		  			}
+		  		} else {
+		  			ndims match {
+		  			case 2 => inputDerivs(i) <-- deriv(colranges(i), ?);
+		  			case 3 => inputDerivs(i) <-- deriv(colranges(i), ?, ?);
+		  			case 4 => inputDerivs(i) <-- deriv(colranges(i), ?, ?, ?);
+		  			case 5 => inputDerivs(i) <-- deriv(colranges(i), ?, ?, ?, ?);
+		  			}
+		  		}
 			  }
 		  }  
 		  backwardtime += toc - start;
