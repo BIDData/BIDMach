@@ -344,10 +344,11 @@ object Layer {
 
   def copy0 = new CopyLayer(null);
   
-  def crop(a:LayerTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
+  def crop(a:LayerTerm)(net:Net=null, sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
+  	val net0 = findNet(net);
     val csizes = sizes;
     val coffsets = offsets;
-    new CropLayer(null, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}
+    new CropLayer(net0, new CropNode{sizes = csizes; offsets = coffsets}){inputs(0) = a;}
   }
   
   def dropout(a:LayerTerm)(dfrac:Float=0.5f) = new DropoutLayer(null, new DropoutNode{frac = dfrac}){inputs(0) = a}
