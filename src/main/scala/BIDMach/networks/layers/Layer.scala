@@ -414,7 +414,7 @@ object Layer {
     opts.copyOpts(node);
     node.modelName = m;
     node.constructGraph;
-    val n = new LSTMLayer(net0, node);
+    val n = LSTMLayer(net0, node);
     n.setInput(0, h);
     n.setInput(1, c);
     n.setInput(2, i);
@@ -428,7 +428,7 @@ object Layer {
     node.alpha = alpha;
     node.beta = beta;
     node.constructGraph;
-    val layer = new LRNwithinLayer(net0, node);
+    val layer = LRNwithinLayer(net0, node);
     layer.setInput(0, h);
     layer
   }

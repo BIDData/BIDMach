@@ -86,8 +86,7 @@ class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {
       val div1 =     fn(pool1)(fwdfn=fwdLRN, bwdfn=bwdLRN);
       val out =      in / div1;
 
-    	grid = (in     \ prod1  \ pool1  on
-    	        div1   \ out     \ null  ).t
+    	grid = (in \ prod1 \ pool1 \ div1 \ out);
     	
     	val lopts = grid.data;
     	lopts.map((x:Node) => if (x != null) x.parent = this);
