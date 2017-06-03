@@ -27,7 +27,10 @@ import java.util.HashMap;
 class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var layers:Array[Layer] = null;
   var layermat:LayerMat = null;
+  var input_layers:Array[Layer] = null;
   var output_layers:Array[Layer] = null;
+  var score_layers:Array[Layer] = null;
+  var og_layers:Array[Layer] = null;
   var targmap:Mat = null;
   var mask:Mat = null;
   var bufmat:Mat = null;
@@ -35,6 +38,13 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var batchSize = -1;
   var imodel = 0;
   var initialize = false;
+  
+  def isInputLayer(l:Layer):Boolean = {
+  		l match {
+  		case _:InputLayer => true;
+  		case _ => false;
+  		}
+  }
 
   override def init() = {
 //	  mats = datasource.next;
@@ -43,17 +53,29 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
-    if (output_layers == null) {
-      output_layers = layers(layers.length-1) match {
-        case a:OutputLayer => Array(layers(layers.length-1));
-        case _ => Array[Layer]();
+	  if (output_layers == null) {
+	  	output_layers = layers(layers.length-1) match {
+	  	case a:OutputLayer => Array(layers(layers.length-1));
+	  	case _ => new Array[Layer](0);
+	  	}
+    }
+    if (input_layers == null) {
+      var ninputs = 0;
+      var isgood = true;
+      while (ninputs < layers.length && isgood) {
+        isgood = isInputLayer(layers(ninputs));
+        if (isgood) ninputs += 1;        
       }
+      input_layers = layers.slice(0, ninputs);
+    }
+    if (score_layers == null) {
+      score_layers = output_layers;
     }
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
 	  }
 	  imodel = 0;
-	  layers.map((x:Layer) => if (x != null)x.getModelMats(this));
+	  layers.map((x:Layer) => if (x != null) x.getModelMats(this));
 	  if (refresh) {
 	  	setmodelmats(new Array[Mat](imodel + modelMap.size));
 	  }
@@ -66,12 +88,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  	}
 	  };
 	  copyMats(mats, gmats);
-	  val pb = putBack;
-	  putBack = -1;
     initialize = true;
     evalbatch(gmats, 0, 0);
     initialize = false;
-    putBack = pb;
 //	  datasource.reset;
   }
 
@@ -126,7 +145,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
 
   def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
-    for (i <- 0 until (gmats.length - output_layers.length)) {
+    for (i <- 0 until input_layers.length) {
     	layers(i).output = gmats(i);
     }
   }
@@ -134,9 +153,19 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
   	if (targmap.asInstanceOf[AnyRef] != null) {
   		layers(layers.length-1).target = targmap * gmats(0);
-  	} else if (gmats.length > 1 && output_layers.length > 0) {
-  	  for (i <- 0 until output_layers.length)
-  	  	output_layers(i).target = full(gmats(gmats.length-output_layers.length+i));
+  	} else if (output_layers.length > 0) {
+  	  var itargets = 0;
+  	  for (i <- 0 until output_layers.length) {
+  	  	output_layers(i) match {
+  	  	  case layer:OutputLayer => {
+  	  	    layer.target = full(gmats(input_layers.length+itargets));
+  	  	    itargets += 1;
+  	  	  }
+  	  	  case _ => output_layers(i).deriv.set(1f);
+  	  	} 	  	
+  	  }
+  	} else {
+  	  layers(layers.length-1).deriv.set(1f);
   	}
   }
   
@@ -205,6 +234,11 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	cleargrad;
     	setderiv();
     	backward(ipass, pos);
+    	if (og_layers.asInstanceOf[AnyRef] != null) {
+    		for (i <- 0 until og_layers.length) {
+    			ogmats(i) = og_layers(i).output;
+    		}
+    	}
     }
   }
 
@@ -216,27 +250,24 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		if (mask.asInstanceOf[AnyRef] != null) {
   			modelmats(0) ~ modelmats(0) ∘ mask;
   		}
-  		var i = 0;
-  		while (i < layers.length) {
-  		  if (opts.debug > 0) {
-  		    println("evalbatch forward %d %s" format (i, layers(i).getClass))
-  		  }
+  		for (i <- 0 until layers.length) {
+  			if (opts.debug > 0) {
+  				println("evalbatch forward %d %s" format (i, layers(i).getClass))
+  			}
   			layers(i).forward;
-  			i += 1;
   		}
-  		if (putBack >= 0) {
-  			output_layers(output_layers.length-1).output.colslice(0, gmats(0).ncols, gmats(1));
+  		val scores = zeros(score_layers.length, 1);
+  		for (i <- 0 until score_layers.length) {
+  			scores(i) = score_layers(i).score.v;
   		}
-      val scores = zeros(output_layers.length, 1);
-  		var j = 0;
-      while (j < output_layers.length) {
-        scores(j) = output_layers(j).score.v;
-        if (ogmats != null && j < ogmats.length) ogmats(j) = output_layers(j).output;
-        j += 1;
-      }
-      scores;
+  		if (og_layers.asInstanceOf[AnyRef] != null) {
+  			for (i <- 0 until og_layers.length) {
+  				ogmats(i) = og_layers(i).output;
+  			}
+  		}
+  		scores;
   	} else {
-  	  zeros(output_layers.length, 1);
+  	  zeros(score_layers.length, 1);
   	}
   }
 

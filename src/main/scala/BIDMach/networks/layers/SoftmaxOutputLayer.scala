@@ -21,8 +21,9 @@ import BIDMach.networks._
 
 class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNodeOpts = new SoftmaxOutputNode) extends Layer(net, opts) with OutputLayer { 
   var coloffsets:IMat = null;
+  var zero:Mat = null;
   var one:Mat = null;
-  var eps:Mat = null;
+
 
   override def forward = {
 		  val start = toc;
@@ -38,22 +39,20 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		  val start = toc;
 		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
+		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
 		    if (one.asInstanceOf[AnyRef] == null) one = convertMat(row(1f));
-		    if (eps.asInstanceOf[AnyRef] == null) eps = convertMat(row(opts.eps));
 		    val inds = int(target) + coloffsets;
 		    output ~ inputData - maxi(inputData);
 		    exp(output, output);
 				output ~ output / sum(output);
-		    val oneMinusP = one - output;
-		    max(oneMinusP, eps, oneMinusP);
-        val invOneMinusP = oneMinusP;
-        invOneMinusP ~ one / oneMinusP;
-        val logit = output ∘ invOneMinusP;
-        val slogit = sum(logit) - invOneMinusP;
-        slogit ~ slogit - invOneMinusP(inds);
-        slogit ~ slogit ∘ output;
-        inputDeriv ~ inputDeriv + slogit;
-        inputDeriv(inds) ~ inputDeriv(inds) + invOneMinusP(inds); 
+		    if (opts.logLoss) {
+		    	inputDeriv ~ inputDeriv - output;
+		    	inputDeriv(inds) ~ inputDeriv(inds) + one; 
+		    } else {
+		      val oderiv = output ∘ output(inds);
+		      inputDeriv ~ inputDeriv - oderiv;
+		      inputDeriv(inds) = inputDeriv(inds) + output(inds); 		      
+		    }
       }
 		  backwardtime += toc - start;
   }
@@ -86,6 +85,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 trait SoftmaxOutputNodeOpts extends NodeOpts {
 	var scoreType = 0;
 	var doVariance = false;
+	var logLoss = true;
 	var eps = 1e-5f;
 		
 	def copyOpts(opts:SoftmaxOutputNodeOpts):SoftmaxOutputNodeOpts = {
