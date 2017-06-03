@@ -47,7 +47,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 				output ~ output / sum(output);
 		    if (opts.logLoss) {
 		    	inputDeriv ~ inputDeriv - output;
-		    	inputDeriv(inds) ~ inputDeriv(inds) + one; 
+		    	inputDeriv(inds) = inputDeriv(inds) + one; 
 		    } else {
 		      val oderiv = output ∘ output(inds);
 		      inputDeriv ~ inputDeriv - oderiv;
