@@ -23,6 +23,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
   var coloffsets:IMat = null;
   var zero:Mat = null;
   var one:Mat = null;
+  var eps:Mat = null;
 
 
   override def forward = {
@@ -39,19 +40,37 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		  val start = toc;
 		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
-		    if (zero.asInstanceOf[AnyRef] == null) zero = convertMat(row(0f));
-		    if (one.asInstanceOf[AnyRef] == null) one = convertMat(row(1f));
+		    if (zero.asInstanceOf[AnyRef] == null) {
+		      zero = convertMat(row(0f));
+		      one = convertMat(row(1f));
+		      eps = convertMat(row(opts.eps));
+		    }		    
 		    val inds = int(target) + coloffsets;
 		    output ~ inputData - maxi(inputData);
 		    exp(output, output);
 				output ~ output / sum(output);
-		    if (opts.logLoss) {
-		    	inputDeriv ~ inputDeriv - output;
-		    	inputDeriv(inds) = inputDeriv(inds) + one; 
-		    } else {
-		      val oderiv = output ∘ output(inds);
-		      inputDeriv ~ inputDeriv - oderiv;
-		      inputDeriv(inds) = inputDeriv(inds) + output(inds); 		      
+		    opts.lossType match {
+		      case SoftmaxOutputLayer.LogTargetProbs => {
+		      	inputDeriv ~ inputDeriv - output;
+		      	inputDeriv(inds) = inputDeriv(inds) + one; 
+		      }
+		      case SoftmaxOutputLayer.TargetProbs => {
+		      	val oderiv = output ∘ output(inds);
+		      	inputDeriv ~ inputDeriv - oderiv;
+		      	inputDeriv(inds) = inputDeriv(inds) + output(inds); 		      
+		      }
+		      case SoftmaxOutputLayer.LogProbs => {
+		      	val oneMinusP = one - output;
+		      	max(oneMinusP, eps, oneMinusP);
+		      	val invOneMinusP = oneMinusP;
+		      	invOneMinusP ~ one / oneMinusP;
+		      	val logit = output ∘ invOneMinusP;
+		      	val slogit = sum(logit) - invOneMinusP;
+		      	slogit ~ slogit - invOneMinusP(inds);
+		      	slogit ~ slogit ∘ output;
+		      	inputDeriv ~ inputDeriv + slogit;
+		      	inputDeriv(inds) = inputDeriv(inds) + invOneMinusP(inds);
+		      }
 		    }
       }
 		  backwardtime += toc - start;
@@ -60,7 +79,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
   override def score:FMat = {
     if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
     val inds = int(target) + coloffsets;
-    if (opts.scoreType == SoftmaxOutputLayer.AccuracyLoss) {
+    if (opts.scoreType == SoftmaxOutputLayer.AccuracyScore) {
       if (opts.doVariance) {
         val matches = (output(inds) == maxi(output));
         FMat(mean(matches)) on FMat(variance(matches));
@@ -85,7 +104,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 trait SoftmaxOutputNodeOpts extends NodeOpts {
 	var scoreType = 0;
 	var doVariance = false;
-	var logLoss = true;
+	var lossType = 0;
 	var eps = 1e-5f;
 		
 	def copyOpts(opts:SoftmaxOutputNodeOpts):SoftmaxOutputNodeOpts = {
@@ -116,8 +135,12 @@ class SoftmaxOutputNode extends Node with SoftmaxOutputNodeOpts {
   
 object SoftmaxOutputLayer { 
   
-  final val CrossEntropyLoss = 0;
-  final val AccuracyLoss = 1;
+  final val CrossEntropyScore = 0;
+  final val AccuracyScore = 1;
+  
+  final val LogTargetProbs = 0;
+  final val TargetProbs = 1;
+  final val LogProbs = 2;
   
   def apply(net:Net) = new SoftmaxOutputLayer(net, new SoftmaxOutputNode);
   
