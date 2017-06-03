@@ -397,7 +397,10 @@ object LSTMLayer {
   
   def apply(net:Net, opts:LSTMNode) = {
     val x = new LSTMLayer(net, opts);
+    val creationState = Net.defaultLayerList;
+    Net.defaultLayerList = null;
     x.construct;
+    Net.defaultLayerList = creationState;
     x;
   }
   

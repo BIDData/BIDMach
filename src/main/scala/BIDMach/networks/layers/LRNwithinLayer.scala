@@ -131,7 +131,10 @@ object LRNwithinLayer {
   
   def apply(net:Net, opts:LRNwithinNode) = {
     val x = new LRNwithinLayer(net, opts);
+    val creationState = Net.defaultLayerList;
+    Net.defaultLayerList = null;
     x.construct;
+    Net.defaultLayerList = creationState;
     x;
   }
 }
