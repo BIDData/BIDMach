@@ -501,9 +501,15 @@ object Layer {
     new ScaleLayer(net0, new ScaleNode{modelName = mname; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}   
   }
     
-  def rect(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
+  def rect(a:LayerTerm)(inplace:Boolean=false) = {
+    val inplac = inplace;
+    new RectLayer(null, new RectNode{inplace=inplac;}){inputs(0) = a};
+  } 
   
-  def relu(a:LayerTerm) = new RectLayer(null){inputs(0) = a};
+  def relu(a:LayerTerm)(inplace:Boolean=false) = {
+    val inplac = inplace;
+    new RectLayer(null, new RectNode{inplace=inplac;}){inputs(0) = a};
+  }
   
   def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
   

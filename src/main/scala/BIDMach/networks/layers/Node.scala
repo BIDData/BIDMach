@@ -280,9 +280,15 @@ object Node {
     new PoolingNode{inputs(0)=a; h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}; 
   }
   
-  def rect(a:NodeTerm) = new RectNode{inputs(0) = a};
+  def rect(a:NodeTerm)(inplace:Boolean=false) = {
+    val inplac = inplace;
+    new RectNode{inputs(0) = a; inplace = inplac};
+  }
   
-  def relu(a:NodeTerm) = new RectNode{inputs(0) = a};
+  def relu(a:NodeTerm)(inplace:Boolean=false) = {
+  	val inplac = inplace;
+    new RectNode{inputs(0) = a; inplace = inplac};
+  }
   
   def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
   	val hb = hasBias;

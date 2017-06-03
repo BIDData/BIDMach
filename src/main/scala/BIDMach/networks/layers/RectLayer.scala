@@ -57,6 +57,7 @@ trait RectNodeOpts extends NodeOpts {
 class RectNode extends Node with RectNodeOpts {
   def copyTo(opts:RectNode):RectNode = {
     super.copyTo(opts);
+    opts.inplace = inplace;
     opts;
   }
     
