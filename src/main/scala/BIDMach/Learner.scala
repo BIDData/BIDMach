@@ -130,11 +130,13 @@ case class Learner(
       datasource.asInstanceOf[IteratorSource].opts.iter = iter;
     }
     datasource.reset
-    var istep = 0
+    var istep = 0;
+    var nsamps = 0L;
     println("pass=%2d" format ipass)
     while (datasource.hasNext) {
       while (paused) Thread.sleep(10)
       val mats = datasource.next;
+      nsamps += mats(0).ncols;
       here += datasource.opts.batchSize
       bytes += mats.map(Learner.numBytes _).reduce(_+_);
       val dsp = datasource.progress;
@@ -159,15 +161,15 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+        print("%5.2f%%, ll=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
           100f*lastp,
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
-          gf._1,
           gf._2,
-          bytes*1e-9,
+          nsamps/gf._2,
+          gf._1,
           bytes/gf._2*1e-6))
         if (useGPU) {
-          print(", GPUmem=%3.6f" format GPUmem._1)
+          print(", GPUmem=%3.4f" format GPUmem._1)
         }
         println;
         lasti = reslist.length;
