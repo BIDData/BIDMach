@@ -513,11 +513,12 @@ object Layer {
 
   def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a};
   
-  def softmaxout(a:LayerTerm)(scoreType:Int=0, doVariance:Boolean=false, net:Net=null) =  {
+  def softmaxout(a:LayerTerm)(scoreType:Int=0, doVariance:Boolean=false, lossType:Int = 0, net:Net=null) =  {
   	val net0 = findNet(net);
     val scoreTyp = scoreType;
+    val lossTyp = lossType;
     val doVar = doVariance;
-    new SoftmaxOutputLayer(net0, new SoftmaxOutputNode{scoreType=scoreTyp; doVariance=doVar}){inputs(0) = a}
+    new SoftmaxOutputLayer(net0, new SoftmaxOutputNode{scoreType=scoreTyp; doVariance=doVar; lossType=lossTyp}){inputs(0) = a}
   }
   
   def softplus(a:LayerTerm) = new SoftplusLayer(null){inputs(0) = a};
