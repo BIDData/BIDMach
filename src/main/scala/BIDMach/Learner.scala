@@ -43,6 +43,7 @@ case class Learner(
   var here = 0L;
   var lasti = 0;
   var bytes = 0L;
+  var nsamps = 0L;
   var cacheState = false;
   var cacheGPUstate = false;
   var debugMemState = false;
@@ -109,6 +110,7 @@ case class Learner(
     here = 0L;
     lasti = 0;
     bytes = 0L;
+    nsamps = 0L;
     if (updater != null) updater.clear;
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
@@ -131,7 +133,6 @@ case class Learner(
     }
     datasource.reset
     var istep = 0;
-    var nsamps = 0L;
     println("pass=%2d" format ipass)
     while (datasource.hasNext) {
       while (paused) Thread.sleep(10)
@@ -161,7 +162,7 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, ll=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+        print("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
           100f*lastp,
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._2,
@@ -169,7 +170,7 @@ case class Learner(
           gf._1,
           bytes/gf._2*1e-6))
         if (useGPU) {
-          print(", GPUmem=%3.4f" format GPUmem._1)
+          print(", GPUmem=%3.6f" format GPUmem._1)
         }
         println;
         lasti = reslist.length;
