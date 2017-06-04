@@ -38,6 +38,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var batchSize = -1;
   var imodel = 0;
   var initialize = false;
+  var predict = false;
   
   def isInputLayer(l:Layer):Boolean = {
   		l match {
@@ -49,7 +50,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   override def init() = {
 //	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
-	  batchSize = mats(0).ncols
+	  batchSize = mats(0).ncols;
+	  predict = opts.predict;
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 	  createLayers;
@@ -244,6 +246,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 
   def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {
   	if (batchSize < 0) batchSize = gmats(0).ncols;
+  	val tmppred = predict;
+  	predict = true;
   	if (batchSize == gmats(0).ncols) {
   		assignInputs(gmats, ipass, pos);
   		assignTargets(gmats, ipass, pos);
@@ -265,8 +269,10 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   				ogmats(i) = og_layers(i).output;
   			}
   		}
+  		predict = tmppred;
   		scores;
   	} else {
+  	  predict = tmppred;
   	  zeros(score_layers.length, 1);
   	}
   }
@@ -660,11 +666,11 @@ object Net  {
     }
     opts.hasBias = mopts.hasBias;
     opts.tensorFormat = mopts.tensorFormat;
-    opts.dropout = 1f;
 
     val newmod = new Net(opts);
     newmod.refresh = false;
-    newmod.copyFrom(model)
+    newmod.copyFrom(model);
+    opts.predict = true;
     val nn = new Learner(
         new MatSource(Array(data0, labels0), opts),
         newmod,
@@ -704,9 +710,9 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
     }
     opts.hasBias = mopts.hasBias;
     opts.tensorFormat = mopts.tensorFormat;
-    opts.dropout = 1f;
 
     val newmod = new Net(opts);
+    opts.predict = true;
     newmod.refresh = false;
     newmod.copyFrom(model);
     val dsource = new FileSource(opts);

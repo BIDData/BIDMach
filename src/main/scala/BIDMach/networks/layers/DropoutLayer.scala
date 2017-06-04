@@ -28,7 +28,7 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 		if (randmat.asInstanceOf[AnyRef] == null) {
 		  randmat = inputData.zeros(inputData.dims)
 		} 
-		if (nopts.predict) {
+		if (net.predict) {
 			output ~ inputData * opts.frac;
 		} else {
 			rand(randmat);

@@ -395,7 +395,7 @@ object Model {
 	  var doAllReduce = false;
 	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
 	  var logDataSink : DataSink = null;
-      var trace = 0
+    var trace = 0
   }
 
 	class Options extends Opts {}
