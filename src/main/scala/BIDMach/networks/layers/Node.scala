@@ -38,6 +38,8 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
   
   override def node = this;
   
+  Net.addNode(this);
+  
   def copyTo(opts:Node):Node = {
     copyOpts(opts);
     opts.inputs(0) = inputs(0);

@@ -348,7 +348,7 @@ object Net  {
 
   var defaultNodeList:List[Node] = null;
   
-  def initDefault {
+  def initDefaultNodeSet {
     defaultNodeList = List[Node]();
   }
   
@@ -358,7 +358,7 @@ object Net  {
     }
   }
   
-  def getDefault:NodeSet = {
+  def getDefaultNodeSet:NodeSet = {
     val nodeset = new NodeSet(defaultNodeList.toArray.reverse);
     defaultNodeList = null;
     nodeset;
