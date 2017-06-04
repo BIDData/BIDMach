@@ -1,5 +1,5 @@
 val doNCHW = true;
-val tt = "train";
+val tt = "val";
 
 val imagenetroot = "/data/ImageNet/2012resized/"+tt+"/";
 val dataroot = "../../data/ImageNet/";
@@ -29,7 +29,7 @@ while (jin < nimgs) {
 	try {
 	    val im = loadImage(imagenetroot+fnames(indx));
 	    val mm = im.toFMat(0->3,?,?).reshapeView(3,256,256,1);
-	    mat(?,?,?,j) = if (doNCHW) mm.fromNHWCtoNCHW else mm;
+	    mat(?,?,?,j) = mm;
 	    labels(0, j) = alllabels(indx);
 	    names(j) = fnames(indx);
 	    j += 1;
@@ -39,16 +39,18 @@ while (jin < nimgs) {
 	jin += 1;
     }
     if (j == bsize) {
-	saveBMat(dataroot+savefname format i, BMat(mat));
+	saveBMat(dataroot+savefname format i, BMat(if (doNCHW) mat.fromNHWCtoNCHW else mat));
 	saveIMat(dataroot+labelfname format i, labels);
 	saveCSMat(dataroot+namesfname format i, names);
     } else {
-	saveBMat(dataroot+savefname format i, BMat(mat.colslice(0,j)));
+	val mc = mat.colslice(0,j);
+	saveBMat(dataroot+savefname format i, BMat(if (doNCHW) mc.fromNHWCtoNCHW else mc));
 	saveIMat(dataroot+labelfname format i, labels.colslice(0,j));
 	saveCSMat(dataroot+namesfname format i, names(0->j,0));
     }
     i += 1;
     print(".");
 }
+Mat.useCache=false;
 println("");
 

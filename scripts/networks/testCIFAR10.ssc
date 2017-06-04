@@ -12,10 +12,11 @@ val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
 opts.batchSize= 100
-opts.npasses = 50
-opts.lrate = 3e-4f 
+opts.npasses = 10
+opts.lrate = 1e-4f 
 
-opts.momentum = 0.9f
+opts.vel_decay = 0f
+opts.gsq_decay = 0.99f
 opts.texp = 0.0f
 opts.pstep = 0.1f
 opts.hasBias = true;

@@ -1,0 +1,88 @@
+val traindir = "../../data/ImageNet/train/";
+val testdir = "../../data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
+
+val (nn,opts) = Net.learner(traindata, trainlabels);
+val net = nn.model.asInstanceOf[Net]
+
+opts.batchSize= 128;
+opts.nend = 400;
+opts.npasses = 1;
+opts.lrate = 1e-3f;
+opts.texp = 0.3f
+opts.pstep = 0.01f
+opts.hasBias = true;
+//opts.gsq_decay=0.999f;
+opts.initsumsq = 0.01f;
+opts.lookahead = 2;
+opts.autoReset = false;
+opts.tensorFormat = Net.TensorNCHW;
+
+:silent
+val means = loadFMat(traindir+"means.fmat.lz4");
+
+{
+import BIDMach.networks.layers.Layer._;
+val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
+
+Net.initDefault(net);
+
+val in =        input;
+val meanv =     const(means);
+val din =       in - meanv;
+val scalef =    const(row(0.01f));
+val sdin =      din *@ scalef;
+//val fin =       format(in)();
+val cin =       crop(sdin)()
+
+val conv1 =     conv(cin)(w=11,h=11,nch=96,stride=4,convType=convt);
+val relu1 =     relu(conv1)(inplace=true);
+val pool1 =     pool(relu1)(w=3,h=3,stride=2);
+val norm1 =     LRNwithin(pool1)(dim=5,alpha=0.0001f,beta=0.75f);
+
+val conv2 =     conv(norm1)(w=5,h=5,nch=256,stride=1,pad=2,convType=convt);   
+val relu2 =     relu(conv2)(inplace=true);
+val pool2 =     pool(relu2)(w=3,h=3,stride=2);
+val norm2 =     LRNwithin(pool2)(dim=5,alpha=0.0001f,beta=0.75f);
+
+val conv3 =     conv(norm2)(w=3,h=3,nch=384,pad=1,convType=convt);   
+val relu3 =     relu(conv3)(inplace=true);
+
+val conv4 =     conv(relu3)(w=3,h=3,nch=384,pad=1,convType=convt);
+val relu4 =     relu(conv4)(inplace=true);
+
+val conv5 =     conv(relu4)(w=3,h=3,nch=256,pad=1,convType=convt);
+val relu5 =     relu(conv5)(inplace=true);
+val pool5 =     pool(relu5)(w=3,h=3,stride=2);
+
+val fc6 =       linear(pool5)(outdim=4096,initv=5e-3f);
+val relu6 =     relu(fc6)(inplace=true);
+val drop6 =     dropout(relu6)(0.5f);
+
+val fc7 =       linear(drop6)(outdim=4096,initv=5e-3f);
+val relu7  =    relu(fc7)(inplace=true);
+val drop7 =     dropout(relu7)(0.5f);
+
+val fc8  =      linear(drop7)(outdim=1000,initv=1e-1f);
+val out =       softmaxout(fc8)(scoreType=1,lossType=0);
+
+Net.getDefault
+}
+
+nn.train;
+
+val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+mopts.batchSize= opts.batchSize;
+mopts.hasBias= opts.hasBias;
+mopts.tensorFormat = opts.tensorFormat;
+mopts.autoReset = false;
+mm.predict;
+
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+:silent
+
+

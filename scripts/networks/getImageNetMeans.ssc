@@ -2,40 +2,36 @@
 
 val tt = "train";
 
-val dataroot = "../../data/ImageNet/";
-val datafname = dataroot+tt+"/part%04d.fmat.lz4";
-val labelfname = dataroot+tt+"/label%04d.imat.lz4";
-val namesfname = dataroot+tt+"/names%04d.csmat.txt";
+val traindir = "../../data/ImageNet/train/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
 
 val bsize = 1024;
-val nparts = 1252;
-
-val triminds = irow(16 -> 240);
-val trimcolors = irow(0,1,2);
+//val nparts = 1252;
+val nparts = 125;
 
 var nimgs = 0L;
-val msum = dzeros(3\224\224\1);
+val msum = dzeros(3\256\256\1);
 
 print("\nComputing mean");
 val times = zeros(1,4)
 for (i <- 0 until nparts) {
     tic;
-    val mat = loadFMat(datafname format i);
+    val mat = loadBMat(traindata format i);
     val t1 = toc;
-    val trim = mat(trimcolors, triminds, triminds, ?);
+    val fmat = unsignedFloat(mat);
     val t2 = toc;
-    val tmpsum = trim.sum(irow(3));
+    val tmpsum = fmat.sum(irow(3));
     val t3 = toc;
     msum ~ msum + DMat(tmpsum);
     val t4 = toc;
     times ~ times + row(t1,t2-t1,t3-t2,t4-t3);
-    nimgs = nimgs + trim.ncols;
+    nimgs = nimgs + fmat.ncols;
     print(".");
 }
 println("");
 
 msum ~ msum / nimgs.toDouble;
 val means = FMat(msum);
-saveFMat(dataroot+tt+"/means.fmat.lz4", means);
+saveFMat(traindir+"/means.fmat.lz4", means);
 
 :silent
