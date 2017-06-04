@@ -139,6 +139,7 @@ object SoftmaxOutputLayer {
   final val CrossEntropyScore = 0;
   final val AccuracyScore = 1;
  
+  final val CrossEntropyLoss = 0;
   final val LogProbs = 0;
   final val LogTargetProbs = 1;
   final val TargetProbs = 2;
