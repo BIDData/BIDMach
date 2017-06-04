@@ -127,6 +127,9 @@ case class Learner(
     if (opts.debugMem && ipass > 0) {
       Mat.debugMem = true;
     }
+    if (opts.debugCPUmem && ipass > 0) {
+      Mat.debugCPUmem = true;
+    }
     var lastp = 0f
     if (iter != null) {
       datasource.asInstanceOf[IteratorSource].opts.iter = iter;
@@ -840,6 +843,7 @@ object Learner {
   	var useCache = true;
   	var updateAll = false;
   	var debugMem = false;
+  	var debugCPUmem = false;
     var cumScore = 0;
     var checkPointFile:String = null;
     var checkPointInterval = 0f;
