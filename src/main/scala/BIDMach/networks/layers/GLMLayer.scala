@@ -59,7 +59,7 @@ trait GLMNodeOpts extends NodeOpts {
 	var links:IMat = null;
 }
  
-class GLMNode extends Node with GLMNodeOpts {  
+class GLMNode extends Node with OutputNode with GLMNodeOpts {  
 	def copyTo(opts:GLMNode) = {
 		super.copyTo(opts);
 		opts.links = links;

@@ -140,7 +140,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
   }
 }
 
-trait NegsampOutputNodeOpts extends ModelNodeOpts {  
+trait NegsampOutputNodeOpts extends ModelNodeOpts with OutputNode {  
  
     var nsamps = 100;
     var hasBias:Boolean = false;

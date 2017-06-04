@@ -27,6 +27,9 @@ import java.util.HashMap;
 class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var layers:Array[Layer] = null;
   var layermat:LayerMat = null;
+  var input_nodes:Array[Node] = null;
+  var output_nodes:Array[Node]= null;
+  var score_nodes:Array[Node] = null;
   var input_layers:Array[Layer] = null;
   var output_layers:Array[Layer] = null;
   var score_layers:Array[Layer] = null;
@@ -40,9 +43,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var initialize = false;
   var predict = false;
   
-  def isInputLayer(l:Layer):Boolean = {
+  def isInputNode(l:Node):Boolean = {
   		l match {
-  		case _:InputLayer => true;
+  		case _:InputNode => true;
   		case _ => false;
   		}
   }
@@ -54,25 +57,13 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  predict = opts.predict;
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
-	  createLayers;
-	  if (output_layers == null) {
-	  	output_layers = layers(layers.length-1) match {
-	  	case a:OutputLayer => Array(layers(layers.length-1));
-	  	case _ => new Array[Layer](0);
-	  	}
-    }
-    if (input_layers == null) {
-      var ninputs = 0;
-      var isgood = true;
-      while (ninputs < layers.length && isgood) {
-        isgood = isInputLayer(layers(ninputs));
-        if (isgood) ninputs += 1;        
-      }
-      input_layers = layers.slice(0, ninputs);
-    }
-    if (score_layers == null) {
-      score_layers = output_layers;
-    }
+
+	  if (opts.nodeset.asInstanceOf[AnyRef] != null) {
+	    createLayersFromNodeSet;
+	  } else if (opts.nodemat.asInstanceOf[AnyRef] != null) {
+	    createLayersFromNodeMat;
+	  }
+
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
 	  }
@@ -96,65 +87,93 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 //	  datasource.reset;
   }
 
-  def createLayers = {
-    if (opts.nodeset.asInstanceOf[AnyRef] != null) {   // create the layers from the nodeset
-    	val nodes = opts.nodeset.nodes;
-    	layers = new Array[Layer](opts.nodeset.nnodes);
-    	for (i <- 0 until opts.nodeset.nnodes) {
-    		layers(i) = nodes(i).create(this);
-    		nodes(i).myLayer = layers(i);
-    	}
-    	for (i <- 0 until opts.nodeset.nnodes) {
-    		for (j <- 0 until nodes(i).inputs.length) {
-    			if (nodes(i).inputs(j) != null) {
-    				val nodeTerm = nodes(i).inputs(j);
-    				layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
-    			}
-    		}
-    	}
-    	for (i <- 0 until opts.nodeset.nnodes) {
-    		nodes(i).myLayer = null;
-    	}
-    } else if (opts.nodemat.asInstanceOf[AnyRef] != null) {                                           // create a LayerMat that mirrors the NodeMat
-      val nrows = opts.nodemat.nrows;
-      val ncols = opts.nodemat.ncols;
-      layermat = LayerMat(nrows, ncols);
-      var nnodes = opts.nodemat.data.map((x:Node) => if (x.asInstanceOf[AnyRef] == null) 0 else 1).reduce(_+_); // count non-null nodes
-      layers = new Array[Layer](nnodes);
-      var nnlayers = 0;
-      for (i <- 0 until ncols) {
-        for (j <- 0 until nrows) {
-          val node = opts.nodemat(j, i);
-          if (node.asInstanceOf[AnyRef] != null) {
-            layermat(j, i) = node.create(this);
-            node.myLayer = layermat(j, i);
-            layers(nnlayers) = layermat(j, i);
-            nnlayers += 1;
-          }
-        }
-    	}
-      for (i <- 0 until ncols) {
-        for (j <- 0 until nrows) {
-          val node = opts.nodemat(j, i);
-          if (node.asInstanceOf[AnyRef] != null) {
-          	for (k <- 0 until node.inputs.length) {
-          		if (node.inputs(k) != null) {
-          			val nodeTerm = node.inputs(k);
-          			layermat(j, i).setInput(k, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
-          		}
-          	}
-          }
-        }
-      }
-      for (i <- 0 until ncols) {
-        for (j <- 0 until nrows) {
-          val node = opts.nodemat(j, i);
-          if (node.asInstanceOf[AnyRef] != null) {
-            node.myLayer = null;
-          }
-        }
-      }
-    }
+  def createLayersFromNodeSet = {
+  	val nodes = opts.nodeset.nodes;
+  	layers = new Array[Layer](opts.nodeset.nnodes);
+  	for (i <- 0 until opts.nodeset.nnodes) {
+  		layers(i) = nodes(i).create(this);
+  		nodes(i).myLayer = layers(i);
+  	}
+  	for (i <- 0 until opts.nodeset.nnodes) {
+  		for (j <- 0 until nodes(i).inputs.length) {
+  			if (nodes(i).inputs(j) != null) {
+  				val nodeTerm = nodes(i).inputs(j);
+  				layers(i).setInput(j, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+  			}
+  		}
+  	}
+  	createInOutScoreLayers(nodes);
+/*  	for (i <- 0 until opts.nodeset.nnodes) {
+  		nodes(i).myLayer = null;
+  	}*/
+  }   
+  
+  def createLayersFromNodeMat = {
+  	val nrows = opts.nodemat.nrows;
+  	val ncols = opts.nodemat.ncols;
+  	layermat = LayerMat(nrows, ncols);
+  	var nnodes = opts.nodemat.data.map((x:Node) => if (x.asInstanceOf[AnyRef] == null) 0 else 1).reduce(_+_); // count non-null nodes
+  	layers = new Array[Layer](nnodes);
+  	val nodes = new Array[Node](nnodes);
+  	var nnlayers = 0;
+  	for (i <- 0 until ncols) {
+  		for (j <- 0 until nrows) {
+  			val node = opts.nodemat(j, i);
+  			if (node.asInstanceOf[AnyRef] != null) {
+  				layermat(j, i) = node.create(this);
+  				node.myLayer = layermat(j, i);
+  				layers(nnlayers) = layermat(j, i);
+  				nodes(nnlayers) = node;
+  				nnlayers += 1;
+  			}
+  		}
+  	}
+  	for (i <- 0 until ncols) {
+  		for (j <- 0 until nrows) {
+  			val node = opts.nodemat(j, i);
+  			if (node.asInstanceOf[AnyRef] != null) {
+  				for (k <- 0 until node.inputs.length) {
+  					if (node.inputs(k) != null) {
+  						val nodeTerm = node.inputs(k);
+  						layermat(j, i).setInput(k, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
+  					}
+  				}
+  			}
+  		}
+  	}
+  	createInOutScoreLayers(nodes);
+/*  	for (i <- 0 until ncols) {
+  		for (j <- 0 until nrows) {
+  			val node = opts.nodemat(j, i);
+  			if (node.asInstanceOf[AnyRef] != null) {
+  				node.myLayer = null;
+  			}
+  		}
+  	}*/
+  }
+  
+  def createInOutScoreLayers(nodes:Array[Node]) = {
+  	if (output_nodes.asInstanceOf[AnyRef] == null) {
+  		output_nodes = nodes(nodes.length-1) match {
+  		case a:OutputNode => Array(nodes(nodes.length-1));
+  		case _ => new Array[Node](0);
+  		}
+  	}
+  	if (input_nodes == null) {
+  		var ninputs = 0;
+  		var isgood = true;
+  		while (ninputs < layers.length && isgood) {
+  			isgood = isInputNode(nodes(ninputs));
+  			if (isgood) ninputs += 1; 
+  		}
+  		input_nodes = nodes.slice(0, ninputs);
+  	}
+  	if (score_nodes == null) {
+  		score_nodes = output_nodes;
+  	}
+  	input_layers = input_nodes.map(_.myLayer);
+  	output_layers = output_nodes.map(_.myLayer);
+  	score_layers = score_nodes.map(_.myLayer);
   }
 
   def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {

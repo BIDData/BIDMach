@@ -60,6 +60,8 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
   def create(net:Net):Layer = {null}
 }
 
+trait OutputNode {}
+
 
 class NodeTerm(val _node:Node, val term:Int) extends Serializable {  
   

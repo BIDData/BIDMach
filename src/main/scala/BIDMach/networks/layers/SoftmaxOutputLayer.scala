@@ -117,7 +117,7 @@ trait SoftmaxOutputNodeOpts extends NodeOpts {
 	}
 }
 
-class SoftmaxOutputNode extends Node with SoftmaxOutputNodeOpts {
+class SoftmaxOutputNode extends Node with OutputNode with SoftmaxOutputNodeOpts {
   
   def copyTo(opts:SoftmaxOutputNode):SoftmaxOutputNode = {
     this.asInstanceOf[Node].copyTo(opts);
