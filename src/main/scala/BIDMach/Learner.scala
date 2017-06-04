@@ -232,10 +232,11 @@ case class Learner(
     Mat.useCache = opts.useCache
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useCache;
-    var here = 0L
-    var lasti = 0
-    var bytes = 0L
-    var lastp = 0f
+    here = 0L;
+    lasti = 0;
+    bytes = 0L;
+    nsamps = 0;
+    var lastp = 0f;
     val reslist = new ListBuffer[FMat]
     val samplist = new ListBuffer[Float]
     println("Predicting")
@@ -244,6 +245,7 @@ case class Learner(
       val mats = datasource.next
       here += datasource.opts.batchSize
       bytes += mats.map(Learner.numBytes _).reduce(_+_);
+      nsamps += mats(0).ncols;
       val scores = model.evalbatchg(mats, 0, here);
       if (datasink != null) datasink.put
       reslist.append(scores.newcopy);
@@ -251,17 +253,17 @@ case class Learner(
       val dsp = datasource.progress;
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
-        lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-            100f*lastp,
-            Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
-            gf._1,
-            gf._2,
-            bytes*1e-9,
-            bytes/gf._2*1e-6))
-            if (useGPU) {
-              print(", GPUmem=%3.2f" format GPUmem._1)
-            }
+        lastp = dsp - (dsp % opts.pstep);
+        print("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+        		100f*lastp,
+        		Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
+        		gf._2,
+        		nsamps/gf._2,
+        		gf._1,
+        		bytes/gf._2*1e-6))
+        		if (useGPU) {
+        			print(", GPUmem=%3.6f" format GPUmem._1)
+        		}
         println
         lasti = reslist.length
       }
