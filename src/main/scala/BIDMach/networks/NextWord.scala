@@ -85,6 +85,7 @@ class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends N
       val smlayer = SoftmaxOutputLayer(this, sopts).setInput(0, linlayer);   
       layers(width*height+preamble_size+1) = smlayer;    
       output_layers = Array(smlayer);
+      score_layers = output_layers;
     }
   }
   

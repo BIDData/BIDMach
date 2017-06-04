@@ -58,11 +58,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 
-	  if (opts.nodeset.asInstanceOf[AnyRef] != null) {
-	    createLayersFromNodeSet;
-	  } else if (opts.nodemat.asInstanceOf[AnyRef] != null) {
-	    createLayersFromNodeMat;
-	  }
+	  createLayers;
 
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
@@ -85,6 +81,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     evalbatch(gmats, 0, 0);
     initialize = false;
 //	  datasource.reset;
+  }
+  
+  def createLayers = {
+    if (opts.nodeset.asInstanceOf[AnyRef] != null) {
+	    createLayersFromNodeSet;
+	  } else if (opts.nodemat.asInstanceOf[AnyRef] != null) {
+	    createLayersFromNodeMat;
+	  }
   }
 
   def createLayersFromNodeSet = {
