@@ -112,6 +112,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     			}
     		}
     	}
+    	for (i <- 0 until opts.nodeset.nnodes) {
+    		nodes(i).myLayer = null;
+    	}
     } else if (opts.nodemat.asInstanceOf[AnyRef] != null) {                                           // create a LayerMat that mirrors the NodeMat
       val nrows = opts.nodemat.nrows;
       val ncols = opts.nodemat.ncols;
@@ -140,6 +143,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
           			layermat(j, i).setInput(k, new LayerTerm(nodeTerm.node.myLayer, nodeTerm.term));
           		}
           	}
+          }
+        }
+      }
+      for (i <- 0 until ncols) {
+        for (j <- 0 until nrows) {
+          val node = opts.nodemat(j, i);
+          if (node.asInstanceOf[AnyRef] != null) {
+            node.myLayer = null;
           }
         }
       }
