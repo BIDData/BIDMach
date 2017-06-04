@@ -670,6 +670,9 @@ object Net  {
     val newmod = new Net(opts);
     newmod.refresh = false;
     newmod.copyFrom(model);
+    if (opts.nodeset.asInstanceOf[AnyRef] == null && opts.nodemat.asInstanceOf[AnyRef] == null) {
+      newmod.layers = model.layers;
+    }
     opts.predict = true;
     val nn = new Learner(
         new MatSource(Array(data0, labels0), opts),
@@ -715,6 +718,9 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
     opts.predict = true;
     newmod.refresh = false;
     newmod.copyFrom(model);
+    if (opts.nodeset.asInstanceOf[AnyRef] == null && opts.nodemat.asInstanceOf[AnyRef] == null) {
+      newmod.layers = model.layers;
+    }
     val dsource = new FileSource(opts);
     val dsink = new FileSink(opts);
     val nn = new Learner(
