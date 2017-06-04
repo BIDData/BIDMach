@@ -690,9 +690,12 @@ object Net  {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
   }
 
-
   def predictor(model0:Model, infn:String, inlb:String, outfn:String):(Learner, FilePredOptions) = {
     predictor(model0, List(FileSource.simpleEnum(infn,1,0),FileSource.simpleEnum(inlb,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
+  }
+  
+   def predLabels(model0:Model, infn:String, inlb:String):(Learner, FilePredOptions) = {
+    predictor(model0, List(FileSource.simpleEnum(infn,1,0),FileSource.simpleEnum(inlb,1,0)), null);
   }
   
 
@@ -728,7 +731,7 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
         newmod,
         null,
         null,
-        dsink,
+        (if (outfiles.asInstanceOf[AnyRef] != null && outfiles.length > 0) dsink else null),
         opts);
     (nn, opts)
   }
