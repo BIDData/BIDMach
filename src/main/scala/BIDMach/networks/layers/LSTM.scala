@@ -50,6 +50,9 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 //    override val inputTerminals:Array[Int] = Array(0,0,0);
     
     def constructGraph = {
+      val nodelist = Net.defaultNodeList;
+	    Net.defaultNodeList = null;
+	    
       kind match {
         case 0 => constructGraph0
         case 1 => constructGraph1
@@ -59,6 +62,8 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
         case 5 => constructGraph5
         case _ => throw new RuntimeException("LSTMLayer type %d not recognized" format kind);
       }
+      
+      Net.defaultNodeList = nodelist;
     }
   
     // Basic LSTM topology with 8 linear layers
@@ -397,10 +402,7 @@ object LSTMLayer {
   
   def apply(net:Net, opts:LSTMNode) = {
     val x = new LSTMLayer(net, opts);
-    val creationState = Net.defaultLayerList;
-    Net.defaultLayerList = null;
     x.construct;
-    Net.defaultLayerList = creationState;
     x;
   }
   

@@ -75,6 +75,9 @@ class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {
   	}
 	  	  
 	  def constructGraph = {
+	    val nodelist = Net.defaultNodeList;
+	    Net.defaultNodeList = null;
+	    
     	import BIDMach.networks.layers.Node._
     	import jcuda.jcudnn.cudnnPoolingMode._
     	val odim = dim;
@@ -91,6 +94,8 @@ class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {
     	val lopts = grid.data;
     	lopts.map((x:Node) => if (x != null) x.parent = this);
     	outputNumbers = Array(lopts.indexOf(out));
+    	
+    	Net.defaultNodeList = nodelist;
 	  }
 	 
 	  override def clone:LRNwithinNode = {
@@ -131,10 +136,7 @@ object LRNwithinLayer {
   
   def apply(net:Net, opts:LRNwithinNode) = {
     val x = new LRNwithinLayer(net, opts);
-    val creationState = Net.defaultLayerList;
-    Net.defaultLayerList = null;
     x.construct;
-    Net.defaultLayerList = creationState;
     x;
   }
 }
