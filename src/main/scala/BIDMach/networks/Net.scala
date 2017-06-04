@@ -345,35 +345,24 @@ object Net  {
     var tensorFormat:Int = Net.TensorNHWC;
     var convType = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
   }
+
+  var defaultNodeList:List[Node] = null;
   
-  var defaultNet:Net = null; 
-  var defaultLayerList:List[Layer] = null;
-  
-  def initDefault(opts:Net.Opts) {
-    defaultNet = new Net(opts);
-    defaultLayerList = List[Layer]();
+  def initDefault {
+    defaultNodeList = List[Node]();
   }
   
-  def initDefault(net:Net) {
-    defaultNet = net;
-    defaultLayerList = List[Layer]();
-  }
-  
-  def addLayer(layer:Layer) = {
-    if (defaultLayerList.asInstanceOf[AnyRef] != null) {
-      defaultLayerList = layer :: defaultLayerList;
+  def addNode(node:Node) = {
+    if (defaultNodeList.asInstanceOf[AnyRef] != null) {
+      defaultNodeList = node :: defaultNodeList;
     }
   }
   
-  def getDefault:Net = {
-    val net = defaultNet;
-    net.layers = defaultLayerList.toArray.reverse;
-    defaultNet = null;
-    defaultLayerList = null;
-    net;
+  def getDefault:NodeSet = {
+    val nodeset = new NodeSet(defaultNodeList.toArray.reverse);
+    defaultNodeList = null;
+    nodeset;
   }
-  
-  def getDefaultNet:Net = getDefault;
 
   class Options extends Opts {}
 
@@ -666,7 +655,6 @@ object Net  {
     }
     opts.hasBias = mopts.hasBias;
     opts.tensorFormat = mopts.tensorFormat;
-
     val newmod = new Net(opts);
     newmod.refresh = false;
     newmod.copyFrom(model);
