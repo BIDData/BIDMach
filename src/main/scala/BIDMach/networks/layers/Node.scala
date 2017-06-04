@@ -105,6 +105,10 @@ object Node {
   def constant(v:Mat) = {
     new ConstantNode{value = v;}
   }
+  
+  def const(v:Mat) = {
+    new ConstantNode{value = v;}
+  }
     
   def conv(a:NodeTerm)(name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
       hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
