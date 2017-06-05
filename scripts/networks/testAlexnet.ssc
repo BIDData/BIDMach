@@ -29,7 +29,7 @@ val means = loadFMat(traindir+"means.fmat.lz4");
 import BIDMach.networks.layers.Layer._;
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
-Net.initDefaultNodeSet(net);
+Net.initDefaultNodeSet;
 
 val in =        input;
 val meanv =     const(means);
