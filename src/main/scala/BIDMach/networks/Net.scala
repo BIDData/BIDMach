@@ -58,7 +58,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 
-	  createLayers;
+//	  createLayers;
 
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
@@ -108,9 +108,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		}
   	}
   	createInOutScoreLayers(nodes);
-/*  	for (i <- 0 until opts.nodeset.nnodes) {
-  		nodes(i).myLayer = null;
-  	}*/
   }   
   
   def createLayersFromNodeMat = {
@@ -147,14 +144,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		}
   	}
   	createInOutScoreLayers(nodes);
-/*  	for (i <- 0 until ncols) {
-  		for (j <- 0 until nrows) {
-  			val node = opts.nodemat(j, i);
-  			if (node.asInstanceOf[AnyRef] != null) {
-  				node.myLayer = null;
-  			}
-  		}
-  	}*/
   }
   
   def createInOutScoreLayers(nodes:Array[Node]) = {
@@ -198,11 +187,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	  	    layer.target = full(gmats(input_layers.length+itargets));
   	  	    itargets += 1;
   	  	  }
-  	  	  case _ => output_layers(i).deriv.set(1f);
   	  	} 	  	
   	  }
-  	} else {
-  	  layers(layers.length-1).deriv.set(1f);
   	}
   }
   
