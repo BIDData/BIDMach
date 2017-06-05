@@ -89,9 +89,9 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     for (i <- 0 until nmats) {
     	if (opts.policies.asInstanceOf[AnyRef] != null) {
     		if (opts.policies.length > 1) {
-    			tscale.set(opts.policies(i)(nsteps, gprogress));
+    			tscale.set(opts.policies(i)(ipass, nsteps, gprogress));
     		} else {
-    			tscale.set(opts.policies(0)(nsteps, gprogress));
+    			tscale.set(opts.policies(0)(ipass, nsteps, gprogress));
     		}
     	}
     	val mm = modelmats(i);

@@ -107,9 +107,9 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
       }
       if (opts.policies.asInstanceOf[AnyRef] != null) {
 			  if (opts.policies.length > 1) {
-				  tscale.set(opts.policies(i)(nsteps, gprogress));
+				  tscale.set(opts.policies(i)(ipass, nsteps, gprogress));
 			  } else {
-				  tscale.set(opts.policies(0)(nsteps, gprogress));
+				  tscale.set(opts.policies(0)(ipass, nsteps, gprogress));
 			  }
 		  }
 	  	if (opts.lrate.ncols > 1) {
@@ -157,7 +157,7 @@ object Grad {
     var pexp:FMat = 0.5f;
     var waitsteps = 3;
     var mask:FMat = null;
-    var policies:Array[(Float, Float)=>Float] = null;
+    var policies:Array[(Float, Float, Float)=>Float] = null;
     var vel_decay:FMat = null;
     var nesterov_vel_decay:FMat = null;
     var langevin = 0f;
