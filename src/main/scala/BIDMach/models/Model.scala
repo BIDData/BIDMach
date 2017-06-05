@@ -378,7 +378,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def combineModels(ipass:Int, model: Model):Model = this;
   def combineModels(model: Model):Model = combineModels(0, model);
   
-  def clear = {}
+  def clear = {}                        // Clear any model tmp matrices
 
   def wrapUp(ipass:Int):Unit = {}
 }

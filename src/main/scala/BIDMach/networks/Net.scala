@@ -360,7 +360,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
   }
   
-  override def clear = {
+  override def clear = {                         // clear matrix variables
     for (i <- 0 until layers.length) {
       layers(i).clear;
     }
