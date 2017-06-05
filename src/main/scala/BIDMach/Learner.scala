@@ -232,6 +232,14 @@ case class Learner(
 
     done = true;
   }
+  
+  def getResults = {
+    def n = reslist.length;
+    def top = Learner.scores2FMat(reslist);
+    def bottom = row(samplist.toList)
+    results = top(?,0->n) on bottom(?,0->n);  
+    results;
+  }
 
   def predict() = {
     setup;
