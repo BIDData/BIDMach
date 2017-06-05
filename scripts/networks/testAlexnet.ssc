@@ -10,17 +10,17 @@ val (nn,opts) = Net.learner(traindata, trainlabels);
 val net = nn.model.asInstanceOf[Net]
 
 opts.batchSize= 128;
-opts.nend = 400;
-opts.npasses = 1;
-opts.lrate = 1e-3f;
-opts.texp = 0.3f
+//opts.nend = 40;
+opts.npasses = 10;
+opts.lrate = 1e-4f;
+opts.texp = 0f
 opts.pstep = 0.01f
 opts.hasBias = true;
-//opts.gsq_decay=0.999f;
+opts.gsq_decay=0.999f;
 opts.initsumsq = 0.01f;
 opts.lookahead = 2;
-opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
+//opts.autoReset = false;
 
 :silent
 val means = loadFMat(traindir+"means.fmat.lz4");
@@ -29,7 +29,7 @@ val means = loadFMat(traindir+"means.fmat.lz4");
 import BIDMach.networks.layers.Layer._;
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
-Net.initDefault(net);
+Net.initDefaultNodeSet(net);
 
 val in =        input;
 val meanv =     const(means);
@@ -70,7 +70,7 @@ val drop7 =     dropout(relu7)(0.5f);
 val fc8  =      linear(drop7)(outdim=1000,initv=1e-1f);
 val out =       softmaxout(fc8)(scoreType=1,lossType=0);
 
-Net.getDefault
+net.nodeset=Net.getDefaultNodeSet
 }
 
 nn.train;
@@ -79,7 +79,7 @@ val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 mopts.batchSize= opts.batchSize;
 mopts.hasBias= opts.hasBias;
 mopts.tensorFormat = opts.tensorFormat;
-mopts.autoReset = false;
+//mopts.autoReset = false;
 mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
