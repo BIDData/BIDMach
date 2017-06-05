@@ -66,7 +66,7 @@ class EfnLayer(override val net:Net, override val opts:EfnNodeOpts = new EfnNode
 		  backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
     finput = null;
     foutput = null;
