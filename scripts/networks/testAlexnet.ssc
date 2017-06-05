@@ -17,10 +17,12 @@ opts.texp = 0f
 opts.pstep = 0.01f
 opts.hasBias = true;
 opts.gsq_decay=0.999f;
+opts.weight_decay=0.9995f;
 opts.initsumsq = 0.01f;
 opts.lookahead = 2;
 opts.tensorFormat = Net.TensorNCHW;
 //opts.autoReset = false;
+val inplace=true;
 
 :silent
 val means = loadFMat(traindir+"means.fmat.lz4");
@@ -40,31 +42,31 @@ val sdin =      din *@ scalef;
 val cin =       crop(sdin)()
 
 val conv1 =     conv(cin)(w=11,h=11,nch=96,stride=4,convType=convt);
-val relu1 =     relu(conv1)(inplace=true);
+val relu1 =     relu(conv1)(inplace);
 val pool1 =     pool(relu1)(w=3,h=3,stride=2);
 val norm1 =     LRNwithin(pool1)(dim=5,alpha=0.0001f,beta=0.75f);
 
 val conv2 =     conv(norm1)(w=5,h=5,nch=256,stride=1,pad=2,convType=convt);   
-val relu2 =     relu(conv2)(inplace=true);
+val relu2 =     relu(conv2)(inplace);
 val pool2 =     pool(relu2)(w=3,h=3,stride=2);
 val norm2 =     LRNwithin(pool2)(dim=5,alpha=0.0001f,beta=0.75f);
 
 val conv3 =     conv(norm2)(w=3,h=3,nch=384,pad=1,convType=convt);   
-val relu3 =     relu(conv3)(inplace=true);
+val relu3 =     relu(conv3)(inplace);
 
 val conv4 =     conv(relu3)(w=3,h=3,nch=384,pad=1,convType=convt);
-val relu4 =     relu(conv4)(inplace=true);
+val relu4 =     relu(conv4)(inplace);
 
 val conv5 =     conv(relu4)(w=3,h=3,nch=256,pad=1,convType=convt);
-val relu5 =     relu(conv5)(inplace=true);
+val relu5 =     relu(conv5)(inplace);
 val pool5 =     pool(relu5)(w=3,h=3,stride=2);
 
 val fc6 =       linear(pool5)(outdim=4096,initv=5e-3f);
-val relu6 =     relu(fc6)(inplace=true);
+val relu6 =     relu(fc6)(inplace);
 val drop6 =     dropout(relu6)(0.5f);
 
 val fc7 =       linear(drop6)(outdim=4096,initv=5e-3f);
-val relu7  =    relu(fc7)(inplace=true);
+val relu7  =    relu(fc7)(inplace);
 val drop7 =     dropout(relu7)(0.5f);
 
 val fc8  =      linear(drop7)(outdim=1000,initv=1e-1f);

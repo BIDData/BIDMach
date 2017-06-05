@@ -96,6 +96,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   	}
   	val nmats = updatemats.length;
 	  //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
+  	val lr0 = if (opts.policies.asInstanceOf[AnyRef] != null) opts.policies(0)(ipass, nsteps, gprogress) else 0;
 	  for (i <- 0 until nmats) {
 		  val mm = modelmats(i);
 		  if (opts.weight_decay.asInstanceOf[AnyRef] != null) {
@@ -113,7 +114,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 			  if (opts.policies.length > 1) {
 				  tscale.set(opts.policies(i)(ipass, nsteps, gprogress));
 			  } else {
-				  tscale.set(opts.policies(0)(ipass, nsteps, gprogress));
+				  tscale.set(lr0);
 			  }
 		  }
 	  	if (opts.lrate.ncols > 1) {
