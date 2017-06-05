@@ -98,6 +98,10 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
 	  for (i <- 0 until nmats) {
 		  val mm = modelmats(i);
+		  if (opts.weight_decay.asInstanceOf[AnyRef] != null) {
+		    val i0 = if (opts.weight_decay.length > 1) i else 0;
+		    mm ~ mm *@ opts.weight_decay(i);
+		  }
       val tscale = if (te.asInstanceOf[AnyRef] != null) {
         stepn.set(1f/nsteps);
         stepn ^ te;
@@ -160,6 +164,7 @@ object Grad {
     var policies:Array[(Float, Float, Float)=>Float] = null;
     var vel_decay:FMat = null;
     var nesterov_vel_decay:FMat = null;
+    var weight_decay:FMat = null;
     var langevin = 0f;
     var clipByValue = -1f;
     var max_grad_norm = -1f;
