@@ -359,6 +359,15 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
       mat;
     }
   }
+  
+  override def clear = {
+    for (i <- 0 until layers.length) {
+      layers(i).clear;
+    }
+    targmap = null;
+    mask = null;
+    bufmat = null;
+  }
 }
 
 object Net  {

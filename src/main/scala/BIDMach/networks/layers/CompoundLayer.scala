@@ -108,6 +108,16 @@ class CompoundLayer(override val net:Net, override val opts:CompoundNode = new C
 			}
 	  }
 	}
+	
+	override def clear = {
+	  clearMats;
+	  for (i <- 0 until internal_layers.length) {
+	    if (internal_layers(i).asInstanceOf[AnyRef] != null) {
+	      internal_layers(i).clear;
+	    }
+	  }
+	}
+	
   
   override def toString = {
     "compound@"+Integer.toHexString(hashCode % 0x10000).toString

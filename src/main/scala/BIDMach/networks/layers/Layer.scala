@@ -251,6 +251,16 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
     }
   }
   
+  def clearMats = {
+    for (i <- 0 until _outputs.length) {
+      _outputs(i) = null;
+      _derivs(i) = null;
+      target = null;
+    }
+  }
+  
+  def clear = clearMats
+  
   def getModelMats(net:Net):Unit = {}
   
   override def toString = {

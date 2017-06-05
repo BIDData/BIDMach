@@ -43,6 +43,11 @@ class PowerLayer(override val net:Net, override val opts:PowerNodeOpts = new Pow
 		  backwardtime += toc - start;
   }
   
+  def clear = {
+    clearMats;
+    one = null;
+  }
+  
   override def toString = {
     "power@"+Integer.toHexString(hashCode % 0x10000).toString
   }

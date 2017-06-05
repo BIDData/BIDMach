@@ -81,6 +81,15 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
     backwardtime += toc - start;
   }
   
+  def clear = {
+    clearMats;
+  	scaleMat = null;
+  	biasMat = null;
+  	updateScaleMat = null;
+  	updateBiasMat = null;
+  	batchDim = null;
+  }
+  
   override def toString = {
     "scale@"+Integer.toHexString(hashCode % 0x10000).toString
   }

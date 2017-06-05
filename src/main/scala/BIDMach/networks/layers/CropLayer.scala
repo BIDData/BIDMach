@@ -82,6 +82,12 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 
 			forwardtime += toc - start;
 	}
+	
+	override def clear = {
+	  clearMats;
+	  blockInds = null;
+    sizes = null;
+	}
   
   override def toString = {
     "crop@"+Integer.toHexString(hashCode % 0x10000).toString

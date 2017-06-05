@@ -83,6 +83,11 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  backwardtime += toc - start;
   }
   
+  def clear = {
+    clearMats;
+    colranges = null;
+  }
+  
   override def toString = {
     "stack@"+Integer.toHexString(hashCode % 0x10000).toString
   }

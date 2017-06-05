@@ -25,7 +25,6 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
   var one:Mat = null;
   var eps:Mat = null;
 
-
   override def forward = {
 		  val start = toc;
       createOutput;
@@ -94,6 +93,14 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
     		FMat(mean(ln(output(inds))));   
     	}
     }
+  }
+  
+  def clear = {
+  		clearMats;
+  		coloffsets = null;
+  		zero = null;
+  		one = null;
+  		eps = null;
   }
   
   override def toString = {

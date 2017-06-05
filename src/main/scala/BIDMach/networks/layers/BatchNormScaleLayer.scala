@@ -267,6 +267,20 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     }
   }
   
+  override def clear = {
+    clearMats;  
+    means = null;
+    variances = null;
+    runningMeans = null;
+    runningVariances = null;
+    sdevs = null;
+    scale = null;
+    bias = null;
+    updateScale= null;
+    updateBias = null;
+    batchDim = null;
+  }
+
   override def toString = {
     "bns@" + Integer.toHexString(hashCode() % 0x10000)
   }

@@ -66,8 +66,15 @@ class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts =
     
     backwardtime += toc - start
   }
-
   
+  override def clear = {
+    clearMats;
+    means = null;
+    variances = null;
+    sdevs= null;
+    batchDim = null;
+  }
+
   override def toString = {
     "batchnorm@" + Integer.toHexString(hashCode() % 0x10000)
   }

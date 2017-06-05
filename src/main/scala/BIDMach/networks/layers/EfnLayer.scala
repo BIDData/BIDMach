@@ -66,6 +66,14 @@ class EfnLayer(override val net:Net, override val opts:EfnNodeOpts = new EfnNode
 		  backwardtime += toc - start;
   }
   
+  def clear = {
+    clearMats;
+    finput = null;
+    foutput = null;
+    finderiv = null;
+    fderiv = null;
+  }
+  
   override def toString = {
     "efn@"+Integer.toHexString(hashCode % 0x10000).toString
   }

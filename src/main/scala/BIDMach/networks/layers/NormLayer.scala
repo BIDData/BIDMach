@@ -43,6 +43,11 @@ class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormN
     backwardtime += toc - start;
   }
   
+  override def clear = {
+    clearMats;
+    sconst = null;
+  }
+  
   override def toString = {
     "norm@"+Integer.toHexString(hashCode % 0x10000).toString
   }

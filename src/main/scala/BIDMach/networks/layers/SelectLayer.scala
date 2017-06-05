@@ -52,6 +52,12 @@ class SelectLayer(override val net:Net, override val opts:SelectNodeOpts = new S
   		backwardtime += toc - start;
   }
   
+  override def clear = {
+    clearMats;
+    colindx = null;
+    fullindx = null;
+  }
+  
   
   override def toString = {
     "select@"+Integer.toHexString(hashCode % 0x10000).toString

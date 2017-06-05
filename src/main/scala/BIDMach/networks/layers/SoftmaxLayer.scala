@@ -20,10 +20,9 @@ import BIDMach.networks._
  */
 
 class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new SoftmaxNode) extends Layer(net, opts) {
-  var coloffsets:Mat = null;
   var one:Mat = null;
 
-	override def forward = {
+  override def forward = {
 			val start = toc;
 			if (one.asInstanceOf[AnyRef] == null) one = inputData.ones(1,1);
 			createOutput;
@@ -42,6 +41,11 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new
 				inputDeriv ~ inputDeriv + ((smax ∘ deriv) - (smax ∘ (smax ∙ deriv)));
 			}
 			backwardtime += toc - start;
+	}
+	
+	def clear = {
+	  clearMats;
+	  one = null;
 	}
 
   override def toString = {

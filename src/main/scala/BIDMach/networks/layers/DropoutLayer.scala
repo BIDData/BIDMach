@@ -48,6 +48,11 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
   override def toString = {
     "dropout@"+Integer.toHexString(hashCode % 0x10000).toString
   }
+  
+  def clear = {
+    clearMats;
+    randmat = null;
+  }
 }
 
 trait DropoutNodeOpts extends NodeOpts {

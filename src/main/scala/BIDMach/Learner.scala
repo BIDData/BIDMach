@@ -200,9 +200,10 @@ case class Learner(
     Mat.debugCPUmem = debugCPUmemState;
     println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
     if (opts.autoReset && useGPU) {
-      Learner.toCPU(modelmats)
-      resetGPUs
-      Mat.clearCaches
+      Learner.toCPU(modelmats);
+      model.clear;
+      resetGPUs;
+      Mat.clearCaches;
     }
     datasource.close;
     if (datasink != null) datasink.close;

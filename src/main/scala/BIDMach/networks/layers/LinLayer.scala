@@ -112,6 +112,17 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     mask = aopts.mask;
     ADAinitialized = true;
   }
+  
+  def clear = {
+  		clearMats;
+  		vexp = null;
+  		texp = null;
+  		lrate = null;
+  		modelcols = null;
+
+  		mask = null;
+  		dprod = null;
+  }
 
   override def toString = {
     "linear@"+Integer.toHexString(hashCode % 0x10000).toString

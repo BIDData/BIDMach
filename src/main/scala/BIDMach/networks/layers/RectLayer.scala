@@ -20,7 +20,8 @@ import BIDMach.networks._
  */
 
 class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectNode) extends Layer(net, opts) {
-	override def forward = {
+
+  override def forward = {
       val start = toc;
       if (opts.inplace) {
         output = inputData;

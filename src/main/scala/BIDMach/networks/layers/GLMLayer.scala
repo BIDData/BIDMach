@@ -49,6 +49,11 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 			val v = if (target.asInstanceOf[AnyRef] != null) GLM.llfun(output, target, ilinks, totflops) else row(0);
 			FMat(mean(mean(v, 2)));
 	}
+	
+	override def clear = {
+	  clearMats;
+	  ilinks = null;
+	}
   
   override def toString = {
     "glm@"+Integer.toHexString(hashCode % 0x10000).toString

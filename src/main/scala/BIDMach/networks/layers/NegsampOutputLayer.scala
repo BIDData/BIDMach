@@ -135,6 +135,25 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
     }
   }
   
+  def clear = {
+  		clearMats;
+  		vexp = null;
+  		texp = null;
+  		lrate = null;
+  		iexpt = null;
+  		cfact = null;
+  		cexpt = null;  
+  		mask = null;
+  		ADAinitialized = false;
+  		randwords = null;
+  		onerow = null;
+  		prods = null;
+  		inputMat = null;
+  		targMat = null;
+  		irange = null;
+  		coloffsets = null;
+  }
+  
   override def toString = {
     "negsamp@"+Integer.toHexString(hashCode % 0x10000).toString
   }

@@ -112,6 +112,17 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
     backwardtime += toc - start;
   }
+  
+  def clear = {
+    clearMats;
+    filter = null; 
+    ffilter= null;
+    updateFilter = null;
+    updateFFilter = null;
+    bias_mat = null; // it should be size (channel_out*1*1*1), to better broadcast?
+    update_bias_mat = null;
+    inputDim = null; 
+  }
 
   override def toString = {
     "conv@" + Integer.toHexString(hashCode() % 0x10000)

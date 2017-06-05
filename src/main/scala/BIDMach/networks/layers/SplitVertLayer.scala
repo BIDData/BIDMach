@@ -82,6 +82,11 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 		  backwardtime += toc - start;
   }
   
+  def clear = {
+    clearMats;
+    colranges = null;
+  }
+  
   override def toString = {
     "splitverte@"+Integer.toHexString(hashCode % 0x10000).toString
   }

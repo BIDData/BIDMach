@@ -45,6 +45,11 @@ class SplitHorizLayer(override val net:Net, override val opts:SplitHorizNodeOpts
 		  backwardtime += toc - start;
   }
   
+  def clear = {
+    clearMats;
+    colranges = null;
+  }
+  
   override def toString = {
     "splithorize@"+Integer.toHexString(hashCode % 0x10000).toString
   }

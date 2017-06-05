@@ -35,6 +35,11 @@ class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode
 		  backwardtime += toc - start;
   }
   
+  def clear = {
+    clearMats;
+    vmap = null;
+  }
+  
   override def toString = {
     "sum@"+Integer.toHexString(hashCode % 0x10000).toString
   }
