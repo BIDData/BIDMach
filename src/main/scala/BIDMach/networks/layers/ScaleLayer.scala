@@ -81,7 +81,7 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
     backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
   	scaleMat = null;
   	biasMat = null;

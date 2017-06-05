@@ -95,7 +95,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
     }
   }
   
-  def clear = {
+  override def clear = {
   		clearMats;
   		coloffsets = null;
   		zero = null;

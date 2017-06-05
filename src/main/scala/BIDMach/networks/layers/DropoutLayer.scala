@@ -45,13 +45,13 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 		backwardtime += toc - start;
   }
   
-  override def toString = {
-    "dropout@"+Integer.toHexString(hashCode % 0x10000).toString
-  }
-  
-  def clear = {
+  override def clear = {
     clearMats;
     randmat = null;
+  } 
+  
+  override def toString = {
+    "dropout@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 

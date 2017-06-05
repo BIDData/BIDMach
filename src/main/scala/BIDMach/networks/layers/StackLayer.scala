@@ -83,7 +83,7 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
     colranges = null;
   }

@@ -113,7 +113,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
     filter = null; 
     ffilter= null;

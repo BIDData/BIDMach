@@ -43,7 +43,7 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new
 			backwardtime += toc - start;
 	}
 	
-	def clear = {
+	override def clear = {
 	  clearMats;
 	  one = null;
 	}

@@ -35,7 +35,7 @@ class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode
 		  backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
     vmap = null;
   }

@@ -82,7 +82,7 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 		  backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
     colranges = null;
   }

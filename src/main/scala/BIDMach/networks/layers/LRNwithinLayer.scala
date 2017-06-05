@@ -18,7 +18,7 @@ import scala.collection.mutable.HashMap;
 
 class LRNwithinLayer(override val net:Net, override val opts:LRNwithinNode = new LRNwithinNode) extends CompoundLayer(net, opts) {
   
-	def clear = {
+	override def clear = {
 			clearMats;
 			opts.xalpha = null;
 			opts.xbeta = null;

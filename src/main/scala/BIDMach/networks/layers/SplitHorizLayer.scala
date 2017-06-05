@@ -45,7 +45,7 @@ class SplitHorizLayer(override val net:Net, override val opts:SplitHorizNodeOpts
 		  backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
     colranges = null;
   }

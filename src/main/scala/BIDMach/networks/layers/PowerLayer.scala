@@ -43,7 +43,7 @@ class PowerLayer(override val net:Net, override val opts:PowerNodeOpts = new Pow
 		  backwardtime += toc - start;
   }
   
-  def clear = {
+  override def clear = {
     clearMats;
     one = null;
   }

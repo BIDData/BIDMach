@@ -135,7 +135,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
     }
   }
   
-  def clear = {
+  override def clear = {
   		clearMats;
   		vexp = null;
   		texp = null;

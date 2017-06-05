@@ -113,7 +113,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     ADAinitialized = true;
   }
   
-  def clear = {
+  override def clear = {
   		clearMats;
   		vexp = null;
   		texp = null;
