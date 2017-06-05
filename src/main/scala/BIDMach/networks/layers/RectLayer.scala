@@ -25,11 +25,13 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
       val start = toc;
       if (opts.inplace) {
         output = inputData;
+        deriv = inputDeriv;
+        deriv.clear;
       } else {
-      	createOutput;
+      	createOutput;     			
+      	clearDeriv;
       }
 			max(inputData, 0f, output);
-			clearDeriv;
 			forwardtime += toc - start;
 	}
 
@@ -37,8 +39,7 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 			val start = toc;
 			if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			  if (opts.inplace) {
-			  	RectLayer.rectHelper(output, deriv, deriv);
-			    inputDeriv ~ inputDeriv + deriv; 
+			  	RectLayer.rectHelper(output, deriv, deriv); 
 			  } else {
 			  	inputDeriv ~ inputDeriv + (deriv ∘ (inputData > 0f));
 			  }
