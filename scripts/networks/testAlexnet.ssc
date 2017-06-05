@@ -26,7 +26,7 @@ opts.tensorFormat = Net.TensorNCHW;
 val means = loadFMat(traindir+"means.fmat.lz4");
 
 {
-import BIDMach.networks.layers.Layer._;
+import BIDMach.networks.layers.Node._;
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 Net.initDefaultNodeSet;
@@ -70,7 +70,7 @@ val drop7 =     dropout(relu7)(0.5f);
 val fc8  =      linear(drop7)(outdim=1000,initv=1e-1f);
 val out =       softmaxout(fc8)(scoreType=1,lossType=0);
 
-net.nodeset=Net.getDefaultNodeSet
+opts.nodeset=Net.getDefaultNodeSet
 }
 
 nn.train;
