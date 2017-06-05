@@ -99,10 +99,6 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   	val lr0 = if (opts.policies.asInstanceOf[AnyRef] != null) opts.policies(0)(ipass, nsteps, gprogress) else 0;
 	  for (i <- 0 until nmats) {
 		  val mm = modelmats(i);
-		  if (opts.weight_decay.asInstanceOf[AnyRef] != null) {
-		    val i0 = if (opts.weight_decay.length > 1) i else 0;
-		    mm ~ mm *@ opts.weight_decay(i0);
-		  }
       val tscale = if (te.asInstanceOf[AnyRef] != null) {
         stepn.set(1f/nsteps);
         stepn ^ te;
@@ -129,6 +125,10 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     	}
 	  	if (opts.waitsteps < nsteps) {
         val grad = updatemats(i);
+        if (opts.l2reg.asInstanceOf[AnyRef] != null) {
+        	val i0 = if (opts.l2reg.length > 1) i else 0;
+        	grad ~ grad - (mm *@ opts.l2reg(i0));
+        }
         if (opts.langevin > 0) {                              // Add Langevin random permutations
         	normrnd(0, opts.langevin, randmat(i));
         	grad ~ grad + randmat(i);
@@ -166,7 +166,7 @@ object Grad {
     var policies:Array[(Float, Float, Float)=>Float] = null;
     var vel_decay:FMat = null;
     var nesterov_vel_decay:FMat = null;
-    var weight_decay:FMat = null;
+    var l2reg:FMat = null;
     var langevin = 0f;
     var clipByValue = -1f;
     var max_grad_norm = -1f;
