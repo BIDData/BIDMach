@@ -91,7 +91,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	val um = updatemats(i);
     	if (opts.weight_decay.asInstanceOf[AnyRef] != null) {
     		val i0 = if (opts.weight_decay.length > 1) i else 0;
-    		mm ~ mm *@ opts.weight_decay(i);
+    		mm ~ mm *@ opts.weight_decay(i0);
     	}
     	if (opts.policies.asInstanceOf[AnyRef] != null) {
     		if (opts.policies.length > 1) {

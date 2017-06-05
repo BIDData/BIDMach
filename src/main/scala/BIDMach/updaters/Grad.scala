@@ -100,7 +100,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 		  val mm = modelmats(i);
 		  if (opts.weight_decay.asInstanceOf[AnyRef] != null) {
 		    val i0 = if (opts.weight_decay.length > 1) i else 0;
-		    mm ~ mm *@ opts.weight_decay(i);
+		    mm ~ mm *@ opts.weight_decay(i0);
 		  }
       val tscale = if (te.asInstanceOf[AnyRef] != null) {
         stepn.set(1f/nsteps);
