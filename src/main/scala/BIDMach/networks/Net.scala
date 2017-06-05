@@ -51,14 +51,13 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
 
   override def init() = {
+    if (layers.asInstanceOf[AnyRef] == null) createLayers;
 //	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
 	  batchSize = mats(0).ncols;
 	  predict = opts.predict;
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
-
-//	  createLayers;
 
 	  if (modelMap == null) {
 	  	modelMap = new HashMap[String,Int];
