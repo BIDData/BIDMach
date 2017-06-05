@@ -96,17 +96,18 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     	}
     	if (opts.policies.asInstanceOf[AnyRef] != null) {
     		if (opts.policies.length > 1) {
-    			tscale.set(opts.policies(i)(ipass, nsteps, gprogress));
+    			lrate.set(opts.policies(i)(ipass, nsteps, gprogress));
     		} else {
-    			tscale.set(lr0);
+    			lrate.set(lr0);
     		}
+    	} else {
+    		if (opts.lrate.ncols > 1) {
+    			lrate <-- opts.lrate(?,i);
+    		} else {
+    			lrate <-- opts.lrate;
+    		}    	  
     	}
     	val ss = sumSq(i);
-    	if (opts.lrate.ncols > 1) {
-    		lrate <-- opts.lrate(?,i);
-    	} else {
-    		lrate <-- opts.lrate;
-    	}
     	val lr_scales = model.lr_scales;
     	if (lr_scales.asInstanceOf[AnyRef] != null) {
     	  lrate ~ lrate *@ lr_scales(i);
