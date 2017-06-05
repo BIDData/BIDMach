@@ -12,8 +12,12 @@ import BIDMach.datasinks._
 import BIDMach.mixins._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+//import scala.concurrent.Future
+//import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  *  Basic sequential Learner class with a single datasource
@@ -72,10 +76,26 @@ case class Learner(
     Mat.useGPUcache = cacheGPUstate;
     useGPU = model.useGPU;
   }
+  
+  def launch:Future[_] = {
+    val nthreads = opts match {
+      case mopts:FileSource.Opts => mopts.lookahead + 4;
+      case _ => 4;
+    }
+  	val executor = Executors.newFixedThreadPool(nthreads);
+  	val runner = new Runnable{
+  	  def run() = {
+    	  train;    			
+    	}
+  	}
+  	executor.submit(runner);
+  }
 
+  
   def train(doInit:Boolean) = {
     retrain(doInit)
   }
+  
   def train:Unit = retrain(true)
 
   def retrain(doInit:Boolean) = {
@@ -378,8 +398,7 @@ case class ParLearner(
     var progress = 0f;
     var gprogress = 0f;
 
-    for (ithread <- 0 until opts.nthreads) {
-    	Future {
+    (0 until opts.nthreads).par.foreach((ithread)=> {
     		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
     		while (running) {
     			while (done(ithread) == 1) Thread.sleep(1)
@@ -406,8 +425,8 @@ case class ParLearner(
     			}
     			done(ithread) = 1
     		}
-    	}
-    }
+    	});
+    
     while (ipass < opts.npasses) {
     	datasource.reset
       istep = 0
@@ -593,8 +612,7 @@ case class ParLearnerx(
 	  var lasti = 0
     var gprogress = 0f
 	  done.clear
-	  for (ithread <- 0 until opts.nthreads) {
-	  	Future {
+	  (0 until opts.nthreads).par.foreach((ithread:Int) => {
 	  		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
 	  		var here = 0L
 	  		updaters(ithread).clear
@@ -636,8 +654,8 @@ case class ParLearnerx(
 	  			done(ithread) += 1
 	  			while (done(ithread) > ipass) Thread.sleep(1)
 	  		}
-	  	}
-	  }
+	  	});
+
 	  println("pass=%2d" format ipass)
 	  while (ipass < opts.npasses) {
 	  	while (mini(done).v == ipass) {

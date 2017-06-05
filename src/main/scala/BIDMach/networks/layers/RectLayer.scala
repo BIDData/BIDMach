@@ -28,7 +28,7 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
         deriv = inputDeriv;
         deriv.clear;
       } else {
-      	createOutput;     			
+      	createOutput;  
       	clearDeriv;
       }
 			max(inputData, 0f, output);
