@@ -83,11 +83,11 @@ case class Learner(
       case mopts:FileSource.Opts => mopts.lookahead + 4;
       case _ => 4;
     }
+    val tmp = myLogger;
+//    myLogger = Mat.getFileLogger;
   	val executor = Executors.newFixedThreadPool(nthreads);
   	val runner = new Runnable{
   	  def run() = {
-  	    val tmp = myLogger;
-  	    myLogger = Mat.getFileLogger;
     	  train;    	
     	  myLogger = tmp;
     	}
