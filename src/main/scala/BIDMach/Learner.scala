@@ -191,13 +191,13 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        myLogger.info("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
           100f*lastp,
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._2,
           nsamps/gf._2,
           gf._1,
-          bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else "");
+          bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
         lasti = reslist.length;
       }
       if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
