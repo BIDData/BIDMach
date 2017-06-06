@@ -22,7 +22,6 @@ test ~ test - mt;
 val (nn,opts) = Net.learner(train,trainlabels);
 
 
-opts.batchSize= 64
 opts.npasses = 2
 
 opts.lrate = 1e-3f 

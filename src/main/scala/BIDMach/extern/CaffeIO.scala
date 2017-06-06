@@ -3,6 +3,7 @@ package BIDMach.extern
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat,FFilter,Filter,GFilter}
 import BIDMat.MatFunctions._
 import BIDMach._
+import BIDMach.datasources.DataSource
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
 import scala.collection.JavaConversions._
@@ -168,7 +169,15 @@ object CaffeIO {
         case "TanH" => nodes += new TanhNode
         case "BNLL" => nodes += new SoftplusNode
 
-        case "Data" => nodes += new InputNode
+        case "Data" => {
+          val dataParam = layer.getDataParam()
+          
+          if (net.opts.isInstanceOf[DataSource.Opts]) {
+            net.opts.asInstanceOf[DataSource.Opts].batchSize = dataParam.getBatchSize()
+          }
+          
+          nodes += new InputNode
+        }
         case "MemoryData" => nodes += new InputNode
         case "HDF5Data" => nodes += new InputNode
 
