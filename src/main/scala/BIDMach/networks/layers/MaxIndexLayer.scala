@@ -19,13 +19,12 @@ class MaxIndexLayer(override val net:Net, override val opts:MaxIndexNodeOpts = n
 
   override def forward = {
     val start = toc;
-    output = maxi2(inputData, 1)._2
+    output = maxi2(inputData, 1)._2;
     forwardtime += toc - start;
   }
 
   override def backward = {
     val start = toc;
-    inputDeriv = null;
     backwardtime += toc - start;
   }
 

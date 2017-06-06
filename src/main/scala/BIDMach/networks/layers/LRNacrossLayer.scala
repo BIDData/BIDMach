@@ -32,7 +32,10 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 			clearMats;
 	}
 	
-	  def forwardCUDNN = {
+	def forward = {
+		val start = toc;
+		createOutput;
+		
     var xDesc:cudnnTensorDescriptor = null;
     var yDesc:cudnnTensorDescriptor = null;
     var pDesc:cudnnLRNDescriptor = null;
@@ -58,12 +61,12 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
       xDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(xDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
       val xSetStatus = cudnnSetTensor4dDescriptor(xDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
-      if (xSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for pooling forward");
+      if (xSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for LRN across channel forward");
       
       yDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(yDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
       val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1))
-      if (ySetStatus > 0) throw new CUDAException(ySetStatus, "Error creating y tensor for pooling forward");
+      if (ySetStatus > 0) throw new CUDAException(ySetStatus, "Error creating y tensor for LRN across channel forward");
       
       pDesc = new cudnnLRNDescriptor;
       cudnnCreateLRNDescriptor(pDesc);
@@ -74,79 +77,89 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
       
       cudaDeviceSynchronize();
       if (err == 0) err = cudaGetLastError();
-      if (err > 0) throw new CUDAException(err, "Error in CUDNN forward pooling: " + cudaGetErrorString(err));
+      if (err > 0) throw new CUDAException(err, "Error in CUDNN forward LRN cross channel: " + cudaGetErrorString(err));
           
     } finally {
       if (pDesc != null) cudnnDestroyLRNDescriptor(pDesc);
       if (yDesc != null) cudnnDestroyTensorDescriptor(yDesc);
       if (xDesc != null) cudnnDestroyTensorDescriptor(xDesc);
     }
+    clearDeriv;
+    forwardtime += toc - start;
   }
 	  
 	    
-  def backwardCUDNN = {
-    var xDesc:cudnnTensorDescriptor = null;
-	  var yDesc:cudnnTensorDescriptor = null;
-    var dyDesc:cudnnTensorDescriptor = null;
-    var dxDesc:cudnnTensorDescriptor = null;
-    var pDesc:cudnnLRNDescriptor = null;
-    
-    val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
-    val xdims = inputData.dims;
-    val ydims = output.dims;
-    
-    val inputGMat = inputData.asInstanceOf[GMat];
-    val outputGMat = output.asInstanceOf[GMat];
-    val inputDerivGMat = inputDeriv.asInstanceOf[GMat];
-    val derivGMat = deriv.asInstanceOf[GMat];
-    
-    val dim = opts.dim;
-    val alpha = opts.alpha;
-    val beta = opts.beta;
-    val lrnK = 2f;
-    
-    aArray(0) = alpha;
-    bArray(0) = beta;
-    val pAlpha = Pointer.to(aArray);
-    val pBeta = Pointer.to(bArray);
-    
-    try {
-      xDesc = new cudnnTensorDescriptor()
-      if (cudnnCreateTensorDescriptor(xDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val xSetStatus = cudnnSetTensor4dDescriptor(xDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
-      if (xSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm backward");
-      
-      yDesc = new cudnnTensorDescriptor()
-      if (cudnnCreateTensorDescriptor(yDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
-      if (ySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm backward");
-      
-      dxDesc = new cudnnTensorDescriptor();
-      if (cudnnCreateTensorDescriptor(dxDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val dxSetStatus = cudnnSetTensor4dDescriptor(dxDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
-      if (dxSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm backward");
-      
-      dyDesc = new cudnnTensorDescriptor();
-      if (cudnnCreateTensorDescriptor(dyDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
-      val dySetStatus = cudnnSetTensor4dDescriptor(dyDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
-      if (dySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for batch norm backward");
-      
-      pDesc = new cudnnLRNDescriptor;
-      cudnnCreateLRNDescriptor(pDesc);
-      val cstatus = cudnnSetLRNDescriptor(pDesc, dim, alpha, beta, lrnK);
-      if (cstatus > 0) throw new RuntimeException("Error setting LRN descriptor %d" format cstatus);
+  def backward = {
+		val start = toc;
+		if (inputDeriv.asInstanceOf[AnyRef] != null) {
+			var xDesc:cudnnTensorDescriptor = null;
+			var yDesc:cudnnTensorDescriptor = null;
+			var dyDesc:cudnnTensorDescriptor = null;
+			var dxDesc:cudnnTensorDescriptor = null;
+			var pDesc:cudnnLRNDescriptor = null;
 
-      cudnnLRNCrossChannelBackward(GFilter.getHandle, pDesc, lrnMode,
-          pAlpha, yDesc, outputGMat.pdata, dyDesc, derivGMat.pdata, xDesc, inputGMat.pdata, pBeta, dxDesc, inputDerivGMat.pdata);
+			val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
+			val xdims = inputData.dims;
+			val ydims = output.dims;
 
-    } finally {
-      
-      if (pDesc != null) cudnnDestroyLRNDescriptor(pDesc);
-      if (dyDesc != null) cudnnDestroyTensorDescriptor(dyDesc);
-      if (dxDesc != null) cudnnDestroyTensorDescriptor(dxDesc);
-      if (yDesc != null) cudnnDestroyTensorDescriptor(yDesc); 
-      if (xDesc != null) cudnnDestroyTensorDescriptor(xDesc);                       
-    }
+			val inputGMat = inputData.asInstanceOf[GMat];
+			val outputGMat = output.asInstanceOf[GMat];
+			val inputDerivGMat = inputDeriv.asInstanceOf[GMat];
+			val derivGMat = deriv.asInstanceOf[GMat];
+
+			val dim = opts.dim;
+			val alpha = opts.alpha;
+			val beta = opts.beta;
+			val lrnK = 2f;
+
+			aArray(0) = alpha;
+			bArray(0) = beta;
+			val pAlpha = Pointer.to(aArray);
+			val pBeta = Pointer.to(bArray);
+
+			try {
+				xDesc = new cudnnTensorDescriptor()
+				if (cudnnCreateTensorDescriptor(xDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
+				val xSetStatus = cudnnSetTensor4dDescriptor(xDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
+				if (xSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating x tensor for LRN across channel backward");
+
+				yDesc = new cudnnTensorDescriptor()
+				if (cudnnCreateTensorDescriptor(yDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
+				val ySetStatus = cudnnSetTensor4dDescriptor(yDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
+				if (ySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating y tensor for LRN across channel backward");
+
+				dxDesc = new cudnnTensorDescriptor();
+				if (cudnnCreateTensorDescriptor(dxDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
+				val dxSetStatus = cudnnSetTensor4dDescriptor(dxDesc, cuTensorFormat, data_type, xdims(3), xdims(0), xdims(2), xdims(1));
+				if (dxSetStatus > 0) throw new CUDAException(xSetStatus, "Error creating dx tensor for LRN across channel backward");
+
+				dyDesc = new cudnnTensorDescriptor();
+				if (cudnnCreateTensorDescriptor(dyDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
+				val dySetStatus = cudnnSetTensor4dDescriptor(dyDesc, cuTensorFormat, data_type, ydims(3), ydims(0), ydims(2), ydims(1));
+				if (dySetStatus > 0) throw new CUDAException(xSetStatus, "Error creating dy tensor for LRN across channel backward");
+
+				pDesc = new cudnnLRNDescriptor;
+				cudnnCreateLRNDescriptor(pDesc);
+				val cstatus = cudnnSetLRNDescriptor(pDesc, dim, alpha, beta, lrnK);
+				if (cstatus > 0) throw new RuntimeException("Error setting LRN descriptor %d" format cstatus);
+
+				var err = cudnnLRNCrossChannelBackward(GFilter.getHandle, pDesc, lrnMode, pAlpha, yDesc, outputGMat.pdata, 
+						dyDesc, derivGMat.pdata, xDesc, inputGMat.pdata, pBeta, dxDesc, inputDerivGMat.pdata);
+
+				cudaDeviceSynchronize();
+				if (err == 0) err = cudaGetLastError();
+				if (err > 0) throw new CUDAException(err, "Error in CUDNN backward LRN cross channel: " + cudaGetErrorString(err));
+          
+			} finally {
+
+				if (pDesc != null) cudnnDestroyLRNDescriptor(pDesc);
+				if (dyDesc != null) cudnnDestroyTensorDescriptor(dyDesc);
+				if (dxDesc != null) cudnnDestroyTensorDescriptor(dxDesc);
+				if (yDesc != null) cudnnDestroyTensorDescriptor(yDesc); 
+				if (xDesc != null) cudnnDestroyTensorDescriptor(xDesc);                       
+			}
+		}
+		backwardtime += toc - start;
   }
   
   	  
