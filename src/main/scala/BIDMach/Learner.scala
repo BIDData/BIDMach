@@ -33,6 +33,7 @@ case class Learner(
     val opts:Learner.Options = new Learner.Options) extends Serializable {
 
   var myLogger = Mat.consoleLogger;
+  var fut:Future[_] = null;
   var results:FMat = null
   val dopts:DataSource.Opts = if (datasource != null) datasource.opts else null
   val mopts:Model.Opts	= model.opts
@@ -78,7 +79,7 @@ case class Learner(
     useGPU = model.useGPU;
   }
   
-  def launch:Future[_] = {
+  def launch = {
     val nthreads = opts match {
       case mopts:FileSource.Opts => mopts.lookahead + 4;
       case _ => 4;
@@ -92,7 +93,8 @@ case class Learner(
     	  myLogger = tmp;
     	}
   	}
-  	executor.submit(runner);
+  	fut = executor.submit(runner);
+  	fut;
   }
 
   
