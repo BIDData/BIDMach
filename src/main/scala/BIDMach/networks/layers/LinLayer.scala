@@ -19,7 +19,7 @@ import BIDMach.networks._
  * Includes a model matrix that contains the linear map.
  */
 
-class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode) extends ModelLayer(net, opts) {
+class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode) extends ModelLayer(net, opts, 2) {
   var vexp:Mat = null;
   var texp:Mat = null;
   var lrate:Mat = null;
@@ -32,50 +32,50 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var epsilon = 0f;
   var ADAinitialized = false;
 
-  def initModelMat(nr:Int, nc:Int):Mat = {
+  def initModelMat(nr:Int, nc:Int, initv:Float):Mat = {
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
     }
     if (opts.tmatShape != null) {
       val (y, x, h, w) = opts.tmatShape(nr, nc);
       val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
-      out.tiles.foreach((x:Mat) => {rand(x); x ~ x - 0.5f; x ~ x *@ opts.initv})
+      out.tiles.foreach((x:Mat) => {rand(x); x ~ x - 0.5f; x ~ x *@ opts.initv});
       out;
     } else {
-    	(rand(nr, nc) - 0.5f) *@ opts.initv;
+    	(rand(nr, nc) - 0.5f) *@ initv;
     }
   }
 
   override def forward = {
-    val start = toc;
-    val modelcols = inputData.nrows;
-    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-      val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
-      modelmats(imodel) = convertMat(initModelMat(outdim, modelcols + (if (opts.hasBias) 1 else 0)));
-      updatemats(imodel) = modelmats(imodel).zeros(modelmats(imodel).nrows, modelmats(imodel).ncols);
-    }
-    if (opts.aopts != null && !ADAinitialized) initADAGrad;
-    val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols) else modelmats(imodel);
-    createOutput(mm.nrows \ inputData.ncols);
-    if (opts.withInteractions) {
-      GLM.pairMult(mm, inputData, output);
-    } else {
-    	output ~ mm * inputData;
-    }
-    if (opts.hasBias) {
-        val outplus = modelmats(imodel).colslice(modelcols, modelcols+1)
-    	output ~ output + outplus;
-	}
-    clearDeriv;
-    forwardtime += toc - start;
+  	val start = toc;
+  	val modelcols = inputData.nrows;
+  	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+  		val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
+  		modelmats(imodel) = convertMat(initModelMat(outdim, modelcols, opts.initv));
+  		updatemats(imodel) = convertMat(initModelMat(outdim, modelcols, 0f));
+  		if (opts.hasBias) {
+  			modelmats(imodel+1) = convertMat(zeros(outdim, 1));
+  			updatemats(imodel+1) = convertMat(zeros(outdim, 1));
+  		}
+  	}
+  	if (opts.aopts != null && !ADAinitialized) initADAGrad;
+  	val mm = modelmats(imodel);
+  	createOutput(mm.nrows \ inputData.ncols);
+  	if (opts.withInteractions) {
+  		GLM.pairMult(mm, inputData, output);
+  	} else {
+  		output ~ mm * inputData;
+  	}
+  	if (opts.hasBias) {
+  		output ~ output + modelmats(imodel+1);
+  	}
+  	clearDeriv;
+  	forwardtime += toc - start;
   }
 
   override def backward(ipass:Int, pos:Long) = {
     val start = toc;
-    if (modelcols.asInstanceOf[AnyRef] == null) {
-    	modelcols = irow(inputData.nrows);
-    }
-    val mm = if (opts.hasBias) modelmats(imodel).view(modelmats(imodel).nrows, modelcols.v) else modelmats(imodel);
+    val mm = modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
       mm.madd(deriv, inputDeriv, true, false);
     }
@@ -88,9 +88,9 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       	ADAGrad.multUpdate(deriv, inputData, modelmats(imodel), updatemats(imodel), mask, lrate, vexp, texp, epsilon, step, waitsteps, opts.hasBias);
       }
     } else {
-    	val um = if (opts.hasBias) updatemats(imodel).view(updatemats(imodel).nrows, modelcols.v) else updatemats(imodel);
+    	val um = updatemats(imodel);
     	deriv.madd(inputData, um, false, true);
-      if (opts.hasBias) updatemats(imodel)(?,modelcols) = updatemats(imodel)(?,modelcols) + sum(deriv,2)
+      if (opts.hasBias) updatemats(imodel+1) ~ updatemats(imodel+1) + sum(deriv,2);
     }
     backwardtime += toc - start;
   }
