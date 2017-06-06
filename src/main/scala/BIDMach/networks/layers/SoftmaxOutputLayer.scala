@@ -148,7 +148,9 @@ object SoftmaxOutputLayer {
  
   final val CrossEntropyLoss = 0;
   final val LogProbs = 0;
+  final val MultinomialLogisticLoss = 1;
   final val LogTargetProbs = 1;
+  final val MultinomialLoss = 2;
   final val TargetProbs = 2;
   
   def apply(net:Net) = new SoftmaxOutputLayer(net, new SoftmaxOutputNode);

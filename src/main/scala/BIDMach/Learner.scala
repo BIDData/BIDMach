@@ -163,7 +163,7 @@ case class Learner(
     datasource.reset
     var istep = 0;
     myLogger.info("pass=%2d" format ipass)
-    while (datasource.hasNext) {
+    while (!done && datasource.hasNext) {
       while (paused) Thread.sleep(10)
       val mats = datasource.next;
       nsamps += mats(0).ncols;
