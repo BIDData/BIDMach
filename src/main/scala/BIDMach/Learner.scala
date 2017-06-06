@@ -240,6 +240,13 @@ case class Learner(
     results = top(?,0->n) on bottom(?,0->n);  
     results;
   }
+  
+  def plotResults(n:Int = 10) = {
+    getResults;
+    val b = zeros(n, results.ncols/n);
+    b(?) = results(0,0->b.length);
+    plot(mean(b))
+  }
 
   def predict() = {
     setup;
