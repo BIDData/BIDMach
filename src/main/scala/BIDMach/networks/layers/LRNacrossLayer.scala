@@ -25,8 +25,11 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 	val data_type = cudnnDataType.CUDNN_DATA_FLOAT;
 	val lrnMode = cudnnLRNMode.CUDNN_LRN_CROSS_CHANNEL_DIM1;
 	
-	val aArray = Array(0f);
-	val bArray = Array(0f);
+	val ZERO = Array(0f);
+	val ONE = Array(1f);
+	
+	val pZERO = Pointer.to(ZERO);
+	val pONE = Pointer.to(ONE);
 	
 	override def forward = {
 		val start = toc;
@@ -48,11 +51,6 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
     val beta = opts.beta;
     val lrnK = 2f;
     
-    aArray(0) = alpha;
-    bArray(0) = beta;
-    val pAlpha = Pointer.to(aArray);
-    val pBeta = Pointer.to(bArray);
-    
     try {
       xDesc = new cudnnTensorDescriptor();
       if (cudnnCreateTensorDescriptor(xDesc) == cudnnStatus.CUDNN_STATUS_ALLOC_FAILED) throw new OutOfMemoryError();
@@ -69,7 +67,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
       val cstatus = cudnnSetLRNDescriptor(pDesc, dim, alpha, beta, lrnK);
       if (cstatus > 0) throw new RuntimeException("Error setting LRN descriptor %d" format cstatus);
 
-      var err = cudnnLRNCrossChannelForward(GFilter.getHandle, pDesc, lrnMode, pAlpha, xDesc, inputGMat.pdata, pBeta, yDesc, outputGMat.pdata);
+      var err = cudnnLRNCrossChannelForward(GFilter.getHandle, pDesc, lrnMode, pONE, xDesc, inputGMat.pdata, pZERO, yDesc, outputGMat.pdata);
       
       cudaDeviceSynchronize();
       if (err == 0) err = cudaGetLastError();
@@ -108,10 +106,6 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 			val beta = opts.beta;
 			val lrnK = 2f;
 
-			aArray(0) = alpha;
-			bArray(0) = beta;
-			val pAlpha = Pointer.to(aArray);
-			val pBeta = Pointer.to(bArray);
 
 			try {
 				xDesc = new cudnnTensorDescriptor()
@@ -139,8 +133,8 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 				val cstatus = cudnnSetLRNDescriptor(pDesc, dim, alpha, beta, lrnK);
 				if (cstatus > 0) throw new RuntimeException("Error setting LRN descriptor %d" format cstatus);
 
-				var err = cudnnLRNCrossChannelBackward(GFilter.getHandle, pDesc, lrnMode, pAlpha, yDesc, outputGMat.pdata, 
-						dyDesc, derivGMat.pdata, xDesc, inputGMat.pdata, pBeta, dxDesc, inputDerivGMat.pdata);
+				var err = cudnnLRNCrossChannelBackward(GFilter.getHandle, pDesc, lrnMode, pONE, yDesc, outputGMat.pdata, 
+						dyDesc, derivGMat.pdata, xDesc, inputGMat.pdata, pONE, dxDesc, inputDerivGMat.pdata);
 
 				cudaDeviceSynchronize();
 				if (err == 0) err = cudaGetLastError();

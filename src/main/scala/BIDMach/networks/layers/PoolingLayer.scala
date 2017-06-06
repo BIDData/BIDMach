@@ -261,7 +261,7 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       if (cstatus > 0) throw new RuntimeException("Error setting pooling descriptor %d" format cstatus);
 
       var err = cudnnPoolingBackward(GFilter.getHandle, pDesc, PoolingLayer.ONE, yDesc, outputGMat.pdata, dyDesc, derivGMat.pdata,
-          xDesc, inputGMat.pdata, PoolingLayer.ZERO, dxDesc, inputDerivGMat.pdata);
+          xDesc, inputGMat.pdata, PoolingLayer.ONE, dxDesc, inputDerivGMat.pdata);
          
       cudaDeviceSynchronize();
       if (err == 0) err = cudaGetLastError();
