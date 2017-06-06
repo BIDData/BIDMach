@@ -27,12 +27,8 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 	
 	val aArray = Array(0f);
 	val bArray = Array(0f);
-  
-	override def clear = {
-			clearMats;
-	}
 	
-	def forward = {
+	override def forward = {
 		val start = toc;
 		createOutput;
 		
@@ -89,7 +85,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
   }
 	  
 	    
-  def backward = {
+  override def backward = {
 		val start = toc;
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			var xDesc:cudnnTensorDescriptor = null;
