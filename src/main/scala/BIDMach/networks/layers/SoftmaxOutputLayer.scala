@@ -28,8 +28,8 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
   override def forward = {
 		  val start = toc;
       createOutput;
-      output ~ inputData - maxi(inputData)
-      exp(output, output);  // ensures sum(exps) is between 1 and nfeats
+      output ~ inputData - maxi(inputData);  // ensures sum(exps) is between 1 and nfeats
+      exp(output, output); 
       output ~ output / sum(output);
       clearDeriv;
       forwardtime += toc - start;
@@ -58,7 +58,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		      	inputDeriv ~ inputDeriv - oderiv;
 		      	inputDeriv(inds) = inputDeriv(inds) + output(inds); 		      
 		      }
-		      case SoftmaxOutputLayer.LogProbs => {
+		      case SoftmaxOutputLayer.CrossEntropyLoss => {
 		      	val oneMinusP = one - output;
 		      	max(oneMinusP, eps, oneMinusP);
 		      	val invOneMinusP = oneMinusP;
@@ -147,8 +147,8 @@ object SoftmaxOutputLayer {
   final val AccuracyScore = 1;
  
   final val CrossEntropyLoss = 0;
-  final val LogProbs = 0;
-  final val MultinomialLogisticLoss = 1;
+  final val MultinomialLogisticLoss = 0;
+  final val CaffeMultinomialLogisticLoss = 1;
   final val LogTargetProbs = 1;
   final val MultinomialLoss = 2;
   final val TargetProbs = 2;
