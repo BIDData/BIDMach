@@ -425,6 +425,14 @@ object Layer {
     layer.setInput(0, h);
     layer
   }
+
+  def LRNacross(a:LayerTerm)(dim:Int=5, alpha:Float=1f, beta:Float=0.5f, net:Net=null) = {
+    val node = new LRNacrossNode;
+    node.dim = dim;
+    node.alpha = alpha;
+    node.beta = beta;
+    new LRNacrossLayer(net, node){inputs(0)=a;}
+  }
   
   def max(a:LayerTerm, b:LayerTerm)= {
     new MaxLayer(null){inputs(0) = a; inputs(1) = b;};

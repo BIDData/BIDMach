@@ -205,6 +205,14 @@ object Node {
     n
   }
   
+  def LRNacross(a:NodeTerm)(dim:Int=5, alpha:Float=1f, beta:Float=0.5f) = {
+    val n = new LRNacrossNode{inputs(0) = a};
+    n.dim = dim;
+    n.alpha = alpha;
+    n.beta = beta;
+    n
+  }
+  
   def lstm(h:NodeTerm, c:NodeTerm, i:NodeTerm, m:String)(opts:LSTMNodeOpts) = {
     val n = new LSTMNode;
     opts.copyOpts(n);
