@@ -160,7 +160,7 @@ case class Learner(
     }
     datasource.reset
     var istep = 0;
-    println("pass=%2d" format ipass)
+    myLogger.info("pass=%2d" format ipass)
     while (datasource.hasNext) {
       while (paused) Thread.sleep(10)
       val mats = datasource.next;
@@ -278,7 +278,7 @@ case class Learner(
     var lastp = 0f;
     val reslist = new ListBuffer[FMat]
     val samplist = new ListBuffer[Float]
-    println("Predicting")
+    myLogger.info("Predicting")
     datasource.reset
     while (datasource.hasNext) {
       val mats = datasource.next
