@@ -32,6 +32,7 @@ case class Learner(
     val datasink:DataSink,
     val opts:Learner.Options = new Learner.Options) extends Serializable {
 
+  var myLogger = Mat.consoleLogger;
   var results:FMat = null
   val dopts:DataSource.Opts = if (datasource != null) datasource.opts else null
   val mopts:Model.Opts	= model.opts
@@ -85,7 +86,10 @@ case class Learner(
   	val executor = Executors.newFixedThreadPool(nthreads);
   	val runner = new Runnable{
   	  def run() = {
-    	  train;    			
+  	    val tmp = myLogger;
+  	    myLogger = Mat.getFileLogger;
+    	  train;    	
+    	  myLogger = tmp;
     	}
   	}
   	executor.submit(runner);
@@ -185,17 +189,13 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        print("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+        myLogger.info("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
           100f*lastp,
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._2,
           nsamps/gf._2,
           gf._1,
-          bytes/gf._2*1e-6))
-        if (useGPU) {
-          print(", GPUmem=%3.6f" format GPUmem._1)
-        }
-        println;
+          bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else "");
         lasti = reslist.length;
       }
       if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
@@ -218,7 +218,7 @@ case class Learner(
     Mat.useGPUcache = cacheGPUstate;
     Mat.debugMem = debugMemState;
     Mat.debugCPUmem = debugCPUmemState;
-    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1))
+    myLogger.info("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats);
       model.clear;
@@ -293,24 +293,20 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep);
-        print("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
         		100f*lastp,
         		Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
         		gf._2,
         		nsamps/gf._2,
         		gf._1,
-        		bytes/gf._2*1e-6))
-        		if (useGPU) {
-        			print(", GPUmem=%3.6f" format GPUmem._1)
-        		}
-        println
-        lasti = reslist.length
+        		bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
+        lasti = reslist.length;
       }
     }
     val gf = gflop;
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
-    println("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
+    myLogger.info("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
       resetGPUs
