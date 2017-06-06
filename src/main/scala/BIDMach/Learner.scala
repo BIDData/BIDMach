@@ -934,11 +934,12 @@ object Learner {
   }
 
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
-    if (reslist.length == 0) return zeros(0, 0)
+    if (reslist.length == 0) return zeros(0, 0);
+    val len = reslist.length;
 
-    val out = FMat(reslist(0).nrows, reslist.length)
+    val out = FMat(reslist(0).nrows, len);
     var i = 0;
-    while (i < reslist.length) {
+    while (i < len) {
       val scoremat = reslist(i)
       out(?, i) = scoremat(?,0)
       i += 1
