@@ -84,7 +84,7 @@ case class Learner(
       case _ => 4;
     }
     val tmp = myLogger;
-//    myLogger = Mat.getFileLogger;
+    myLogger = Mat.getFileLogger;
   	val executor = Executors.newFixedThreadPool(nthreads);
   	val runner = new Runnable{
   	  def run() = {
