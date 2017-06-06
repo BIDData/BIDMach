@@ -236,9 +236,9 @@ case class Learner(
   }
   
   def getResults = {
-    def n = math.min(reslist.length, samplist.length);
     def top = Learner.scores2FMat(reslist);
     def bottom = row(samplist.toList);
+    def n = math.min(top.ncols, bottom.ncols);
     results = top(?,0->n) on bottom(?,0->n);  
     results;
   }
