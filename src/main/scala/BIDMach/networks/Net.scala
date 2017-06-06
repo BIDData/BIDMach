@@ -620,7 +620,7 @@ object Net  {
     (nn, opts)
   }
 
-  class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts;
 
   def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
   		                                                                  FileSource.simpleEnum(fn2,1,0)));
@@ -632,12 +632,11 @@ object Net  {
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
-    implicit val threads = threadPool(4);
     val ds = new FileSource(opts)
   	val nn = new Learner(
   			ds,
   	    new Net(opts),
-  	    Array(new L1Regularizer(opts)),
+  	    null,
   	    new ADAGrad(opts),
   	    null,
   	    opts)
@@ -762,7 +761,6 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
     opts.batchSize = 10000;
     opts.lrate = 1f;
     opts.fnames = fnames;
-    implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
         new FileSource(opts),
         opts, mkNetModel _,
