@@ -18,6 +18,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
   override def init(model0:Model) = {
     initGrad(model0);
     val nmats = modelmats.length;
+    sumSq = new Array[Mat](nmats);
     for (i <- 0 until nmats) {
     	sumSq(i) = modelmats(i).ones(modelmats(i).dims) *@ opts.initsumsq
     }
