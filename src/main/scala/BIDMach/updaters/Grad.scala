@@ -160,7 +160,7 @@ object Grad {
   trait Opts extends Updater.Opts {
   	var lrate:FMat = 1f;
     var texp:FMat = 0.5f;
-    var pexp:FMat = 0.5f;
+    var pexp:FMat = 0f;
     var waitsteps = 3;
     var mask:FMat = null;
     var policies:Array[(Float, Float, Float)=>Float] = null;

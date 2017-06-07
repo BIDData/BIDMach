@@ -54,13 +54,12 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     if (opts.pexp.asInstanceOf[AnyRef] != null) pe = mm.zeros(opts.pexp.nrows, opts.pexp.ncols);
     lrate = mm.zeros(opts.lrate.nrows, 1);
     mu = mm.zeros(1,1);
-    ve <-- opts.vexp;
-    te <-- opts.texp;
   } 
 
 	
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = { 
     val start = toc;
+    ve <-- opts.vexp;
     modelmats = model.modelmats;
     updatemats = model.updatemats;
     val nsteps = if (step == 0) 1f else {
@@ -71,12 +70,16 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Upda
     		step / firstStep;
     	}
     }
-    val tscale = if (opts.texp.asInstanceOf[AnyRef] != 0) {
+    val tscale = if (opts.texp.asInstanceOf[AnyRef] != null) {
+    	te <-- opts.texp;
     	stepn.set(1/(nsteps+1));
     	stepn ^ te;
-    } else {
+    } else if (opts.pexp.asInstanceOf[AnyRef] != null) {
+    	pe <-- opts.pexp;
     	stepn.set(1f/(ipass+1));
     	stepn ^ pe;
+    } else {
+      stepn.set(1f)
     }
     if (opts.gsq_decay >= 0){
     	stepn.set(1f - opts.gsq_decay);

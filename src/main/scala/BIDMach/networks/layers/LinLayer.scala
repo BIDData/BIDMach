@@ -35,6 +35,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   def initModelMat(nr:Int, nc:Int, initv:Float):Mat = {
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
+    	lr_scales(imodel+1) = opts.bias_scale;
     }
     if (opts.tmatShape != null) {
       val (y, x, h, w) = opts.tmatShape(nr, nc);
@@ -52,7 +53,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
   		val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
   		modelmats(imodel) = convertMat(initModelMat(outdim, modelcols, opts.initv));
-  		updatemats(imodel) = convertMat(initModelMat(outdim, modelcols, 0f));
+  		updatemats(imodel) = convertMat(modelmats(imodel).copy);
   		if (opts.hasBias) {
   			modelmats(imodel+1) = convertMat(zeros(outdim, 1));
   			updatemats(imodel+1) = convertMat(zeros(outdim, 1));
