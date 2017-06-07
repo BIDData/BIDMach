@@ -164,7 +164,6 @@ case class Learner(
     var istep = 0;
     myLogger.info("pass=%2d" format ipass)
     while (!done && datasource.hasNext) {
-      while (paused) Thread.sleep(10)
       val mats = datasource.next;
       nsamps += mats(0).ncols;
       here += datasource.opts.batchSize
@@ -175,6 +174,7 @@ case class Learner(
         if (opts.updateAll) {
           model.dobatchg(mats, ipass, here);
           if (mixins != null) mixins map (_ compute(mats, here));
+          while (paused) Thread.sleep(1000);
           if (updater != null) updater.update(ipass, here, gprogress);
         }
         val scores = model.evalbatchg(mats, ipass, here);
@@ -182,9 +182,10 @@ case class Learner(
         reslist.append(scores.newcopy)
         samplist.append(here)
       } else {
-        model.dobatchg(mats, ipass, here)
-        if (mixins != null) mixins map (_ compute(mats, here))
-        if (updater != null) updater.update(ipass, here, gprogress)
+        model.dobatchg(mats, ipass, here);
+        if (mixins != null) mixins map (_ compute(mats, here));
+        while (paused) Thread.sleep(1000);
+        if (updater != null) updater.update(ipass, here, gprogress);
       }
       if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
       istep += 1
