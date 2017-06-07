@@ -69,7 +69,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
         var i=0;
         var tot = 0.0
         while(i<updatemats.length){
-            tot+=sum(sum(updatemats(i)*@updatemats(i))).dv
+            tot+=sum(updatemats(i) dot updatemats(i)).dv
             i+=1
         }
         val scale=opts.max_grad_norm/max(sqrt(tot),opts.max_grad_norm).dv
@@ -153,6 +153,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  		modelmats(i) ~ modelmats(i) + grad;
 	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
 	  	}
+	  	updatemats(i).clear;
 	  }
 	  runningtime += toc - start;
 	}

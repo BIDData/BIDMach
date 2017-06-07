@@ -41,7 +41,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var batchSize = -1;
   var imodel = 0;
   var initialize = false;
-  var predict = false;
+  var predicting = false;
   
   def isInputNode(l:Node):Boolean = {
   		l match {
@@ -55,7 +55,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 //	  mats = datasource.next;
 	  var nfeats = mats(0).nrows;
 	  batchSize = mats(0).ncols;
-	  predict = opts.predict;
+	  predicting = opts.predict;
 	  targmap = if (opts.targmap.asInstanceOf[AnyRef] != null) convertMat(opts.targmap) else null;
 	  mask = if (opts.dmask.asInstanceOf[AnyRef] != null) convertMat(opts.dmask) else null;
 
@@ -206,7 +206,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   }
   
   def cleargrad {
-  	if (opts.aopts == null) {
+  	if (opts.aopts.asInstanceOf[AnyRef] == null) {
   		for (j <- 0 until updatemats.length) updatemats(j).clear;
   	}
   }
@@ -253,7 +253,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     	assignInputs(gmats, ipass, pos);
     	assignTargets(gmats, ipass, pos);
     	forward;
-    	cleargrad;
+//    	cleargrad;
     	setderiv();
     	backward(ipass, pos);
     	if (og_layers.asInstanceOf[AnyRef] != null) {
@@ -266,8 +266,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 
   def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {
   	if (batchSize < 0) batchSize = gmats(0).ncols;
-  	val tmppred = predict;
-  	predict = true;
+  	val tmppred = predicting;
+  	predicting = true;
   	if (batchSize == gmats(0).ncols) {
   		assignInputs(gmats, ipass, pos);
   		assignTargets(gmats, ipass, pos);
@@ -289,10 +289,10 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   				ogmats(i) = og_layers(i).output;
   			}
   		}
-  		predict = tmppred;
+  		predicting = tmppred;
   		scores;
   	} else {
-  	  predict = tmppred;
+  	  predicting = tmppred;
   	  zeros(score_layers.length, 1);
   	}
   }

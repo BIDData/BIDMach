@@ -139,6 +139,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	  	}
     	  }
     	}
+    	um.clear
     }
     runningtime += toc - start;
   }
