@@ -16,7 +16,6 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   var vel_decay:Array[Mat] = null;
   var stepn:Mat = null
   var mask:Mat = null
-  var ve:Mat = null
 	var te:Mat = null
 	var pe:Mat = null
 	var lrate:Mat = null
