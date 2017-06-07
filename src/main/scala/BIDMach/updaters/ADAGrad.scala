@@ -10,55 +10,23 @@ import jcuda.runtime.JCuda._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Updater {
+class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad {
   
-  var firstStep = 0f
-  var modelmats:Array[Mat] = null
-  var updatemats:Array[Mat] = null  
-  var sumSq:Array[Mat] = null 
-  var stepn:Mat = null
-  var mask:Mat = null
-  var vel_decay:Array[Mat] = null;
-  var ve:Mat = null
-  var pe:Mat = null
-  var te:Mat = null
-  var lrate:Mat = null
-  var mu:Mat = null
+	var sumSq:Array[Mat] = null
   var one:Mat = null
-  var randmat:Array[Mat] = null
 
   override def init(model0:Model) = {
-    model = model0
-    modelmats = model.modelmats;
-    updatemats = model.updatemats;
-    val mm = modelmats(0);
-    mask = opts.mask;
+    initGrad(model0);
     val nmats = modelmats.length;
-    sumSq = new Array[Mat](nmats);
-    val hasvel_decay = (opts.vel_decay.asInstanceOf[AnyRef] != null || opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null);
-    if (hasvel_decay) vel_decay = new Array[Mat](nmats);
     for (i <- 0 until nmats) {
-    	sumSq(i) = modelmats(i).ones(modelmats(i).nrows, modelmats(i).ncols) *@ opts.initsumsq
-      if (hasvel_decay) vel_decay(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
+    	sumSq(i) = modelmats(i).ones(modelmats(i).dims) *@ opts.initsumsq
     }
-    if (opts.langevin > 0) {
-    	randmat = new Array[Mat](nmats);
-    	for (i <- 0 until nmats) {
-    		randmat(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
-    	}
-    }
-    stepn = mm.zeros(1,1);
-    one = mm.ones(1,1);
-    ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols);
-    if (opts.texp.asInstanceOf[AnyRef] != null) te = mm.zeros(opts.texp.nrows, opts.texp.ncols);
-    if (opts.pexp.asInstanceOf[AnyRef] != null) pe = mm.zeros(opts.pexp.nrows, opts.pexp.ncols);
-    lrate = mm.zeros(opts.lrate.nrows, 1);
-    mu = mm.zeros(1,1);
   } 
 
 	
   override def update(ipass:Int, step:Long, gprogress:Float):Unit = { 
     val start = toc;
+    clipping()
     ve <-- opts.vexp;
     modelmats = model.modelmats;
     updatemats = model.updatemats;

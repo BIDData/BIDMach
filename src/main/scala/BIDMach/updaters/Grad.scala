@@ -12,7 +12,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
  
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null
-  var sumSq:Mat = null 
+//  var sumSq:Array[Mat] = null 
   var vel_decay:Array[Mat] = null;
   var stepn:Mat = null
   var mask:Mat = null
@@ -24,7 +24,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	var randmat:Array[Mat] = null
 	var norm_scaling:Mat = null
 
-  override def init(model0:Model) = {
+  def initGrad(model0:Model) = {
     model = model0;
 	  modelmats = model.modelmats;
 	  updatemats = model.updatemats;
@@ -36,26 +36,26 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     if (hasvel_decay) {
       vel_decay = new Array[Mat](nmats);
       for (i <- 0 until nmats) {
-    	  vel_decay(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
+    	  vel_decay(i) = modelmats(i).zeros(modelmats(i).dims);
       }
     }
     if (opts.langevin > 0) {
       randmat = new Array[Mat](nmats);
       for (i <- 0 until nmats) {
-        randmat(i) = modelmats(i).zeros(modelmats(i).nrows, modelmats(i).ncols);
+        randmat(i) = modelmats(i).zeros(modelmats(i).dims);
       }
     }
     if (opts.texp.asInstanceOf[AnyRef] != null) {
       te = mm.zeros(opts.texp.nrows, opts.texp.ncols);
-      te <-- opts.texp;
     }
     if (opts.pexp.asInstanceOf[AnyRef] != null) {
       pe = mm.zeros(opts.pexp.nrows, opts.pexp.ncols);
-      pe <-- opts.pexp;
     }
     lrate = mm.zeros(opts.lrate.nrows, 1);
     mu = mm.zeros(1,1);
   } 
+  
+  override def init(model0:Model) = initGrad(model0);
   
   def clipping() {
       if (opts.clipByValue>0f) {
@@ -85,7 +85,8 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   }
   
 	override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
-	    clipping()
+		val start = toc;
+	  clipping()
   	val nsteps = if (step == 0) 1f else {
   		if (firstStep == 0f) {
   			firstStep = step;
@@ -100,9 +101,11 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  for (i <- 0 until nmats) {
 		  val mm = modelmats(i);
       val tscale = if (te.asInstanceOf[AnyRef] != null) {
+      	te <-- opts.texp;
         stepn.set(1f/nsteps);
         stepn ^ te;
       } else {
+      	pe <-- opts.pexp;
         stepn.set(1f/(ipass+1));
         stepn ^ pe;
       }
@@ -152,6 +155,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
 	  	}
 	  }
+	  runningtime += toc - start;
 	}
 }
 
