@@ -27,7 +27,7 @@ class RandomMirrorLayer(override val net:Net, override val opts:RandomMirrorNode
   def setupInds = {
     val dims = inputData.dims;
     val w = dims(1);
-    mirrorInds = inputData.izeros(1, dims(3)).asInstanceOf[IMat];
+    mirrorInds = inputData.izeros(1, w).asInstanceOf[IMat];
     mirrorInds <-- irow((w-1) to 0 by -1);
     randomSelector = inputData.zeros(1, dims(3));
   }
@@ -61,7 +61,7 @@ class RandomMirrorLayer(override val net:Net, override val opts:RandomMirrorNode
 	}
   
   override def toString = {
-    "crop@"+Integer.toHexString(hashCode % 0x10000).toString
+    "randmirror@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
@@ -89,7 +89,7 @@ class RandomMirrorNode extends Node with RandomMirrorNodeOpts {
   override def create(net:Net):RandomMirrorLayer = {RandomMirrorLayer(net, this);}
   
   override def toString = {
-    "crop@"+Integer.toHexString(hashCode % 0x10000).toString
+    "randmirror@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
