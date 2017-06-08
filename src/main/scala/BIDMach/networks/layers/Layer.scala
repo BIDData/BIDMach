@@ -329,15 +329,21 @@ object Layer {
     new ConstantLayer(null, new ConstantNode{value = v;})
   }
   
-  def conv(a:LayerTerm)(name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
-      hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION, net:Net=null) = {
+  def conv(a:LayerTerm)(name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true, 
+      initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
+      initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+      convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION, net:Net=null) = {
     val str = stride;
     val pd = pad;
     val hb = hasBias;
     val mname = name;
+    val initf = initfn;
     val initv0 = initv;
+    val initbiasf = initbiasfn;
+    val initbiasv0 = initbiasv;
     val ct = convType;
-    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; initv=initv0; stride=str; pad=pd; hasBias=hb; convType=ct}){inputs(0)=a;};
+    new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; stride=str; pad=pd; hasBias=hb; 
+    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; convType=ct}){inputs(0)=a;};
   }
   
   def copy(a:LayerTerm) = new CopyLayer(null){inputs(0) = a;}
@@ -390,7 +396,9 @@ object Layer {
   
   def input = new InputLayer(null);
   
-  def linear(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, initv:Float = 1f, aopts:ADAGrad.Opts=null, 
+  def linear(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null,
+      initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
+      initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null, net:Net = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -398,8 +406,13 @@ object Layer {
     val mname = name;
     val tms = tmatShape;
     val wi = withInteractions;
+    val initf = initfn;
     val initv0 = initv;
-    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; initv=initv0; aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
+    val initbiasf = initbiasfn;
+    val initbiasv0 = initbiasv;
+    new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; 
+    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; 
+    aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
   }
   
   def ln(a:LayerTerm) = new LnLayer(null){inputs(0) = a};

@@ -112,15 +112,21 @@ object Node {
     new ConstantNode{value = v;}
   }
     
-  def conv(a:NodeTerm)(name:String="", w:Int, h:Int, nch:Int, initv:Float = 1f, stride:IMat = irow(1), pad:IMat = irow(1), 
-      hasBias:Boolean = true, convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
+  def conv(a:NodeTerm)(name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true, 
+      initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
+      initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+      convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
     val str = stride;
     val pd = pad;
     val hb = hasBias;
+    val initf = initfn;
     val initv0 = initv;
+    val initbiasf = initbiasfn;
+    val initbiasv0 = initbiasv;
     val mname = name;
     val ct = convType;
-    new ConvNode{inputs(0)=a; modelName=mname; kernel=irow(w,h); noutputs=nch; initv = initv0; stride=str; pad=pd; hasBias=hb; convType=ct}
+    new ConvNode{inputs(0)=a; modelName=mname; kernel=irow(w,h); noutputs=nch; stride=str; pad=pd; hasBias=hb; 
+    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; convType=ct}
   }
   
   def copy(a:NodeTerm) = new CopyNode{inputs(0) = a;}
@@ -176,16 +182,23 @@ object Node {
     new TensorFormatNode{inputs(0) = a; conversion = con; inputFormat = fmt;}
   }
   
-  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, initv:Float=1f,
-      withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
+  def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, withInteractions:Boolean=false, 
+      initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
+      initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+      tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
     val hBias = hasBias;
     val aaopts = aopts;
     val mname = name;
     val wi = withInteractions;
     val tms = tmatShape; 
+    val initf = initfn;
     val initv0 = initv;
-    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; initv=initv0; aopts=aaopts; withInteractions = wi; tmatShape = tms};
+    val initbiasf = initbiasfn;
+    val initbiasv0 = initbiasv;
+    new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; 
+    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; 
+    aopts=aaopts; withInteractions = wi; tmatShape = tms};
   }
   
   def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {

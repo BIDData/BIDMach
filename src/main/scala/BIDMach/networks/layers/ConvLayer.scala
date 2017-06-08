@@ -52,15 +52,20 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	ffilter = modelmats(imodel).asInstanceOf[Filter];   	
     	ffilter match {
     	  case aa:GFilter => aa.convType = opts.convType;
+    	  case _ => {}
     	}
     	updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
     	
-    	ffilter.xavier(opts.initv);
+    	opts.initfn(filter, opts.initv);
     	
     	val outDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
-    	val biasDim = irow(outDim(0), outDim(1), outDim(2), 1);
-    	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
-    	updatemats(imodel+1) = modelmats(imodel).zeros(biasDim);
+    	
+    	if (opts.hasBias) {
+    		val biasDim = irow(outDim(0), outDim(1), outDim(2), 1);
+    		modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
+    		updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
+    		opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
+    	}
     }
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
@@ -101,7 +106,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     val ndims = output.dims.length;
     
     if(opts.hasBias){
-      update_bias_mat ~ update_bias_mat + (deriv.sum(irow(ndims - 1)) / inputData.ncols);
+      update_bias_mat ~ update_bias_mat + deriv.sum(irow(ndims - 1));
     }
 
     if (inputDeriv.asInstanceOf[AnyRef] != null) {      
@@ -139,7 +144,10 @@ trait ConvNodeOpts extends ModelNodeOpts {
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
   var tensorFormat:Int = Net.UseNetFormat;
   var convType:Int = cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
+  var initfn:(Mat,Float)=>Mat = Net.xavier;
   var initv:Float = 1f;
+  var initbiasfn:(Mat,Float)=>Mat = Net.constant;
+  var initbiasv:Float = 0f;
 
   def copyOpts(opts:ConvNodeOpts):ConvNodeOpts = {
   		super.copyOpts(opts);
@@ -151,7 +159,10 @@ trait ConvNodeOpts extends ModelNodeOpts {
   		opts.dilation = dilation;
   		opts.tensorFormat = tensorFormat;
   		opts.convType = convType;
+  		opts.initfn = initfn;
   		opts.initv = initv;
+  		opts.initbiasfn = initbiasfn;
+  		opts.initbiasv = initbiasv;
   		opts;
   }
 

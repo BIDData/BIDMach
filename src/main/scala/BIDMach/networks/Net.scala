@@ -374,6 +374,12 @@ object Net  {
     var tensorFormat:Int = Net.TensorNHWC;
     var convType = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
   }
+   
+  final val UseNetFormat = 0;
+  final val TensorNCHW = 1;
+  final val TensorNHWC = 2;
+  
+  class Options extends Opts {}
 
   var defaultNodeList:List[Node] = null;
   
@@ -392,12 +398,28 @@ object Net  {
     defaultNodeList = null;
     nodeset;
   }
+  
+  def xavierFn(a:Mat, v:Float):Mat = {
+    normrnd(0, v/math.sqrt(a.nrows).toFloat, a);
+    a;
+  }
+  
+  def gaussianFn(a:Mat, v:Float):Mat = {
+    normrnd(0, v, a);
+    a;
+  } 
+   
+  def constantFn(a:Mat, v:Float):Mat = {
+    a.set(v);
+    a;
+  }
+      
+  final val xavier = xavierFn _;
+  
+  final val gaussian = gaussianFn _;
+  
+  final val constant = constantFn _;
 
-  class Options extends Opts {}
-
-  final val UseNetFormat = 0;
-  final val TensorNCHW = 1;
-  final val TensorNHWC = 2;
 
   def getCUDNNformat(layerFormat:Int, netFormat:Int):Int = {
     layerFormat match {

@@ -40,10 +40,9 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     if (opts.tmatShape != null) {
       val (y, x, h, w) = opts.tmatShape(nr, nc);
       val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
-      out.tiles.foreach((x:Mat) => {rand(x); x ~ x - 0.5f; x ~ x *@ opts.initv});
       out;
     } else {
-    	(rand(nr, nc) - 0.5f) *@ initv;
+    	zeros(nr, nc);
     }
   }
 
@@ -54,9 +53,11 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   		val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
   		modelmats(imodel) = convertMat(initModelMat(outdim, modelcols, opts.initv));
   		updatemats(imodel) = convertMat(modelmats(imodel).copy);
+  		opts.initfn(modelmats(imodel), opts.initv);
   		if (opts.hasBias) {
   			modelmats(imodel+1) = convertMat(zeros(outdim, 1));
   			updatemats(imodel+1) = convertMat(zeros(outdim, 1));
+  			opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
   		}
   	}
   	if (opts.aopts != null && !ADAinitialized) initADAGrad;
@@ -136,7 +137,10 @@ trait LinNodeOpts extends ModelNodeOpts {
   var outdim = 0;
   var tmatShape:(Int, Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
   var withInteractions = false;
+  var initfn:(Mat,Float)=>Mat = Net.xavier;
   var initv:Float = 1f;
+  var initbiasfn:(Mat,Float)=>Mat = Net.constant;
+  var initbiasv:Float = 0f;
   
   def copyOpts(opts:LinNodeOpts):LinNodeOpts = {
   		super.copyOpts(opts);
