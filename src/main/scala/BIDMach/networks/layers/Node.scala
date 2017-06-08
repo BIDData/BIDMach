@@ -127,10 +127,11 @@ object Node {
 
   def copy() = new CopyNode;
   
-  def crop(a:NodeTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1)) = {
+  def crop(a:NodeTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1), randoffsets:IMat=null) = {
     val csizes = sizes;
     val coffsets = offsets;
-    new CropNode{inputs(0) = a; sizes = csizes; offsets = coffsets};
+    val roffsets = randoffsets;
+    new CropNode{inputs(0) = a; sizes = csizes; offsets = coffsets; randoffsets = roffsets};
   }
   
   def dropout(a:NodeTerm)(frac:Float=0.5f) = new DropoutNode{inputs(0) = a; frac = frac}
