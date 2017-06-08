@@ -242,7 +242,7 @@ case class Learner(
   }
   
   def unpause = {
-    paused = true;
+    paused = false;
   }
   
   def stop = {

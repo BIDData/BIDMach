@@ -140,17 +140,20 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  		grad ~ grad *@ (lrate *@ tscale);
 	  		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
 	  			val i0 = if (opts.vel_decay.length > 1) i else 0;
-	  			mu <-- opts.vel_decay(i0);                           // Get the vel_decay decay rate
-	  			grad ~ grad + vel_decay(i);                          // Add vel_decay to the gradient
-	  			vel_decay(i) ~ grad *@ mu;                           // update vel_decay using the new gradient
+	  			mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
+	  			vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
+	  			vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
+	  			vel_decay(i) ~ vel_decay(i) + grad;
+	  			grad <-- vel_decay(i);
 	  		}
 	  		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
 	  			val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-	  			mu <-- opts.nesterov_vel_decay(i0);                           // Get the vel_decay decay rate
-	  			grad ~ grad + vel_decay(i);                          // Add vel_decay to the gradient
+	  			mu <-- opts.nesterov_vel_decay(i0);                           // Get the momentum decay rate
 	  			mm ~ mm - vel_decay(i);                              // A bit of algebra, remove old vel_decay from the model
-	  			vel_decay(i) ~ grad *@ mu;                           // Update the vel_decay
-	  			mm ~ mm + vel_decay(i);                              // Add the new vel_decay to the model;
+	  			vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
+	  			vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
+	  			vel_decay(i) ~ vel_decay(i) + grad;        	
+	  			mm ~ mm + vel_decay(i);                               // Add the new vel_decay to the model;
 	  		}
 	  		modelmats(i) ~ modelmats(i) + grad;
 	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
