@@ -126,12 +126,12 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
             }
             if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-              mu <-- opts.nesterov_vel_decay(i0);                  // Get the momentum decay rate
-              mm ~ mm - momentum(i);                               // A bit of algebra, remove old momentum from the model
-              momentum(i) ~ momentum(i) + grad;        	           // Memory-efficient version of p = mu * p + (1-mu) grad
-            	momentum(i) ~ momentum(i) *@ mu;                     // update momentum using the new gradient
-            	mm ~ mm + momentum(i);                               // Add the new momentum to the model;
-            	grad ~ momentum(i) / mu;
+              mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
+              momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
+              mm ~ mm - momentum(i);                               // Subtract mu * p_t-1 from the model
+              momentum(i) ~ momentum(i) + grad;        	           // p_t = mu * p_t-1 + g
+            	mm ~ mm + momentum(i);                               // Add p_t to the model;
+            	grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added. 
             }
             mm ~ mm + grad;                                        // Add full gradient to the model
     	  		if (mask != null) mm ~ mm *@ mask;
