@@ -685,8 +685,7 @@ __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq
       veval = (nve > 1) ? ve[irow] : ve[0];
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
-      denom = (veval == 0.5f) ? newss : powf(newss, veval*2);
-      denom = denom + eps;
+      denom = (veval == 0.5f) ? (newss + eps) : powf(newss + eps, veval*2);
       grad = (umval / denom);
       if (langevin > 0) grad += curand_normal(prstate) * langevin;
       mmval += grad * lrval * tsval;

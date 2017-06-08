@@ -244,6 +244,13 @@ case class Learner(
     results;
   }
   
+  def smoothResults(n:Int=10):FMat = {
+    getResults;
+    val b = zeros(n, results.ncols/n);
+    b(?) = results(0,0->b.length);
+    mean(b);
+  }
+  
   def plotResults(n:Int = 10) = {
     getResults;
     val b = zeros(n, results.ncols/n);
