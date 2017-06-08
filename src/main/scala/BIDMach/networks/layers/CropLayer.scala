@@ -25,7 +25,8 @@ import java.util.Random;
 class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropNode) extends Layer(net, opts) {
   var blockInds:Array[IMat] = null;
   var baseInds:Array[IMat] = null;
-  var offsets:Array[IMat] = null;
+  var roffset:IMat = null;
+  var offsets:IMat = null;
   var sizes:IMat = null;
   var random:Random = null;
   
@@ -35,21 +36,21 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
     random = new Random;
     blockInds = new Array[IMat](dims.length);
     baseInds = new Array[IMat](dims.length);
-    offsets = new Array[IMat](dims.length);
+    roffset = inputData.izeros(1,1).asInstanceOf[IMat];
+    offsets = izeros(1, dims.length)
     for (i <- 0 until dims.length) {
       blockInds(i) = if (opts.sizes(i) <= 0 || dims(i) - opts.sizes(i) <= 0) {
         ? 
       } else {
         val gap = dims(i) - opts.sizes(i);
-        val offset = if (opts.offsets.asInstanceOf[AnyRef] != null && opts.offsets(i) >= 0) {
+        offsets(i) = if (opts.offsets.asInstanceOf[AnyRef] != null && opts.offsets(i) >= 0) {
           math.min(opts.offsets(i), gap);
         } else {
           gap/2;
         }
-        net.convertMat(irow(offset->(offset + opts.sizes(i)))).asInstanceOf[IMat];
+        net.convertMat(irow(offsets(i)->(offsets(i) + opts.sizes(i)))).asInstanceOf[IMat];
       } 
       if (opts.sizes(i) > 0) baseInds(i) = net.convertMat(irow(0->opts.sizes(i))).asInstanceOf[IMat];
-      offsets(i) = inputData.izeros(1,1).asInstanceOf[IMat];
     }
   }
   
@@ -57,10 +58,14 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
   	val dims = inputData.dims;
   	for (i <- 0 until dims.length) {
   	  val gap = dims(i) - opts.sizes(i);
-      if (opts.randoffsets(i) > 0 && opts.sizes(i) > 0 && gap > 0) {
-        val ioff = math.max(0, math.min(gap-1, gap/2 + (opts.randoffsets(i) * (random.nextFloat() -0.5f)).toInt));
-        offsets(i).set(ioff);
-        blockInds(i) ~ baseInds(i) + offsets(i);
+      if (opts.randoffsets(i) > 0 && opts.sizes(i) > 0 && gap > 0) { 
+        if (net.predicting || opts.randoffsets.asInstanceOf[AnyRef] == null) {
+        	roffset.set(offsets(i));
+        } else {
+          val ioff = math.max(0, math.min(gap-1, gap/2 + (opts.randoffsets(i) * (random.nextFloat() -0.5f)).toInt)); 
+          roffset.set(ioff);
+        }
+        blockInds(i) ~ baseInds(i) + roffset;
       }
   	}
   }
@@ -73,7 +78,7 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
   		}
   		sizes(sizes.length-1) = inputData.ncols;
 			if (blockInds.asInstanceOf[AnyRef] == null) setupInds;
-			if (opts.randoffsets.asInstanceOf[AnyRef] != null) updateInds;
+			updateInds;
 			if (net.opts.tensorFormat == Net.TensorNHWC) {
 				blockInds.length match {
 				case 2 => output = inputData(blockInds(0), blockInds(1));
@@ -110,6 +115,7 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 	  blockInds = null;
     sizes = null;
     baseInds= null;
+    roffset = null;
     offsets = null;
 	}
   

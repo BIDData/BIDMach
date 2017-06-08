@@ -35,21 +35,26 @@ class RandomMirrorLayer(override val net:Net, override val opts:RandomMirrorNode
 	override def forward = {
   		val start = toc;
   		
-  		val dims = inputData.dims;
-			if (mirrorInds.asInstanceOf[AnyRef] == null) setupInds;
-			
-			val tformat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
-			val mirrored = if (tformat == Net.TensorNHWC) {
-				inputData(?, mirrorInds, ?, ?);
-			} else {
-			  val realshape = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
-			  realshape(mirrorInds, ?, ?, ?).reshapeView(dims);
-			}
-			mirrored ~ mirrored - inputData;
-			rand(randomSelector);
-			randomSelector ~ randomSelector < opts.prob;
-			mirrored ~ mirrored *@ randomSelector;
-			output = inputData + mirrored;
+  		createOutput;
+  		if (net.predicting) {
+  		  output <-- inputData;
+  		} else {
+  			val dims = inputData.dims;
+  			if (mirrorInds.asInstanceOf[AnyRef] == null) setupInds;
+
+  			val tformat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
+  			val mirrored = if (tformat == Net.TensorNHWC) {
+  				inputData(?, mirrorInds, ?, ?);
+  			} else {
+  				val realshape = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
+  				realshape(mirrorInds, ?, ?, ?).reshapeView(dims);
+  			}
+  			mirrored ~ mirrored - inputData;
+  			rand(randomSelector);
+  			randomSelector ~ randomSelector < opts.prob;
+  			mirrored ~ mirrored *@ randomSelector;
+  			output ~ inputData + mirrored;
+  		}
 
 			forwardtime += toc - start;
 	}
