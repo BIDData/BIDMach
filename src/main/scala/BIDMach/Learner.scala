@@ -236,6 +236,19 @@ case class Learner(
     done = true;
   }
   
+  def pause = {
+    paused = true;
+    Thread.sleep(500);
+  }
+  
+  def unpause = {
+    paused = true;
+  }
+  
+  def stop = {
+    done = true;
+  }
+  
   def getResults = {
     val top = Learner.scores2FMat(reslist);
     val bottom = row(samplist.toList);
