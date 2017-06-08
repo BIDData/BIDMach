@@ -92,10 +92,10 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	  case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
           if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
-            ADAGrad.ADAGradm(gmm, gum, gss, vel_decay(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+            ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           } else if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
             val mu = if (opts.nesterov_vel_decay.length > 1) opts.nesterov_vel_decay(i) else opts.nesterov_vel_decay(0);
-            ADAGrad.ADAGradn(gmm, gum, gss, vel_decay(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+            ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           } else {
         	  ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
           }
@@ -110,8 +110,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	  		val grad = ss ^ ve;
     	  		// if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
     	  		grad ~ grad + opts.epsilon;
-    	  		grad ~ um / grad;                                       // Normalized gradient
-            if (opts.langevin > 0) {                              // Add Langevin random permutations
+    	  		grad ~ um / grad;                                      // Normalized gradient
+            if (opts.langevin > 0) {                               // Add Langevin random permutations
               normrnd(0, opts.langevin, randmat(i));
               grad ~ grad + randmat(i);
             }
@@ -120,19 +120,18 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
             if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.vel_decay.length > 1) i else 0;
               mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
-              vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
-            	vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
-            	vel_decay(i) ~ vel_decay(i) + grad;
-            	grad <-- vel_decay(i);
+            	momentum(i) ~ momentum(i) *@ mu;                     // Memory-efficient version of p = mu * p + grad
+            	momentum(i) ~ momentum(i) + grad;
+            	grad <-- momentum(i);
             }
             if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
               val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-              mu <-- opts.nesterov_vel_decay(i0);                           // Get the momentum decay rate
-              mm ~ mm - vel_decay(i);                              // A bit of algebra, remove old vel_decay from the model
-              vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
-            	vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
-            	vel_decay(i) ~ vel_decay(i) + grad;        	
-              grad <-- vel_decay(i);                               // Add the new vel_decay to the model;
+              mu <-- opts.nesterov_vel_decay(i0);                  // Get the momentum decay rate
+              mm ~ mm - momentum(i);                               // A bit of algebra, remove old momentum from the model
+              momentum(i) ~ momentum(i) + grad;        	           // Memory-efficient version of p = mu * p + (1-mu) grad
+            	momentum(i) ~ momentum(i) *@ mu;                     // update momentum using the new gradient
+            	mm ~ mm + momentum(i);                               // Add the new momentum to the model;
+            	grad ~ momentum(i) / mu;
             }
             mm ~ mm + grad;                                        // Add full gradient to the model
     	  		if (mask != null) mm ~ mm *@ mask;

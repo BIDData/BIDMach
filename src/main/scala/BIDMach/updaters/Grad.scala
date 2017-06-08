@@ -13,7 +13,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   var modelmats:Array[Mat] = null
   var updatemats:Array[Mat] = null
 //  var sumSq:Array[Mat] = null 
-  var vel_decay:Array[Mat] = null;
+  var momentum:Array[Mat] = null;
   var stepn:Mat = null
   var mask:Mat = null
 	var te:Mat = null
@@ -35,9 +35,9 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     val nmats = modelmats.length;
     val hasvel_decay = (opts.vel_decay.asInstanceOf[AnyRef] != null || opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null);
     if (hasvel_decay) {
-      vel_decay = new Array[Mat](nmats);
+      momentum = new Array[Mat](nmats);
       for (i <- 0 until nmats) {
-    	  vel_decay(i) = modelmats(i).zeros(modelmats(i).dims);
+    	  momentum(i) = modelmats(i).zeros(modelmats(i).dims);
       }
     }
     if (opts.langevin > 0) {
@@ -140,20 +140,19 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  		grad ~ grad *@ (lrate *@ tscale);
 	  		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
 	  			val i0 = if (opts.vel_decay.length > 1) i else 0;
-	  			mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
-	  			vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
-	  			vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
-	  			vel_decay(i) ~ vel_decay(i) + grad;
-	  			grad <-- vel_decay(i);
+	  			mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
+	  			momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
+	  			momentum(i) ~ momentum(i) + grad;
+	  			grad <-- momentum(i);
 	  		}
 	  		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
 	  			val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-	  			mu <-- opts.nesterov_vel_decay(i0);                           // Get the momentum decay rate
-	  			mm ~ mm - vel_decay(i);                              // A bit of algebra, remove old vel_decay from the model
-	  			vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
-	  			vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
-	  			vel_decay(i) ~ vel_decay(i) + grad;        	
-	  			grad <-- vel_decay(i);                               // Add the new vel_decay to the model;
+	  			mu <-- opts.nesterov_vel_decay(i0);                 // Get the momentum decay rate
+	  			mm ~ mm - momentum(i);                              // A bit of algebra, remove old momentum from the model
+	  			momentum(i) ~ momentum(i) + grad;                   // Memory-efficient version of p = mu * p + mu grad
+	  			momentum(i) ~ momentum(i) *@ mu;
+	  			mm ~ mm + momentum(i);                              // Add the new momentum to the model;
+	  			grad ~ momentum(i) / mu;                              
 	  		}
 	  		modelmats(i) ~ modelmats(i) + grad;
 	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
