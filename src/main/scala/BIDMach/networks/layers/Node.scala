@@ -140,7 +140,10 @@ object Node {
     new CropNode{inputs(0) = a; sizes = csizes; offsets = coffsets; randoffsets = roffsets};
   }
   
-  def dropout(a:NodeTerm)(frac:Float=0.5f) = new DropoutNode{inputs(0) = a; frac = frac}
+  def dropout(a:NodeTerm)(frac:Float=0.5f) = {
+    val dfrac = frac;
+    new DropoutNode{inputs(0) = a; frac = dfrac}
+  }
   
   def efn(a:NodeTerm)(fwdfn:(Float)=>Float=null, bwdfn:(Float,Float,Float)=>Float=null) = {
     val fwd = fwdfn;

@@ -357,7 +357,8 @@ object Layer {
     new CropLayer(net, new CropNode{sizes = csizes; offsets = coffsets; randoffsets = roffsets}){inputs(0) = a;}
   }
   
-  def dropout(a:LayerTerm)(dfrac:Float=0.5f, net:Net=null) = {
+  def dropout(a:LayerTerm)(frac:Float=0.5f, net:Net=null) = {
+    val dfrac = frac;
     new DropoutLayer(net, new DropoutNode{frac = dfrac}){inputs(0) = a}
   }
   
