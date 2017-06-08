@@ -29,7 +29,7 @@ class RandomMirrorLayer(override val net:Net, override val opts:RandomMirrorNode
     val w = dims(1);
     mirrorInds = inputData.izeros(1, w).asInstanceOf[IMat];
     mirrorInds <-- irow((w-1) to 0 by -1);
-    randomSelector = inputData.zeros(1, dims(3));
+    randomSelector = inputData.zeros(1\1\1\dims(3));
   }
 
 	override def forward = {
