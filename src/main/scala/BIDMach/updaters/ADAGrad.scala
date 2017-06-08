@@ -132,7 +132,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
               vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
             	vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
             	vel_decay(i) ~ vel_decay(i) + grad;        	
-              mm ~ mm + vel_decay(i);                               // Add the new vel_decay to the model;
+              grad <-- vel_decay(i);                               // Add the new vel_decay to the model;
             }
             mm ~ mm + grad;                                        // Add full gradient to the model
     	  		if (mask != null) mm ~ mm *@ mask;

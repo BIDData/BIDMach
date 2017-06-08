@@ -153,7 +153,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  			vel_decay(i) ~ vel_decay(i) - grad;                   // Memory-efficient version of p = mu * p + (1-mu) grad
 	  			vel_decay(i) ~ vel_decay(i) *@ mu;                    // update vel_decay using the new gradient
 	  			vel_decay(i) ~ vel_decay(i) + grad;        	
-	  			mm ~ mm + vel_decay(i);                               // Add the new vel_decay to the model;
+	  			grad <-- vel_decay(i);                               // Add the new vel_decay to the model;
 	  		}
 	  		modelmats(i) ~ modelmats(i) + grad;
 	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
