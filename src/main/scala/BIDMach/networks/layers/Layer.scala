@@ -496,6 +496,11 @@ object Layer {
     new ScaleLayer(net, new ScaleNode{modelName = mname; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}   
   }
     
+  def randmirror(a:LayerTerm)(prob:Float=0.5f, net:Net=null) = {
+    val p = prob;
+    new RandomMirrorLayer(net, new RandomMirrorNode{prob=p;}){inputs(0) = a};
+  } 
+  
   def rect(a:LayerTerm)(inplace:Boolean=false) = {
     val inplac = inplace;
     new RectLayer(null, new RectNode{inplace=inplac;}){inputs(0) = a};

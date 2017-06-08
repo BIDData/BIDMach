@@ -296,6 +296,11 @@ object Node {
     new PoolingNode{inputs(0)=a; h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}; 
   }
   
+  def randmirror(a:NodeTerm)(prob:Float=0.5f) = {
+    val p = prob;
+    new RandomMirrorNode{inputs(0) = a; prob = p};
+  }
+   
   def rect(a:NodeTerm)(inplace:Boolean=false) = {
     val inplac = inplace;
     new RectNode{inputs(0) = a; inplace = inplac};

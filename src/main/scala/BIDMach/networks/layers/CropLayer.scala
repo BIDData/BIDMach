@@ -13,6 +13,7 @@ import edu.berkeley.bid.CUMACH
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
+import java.util.Random;
 
 
 /**
@@ -23,12 +24,17 @@ import BIDMach.networks._
 
 class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropNode) extends Layer(net, opts) {
   var blockInds:Array[IMat] = null;
+  var baseInds:Array[IMat] = null;
+  var offsets:Array[IMat] = null;
   var sizes:IMat = null;
+  var random:Random = null;
   
   def setupInds = {
     val dims = inputData.dims;
     if (dims.length != opts.sizes.length) throw new RuntimeException("CropLayer sizes param doesnt match input dimension");
+    random = new Random;
     blockInds = new Array[IMat](dims.length);
+    offsets = new Array[IMat](dims.length);
     for (i <- 0 until dims.length) {
       blockInds(i) = if (opts.sizes(i) <= 0 || dims(i) - opts.sizes(i) <= 0) {
         ? 
@@ -41,7 +47,21 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
         }
         net.convertMat(irow(offset->(offset + opts.sizes(i)))).asInstanceOf[IMat];
       } 
+      if (opts.sizes(i) > 0) baseInds(i) = net.convertMat(irow(0->opts.sizes(i))).asInstanceOf[IMat];
+      offsets(i) = inputData.izeros(1,1).asInstanceOf[IMat];
     }
+  }
+  
+  def updateInds = {
+  	val dims = inputData.dims;
+  	for (i <- 0 until dims.length) {
+  	  val gap = dims(i) - opts.sizes(i);
+      if (opts.randoffsets(i) > 0 && opts.sizes(i) > 0 && gap > 0) {
+        val ioff = math.max(0, math.min(gap-1, gap/2 + (opts.randoffsets(i) * (random.nextFloat() -0.5f)).toInt));
+        offsets(i).set(ioff);
+        blockInds(i) ~ baseInds(i) + offsets(i);
+      }
+  	}
   }
 
 	override def forward = {
@@ -52,6 +72,7 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
   		}
   		sizes(sizes.length-1) = inputData.ncols;
 			if (blockInds.asInstanceOf[AnyRef] == null) setupInds;
+			if (opts.randoffsets.asInstanceOf[AnyRef] != null) updateInds;
 			if (net.opts.tensorFormat == Net.TensorNHWC) {
 				blockInds.length match {
 				case 2 => output = inputData(blockInds(0), blockInds(1));
@@ -87,6 +108,8 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 	  clearMats;
 	  blockInds = null;
     sizes = null;
+    baseInds= null;
+    offsets = null;
 	}
   
   override def toString = {
@@ -97,10 +120,12 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 trait CropNodeOpts extends NodeOpts {
   var sizes:IMat = irow(3, 224, 224, 0);
   var offsets:IMat = irow(0, -1, -1, -1); 
+  var randoffsets:IMat = null;
   def copyOpts(opts:CropNodeOpts):CropNodeOpts = {
   		super.copyOpts(opts);
   		opts.sizes = sizes;
   		opts.offsets = offsets;
+  		opts.randoffsets = randoffsets;
   		opts;
   }
 }

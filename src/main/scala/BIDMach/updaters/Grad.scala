@@ -22,8 +22,10 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	var mu:Mat = null
 	var randmat:Array[Mat] = null
 	var norm_scaling:Mat = null
+	var tscale:Mat = null
 
   def initGrad(model0:Model) = {
+    firstStep = 0f;
     model = model0;
 	  modelmats = model.modelmats;
 	  updatemats = model.updatemats;
@@ -99,7 +101,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   	val lr0 = if (opts.policies.asInstanceOf[AnyRef] != null) opts.policies(0)(ipass, nsteps, gprogress) else 0;
 	  for (i <- 0 until nmats) {
 		  val mm = modelmats(i);
-      val tscale = if (te.asInstanceOf[AnyRef] != null) {
+      tscale = if (te.asInstanceOf[AnyRef] != null) {
       	te <-- opts.texp;
         stepn.set(1f/nsteps);
         stepn ^ te;
