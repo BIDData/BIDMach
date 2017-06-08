@@ -34,6 +34,7 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
     if (dims.length != opts.sizes.length) throw new RuntimeException("CropLayer sizes param doesnt match input dimension");
     random = new Random;
     blockInds = new Array[IMat](dims.length);
+    baseInds = new Array[IMat](dims.length);
     offsets = new Array[IMat](dims.length);
     for (i <- 0 until dims.length) {
       blockInds(i) = if (opts.sizes(i) <= 0 || dims(i) - opts.sizes(i) <= 0) {
