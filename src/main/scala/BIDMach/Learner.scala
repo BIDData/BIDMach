@@ -85,7 +85,7 @@ case class Learner(
       case _ => 4;
     }
     val tmp = myLogger;
-    myLogger = Mat.getFileLogger;
+    myLogger = Mat.getFileLogger(opts.logfile);
   	val executor = Executors.newFixedThreadPool(nthreads);
   	val runner = new Runnable{
   	  def run() = {
@@ -887,6 +887,7 @@ object Learner {
     var cumScore = 0;
     var checkPointFile:String = null;
     var checkPointInterval = 0f;
+    var logfile = "log.txt";
   }
 
   def numBytes(mat:Mat):Long = {
