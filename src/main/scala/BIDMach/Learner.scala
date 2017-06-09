@@ -110,8 +110,6 @@ case class Learner(
   }
   
   def train:Unit = retrain(true);
-  
-  def trainx():Unit = retrain(true);
 
   def retrain(doInit:Boolean) = {
     flip
@@ -150,7 +148,7 @@ case class Learner(
     cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;
+    Mat.useGPUcache = opts.useGPUcache;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
     flip;
@@ -903,6 +901,7 @@ object Learner {
   	var resFile:String = null;
   	var autoReset = true;
   	var useCache = true;
+  	var useGPUcache = true;
   	var updateAll = false;
   	var debugMem = false;
   	var debugCPUmem = false;
