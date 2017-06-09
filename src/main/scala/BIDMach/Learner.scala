@@ -15,6 +15,9 @@ import scala.collection.mutable.ListBuffer
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.util.logging.Level;
 
 //import scala.concurrent.Future
 //import scala.concurrent.ExecutionContext.Implicits.global
@@ -79,7 +82,7 @@ case class Learner(
     useGPU = model.useGPU;
   }
   
-  def launch = {
+  def launch(fn:()=>Unit) = {
     val nthreads = opts match {
       case mopts:FileSource.Opts => mopts.lookahead + 4;
       case _ => 4;
@@ -89,7 +92,11 @@ case class Learner(
   	val executor = Executors.newFixedThreadPool(nthreads);
   	val runner = new Runnable{
   	  def run() = {
-    	  train;    	
+  	    try {
+  	    	fn();
+  	    } catch {
+  	      case e:Throwable => myLogger.severe("Learner thread failed: %s" format Learner.printStackTrace(e));
+  	    }
     	  myLogger = tmp;
     	}
   	}
@@ -102,7 +109,9 @@ case class Learner(
     retrain(doInit)
   }
   
-  def train:Unit = retrain(true)
+  def train:Unit = retrain(true);
+  
+  def trainx():Unit = retrain(true);
 
   def retrain(doInit:Boolean) = {
     flip
@@ -965,6 +974,15 @@ object Learner {
       i += 1
     }
     out
+  }
+  
+  def printStackTrace(e:Throwable):String = {
+    val baos = new ByteArrayOutputStream();
+    val ps = new PrintStream(baos);
+    e.printStackTrace(ps);
+    val str = baos.toString();
+    ps.close();
+    str;
   }
 }
 
