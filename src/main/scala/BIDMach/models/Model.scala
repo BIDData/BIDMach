@@ -328,7 +328,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:FMat => GDMat(aa)
         	case aa:IMat => GIMat(aa)
         	case aa:DMat => GDMat(aa)
-        	case aa:BMat => GDMat(unsignedFloat(aa, null, true))
+        	case aa:BMat => GDMat(unsignedFloat(aa, true))
         	case aa:SMat => GSDMat(aa)
         	}
         } else {
@@ -339,7 +339,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:FMat => GMat(aa)
         	case aa:DMat => GMat(aa)
         	case aa:IMat => GIMat(aa)
-        	case aa:BMat => GMat(unsignedFloat(aa, null, true))
+        	case aa:BMat => GMat(unsignedFloat(aa, true))
         	case aa:SMat => GSMat(aa)
         	}
         }
@@ -352,7 +352,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SDMat => SDMat(aa);
         	case aa:IMat => IMat(aa);
         	case aa:LMat => LMat(aa);
-        	case aa:BMat => DMat(unsignedFloat(aa, null, true))
+        	case aa:BMat => DMat(unsignedFloat(aa,  true))
         	}
       	} else {
          	to(i) = from(i) match {
@@ -362,7 +362,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
         	case aa:SDMat => SMat(aa);
         	case aa:IMat => IMat(aa);
         	case aa:LMat => LMat(aa);
-        	case aa:BMat => unsignedFloat(aa, null, true);
+        	case aa:BMat => unsignedFloat(aa,  true);
         	}
       	}
       }
