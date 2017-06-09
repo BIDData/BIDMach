@@ -192,8 +192,26 @@ class ConvNode extends Node with ConvNodeOpts {
 
 object ConvLayer {
   
-  def apply(net:Net) = new ConvLayer(net, new ConvNode)
+  def apply(net:Net) = new ConvLayer(net, new ConvNode);
   
-  def apply(net:Net, opts:ConvNodeOpts) = new ConvLayer(net, opts)
+  def apply(net:Net, opts:ConvNodeOpts) = new ConvLayer(net, opts);
+  
+  def fieldArray(a:FMat, m:Int, n:Int, scale:Float = 100f, border:Int=1, isNCHW:Boolean = true):FMat = {
+    val c = a.dims(0);
+    val w = a.dims(1);
+    val h = a.dims(2);
+    val nn = a.dims(3);
+    val aa = if (isNCHW) {
+      FMat(a).fromNCHWtoNHWC;
+    } else {
+      FMat(a);
+    }
+    val bb = aa.reshapeView(c,w,h*n,m).transpose(0\1\3\2).reshapeView(c,w*m,h*n,1) * scale + 128;
+    val hinds = (irow(0->(h*n)).reshapeView(h,n) + irow(0->n)*border)(?);
+    val vinds = (irow(0->(w*m)).reshapeView(w,m) + irow(0->m)*border)(?);
+    val out = zeros(c\((w+border)*m)\((h+border)*n)\1);
+    out(?,hinds,vinds,?) = bb;
+    out;
+  }
 
 }
