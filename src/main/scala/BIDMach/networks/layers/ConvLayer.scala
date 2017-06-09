@@ -207,8 +207,8 @@ object ConvLayer {
       FMat(a);
     }
     val bb = aa.reshapeView(c,w,h*n,m).transpose(0\1\3\2).reshapeView(c,w*m,h*n,1) * scale + 128;
-    val hinds = (irow(0->(h*n)).reshapeView(h,n) + irow(0->n)*border)(?);
-    val vinds = (irow(0->(w*m)).reshapeView(w,m) + irow(0->m)*border)(?);
+    val hinds = (irow(0->(w*m)).reshapeView(w,m) + irow(0->m)*border)(?);
+    val vinds = (irow(0->(h*n)).reshapeView(h,n) + irow(0->n)*border)(?);
     val out = zeros(c\((w+border)*m)\((h+border)*n)\1);
     out(?,hinds,vinds,?) = bb;
     out;
