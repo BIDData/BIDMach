@@ -103,7 +103,10 @@ case class Learner(
   	fut = executor.submit(runner);
   	fut;
   }
-
+  
+  def launchTrain = {
+    launch(()=>this.train)
+  }
   
   def train(doInit:Boolean) = {
     retrain(doInit)

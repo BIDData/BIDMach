@@ -285,8 +285,8 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 				} else {
 					val hashdims = ND.hashInts(dims.data);
 					out match {
-					case a:FMat => FMat.newOrCheckFMat(dims, null, GUID, i, hashdims, "FileSource_FMat".##);
-					case a:IMat => IMat.newOrCheckIMat(dims, null, GUID, i, hashdims, "FileSource_IMat".##);
+					case a:FMat => FMat.newOrCheckFMat(dims, null, GUID, i, hashdims, "FileSource_FMat".##, true);
+					case a:IMat => IMat.newOrCheckIMat(dims, null, GUID, i, hashdims, "FileSource_IMat".##, true);
 					case a:DMat => DMat.newOrCheckDMat(dims, null, GUID, i, hashdims, "FileSource_DMat".##);
 					case a:BMat => BMat.newOrCheckBMat(dims, null, GUID, i, hashdims, "FileSource_BMat".##);
 					case a:SMat => SMat.newOrCheckSMat(dims(0), dims(1), a.nnz, null, GUID, i, hashdims, "FileSource_SMat".##);

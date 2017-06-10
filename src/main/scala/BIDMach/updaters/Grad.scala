@@ -123,10 +123,12 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 		  		lrate <-- opts.lrate;
 		  	}
 		  }
+      stepn.set(1f/model.gmats(0).ncols);
+      lrate ~ lrate *@ stepn;
     	val lr_scales = model.lr_scales;
     	if (lr_scales.asInstanceOf[AnyRef] != null) {
     	  lrate ~ lrate *@ lr_scales(i);
-    	}
+    	} 
 	  	if (opts.waitsteps < nsteps) {
         val grad = updatemats(i);
         if (opts.l2reg.asInstanceOf[AnyRef] != null) {
