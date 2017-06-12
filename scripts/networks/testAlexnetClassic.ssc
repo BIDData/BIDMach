@@ -1,0 +1,124 @@
+val traindir = "../../data/ImageNet/train/";
+val testdir = "../../data/ImageNet/test/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+val opts = new MyOpts;
+opts.fnames = List(FileSource.simpleEnum(traindata,1,0), FileSource.simpleEnum(trainlabels,1,0));
+val ds = new FileSource(opts);
+val net = new Net(opts);
+val grad = new Grad(opts);
+val nn = new Learner(ds, net, null, grad, null, opts);
+
+
+def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
+  val lr = if (ipass < 20) {
+      1e-2f
+  } else if (ipass < 40) {
+      1e-3f
+  } else 1e-4f;
+  lr
+}
+
+opts.logfile = "logc.txt";
+opts.batchSize= 128;
+//opts.nend = 40;
+opts.npasses = 90;
+opts.evalStep=31;
+opts.lrate = 1e-4f;
+opts.texp = 0f;
+opts.pexp = 0f;
+opts.pstep = 0.05f
+opts.hasBias = true;
+opts.l2reg = 0.0005f;
+opts.vel_decay=0.9f;
+//opts.clipByValue=10f;
+opts.policies=Array(lr_update _);
+opts.lookahead = 2;
+//opts.gsq_decay=0.999f;
+//opts.initsumsq = 0.01f;
+opts.tensorFormat = Net.TensorNCHW;
+opts.autoReset = false;
+val inplace = true;
+
+:silent
+
+val means = loadFMat(traindir+"means.fmat.lz4");
+
+{
+import BIDMach.networks.layers.Node._;
+val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
+
+Net.initDefaultNodeSet;
+
+val in =        input;
+val meanv =     const(means);
+val din =       in - meanv;
+//val scalef =    const(row(0.01f));
+//val sdin =      din *@ scalef;
+//val fin =       format(in)();
+val cin =       crop(din)(randoffsets=irow(0,32,32,-1));
+val min =       randmirror(cin)();
+
+val conv1a =    conv(min)(w=11,h=11,nch=48,stride=4,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);   
+val relu1a =    relu(conv1a)(inplace);
+val norm1a =    LRNwithin(relu1a)(dim=5,alpha=0.0001f,beta=0.75f);
+val pool1a =    pool(norm1a)(w=3,h=3,stride=2);
+val conv2a =    conv(pool1a)(w=5,h=5,nch=128,stride=1,pad=2,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
+
+val conv1b =    conv(min)(w=11,h=11,nch=48,stride=4,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);
+val relu1b =    relu(conv1b)(inplace);
+val norm1b =    LRNwithin(relu1b)(dim=5,alpha=0.0001f,beta=0.75f);
+val pool1b =    pool(norm1b)(w=3,h=3,stride=2);
+val conv2b =    conv(pool1b)(w=5,h=5,nch=128,stride=1,pad=2,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
+
+val conv2 =     conv2a over conv2b;
+val relu2 =     relu(conv2)(inplace);
+val norm2 =     LRNwithin(relu2)(dim=5,alpha=0.0001f,beta=0.75f);
+val pool2 =     pool(norm2)(w=3,h=3,stride=2);
+
+val conv3 =     conv(pool2)(w=3,h=3,nch=384,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=0f); 
+val relu3 =     relu(conv3)(inplace);
+val split =     splitvert(relu3)(2)
+
+val conv4a =    conv(split)(w=3,h=3,nch=192,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
+val relu4a =    relu(conv4a)(inplace);
+val conv5a =    conv(relu4a)(w=3,h=3,nch=128,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
+val relu5a =    relu(conv5a)(inplace);
+val pool5a =    pool(relu5a)(w=3,h=3,stride=2);
+
+val conv4b =    conv(split(1))(w=3,h=3,nch=192,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
+val relu4b =    relu(conv4b)(inplace);
+val conv5b =    conv(relu4b)(w=3,h=3,nch=128,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
+val relu5b =    relu(conv5b)(inplace);
+val pool5b =    pool(relu5b)(w=3,h=3,stride=2);
+
+val pool5 =     pool5a over pool5b;
+val fc6 =       linear(pool5)(outdim=4096,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
+val relu6 =     relu(fc6)(inplace);
+val drop6 =     dropout(relu6)(0.5f);
+
+val fc7 =       linear(drop6)(outdim=4096,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
+val relu7 =     relu(fc7)(inplace);
+val drop7 =     dropout(relu7)(0.5f);
+
+val fc8 =       linear(drop7)(outdim=1000,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
+val out =       softmaxout(fc8)(scoreType=1,lossType=1);
+
+opts.nodeset =  Net.getDefaultNodeSet
+
+}
+
+//nn.train;
+
+//val (mm, mopts) =  Net.predictor(net, testdata, testlabels);
+//mopts.autoReset = false;
+//mm.predict;
+
+//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+:silent
+
+
