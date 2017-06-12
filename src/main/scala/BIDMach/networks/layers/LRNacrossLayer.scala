@@ -49,7 +49,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
     val dim = opts.dim;
     val alpha = opts.alpha;
     val beta = opts.beta;
-    val lrnK = 2f;
+    val lrnK = opts.k;
     
     try {
       xDesc = new cudnnTensorDescriptor();
@@ -162,6 +162,7 @@ trait LRNacrossNodeOpts extends CompoundNodeOpts {
     var dim = 5;
     var alpha = 1f;
     var beta = 0.5f;
+    var k = 2f;
     var tensorFormat:Int = Net.UseNetFormat;
     
    def copyOpts(opts:LRNacrossNodeOpts):LRNacrossNodeOpts = {
@@ -169,6 +170,7 @@ trait LRNacrossNodeOpts extends CompoundNodeOpts {
   		opts.dim = dim;
   		opts.alpha = alpha;
   		opts.beta = beta;
+  		opts.k = k;
   		opts.tensorFormat = tensorFormat;
   		opts;
     }

@@ -20,7 +20,7 @@ val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
 opts.batchSize= 64
-opts.npasses = 10
+opts.npasses = 2
 
 opts.lrate = 1e-3f 
 opts.texp = 0.3f
@@ -40,7 +40,7 @@ val conv2 = conv(pool1)(w=5,h=5,nch=20,stride=1,pad=0,convType=convt);
 val pool2 = pool(conv2)(w=2,h=2,stride=2);
 
 val fc3 = linear(pool2)(outdim=500,initv=3e-2f);
-val relu3 = relu(fc3);
+val relu3 = relu(fc3)();
 
 val fc4 = linear(relu3)(outdim=10,initv=5e-2f);
 //val out = softmaxout(fc4)();

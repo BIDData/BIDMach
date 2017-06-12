@@ -441,11 +441,12 @@ object Layer {
     layer
   }
 
-  def LRNacross(a:LayerTerm)(dim:Int=5, alpha:Float=1f, beta:Float=0.5f, net:Net=null) = {
+  def LRNacross(a:LayerTerm)(dim:Int=5, alpha:Float=1f, beta:Float=0.5f, k:Float=2f, net:Net=null) = {
     val node = new LRNacrossNode;
     node.dim = dim;
     node.alpha = alpha;
     node.beta = beta;
+    node.k = k;
     new LRNacrossLayer(net, node){inputs(0)=a;}
   }
   

@@ -30,6 +30,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var input_nodes:Array[Node] = null;
   var output_nodes:Array[Node]= null;
   var score_nodes:Array[Node] = null;
+  var og_nodes:Array[Node] = null;
   var input_layers:Array[Layer] = null;
   var output_layers:Array[Layer] = null;
   var score_layers:Array[Layer] = null;
@@ -167,6 +168,13 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	input_layers = input_nodes.map(_.myLayer);
   	output_layers = output_nodes.map(_.myLayer);
   	score_layers = score_nodes.map(_.myLayer);
+  	og_layers = if (og_nodes.asInstanceOf[AnyRef] != null) {
+  	  ogmats = new Array[Mat](og_nodes.length);
+  		og_nodes.map(_.myLayer);
+  	} else {
+  		ogmats = new Array[Mat](output_layers.length);
+  	  output_layers;
+  	}
   }
 
   def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
