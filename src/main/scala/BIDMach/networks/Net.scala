@@ -288,9 +288,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   			}
   			layers(i).forward;
   		}
-  		val scores = zeros(score_layers.length, 1);
+  		val scores = zeros(score_layers.length, batchSize);
   		for (i <- 0 until score_layers.length) {
-  			scores(i) = score_layers(i).score.v;
+  			scores(i,?) = score_layers(i).score;
   		}
   		if (og_layers.asInstanceOf[AnyRef] != null) {
   			for (i <- 0 until og_layers.length) {

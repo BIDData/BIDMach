@@ -196,8 +196,7 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
   }
   
   def meval(in:Mat):FMat = {
-    val targs = targets * in
-    min(targs, 1f, targs)
+  	val targs = if (targets.asInstanceOf[AnyRef] != null) {val targs0 = targets * in; min(targs0, 1f, targs0); targs0} else null
     val alltargs = if (targmap.asInstanceOf[AnyRef] != null) targmap * targs else targs
     val dweights = if (iweight.asInstanceOf[AnyRef] != null) iweight * in else null
     meval3(in, alltargs, dweights)
@@ -208,7 +207,8 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
   // Evaluate the positive/negative factorizations
   
   def meval3(in:Mat, targ:Mat, dweights:Mat):FMat = {
-    val ftarg = full(targ)
+  	val ftarg = if (targ.asInstanceOf[AnyRef] != null) full(targ) else null;
+  	val targs = if (targmap.asInstanceOf[AnyRef] != null && ftarg.asInstanceOf[AnyRef] != null) targmap * ftarg else ftarg;    
     val vt1 = mm1 * in;
     var vt2:Mat = null;
     if (opts.dim2 > 0) {
@@ -229,11 +229,16 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
     }
     GLM.preds(eta, eta, mylinks, totflops);
     if (ogmats != null) ogmats(0) = eta;
-    val v = GLM.llfun(eta, ftarg, mylinks, totflops);
-    if (dweights.asInstanceOf[AnyRef] != null) {
-      FMat(sum(v ∘  dweights, 2) / sum(dweights));
+    
+    if (targs.asInstanceOf[AnyRef] != null) {
+    	val v = GLM.llfun(eta, targs, mylinks, totflops);
+    	if (dweights.asInstanceOf[AnyRef] != null) {
+    		FMat(sum(v ∘  dweights, 2) / sum(dweights));
+    	} else {
+    		FMat(mean(v, 2));
+    	}
     } else {
-      FMat(mean(v, 2));
+      row(0);
     }
   }
   
@@ -322,7 +327,6 @@ object FM {
     val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     nopts.links = mopts.links.copy;
-    nopts.putBack = 1;
     nopts.dim1 = mopts.dim1;
     nopts.dim2 = mopts.dim2;
     nopts.strictFM = mopts.strictFM;

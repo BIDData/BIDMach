@@ -906,7 +906,6 @@ object GLM {
     nopts.links = mopts.links
     mopts.links.set(d)
     nopts.batchSize = mopts.batchSize
-    nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
         new MatSource(Array(mat0, targ), mopts), 
@@ -1017,7 +1016,6 @@ object GLM {
     val model = model0.asInstanceOf[GLM]
     val nopts = new PredOptions;
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
-    nopts.putBack = 0
     val newmod = new GLM(nopts);
     newmod.refresh = false
     newmod.copyFrom(model);
@@ -1070,7 +1068,6 @@ object GLM {
     mopts.reg2weight = 1f
     nopts.links = mopts.links
     nopts.batchSize = mopts.batchSize
-    nopts.putBack = 1
     val model = new GLM(mopts)
     val mm = new Learner(
         new MatSource(Array(mat0, targ), mopts), 
@@ -1095,7 +1092,6 @@ object GLM {
     nopts.batchSize = math.min(10000, mat1.ncols/30 + 1)
     if (nopts.links == null) nopts.links = izeros(preds.nrows,1)
     nopts.links.set(3)
-    nopts.putBack = 1
     val nn = new Learner(
         new MatSource(Array(mat1, preds), nopts), 
         model.asInstanceOf[GLM], 

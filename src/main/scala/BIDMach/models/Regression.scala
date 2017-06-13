@@ -34,8 +34,10 @@ abstract class RegressionModel(override val opts:RegressionModel.Opts) extends M
       opts.targmap.nrows 
     } else if (opts.targets.asInstanceOf[AnyRef] != null) {
       opts.targets.nrows 
-    } else {
+    } else if (refresh) {
       mats(1).nrows  
+    } else {
+      modelmats(0).nrows;
     }
     val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
     sp = sdat / sum(sdat)

@@ -182,7 +182,8 @@ case class Learner(
           while (paused) Thread.sleep(1000);
           if (updater != null) updater.update(ipass, here, gprogress);
         }
-        val scores = model.evalbatchg(mats, ipass, here);
+        val tmpscores = model.evalbatchg(mats, ipass, here);
+        val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
         if (datasink != null) datasink.put;
         reslist.append(scores.newcopy)
         samplist.append(here)
@@ -312,7 +313,8 @@ case class Learner(
       here += datasource.opts.batchSize
       bytes += mats.map(Learner.numBytes _).reduce(_+_);
       nsamps += mats(0).ncols;
-      val scores = model.evalbatchg(mats, 0, here);
+      val tmpscores = model.evalbatchg(mats, 0, here);
+      val scores = if (tmpscores.ncols > 1) mean(tmpscores,2) else tmpscores;
       if (datasink != null) datasink.put
       reslist.append(scores.newcopy);
       samplist.append(here);
@@ -562,7 +564,20 @@ case class ParLearner(
       Learner.toCPU(models(0).modelmats)
       resetGPUs
     }
-    println("Time=%5.4f secs, gflops=%4.2f, samples=%4.2g, MB/sec=%4.2g" format (gf._2, gf._1, 1.0*opts.nthreads*here, bytes/gf._2/1e6))
+    val perfStr = ("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+    		           100f*lastp,
+    		           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
+    		           gf._1,
+    		           gf._2,
+    		           bytes*1e9,
+    		           bytes/gf._2*1e-6));
+    val gpuStr = if (useGPU) {
+    	             (0 until math.min(opts.nthreads, Mat.hasCUDA)).map((i)=>{
+    	            	 setGPU(i);
+    	            	 if (i==0) (", GPUmem=%3.2f" format GPUmem._1) else (", %3.2f" format GPUmem._1)
+    	             });
+    } else "";
+    myLogger.info(perfStr + gpuStr);
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
 

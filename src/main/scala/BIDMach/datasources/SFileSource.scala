@@ -60,7 +60,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     val omat = omat0.asInstanceOf[SMat]
     val ioff = Mat.ioneBased
     var idone = done
-    var innz = omat.nnz
+    var onnz = 0;//omat.nnz
     val lims = fcounts
     val nfiles = fcounts.length
     val addConstFeat = opts.addConstFeat
@@ -73,7 +73,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
         val mat = inmat(j).asInstanceOf[SMat];
         var k = mat.jc(icol) - ioff;
         var lastk = mat.jc(icol+1) - ioff;
-        val xoff = innz - k;
+        val xoff = onnz - k;
  //       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
         while (k < lastk && mat.ir(k)-ioff < lims(j)) {
           if (xoff + k >= omat.ir.length) {
@@ -89,19 +89,19 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
           }
           k += 1;
         }
-        innz = xoff + k
+        onnz = xoff + k
         j += 1
       }
       icol += 1
       idone += 1
       if (addConstFeat) {
-        omat.ir(innz) = omat.nrows - 1 + ioff
-        omat.data(innz) = 1
-        innz += 1
+        omat.ir(onnz) = omat.nrows - 1 + ioff
+        omat.data(onnz) = 1
+        onnz += 1
       }
-      omat.jc(idone) = innz + ioff
+      omat.jc(idone) = onnz + ioff
     }
-    omat.nnz0 = innz
+    omat.nnz0 = onnz
     omat    
   }
   

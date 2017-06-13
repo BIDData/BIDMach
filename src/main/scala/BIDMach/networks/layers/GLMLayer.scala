@@ -47,7 +47,7 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 
 	override def score:FMat = { 
 			val v = if (target.asInstanceOf[AnyRef] != null) GLM.llfun(output, target, ilinks, totflops) else row(0);
-			FMat(mean(mean(v, 2)));
+			FMat(mean(v));
 	}
 	
 	override def clear = {
