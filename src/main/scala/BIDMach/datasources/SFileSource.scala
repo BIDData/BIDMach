@@ -70,39 +70,39 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
     while (icol < endcol) {
       var j = 0;
       while (j < nfiles) {
-        val mat = inmat(j).asInstanceOf[SMat];
-        var k = mat.jc(icol) - ioff;
-        var lastk = mat.jc(icol+1) - ioff;
-        val xoff = onnz - k;
- //       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
-        while (k < lastk && mat.ir(k)-ioff < lims(j)) {
-          if (xoff + k >= omat.ir.length) {
-            throw new RuntimeException("SFileSource index out of range. Try increasing opts.eltsPerSample");
-          }
-          omat.ir(xoff + k) = mat.ir(k) + offsets(j);
-          omat.data(xoff + k) = if (featType == 0) {
-            1f;
-          } else if (featType == 1) {
-            mat.data(k) ;
-          } else {
-            if (mat.data(k).toDouble >= threshold.dv) 1f else 0f;       
-          }
-          k += 1;
-        }
-        onnz = xoff + k
-        j += 1
+      	val mat = inmat(j).asInstanceOf[SMat];
+      	var k = mat.jc(icol) - ioff;
+      	var lastk = mat.jc(icol+1) - ioff;
+      	val xoff = onnz - k;
+      	//       println("here %d %d %d %d %d" format (k, mat.nrows, mat.ncols, lims.length, j))
+      	while (k < lastk && mat.ir(k)-ioff < lims(j)) {
+      		if (xoff + k >= omat.ir.length) {
+      			throw new RuntimeException("SFileSource index out of range. Try increasing opts.eltsPerSample");
+      		}
+      		omat.ir(xoff + k) = mat.ir(k) + offsets(j);
+      		omat.data(xoff + k) = if (featType == 0) {
+      			1f;
+      		} else if (featType == 1) {
+      			mat.data(k) ;
+      		} else {
+      			if (mat.data(k).toDouble >= threshold.dv) 1f else 0f;       
+      		}
+      		k += 1;
+      	}
+      	onnz = xoff + k;
+      	j += 1;
       }
-      icol += 1
-      idone += 1
+      icol += 1;
+      idone += 1;
       if (addConstFeat) {
-        omat.ir(onnz) = omat.nrows - 1 + ioff
-        omat.data(onnz) = 1
-        onnz += 1
+        omat.ir(onnz) = omat.nrows - 1 + ioff;
+        omat.data(onnz) = 1;
+        onnz += 1;
       }
-      omat.jc(idone) = onnz + ioff
+      omat.jc(idone) = onnz + ioff;
     }
-    omat.nnz0 = onnz
-    omat    
+    omat.nnz0 = onnz;
+    omat; 
   }
   
   def spmax(matq:Array[Mat]):Int = {

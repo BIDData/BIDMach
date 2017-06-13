@@ -27,15 +27,6 @@ abstract class FactorModel(override val opts:FactorModel.Opts) extends Model(opt
     	modelmats(0) = modelmat;
     }
     modelmats(0) = convertMat(modelmats(0));
-    
-    if (datasource.opts.putBack > 0) {
-      while (datasource.hasNext) {
-        mats = datasource.next
-        val dmat = mats(datasource.opts.putBack)
-        dmat.set(1.0f/d)
-        datasource.putBack(mats,datasource.opts.putBack)
-      }
-    }
   } 
   
   

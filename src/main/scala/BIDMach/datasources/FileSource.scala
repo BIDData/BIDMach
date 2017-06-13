@@ -317,29 +317,23 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
 object FileSource {
 
   def apply(opts:FileSource.Opts, nthreads:Int):FileSource = {
-    implicit val ec = threadPool(nthreads);
     new FileSource(opts);
   }
 
   def apply(opts:FileSource.Opts):FileSource = apply(opts, 4);
 
-  def apply(fname:String, opts:FileSource.Opts, nthreads:Int):FileSource = {
+  def apply(fname:String, opts:FileSource.Opts):FileSource = {
     opts.fnames = List(simpleEnum(fname, 1, 0));
-    implicit val ec = threadPool(nthreads);
     new FileSource(opts);
   }
 
-  def apply(fname:String, opts:FileSource.Opts):FileSource = apply(fname, opts, 4);
 
-  def apply(fname:String):FileSource = apply(fname, new FileSource.Options, 4);
+  def apply(fname:String):FileSource = apply(fname, new FileSource.Options);
 
-  def apply(fn1:String, fn2:String, opts:FileSource.Opts, nthreads:Int) = {
+  def apply(fn1:String, fn2:String, opts:FileSource.Opts) = {
     opts.fnames = List(simpleEnum(fn1, 1, 0), simpleEnum(fn2, 1, 0));
-    implicit val ec = threadPool(nthreads);
     new FileSource(opts);
   }
-
-  def apply(fn1:String, fn2:String, opts:FileSource.Opts):FileSource = apply(fn1, fn2, opts, 4);
 
   def encodeDate(yy:Int, mm:Int, dd:Int, hh:Int) = (((12*yy + mm) * 31) + dd)*24 + hh
 
