@@ -1,12 +1,12 @@
-val dir = "../data/uci/"
+val dir = "../data/uci/";
 
-val (nn, opts) = LDA.learner(dir + "pubmed_parts/part%02d.smat.lz4", 256);
+val (nn,opts)=LDA.learner(dir + "pubmed_parts/part%02d.smat.lz4", 256);
 
+opts.batchSize = 10000;
 opts.nend = 9;
-opts.eltsPerSample = 400
-
-opts.batchSize = 20000;
+opts.eltsPerSample = 400;
 opts.npasses = 3;
+
 
 val dict = Dict(loadSBMat(dir+"pubmed.term.sbmat.gz"))
 
