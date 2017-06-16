@@ -96,6 +96,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   			step / firstStep;
   		}
   	}
+	  val batchSize = model.gmats(0).ncols;
   	val nmats = updatemats.length;
 	  //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
   	val lr0 = if (opts.policies.asInstanceOf[AnyRef] != null) opts.policies(0)(ipass, nsteps, gprogress) else 0;
@@ -123,6 +124,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 		  		lrate <-- opts.lrate;
 		  	}
 		  }
+      lrate ~ lrate / batchSize;
     	val lr_scales = model.lr_scales;
     	if (lr_scales.asInstanceOf[AnyRef] != null) {
     	  lrate ~ lrate *@ lr_scales(i);
@@ -131,7 +133,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
         val grad = updatemats(i);
         if (opts.l2reg.asInstanceOf[AnyRef] != null) {
         	val i0 = if (opts.l2reg.length > 1) i else 0;
-        	grad ~ grad - (mm *@ opts.l2reg(i0));
+        	grad ~ grad - (mm *@ (opts.l2reg(i0) * batchSize));
         }
         if (opts.langevin > 0) {                              // Add Langevin random permutations
         	normrnd(0, opts.langevin, randmat(i));

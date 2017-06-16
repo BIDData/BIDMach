@@ -195,7 +195,6 @@ case class Learner(
         while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
         if (updater != null) updater.update(ipass, here, gprogress);
       }
-      if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
       istep += 1
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
