@@ -50,6 +50,7 @@ case class Learner(
   var paused = false;
   var pauseAt = -1L;
   var ipass = 0;
+  var istep = 0;
   var here = 0L;
   var lasti = 0;
   var bytes = 0L;
@@ -167,7 +168,7 @@ case class Learner(
       datasource.asInstanceOf[IteratorSource].opts.iter = iter;
     }
     datasource.reset
-    var istep = 0;
+    istep = 0;
     myLogger.info("pass=%2d" format ipass)
     while (!done && datasource.hasNext) {
       val mats = datasource.next;
