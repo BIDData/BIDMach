@@ -48,6 +48,7 @@ case class Learner(
   var lastCheckPoint = 0;
   var done = false;
   var paused = false;
+  var pauseAt = -1L;
   var ipass = 0;
   var here = 0L;
   var lasti = 0;
@@ -179,7 +180,7 @@ case class Learner(
         if (opts.updateAll) {
           model.dobatchg(mats, ipass, here);
           if (mixins != null) mixins map (_ compute(mats, here));
-          while (paused) Thread.sleep(1000);
+          while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
           if (updater != null) updater.update(ipass, here, gprogress);
         }
         val tmpscores = model.evalbatchg(mats, ipass, here);
@@ -190,7 +191,7 @@ case class Learner(
       } else {
         model.dobatchg(mats, ipass, here);
         if (mixins != null) mixins map (_ compute(mats, here));
-        while (paused) Thread.sleep(1000);
+        while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
         if (updater != null) updater.update(ipass, here, gprogress);
       }
       if (datasource.opts.putBack >= 0) datasource.putBack(mats, datasource.opts.putBack)
@@ -936,6 +937,7 @@ object Learner {
     var cumScore = 0;
     var checkPointFile:String = null;
     var checkPointInterval = 0f;
+    var pauseAt = -1L;
     var logfile = "log.txt";
   }
   
