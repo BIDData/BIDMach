@@ -182,9 +182,8 @@ object LDA  {
     val opts = new FileOpts
     opts.dim = d
     opts.fnames = fnames
-    opts.batchSize = 100000;
+    opts.batchSize = 10000;
     opts.eltsPerSample = 500;
-    implicit val threads = threadPool(4)
   	val nn = new Learner(
   	    new SFileSource(opts), 
   	    new LDA(opts), 
