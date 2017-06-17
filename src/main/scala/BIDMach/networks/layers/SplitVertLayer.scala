@@ -40,15 +40,15 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 		  		case 2 =>	setOutput(i, inputData(colranges(i), ?));
 		  		case 3 =>	{
 		  			val indat = inputData.reshapeView(dims(1), dims(0), dims(2));
-		  		  setOutput(i, indat(?, colranges(i), ?).reshapeView(dims));
+		  		  setOutput(i, indat(?, colranges(i), ?).reshapeView(nblock, dims(1), dims(2)));
 		  		}
 		  		case 4 =>	{
 		  			val indat = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
-		  		  setOutput(i, indat(?, ?, colranges(i), ?).reshapeView(dims));	  		
+		  		  setOutput(i, indat(?, ?, colranges(i), ?).reshapeView(nblock, dims(1), dims(2), dims(3)));	  		
 		  		}
 		  		case 5 =>	{
 		  			val indat = inputData.reshapeView(dims(1), dims(2), dims(3), dims(0), dims(4));
-		  		  setOutput(i, indat(?, ?, ?, colranges(i), ?).reshapeView(dims));
+		  		  setOutput(i, indat(?, ?, ?, colranges(i), ?).reshapeView(nblock, dims(1), dims(2), dims(3), dims(4)));
 		  		}
 		  		}
 		  	} else {
