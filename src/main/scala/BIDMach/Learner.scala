@@ -416,8 +416,8 @@ case class ParLearner(
     mm = new Array[Mat](mml)
     for (i <- 0 until mml) {
     	val mm0 = models(0).modelmats(i)
-    	mm(i) = zeros(mm0.nrows, mm0.ncols)
-    	um(i) = zeros(mm0.nrows, mm0.ncols)
+    	mm(i) = zeros(mm0.dims)
+    	um(i) = zeros(mm0.dims)
     }
     ParLearner.syncmodels(models, mm, um, 0, useGPU)
   }
