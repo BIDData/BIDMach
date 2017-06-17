@@ -24,14 +24,11 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
   
   override def forward = {
 		  val start = toc;
+		  val dims = inputData.dims;
 		  if (output.asInstanceOf[AnyRef] == null) {
 		  	if (net.asInstanceOf[AnyRef] != null) tensorFormat = net.opts.tensorFormat;
-		    ndims = inputData.dims.length;
-			  nblock = if (tensorFormat == Net.TensorNCHW) {
-			    inputData.dims(ndims-2) / opts.nparts;
-			  } else {
-			    inputData.dims(0) / opts.nparts
-			  }
+		    ndims = dims.length;
+			  nblock = dims(0) / opts.nparts;
 			  for (i <- 0 until opts.nparts) {		    
 				  colranges(i) = inputData.izeros(1, nblock).asInstanceOf[IMat];
 				  colranges(i) <-- icol((i*nblock)->((i+1)*nblock));
@@ -41,9 +38,18 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 		  	if (tensorFormat == Net.TensorNCHW) {
 		  		ndims match {
 		  		case 2 =>	setOutput(i, inputData(colranges(i), ?));
-		  		case 3 =>	setOutput(i, inputData(?, colranges(i), ?));
-		  		case 4 =>	setOutput(i, inputData(?, ?, colranges(i), ?));
-		  		case 5 =>	setOutput(i, inputData(?, ?, ?, colranges(i), ?));
+		  		case 3 =>	{
+		  			val indat = inputData.reshapeView(dims(1), dims(0), dims(2));
+		  		  setOutput(i, indat(?, colranges(i), ?).reshapeView(dims));
+		  		}
+		  		case 4 =>	{
+		  			val indat = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
+		  		  setOutput(i, indat(?, ?, colranges(i), ?).reshapeView(dims));	  		
+		  		}
+		  		case 5 =>	{
+		  			val indat = inputData.reshapeView(dims(1), dims(2), dims(3), dims(0), dims(4));
+		  		  setOutput(i, indat(?, ?, ?, colranges(i), ?).reshapeView(dims));
+		  		}
 		  		}
 		  	} else {
 		  		ndims match {
@@ -60,14 +66,24 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 
   override def backward = {
 		  val start = toc;
+		  val dims = inputData.dims;
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			  for (i <- 0 until opts.nparts) {
 			  	if (tensorFormat == Net.TensorNCHW) {
 			  		ndims match {
 			  		case 2 => inputDeriv(colranges(i), ?) = inputDeriv(colranges(i), ?) + derivs(i);
-			  		case 3 => inputDeriv(?, colranges(i), ?) = inputDeriv(?, colranges(i), ?) + derivs(i);
-			  		case 4 => inputDeriv(?, ?, colranges(i), ?) = inputDeriv(?, ?, colranges(i), ?) + derivs(i);
-			  		case 5 => inputDeriv(?, ?, ?, colranges(i), ?) = inputDeriv(?, ?, ?, colranges(i), ?) + derivs(i);
+			  		case 3 => {
+			  			val indat = inputData.reshapeView(dims(1), dims(0), dims(2));
+			  		  indat(?, colranges(i), ?) = indat(?, colranges(i), ?) + derivs(i).reshapeView(dims(1), nblock, dims(2));
+			  		}
+			  		case 4 => {
+			  			val indat = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
+			  		  indat(?, ?, colranges(i), ?) = indat(?, ?, colranges(i), ?) + derivs(i).reshapeView(dims(1), dims(2), nblock, dims(3));
+			  		}
+			  		case 5 => {
+			  			val indat = inputData.reshapeView(dims(1), dims(2), dims(3), dims(0), dims(4));
+			  		  indat(?, ?, ?, colranges(i), ?) = indat(?, ?, ?, colranges(i), ?) + derivs(i).reshapeView(dims(1), dims(2), dims(3), nblock, dims(4));
+			  		}
 			  		}
 			  	} else {
 			  		ndims match {
@@ -88,7 +104,7 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
   }
   
   override def toString = {
-    "splitverte@"+Integer.toHexString(hashCode % 0x10000).toString
+    "splitvert@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
@@ -103,7 +119,7 @@ class SplitVertNode extends Node with SplitVertNodeOpts {
   override def create(net:Net):SplitVertLayer = {SplitVertLayer(net, this);}
   
   override def toString = {
-    "splitverte@"+Integer.toHexString(hashCode % 0x10000).toString
+    "splitvert@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
