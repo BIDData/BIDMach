@@ -786,6 +786,11 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
 
   def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)))}
 
+  def learnPar(fn1:String, fn2:String, mkUpdate:(Updater.Opts)=>Updater = mkUpdater _):(ParLearnerF, LearnParOptions) = {
+    learnPar(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)), mkUpdate)
+    }
+
+ 
   def learnPar(fnames:List[(Int) => String], mkUpdate:(Updater.Opts)=>Updater = mkUpdater _):(ParLearnerF, LearnParOptions) = {
     val opts = new LearnParOptions;
     opts.batchSize = 10000;
