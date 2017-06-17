@@ -7,8 +7,7 @@ val testlabels = testdir+"label%04d.imat.lz4";
 
 class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
 val opts = new MyOpts;
-opts.fnames = List(FileSource.simpleEnum(traindata,1,0), FileSource.simpleEnum(trainlabels,1,0));
-val ds = new FileSource(opts);
+val ds = FileSource(traindata, trainlabels, opts);
 val net = new Net(opts);
 val grad = new Grad(opts);
 val nn = new Learner(ds, net, null, grad, null, opts);
@@ -25,23 +24,15 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 
 opts.logfile = "logc.txt";
 opts.batchSize= 128;
-//opts.nend = 40;
 opts.npasses = 90;
-opts.evalStep=31;
-opts.lrate = 1e-4f;
 opts.texp = 0f;
-opts.pexp = 0f;
 opts.pstep = 0.05f
 opts.hasBias = true;
 opts.l2reg = 0.0005f;
 opts.vel_decay=0.9f;
-//opts.clipByValue=10f;
-opts.policies=Array(lr_update _);
+opts.policy = lr_update _;
 opts.lookahead = 2;
-//opts.gsq_decay=0.999f;
-//opts.initsumsq = 0.01f;
 opts.tensorFormat = Net.TensorNCHW;
-opts.autoReset = false;
 val inplace = true;
 
 :silent
@@ -87,16 +78,15 @@ val split =     splitvert(relu3)(2)
 val conv4a =    conv(split)(w=3,h=3,nch=192,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
 val relu4a =    relu(conv4a)(inplace);
 val conv5a =    conv(relu4a)(w=3,h=3,nch=128,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
-val relu5a =    relu(conv5a)(inplace);
-val pool5a =    pool(relu5a)(w=3,h=3,stride=2);
 
 val conv4b =    conv(split(1))(w=3,h=3,nch=192,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
 val relu4b =    relu(conv4b)(inplace);
 val conv5b =    conv(relu4b)(w=3,h=3,nch=128,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
-val relu5b =    relu(conv5b)(inplace);
-val pool5b =    pool(relu5b)(w=3,h=3,stride=2);
 
-val pool5 =     pool5a over pool5b;
+val conv5 =     conv5a over conv5b;
+val relu5 =     relu(conv5)(inplace);
+val pool5 =     pool(relu5)(w=3,h=3,stride=2);
+
 val fc6 =       linear(pool5)(outdim=4096,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
 val relu6 =     relu(fc6)(inplace);
 val drop6 =     dropout(relu6)(0.5f);
