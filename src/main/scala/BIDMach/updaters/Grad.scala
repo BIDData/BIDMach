@@ -99,7 +99,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  val batchSize = model.gmats(0).ncols;
   	val nmats = updatemats.length;
 	  //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
-  	val lr0 = if (opts.policies.asInstanceOf[AnyRef] != null) opts.policies(0)(ipass, nsteps, gprogress) else 0;
+  	val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
 	  for (i <- 0 until nmats) {
 		  val mm = modelmats(i);
       tscale = if (te.asInstanceOf[AnyRef] != null) {
@@ -111,12 +111,8 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
         stepn.set(1f/(ipass+1));
         stepn ^ pe;
       }
-      if (opts.policies.asInstanceOf[AnyRef] != null) {
-			  if (opts.policies.length > 1) {
-				  lrate.set(opts.policies(i)(ipass, nsteps, gprogress));
-			  } else {
-				  lrate.set(lr0);
-			  }
+      if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
+      	lrate.set(lr0);
 		  } else {
 		  	if (opts.lrate.ncols > 1) {
 		  		lrate <-- opts.lrate(?,i);
@@ -173,7 +169,7 @@ object Grad {
     var pexp:FMat = 0f;
     var waitsteps = 3;
     var mask:FMat = null;
-    var policies:Array[(Float, Float, Float)=>Float] = null;
+    var lr_policy:(Float, Float, Float)=>Float = null;
     var vel_decay:FMat = null;
     var nesterov_vel_decay:FMat = null;
     var l2reg:FMat = null;

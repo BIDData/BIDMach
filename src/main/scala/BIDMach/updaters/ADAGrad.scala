@@ -62,7 +62,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     val nw = stepn;
     val nmats = math.min(modelmats.length, updatemats.length);
 //    println("u sumsq %g" format mini(sumSq(0)).dv)
-    val lr0 = if (opts.policies.asInstanceOf[AnyRef] != null) opts.policies(0)(ipass, nsteps, gprogress) else 0;
+    val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
     for (i <- 0 until nmats) {
     	val mm = modelmats(i);
     	val um = updatemats(i);
@@ -70,12 +70,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     		val i0 = if (opts.l2reg.length > 1) i else 0;
     		um ~ um - (mm *@ opts.l2reg(i0));
     	}
-    	if (opts.policies.asInstanceOf[AnyRef] != null) {
-    		if (opts.policies.length > 1) {
-    			lrate.set(opts.policies(i)(ipass, nsteps, gprogress));
-    		} else {
-    			lrate.set(lr0);
-    		}
+    	if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
+    		lrate.set(lr0);
     	} else {
     		if (opts.lrate.ncols > 1) {
     			lrate <-- opts.lrate(?,i);
