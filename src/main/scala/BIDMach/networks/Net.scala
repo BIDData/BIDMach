@@ -782,7 +782,7 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
     (nn, opts)
   }
 
-  class LearnParOptions extends ParLearner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  class LearnParOptions extends ParLearner.Options with Net.Opts with FileSource.Opts with Grad.Opts 
 
   def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)))}
 
@@ -794,7 +794,7 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
     val nn = new ParLearnerF(
         new FileSource(opts),
         opts, mkNetModel _,
-        opts, mkRegularizer _,
+        null, null,
         opts, mkUpdater _,
         null, null,
         opts)
