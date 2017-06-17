@@ -73,16 +73,16 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 			  		ndims match {
 			  		case 2 => inputDeriv(colranges(i), ?) = inputDeriv(colranges(i), ?) + derivs(i);
 			  		case 3 => {
-			  			val indat = inputData.reshapeView(dims(1), dims(0), dims(2));
-			  		  indat(?, colranges(i), ?) = indat(?, colranges(i), ?) + derivs(i).reshapeView(dims(1), nblock, dims(2));
+			  			val inderiv = inputDeriv.reshapeView(dims(1), dims(0), dims(2));
+			  		  inderiv(?, colranges(i), ?) = inderiv(?, colranges(i), ?) + derivs(i).reshapeView(dims(1), nblock, dims(2));
 			  		}
 			  		case 4 => {
-			  			val indat = inputData.reshapeView(dims(1), dims(2), dims(0), dims(3));
-			  		  indat(?, ?, colranges(i), ?) = indat(?, ?, colranges(i), ?) + derivs(i).reshapeView(dims(1), dims(2), nblock, dims(3));
+			  			val inderiv = inputDeriv.reshapeView(dims(1), dims(2), dims(0), dims(3));
+			  		  inderiv(?, ?, colranges(i), ?) = inderiv(?, ?, colranges(i), ?) + derivs(i).reshapeView(dims(1), dims(2), nblock, dims(3));
 			  		}
 			  		case 5 => {
-			  			val indat = inputData.reshapeView(dims(1), dims(2), dims(3), dims(0), dims(4));
-			  		  indat(?, ?, ?, colranges(i), ?) = indat(?, ?, ?, colranges(i), ?) + derivs(i).reshapeView(dims(1), dims(2), dims(3), nblock, dims(4));
+			  			val inderiv = inputDeriv.reshapeView(dims(1), dims(2), dims(3), dims(0), dims(4));
+			  		  inderiv(?, ?, ?, colranges(i), ?) = inderiv(?, ?, ?, colranges(i), ?) + derivs(i).reshapeView(dims(1), dims(2), dims(3), nblock, dims(4));
 			  		}
 			  		}
 			  	} else {
