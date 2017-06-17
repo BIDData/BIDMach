@@ -49,11 +49,11 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  		}
 		  		case 4 => {
 		  			val out = output.reshapeView(odims(1), odims(2), odims(0), odims(3));
-		  		  output(?, ?, colranges(i), ?) = inputDatas(i).reshapeView(odims(1), odims(2), inputDatas(i).dims(0), odims(3));
+		  		  out(?, ?, colranges(i), ?) = inputDatas(i).reshapeView(odims(1), odims(2), inputDatas(i).dims(0), odims(3));
 		  		}
 		  		case 5 => {
 		  			val out = output.reshapeView(odims(1), odims(2), odims(3), odims(0), odims(4));
-		  		  output(?, ?, ?, colranges(i), ?) = inputDatas(i).reshapeView(odims(1), odims(2), odims(3), inputDatas(i).dims(0), odims(4));
+		  		  out(?, ?, ?, colranges(i), ?) = inputDatas(i).reshapeView(odims(1), odims(2), odims(3), inputDatas(i).dims(0), odims(4));
 		  		}
 		  		}
 		  	} else {
