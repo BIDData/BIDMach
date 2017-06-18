@@ -30,9 +30,9 @@ opts.pstep = 0.05f
 opts.hasBias = true;
 opts.l2reg = 0.0005f;
 opts.vel_decay=0.9f;
-opts.policy = lr_update _;
-opts.lookahead = 2;
+opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
+opts.useCache = false;
 val inplace = true;
 
 :silent
