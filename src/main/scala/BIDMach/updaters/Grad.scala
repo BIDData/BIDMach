@@ -101,61 +101,63 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
   	val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
 	  for (i <- 0 until nmats) {
-		  val mm = modelmats(i);
-      tscale = if (te.asInstanceOf[AnyRef] != null) {
-      	te <-- opts.texp;
-        stepn.set(1f/nsteps);
-        stepn ^ te;
-      } else {
-      	pe <-- opts.pexp;
-        stepn.set(1f/(ipass+1));
-        stepn ^ pe;
-      }
-      if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
-      	lrate.set(lr0);
-		  } else {
-		  	if (opts.lrate.ncols > 1) {
-		  		lrate <-- opts.lrate(?,i);
-		  	} else {
-		  		lrate <-- opts.lrate;
-		  	}
-		  }
-      lrate ~ lrate / batchSize;
-    	val lr_scales = model.lr_scales;
-    	if (lr_scales.asInstanceOf[AnyRef] != null) {
-    	  lrate ~ lrate *@ lr_scales(i);
-    	} 
-	  	if (opts.waitsteps < nsteps) {
-        val grad = updatemats(i);
-        if (opts.l2reg.asInstanceOf[AnyRef] != null) {
-        	val i0 = if (opts.l2reg.length > 1) i else 0;
-        	grad ~ grad - (mm *@ (opts.l2reg(i0) * batchSize));
-        }
-        if (opts.langevin > 0) {                              // Add Langevin random permutations
-        	normrnd(0, opts.langevin, randmat(i));
-        	grad ~ grad + randmat(i);
-        }
-	  		grad ~ grad *@ (lrate *@ tscale);
-	  		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
-	  			val i0 = if (opts.vel_decay.length > 1) i else 0;
-	  			mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
-	  			momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
-	  			momentum(i) ~ momentum(i) + grad;
-	  			grad <-- momentum(i);
-	  		}
-	  		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
-            val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-              mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
-              momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
-              mm ~ mm - momentum(i);                               // Subtract mu * p_t-1 from the model
-              momentum(i) ~ momentum(i) + grad;        	           // Compute new momentum p_t = mu * p_t-1 + g
-            	mm ~ mm + momentum(i);                               // Add p_t to the model;
-            	grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added.                       
-	  		}
-	  		modelmats(i) ~ modelmats(i) + grad;
-	  		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
-	  	}
-	  	updatemats(i).clear;
+	    if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	    	val mm = modelmats(i);
+	    	tscale = if (te.asInstanceOf[AnyRef] != null) {
+	    		te <-- opts.texp;
+	    		stepn.set(1f/nsteps);
+	    		stepn ^ te;
+	    	} else {
+	    		pe <-- opts.pexp;
+	    		stepn.set(1f/(ipass+1));
+	    		stepn ^ pe;
+	    	}
+	    	if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
+	    		lrate.set(lr0);
+	    	} else {
+	    		if (opts.lrate.ncols > 1) {
+	    			lrate <-- opts.lrate(?,i);
+	    		} else {
+	    			lrate <-- opts.lrate;
+	    		}
+	    	}
+	    	lrate ~ lrate / batchSize;
+	    	val lr_scales = model.lr_scales;
+	    	if (lr_scales.asInstanceOf[AnyRef] != null) {
+	    		lrate ~ lrate *@ lr_scales(i);
+	    	} 
+	    	if (opts.waitsteps < nsteps) {
+	    		val grad = updatemats(i);
+	    		if (opts.l2reg.asInstanceOf[AnyRef] != null) {
+	    			val i0 = if (opts.l2reg.length > 1) i else 0;
+	    			grad ~ grad - (mm *@ (opts.l2reg(i0) * batchSize));
+	    		}
+	    		if (opts.langevin > 0) {                              // Add Langevin random permutations
+	    			normrnd(0, opts.langevin, randmat(i));
+	    			grad ~ grad + randmat(i);
+	    		}
+	    		grad ~ grad *@ (lrate *@ tscale);
+	    		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+	    			val i0 = if (opts.vel_decay.length > 1) i else 0;
+	    			mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
+	    			momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
+	    			momentum(i) ~ momentum(i) + grad;
+	    			grad <-- momentum(i);
+	    		}
+	    		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+	    			val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
+	    			mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
+	    			momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
+	    			mm ~ mm - momentum(i);                               // Subtract mu * p_t-1 from the model
+	    			momentum(i) ~ momentum(i) + grad;        	           // Compute new momentum p_t = mu * p_t-1 + g
+	    			mm ~ mm + momentum(i);                               // Add p_t to the model;
+	    			grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added.                       
+	    		}
+	    		modelmats(i) ~ modelmats(i) + grad;
+	    		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
+	    	}
+	    	updatemats(i).clear;
+	    }
 	  }
 	  runningtime += toc - start;
 	}

@@ -315,10 +315,13 @@ object Layer {
     new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
   }
   
-  def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, net:Net=null) = {
+  def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, 
+      lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {
     val hb = hasBias;
   	val mname = name;
-    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}
+  	val lrs = lr_scale;
+  	val bs = bias_scale;
+    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb;  lr_scale=lrs; bias_scale=bs}){inputs(0)=a;}
   }
   
   def constant(v:Mat)(net:Net=null):ConstantLayer = {
@@ -332,6 +335,7 @@ object Layer {
   def conv(a:LayerTerm)(name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true, 
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
       initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+      lr_scale:Float=1f, bias_scale:Float=1f,
       convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION, net:Net=null) = {
     val str = stride;
     val pd = pad;
@@ -341,9 +345,11 @@ object Layer {
     val initv0 = initv;
     val initbiasf = initbiasfn;
     val initbiasv0 = initbiasv;
+    val lrs = lr_scale;
+  	val bs = bias_scale;
     val ct = convType;
     new ConvLayer(net, new ConvNode{modelName = mname; kernel=irow(w,h); noutputs=nch; stride=str; pad=pd; hasBias=hb; 
-    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; convType=ct}){inputs(0)=a;};
+    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; lr_scale=lrs; bias_scale=bs; convType=ct}){inputs(0)=a;};
   }
   
   def copy(a:LayerTerm) = new CopyLayer(null){inputs(0) = a;}
@@ -400,6 +406,7 @@ object Layer {
   def linear(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null,
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
       initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+      lr_scale:Float=1f, bias_scale:Float=1f,
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null, net:Net = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -411,8 +418,11 @@ object Layer {
     val initv0 = initv;
     val initbiasf = initbiasfn;
     val initbiasv0 = initbiasv;
+    val lrs = lr_scale;
+  	val bs = bias_scale;
     new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; 
     initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; 
+    lr_scale=lrs; bias_scale=bs;
     aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
   }
   
@@ -476,7 +486,7 @@ object Layer {
 
   
   def negsamp(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, 
-      nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true, net:Net=null) = {
+      nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true, lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {
     val odim = outdim;
     val hBias = hasBias;
     val aaopts = aopts;
@@ -485,7 +495,10 @@ object Layer {
     val dcr = doCorrect;
     val sct = scoreType;
     val mname = name;
-    new NegsampOutputLayer(net, new NegsampOutputNode{modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr}){inputs(0)=a;};
+    val lrs = lr_scale;
+  	val bs = bias_scale;
+    new NegsampOutputLayer(net, new NegsampOutputNode{modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; 
+    lr_scale=lrs; bias_scale=bs; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr}){inputs(0)=a;};
   }
   
   def norm(a:LayerTerm)(opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
@@ -506,10 +519,12 @@ object Layer {
     new PoolingLayer(net, new PoolingNode{h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
   }
   
-  def scale(a:LayerTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, net:Net=null) = {
+  def scale(a:LayerTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {
   	val hb = hasBias;
   	val mname = name;
-    new ScaleLayer(net, new ScaleNode{modelName = mname; batchNormMode=normMode; hasBias=hb}){inputs(0)=a;}   
+  	val lrs = lr_scale;
+  	val bs = bias_scale;
+    new ScaleLayer(net, new ScaleNode{modelName = mname; batchNormMode=normMode; hasBias=hb; lr_scale=lrs; bias_scale=bs;}){inputs(0)=a;}   
   }
     
   def randmirror(a:LayerTerm)(prob:Float=0.5f, net:Net=null) = {

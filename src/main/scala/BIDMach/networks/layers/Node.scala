@@ -98,10 +98,13 @@ object Node {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
   }
   
-  def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
+      lr_scale:Float=1f, bias_scale:Float=1f) = {
   	val hb = hasBias;
   	val mname = name;
-    new BatchNormScaleNode{inputs(0)=a; modelName=mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb}    
+  	val lrs = lr_scale;
+  	val bs = bias_scale;
+    new BatchNormScaleNode{inputs(0)=a; modelName=mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb; lr_scale=lrs; bias_scale=bs;}    
   }
     
   def constant(v:Mat) = {
@@ -115,6 +118,7 @@ object Node {
   def conv(a:NodeTerm)(name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true, 
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
       initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+      lr_scale:Float=1f, bias_scale:Float=1f,
       convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION) = {
     val str = stride;
     val pd = pad;
@@ -123,10 +127,12 @@ object Node {
     val initv0 = initv;
     val initbiasf = initbiasfn;
     val initbiasv0 = initbiasv;
+    val lrs = lr_scale;
+  	val bs = bias_scale;
     val mname = name;
     val ct = convType;
     new ConvNode{inputs(0)=a; modelName=mname; kernel=irow(w,h); noutputs=nch; stride=str; pad=pd; hasBias=hb; 
-    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; convType=ct}
+    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; convType=ct; lr_scale=lrs; bias_scale=bs;}
   }
   
   def copy(a:NodeTerm) = new CopyNode{inputs(0) = a;}
@@ -188,6 +194,7 @@ object Node {
   def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, withInteractions:Boolean=false, 
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
       initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+      lr_scale:Float=1f, bias_scale:Float=1f,
       tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -199,8 +206,10 @@ object Node {
     val initv0 = initv;
     val initbiasf = initbiasfn;
     val initbiasv0 = initbiasv;
+    val lrs = lr_scale;
+  	val bs = bias_scale;
     new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; 
-    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; 
+    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; lr_scale=lrs; bias_scale=bs;
     aopts=aaopts; withInteractions = wi; tmatShape = tms};
   }
   
@@ -268,7 +277,8 @@ object Node {
     new MiniNode{inputs(0) = a};
   }
   
-  def negsamp(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, scoreType:Int=0, doCorrect:Boolean=true) = {
+  def negsamp(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, expt:Float=0.5f, 
+      lr_scale:Float=1f, bias_scale:Float=1f, scoreType:Int=0, doCorrect:Boolean=true) = {
     val odim = outdim;
     val hBias = hasBias;
     val aaopts = aopts;
@@ -276,8 +286,11 @@ object Node {
     val eexpt = expt;
     val dcr = doCorrect;
     val sct = scoreType;
+    val lrs = lr_scale;
+  	val bs = bias_scale;
     val mname = name;
-    new NegsampOutputNode{inputs(0)=a; modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; scoreType=sct; docorrect=dcr};
+    new NegsampOutputNode{inputs(0)=a; modelName=mname; outdim=odim; hasBias=hBias; aopts=aaopts; nsamps=nnsamps; expt=eexpt; 
+    scoreType=sct; docorrect=dcr; lr_scale=lrs; bias_scale=bs;};
   }
     
   def negsamp_(a:NodeTerm)(implicit opts:NegsampOutputNodeOpts) =     {
@@ -329,10 +342,13 @@ object Node {
     new RectNode{inputs(0) = a; inplace = inplac};
   }
   
-  def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true) = {
+  def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
+      lr_scale:Float=1f, bias_scale:Float=1f) = {
   	val hb = hasBias;
   	val mname = name;
-    new ScaleNode{inputs(0)=a; modelName=mname; batchNormMode=normMode; hasBias=hb}    
+  	val lrs = lr_scale;
+  	val bs = bias_scale;
+    new ScaleNode{inputs(0)=a; modelName=mname; batchNormMode=normMode; hasBias=hb; lr_scale=lrs; bias_scale=bs;}    
   }
   
   def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
