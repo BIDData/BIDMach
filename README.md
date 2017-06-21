@@ -2,7 +2,7 @@
 
 BIDMach is a very fast machine learning library. Check the latest <b><a href="https://github.com/BIDData/BIDMach/wiki/Benchmarks">benchmarks</a></b>
 
-The github distribution contains source code only. After doing <code>git clone</code>, cd to the BIDMach directory, and build and install the jars with <code>mvn install</code>. You can then run bidmach with `./bidmach`.
+The github distribution contains source code only. After doing <code>git clone</code>, cd to the BIDMach directory, and build and install the jars with <code>mvn install</code>. You can then run bidmach with `./bidmach`. More details on installing and running are available <b><a href="https://github.com/BIDData/BIDMach/wiki/Installing-and-Running">here</a></b>.
 
 The main project page is <b><a href="http://bid2.berkeley.edu/bid-data-project/">here</a></b>.
 
