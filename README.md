@@ -12,3 +12,5 @@ Documentation is <b><a href="https://github.com/BIDData/BIDMach/wiki">here in th
 
 BIDMach is a sister project of BIDMat, a matrix library, which is 
 <b><a href="https://github.com/BIDData/BIDMat">also on github</a></b>
+
+BIDMach also has a sibling project for deep reinforcement learning. <b><a href="https://github.com/BIDData/BIDMach_RL">BIDMach_RL</a></b> contains state-of-the-art implementations of several reinforcement learning algorithms.
