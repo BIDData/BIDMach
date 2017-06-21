@@ -2,9 +2,7 @@
 
 BIDMach is a very fast machine learning library. Check the latest <b><a href="https://github.com/BIDData/BIDMach/wiki/Benchmarks">benchmarks</a></b>
 
-The github distribution contains source code only. To get the libraries for your platform, run `./getdevlibs.sh` from this directory. Then you can run bidmach with `./bidmach`. Also, you can run the iScala notebook using `./bidmach notebook`.
-
-**Update 01/30/2017**: `./getdevlibs.sh` is obsolete, so please see the <a href="https://github.com/BIDData/BIDMach/wiki/Installing-and-Running">installation instructions here using maven</a>. If you modifythe code for your own use, the command `mvn package` will compile the code.
+The github distribution contains source code only. After doing <code>git clone</code>, build and install the jars with <code>mvn package</code>.
 
 You can build the Java/Scala main jar with sbt (included). There are build scripts for both Scala 2.10 and 2.11. Copy the appropriate one into `build.sbt`, and then do `./sbt package`. You can then run bidmach with `./bidmach` (you still need to download the libraries some of which are native).
 
