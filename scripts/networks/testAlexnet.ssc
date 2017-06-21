@@ -9,19 +9,22 @@ val testpreds = testdir+"pred%04d.fmat.lz4";
 val (nn,opts) = Net.learner(traindata, trainlabels);
 val net = nn.model.asInstanceOf[Net]
 
+def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
+  if (ipass < 10) 3e-4f else if (ipass < 20) 1e-4f else 3e-5f;
+}
+
 opts.batchSize= 128;
-//opts.nend = 40;
-opts.npasses = 10;
+opts.npasses = 40;
 opts.lrate = 1e-4f;
 opts.texp = 0f
-opts.pstep = 0.01f
+opts.pstep = 0.05f
 opts.hasBias = true;
-opts.gsq_decay=0.999f;
-opts.weight_decay=0.9995f;
+opts.lr_policy = lr_update _;
+opts.gsq_decay = 0.999f;
+opts.l2reg = 0.0005f;
 opts.initsumsq = 0.01f;
 opts.lookahead = 2;
 opts.tensorFormat = Net.TensorNCHW;
-//opts.autoReset = false;
 val inplace=true;
 
 :silent
@@ -36,12 +39,14 @@ Net.initDefaultNodeSet;
 val in =        input;
 val meanv =     const(means);
 val din =       in - meanv;
-val scalef =    const(row(0.01f));
-val sdin =      din *@ scalef;
+//val scalef =    const(row(0.01f));
+//val sdin =      din *@ scalef;
 //val fin =       format(in)();
-val cin =       crop(sdin)()
+val cin =       crop(din)(randoffsets=irow(0,32,32,-1));
+val min =       randmirror(cin)();
 
-val conv1 =     conv(cin)(w=11,h=11,nch=96,stride=4,convType=convt);
+
+val conv1 =     conv(min)(w=11,h=11,nch=96,stride=4,convType=convt);
 val relu1 =     relu(conv1)(inplace);
 val pool1 =     pool(relu1)(w=3,h=3,stride=2);
 val norm1 =     LRNwithin(pool1)(dim=5,alpha=0.0001f,beta=0.75f);
@@ -70,21 +75,20 @@ val relu7  =    relu(fc7)(inplace);
 val drop7 =     dropout(relu7)(0.5f);
 
 val fc8  =      linear(drop7)(outdim=1000,initv=1e-1f);
-val out =       softmaxout(fc8)(scoreType=1,lossType=0);
+val out =       softmaxout(fc8)(scoreType=1,lossType=1);
 
 opts.nodeset=Net.getDefaultNodeSet
 }
 
-nn.train;
+// nn.train;
 
-val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
-mopts.batchSize= opts.batchSize;
-mopts.hasBias= opts.hasBias;
-mopts.tensorFormat = opts.tensorFormat;
-//mopts.autoReset = false;
-mm.predict;
+// val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+// mopts.batchSize= opts.batchSize;
+// mopts.hasBias= opts.hasBias;
+// mopts.tensorFormat = opts.tensorFormat;
+// mm.predict;
 
-println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+// println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 :silent
 
 

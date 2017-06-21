@@ -1,0 +1,210 @@
+import BIDMach.networks.layers._
+
+//
+// TODO: Bottleneck conv block needs to expand input depth in first block. 
+//
+
+val traindir = "../../data/ImageNet/train/";
+val testdir = "../../data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
+
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+val opts = new MyOpts;
+val ds = FileSource(traindata, trainlabels, opts);
+val net = new Net(opts);
+val grad = new Grad(opts);
+val nn = new Learner(ds, net, null, grad, null, opts);
+
+val resdim = 50;
+val bottleneckThreshold = 60;
+
+val layercounts = (
+18   \  2 \  2 \  2 \  2 on
+34   \  3 \  4 \  6 \  3 on
+50   \  3 \  4 \  6 \  3 on 
+101  \  3 \  4 \ 23 \  3 on
+152  \  3 \  8 \ 36 \  3);
+
+val imodel = find(layercounts(?,0) == resdim).v;
+
+val nconv2x = layercounts(imodel, 1);
+val nconv3x = layercounts(imodel, 2);
+val nconv4x = layercounts(imodel, 3);
+val nconv5x = layercounts(imodel, 4);
+
+def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
+  val lr = if (ipass < 20) {
+      1e-2f
+  } else if (ipass < 40) {
+      1e-3f
+  } else 1e-4f;
+  lr
+}
+
+opts.logfile = "logresv1.txt";
+opts.batchSize= 64;
+opts.nend = 10;
+opts.npasses = 1;
+opts.lrate = 1e-2f;
+opts.texp = 0f;
+opts.pstep = 0.0001f;
+opts.hasBias = true;
+opts.l2reg = 0.0005f;
+opts.vel_decay = 0.9f;
+opts.lr_policy = lr_update _;
+opts.tensorFormat = Net.TensorNCHW;
+opts.useCache = false;
+
+val in_place = true;
+val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
+val bnMode = BatchNormLayer.SPATIAL;
+
+:silent
+val means = loadFMat(traindir+"means.fmat.lz4");
+
+{
+import BIDMach.networks.layers.Node._;
+
+// dim is the input and output depth. Image dimensions unchanged.
+def conv3x3Block(in:Node, dim:Int):Node = {
+    val convx_1 =   conv(in)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,convType=convt);
+    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
+    val relux_1 =   relu(normx_1)(in_place);
+
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,convType=convt);
+    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
+
+    val sum_2 =     in + normx_2;
+    val out =       relu(sum_2)(in_place);
+    out;
+}
+
+// dim is the internal (bottleneck) depth. Input and output should have depth 4x dim. Image dimensions unchanged.
+def convBottleNeckBlock(in:Node, dim:Int, firstBlock:Boolean):Node = {
+    val convx_1 =   conv(in)(w=1,h=1,pad=0,nch=dim,initv=1.4142f,convType=convt);
+    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
+    val relux_1 =   relu(normx_1)(in_place);
+
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,convType=convt);
+    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
+    val relux_2 =   relu(normx_2)(in_place);
+
+    val convx_3 =   conv(relux_2)(w=1,h=1,pad=0,nch=dim*4,initv=1.4142f,convType=convt);
+    val normx_3 =   batchNormScale(convx_3)(normMode=bnMode,inplace=in_place);
+    val shortcut =  if (firstBlock) conv(in)(w=1,h=1,pad=0,nch=4*dim,initv=1.4142f,convType=convt) else in;
+    val sum_3 =     shortcut + normx_3;
+    val out =       relu(sum_3)(in_place);
+    out;
+}
+
+def convBlock(in:Node, dim:Int, firstBlock:Boolean = false):Node = {
+    if (resdim > bottleneckThreshold) convBottleNeckBlock(in, dim, firstBlock) else conv3x3Block(in, dim);
+}
+
+// dim is the output depth. The input should be depth dim/2. The image dimensions are halved. 
+def span3x3Block(in:Node, dim:Int, imgdim:Int):Node = {
+    val convx_1 =   conv(in)(w=3,h=3,pad=1,stride=2,nch=dim,initv=1.4142f,convType=convt);
+    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
+    val relux_1 =   relu(normx_1)(in_place);
+
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,convType=convt);
+    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
+
+    val pool_2 =    pool(in)(w=1,h=1,pad=0,stride=2);
+    val fill_2 =    constant(zeros((dim/2)\imgdim\imgdim\opts.batchSize));
+    val stretch_2 = pool_2 over fill_2;
+
+    val out =       relu(stretch_2)(in_place);
+    out;
+}
+
+// dim is the input depth. Output depth is 4*dim. The image dimensions are halved. 
+def spanBottleNeckBlock(in:Node, dim:Int, imgdim:Int):Node = {
+    val convx_1 =   conv(in)(w=1,h=1,pad=0,stride=2,nch=dim,initv=1.4142f,convType=convt);
+    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
+    val relux_1 =   relu(normx_1)(in_place);
+
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,convType=convt);
+    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
+    val relux_2 =   relu(normx_2)(in_place);
+
+    val convx_3 =   conv(relux_2)(w=1,h=1,pad=0,nch=dim*4,initv=1.4142f,convType=convt);
+    val normx_3 =   batchNormScale(convx_3)(normMode=bnMode,inplace=in_place);
+
+    val shortcut =  conv(in)(w=1,h=1,pad=0,stride=2,nch=dim*4,initv=1.4142f,convType=convt);
+    val sum_3 =     shortcut + normx_3;
+    val out =       relu(sum_3)(in_place);
+    out;
+}
+
+def spanBlock(in:Node, dim:Int, imgdim:Int):Node = {
+    if (resdim > bottleneckThreshold) spanBottleNeckBlock(in, dim, imgdim) else span3x3Block(in, dim, imgdim);
+}
+
+Net.initDefaultNodeSet;
+var thisnode:Node = null;
+
+val in =        input;
+val meanv =     const(means);
+val din =       in - meanv;
+//val scalef =    const(row(0.01f));
+//val sdin =      din *@ scalef;
+//val fin =       format(in)();
+val cin =       crop(din)(randoffsets=irow(0,32,32,-1));
+val min =       randmirror(cin)();
+
+val conv1 =     conv(min)(w=7,h=7,pad=3,stride=2,nch=64,initv=1.4142f,convType=convt);
+val norm1 =     batchNormScale(conv1)(normMode=bnMode,inplace=in_place);
+val relu1 =     relu(norm1)(in_place);
+val pool1 =     pool(relu1)(h=3,w=3,pad=1,stride=2);
+
+thisnode =      convBlock(pool1, 64, true);
+
+for (i <- 0 until (nconv2x-1)) {
+    thisnode =  convBlock(thisnode, 64);
+}
+
+thisnode =      spanBlock(thisnode, 128, 28);
+
+for (i <- 0 until (nconv3x-1)) {
+    thisnode =  convBlock(thisnode, 128);
+}
+
+thisnode =      spanBlock(thisnode, 256, 14);
+
+for (i <- 0 until (nconv4x-1)) {
+    thisnode =  convBlock(thisnode, 256);
+}
+
+thisnode =      spanBlock(thisnode, 512, 7);
+
+for (i <- 0 until (nconv5x-1)) {
+    thisnode =  convBlock(thisnode, 512);
+}
+
+val pool5 =     pool(thisnode)(h=7,w=7,poolingMode=jcuda.jcudnn.cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING);
+val fc5  =      linear(pool5)(outdim=1000);
+val out =       softmaxout(fc5)(scoreType=1,lossType=1);
+
+opts.nodeset=Net.getDefaultNodeSet
+}
+
+def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
+
+val sgd = nn.updater.asInstanceOf[Grad];
+
+nn.train;
+
+//val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+//mopts.batchSize= opts.batchSize;
+//mopts.autoReset = false;
+//mm.predict;
+
+//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+:silent
+
+
