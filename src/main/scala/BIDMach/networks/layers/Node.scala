@@ -99,12 +99,13 @@ object Node {
   }
   
   def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
-      lr_scale:Float=1f, bias_scale:Float=1f) = {
+      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Boolean = false) = {
   	val hb = hasBias;
   	val mname = name;
   	val lrs = lr_scale;
   	val bs = bias_scale;
-    new BatchNormScaleNode{inputs(0)=a; modelName=mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb; lr_scale=lrs; bias_scale=bs;}    
+  	val inp = inplace;
+    new BatchNormScaleNode{inputs(0)=a; modelName=mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}    
   }
     
   def constant(v:Mat) = {

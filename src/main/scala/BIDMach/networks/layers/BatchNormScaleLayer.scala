@@ -64,7 +64,12 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 
   override def forward = {
     val start = toc;
-    createOutput
+    if (opts.inplace) {
+      output = inputData;
+      deriv = inputDeriv;
+    } else {
+      createOutput;
+    }
     if (batchDim.asInstanceOf[AnyRef] == null) initModelMats;
     
     if (Mat.hasCUDA > 0 && net.opts.useGPU && Mat.hasCUDNN) {
@@ -74,20 +79,20 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       	forwardCUDNN(true);        
       }
     } else {
-      forwardGeneric
+      forwardGeneric;
     }  
-    clearDeriv
-    forwardtime += toc - start
+    clearDeriv;
+    forwardtime += toc - start;
   }
   
   override def backward = {
-    val start = toc
+    val start = toc;
     if (Mat.hasCUDA > 0 && net.opts.useGPU && Mat.hasCUDNN) {
       backwardCUDNN
     } else {
       backwardGeneric
     }   
-    backwardtime += toc - start
+    backwardtime += toc - start;
   }
   
     
@@ -299,6 +304,7 @@ trait BatchNormScaleNodeOpts extends ModelNodeOpts {
   var epsilon:Float = 1e-4f;
   var batchNormMode:Int = BatchNormLayer.SPATIAL;
   var tensorFormat:Int = Net.UseNetFormat;
+  var inplace:Boolean = false;
 
   def copyOpts(opts:BatchNormScaleNodeOpts):BatchNormScaleNodeOpts = {
 		super.copyOpts(opts);
@@ -307,6 +313,7 @@ trait BatchNormScaleNodeOpts extends ModelNodeOpts {
 		opts.epsilon = epsilon;
 		opts.batchNormMode = batchNormMode;
 		opts.tensorFormat = tensorFormat;
+		opts.inplace = inplace;
 		opts;
   }
 }

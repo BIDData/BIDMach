@@ -316,12 +316,14 @@ object Layer {
   }
   
   def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, 
-      lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {
+      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Boolean= false, net:Net=null) = {
     val hb = hasBias;
   	val mname = name;
   	val lrs = lr_scale;
   	val bs = bias_scale;
-    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; hasBias=hb;  lr_scale=lrs; bias_scale=bs}){inputs(0)=a;}
+  	val inp = inplace;
+    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; 
+    hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}){inputs(0)=a;}
   }
   
   def constant(v:Mat)(net:Net=null):ConstantLayer = {

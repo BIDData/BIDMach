@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GFilter,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GFilter,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -360,6 +360,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     targmap = null;
     mask = null;
     bufmat = null;
+  }
+  
+    
+  def analyzeTimes = {
+    val tt = layers.map(_.forwardtime.toFloat) ++ layers.map(_.backwardtime.toFloat);
+    val times = new FMat(layers.length, 2, tt);
+    val layernames = new CSMat(layers.length, 1, layers.map(_.getClass.getSimpleName));
+    (times, layernames);
   }
 }
 
@@ -807,7 +815,7 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
         opts)
     (nn, opts)
   }
-  
+
 }
 
 
