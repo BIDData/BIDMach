@@ -181,6 +181,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		ogmats = new Array[Mat](output_layers.length);
   	  output_layers;
   	}
+  	val dolayers = if (output_layers.length > 0) output_layers else Array(layers(layers.length-1));
+  	dolayers.map((x) => x.doreturn=false);
   }
 
   def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) {
