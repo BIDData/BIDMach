@@ -1,6 +1,6 @@
 package BIDMach.networks
 
-import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GFilter,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GFilter,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -43,6 +43,12 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var imodel = 0;
   var initialize = false;
   var predicting = false;
+  
+  private var _GUID = Mat.myrand.nextLong
+  def GUID = _GUID;
+  def setGUID(v:Long) {
+    _GUID = v;
+  }
   
   def isInputNode(l:Node):Boolean = {
   		l match {
@@ -360,6 +366,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     targmap = null;
     mask = null;
     bufmat = null;
+    clearBackwardCache;
   }
   
     
@@ -368,6 +375,38 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     val times = new FMat(layers.length, 2, tt);
     val layernames = new CSMat(layers.length, 1, layers.map(_.getClass.getSimpleName));
     (times, layernames);
+  }
+  
+    
+  def getMat(dims:IMat, typeMat:Mat):Mat = {
+    val indx = ND.hash2(ND.hashIMat(dims), typeMat.mytype.##);
+    val list = _backwardCache.get(indx);
+    if (list.asInstanceOf[List[Mat]] == null || list.length == 0) {
+    	typeMat.zeros(dims);
+    } else {
+      val x = list.head;
+      _backwardCache.put(indx, list.drop(1));
+      x.clear;
+      x;
+    }
+  }
+  
+  def returnMat(mat:Mat) = {
+  	if (mat.asInstanceOf[AnyRef] != null) {
+  		val indx = ND.hash2(ND.hashIMat(mat.dims), mat.mytype.##);
+  		val list = _backwardCache.get(indx);
+  		if (list.asInstanceOf[List[Mat]] == null) {
+  			_backwardCache.put(indx, List(mat));
+  		} else {
+  			_backwardCache.put(indx, mat :: list);
+  		}
+    }
+  }
+  
+  private val _backwardCache = new HashMap[Long, List[Mat]];
+  
+  def clearBackwardCache = {
+    _backwardCache.clear();
   }
 }
 
@@ -388,12 +427,23 @@ object Net  {
     var withInteractions = false;
     var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
     var tensorFormat:Int = Net.TensorNHWC;
-    var convType = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
+    var convType = CrossCorrelation;
+    var inplace = NoInPlace;
   }
    
   final val UseNetFormat = 0;
   final val TensorNCHW = 1;
   final val TensorNHWC = 2;
+  
+  final val UseNetConvType
+  = 0;
+  final val CrossCorrelation = 1;
+  final val Convolution = 2;
+  
+  final val UseNetPlacing = 0;
+  final val NoInPlace = 1;
+  final val InPlace = 2;
+  final val BackwardCaching = 3;
   
   class Options extends Opts {}
 
@@ -436,19 +486,46 @@ object Net  {
   
   final val constant = constantFn _;
 
-
-  def getCUDNNformat(layerFormat:Int, netFormat:Int):Int = {
-    layerFormat match {
-      case TensorNCHW => cudnnTensorFormat.CUDNN_TENSOR_NCHW;
-      case TensorNHWC => cudnnTensorFormat.CUDNN_TENSOR_NHWC;
-      case UseNetFormat => {
-        netFormat match {
-        case TensorNCHW => cudnnTensorFormat.CUDNN_TENSOR_NCHW;
-        case TensorNHWC => cudnnTensorFormat.CUDNN_TENSOR_NHWC;
+  import jcuda.jcudnn.cudnnConvolutionMode._
+  
+  def getCUDNNconvType(layerType:Int, netType:Int):Int = {
+    layerType match {
+      case CrossCorrelation => CUDNN_CROSS_CORRELATION;
+      case Convolution => CUDNN_CONVOLUTION;     
+      case UseNetConvType => {
+        netType match {
+        case CrossCorrelation => CUDNN_CROSS_CORRELATION;
+        case Convolution => CUDNN_CONVOLUTION;
         }
       }
     }
   }
+  
+  import jcuda.jcudnn.cudnnTensorFormat._
+  
+  def getCUDNNformat(layerFormat:Int, netFormat:Int):Int = {
+    layerFormat match {
+      case TensorNCHW => CUDNN_TENSOR_NCHW;
+      case TensorNHWC => CUDNN_TENSOR_NHWC;
+      case UseNetFormat => {
+        netFormat match {
+        case TensorNCHW => CUDNN_TENSOR_NCHW;
+        case TensorNHWC => CUDNN_TENSOR_NHWC;
+        }
+      }
+    }
+  }
+  
+  def getPlacing(layerPlacing:Int, netPlacing:Int):Int = {
+    if (layerPlacing == UseNetPlacing) {
+      netPlacing;
+    } else {
+      layerPlacing;
+    }
+  }
+
+  
+  
   /**
    * Build a net with a stack of nodes. node(0) is an input node, node(n-1) is a GLM node.
    * Intermediate nodes are Linear followed by nonlinear, starting and ending with Linear.

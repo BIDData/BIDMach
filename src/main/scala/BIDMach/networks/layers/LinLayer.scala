@@ -63,6 +63,8 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   	if (opts.aopts != null && !ADAinitialized) initADAGrad;
   	val mm = modelmats(imodel);
   	createOutput(mm.nrows \ inputData.ncols);
+  	inplaceNoConnect;
+  	
   	if (opts.withInteractions) {
   		GLM.pairMult(mm, inputData, output);
   	} else {
@@ -71,12 +73,13 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   	if (opts.hasBias) {
   		output ~ output + modelmats(imodel+1);
   	}
-  	clearDeriv;
   	forwardtime += toc - start;
   }
 
   override def backward(ipass:Int, pos:Long) = {
     val start = toc;
+    inplaceGetInputDerivs;
+    
     val mm = modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
       mm.madd(deriv, inputDeriv, true, false);
@@ -94,6 +97,8 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     	deriv.madd(inputData, um, false, true);
       if (opts.hasBias) updatemats(imodel+1) ~ updatemats(imodel+1) + sum(deriv,2);
     }
+    
+    inplaceReturnDeriv;
     backwardtime += toc - start;
   }
 

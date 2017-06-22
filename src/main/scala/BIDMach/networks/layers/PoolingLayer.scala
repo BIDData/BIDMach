@@ -25,20 +25,23 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   }
 
   override def forward = {
-    val start = toc;
+    val start = toc;    
     if (output.asInstanceOf[AnyRef] == null) initModelMats;
+    inplaceNoConnect;
     
     if (Mat.hasCUDA > 0 && net.opts.useGPU && Mat.hasCUDNN) {
       forwardCUDNN
     } else {
       forwardGeneric
     }  
-    clearDeriv
+
     forwardtime += toc - start
   }
   
   override def backward = {
     val start = toc;
+    inplaceGetInputDerivs;
+    
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
     	if (Mat.hasCUDA > 0 && net.opts.useGPU && Mat.hasCUDNN) {
     		backwardCUDNN
@@ -46,6 +49,8 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
     		backwardGeneric
     	}  
     }
+    
+    inplaceReturnDeriv;
     backwardtime += toc - start
   }
   

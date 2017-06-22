@@ -44,6 +44,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	modelmats(imodel) = if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
     		val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
     		x.setTensorFormat(Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat));
+    		x.convType = Net.getCUDNNconvType(opts.convType, net.opts.convType);
     		x;
     	} else {
     		FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
@@ -89,6 +90,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
   override def forward = {
     val start = toc;
+    inplaceNoConnect;
     
     // Create filter model, filter update and bias model if needed
     if (inputDim.asInstanceOf[AnyRef] == null) initModelMats;
@@ -96,24 +98,25 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     ffilter.convolve(inputData, output, true);
     if (opts.hasBias) output ~ output + bias_mat;
 
-    clearDeriv
     forwardtime += toc - start
   }
 
   override def backward = {
     val start = toc;
+    inplaceGetInputDerivs;
     val ndims = output.dims.length;
     
     if(opts.hasBias){
       update_bias_mat ~ update_bias_mat + deriv.sum(irow(ndims - 1));
     }
 
-    if (inputDeriv.asInstanceOf[AnyRef] != null) {      
-        ffilter.convolveT(deriv, inputDeriv, false)
+    if (inputDeriv.asInstanceOf[AnyRef] != null) {
+      ffilter.convolveT(deriv, inputDeriv, false);
     }
 
-    updateFFilter.convolveM(inputData, deriv, false)
-
+    updateFFilter.convolveM(inputData, deriv, false);
+    
+    inplaceReturnDeriv;
     backwardtime += toc - start;
   }
   
@@ -142,7 +145,7 @@ trait ConvNodeOpts extends ModelNodeOpts {
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
   var tensorFormat:Int = Net.UseNetFormat;
-  var convType:Int = cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
+  var convType:Int = Net.UseNetConvType;
   var initfn:(Mat,Float)=>Mat = Net.xavier;
   var initv:Float = 1f;
   var initbiasfn:(Mat,Float)=>Mat = Net.constant;

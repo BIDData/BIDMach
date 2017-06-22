@@ -174,6 +174,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   var backwardtime = 0.0
   override def layer = this
   def inputs = _inputs;
+  var doreturn = true;
   
   private var _GUID = Mat.myrand.nextLong
   def setGUID(v:Long):Unit = {_GUID = v}
@@ -206,6 +207,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def inputDeriv_=(v:Mat):Unit = {val i = _inputs(0); i.layer._derivs(i.term) = v;}  
   def inputDatas(i:Int) = {val lt = _inputs(i); lt.layer._outputs(lt.term);}
   def inputDerivs(i:Int) = {val lt = _inputs(i); lt.layer._derivs(lt.term);}
+  def setInputDeriv(i:Int,m:Mat) = {val inn = _inputs(i); inn.layer._derivs(inn.term) = m;}
   
   var target:Mat = null;
   def forward = {};
@@ -279,6 +281,67 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   		a;
   	}
   }
+  
+  def anyNonNullDeriv = {
+  	var onegood = false;
+  	var i = 0;
+  	while (! onegood && i < inputlength) {
+  		onegood = (inputDerivs(i).asInstanceOf[AnyRef] != null);
+  		i += 1;
+  	}
+  	onegood;
+  }
+  
+  def inplaceConnect = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	if (inplace == Net.NoInPlace) {
+  		createOutput;  
+  		clearDeriv;
+  	} else if (inplace == Net.InPlace){
+  		output = inputData;
+  		deriv = inputDeriv;
+  		deriv.clear;
+  	} else {
+  		output = inputData;  
+  		if (!doreturn) {
+  			clearDeriv;
+  		} else if (anyNonNullDeriv) {
+  			deriv = ?
+  		}
+  	}
+  }
+  
+  def inplaceNoConnect = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	createOutput;
+  	if (inplace == Net.NoInPlace || inplace == Net.InPlace || !doreturn) {  
+  		clearDeriv;
+  	} else {    
+  		if (anyNonNullDeriv) {
+  			deriv = ?
+  		}
+  	}
+  }
+  	
+  def inplaceGetInputDerivs = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	if (inplace == Net.BackwardCaching) {
+  		for (i <- 0 until inputlength) {
+  			if (inputDerivs(i).asInstanceOf[AnyRef] == ?) {
+  				setInputDeriv(i, net.getMat(inputData.dims, inputData));
+  			}
+  		}
+  	}
+  }
+  
+  def inplaceReturnDeriv = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	if (inplace == Net.BackwardCaching && doreturn) {
+  		net.returnMat(deriv);
+  		deriv = null;
+  	}
+  }
+  
 }
 
 class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
@@ -316,7 +379,7 @@ object Layer {
   }
   
   def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, 
-      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Boolean= false, net:Net=null) = {
+      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing, net:Net=null) = {
     val hb = hasBias;
   	val mname = name;
   	val lrs = lr_scale;
@@ -534,12 +597,12 @@ object Layer {
     new RandomMirrorLayer(net, new RandomMirrorNode{prob=p;}){inputs(0) = a};
   } 
   
-  def rect(a:LayerTerm)(inplace:Boolean=false) = {
+  def rect(a:LayerTerm)(inplace:Int=Net.UseNetPlacing) = {
     val inplac = inplace;
     new RectLayer(null, new RectNode{inplace=inplac;}){inputs(0) = a};
   } 
   
-  def relu(a:LayerTerm)(inplace:Boolean=false) = {
+  def relu(a:LayerTerm)(inplace:Int=Net.UseNetPlacing) = {
     val inplac = inplace;
     new RectLayer(null, new RectNode{inplace=inplac;}){inputs(0) = a};
   }

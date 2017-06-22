@@ -21,10 +21,12 @@ import BIDMach.networks._
 
 @SerialVersionUID(100L)
 trait NodeOpts extends BIDMat.Opts {
-  var name = "";  
+  var name = ""; 
+  var inplace:Int = Net.UseNetPlacing;
   
   def copyOpts(opts:NodeOpts):NodeOpts = {
     opts.name = name;
+    opts.inplace = inplace;
 		opts;
   }
 }
@@ -99,7 +101,7 @@ object Node {
   }
   
   def batchNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
-      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Boolean = false) = {
+      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing) = {
   	val hb = hasBias;
   	val mname = name;
   	val lrs = lr_scale;
@@ -333,12 +335,12 @@ object Node {
     new RandomMirrorNode{inputs(0) = a; prob = p};
   }
    
-  def rect(a:NodeTerm)(inplace:Boolean=false) = {
+  def rect(a:NodeTerm)(inplace:Int=Net.UseNetPlacing) = {
     val inplac = inplace;
     new RectNode{inputs(0) = a; inplace = inplac};
   }
   
-  def relu(a:NodeTerm)(inplace:Boolean=false) = {
+  def relu(a:NodeTerm)(inplace:Int=Net.UseNetPlacing) = {
   	val inplac = inplace;
     new RectNode{inputs(0) = a; inplace = inplac};
   }

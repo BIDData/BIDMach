@@ -23,27 +23,19 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 
   override def forward = {
       val start = toc;
-      if (opts.inplace) {
-        output = inputData;
-        deriv = inputDeriv;
-        deriv.clear;
-      } else {
-      	createOutput;  
-      	clearDeriv;
-      }
+      inplaceConnect;
+      
 			max(inputData, 0f, output);
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
-			if (inputDeriv.asInstanceOf[AnyRef] != null) {
-			  if (opts.inplace) {
-			  	RectLayer.rectHelper(output, deriv, deriv); 
-			  } else {
-			  	inputDeriv ~ inputDeriv + (deriv ∘ (inputData > 0f));
-			  }
-			}
+			inplaceGetInputDerivs;
+
+			RectLayer.rectHelper(inputData, deriv, inputDeriv);
+			  
+			inplaceReturnDeriv;
 			backwardtime += toc - start;
 	}
   
@@ -53,13 +45,11 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 }
 
 trait RectNodeOpts extends NodeOpts {
-  var inplace:Boolean = false;
 }
     
 class RectNode extends Node with RectNodeOpts {
   def copyTo(opts:RectNode):RectNode = {
     super.copyTo(opts);
-    opts.inplace = inplace;
     opts;
   }
     

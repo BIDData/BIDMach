@@ -25,18 +25,23 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
 
 	override def forward = {
       val start = toc;
-			createOutput(inputData.dims);
+      inplaceNoConnect;
+      
 			output <-- inputData;
 			(1 until inputlength).map((i:Int) => output ~ output + inputDatas(i));
-			clearDeriv;
+
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
       val start = toc;
+      inplaceGetInputDerivs;
+      
 			(0 until inputlength).map((i:Int) => {
 				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + squash(deriv, inputDerivs(i));
 			});
+			
+			inplaceReturnDeriv;
 			backwardtime += toc - start;
 	}
   
