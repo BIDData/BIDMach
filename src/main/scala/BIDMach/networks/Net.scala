@@ -389,7 +389,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
       val x = list.head;
       _backwardCache.put(indx, list.drop(1));
       x.clear;
-      x;
+      x.reshapeView(dims);
     }
   }
   
