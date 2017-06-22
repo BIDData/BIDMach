@@ -24,7 +24,8 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 
   override def forward = {
     val start = toc;
-		createOutput;
+		inplaceNoConnect();
+		
 		if (randmat.asInstanceOf[AnyRef] == null) {
 		  randmat = inputData.zeros(inputData.dims)
 		} 
@@ -35,13 +36,16 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 			randmat ~ randmat < opts.frac
 			output ~ inputData ∘ randmat;
 		}
-		clearDeriv;
 		forwardtime += toc - start;
   }
 
   override def backward = {
 		val start = toc;
+		inplaceGetInputDerivs;
+		
 		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ randmat);
+		
+		inplaceReturnDeriv;
 		backwardtime += toc - start;
   }
   
