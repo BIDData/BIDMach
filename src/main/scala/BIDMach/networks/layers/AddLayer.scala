@@ -25,7 +25,7 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
 
 	override def forward = {
       val start = toc;
-      inplaceNoConnect;
+      inplaceNoConnect();
       
 			output <-- inputData;
 			(1 until inputlength).map((i:Int) => output ~ output + inputDatas(i));

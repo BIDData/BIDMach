@@ -92,7 +92,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     val start = toc;    
     // Create filter model, filter update and bias model if needed
     if (inputDim.asInstanceOf[AnyRef] == null) initModelMats;
-    inplaceNoConnect;
+    inplaceNoConnect(true);
    
     ffilter.convolve(inputData, output, true);
     if (opts.hasBias) output ~ output + bias_mat;

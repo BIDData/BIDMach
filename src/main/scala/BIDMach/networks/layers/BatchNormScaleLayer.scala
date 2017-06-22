@@ -63,7 +63,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 
   override def forward = {
     val start = toc;
-    inplaceConnect;
+    inplaceConnect(true);
 
     if (batchDim.asInstanceOf[AnyRef] == null) initModelMats;
     

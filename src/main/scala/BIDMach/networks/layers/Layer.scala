@@ -292,7 +292,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   	onegood;
   }
   
-  def inplaceConnect = {
+  def inplaceConnect(forceOut:Boolean = false) = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	if (inplace == Net.NoInPlace) {
   		createOutput;  
@@ -305,19 +305,19 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   		output = inputData;  
   		if (!doreturn) {
   			clearDeriv;
-  		} else if (anyNonNullDeriv) {
+  		} else if (anyNonNullDeriv || forceOut) {
   			deriv = ?
   		}
   	}
   }
   
-  def inplaceNoConnect = {
+  def inplaceNoConnect(forceOut:Boolean = false) = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	createOutput;
   	if (inplace == Net.NoInPlace || inplace == Net.InPlace || !doreturn) {  
   		clearDeriv;
   	} else {    
-  		if (anyNonNullDeriv) {
+  		if (anyNonNullDeriv || forceOut) {
   			deriv = ?
   		}
   	}

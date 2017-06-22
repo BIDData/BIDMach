@@ -27,7 +27,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 
   override def forward = {
 		  val start = toc;
-      inplaceNoConnect;
+      inplaceNoConnect();
       
       output ~ inputData - maxi(inputData);  // ensures sum(exps) is between 1 and nfeats
       exp(output, output); 

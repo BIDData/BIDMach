@@ -27,7 +27,7 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   override def forward = {
     val start = toc;    
     if (output.asInstanceOf[AnyRef] == null) initModelMats;
-    inplaceNoConnect;
+    inplaceNoConnect();
     
     if (Mat.hasCUDA > 0 && net.opts.useGPU && Mat.hasCUDNN) {
       forwardCUDNN

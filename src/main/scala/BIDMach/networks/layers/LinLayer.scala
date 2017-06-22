@@ -63,7 +63,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   	if (opts.aopts != null && !ADAinitialized) initADAGrad;
   	val mm = modelmats(imodel);
   	createOutput(mm.nrows \ inputData.ncols);
-  	inplaceNoConnect;
+  	inplaceNoConnect(true);
   	
   	if (opts.withInteractions) {
   		GLM.pairMult(mm, inputData, output);

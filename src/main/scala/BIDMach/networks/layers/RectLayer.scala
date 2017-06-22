@@ -23,7 +23,7 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 
   override def forward = {
       val start = toc;
-      inplaceConnect;
+      inplaceConnect();
       
 			max(inputData, 0f, output);
 			forwardtime += toc - start;
