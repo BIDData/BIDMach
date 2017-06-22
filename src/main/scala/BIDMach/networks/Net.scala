@@ -405,7 +405,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     }
   }
   
-  private val _backwardCache = new HashMap[Long, List[Mat]];
+  val _backwardCache = new HashMap[Long, List[Mat]];
   
   def clearBackwardCache = {
     _backwardCache.clear();
