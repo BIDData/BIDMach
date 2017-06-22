@@ -381,7 +381,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   
     
   def getMat(dims:IMat, typeMat:Mat):Mat = {
-    val indx = ND.hash2(ND.hashIMat(dims), typeMat.mytype.##);
+    val indx = ND.hash2(prod(dims).v, typeMat.mytype.##);
     val list = _backwardCache.get(indx);
     if (list.asInstanceOf[List[Mat]] == null || list.length == 0) {
     	typeMat.zeros(dims);
@@ -395,7 +395,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   
   def returnMat(mat:Mat) = {
   	if (mat.asInstanceOf[AnyRef] != null) {
-  		val indx = ND.hash2(ND.hashIMat(mat.dims), mat.mytype.##);
+  		val indx = ND.hash2(prod(mat.dims).v, mat.mytype.##);
   		val list = _backwardCache.get(indx);
   		if (list.asInstanceOf[List[Mat]] == null) {
   			_backwardCache.put(indx, List(mat));
