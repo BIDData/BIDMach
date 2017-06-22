@@ -437,8 +437,7 @@ object Net  {
   final val TensorNCHW = 1;
   final val TensorNHWC = 2;
   
-  final val UseNetConvType
-  = 0;
+  final val UseNetConvType = 0;
   final val CrossCorrelation = 1;
   final val Convolution = 2;
   
