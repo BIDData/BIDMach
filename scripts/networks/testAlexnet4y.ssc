@@ -26,7 +26,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "log4y2.txt";
-opts.batchSize= 128;
+opts.batchSize= 256;
 opts.npasses = 80;
 opts.lrate = 1e-4f;
 opts.texp = 0f;
