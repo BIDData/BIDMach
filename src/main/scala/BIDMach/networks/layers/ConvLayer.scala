@@ -92,7 +92,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     val start = toc;    
     // Create filter model, filter update and bias model if needed
     if (inputDim.asInstanceOf[AnyRef] == null) initModelMats;
-    inplaceNoConnect(true);
+    inplaceNoConnectGetOutput(true);
    
     ffilter.convolve(inputData, output, true);
     if (opts.hasBias) output ~ output + bias_mat;
@@ -102,7 +102,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
   override def backward = {
     val start = toc;
-    inplaceGetInputDerivs;
+    inplaceNoConnectGetInputDerivs;
     val ndims = output.dims.length;
     
     if(opts.hasBias){
@@ -115,7 +115,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
     updateFFilter.convolveM(inputData, deriv, false);
     
-    inplaceReturnDeriv;
+    inplaceNoConnectReturnDeriv;
     backwardtime += toc - start;
   }
   

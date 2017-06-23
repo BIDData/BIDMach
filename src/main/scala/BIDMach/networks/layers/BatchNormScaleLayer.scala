@@ -63,7 +63,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 
   override def forward = {
     val start = toc;
-    inplaceConnect(true);
+    inplaceConnectGetOutput(true);
 
     if (batchDim.asInstanceOf[AnyRef] == null) initModelMats;
     
@@ -81,7 +81,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
   
   override def backward = {
     val start = toc;
-    inplaceGetInputDerivs;
+    inplaceConnectGetInputDerivs;
     
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
     	if (Mat.hasCUDA > 0 && net.opts.useGPU && Mat.hasCUDNN) {
@@ -91,7 +91,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     	}
     }
     
-    inplaceReturnDeriv;
+    inplaceConnectReturnDeriv;
     backwardtime += toc - start;
   }
   

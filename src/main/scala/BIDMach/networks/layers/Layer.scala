@@ -1,6 +1,6 @@
 package BIDMach.networks.layers
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,ND,SMat,SDMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -269,7 +269,10 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
     "layer@"+(hashCode % 0x10000).toString
   }
   
-    
+  /**
+   * When a layer implements a broadcast-compatible op, e.g. +, *@, this reduces the output derivative to match the smaller input deriv dimension.
+   */
+ 
   def squash(a:Mat, b:Mat):Mat = {
   	if (b.nrows == 1 && a.nrows > 1) {
   		if (b.ncols == 1 && a.ncols > 1) {
@@ -282,6 +285,10 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   	}
   }
   
+  /**
+   * For backward caching, check whether any input derivative is non-zero, i.e. if there is any need to back-prop for this layer. 
+   */
+  
   def anyNonNullDeriv = {
   	var onegood = false;
   	var i = 0;
@@ -292,7 +299,11 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   	onegood;
   }
   
-  def inplaceConnect(forceOut:Boolean = false) = {
+  /**
+   * Setup output and output derivative for Connected (inplace) layers. 
+   */ 
+  
+  def inplaceConnectGetOutput(forceOut:Boolean = false) = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	if (inplace == Net.NoInPlace) {
   		createOutput;  
@@ -311,7 +322,11 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   	}
   }
   
-  def inplaceNoConnect(forceOut:Boolean = false) = {
+  /**
+   * Setup output and output derivative for Non-Connected (not inplace) layers. 
+   */
+  
+  def inplaceNoConnectGetOutput(forceOut:Boolean = false) = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	createOutput;
   	if (inplace == Net.NoInPlace || inplace == Net.InPlace || !doreturn) {  
@@ -322,19 +337,62 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   		}
   	}
   }
-  	
-  def inplaceGetInputDerivs = {
+  
+  /**
+   * Set up input derivative matrices for connected layers. Assumes getMat zeros the matrix. 
+   * The GUID for each input derivative should be unique to this layer and input derivative number. 
+   */
+
+  def inplaceConnectGetInputDerivs = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	if (inplace == Net.BackwardCaching) {
-  		for (i <- 0 until inputlength) {
+  	  inputDeriv = deriv;
+  		for (i <- 1 until inputlength) {
   			if (inputDerivs(i).asInstanceOf[AnyRef] == ?) {
-  				setInputDeriv(i, net.getMat(inputData.dims, inputData));
+  			  val newmat = net.getMat(inputData.dims, inputData);
+  			  newmat.setGUID(ND.hash2(GUID, i));
+  				setInputDeriv(i, newmat);
   			}
   		}
   	}
   }
   
-  def inplaceReturnDeriv = {
+  /**
+   * Set up input derivative matrices for non-connected layers. Assumes getMat zeros the matrix. 
+   * The GUID for each input derivative should be unique to this layer and input derivative number. 
+   */
+  
+  def inplaceNoConnectGetInputDerivs = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	if (inplace == Net.BackwardCaching) {
+  		for (i <- 0 until inputlength) {
+  			if (inputDerivs(i).asInstanceOf[AnyRef] == ?) {
+  			  val newmat = net.getMat(inputData.dims, inputData);
+  			  newmat.setGUID(ND.hash2(GUID, i));
+  				setInputDeriv(i, newmat);
+  			}
+  		}
+  	}
+  }
+  
+  /**
+   * If appropriate, return the current derivative matrix to the backward cache for this net. 
+   * Since this is a connected layer, the derivative is aliased with the input derivative and so is not 
+   * actually returned to cache. 
+   */
+  
+  def inplaceConnectReturnDeriv = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	if (inplace == Net.BackwardCaching && doreturn) {
+  		deriv = null;
+  	}
+  }
+  
+  /**
+   * If appropriate, return the current derivative matrix to the backward cache for this net. 
+   */
+  
+  def inplaceNoConnectReturnDeriv = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	if (inplace == Net.BackwardCaching && doreturn) {
   		net.returnMat(deriv);
