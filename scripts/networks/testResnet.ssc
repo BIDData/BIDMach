@@ -19,7 +19,7 @@ val net = new Net(opts);
 val grad = new Grad(opts);
 val nn = new Learner(ds, net, null, grad, null, opts);
 
-val resdim = 34;
+val resdim = 50;
 val bottleneckThreshold = 40;
 
 val layercounts = (
@@ -46,7 +46,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logresv1.txt";
-opts.batchSize= 16;
+opts.batchSize= 64;
 opts.nend = 10;
 opts.npasses = 1;
 opts.lrate = 1e-2f;
@@ -59,6 +59,7 @@ opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
 opts.inplace = Net.BackwardCaching;
+//opts.inplace = Net.NoInPlace;
 opts.convType = Net.CrossCorrelation;
 
 val bnMode = BatchNormLayer.SPATIAL;
@@ -107,7 +108,7 @@ def convBottleNeckBlock(in:Node, dim:Int, imgdim:Int=0, firstBlock:Boolean):Node
     val convx_3 =   conv(relux_2)(w=1,h=1,pad=0,nch=dim*4,initv=1.4142f);
     val normx_3 =   batchNormScale(convx_3)(normMode=bnMode);
 
-    val shortcut =  if (firstBlock) conv(in)(w=1,h=1,pad=0,stride=cstride,nch=4*dim,initv=1.4142f) else in;
+    val shortcut =  if (firstBlock || imgdim > 0) conv(in)(w=1,h=1,pad=0,stride=cstride,nch=4*dim,initv=1.4142f) else in;
     val sum_3 =     shortcut + normx_3;
     val out =       relu(sum_3)();
     out;
