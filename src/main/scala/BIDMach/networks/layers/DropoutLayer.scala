@@ -41,11 +41,11 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 
   override def backward = {
 		val start = toc;
-		inplaceConnectGetInputDerivs;
+		inplaceConnectGetInputDerivs();
 		
 		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ randmat);
 		
-		inplaceConnectReturnDeriv;
+		inplaceConnectReturnDeriv();
 		backwardtime += toc - start;
   }
   

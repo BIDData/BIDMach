@@ -102,7 +102,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
   override def backward = {
     val start = toc;
-    inplaceNoConnectGetInputDerivs;
+    inplaceNoConnectGetInputDerivs();
     val ndims = output.dims.length;
     
     if(opts.hasBias){
@@ -115,7 +115,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
     updateFFilter.convolveM(inputData, deriv, false);
     
-    inplaceNoConnectReturnDeriv;
+    inplaceNoConnectReturnDeriv();
     backwardtime += toc - start;
   }
   

@@ -38,6 +38,8 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 			  odims(0) = ocols;
 			  output = inputData.zeros(odims);
 		  }
+		  inplaceNoConnectGetOutput();
+		  
 		  val odims = output.dims;
 		  for (i <- 0 until opts.ninputs) {
 		  	if (tensorFormat == Net.TensorNCHW) {
@@ -65,12 +67,14 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  		}
 		  	}
 		  }
-		  clearDeriv;
+		  
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  val odims = output.dims;
 		  for (i <- 0 until opts.ninputs) {
 		  	if (inputDerivs(i).asInstanceOf[AnyRef] != null) {
@@ -100,6 +104,8 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  		}
 			  }
 		  }  
+		  
+		  inplaceNoConnectReturnDeriv();
 		  backwardtime += toc - start;
   }
   

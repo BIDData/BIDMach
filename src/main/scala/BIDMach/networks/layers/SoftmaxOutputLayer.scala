@@ -38,7 +38,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 
   override def backward = {
 		  val start = toc;
-		  inplaceNoConnectGetInputDerivs;
+		  inplaceNoConnectGetInputDerivs();
 		  
 		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
@@ -76,7 +76,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		    }
       }
 		  
-		  inplaceNoConnectReturnDeriv;
+		  inplaceNoConnectReturnDeriv();
 		  backwardtime += toc - start;
   }
   
