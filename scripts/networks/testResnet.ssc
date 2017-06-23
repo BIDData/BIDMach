@@ -94,10 +94,6 @@ def conv3x3Block(in:Node, dim:Int, imgdim:Int=0):Node = {
     out;
 }
 
-
-// dim is the internal (bottleneck) depth. Input and output should have depth 4x dim, except for the first block. 
-// Image dimensions unchanged if imgdim = 0, otherwise they are halved. 
-
 def convBottleNeckBlock(in:Node, dim:Int, imgdim:Int=0, firstBlock:Boolean):Node = {
     val cstride =   if (imgdim > 0) 2 else 1;
     val convx_1 =   conv(in)(w=1,h=1,pad=0,stride=cstride,nch=dim,initv=1.4142f);

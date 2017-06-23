@@ -84,7 +84,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 	    
   override def backward = {
 		val start = toc;
-		inplaceNoConnectGetInputDerivs;
+		inplaceNoConnectGetInputDerivs();
 		
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			var xDesc:cudnnTensorDescriptor = null;
@@ -151,7 +151,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 			}
 		}
 		
-		inplaceNoConnectReturnDeriv;
+		inplaceNoConnectReturnDeriv();
 		backwardtime += toc - start;
   }
   
