@@ -391,7 +391,7 @@ object Net  {
     var nodemat:NodeMat = null;
     var withInteractions = false;
     var tmatShape:(Int,Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
-    var tensorFormat:Int = Net.TensorNHWC;
+    var tensorFormat:Int = Net.TensorNCHW;
     var convType = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
   }
    
