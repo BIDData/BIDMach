@@ -22,7 +22,9 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     val mm = modelmats(0);
     sumSq = new Array[Mat](nmats);
     for (i <- 0 until nmats) {
-    	sumSq(i) = modelmats(i).ones(modelmats(i).dims) *@ opts.initsumsq
+      if (modelmats(i).asInstanceOf[AnyRef] != null) {
+      	sumSq(i) = modelmats(i).ones(modelmats(i).dims) *@ opts.initsumsq;
+      }
     }
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols);
     one = mm.ones(1,1);
