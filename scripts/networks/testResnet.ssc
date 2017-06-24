@@ -65,7 +65,7 @@ opts.convType = Net.CrossCorrelation;
 val bnMode = BatchNormLayer.SPATIAL;
 
 :silent
-val means = loadFMat(traindir+"means.fmat.lz4");
+val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 
 {
 import BIDMach.networks.layers.Node._;
@@ -174,7 +174,7 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-nn.train;
+//nn.train;
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 //mopts.batchSize= opts.batchSize;

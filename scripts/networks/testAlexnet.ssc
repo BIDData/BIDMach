@@ -27,11 +27,12 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "log.txt";
-opts.batchSize= 512;
+opts.batchSize= 128;
 opts.npasses = 80;
+//opts.nend = 10;
 opts.lrate = 1e-4f;
 opts.texp = 0f;
-opts.pstep = 0.005f
+opts.pstep = 0.05f
 opts.hasBias = true;
 opts.l2reg = 0.0005f;
 opts.vel_decay = 0.9f;
@@ -40,9 +41,11 @@ opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
 opts.convType = Net.CrossCorrelation;
 opts.inplace = Net.BackwardCaching;
+opts.inplace = Net.InPlace;
 
 :silent
-val means = loadFMat(traindir+"means.fmat.lz4");
+
+val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 
 {
 import BIDMach.networks.layers.Node._;
@@ -56,7 +59,7 @@ val din =       in - meanv;
 val scalef =    const(row(0.01f));
 //val sdin =      din *@ scalef;
 //val fin =       format(in)();
-val cin =       crop(din)(randoffsets=irow(0,32,32,-1));
+val cin =       crop(din)(sizes=irow(3,227,227,0), randoffsets=irow(0,28,28,-1));
 val min =       randmirror(cin)();
 
 val conv1 =     conv(min)(w=11,h=11,nch=96,stride=4,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);
@@ -97,7 +100,7 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-nn.train;
+//nn.train;
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 //mopts.batchSize= opts.batchSize;
