@@ -215,7 +215,11 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   
   def cleargrad {
   	if (opts.aopts.asInstanceOf[AnyRef] == null) {
-  		for (j <- 0 until updatemats.length) updatemats(j).clear;
+  		for (j <- 0 until updatemats.length) {
+  		  if (updatemats(j).asInstanceOf[AnyRef] ne null) {
+  		  	updatemats(j).clear;
+  		  }
+  		}
   	}
   }
   
