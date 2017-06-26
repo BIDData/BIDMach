@@ -20,8 +20,8 @@ class AddLayerTest extends BIDMachSpec {
     
     val inmat1 = rand(w\h\c\n);
     val inmat2 = rand(w\h\c\n);
-    val inderiv1 = zeros(w\h\c\n);
-    val inderiv2 = zeros(w\h\c\n);
+    val inderiv1 = rand(w\h\c\n);
+    val inderiv2 = rand(w\h\c\n);
     val dout = rand(w\h\c\n);
     
     val input1 = Layer.input;
@@ -29,8 +29,8 @@ class AddLayerTest extends BIDMachSpec {
     
     input1.output = inmat1;
     input2.output = inmat2;
-    input1.deriv = inderiv1;
-    input2.deriv = inderiv2;
+    input1.deriv = inderiv1.copy;
+    input2.deriv = inderiv2.copy;
     
     "An AddLayer" should "support forward computation" in {
       
@@ -56,10 +56,13 @@ class AddLayerTest extends BIDMachSpec {
       aa.deriv should not be (null);
       
       aa.deriv <-- dout;
+      input1.deriv <-- inderiv1;
+      input2.deriv <-- inderiv2;
+      
       net.backward(0,0);
       
-    	checkSimilar(dout, input1.deriv.asInstanceOf[FMat]);
-    	checkSimilar(dout, input2.deriv.asInstanceOf[FMat]); 
+    	checkSimilar(dout + inderiv1, input1.deriv.asInstanceOf[FMat]);
+    	checkSimilar(dout + inderiv2, input2.deriv.asInstanceOf[FMat]); 
     }  
 
 }
