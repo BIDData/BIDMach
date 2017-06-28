@@ -85,6 +85,8 @@ object CaffeIO {
             // TODO: avoid duplicating code with ConvLayer here
             val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue())
             val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
+            // TODO: is this an abstraction barrier violation
+            layer.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
             modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
               val x = GFilter(filter)
               x.convType = convNode.convType
@@ -97,6 +99,8 @@ object CaffeIO {
             if (convNode.hasBias) {
               val n = layer.getBlobs(1).getShape().getDim(0).toInt
               modelMats += row(layer.getBlobs(1).getDataList().map(_.floatValue()).toArray).reshapeView(n, 1, 1, 1)
+            } else {
+              modelMats += null
             }
           }
           
