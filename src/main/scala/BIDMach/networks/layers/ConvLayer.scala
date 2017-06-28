@@ -108,11 +108,19 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
       update_bias_mat ~ update_bias_mat + deriv.sum(irow(ndims - 1));
     }
 
-    if (inputDeriv.asInstanceOf[AnyRef] != null) {      
-        ffilter.convolveT(deriv, inputDeriv, false)
+    def bwdData() = {
+    	ffilter.convolveT(deriv, inputDeriv, false);
     }
-
-    updateFFilter.convolveM(inputData, deriv, false)
+    
+    def bwdFilter() = {
+    	updateFFilter.convolveM(inputData, deriv, false);
+    }
+    
+    if (inputDeriv.asInstanceOf[AnyRef] == null) {      
+      bwdFilter();
+    } else {
+      Array(bwdData _, bwdFilter _).par.map((fn) => fn());
+    }
 
     backwardtime += toc - start;
   }
