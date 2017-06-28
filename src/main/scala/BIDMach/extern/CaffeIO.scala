@@ -30,6 +30,7 @@ object CaffeIO {
   }
 
   private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, net:Net) = {
+    // TODO: enforce NCHW if necessary
     // Translate every layer and build a mapping of blobs to layers feeding into them
     val nodes = new mutable.ArrayBuffer[Node]
     // TODO: make sure that either everything is trained or nothing is
@@ -327,12 +328,7 @@ object CaffeIO {
     node.imodel = modelMats.length
     for (blob <- layer.getBlobsList()) {
       val dimList = blob.getShape().getDimList()
-      val dims = if (dimList.size() == 4) {
-        // Translate from NCHW -> CWHN
-        Array(1, 3, 2, 0).map(dimList.get(_).intValue())
-      } else {
-        dimList.map(_.intValue()).toArray
-      }
+      val dims = dimList.map(_.intValue()).toArray
       if (blob.getDoubleDataCount() > 0) {
         val data = blob.getDoubleDataList().map(_.doubleValue()).toArray
         // TODO: what kind of Mat should I be instantiating
