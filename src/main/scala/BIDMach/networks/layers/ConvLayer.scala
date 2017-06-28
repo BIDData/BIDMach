@@ -27,6 +27,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var bias_mat:FMat = null; // it should be size (channel_out*1*1*1), to better broadcast?
     var update_bias_mat:FMat = null;
     var inputDim:IMat = null; // Should be three numbers
+    var backwardfiltertime = 0.0;
 //    var outputDim:IMat = null; //Should be three numbers
     
 
@@ -109,6 +110,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     }
     
     updateFFilter.convolveMfork(inputData, deriv, false);
+    backwardfiltertime += toc - start;
     
     if (inputDeriv.asInstanceOf[AnyRef] != null) {      
       ffilter.convolveT(deriv, inputDeriv, false);
@@ -125,7 +127,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     ffilter= null;
     updateFilter = null;
     updateFFilter = null;
-    bias_mat = null; // it should be size (channel_out*1*1*1), to better broadcast?
+    bias_mat = null; 
     update_bias_mat = null;
     inputDim = null; 
   }
