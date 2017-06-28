@@ -28,6 +28,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var update_bias_mat:FMat = null;
     var inputDim:IMat = null; // Should be three numbers
     var backwardfiltertime = 0.0;
+    var backwarddatatime = 0.0;
 //    var outputDim:IMat = null; //Should be three numbers
     
 
@@ -115,6 +116,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     if (inputDeriv.asInstanceOf[AnyRef] != null) {      
       ffilter.convolveT(deriv, inputDeriv, false);
     } 
+    backwarddatatime += toc - start;
     
     updateFFilter.convolveMjoin;
 
