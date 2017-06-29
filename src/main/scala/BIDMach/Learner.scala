@@ -103,7 +103,8 @@ case class Learner(
   }
   
   def launchTrain = {
-    launch(()=>this.train)
+    println("Running training in the background.\nLogging to file %s in the current directory" format opts.logfile);
+    launch(()=>this.train);
   }
   
   def train(doInit:Boolean) = {
