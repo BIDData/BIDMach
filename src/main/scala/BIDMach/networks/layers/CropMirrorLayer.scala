@@ -71,7 +71,7 @@ class CropMirrorLayer(override val net:Net, override val opts:CropMirrorNodeOpts
           val ioff = math.max(0, math.min(gap-1, gap/2 + (opts.randoffsets(i) * (random.nextFloat() -0.5f)).toInt)); 
           roffset.set(ioff);
         }
-        if (i == 1 && random.nextFloat() < 0.5f) {
+        if (i == 1 && !net.predicting && random.nextFloat() < 0.5f) {
         	blockInds(i) ~ baseMirrorInds + roffset;
         } else {
         	blockInds(i) ~ baseInds(i) + roffset; 
