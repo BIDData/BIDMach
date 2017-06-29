@@ -89,7 +89,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     			lrate ~ lrate *@ lr_scales(i);
     		}
     		(mm, um, ss, ve, tscale, lrate) match {
-    		case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
+/*    		case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
     			if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
     				val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
     				ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
@@ -99,7 +99,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     			} else {
     				ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
     			}
-    		}
+    		}*/
     		case _ => {
     			val newsquares = um *@ um;
     			newsquares ~ newsquares *@ nw;

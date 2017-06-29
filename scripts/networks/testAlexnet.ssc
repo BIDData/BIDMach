@@ -1,3 +1,5 @@
+import BIDMach.networks.layers._
+
 val traindir = "../../data/ImageNet/train/";
 val testdir = "../../data/ImageNet/val/";
 val traindata = traindir+"partNCHW%04d.bmat.lz4";
@@ -6,26 +8,36 @@ val testdata = testdir+"partNCHW%04d.bmat.lz4";
 val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
 
-val (nn,opts) = Net.learner(traindata, trainlabels);
-val net = nn.model.asInstanceOf[Net]
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+val opts = new MyOpts;
+val ds = FileSource(traindata, trainlabels, opts);
+val net = new Net(opts);
+val grad = new Grad(opts);
+val nn = new Learner(ds, net, null, grad, null, opts);
+
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
-  if (ipass < 10) 3e-4f else if (ipass < 20) 1e-4f else 3e-5f;
+  val lr = if (ipass < 20) {
+      1e-2f
+  } else if (ipass < 40) {
+      1e-3f
+  } else 1e-4f;
+  lr
 }
 
+opts.logfile = "logAlexnet.txt";
 opts.batchSize= 128;
-opts.npasses = 40;
+opts.npasses = 80;
 opts.lrate = 1e-4f;
-opts.texp = 0f
+opts.texp = 0f;
 opts.pstep = 0.05f
 opts.hasBias = true;
-opts.lr_policy = lr_update _;
-opts.gsq_decay = 0.999f;
 opts.l2reg = 0.0005f;
-opts.initsumsq = 0.01f;
-opts.lookahead = 2;
+opts.vel_decay = 0.9f;
+opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
-val inplace=true;
+opts.useCache = false;
+val inplace = true;
 
 :silent
 val means = loadFMat(traindir+"means.fmat.lz4");
@@ -39,56 +51,58 @@ Net.initDefaultNodeSet;
 val in =        input;
 val meanv =     const(means);
 val din =       in - meanv;
-//val scalef =    const(row(0.01f));
+val scalef =    const(row(0.01f));
 //val sdin =      din *@ scalef;
 //val fin =       format(in)();
 val cin =       crop(din)(randoffsets=irow(0,32,32,-1));
 val min =       randmirror(cin)();
 
-
-val conv1 =     conv(min)(w=11,h=11,nch=96,stride=4,convType=convt);
+val conv1 =     conv(min)(w=11,h=11,nch=96,stride=4,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);
 val relu1 =     relu(conv1)(inplace);
 val pool1 =     pool(relu1)(w=3,h=3,stride=2);
-val norm1 =     LRNwithin(pool1)(dim=5,alpha=0.0001f,beta=0.75f);
+val norm1 =     LRNacross(pool1)(dim=5,alpha=0.0001f,beta=0.75f);
 
-val conv2 =     conv(norm1)(w=5,h=5,nch=256,stride=1,pad=2,convType=convt);   
+val conv2 =     conv(norm1)(w=5,h=5,nch=256,stride=1,pad=2,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
 val relu2 =     relu(conv2)(inplace);
 val pool2 =     pool(relu2)(w=3,h=3,stride=2);
-val norm2 =     LRNwithin(pool2)(dim=5,alpha=0.0001f,beta=0.75f);
+val norm2 =     LRNacross(pool2)(dim=5,alpha=0.0001f,beta=0.75f);
 
-val conv3 =     conv(norm2)(w=3,h=3,nch=384,pad=1,convType=convt);   
+val conv3 =     conv(norm2)(w=3,h=3,nch=384,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=0f); 
 val relu3 =     relu(conv3)(inplace);
 
-val conv4 =     conv(relu3)(w=3,h=3,nch=384,pad=1,convType=convt);
+val conv4 =     conv(relu3)(w=3,h=3,nch=384,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);   
 val relu4 =     relu(conv4)(inplace);
 
-val conv5 =     conv(relu4)(w=3,h=3,nch=256,pad=1,convType=convt);
+val conv5 =     conv(relu4)(w=3,h=3,nch=256,pad=1,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
 val relu5 =     relu(conv5)(inplace);
 val pool5 =     pool(relu5)(w=3,h=3,stride=2);
 
-val fc6 =       linear(pool5)(outdim=4096,initv=5e-3f);
+val fc6 =       linear(pool5)(outdim=4096,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
 val relu6 =     relu(fc6)(inplace);
 val drop6 =     dropout(relu6)(0.5f);
 
-val fc7 =       linear(drop6)(outdim=4096,initv=5e-3f);
+val fc7 =       linear(drop6)(outdim=4096,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
 val relu7  =    relu(fc7)(inplace);
 val drop7 =     dropout(relu7)(0.5f);
 
-val fc8  =      linear(drop7)(outdim=1000,initv=1e-1f);
+val fc8  =      linear(drop7)(outdim=1000,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
 val out =       softmaxout(fc8)(scoreType=1,lossType=1);
 
 opts.nodeset=Net.getDefaultNodeSet
 }
 
-// nn.train;
+def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
-// val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
-// mopts.batchSize= opts.batchSize;
-// mopts.hasBias= opts.hasBias;
-// mopts.tensorFormat = opts.tensorFormat;
-// mm.predict;
+val sgd = nn.updater.asInstanceOf[Grad];
 
-// println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+//nn.train;
+
+//val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+//mopts.batchSize= opts.batchSize;
+//mopts.autoReset = false;
+//mm.predict;
+
+//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 :silent
 
 
