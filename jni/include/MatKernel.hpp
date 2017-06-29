@@ -1,5 +1,7 @@
 void setsizes(int N, dim3 *gridp, int *nthreadsp);
 
+void setsizesLean(int N, dim3 *gridp, int *nthreadsp);
+
 int apply_links(float *A, int *L, float *C, int nrows, int ncols);
 
 int apply_preds(float *A, int *L, float *C, int nrows, int ncols);

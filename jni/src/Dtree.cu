@@ -735,7 +735,7 @@ __global__ void __floatToInt(int n, float *in, int *out, int nbits) {
 int floatToInt(int n, float *in, int *out, int nbits) {
   int nthreads;
   dim3 griddims;
-  setsizes(n, &griddims, &nthreads);
+  setsizesLean(n, &griddims, &nthreads);
   __floatToInt<<<griddims,nthreads>>>(n, in, out, nbits);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -755,7 +755,7 @@ __global__ void __jfeatsToIfeats(int itree, int *inodes, int *jfeats, int *ifeat
 int jfeatsToIfeats(int itree, int *inodes, int *jfeats, int *ifeats, int n, int nfeats, int seed) {
   int nthreads;
   dim3 griddims;
-  setsizes(n, &griddims, &nthreads);
+  setsizesLean(n, &griddims, &nthreads);
   __jfeatsToIfeats<<<griddims,nthreads>>>(itree, inodes, jfeats, ifeats, n, nfeats, seed);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();

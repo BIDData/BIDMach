@@ -85,7 +85,7 @@ __global__ void __apply_fwd(float *A, float *B, int ifn, int n) {
 int apply_fwd(float *A, float *B, int ifn, int n) {
   int nthreads;
   dim3 griddims;
-  setsizes(n, &griddims, &nthreads);
+  setsizesLean(n, &griddims, &nthreads);
   __apply_fwd<<<griddims,nthreads>>>(A, B, ifn, n);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -104,7 +104,7 @@ __global__ void __apply_deriv(float *A, float *B, float *C, int ifn, int n) {
 int apply_deriv(float *A, float *B, float *C, int ifn, int n) {
   int nthreads;
   dim3 griddims;
-  setsizes(n, &griddims, &nthreads);
+  setsizesLean(n, &griddims, &nthreads);
   __apply_deriv<<<griddims,nthreads>>>(A, B, C, ifn, n);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -210,7 +210,7 @@ __global__ void __lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, fl
 int lstm_fwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, float *outC, float *outH, int n) {
   int nthreads;
   dim3 griddims;
-  setsizes(n, &griddims, &nthreads);
+  setsizesLean(n, &griddims, &nthreads);
   __lstm_fwd<<<griddims,nthreads>>>(inC, LIN1, LIN2, LIN3, LIN4, outC, outH, n);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -221,7 +221,7 @@ int lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, flo
              float *dinC, float *dLIN1, float *dLIN2, float *dLIN3, float *dLIN4, int n) {
   int nthreads;
   dim3 griddims;
-  setsizes(n, &griddims, &nthreads);
+  setsizesLean(n, &griddims, &nthreads);
   __lstm_bwd<<<griddims,nthreads>>>(inC, LIN1, LIN2, LIN3, LIN4, outC, outH, dinC, dLIN1, dLIN2, dLIN3, dLIN4, n);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
