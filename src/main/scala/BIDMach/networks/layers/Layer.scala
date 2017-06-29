@@ -373,6 +373,13 @@ object Layer {
     new CropLayer(net, new CropNode{sizes = csizes; offsets = coffsets; randoffsets = roffsets}){inputs(0) = a;}
   }
   
+  def cropMirror(a:LayerTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1), randoffsets:IMat=null, net:Net=null) = {
+    val csizes = sizes;
+    val coffsets = offsets;
+    val roffsets = randoffsets;
+    new CropMirrorLayer(net, new CropMirrorNode{sizes = csizes; offsets = coffsets; randoffsets = roffsets}){inputs(0) = a;}
+  }
+  
   def dropout(a:LayerTerm)(frac:Float=0.5f, net:Net=null) = {
     val dfrac = frac;
     new DropoutLayer(net, new DropoutNode{frac = dfrac}){inputs(0) = a}
