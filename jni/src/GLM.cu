@@ -132,7 +132,8 @@ void setsizes(int N, dim3 *gridp, int *nthreadsp) {
     } else if (nthreads < 1024) {
       nthreads = 2*nthreads;
     } else {
-      nblocks = max(nblocks, 1 + (int)((N-1)/nthreads));
+//      nblocks = max(nblocks, 1 + (int)((N-1)/nthreads));
+      nblocks = 2*nblocks;
     }
   }
   gridp->y = 1 + (nblocks-1)/65536;
