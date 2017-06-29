@@ -26,7 +26,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet.txt";
-opts.batchSize= 128;
+opts.batchSize= 256;
 opts.npasses = 80;
 opts.lrate = 1e-4f;
 opts.texp = 0f;
@@ -95,7 +95,10 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-//nn.train;
+
+nn.launchTrain;
+
+println("Examine the 'nn' variable to track learning state.\n");
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 //mopts.batchSize= opts.batchSize;
