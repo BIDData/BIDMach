@@ -303,7 +303,6 @@ trait BatchNormScaleNodeOpts extends ModelNodeOpts {
   var expAvgFactor:Float = 1.0f;                  
   var epsilon:Float = 1e-4f;
   var batchNormMode:Int = BatchNormLayer.SPATIAL;
-  var tensorFormat:Int = Net.UseNetFormat;
   var inplace:Boolean = false;
 
   def copyOpts(opts:BatchNormScaleNodeOpts):BatchNormScaleNodeOpts = {
@@ -312,7 +311,6 @@ trait BatchNormScaleNodeOpts extends ModelNodeOpts {
 		opts.expAvgFactor = expAvgFactor;
 		opts.epsilon = epsilon;
 		opts.batchNormMode = batchNormMode;
-		opts.tensorFormat = tensorFormat;
 		opts.inplace = inplace;
 		opts;
   }

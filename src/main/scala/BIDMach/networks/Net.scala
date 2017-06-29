@@ -373,6 +373,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     val layernames = new CSMat(layers.length, 1, layers.map(_.getClass.getSimpleName));
     (times, layernames);
   }
+  
+  def hasFormat(layerFormat:Int):Int = {
+    if (layerFormat != Net.UseNetFormat) {
+      layerFormat;
+    } else {
+      opts.tensorFormat;
+    }
+  }
 }
 
 object Net  {

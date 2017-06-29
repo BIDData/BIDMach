@@ -72,12 +72,10 @@ class RandomMirrorLayer(override val net:Net, override val opts:RandomMirrorNode
 
 trait RandomMirrorNodeOpts extends NodeOpts {
   var prob = 0.5f;
-  var tensorFormat:Int = Net.UseNetFormat;
     
   def copyOpts(opts:RandomMirrorNodeOpts):RandomMirrorNodeOpts = {
   		super.copyOpts(opts);
   		opts.prob = prob;
-  		opts.tensorFormat = tensorFormat;
   		opts;
   }
 }

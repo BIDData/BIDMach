@@ -163,7 +163,6 @@ trait LRNacrossNodeOpts extends CompoundNodeOpts {
     var alpha = 1f;
     var beta = 0.5f;
     var k = 2f;
-    var tensorFormat:Int = Net.UseNetFormat;
     
    def copyOpts(opts:LRNacrossNodeOpts):LRNacrossNodeOpts = {
   		super.copyOpts(opts);
@@ -171,7 +170,6 @@ trait LRNacrossNodeOpts extends CompoundNodeOpts {
   		opts.alpha = alpha;
   		opts.beta = beta;
   		opts.k = k;
-  		opts.tensorFormat = tensorFormat;
   		opts;
     }
 }

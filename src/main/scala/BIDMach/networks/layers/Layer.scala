@@ -279,6 +279,14 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   		a;
   	}
   }
+  
+  def getTensorFormat:Int = {
+    if (opts.tensorFormat != Net.UseNetFormat) {
+      opts.tensorFormat;
+    } else {
+      net.opts.tensorFormat;
+    }
+  }
 }
 
 class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {

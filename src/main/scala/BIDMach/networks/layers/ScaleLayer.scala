@@ -99,14 +99,12 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
 trait ScaleNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = true;
   var batchNormMode = BatchNormLayer.SPATIAL;
-  var tensorFormat:Int = Net.UseNetFormat;
-  
+   
   def copyOpts(opts:ScaleNodeOpts):ScaleNodeOpts = {
   		super.copyOpts(opts);
   		opts.hasBias = hasBias;
   		opts.batchNormMode = batchNormMode;
-  		opts.tensorFormat = tensorFormat;
-  		opts;
+   		opts;
   }
 }
     

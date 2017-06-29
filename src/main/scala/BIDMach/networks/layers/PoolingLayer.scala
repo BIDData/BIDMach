@@ -289,7 +289,6 @@ trait PoolingNodeOpts extends ModelNodeOpts {
 	var stride:Int = 1;
 	var poolingMode:Int = cudnnPoolingMode.CUDNN_POOLING_MAX;
 	var poolingNaN:Int = cudnnNanPropagation.CUDNN_PROPAGATE_NAN;
-  var tensorFormat:Int = Net.UseNetFormat;
 
   def copyOpts(opts:PoolingNodeOpts):PoolingNodeOpts = {
 		super.copyOpts(opts);
@@ -299,7 +298,6 @@ trait PoolingNodeOpts extends ModelNodeOpts {
 		opts.stride = stride;
 		opts.poolingMode = poolingMode;
 		opts.poolingNaN = poolingNaN;
-		opts.tensorFormat = tensorFormat;
 		opts;
   }
 }

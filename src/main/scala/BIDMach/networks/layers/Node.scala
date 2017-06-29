@@ -22,10 +22,12 @@ import BIDMach.networks._
 @SerialVersionUID(100L)
 trait NodeOpts extends BIDMat.Opts {
   var name = "";  
+  var tensorFormat:Int = Net.UseNetFormat;
   
   def copyOpts(opts:NodeOpts):NodeOpts = {
     opts.name = name;
-		opts;
+    opts.tensorFormat = tensorFormat;
+	opts;
   }
 }
 
