@@ -95,9 +95,10 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-println("\nRunning training in the background.\nSaving to file '%s' in the current directory.\nExamine the 'nn' variable to track learning state.\n" format opts.logfile);
 
 nn.launchTrain;
+
+println("Examine the 'nn' variable to track learning state.\n");
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 //mopts.batchSize= opts.batchSize;
