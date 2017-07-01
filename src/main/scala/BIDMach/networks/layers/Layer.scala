@@ -179,6 +179,8 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def setGUID(v:Long):Unit = {_GUID = v}
   def GUID:Long = _GUID
   
+  val myGPU = getGPU;
+  
   // Setters and getters for general elements of those arrays
   def outputs(i:Int) = _outputs(i);
   def derivs(i:Int) = _derivs(i);  
