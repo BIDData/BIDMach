@@ -18,6 +18,20 @@ val nn = new Learner(ds, net, null, grad, null, opts);
 val resdim = 50;
 val bottleneckThreshold = 40;
 
+val layercounts = (
+18   \  2 \  2 \  2 \  2 on
+34   \  3 \  4 \  6 \  3 on
+50   \  3 \  4 \  6 \  3 on 
+101  \  3 \  4 \ 23 \  3 on
+152  \  3 \  8 \ 36 \  3);
+
+val imodel = find(layercounts(?,0) == resdim).v;
+
+val nconv2x = layercounts(imodel, 1);
+val nconv3x = layercounts(imodel, 2);
+val nconv4x = layercounts(imodel, 3);
+val nconv5x = layercounts(imodel, 4);
+
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 20) {
       1e-2f
@@ -36,33 +50,20 @@ opts.texp = 0f;
 opts.pstep = 0.01f;
 opts.hasBias = false;
 opts.l2reg = 0.0005f;
+opts.hasBias = true;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
+opts.inplace = Net.BackwardCaching;
+//opts.inplace = Net.NoInPlace;
+opts.convType = Net.CrossCorrelation;
 
-val in_place = true;
-val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
 val bnMode = BatchNormLayer.SPATIAL;
 
 
-val layercounts = (
-18   \  2 \  2 \  2 \  2 on
-34   \  3 \  4 \  6 \  3 on
-50   \  3 \  4 \  6 \  3 on 
-101  \  3 \  4 \ 23 \  3 on
-152  \  3 \  8 \ 36 \  3);
-
-val imodel = find(layercounts(?,0) == resdim).v;
-
-val nconv2x = layercounts(imodel, 1);
-val nconv3x = layercounts(imodel, 2);
-val nconv4x = layercounts(imodel, 3);
-val nconv5x = layercounts(imodel, 4);
-
-
 :silent
-val means = loadFMat(traindir+"means.fmat.lz4");
+val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 
 {
 import BIDMach.networks.layers.Node._;
@@ -99,49 +100,13 @@ def convBottleNeckBlock(in:Node, dim:Int, firstBlock:Boolean):Node = {
     out;
 }
 
-def convBlock(in:Node, dim:Int, firstBlock:Boolean = false):Node = {
-    if (resdim > bottleneckThreshold) convBottleNeckBlock(in, dim, firstBlock) else conv3x3Block(in, dim);
-}
 
-// dim is the output depth. The input should be depth dim/2. The image dimensions are halved. 
-def span3x3Block(in:Node, dim:Int, imgdim:Int):Node = {
-    val convx_1 =   conv(in)(w=3,h=3,pad=1,stride=2,nch=dim,initv=1.4142f,hasBias=opts.hasBias);
-    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
-    val relux_1 =   relu(normx_1)(in_place);
-
-    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,hasBias=opts.hasBias);
-    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
-
-    val pool_2 =    pool(in)(w=1,h=1,pad=0,stride=2);
-    val fill_2 =    constant(zeros((dim/2)\imgdim\imgdim\opts.batchSize));
-    val shortcut =  pool_2 over fill_2;
-
-    val sum_2 =     shortcut + normx_2;
-    val out =       relu(sum_2)(in_place);
-    out;
-}
-
-// dim is the input depth. Output depth is 4*dim. The image dimensions are halved. 
-def spanBottleNeckBlock(in:Node, dim:Int, imgdim:Int):Node = {
-    val convx_1 =   conv(in)(w=1,h=1,pad=0,stride=2,nch=dim,initv=1.4142f,hasBias=opts.hasBias);
-    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
-    val relux_1 =   relu(normx_1)(in_place);
-
-    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,hasBias=opts.hasBias);
-    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
-    val relux_2 =   relu(normx_2)(in_place);
-
-    val convx_3 =   conv(relux_2)(w=1,h=1,pad=0,nch=dim*4,initv=1.4142f,hasBias=opts.hasBias);
-    val normx_3 =   batchNormScale(convx_3)(normMode=bnMode,inplace=in_place);
-
-    val shortcut =  conv(in)(w=1,h=1,pad=0,stride=2,nch=dim*4,initv=1.4142f,hasBias=opts.hasBias);
-    val sum_3 =     shortcut + normx_3;
-    val out =       relu(sum_3)(in_place);
-    out;
-}
-
-def spanBlock(in:Node, dim:Int, imgdim:Int):Node = {
-    if (resdim > bottleneckThreshold) spanBottleNeckBlock(in, dim, imgdim) else span3x3Block(in, dim, imgdim);
+def convBlock(in:Node, dim:Int, imgdim:Int = 0, firstBlock:Boolean = false):Node = {
+    if (resdim > bottleneckThreshold) {
+	convBottleNeckBlock(in, dim, imgdim, firstBlock) 
+    } else {
+	conv3x3Block(in, dim, imgdim);
+    }
 }
 
 Net.initDefaultNodeSet;
@@ -161,25 +126,25 @@ val norm1 =     batchNormScale(conv1)(normMode=bnMode,inplace=in_place);
 val relu1 =     relu(norm1)(in_place);
 val pool1 =     pool(relu1)(h=3,w=3,pad=1,stride=2);
 
-thisnode =      convBlock(pool1, 64, true);
+thisnode =      convBlock(pool1, 64, 0, true);
 
 for (i <- 0 until (nconv2x-1)) {
     thisnode =  convBlock(thisnode, 64);
 }
 
-thisnode =      spanBlock(thisnode, 128, 28);
+thisnode =      convBlock(thisnode, 128, 28);
 
 for (i <- 0 until (nconv3x-1)) {
     thisnode =  convBlock(thisnode, 128);
 }
 
-thisnode =      spanBlock(thisnode, 256, 14);
+thisnode =      convBlock(thisnode, 256, 14);
 
 for (i <- 0 until (nconv4x-1)) {
     thisnode =  convBlock(thisnode, 256);
 }
 
-thisnode =      spanBlock(thisnode, 512, 7);
+thisnode =      convBlock(thisnode, 512, 7);
 
 for (i <- 0 until (nconv5x-1)) {
     thisnode =  convBlock(thisnode, 512);
@@ -196,7 +161,7 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-nn.train;
+//nn.train;
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 //mopts.batchSize= opts.batchSize;
