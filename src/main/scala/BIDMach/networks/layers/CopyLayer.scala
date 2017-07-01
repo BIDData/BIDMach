@@ -29,7 +29,9 @@ class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyN
 			  }
 		  }
 		  output <-- inputData;
-		  clearDeriv;
+		  
+      inplaceNoConnectSetupDerivs();
+      
 		  forwardtime += toc - start;
   }
 

@@ -22,15 +22,20 @@ class TanhLayer(override val net:Net, override val opts:TanhNodeOpts = new TanhN
 
 	override def forward = {
 			val start = toc;
-			createOutput;
+			inplaceNoConnectGetOutput();
+			
 			tanh(inputData, output);
-			clearDeriv;
+	
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(output, deriv, LayerFn.TANHFN);
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

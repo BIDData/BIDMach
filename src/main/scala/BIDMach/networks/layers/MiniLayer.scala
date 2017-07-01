@@ -24,14 +24,20 @@ class MiniLayer(override val net:Net, override val opts:MiniNodeOpts = new MiniN
 	override def forward = {
 			val start = toc;
 		  createOutput(1 \ inputData.ncols);
+		  inplaceNoConnectGetOutput();
+		  
 			output <-- mini(inputData);
-			clearDeriv;
+
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ (inputData == mini(inputData)));  
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

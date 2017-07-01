@@ -23,15 +23,20 @@ class ExpLayer(override val net:Net, override val opts:ExpNodeOpts = new ExpNode
 
 	override def forward = {
 			val start = toc;
-			createOutput;
+			inplaceNoConnectGetOutput();
+			
 			exp(inputData, output);
-			clearDeriv;
+	
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ output);  
+			
+			inplaceNoConnectReleaseDeriv();
 			backwardtime += toc - start;
 	}
   

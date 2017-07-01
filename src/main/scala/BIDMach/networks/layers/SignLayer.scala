@@ -23,14 +23,16 @@ class SignLayer(override val net:Net, override val opts:SignNodeOpts = new SignN
 
 	override def forward = {
 			val start = toc;
-			createOutput;
+			inplaceNoConnectGetOutput();
+					  
 			sign(inputData, output);
-			clearDeriv;
+
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc; 
+			
 			backwardtime += toc - start;
 	}
   

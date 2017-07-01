@@ -28,7 +28,8 @@ class EfnLayer(override val net:Net, override val opts:EfnNodeOpts = new EfnNode
 
   override def forward = {
 		  val start = toc;
-		  createOutput;
+		  inplaceNoConnectGetOutput();
+		        
 		  if (finput.asInstanceOf[AnyRef] == null) {
 		    finput = FMat(inputData);
 		    foutput = FMat(output);		    
@@ -42,12 +43,13 @@ class EfnLayer(override val net:Net, override val opts:EfnNodeOpts = new EfnNode
 		  	}
 		  	output <-- foutput;
 		  }
-		  clearDeriv;
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  if (inputDeriv.asInstanceOf[AnyRef] != null &&  opts.bwdfn.asInstanceOf[AnyRef] != null) {
 		  	if (finderiv.asInstanceOf[AnyRef] == null) {
 		  		finderiv = FMat(inputDeriv);
@@ -63,6 +65,7 @@ class EfnLayer(override val net:Net, override val opts:EfnNodeOpts = new EfnNode
 		  	}
 		  	inputDeriv <-- finderiv;		    
 		  }
+		  inplaceNoConnectReleaseDeriv()
 		  backwardtime += toc - start;
   }
   

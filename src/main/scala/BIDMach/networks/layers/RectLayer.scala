@@ -36,7 +36,7 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 
 			RectLayer.rectHelper(inputData, deriv, inputDeriv);
 			  
-			inplaceConnectReturnDeriv();
+			inplaceConnectReleaseDeriv();
 			backwardtime += toc - start;
 	}
   

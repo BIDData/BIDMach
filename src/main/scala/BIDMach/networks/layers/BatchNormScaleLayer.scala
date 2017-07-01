@@ -91,7 +91,7 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     	}
     }
     
-    inplaceConnectReturnDeriv();
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
   }
   

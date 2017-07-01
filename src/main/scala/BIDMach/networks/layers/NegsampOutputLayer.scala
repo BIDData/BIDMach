@@ -64,6 +64,7 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
     val indmat = nHot(irandwords, nfeats);
     prods = DDS(mm, inputMat, indmat);
     output = prods.contents.view(opts.nsamps+1, inputData.ncols);
+    inplaceNoConnectSetupDerivs();
 
     output ~ output - maxi(output)
     exp(output, output);  // ensures sum(exps) is between 1 and nfeats
@@ -77,6 +78,8 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
 
   override def backward = {
 		val start = toc;
+		inplaceNoConnectGetInputDerivs();
+		
 		val modelrows = inputData.nrows;
 		val nfeats = if (opts.outdim == 0) inputData.nrows else opts.outdim;
 		if (targMat.asInstanceOf[AnyRef] == null) targMat = convertMat(zeros(opts.nsamps, inputData.ncols) on ones(1, inputData.ncols));
@@ -95,6 +98,8 @@ class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNo
 				mm.madd(prods, inputDeriv);
 			}
 		}
+		
+		inplaceNoConnectReleaseDeriv()
 		backwardtime += toc - start;
   }
   

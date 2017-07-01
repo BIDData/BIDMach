@@ -24,19 +24,21 @@ class DivLayer(override val net:Net, override val opts:DivNodeOpts = new DivNode
 
 	override def forward = {
     val start = toc;
-	  createOutput(inputData.dims);
-	  output <-- inputData;
-	  output ~ output / inputDatas(1);
-	  clearDeriv;
+	  inplaceNoConnectGetOutput();
+	  
+	  output ~ inputData / inputDatas(1);
+	  
 	  forwardtime += toc - start;
 	}
 	
 	override def backward = {
     val start = toc;
-
+    inplaceNoConnectGetInputDerivs();
+      
     if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + squash(deriv / inputDatas(1), inputDerivs(0));
     if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) - squash((deriv / inputDatas(1)) ∘ (inputDatas(0) / inputDatas(1)), inputDerivs(1));
 
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
 	}
   

@@ -60,12 +60,14 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 		  		}		    
 		  	}
 		  }
-		  clearDerivs;
+		  inplaceNoConnectSetupDerivs();
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  val dims = inputData.dims;
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			  for (i <- 0 until opts.nparts) {
@@ -95,6 +97,7 @@ class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts =
 			  	}
 			  }
 		  }
+		  inplaceNoConnectReleaseDeriv()
 		  backwardtime += toc - start;
   }
   

@@ -25,21 +25,26 @@ class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new
   override def forward = {
 			val start = toc;
 			if (one.asInstanceOf[AnyRef] == null) one = inputData.ones(1,1);
-			createOutput;
+			inplaceNoConnectGetOutput();
+			
 			output ~ inputData - maxi(inputData)
 			exp(output, output);  // ensures sum(exps) is between 1 and nfeats
 			output ~ output / sum(output);
-			clearDeriv;
+		
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) {
 				val exps = exp(inputData - maxi(inputData));
 				val smax = exps / sum(exps);
 				inputDeriv ~ inputDeriv + ((smax ∘ deriv) - (smax ∘ (smax ∙ deriv)));
 			}
+			
+			inplaceNoConnectReleaseDeriv();
 			backwardtime += toc - start;
 	}
 	

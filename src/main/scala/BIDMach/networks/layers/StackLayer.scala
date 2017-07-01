@@ -105,7 +105,7 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 			  }
 		  }  
 		  
-		  inplaceNoConnectReturnDeriv();
+		  inplaceNoConnectReleaseDeriv();
 		  backwardtime += toc - start;
   }
   

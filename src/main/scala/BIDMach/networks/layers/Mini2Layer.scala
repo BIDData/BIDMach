@@ -26,16 +26,22 @@ class Mini2Layer(override val net:Net, override val opts:Mini2NodeOpts = new Min
 	
 	override def forward = {
 			val start = toc;
+			inplaceNoConnectSetupDerivs();
+			
 			val (mm, ii) = mini2(inputData);
 			output = mm;
 			setOutput(1, ii);
-			clearDeriv;
+
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ (inputData == mini(inputData)));  
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

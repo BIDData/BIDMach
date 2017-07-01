@@ -23,15 +23,21 @@ class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode
   override def forward = {
 		  val start = toc;
 		  createOutput(1 \ inputData.ncols);
+		  inplaceNoConnectSetupDerivs();
+		  
 		  output <-- sum(inputData);
-		  clearDeriv;
+		  
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  if (vmap.asInstanceOf[AnyRef] == null) vmap = deriv.ones(output.nrows, 1);
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (vmap * deriv);  
+		  
+		  inplaceNoConnectReleaseDeriv();
 		  backwardtime += toc - start;
   }
   

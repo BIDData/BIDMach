@@ -22,22 +22,27 @@ class Fn2Layer(override val net:Net, override val opts:Fn2NodeOpts = new Fn2Node
     
   override def forward = {
 		  val start = toc;
-		  createOutput;
+		  inplaceNoConnectGetOutput();
+		        
 		  if (opts.fwdfn.asInstanceOf[AnyRef] != null) {
 		  	output <-- opts.fwdfn(inputData, inputDatas(1));
 		  }
-		  clearDeriv;
+
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  if (inputDeriv.asInstanceOf[AnyRef] != null &&  opts.bwdfn1.asInstanceOf[AnyRef] != null) {
 		    inputDeriv ~ inputDeriv + opts.bwdfn1(inputData, inputDatas(1), output, deriv);
 		  }
 		  if (inputDerivs(1).asInstanceOf[AnyRef] != null &&  opts.bwdfn2.asInstanceOf[AnyRef] != null) {
 		    inputDeriv ~ inputDeriv + opts.bwdfn2(inputData, inputDatas(1), output, deriv);
 		  }
+		  
+		  inplaceNoConnectReleaseDeriv()
 		  backwardtime += toc - start;
   }
   

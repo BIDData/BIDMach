@@ -26,16 +26,22 @@ class Maxi2Layer(override val net:Net, override val opts:Maxi2NodeOpts = new Max
 	
 	override def forward = {
 			val start = toc;
+			inplaceNoConnectSetupDerivs();
+			
 			val (mm, ii) = maxi2(inputData);
 			output = mm;
 			setOutput(1, ii);
-			clearDeriv;
+
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
-			val start = toc;		
+			val start = toc;	
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ (inputData == maxi(inputData)));  
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

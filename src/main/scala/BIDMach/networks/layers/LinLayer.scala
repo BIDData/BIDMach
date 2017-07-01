@@ -98,7 +98,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       if (opts.hasBias) updatemats(imodel+1) ~ updatemats(imodel+1) + sum(deriv,2);
     }
     
-    inplaceNoConnectReturnDeriv();
+    inplaceNoConnectReleaseDeriv();
     backwardtime += toc - start;
   }
 

@@ -34,8 +34,8 @@ class RandomMirrorLayer(override val net:Net, override val opts:RandomMirrorNode
 
 	override def forward = {
   		val start = toc;
+  		inplaceNoConnectGetOutput();
   		
-  		createOutput;
   		if (net.predicting) {
   		  output <-- inputData;
   		} else {

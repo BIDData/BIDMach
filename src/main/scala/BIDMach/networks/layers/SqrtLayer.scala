@@ -25,16 +25,21 @@ class SqrtLayer(override val net:Net, override val opts:SqrtNodeOpts = new SqrtN
 
 	override def forward = {
 			val start = toc;
-			createOutput;
+			inplaceNoConnectGetOutput();
+			
 			if (half.asInstanceOf[AnyRef] == null) half = inputData.ones(1,1) * 0.5f
 			sqrt(inputData, output);
-			clearDeriv;
+	
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv * half / sqrt(inputData) );  
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

@@ -31,17 +31,21 @@ class SplitHorizLayer(override val net:Net, override val opts:SplitHorizNodeOpts
 		  for (i <- 0 until opts.nparts) {
 			  setOutput(i, inputData.colslice(i*nblock, (i+1)* nblock));
 		  }
-		  clearDerivs;
+		  inplaceNoConnectSetupDerivs();
+		  
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			  for (i <- 0 until opts.nparts) {
 				  inputDeriv(?, colranges(i)) = inputDeriv(?, colranges(i)) + derivs(i);
 			  }
 		  }  
+		  inplaceNoConnectReleaseDeriv()
 		  backwardtime += toc - start;
   }
   

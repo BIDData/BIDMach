@@ -25,7 +25,8 @@ class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts =
       throw new RuntimeException("Spatial BatchNorm with NCHW tensors requires CUDNN fused BatchNormScaleLayer");
     }
     val start = toc;
-    createOutput;
+    inplaceNoConnectGetOutput();
+      
     if (batchDim.asInstanceOf[AnyRef] == null) {
     	batchDim = opts.batchNormMode match {
     	case BatchNormLayer.SPATIAL => irow(1->inputData.dims.length);
@@ -38,32 +39,33 @@ class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts =
     sdevs = sqrt(variances);
     output ~ inputData - means;                    // minimize tmp storage;
     output ~ output / sdevs;                       // Works even if output = input;
-    
-    clearDeriv
+ 
     forwardtime += toc - start
   }
   
   override def backward = {
-    val start = toc
+    val start = toc;
+    inplaceNoConnectGetInputDerivs();
 
-   if (debugMe) {
-  			val diff = inputData - means;
-  			val normedvar = diff *@ diff / variances;
-  			val terms = (1f - normedvar) *@ deriv - (deriv.mean(batchDim) + (normedvar dotr deriv));
-  			inputDeriv ~ inputDeriv + (terms / sdevs);
-  		} else {
-  			// minimize tmp storage
-  			val tmp = inputData - means;
-  			tmp ~ tmp *@ tmp;
-  			tmp ~ tmp / variances;                     // Normalized per-element variance (normedvar)
-  			val lastTerm = tmp dotr deriv;
-  			tmp ~ 1f - tmp;
-  			tmp ~ tmp *@ deriv;
-  			tmp ~ tmp - (lastTerm + deriv.mean(batchDim));
-  			tmp ~ tmp / sdevs;
-  			inputDeriv ~ inputDeriv + tmp;
+    if (debugMe) {
+    	val diff = inputData - means;
+    	val normedvar = diff *@ diff / variances;
+    	val terms = (1f - normedvar) *@ deriv - (deriv.mean(batchDim) + (normedvar dotr deriv));
+    	inputDeriv ~ inputDeriv + (terms / sdevs);
+    } else {
+    	// minimize tmp storage
+    	val tmp = inputData - means;
+    	tmp ~ tmp *@ tmp;
+    	tmp ~ tmp / variances;                     // Normalized per-element variance (normedvar)
+    	val lastTerm = tmp dotr deriv;
+    	tmp ~ 1f - tmp;
+    	tmp ~ tmp *@ deriv;
+    	tmp ~ tmp - (lastTerm + deriv.mean(batchDim));
+    	tmp ~ tmp / sdevs;
+    	inputDeriv ~ inputDeriv + tmp;
     }  
-    
+
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start
   }
   

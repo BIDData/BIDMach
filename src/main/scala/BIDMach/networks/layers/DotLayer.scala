@@ -26,19 +26,21 @@ class DotLayer(override val net:Net, override val opts:DotNodeOpts = new DotNode
 	override def forward = {
       val start = toc;
 			createOutput(1 \ inputData.ncols);
+			inplaceNoConnectGetOutput();
 			
 			(output ~ inputData) dot inputDatas(1);
 			
-			clearDeriv;
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
       val start = toc;
+      inplaceNoConnectGetInputDerivs();
       
       if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv *@ inputDatas(1));
       if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + (deriv *@ inputData);
 
+      inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

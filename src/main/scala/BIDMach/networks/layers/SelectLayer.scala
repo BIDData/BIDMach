@@ -37,18 +37,20 @@ class SelectLayer(override val net:Net, override val opts:SelectNodeOpts = new S
 		  fullindx ~ colindx + indx;
 		  
 		  output = inputData(fullindx);
+		  inplaceNoConnectSetupDerivs();
 		  
-			clearDeriv;
 		  forwardtime += toc - start;
   }
   
   override def backward = {
   		val start = toc;
+  		inplaceNoConnectGetInputDerivs();
   		
   		if (inputDeriv.asInstanceOf[AnyRef] != null){
   		  inputDeriv(fullindx) = inputDeriv(fullindx) + deriv;
   		}
   		
+  		inplaceNoConnectReleaseDeriv();
   		backwardtime += toc - start;
   }
   

@@ -24,14 +24,20 @@ class MaxiLayer(override val net:Net, override val opts:MaxiNodeOpts = new MaxiN
 	override def forward = {
 			val start = toc;
 		  createOutput(1 \ inputData.ncols);
+		  inplaceNoConnectGetOutput();
+		  
 			output <-- maxi(inputData);
-			clearDeriv;
+;
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ (inputData == maxi(inputData)));  
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

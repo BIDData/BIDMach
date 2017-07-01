@@ -27,7 +27,8 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 
 	override def forward = {
 			val start = toc;
-			createOutput;
+			inplaceConnectGetOutput();
+			
 			if (ilinks.asInstanceOf[AnyRef] == null) {
 			  ilinks = convertMat(opts.links);
 			  for (i <- 0 until opts.links.length) {
@@ -35,13 +36,17 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 			  }
 			}
 			output <-- GLM.preds(inputData, ilinks, totflops);
-			clearDeriv;
+
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
+			inplaceNoConnectGetInputDerivs();
+			
 			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ GLM.derivs(output, target, ilinks, totflops));
+			
+			inplaceNoConnectReleaseDeriv();
 			backwardtime += toc - start;
 	}
 

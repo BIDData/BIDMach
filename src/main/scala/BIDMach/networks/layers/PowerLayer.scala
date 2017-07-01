@@ -24,14 +24,16 @@ class PowerLayer(override val net:Net, override val opts:PowerNodeOpts = new Pow
 
   override def forward = {
 		  val start = toc;
-		  createOutput;
+		  inplaceNoConnectGetOutput();
+		  
 		  output ~ inputData ^ inputDatas(1);
-		  clearDeriv;
+
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
 		  
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 		  	if (one.asInstanceOf[AnyRef] == null) one = inputData.ones(1, 1);  
@@ -40,6 +42,7 @@ class PowerLayer(override val net:Net, override val opts:PowerNodeOpts = new Pow
 		    inputDeriv ~ inputDeriv + (powm1 *@ deriv);  
 		  }
 		  
+		  inplaceNoConnectReleaseDeriv()
 		  backwardtime += toc - start;
   }
   

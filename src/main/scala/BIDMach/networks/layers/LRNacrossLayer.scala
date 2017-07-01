@@ -151,7 +151,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 			}
 		}
 		
-		inplaceNoConnectReturnDeriv();
+		inplaceNoConnectReleaseDeriv();
 		backwardtime += toc - start;
   }
   

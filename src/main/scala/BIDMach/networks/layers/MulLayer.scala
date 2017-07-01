@@ -29,15 +29,18 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
 
 	override def forward = {
     val start = toc;
-	  createOutput(inputData.dims);
-	  output <-- inputData;
-	  (1 until inputlength).map((i:Int) => output ~ output ∘ inputDatas(i));
-	  clearDeriv;
+    inplaceNoConnectGetOutput();
+	        
+	  output ~ inputData ∘ inputDatas(1);
+	  (2 until inputlength).map((i:Int) => output ~ output ∘ inputDatas(i));
+	
 	  forwardtime += toc - start;
 	}
 
 	override def backward = {
     val start = toc;
+    inplaceNoConnectGetInputDerivs();
+    
     if (_inputs.length == 2) {
       if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + squash(deriv ∘ inputDatas(1), inputDerivs(0));
       if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + squash(deriv ∘ inputDatas(0), inputDerivs(1));
@@ -47,6 +50,8 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
 				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + squash(doutput / guardSmall(inputDatas(i), qeps), inputDerivs(i));
 			});
     }
+    
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
 	}
   

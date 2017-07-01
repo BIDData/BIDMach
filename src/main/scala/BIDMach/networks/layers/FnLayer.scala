@@ -20,19 +20,24 @@ class FnLayer(override val net:Net, override val opts:FnNodeOpts = new FnNode) e
 
   override def forward = {
 		  val start = toc;
-		  createOutput;
+		  inplaceNoConnectGetOutput();
+		  
 		  if (opts.fwdfn.asInstanceOf[AnyRef] != null) {
 		  	output <-- opts.fwdfn(inputData);
 		  }
-		  clearDeriv;
+
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  if (inputDeriv.asInstanceOf[AnyRef] != null &&  opts.bwdfn.asInstanceOf[AnyRef] != null) {
 		    inputDeriv ~ inputDeriv + opts.bwdfn(inputData, output, deriv);
 		  }
+		  
+		  inplaceNoConnectReleaseDeriv()
 		  backwardtime += toc - start;
   }
   

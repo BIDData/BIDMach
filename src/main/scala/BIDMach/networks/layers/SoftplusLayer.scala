@@ -24,15 +24,20 @@ class SoftplusLayer(override val net:Net, override val opts:SoftplusNodeOpts = n
 
   override def forward = {
 		  val start = toc;
-		  createOutput;
+		  inplaceNoConnectGetOutput();
+		  
 		  LayerFn.applyfwd(inputData, output, LayerFn.SOFTPLUSFN);
-		  clearDeriv;
+
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + LayerFn.applyderiv(inputData, deriv, LayerFn.SOFTPLUSFN);
+		  
+		  inplaceNoConnectReleaseDeriv()
 		  backwardtime += toc - start;
   }
   

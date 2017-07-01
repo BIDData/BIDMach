@@ -169,7 +169,8 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   val _inputs = new Array[LayerTerm](1);
   val _outputs = new Array[Mat](1);
   val _derivs = new Array[Mat](1);
-  def inputlength = _inputs.length
+  def inputlength = _inputs.length;
+  def outputlength = _outputs.length;
   var forwardtime = 0.0
   var backwardtime = 0.0
   override def layer = this
@@ -309,19 +310,10 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	if (inplace == Net.NoInPlace) {
   		createOutput;  
-  		clearDeriv;
-  	} else if (inplace == Net.InPlace){
-  		output = inputData;
-  		deriv = inputDeriv;
-  		deriv.clear;
   	} else {
-  		output = inputData;  
-  		if (!doreturn) {
-  			clearDeriv;
-  		} else if (anyNonNullDeriv || forceOut) {
-  			deriv = ?
-  		}
+  		output = inputData; 
   	}
+  	inplaceConnectSetupDerivs(forceOut);
   }
   
   /**
@@ -331,14 +323,34 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def inplaceNoConnectGetOutput(forceOut:Boolean = false) = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	createOutput;
-  	if (inplace == Net.NoInPlace || inplace == Net.InPlace || !doreturn) {  
+  	inplaceNoConnectSetupDerivs(forceOut);
+  }
+  
+  def inplaceConnectSetupDerivs(forceOut:Boolean = false) = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	if (inplace == Net.NoInPlace || !doreturn){
   		clearDeriv;
-  	} else {    
-  		if (anyNonNullDeriv || forceOut) {
-  			deriv = ?
+  	} else if (inplace == Net.InPlace) {
+  	  deriv = inputDeriv;
+  	}	else if (anyNonNullDeriv || forceOut) {
+  		for (i <- 0 until outputlength) {
+  			setDeriv(i, ?);
   		}
   	}
   }
+  
+  def inplaceNoConnectSetupDerivs(forceOut:Boolean = false) = {
+  	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
+  	if (inplace == Net.NoInPlace || inplace == Net.InPlace || !doreturn){
+  		clearDeriv;
+  	}	else if (anyNonNullDeriv || forceOut) {
+  		for (i <- 0 until outputlength) {
+  			setDeriv(i, ?);
+  		}
+  	}
+  }
+  
+
   
   /**
    * Set up input derivative matrices for connected layers. Assumes getMat zeros the matrix. 
@@ -383,10 +395,12 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
    * actually returned to cache. 
    */
   
-  def inplaceConnectReturnDeriv() = {
+  def inplaceConnectReleaseDeriv() = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	if (inplace == Net.BackwardCaching && doreturn) {
-  		deriv = null;
+  		for (i <- 0 until outputlength) {
+  	  	setDeriv(i, null);
+  	  }
   	}
   }
   
@@ -394,11 +408,13 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
    * If appropriate, return the current derivative matrix to the backward cache for this net. 
    */
   
-  def inplaceNoConnectReturnDeriv() = {
+  def inplaceNoConnectReleaseDeriv() = {
   	val inplace = Net.getPlacing(opts.inplace, net.opts.inplace);
   	if (inplace == Net.BackwardCaching && doreturn) {
-  		net.returnMat(deriv);
-  		deriv = null;
+  	  for (i <- 0 until outputlength) {
+  	  	net.returnMat(derivs(i));
+  	  	setDeriv(i, null);
+  	  }
   	}
   }
 

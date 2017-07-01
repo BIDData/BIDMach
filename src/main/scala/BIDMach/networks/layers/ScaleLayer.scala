@@ -61,23 +61,24 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
     }
     val start = toc;
     if (batchDim.asInstanceOf[AnyRef] == null) initModelMats;
-    createOutput;
+    inplaceNoConnectGetOutput();
     
     output ~ scaleMat *@ inputData
     if (opts.hasBias) output ~ output + biasMat;
     
-    clearDeriv;
     forwardtime += toc - start;
   }
 
   override def backward(ipass:Int, pos:Long) = {
     val start = toc;
+    inplaceNoConnectGetInputDerivs();
     
     inputDeriv ~ inputDeriv + (scaleMat *@ deriv);
     updateScaleMat ~ updateScaleMat + (inputData dotr deriv);
     
     if (opts.hasBias) updateBiasMat ~ updateBiasMat + deriv.sum(batchDim);
 
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
   }
   

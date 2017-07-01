@@ -23,7 +23,8 @@ class AbsLayer(override val net:Net, override val opts:AbsNodeOpts = new AbsNode
 
 	override def forward = {
 			val start = toc;
-			createOutput;
+      inplaceNoConnectGetOutput();
+      
 			abs(inputData, output);
 			clearDeriv;
 			forwardtime += toc - start;
@@ -31,7 +32,11 @@ class AbsLayer(override val net:Net, override val opts:AbsNodeOpts = new AbsNode
 
 	override def backward = {
 			val start = toc;
-			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ sign(inputData));  
+			inplaceNoConnectGetInputDerivs();
+			
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ sign(inputData));
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

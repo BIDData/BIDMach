@@ -23,15 +23,20 @@ class LnLayer(override val net:Net, override val opts:LnNodeOpts = new LnNode) e
 
 	override def forward = {
 			val start = toc;
-			createOutput;
+			inplaceNoConnectGetOutput();
+			
 			ln(inputData, output);
-			clearDeriv;
+
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
 			val start = toc;
-			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv/inputData);    
+			inplaceNoConnectGetInputDerivs();
+			
+			if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv/inputData);  
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

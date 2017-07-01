@@ -76,7 +76,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		    }
       }
 		  
-		  inplaceNoConnectReturnDeriv();
+		  inplaceNoConnectReleaseDeriv();
 		  backwardtime += toc - start;
   }
   

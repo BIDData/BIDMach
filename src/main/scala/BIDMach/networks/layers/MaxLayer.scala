@@ -24,19 +24,22 @@ class MaxLayer(override val net:Net, override val opts:MaxNodeOpts = new MaxNode
 
 	override def forward = {
     val start = toc;
-	  createOutput(inputData.dims);
+	  inplaceNoConnectGetOutput();
+	  
 	  max(inputData, inputDatas(1), output);
-	  clearDeriv;
+
 	  forwardtime += toc - start;
 	}
 
 	override def backward = {
     val start = toc;
+    inplaceNoConnectGetInputDerivs();
 
     max(inputData, inputDatas(1), output);
     if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + squash((output == inputData) ∘ deriv, inputDerivs(0));
     if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + squash((output == inputDatas(1)) ∘ deriv, inputDerivs(1));
 
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
 	}
   

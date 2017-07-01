@@ -25,19 +25,24 @@ class SubLayer(override val net:Net, override val opts:SubNodeOpts = new SubNode
 
 	override def forward = {
       val start = toc;
-			createOutput(inputData.dims);
-			output <-- inputData;
-			(1 until inputlength).map((i:Int) => output ~ output - inputDatas(i));
-			clearDeriv;
+      inplaceNoConnectGetOutput();
+      
+			output ~ inputData - inputDatas(1);
+			(2 until inputlength).map((i:Int) => output ~ output - inputDatas(i));
+		
 			forwardtime += toc - start;
 	}
 
 	override def backward = {
       val start = toc;
+      inplaceNoConnectGetInputDerivs();
+      
       if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + squash(deriv, inputDeriv);
 			(1 until inputlength).map((i:Int) => {
 				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) - squash(deriv, inputDerivs(i));
 			});
+			
+			inplaceNoConnectReleaseDeriv()
 			backwardtime += toc - start;
 	}
   

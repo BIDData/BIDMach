@@ -27,7 +27,7 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
   }
   
   override def forward = {
-	  createOutput(inputData.dims);
+	  inplaceNoConnectGetOutput();
 	  (inputData(0), inputData(1), inputData(2), inputData(3), inputData(4), outputs(0), outputs(1)) match {
 	    case (i0:GMat, i1:GMat, i2:GMat, i3:GMat, i4:GMat, out0:GMat, out1:GMat) => {
 	      CUMACH.LSTMfwd(i0.pdata, i1.pdata, i2.pdata, i3.pdata, i4.pdata, out0.pdata, out1.pdata, i0.length);
@@ -36,10 +36,11 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
 	      LSTMfusedLayer.LSTMforward(i0, i1, i2, i3, i4, out0, out1);
 	    }
 	  }
-	  clearDerivs;
 	}
   
   override def backward = {
+  	inplaceNoConnectGetInputDerivs();
+  		
 	  (inputData(0), inputData(1), inputData(2), inputData(3), inputData(4), deriv(0), deriv(1), inputDeriv(0), inputDeriv(1), inputDeriv(2), inputDeriv(3), inputDeriv(4)) match {
 	    case (inC:GMat, lin1:GMat, lin2:GMat, lin3:GMat, lin4:GMat, doutC:GMat, doutH:GMat, dinC:GMat, dlin1:GMat, dlin2:GMat, dlin3:GMat, dlin4:GMat) => {
 	      CUMACH.LSTMbwd(inC.pdata, lin1.pdata, lin2.pdata, lin3.pdata, lin4.pdata, doutC.pdata, doutH.pdata, dinC.pdata, dlin1.pdata, dlin2.pdata, dlin3.pdata, dlin4.pdata, inC.length);	      

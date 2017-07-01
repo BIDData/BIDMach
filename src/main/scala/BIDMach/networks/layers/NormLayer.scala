@@ -25,14 +25,17 @@ class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormN
 
   override def forward = {
 		val start = toc;
-		createOutput;
+		inplaceNoConnectGetOutput();
+		
 		output <-- inputData;
-		clearDeriv;
+		
 		forwardtime += toc - start;
   }
 
   override def backward = {
     val start = toc;
+    inplaceNoConnectGetInputDerivs();
+    
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
     	if (sconst.asInstanceOf[AnyRef] == null) sconst = output.zeros(1,1);
     	sconst.set(math.min(0.1f, math.max(-0.1f, (opts.targetNorm - norm(output)/output.length).toFloat * opts.weight)));
@@ -40,6 +43,8 @@ class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormN
     	inputDeriv ~ output ∘ sconst;
     	inputDeriv ~ inputDeriv + deriv;  
     }
+    
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
   }
   

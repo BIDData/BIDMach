@@ -126,6 +126,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     
     updateFFilter.convolveMjoin;
 
+    inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
   }
   
