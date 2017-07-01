@@ -21,11 +21,14 @@ import BIDMach.networks._
 
 @SerialVersionUID(100L)
 trait NodeOpts extends BIDMat.Opts {
-  var name = ""; 
+
+  var name = "";  
   var inplace:Int = Net.UseNetPlacing;
+  var tensorFormat:Int = Net.UseNetFormat;
   
   def copyOpts(opts:NodeOpts):NodeOpts = {
     opts.name = name;
+    opts.tensorFormat = tensorFormat
     opts.inplace = inplace;
 		opts;
   }
@@ -147,6 +150,13 @@ object Node {
     val coffsets = offsets;
     val roffsets = randoffsets;
     new CropNode{inputs(0) = a; sizes = csizes; offsets = coffsets; randoffsets = roffsets};
+  }
+  
+  def cropMirror(a:NodeTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1), randoffsets:IMat=null) = {
+    val csizes = sizes;
+    val coffsets = offsets;
+    val roffsets = randoffsets;
+    new CropMirrorNode{inputs(0) = a; sizes = csizes; offsets = coffsets; randoffsets = roffsets};
   }
   
   def dropout(a:NodeTerm)(frac:Float=0.5f) = {

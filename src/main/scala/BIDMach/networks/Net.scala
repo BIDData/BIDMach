@@ -221,9 +221,13 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 		  }
   }
   
-  def cleargrad {
+  def clearUpdatemats {
   	if (opts.aopts.asInstanceOf[AnyRef] == null) {
-  		for (j <- 0 until updatemats.length) updatemats(j).clear;
+  		for (j <- 0 until updatemats.length) {
+  		  if (updatemats(j).asInstanceOf[AnyRef] ne null) {
+  		  	updatemats(j).clear;
+  		  }
+  		}
   	}
   }
   
@@ -378,7 +382,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     val layernames = new CSMat(layers.length, 1, layers.map(_.getClass.getSimpleName));
     (times, layernames);
   }
-  
     
   def getMat(dims:IMat, typeMat:Mat):Mat = {
     val indx = ND.hash2(prod(dims).v, typeMat.mytype.##);
@@ -410,6 +413,15 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   def clearBackwardCache = {
     _backwardCache.clear();
   }
+
+  def hasFormat(layerFormat:Int):Int = {
+    if (layerFormat != Net.UseNetFormat) {
+      layerFormat;
+    } else {
+      opts.tensorFormat;
+    }
+  }
+
 }
 
 object Net  {

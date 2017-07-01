@@ -11,6 +11,9 @@ import BIDMach.models._
 import BIDMach._
 import edu.berkeley.bid.CPUMACH
 import edu.berkeley.bid.CUMACH
+import jcuda._
+import jcuda.runtime._
+import jcuda.runtime.JCuda._
 import jcuda.jcudnn._
 import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3
@@ -27,6 +30,8 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var bias_mat:FMat = null; // it should be size (channel_out*1*1*1), to better broadcast?
     var update_bias_mat:FMat = null;
     var inputDim:IMat = null; // Should be three numbers
+    var backwardfiltertime = 0.0;
+    var backwarddatatime = 0.0;
 //    var outputDim:IMat = null; //Should be three numbers
     
 
@@ -62,7 +67,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	val outDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
     	
     	if (opts.hasBias) {
-    		val biasDim = irow(outDim(0), outDim(1), outDim(2), 1);
+    		val biasDim = irow(outDim(0), 1, 1, 1);
     		modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
     		updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
     		opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
@@ -95,7 +100,9 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     inplaceNoConnectGetOutput(true);
    
     ffilter.convolve(inputData, output, true);
-    if (opts.hasBias) output ~ output + bias_mat;
+    if (opts.hasBias) {
+      applyBias(bias_mat, output);
+    }
 
     forwardtime += toc - start
   }
@@ -106,16 +113,19 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     val ndims = output.dims.length;
     
     if(opts.hasBias){
-      update_bias_mat ~ update_bias_mat + deriv.sum(irow(ndims - 1));
+      updateBias(deriv, update_bias_mat);
     }
-
-    if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      ffilter.convolveT(deriv, inputDeriv, false);
-    }
-
-    updateFFilter.convolveM(inputData, deriv, false);
     
-    inplaceNoConnectReturnDeriv();
+    updateFFilter.convolveMfork(inputData, deriv, false);
+    backwardfiltertime += toc - start;
+    
+    if (inputDeriv.asInstanceOf[AnyRef] != null) {      
+      ffilter.convolveT(deriv, inputDeriv, false);
+    } 
+    backwarddatatime += toc - start;
+    
+    updateFFilter.convolveMjoin;
+
     backwardtime += toc - start;
   }
   
@@ -125,15 +135,172 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     ffilter= null;
     updateFilter = null;
     updateFFilter = null;
-    bias_mat = null; // it should be size (channel_out*1*1*1), to better broadcast?
+    bias_mat = null; 
     update_bias_mat = null;
     inputDim = null; 
   }
 
+    
+  def applyBias(bias:Mat, output:Mat) = {
+    (bias, output) match {
+      case (gbias:GMat, goutput:GMat) => applyBiasGMat(gbias, goutput);
+      case (fbias:FMat, foutput:FMat) => applyBiasFMat(fbias, foutput);
+    }
+  }
+        
+  def applyBiasFMat(bias:FMat, output:FMat) = {
+  	val dims = output.dims;
+  	val n = dims(3);
+  	val h = dims(2);
+  	val w = dims(1);
+  	val c = dims(0);
+  	if (getTensorFormat == Net.TensorNCHW) {
+  		var hw = h*w;
+  		var i = 0;
+  		var iptr = 0;
+  		while (i < n) {
+  			var j = 0;
+  			while (j < c) {
+  				val vout = bias.data(j);
+  				var k = 0;
+  				while (k < hw) {
+  					output.data(iptr) += vout;
+  					iptr += 1;
+  					k += 1;
+  				}
+  				j += 1;
+  			}
+  			i += 1;
+  		}
+  	} else {
+  		var hw = h*w;
+  		var i = 0;
+  		var iptr = 0;
+  		while (i < n) {
+  			var j = 0;
+  			while (j < hw) {
+  				var k = 0;
+  				while (k < c) {
+  					output.data(iptr) += bias.data(k);
+  					iptr += 1;
+  					k += 1;
+  				}
+  				j += 1;
+  			}
+  			i += 1;
+  		}        
+  	}
+  }
+  
+  def applyBiasGMat(bias:GMat, output:GMat) = {
+  	val dims = output.dims;
+  	val bdims = bias.dims;
+  	var dataType = cudnnDataType.CUDNN_DATA_FLOAT;
+  	val tformat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
+  	
+  	val adesc = new cudnnTensorDescriptor;
+  	cudnnCreateTensorDescriptor(adesc);
+  	val astatus = cudnnSetTensor4dDescriptor(adesc, tformat, dataType, bdims(3), bdims(0), bdims(2), bdims(1));
+  	if (astatus > 0) throw new RuntimeException("Error %d creating A tensor for forward bias computation" format astatus);
+
+  	val bdesc = new cudnnTensorDescriptor;
+  	cudnnCreateTensorDescriptor(bdesc);
+  	val bstatus = cudnnSetTensor4dDescriptor(bdesc, tformat, dataType, dims(3), dims(0), dims(2), dims(1));
+  	if (bstatus > 0) throw new RuntimeException("Error %d creating B tensor for forward bias computation" format bstatus);
+	  
+  	var err = cudnnAddTensor(GFilter.getHandle, GFilter.ONE, adesc, bias.pdata, GFilter.ONE, bdesc, output.pdata);
+  	
+  	cudaStreamSynchronize(GFilter.getStream);
+  	if (err == 0) err = cudaGetLastError();
+  	if (err > 0) throw new RuntimeException("Error in forward convolution bias: %s" format cudaGetErrorString(err));
+  	
+  	cudnnDestroyTensorDescriptor(bdesc);
+  	cudnnDestroyTensorDescriptor(adesc);
+  }
+  
+  def updateBias(deriv:Mat, updateBias:Mat) = {
+     (deriv, updateBias) match {
+      case (gderiv:GMat, gupdateBias:GMat) => updateBiasGMat(gderiv, gupdateBias);
+      case (fderiv:FMat, fupdateBias:FMat) => updateBiasFMat(fderiv, fupdateBias);
+     } 	
+  }
+    
+  def updateBiasFMat(deriv:FMat, updateBias:FMat) = {   
+  	val dims = deriv.dims;
+  	val n = dims(3);
+  	val h = dims(2);
+  	val w = dims(1);
+  	val c = dims(0);
+  	if (getTensorFormat == Net.TensorNCHW) {
+  		var hw = h*w;
+  		var i = 0;
+  		var iptr = 0;
+  		while (i < n) {
+  			var j = 0;
+  			while (j < c) {
+  				var vsum = 0f;
+  				var k = 0;
+  				while (k < hw) {
+  					vsum += deriv.data(iptr);
+  					iptr += 1;
+  					k += 1;
+  				}
+  				updateBias.data(j) += vsum;
+  				j += 1;
+  			}
+  			i += 1;
+  		}
+  	} else {
+  		var hw = h*w;
+  		var i = 0;
+  		var iptr = 0;
+  		while (i < n) {
+  			var j = 0;
+  			while (j < hw) {
+  				var k = 0;
+  				while (k < c) {
+  					updateBias.data(k) += deriv.data(iptr);
+  					iptr += 1;
+  					k += 1;
+  				}
+  				j += 1;
+  			}
+  			i += 1;
+  		}        
+  	}      
+  }
+  
+  def updateBiasGMat(deriv:GMat, updateBias:GMat) = {   
+  	val dims = deriv.dims;
+  	val bdims = updateBias.dims;
+  	var dataType = cudnnDataType.CUDNN_DATA_FLOAT;
+  	val tformat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
+  	
+  	val adesc = new cudnnTensorDescriptor;
+  	cudnnCreateTensorDescriptor(adesc);
+  	val astatus = cudnnSetTensor4dDescriptor(adesc, tformat, dataType, dims(3), dims(0), dims(2), dims(1));
+  	if (astatus > 0) throw new RuntimeException("Error %d creating A tensor for backward bias computation" format astatus);
+
+  	val bdesc = new cudnnTensorDescriptor;
+  	cudnnCreateTensorDescriptor(bdesc);
+  	val bstatus = cudnnSetTensor4dDescriptor(bdesc, tformat, dataType, bdims(3), bdims(0), bdims(2), bdims(1));
+  	if (bstatus > 0) throw new RuntimeException("Error %d creating B tensor for backward bias computation" format bstatus);
+	  
+  	var err = cudnnConvolutionBackwardBias(GFilter.getHandle, GFilter.ONE, adesc, deriv.pdata, GFilter.ONE, bdesc, updateBias.pdata);
+
+  	cudaStreamSynchronize(GFilter.getStream);
+  	if (err == 0) err = cudaGetLastError();
+  	if (err > 0) throw new RuntimeException("Error in backward convolution bias: %s" format cudaGetErrorString(err));
+  	
+  	cudnnDestroyTensorDescriptor(bdesc);
+  	cudnnDestroyTensorDescriptor(adesc);
+  }
+  
+
   override def toString = {
     "conv@" + Integer.toHexString(hashCode() % 0x10000)
   }
-
+  
 }
 
 trait ConvNodeOpts extends ModelNodeOpts {
@@ -143,7 +310,6 @@ trait ConvNodeOpts extends ModelNodeOpts {
   var kernel:IMat = null
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
-  var tensorFormat:Int = Net.UseNetFormat;
   var convType:Int = Net.UseNetConvType;
   var initfn:(Mat,Float)=>Mat = Net.xavier;
   var initv:Float = 1f;
@@ -158,7 +324,6 @@ trait ConvNodeOpts extends ModelNodeOpts {
   		opts.kernel = kernel;
   		opts.stride = stride;
   		opts.dilation = dilation;
-  		opts.tensorFormat = tensorFormat;
   		opts.convType = convType;
   		opts.initfn = initfn;
   		opts.initv = initv;
@@ -188,6 +353,7 @@ class ConvNode extends Node with ConvNodeOpts {
   override def toString = {
     "conv@" + Integer.toHexString(hashCode() % 0x10000)
   }
+
 
 }
 

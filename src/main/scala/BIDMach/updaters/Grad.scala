@@ -37,13 +37,17 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     if (hasvel_decay) {
       momentum = new Array[Mat](nmats);
       for (i <- 0 until nmats) {
-    	  momentum(i) = modelmats(i).zeros(modelmats(i).dims);
+        if (modelmats(i).asInstanceOf[AnyRef] != null) {
+        	momentum(i) = modelmats(i).zeros(modelmats(i).dims);
+        }
       }
     }
     if (opts.langevin > 0) {
       randmat = new Array[Mat](nmats);
       for (i <- 0 until nmats) {
-        randmat(i) = modelmats(i).zeros(modelmats(i).dims);
+      	if (modelmats(i).asInstanceOf[AnyRef] != null) {
+      		randmat(i) = modelmats(i).zeros(modelmats(i).dims);
+      	}
       }
     }
     if (opts.texp.asInstanceOf[AnyRef] != null) {
@@ -59,30 +63,30 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   override def init(model0:Model) = initGrad(model0);
   
   def clipping() {
-      if (opts.clipByValue>0f) {
-          var i = 0
-          while (i < updatemats.length){
-              min(updatemats(i),opts.clipByValue,updatemats(i));
-              max(updatemats(i),-opts.clipByValue,updatemats(i));
-              i+=1
-          }
-      }
-      if (opts.max_grad_norm>0f){
-        var i=0;
-        var tot = 0.0
-        while(i<updatemats.length){
-            tot+=sum(updatemats(i) dot updatemats(i)).dv
-            i+=1
-        }
-        val scale=opts.max_grad_norm/max(sqrt(tot),opts.max_grad_norm).dv
-        if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1)
-        norm_scaling(0,0) = scale.toFloat
-        i=0;
-        while(i<updatemats.length){
-            updatemats(i)~updatemats(i)*@norm_scaling
-            i+=1
-        }     
-      }
+  	if (opts.clipByValue>0f) {
+  		for (i <- 0 until updatemats.length){
+  			if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  				min(updatemats(i),opts.clipByValue,updatemats(i));
+  				max(updatemats(i),-opts.clipByValue,updatemats(i));
+  			}
+  		}
+  	}
+  	if (opts.max_grad_norm>0f){
+  		var tot = 0.0;
+  		for (i <- 0 until updatemats.length){
+  			if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  				tot+=sum(updatemats(i) dot updatemats(i)).dv
+  			}
+  		}
+  		val scale=opts.max_grad_norm/max(sqrt(tot),opts.max_grad_norm).dv;
+  		if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1);
+  		norm_scaling(0,0) = scale.toFloat;
+  		for (i <- 0 until updatemats.length){
+  			if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  				updatemats(i)~updatemats(i)*@norm_scaling;
+  			}     
+  		}
+  	}
   }
   
 	override def update(ipass:Int, step:Long, gprogress:Float):Unit = {

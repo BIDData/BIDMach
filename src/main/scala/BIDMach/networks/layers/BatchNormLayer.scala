@@ -84,14 +84,12 @@ trait BatchNormNodeOpts extends ModelNodeOpts {
 	var expAvgFactor:Float = 1f;
   var epsilon:Float = 1e-4f;
   var batchNormMode = BatchNormLayer.SPATIAL;
-  var tensorFormat:Int = Net.UseNetFormat;
   
   def copyOpts(opts:BatchNormNodeOpts):BatchNormNodeOpts = {
       super.copyOpts(opts);
       opts.expAvgFactor = expAvgFactor;
       opts.epsilon = epsilon;
       opts.batchNormMode = batchNormMode;
-      opts.tensorFormat = tensorFormat;
       opts;
   }
 }

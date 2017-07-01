@@ -180,6 +180,8 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   def setGUID(v:Long):Unit = {_GUID = v}
   def GUID:Long = _GUID
   
+  val myGPU = getGPU;
+  
   // Setters and getters for general elements of those arrays
   def outputs(i:Int) = _outputs(i);
   def derivs(i:Int) = _derivs(i);  
@@ -399,7 +401,14 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   		deriv = null;
   	}
   }
-  
+
+  def getTensorFormat:Int = {
+    if (opts.tensorFormat != Net.UseNetFormat) {
+      opts.tensorFormat;
+    } else {
+      net.opts.tensorFormat;
+    }
+  }
 }
 
 class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
@@ -484,6 +493,13 @@ object Layer {
     val coffsets = offsets;
     val roffsets = randoffsets;
     new CropLayer(net, new CropNode{sizes = csizes; offsets = coffsets; randoffsets = roffsets}){inputs(0) = a;}
+  }
+  
+  def cropMirror(a:LayerTerm)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1), randoffsets:IMat=null, net:Net=null) = {
+    val csizes = sizes;
+    val coffsets = offsets;
+    val roffsets = randoffsets;
+    new CropMirrorLayer(net, new CropMirrorNode{sizes = csizes; offsets = coffsets; randoffsets = roffsets}){inputs(0) = a;}
   }
   
   def dropout(a:LayerTerm)(frac:Float=0.5f, net:Net=null) = {

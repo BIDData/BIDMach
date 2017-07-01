@@ -22,7 +22,9 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     val mm = modelmats(0);
     sumSq = new Array[Mat](nmats);
     for (i <- 0 until nmats) {
-    	sumSq(i) = modelmats(i).ones(modelmats(i).dims) *@ opts.initsumsq
+      if (modelmats(i).asInstanceOf[AnyRef] != null) {
+      	sumSq(i) = modelmats(i).ones(modelmats(i).dims) *@ opts.initsumsq;
+      }
     }
     ve = mm.zeros(opts.vexp.nrows, opts.vexp.ncols);
     one = mm.ones(1,1);
@@ -52,7 +54,8 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	stepn.set(1f/(ipass+1));
     	stepn ^ pe;
     } else {
-      stepn.set(1f)
+      te.set(0f);
+      stepn ^ te;
     }
     if (opts.gsq_decay >= 0){
     	stepn.set(1f - opts.gsq_decay);
@@ -86,7 +89,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     			lrate ~ lrate *@ lr_scales(i);
     		}
     		(mm, um, ss, ve, tscale, lrate) match {
-    		case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
+/*    		case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
     			if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
     				val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
     				ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
@@ -96,7 +99,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     			} else {
     				ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
     			}
-    		}
+    		}*/
     		case _ => {
     			val newsquares = um *@ um;
     			newsquares ~ newsquares *@ nw;
@@ -104,9 +107,9 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     			ss ~ ss + newsquares;
     			if (opts.waitsteps < nsteps) {
     				// if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
-    				val grad = ss ^ ve;
+    				val grad = ss + opts.epsilon;
     				// if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
-    				grad ~ grad + opts.epsilon;
+    				grad ~ grad ^ ve;
     				grad ~ um / grad;                                      // Normalized gradient
     				if (opts.langevin > 0) {                               // Add Langevin random permutations
     					normrnd(0, opts.langevin, randmat(i));

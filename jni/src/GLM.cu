@@ -141,6 +141,24 @@ void setsizes(int N, dim3 *gridp, int *nthreadsp) {
   *nthreadsp = nthreads;
 }
 
+void setsizesLean(int N, dim3 *gridp, int *nthreadsp) {
+  int nblocks = 1;
+  int nthreads = 1;
+  while (nblocks * nthreads < N) {
+    if (nblocks < 16) {
+      nblocks = 2*nblocks;
+    } else if (nthreads < 1024) {
+      nthreads = 2*nthreads;
+    } else {
+      nblocks = max(nblocks, 1 + (int)((N-1)/nthreads));
+    }
+  }
+  gridp->y = 1 + (nblocks-1)/65536;
+  gridp->x = 1 + (nblocks-1)/gridp->y;
+  gridp->z = 1;
+  *nthreadsp = nthreads;
+}
+
 __global__ void __apply_preds(float *A, int *L, float *C, int nrows, int ncols) {
   int ip = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   for (int i = ip; i < nrows*ncols; i += blockDim.x * gridDim.x * gridDim.y) {
@@ -152,7 +170,7 @@ __global__ void __apply_preds(float *A, int *L, float *C, int nrows, int ncols) 
 int apply_preds(float *A, int *L, float *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_preds<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -170,7 +188,7 @@ __global__ void __apply_links(float *A, int *L, float *C, int nrows, int ncols) 
 int apply_links(float *A, int *L, float *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_links<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -189,7 +207,7 @@ __global__ void __apply_lls(float *A, float *B, int *L, float *C, int nrows, int
 int apply_lls(float *A, float *B, int *L, float *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_lls<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -207,7 +225,7 @@ __global__ void __apply_derivs(float *A, float *B, int *L, float *C, int nrows, 
 int apply_derivs(float *A, float *B, int *L, float *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_derivs<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -225,7 +243,7 @@ __global__ void __apply_dpreds(double *A, int *L, double *C, int nrows, int ncol
 int apply_dpreds(double *A, int *L, double *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dpreds<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -243,7 +261,7 @@ __global__ void __apply_dlinks(double *A, int *L, double *C, int nrows, int ncol
 int apply_dlinks(double *A, int *L, double *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dlinks<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -262,7 +280,7 @@ __global__ void __apply_dlls(double *A, double *B, int *L, double *C, int nrows,
 int apply_dlls(double *A, double *B, int *L, double *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dlls<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -280,7 +298,7 @@ __global__ void __apply_dderivs(double *A, double *B, int *L, double *C, int nro
 int apply_dderivs(double *A, double *B, int *L, double *C, int nrows, int ncols) {
   int nthreads;
   dim3 griddims;
-  setsizes(nrows*ncols, &griddims, &nthreads);
+  setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dderivs<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
   cudaDeviceSynchronize();
   cudaError_t err = cudaGetLastError();
@@ -668,24 +686,26 @@ __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;
-  float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad;
-  float sqnw = sqrtf(nw);
-  float sq1mnw = sqrtf(1-nw);
+  float mmval, umval, sqrtss, sqrtnewss, veval, tsval, lrval, denom, grad;
+  float sqrtnw = sqrtf(nw);
+  float sqrt1mnw = sqrtf(1-nw);
+  float sqrteps = sqrt(eps);
   curandState *prstate = &rstates[ithread];
   for (i = ithread; i < nrows*ncols; i += nthreads) {
     icol = i / nrows;
     irow = i - icol * nrows;
     umval = um[i];
-    sqval = ssq[i];
-//    newss = (nw * umval * umval) + (1 - nw) * sqval;
-    newss = hypotf(sqnw * umval, sq1mnw * sqval);
-    ssq[i] = newss;
+    sqrtss = ssq[i];
+//    newsumsq = (nw * umval * umval) + (1 - nw) * sumsq;
+    sqrtnewss = hypotf(sqrtnw * umval, sqrt1mnw * sqrtss);
+    ssq[i] = sqrtnewss;
     if (doupdate) {
       mmval = mm[i];
       veval = (nve > 1) ? ve[irow] : ve[0];
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
-      denom = (veval == 0.5f) ? (newss + eps) : powf(newss + eps, veval*2);
+      sqrtnewss = hypotf(sqrtnewss, sqrteps);
+      denom = (veval == 0.5f) ? sqrtnewss : powf(sqrtnewss, veval*2);
       grad = (umval / denom);
       if (langevin > 0) grad += curand_normal(prstate) * langevin;
       mmval += grad * lrval * tsval;
@@ -708,24 +728,26 @@ __global__ void __ADAGradm(int nrows, int ncols, float *mm, float *um, float *ss
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;
-  float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad;
-  float sqnw = sqrtf(nw);
-  float sq1mnw = sqrtf(1-nw);
+  float mmval, umval, sqrtss, sqrtnewss, veval, tsval, lrval, denom, grad;
+  float sqrtnw = sqrtf(nw);
+  float sqrt1mnw = sqrtf(1-nw);
+  float sqrteps = sqrt(eps);
   curandState *prstate = &rstates[ithread];
   for (i = ithread; i < nrows*ncols; i += nthreads) {
     icol = i / nrows;
     irow = i - icol * nrows;
     umval = um[i];
-    sqval = ssq[i];
+    sqrtss = ssq[i];
 //    newss = (nw * umval * umval) + (1 - nw) * sqval;
-    newss = hypotf(sqnw * umval, sq1mnw * sqval);
-    ssq[i] = newss;
+    sqrtnewss = hypotf(sqrtnw * umval, sqrt1mnw * sqrtss);
+    ssq[i] = sqrtnewss;
     if (doupdate) {
       mmval = mm[i];
       veval = (nve > 1) ? ve[irow] : ve[0];
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
-      denom = (veval == 0.5f) ? newss + eps : powf(newss + eps, veval*2);
+      sqrtnewss = hypotf(sqrtnewss, sqrteps);
+      denom = (veval == 0.5f) ? sqrtnewss : powf(sqrtnewss, veval*2);
       grad = (umval / denom);
       if (langevin > 0) grad += curand_normal(prstate) * langevin;
       grad = grad * lrval * tsval;               // Normal gradient
@@ -751,25 +773,26 @@ __global__ void __ADAGradn(int nrows, int ncols, float *mm, float *um, float *ss
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;
-  float mmval, umval, sqval, newss, veval, tsval, lrval, denom, grad, oldmom, newmom;
-  float sqnw = sqrtf(nw);
-  float sq1mnw = sqrtf(1-nw);
+  float mmval, umval, sqrtss, sqrtnewss, veval, tsval, lrval, denom, grad, oldmom, newmom;
+  float sqrtnw = sqrtf(nw);
+  float sqrt1mnw = sqrtf(1-nw);
+  float sqrteps = sqrt(eps);    
   curandState *prstate = &rstates[ithread];
   for (i = ithread; i < nrows*ncols; i += nthreads) {
     icol = i / nrows;
     irow = i - icol * nrows;
     umval = um[i];
-    sqval = ssq[i];
+    sqrtss = ssq[i];
 //    newss = (nw * umval * umval) + (1 - nw) * sqval;
-    newss = hypotf(sqnw * umval, sq1mnw * sqval);
-    ssq[i] = newss;
+    sqrtnewss = hypotf(sqrtnw * umval, sqrt1mnw * sqrtss);
+    ssq[i] = sqrtnewss;
     if (doupdate) {
       mmval = mm[i];
       veval = (nve > 1) ? ve[irow] : ve[0];
       tsval = (nts > 1) ? ts[irow] : ts[0];
       lrval = (nlr > 1) ? lr[irow] : lr[0];
-      denom = (veval == 0.5f) ? newss : powf(newss, veval*2);
-      denom = denom + eps;
+      sqrtnewss = hypotf(sqrtnewss, sqrteps);
+      denom = (veval == 0.5f) ? sqrtnewss : powf(sqrtnewss, veval*2);
       grad = (umval / denom);
       if (langevin > 0) grad += curand_normal(prstate) * langevin;
       grad = grad * lrval * tsval;               // Normal gradient
@@ -799,7 +822,7 @@ int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask,
   } else {
     basesize = max(32, nrows * ncols);
   }
-  setsizes(basesize, &griddims, &nthreads);
+  setsizesLean(basesize, &griddims, &nthreads);
   int ntt = nthreads * griddims.x * griddims.y;
   curandState *rstates = NULL;
   if (langevin > 0) {
@@ -829,7 +852,7 @@ int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *mome
   } else {
     basesize = max(32, nrows * ncols);
   }
-  setsizes(basesize, &griddims, &nthreads);
+  setsizesLean(basesize, &griddims, &nthreads);
   int ntt = nthreads * griddims.x * griddims.y;
   curandState *rstates = NULL;
   if (langevin > 0) {
@@ -859,7 +882,7 @@ int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *mome
   } else {
     basesize = max(32, nrows * ncols);
   }
-  setsizes(basesize, &griddims, &nthreads);
+  setsizesLean(basesize, &griddims, &nthreads);
   int ntt = nthreads * griddims.x * griddims.y;
   curandState *rstates = NULL;
   if (langevin > 0) {
