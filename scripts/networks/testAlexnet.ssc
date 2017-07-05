@@ -27,7 +27,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet.txt";
-opts.batchSize= 256;
+opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
 opts.lrate = 1e-4f;
@@ -59,10 +59,10 @@ val din =       in - meanv;
 val scalef =    const(row(0.01f));
 //val sdin =      din *@ scalef;
 //val fin =       format(in)();
-val cin =       crop(din)(sizes=irow(3,227,227,0), randoffsets=irow(0,28,28,-1));
-val min =       randmirror(cin)();
+val cin =       cropMirror(din)(sizes=irow(3,227,227,0), randoffsets=irow(0,28,28,-1));
+//val min =       randmirror(cin)();
 
-val conv1 =     conv(min)(w=11,h=11,nch=96,stride=4,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);
+val conv1 =     conv(cin)(w=11,h=11,nch=96,stride=4,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);
 val relu1 =     relu(conv1)();
 val pool1 =     pool(relu1)(w=3,h=3,stride=2);
 val norm1 =     LRNacross(pool1)(dim=5,alpha=0.0001f,beta=0.75f);
@@ -104,7 +104,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 nn.launchTrain;
 
 println("Examine the 'nn' variable to track learning state.\n");
-=======
+
 //nn.train;
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);

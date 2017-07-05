@@ -10,6 +10,7 @@ import BIDMach.models._
 import BIDMach.networks._
 import BIDMach._
 import jcuda._
+import jcuda.runtime._
 import jcuda.runtime.JCuda._
 import jcuda.jcudnn._
 import jcuda.jcudnn.JCudnn._
@@ -30,6 +31,22 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 	
 	val pZERO = Pointer.to(ZERO);
 	val pONE = Pointer.to(ONE);
+
+
+  var cudnnMainHandle:cudnnHandle = null;
+  var cudnnMainStream:cudaStream_t = null;
+  
+  def initHandles() = { 
+    cudnnMainHandle = new cudnnHandle;
+    cudnnMainStream = new cudaStream_t;
+    var err = cudnnCreate(cudnnMainHandle);
+    if (err == 0) err = cudaStreamCreate(cudnnMainStream);
+    if (err == 0) err = cudnnSetStream(cudnnMainHandle, cudnnMainStream);
+    
+    if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
+  }
+
+  initHandles();
 	
 	override def forward = {
 		val start = toc;
@@ -67,9 +84,9 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
       val cstatus = cudnnSetLRNDescriptor(pDesc, dim, alpha, beta, lrnK);
       if (cstatus > 0) throw new RuntimeException("Error setting LRN descriptor %d" format cstatus);
 
-      var err = cudnnLRNCrossChannelForward(GFilter.getHandle, pDesc, lrnMode, pONE, xDesc, inputGMat.pdata, pZERO, yDesc, outputGMat.pdata);
+      var err = cudnnLRNCrossChannelForward(cudnnMainHandle, pDesc, lrnMode, pONE, xDesc, inputGMat.pdata, pZERO, yDesc, outputGMat.pdata);
       
-      cudaDeviceSynchronize();
+      cudaStreamSynchronize(cudnnMainStream);
       if (err == 0) err = cudaGetLastError();
       if (err > 0) throw new CUDAException(err, "Error in CUDNN forward LRN cross channel: " + cudaGetErrorString(err));
           
@@ -134,10 +151,10 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 				val cstatus = cudnnSetLRNDescriptor(pDesc, dim, alpha, beta, lrnK);
 				if (cstatus > 0) throw new RuntimeException("Error setting LRN descriptor %d" format cstatus);
 
-				var err = cudnnLRNCrossChannelBackward(GFilter.getHandle, pDesc, lrnMode, pONE, yDesc, outputGMat.pdata, 
+				var err = cudnnLRNCrossChannelBackward(cudnnMainHandle, pDesc, lrnMode, pONE, yDesc, outputGMat.pdata, 
 						dyDesc, derivGMat.pdata, xDesc, inputGMat.pdata, pONE, dxDesc, inputDerivGMat.pdata);
 
-				cudaDeviceSynchronize();
+				cudaStreamSynchronize(cudnnMainStream);
 				if (err == 0) err = cudaGetLastError();
 				if (err > 0) throw new CUDAException(err, "Error in CUDNN backward LRN cross channel: " + cudaGetErrorString(err));
           

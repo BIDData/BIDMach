@@ -1,6 +1,7 @@
 package BIDMach.networks.layers
 
 import jcuda._
+import jcuda.runtime._
 import jcuda.runtime.JCuda._
 import jcuda.jcudnn._
 import jcuda.jcudnn.JCudnn._
@@ -28,6 +29,21 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
   
   var debugMe = false;
   var batchDim:IMat = null;
+
+  var cudnnMainHandle:cudnnHandle = null;
+  var cudnnMainStream:cudaStream_t = null;
+  
+  def initHandles() = { 
+    cudnnMainHandle = new cudnnHandle;
+    cudnnMainStream = new cudaStream_t;
+    var err = cudnnCreate(cudnnMainHandle);
+    if (err == 0) err = cudaStreamCreate(cudnnMainStream);
+    if (err == 0) err = cudnnSetStream(cudnnMainHandle, cudnnMainStream);
+    
+    if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
+  }
+
+  initHandles();
   
   def initModelMats = {
     val bdims = inputData.dims.copy;
@@ -194,15 +210,15 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       if (sbmvDeriveStatus == cudnnStatus.CUDNN_STATUS_BAD_PARAM) throw new CUDAException(sbmvDeriveStatus, "Error creating scale/bias/mean/var tensor for batch norm forward")
 
       var err = if (dotrain) {
-        cudnnBatchNormalizationForwardTraining(GFilter.getHandle, normMode, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
+        cudnnBatchNormalizationForwardTraining(cudnnMainHandle, normMode, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
             xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata, biasGMat.pdata, 
             opts.expAvgFactor, runningMeansGMat.pdata, runningVariancesGMat.pdata, opts.epsilon, meansGMat.pdata, variancesGMat.pdata);
       } else {
-      	cudnnBatchNormalizationForwardInference(GFilter.getHandle, normMode, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
+      	cudnnBatchNormalizationForwardInference(cudnnMainHandle, normMode, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
       	    xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata,
       	    biasGMat.pdata, runningMeansGMat.pdata, runningVariancesGMat.pdata, opts.epsilon);        
       }
-      cudaDeviceSynchronize();
+      cudaStreamSynchronize(cudnnMainStream);
       if (err == 0) {
         err = cudaGetLastError();
       }
@@ -264,11 +280,13 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       val sbmvDeriveStatus = cudnnDeriveBNTensorDescriptor(scaleBiasDiffDesc, xDesc, normMode)
       if (sbmvDeriveStatus == cudnnStatus.CUDNN_STATUS_BAD_PARAM) throw new CUDAException(sbmvDeriveStatus, "Error creating scale/bias diff tensor for batch norm backward")
       
-      cudnnBatchNormalizationBackward(GFilter.getHandle, normMode,
+      cudnnBatchNormalizationBackward(cudnnMainHandle, normMode,
           BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, BatchNormScaleLayer.ONE, BatchNormScaleLayer.ZERO, 
           xDesc, inputGMat.pdata, dyDesc, derivGMat.pdata, dxDesc, inputDerivGMat.pdata,
           scaleBiasDiffDesc, scaleGMat.pdata, updateScaleGMat.pdata, updateBiasGMat.pdata, opts.epsilon,
-          meansGMat.pdata, variancesGMat.pdata)
+          meansGMat.pdata, variancesGMat.pdata);
+
+      cudaStreamSynchronize(cudnnMainStream);
 
     } finally {
       

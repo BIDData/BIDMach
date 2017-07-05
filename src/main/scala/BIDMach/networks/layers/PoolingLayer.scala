@@ -1,6 +1,7 @@
 package BIDMach.networks.layers
 
 import jcuda._
+import jcuda.runtime._
 import jcuda.runtime.JCuda._
 import jcuda.jcudnn._
 import jcuda.jcudnn.JCudnn._
@@ -14,6 +15,21 @@ import BIDMach.networks._
 class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new PoolingNode) extends Layer(net, opts) {
    
   val data_type = cudnnDataType.CUDNN_DATA_FLOAT;
+
+  var cudnnMainHandle:cudnnHandle = null;
+  var cudnnMainStream:cudaStream_t = null;
+  
+  def initHandles() = { 
+    cudnnMainHandle = new cudnnHandle;
+    cudnnMainStream = new cudaStream_t;
+    var err = cudnnCreate(cudnnMainHandle);
+    if (err == 0) err = cudaStreamCreate(cudnnMainStream);
+    if (err == 0) err = cudnnSetStream(cudnnMainHandle, cudnnMainStream);
+    
+    if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
+  }
+
+  initHandles();
   
   def initModelMats = {
     val outdims = inputData.dims.copy;
@@ -201,9 +217,9 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       val cstatus = cudnnSetPooling2dDescriptor(pDesc, opts.poolingMode, opts.poolingNaN, h, w, pady, padx, stridey, stridex);
       if (cstatus > 0) throw new RuntimeException("Error setting pooling descriptor %d" format cstatus);
 
-      var err = cudnnPoolingForward(GFilter.getHandle, pDesc, PoolingLayer.ONE, xDesc, inputGMat.pdata, PoolingLayer.ZERO, yDesc, outputGMat.pdata);
+      var err = cudnnPoolingForward(cudnnMainHandle, pDesc, PoolingLayer.ONE, xDesc, inputGMat.pdata, PoolingLayer.ZERO, yDesc, outputGMat.pdata);
       
-      cudaDeviceSynchronize();
+      cudaStreamSynchronize(cudnnMainStream);
       if (err == 0) err = cudaGetLastError();
       if (err > 0) throw new CUDAException(err, "Error in CUDNN forward pooling: " + cudaGetErrorString(err));
           
@@ -265,10 +281,10 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       val cstatus = cudnnSetPooling2dDescriptor(pDesc, opts.poolingMode, opts.poolingNaN, h, w, pady, padx, stridey, stridex);
       if (cstatus > 0) throw new RuntimeException("Error setting pooling descriptor %d" format cstatus);
 
-      var err = cudnnPoolingBackward(GFilter.getHandle, pDesc, PoolingLayer.ONE, yDesc, outputGMat.pdata, dyDesc, derivGMat.pdata,
+      var err = cudnnPoolingBackward(cudnnMainHandle, pDesc, PoolingLayer.ONE, yDesc, outputGMat.pdata, dyDesc, derivGMat.pdata,
           xDesc, inputGMat.pdata, PoolingLayer.ONE, dxDesc, inputDerivGMat.pdata);
          
-      cudaDeviceSynchronize();
+      cudaStreamSynchronize(cudnnMainStream);
       if (err == 0) err = cudaGetLastError();
       if (err > 0) throw new CUDAException(err, "Error in CUDNN backward pooling: " + cudaGetErrorString(err));
 

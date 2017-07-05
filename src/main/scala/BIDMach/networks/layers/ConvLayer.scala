@@ -33,7 +33,21 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var backwardfiltertime = 0.0;
     var backwarddatatime = 0.0;
 //    var outputDim:IMat = null; //Should be three numbers
+
+  var cudnnMainHandle:cudnnHandle = null;
+  var cudnnMainStream:cudaStream_t = null;
+  
+  def initHandles() = { 
+    cudnnMainHandle = new cudnnHandle;
+    cudnnMainStream = new cudaStream_t;
+    var err = cudnnCreate(cudnnMainHandle);
+    if (err == 0) err = cudaStreamCreate(cudnnMainStream);
+    if (err == 0) err = cudnnSetStream(cudnnMainHandle, cudnnMainStream);
     
+    if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
+  }
+
+  initHandles();
 
   def initModelMats = {
     inputDim = inputData.dims;
@@ -209,9 +223,9 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
   	val bstatus = cudnnSetTensor4dDescriptor(bdesc, tformat, dataType, dims(3), dims(0), dims(2), dims(1));
   	if (bstatus > 0) throw new RuntimeException("Error %d creating B tensor for forward bias computation" format bstatus);
 	  
-  	var err = cudnnAddTensor(GFilter.getHandle, GFilter.ONE, adesc, bias.pdata, GFilter.ONE, bdesc, output.pdata);
+  	var err = cudnnAddTensor(cudnnMainHandle, GFilter.ONE, adesc, bias.pdata, GFilter.ONE, bdesc, output.pdata);
   	
-  	cudaStreamSynchronize(GFilter.getStream);
+  	cudaStreamSynchronize(cudnnMainStream);
   	if (err == 0) err = cudaGetLastError();
   	if (err > 0) throw new RuntimeException("Error in forward convolution bias: %s" format cudaGetErrorString(err));
   	
@@ -287,9 +301,9 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
   	val bstatus = cudnnSetTensor4dDescriptor(bdesc, tformat, dataType, bdims(3), bdims(0), bdims(2), bdims(1));
   	if (bstatus > 0) throw new RuntimeException("Error %d creating B tensor for backward bias computation" format bstatus);
 	  
-  	var err = cudnnConvolutionBackwardBias(GFilter.getHandle, GFilter.ONE, adesc, deriv.pdata, GFilter.ONE, bdesc, updateBias.pdata);
+  	var err = cudnnConvolutionBackwardBias(cudnnMainHandle, GFilter.ONE, adesc, deriv.pdata, GFilter.ONE, bdesc, updateBias.pdata);
 
-  	cudaStreamSynchronize(GFilter.getStream);
+  	cudaStreamSynchronize(cudnnMainStream);
   	if (err == 0) err = cudaGetLastError();
   	if (err > 0) throw new RuntimeException("Error in backward convolution bias: %s" format cudaGetErrorString(err));
   	

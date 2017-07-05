@@ -120,8 +120,4 @@ object BatchNormLayer {
   
   def apply(net:Net, opts:BatchNormNodeOpts) = new BatchNormLayer(net, opts)
 
-  def getHandle = {
-    if (!GFilter.cudnnContextsInitialized) GFilter.initHandles();
-    GFilter.cudnnContexts(getGPU)
-  }
 }
