@@ -44,12 +44,11 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     if (err == 0) err = cudaStreamCreate(cudnnMainStream);
     if (err == 0) err = cudnnSetStream(cudnnMainHandle, cudnnMainStream);
     
-    if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
+    if (err != 0) throw new RuntimeException("Error in CUDNN ConvLayer creation %s" format cudaGetErrorString(err))
   }
 
-  initHandles();
-
   def initModelMats = {
+  	initHandles();
     inputDim = inputData.dims;
     val channel_in = inputDim(0);
     val filter_h = opts.kernel(0); // 3;0
@@ -153,6 +152,8 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     bias_mat = null; 
     update_bias_mat = null;
     inputDim = null; 
+    cudnnMainHandle= null;
+    cudnnMainStream = null;
   }
 
     

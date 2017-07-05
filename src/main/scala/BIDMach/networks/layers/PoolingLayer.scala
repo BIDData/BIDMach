@@ -26,12 +26,11 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
     if (err == 0) err = cudaStreamCreate(cudnnMainStream);
     if (err == 0) err = cudnnSetStream(cudnnMainHandle, cudnnMainStream);
     
-    if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
+    if (err != 0) throw new RuntimeException("Error in CUDNN PoolingLayer creation %s" format cudaGetErrorString(err))
   }
-
-  initHandles();
   
-  def initModelMats = {
+  def initModelMats = {   
+  	initHandles();
     val outdims = inputData.dims.copy;
     val outh = (outdims(2) + 2*opts.pad - opts.h)/opts.stride + 1;
     val outw = (outdims(1) + 2*opts.pad - opts.w)/opts.stride + 1;
@@ -296,6 +295,12 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
       if (yDesc != null) cudnnDestroyTensorDescriptor(yDesc); 
       if (xDesc != null) cudnnDestroyTensorDescriptor(xDesc); 
     }
+  }
+  
+  override def clear = {
+    clearMats;
+    cudnnMainHandle = null;
+    cudnnMainStream = null;
   }
   
   override def toString = {

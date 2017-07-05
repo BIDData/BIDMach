@@ -42,10 +42,9 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     
     if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
   }
-
-  initHandles();
   
   def initModelMats = {
+  	initHandles();
     val bdims = inputData.dims.copy;
     opts.batchNormMode match {
     case BatchNormLayer.SPATIAL => {
@@ -309,6 +308,8 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     updateScale= null;
     updateBias = null;
     batchDim = null;
+    cudnnMainHandle = null;
+    cudnnMainStream = null;
   }
 
   override def toString = {

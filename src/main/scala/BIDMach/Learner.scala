@@ -46,11 +46,11 @@ case class Learner(
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
   var lastCheckPoint = 0;
-  var done = false;
-  var paused = false;
-  var pauseAt = -1L;
-  var ipass = 0;
-  var istep = 0;
+  @volatile var done = false;
+  @volatile var paused = false;
+  @volatile var pauseAt = -1L;
+  @volatile var ipass = 0;
+  @volatile var istep = 0;
   var here = 0L;
   var lasti = 0;
   var bytes = 0L;

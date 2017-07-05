@@ -382,6 +382,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     val layernames = new CSMat(layers.length, 1, layers.map(_.getClass.getSimpleName));
     (times, layernames);
   }
+  
+  // Return a matrix from the backward derivative cache. This matrix must be zero'ed. 
     
   def getMat(dims:IMat, typeMat:Mat):Mat = {
     val indx = ND.hash2(prod(dims).v, typeMat.mytype.##);

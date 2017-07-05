@@ -43,13 +43,13 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
     if (err == 0) err = cudaStreamCreate(cudnnMainStream);
     if (err == 0) err = cudnnSetStream(cudnnMainHandle, cudnnMainStream);
     
-    if (err != 0) throw new RuntimeException("Error in CUDNN BatchNormScaleLayer creation %s" format cudaGetErrorString(err))
+    if (err != 0) throw new RuntimeException("Error in CUDNN LRNacrossLayer creation %s" format cudaGetErrorString(err))
   }
 
-  initHandles();
 	
 	override def forward = {
 		val start = toc;
+		if (cudnnMainHandle.asInstanceOf[AnyRef] == null) initHandles();
 		inplaceNoConnectGetOutput();
 		
     var xDesc:cudnnTensorDescriptor = null;
@@ -170,6 +170,12 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 		
 		inplaceNoConnectReleaseDeriv();
 		backwardtime += toc - start;
+  }
+  
+  override def clear {
+    clearMats;
+    cudnnMainHandle = null;
+    cudnnMainStream = null;
   }
   
   	  
