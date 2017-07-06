@@ -55,6 +55,7 @@ BIDMACH_LIBS="${BIDMACH_ROOT}/target/BIDMach-${BIDMAT_VERSION}.jar;\
 ${LIBDIR}/BIDMach-${BIDMAT_VERSION}-cpu-${OSS}-${ARCH}.jar;\
 ${LIBDIR}/BIDMach-${BIDMAT_VERSION}-gpu-${OSS}-${ARCH}.jar;\
 ${LIBDIR}/BIDMat-${BIDMAT_VERSION}.jar;\
+${LIBDIR}/akka-actor_2.11-2.5.3.jar;\
 ${LIBDIR}/BIDMat-${BIDMAT_VERSION}-cpu-${OSS}-${ARCH}.jar;\
 ${LIBDIR}/BIDMat-${BIDMAT_VERSION}-gpu-${OSS}-${ARCH}.jar;\
 ${LIBDIR}/ptplot-1.0.jar;${LIBDIR}/ptplotapplication-1.0.jar;${LIBDIR}/protobuf-java-3.1.0.jar;\
