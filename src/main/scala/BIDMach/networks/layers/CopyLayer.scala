@@ -29,15 +29,18 @@ class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyN
 			  }
 		  }
 		  output <-- inputData;
-		  
-      inplaceNoConnectSetupDerivs();
+		  inplaceNoConnectSetupDerivs();
       
 		  forwardtime += toc - start;
   }
 
   override def backward = {
 		  val start = toc;
+		  inplaceNoConnectGetInputDerivs();
+		  
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv;
+		  
+		  inplaceNoConnectReleaseDeriv();
 		  backwardtime += toc - start;
   }
 

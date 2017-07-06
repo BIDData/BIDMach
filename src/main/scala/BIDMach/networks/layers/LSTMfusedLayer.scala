@@ -49,6 +49,7 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
 	      LSTMfusedLayer.LSTMbackward(inC, lin1, lin2, lin3, lin4, doutC, doutH, dinC, dlin1, dlin2, dlin3, dlin4);	      
 	    }
 	  }
+	  inplaceNoConnectReleaseDeriv();
 	}
   
 }

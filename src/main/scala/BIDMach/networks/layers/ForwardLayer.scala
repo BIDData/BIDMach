@@ -20,7 +20,7 @@ class ForwardLayer(override val net:Net, override val opts:ForwardNodeOpts = new
 
   override def forward = {
 		  val start = toc;
-		  inplaceConnectGetOutput();
+		  inplaceNoConnectGetOutput();
 		  
 		  output <-- inputData;
 //		  clearDeriv;

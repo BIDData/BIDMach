@@ -27,7 +27,7 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 
 	override def forward = {
 			val start = toc;
-			inplaceConnectGetOutput();
+			inplaceNoConnectGetOutput();
 			
 			if (ilinks.asInstanceOf[AnyRef] == null) {
 			  ilinks = convertMat(opts.links);

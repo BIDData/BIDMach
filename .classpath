@@ -35,6 +35,6 @@
 	<classpathentry kind="lib" path="lib/scalacheck_2.11-1.11.6.jar"/>
 	<classpathentry kind="lib" path="lib/scalatest_2.11-2.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/junit-4.11.jar"/>
-	<classpathentry kind="lib" path="lib/BIDMat-2.0.4-cuda8.0beta.jar"/>
+	<classpathentry kind="lib" path="lib/BIDMat-2.0.5-cuda8.0beta.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

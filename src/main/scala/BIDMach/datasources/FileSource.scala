@@ -11,11 +11,11 @@ import java.io._
 class FileSource(override val opts:FileSource.Opts = new FileSource.Options) extends DataSource(opts) {
 	var sizeMargin = 0f;
 	var blockSize = 0;
-	@volatile var fileno = 0;                // Index of the file to be read. 
-	var fileptrs:IMat = null;                // Indices of files to be written. 
-	var colno = 0;                           // Column of input matrix that has been read                 
+	@volatile var fileno = 0;                // Index of the file to be read.  
+	@volatile var colno = 0;                 // Column of input matrix that has been read  
 	var nstart = 0;                          // First file index
 	var nend = 0;                            // Last file index (exclusive)
+	var fileptrs:IMat = null;                // Indices of files to be written.
 	var fnames:List[(Int)=>String] = null;   // List of file name mappings
 
 	omats = null;

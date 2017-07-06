@@ -45,7 +45,7 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 		
 		if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + (deriv ∘ randmat);
 		
-		inplaceNoConnectReleaseDeriv()
+		inplaceConnectReleaseDeriv();
 		backwardtime += toc - start;
   }
   
