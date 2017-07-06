@@ -129,7 +129,7 @@ public final class CUMACH {
  		   Pointer MM, int ldmm, Pointer Sumsq, Pointer Mask, int maskrows, Pointer lrate, int lrlen, Pointer vexp, int vexplen, Pointer texp, int texplen, 
  		   float istep, int addgrad, float epsilon);   
     
-
+    public static native int linComb(Pointer x, float wx, Pointer y, float wy, Pointer z, int len);
 
 
 }

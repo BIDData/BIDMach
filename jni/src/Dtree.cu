@@ -92,7 +92,7 @@ int treePack(float *fdata, int *treenodes, int *icats, long long *out, int *fiel
   dim3 bdim(ntx, nty, 1);
   int nb = min(32, 1 + (ncols-1)/32);
   __treePack<float,int><<<nb,bdim>>>(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps, seed);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -103,7 +103,7 @@ int treePackfc(float *fdata, int *treenodes, float *icats, long long *out, int *
   dim3 bdim(ntx, nty, 1);
   int nb = min(32, 1 + (ncols-1)/32);
   __treePack<float,float><<<nb,bdim>>>(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps, seed);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -115,7 +115,7 @@ int treePackInt(int *fdata, int *treenodes, int *icats, long long *out, int *fie
   dim3 bdim(ntx, nty, 1);
   int nb = min(32, 1 + (ncols-1)/32);
   __treePack<int,int><<<nb,bdim>>>(fdata, treenodes, icats, out, fieldlens, nrows, ncols, ntrees, nsamps, seed);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -189,7 +189,7 @@ int treeWalk(float *fdata, int *inodes, float *fnodes, int *itrees, int *ftrees,
   //  printf("nrows %d, ncols %d, ntrees %d, nnodes %d, getcat %d, nbits %d, nlevels %d, xthreads %d, ythreads %d, xblocks %d, yblocks %d\n",
   //  nrows, ncols, ntrees, nnodes, getcat, nbits, nlevels, xthreads, ythreads, xblocks, yblocks);
   __treeWalk<<<blockdims,threaddims>>>(fdata, inodes, fnodes, itrees, ftrees, vtrees, ctrees, nrows, ncols, ntrees, nnodes, getcat, nbits, nlevels);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -670,7 +670,7 @@ int minImpurity(long long *keys, int *counts, int *outv, int *outf, float *outg,
     }
   }
   fflush(stdout);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -717,7 +717,7 @@ int findBoundaries(long long *keys, int *jc, int n, int njc, int shift) {
   dim3 tdim(32, ny, 1);
   int ng = min(64, 1+n/32/ny);
   __findBoundaries<<<ng,tdim>>>(keys, jc, n, njc, shift);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -737,7 +737,7 @@ int floatToInt(int n, float *in, int *out, int nbits) {
   dim3 griddims;
   setsizesLean(n, &griddims, &nthreads);
   __floatToInt<<<griddims,nthreads>>>(n, in, out, nbits);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -757,7 +757,7 @@ int jfeatsToIfeats(int itree, int *inodes, int *jfeats, int *ifeats, int n, int 
   dim3 griddims;
   setsizesLean(n, &griddims, &nthreads);
   __jfeatsToIfeats<<<griddims,nthreads>>>(itree, inodes, jfeats, ifeats, n, nfeats, seed);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }

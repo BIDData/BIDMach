@@ -1,3 +1,6 @@
+
+#define SYNC_STREAM cudaStreamDefault
+
 void setsizes(int N, dim3 *gridp, int *nthreadsp);
 
 void setsizesLean(int N, dim3 *gridp, int *nthreadsp);
@@ -112,3 +115,5 @@ int pairMultADAGradTile(int nrows, int ncols, int bound1, int bound2, float *A, 
                         float *Bdata, int *Bir, int *Bjc, int broff, int bcoff, int transpose, 
                         float *MM, int ldmm, float *Sumsq, float *Mask, int maskrows, float *lrate, int lrlen, 
                         float *vexp, int vexplen, float *texp, int texplen, float istep, int addgrad, float epsilon);
+
+int linComb(float *X, float wx, float *Y, float wy, float *Z, int len);

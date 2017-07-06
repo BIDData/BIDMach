@@ -661,4 +661,13 @@ JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_pairMultADAGradTile
                                MM, ldmm, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
   }
 
+JNIEXPORT jint JNICALL Java_edu_berkeley_bid_CUMACH_linComb
+(JNIEnv *env, jobject obj, jobject jX, jfloat wx, jobject jY, jfloat wy, jobject jZ, jint len)
+  {
+    float *X = (float*)getPointer(env, jX);
+    float *Y = (float*)getPointer(env, jY);
+    float *Z = (float*)getPointer(env, jZ);
+
+    return linComb(X, wx, Y, wy, Z, len);
+  }
 }

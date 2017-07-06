@@ -1,6 +1,6 @@
 package BIDMach.updaters
  
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GMat,GIMat,GSMat,ND,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
@@ -134,7 +134,10 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	    		val grad = updatemats(i);
 	    		if (opts.l2reg.asInstanceOf[AnyRef] != null) {
 	    			val i0 = if (opts.l2reg.length > 1) i else 0;
-	    			grad ~ grad - (mm *@ (opts.l2reg(i0) * batchSize));
+	    			(grad, mm) match {
+	    			  case (ggrad:GMat, gmm:GMat) => Grad.linComb(ggrad, 1f, gmm, -opts.l2reg(i0) * batchSize, ggrad);
+	    			  case _ => grad ~ grad - (mm *@ (opts.l2reg(i0) * batchSize));
+	    			}
 	    		}
 	    		if (opts.langevin > 0) {                              // Add Langevin random permutations
 	    			normrnd(0, opts.langevin, randmat(i));
@@ -143,19 +146,31 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	    		grad ~ grad *@ (lrate *@ tscale);
 	    		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
 	    			val i0 = if (opts.vel_decay.length > 1) i else 0;
-	    			mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
-	    			momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
-	    			momentum(i) ~ momentum(i) + grad;
+	    			(grad, momentum(i)) match {
+	    			  case (ggrad:GMat, gmom:GMat) => Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);
+	    			  case _ => {
+	    			  	mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
+	    			  	momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
+	    			  	momentum(i) ~ momentum(i) + grad;
+	    			  }
+	    			}
 	    			grad <-- momentum(i);
 	    		}
 	    		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
 	    			val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-	    			mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
-	    			momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
-	    			mm ~ mm - momentum(i);                               // Subtract mu * p_t-1 from the model
-	    			momentum(i) ~ momentum(i) + grad;        	           // Compute new momentum p_t = mu * p_t-1 + g
-	    			mm ~ mm + momentum(i);                               // Add p_t to the model;
-	    			grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added.                       
+	    			mu <-- opts.nesterov_vel_decay(i0);                    // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
+	    			(grad, momentum(i)) match {
+	    			case (ggrad:GMat, gmom:GMat) => {
+	    			  Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);   // p_t = mu * p_t-1 + g
+	    			  Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), ggrad);  // g' = mu p_t + (p_t - mu*p_t-1) = mu *p_t + g
+	    			}
+	    			case _ => {      
+	    				momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
+	    				momentum(i) ~ momentum(i) + grad;                    // Compute new momentum p_t = mu * p_t-1 + g
+	    				mm ~ mm + grad;                                      // Add 2nd and 4th terms: (p_t - mu p_t-1) = g to the model;
+	    				grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added.
+	    			}
+	    			}       	                                  
 	    		}
 	    		modelmats(i) ~ modelmats(i) + grad;
 	    		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
@@ -252,5 +267,11 @@ object Grad {
       math.exp(frac * math.log(segments(i,1)) + (1-frac) * math.log(segments(i-1,1))).toFloat;
     }
   }
+   
+   def linComb(x:GMat, wx:Float, y:GMat, wy:Float, z:GMat) = {
+     ND.checkDims("linComb", x.dims, y.dims);
+     ND.checkDims("linComb", x.dims, z.dims);
+     CUMACH.linComb(x.pdata, wx, y.pdata, wy, z.pdata, x.length);
+   }
 }
 

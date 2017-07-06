@@ -289,7 +289,7 @@ int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float 
   case 2 : __word2vecPos<2, CDIM, 10/CDIM><<<nblocks,threads>>>(nrows, ncols, W, LB, UB, A, B, lrate); break;
   default : printf("word2vecPos unsupport size %d\n", skip); return 1;
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
 }

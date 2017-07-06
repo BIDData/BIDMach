@@ -168,7 +168,7 @@ int hammingdists(int *a, int *b, int *w, int *op, int *ow, int n) {
   int nb = 1+((n-1)/32);
   dim3 blockdims(32,32,1);
   __hammingdists<16,2,1024><<<nb,blockdims>>>(a, b, w, op, ow, n);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }    
@@ -402,11 +402,11 @@ int multinomial2(int nrows, int ncols, float *A, int *B, int nvals) {
     fprintf(stderr, "Error in cudaMalloc %d", err);
     return err;
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   __prandinit<<<nblocks,nthreads>>>(rstates); 
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   __multinomial2<<<nblocks,nthreads>>>(nrows, ncols, A, B, rstates, nvals);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaFree(rstates);
   err = cudaGetLastError();
   return err;
@@ -422,11 +422,11 @@ int multinomial(int nrows, int ncols, float *A, int *B, float *Norm, int nvals) 
     fprintf(stderr, "Error in cudaMalloc %d", err);
     return err;
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   __prandinit<<<nblocks,nthreads>>>(rstates); 
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   __multinomial<<<nblocks,threads>>>(nrows, ncols, A, B, Norm, rstates, nvals);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaFree(rstates);
   err = cudaGetLastError();
   return err;

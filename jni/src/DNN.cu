@@ -87,7 +87,7 @@ int apply_fwd(float *A, float *B, int ifn, int n) {
   dim3 griddims;
   setsizesLean(n, &griddims, &nthreads);
   __apply_fwd<<<griddims,nthreads>>>(A, B, ifn, n);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -106,7 +106,7 @@ int apply_deriv(float *A, float *B, float *C, int ifn, int n) {
   dim3 griddims;
   setsizesLean(n, &griddims, &nthreads);
   __apply_deriv<<<griddims,nthreads>>>(A, B, C, ifn, n);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -212,7 +212,7 @@ int lstm_fwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, flo
   dim3 griddims;
   setsizesLean(n, &griddims, &nthreads);
   __lstm_fwd<<<griddims,nthreads>>>(inC, LIN1, LIN2, LIN3, LIN4, outC, outH, n);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -223,8 +223,24 @@ int lstm_bwd(float *inC, float *LIN1, float *LIN2, float *LIN3, float *LIN4, flo
   dim3 griddims;
   setsizesLean(n, &griddims, &nthreads);
   __lstm_bwd<<<griddims,nthreads>>>(inC, LIN1, LIN2, LIN3, LIN4, outC, outH, dinC, dLIN1, dLIN2, dLIN3, dLIN4, n);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
 
+__global__ void __linComb(float *X, float wx, float *Y, float wy, float *Z, int len) {
+  int ip = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
+  for (int i = ip; i < len; i += blockDim.x * gridDim.x * gridDim.y) {
+    Z[i] = X[i]*wx + Y[i]*wy;
+  }
+}
+
+int linComb(float *X, float wx, float *Y, float wy, float *Z, int len) {
+  int nthreads;
+  dim3 griddims;
+  setsizesLean(len, &griddims, &nthreads);
+  __linComb<<<griddims,nthreads>>>(X, wx, Y, wy, Z, len);
+  cudaStreamSynchronize(SYNC_STREAM);
+  cudaError_t err = cudaGetLastError();
+  return err;
+}

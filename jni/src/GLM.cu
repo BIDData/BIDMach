@@ -172,7 +172,7 @@ int apply_preds(float *A, int *L, float *C, int nrows, int ncols) {
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_preds<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -190,7 +190,7 @@ int apply_links(float *A, int *L, float *C, int nrows, int ncols) {
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_links<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -209,7 +209,7 @@ int apply_lls(float *A, float *B, int *L, float *C, int nrows, int ncols) {
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_lls<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -227,7 +227,7 @@ int apply_derivs(float *A, float *B, int *L, float *C, int nrows, int ncols) {
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_derivs<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -245,7 +245,7 @@ int apply_dpreds(double *A, int *L, double *C, int nrows, int ncols) {
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dpreds<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -263,7 +263,7 @@ int apply_dlinks(double *A, int *L, double *C, int nrows, int ncols) {
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dlinks<<<griddims,nthreads>>>(A, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -282,7 +282,7 @@ int apply_dlls(double *A, double *B, int *L, double *C, int nrows, int ncols) {
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dlls<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -300,7 +300,7 @@ int apply_dderivs(double *A, double *B, int *L, double *C, int nrows, int ncols)
   dim3 griddims;
   setsizesLean(nrows*ncols, &griddims, &nthreads);
   __apply_dderivs<<<griddims,nthreads>>>(A, B, L, C, nrows, ncols);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -448,7 +448,7 @@ int multADAGrad(int nrows, int ncols, int nnz, float *A, float *Bdata, int *Bir,
     __multADAGrad<<<nblocks,nthreads>>>(nrows, ncols, nnz, A, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
                                         vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -554,7 +554,7 @@ int multADAGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int l
     __multADAGradTile<<<nblocks,nthreads>>>(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Sumsq, Mask, maskrows, lrate, lrlen,
                                             vexp, vexplen, texp, texplen, istep, addgrad, epsilon, biasv, nbr);
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -671,7 +671,7 @@ int multGradTile(int nrows, int ncols, int y, int x, int nnz, float *A, int lda,
     int nblocks = min(128, ncols);
     __multGradTile<<<nblocks,nthreads>>>(nrows, ncols, y, x, nnz, A, lda, Bdata, Bir, Bic, MM, Mask, maskrows, lrate, lrlen, limit, biasv, nbr);
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -831,12 +831,12 @@ int ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq, float *mask,
       fprintf(stderr, "Error in cudaMalloc %d", err);
       return err;
     }
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(SYNC_STREAM);
     __nrandinit<<<griddims,nthreads>>>(rstates); 
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(SYNC_STREAM);
   }
   __ADAGrad<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, langevin, eps, doupdate, rstates);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   if (langevin > 0)   cudaFree(rstates);
   cudaError_t err = cudaGetLastError();
   return err;
@@ -861,12 +861,12 @@ int ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *mome
       fprintf(stderr, "Error in cudaMalloc %d", err);
       return err;
     }
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(SYNC_STREAM);
     __nrandinit<<<griddims,nthreads>>>(rstates); 
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(SYNC_STREAM);
   }
   __ADAGradm<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, langevin, eps, doupdate, rstates);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   if (langevin > 0)   cudaFree(rstates);
   cudaError_t err = cudaGetLastError();
   return err;
@@ -891,12 +891,12 @@ int ADAGradn(int nrows, int ncols, float *mm, float *um, float *ssq, float *mome
       fprintf(stderr, "Error in cudaMalloc %d", err);
       return err;
     }
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(SYNC_STREAM);
     __nrandinit<<<griddims,nthreads>>>(rstates); 
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(SYNC_STREAM);
   }
   __ADAGradn<<<griddims,nthreads>>>(nrows, ncols, mm, um, ssq, momentum, mu, mask, maskr, nw, ve, nve, ts, nts, lrate, nlrate, langevin, eps, doupdate, rstates);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   if (langevin > 0)   cudaFree(rstates);
   cudaError_t err = cudaGetLastError();
   return err;

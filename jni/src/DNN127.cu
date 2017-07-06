@@ -1414,7 +1414,7 @@ int word2vecPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, float 
     printf("word2vecPos too many rows %d\n", nrows);
     return 1;
   }        
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
 }
@@ -1446,7 +1446,7 @@ int word2vecNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
     default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
     }
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
 }
@@ -1477,7 +1477,7 @@ int word2vecNegFilt(int nrows, int ncols, int nwords, int nwa, int nwb, int *WA,
     default : printf("word2vec unsupport size combination %d %d\n", nwa, nwb); return 1;
     }
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
 }
@@ -1510,7 +1510,7 @@ int word2vecEvalPos(int nrows, int ncols, int skip, int *W, int *LB, int *UB, fl
     printf("word2vecEvalPos nrows too large %d\n", nrows);
     return 1;
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
 }
@@ -1542,7 +1542,7 @@ int word2vecEvalNeg(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, fl
     default : printf("word2vecEvalNeg unsupport size combination %d %d\n", nwa, nwb); return 1;
     }
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
 }
@@ -1557,7 +1557,7 @@ int word2vecFwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
   case 100005: __word2vecFwd<10,5,BYDIMF><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C); break;
   default : printf("word2vecFwd unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
   }
@@ -1572,7 +1572,7 @@ int word2vecBwd(int nrows, int ncols, int nwa, int nwb, int *WA, int *WB, float 
   case 100005: __word2vecBwd<10,5,10><<<nblocks,threads>>>(nrows, ncols, WA, WB, A, B, C, lrate); break;
   default : printf("word2vecBwd unsupport size combination %d %d\n", nwa, nwb); return 1;
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   int err = cudaGetLastError();
   return err;
 }

@@ -167,7 +167,7 @@ int hashmult(int nrows, int nfeats, int ncols, int brows1, int brows2, float *A,
     int nblocks = min(MAXXGRID, ncols);
     __hashmult2<<<nblocks,threadDim>>>(nrows, nfeats, ncols, brows1, brows2, A, Bdata, Bir, Bjc, C, transpose);
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -206,7 +206,7 @@ int pairembed(int *r1, int *r2, long long *res, int n) {
   dim3 griddims;
   setsizes(n, &griddims, &nthreads);
   __dopairembed<<<griddims,nthreads>>>(r1, r2, res, n);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -359,7 +359,7 @@ int pairMultTile(int nrows, int bncols, int brows1, int brows2, float *A, int ld
     int nblocks = min(MAXXGRID, bncols);
     __pairmult2<<<nblocks,threadDim>>>(nrows, bncols, brows1, brows2, A, lda, A2, lda2, Bdata, Bir, Bjc, broff, bcoff, C, ldc, transpose);
   }
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -470,7 +470,7 @@ int hashmultADAGrad(int nrows, int nfeats, int ncols, int brows1, int brows2, fl
   int nblocks = min(MAXXGRID, ncols);
   __hashmultADAGrad<<<nblocks,threadDim>>>(nrows, nfeats, ncols, brows1, brows2, A, Bdata, Bir, Bjc, transpose, 
                                            MM, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -547,7 +547,7 @@ int pairMultADAGradTile(int nrows, int bncols, int brows1, int brows2, float *A,
   int nblocks = min(MAXXGRID, bncols);
   __pairMultADAGradTile<<<nblocks,threadDim>>>(nrows, bncols, brows1, brows2, A, lda, aroff, acoff, Bdata, Bir, Bjc, broff, bcoff, transpose, 
                                                MM, ldmm, Sumsq, Mask, maskrows, lrate, lrlen, vexp, vexplen, texp, texplen, istep, addgrad, epsilon);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
@@ -600,7 +600,7 @@ int hashcross(int nrows, int nfeats, int ncols, float *A, float *Bdata, int *Bir
   dim3 threadDim(nrows, nt, 1);
   int nblocks = min(MAXXGRID, ncols);
   __hashcross<<<nblocks,threadDim>>>(nrows, nfeats, ncols, A, Bdata, Bir, Bjc, Cdata, Cir, Cjc, D, transpose);
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(SYNC_STREAM);
   cudaError_t err = cudaGetLastError();
   return err;
 }
