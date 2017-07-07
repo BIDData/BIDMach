@@ -130,7 +130,7 @@ class CropMirrorLayer(override val net:Net, override val opts:CropMirrorNodeOpts
 	}
   
   override def toString = {
-    "crop@"+Integer.toHexString(hashCode % 0x10000).toString
+    "cropMirror@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
@@ -149,7 +149,7 @@ class CropMirrorNode extends Node with CropMirrorNodeOpts {
   override def create(net:Net):CropMirrorLayer = {CropMirrorLayer(net, this);}
   
   override def toString = {
-    "crop@"+Integer.toHexString(hashCode % 0x10000).toString
+    "cropMirror@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
 
