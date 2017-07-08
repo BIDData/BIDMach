@@ -15,6 +15,7 @@ import jcuda.jcudnn.JCudnn._
 import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
+import akka.actor.{Actor,Props,ActorSystem,ActorRef};
 
 /**
  * Net Layer class. There are currently 46 layer types:
@@ -176,6 +177,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   override def layer = this
   def inputs = _inputs;
   var doreturn = true;
+  var myActor:ActorRef = null;
   
   private var _GUID = Mat.myrand.nextLong
   def setGUID(v:Long):Unit = {_GUID = v}
