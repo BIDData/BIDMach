@@ -17,7 +17,7 @@ import java.util.HashMap;
 import akka.actor.{Actor,Props,ActorSystem,ActorRef};
 
 /**
- * Net compute Actor. Attach to the network to support async and GPU-streamed layer udpates.  
+ * Net compute Actor. Attach to the network to support async and GPU-streamed layer updates.  
  * 
  * Call setup() once after creation to find outputs for each layer, and source and sink layers.
  * 
