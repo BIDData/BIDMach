@@ -79,7 +79,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
     	var j = 0;
     	while (j < idims(0)) {
     		val ii = i * idims(0);
-    	  var ij = j + i * ii;
+    	  var ij = j + ii;
     	  var k = 0;
     	  var ss = 0f;
     	  val klim = math.min(opts.dim, idims(0) - j);
