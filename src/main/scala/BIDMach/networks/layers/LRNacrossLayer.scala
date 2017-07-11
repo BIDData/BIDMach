@@ -46,11 +46,110 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
     if (err != 0) throw new RuntimeException("Error in CUDNN LRNacrossLayer creation %s" format cudaGetErrorString(err))
   }
 
+  override def forward = {
+  	val start = toc;
+  	inplaceNoConnectGetOutput();
+    inputData match {
+      case in:GMat => forwardGPU;
+      case in:FMat => forwardCPU;
+    }
+    forwardtime += toc - start;
+  }
+  
+  override def backward = {
+  	val start = toc;
+  	inplaceNoConnectGetInputDerivs();
+    inputData match {
+      case in:GMat => backwardGPU;
+      case in:FMat => backwardCPU;
+    }
+    inplaceNoConnectReleaseDeriv();
+    backwardtime += toc - start;
+  }
+  
+  def forwardCPU = {
+  	val inputFMat = inputData.asInstanceOf[FMat];
+    val outputFMat = output.asInstanceOf[FMat];
+    if (getTensorFormat != Net.TensorNHWC) throw new RuntimeException("CPU LRN reqruires NHWC")
+    val idims = inputFMat.dims.data;
+    val npos = idims.slice(1,4).reduce(_*_);
+    val k0 = (opts.dim + 1)/2;
+    var i = 0;
+    while (i < npos) {
+    	var j = 0;
+    	while (j < idims(0)) {
+    		val ii = i * idims(0);
+    	  var ij = j + i * ii;
+    	  var k = 0;
+    	  var ss = 0f;
+    	  val klim = math.min(opts.dim, idims(0) - j);
+    	  while (k < klim) {
+    	    ss += inputFMat.data(k + ij);
+    	    k += 1;
+    	  }
+    	  k = j + opts.dim - idims(0) - 1;
+    	  while (k >= 0) {
+    	  	ss += inputFMat.data(k + ii);
+    	    k -= 1;   
+    	  }
+    	  val k1 = ((k0 + j) % idims(0)) + ii;
+    	  outputFMat.data(k1) = inputFMat.data(k1) / math.pow(1 + opts.alpha * ss, opts.beta).toFloat;
+    		j += 1;
+    	} 
+      i += 1;
+    } 
+  }
+  
+  def backwardCPU = {
+  	val inputFMat = inputData.asInstanceOf[FMat];
+    val outputFMat = output.asInstanceOf[FMat];
+    val iderivFMat = inputDeriv.asInstanceOf[FMat];
+    val derivFMat = deriv.asInstanceOf[FMat];
+    if (getTensorFormat != Net.TensorNHWC) throw new RuntimeException("CPU LRN reqruires NHWC")
+    val idims = inputFMat.dims.data;
+    val npos = idims.slice(1,4).reduce(_*_);
+    val k0 = (opts.dim + 1)/2;
+    var i = 0;
+    while (i < npos) {
+    	var j = 0;
+    	while (j < idims(0)) {
+    	  val ii = i * idims(0);
+    	  val ij = j + ii;
+    	  var k = 0;
+    	  var ss = 0f;
+    	  val klim = math.min(opts.dim, idims(0) - j);
+    	  while (k < klim) {
+    	    ss += inputFMat.data(k + ij);
+    	    k += 1;
+    	  }
+    	  k = j + opts.dim - idims(0) - 1;
+    	  while (k >= 0) {
+    	  	ss += inputFMat.data(k + ii);
+    	    k -= 1;   
+    	  }
+    	  val k1 = ((k0 + j) % idims(0)) + ii;
+    	  val denom0 = 1 + opts.alpha * ss
+    	  val denom = math.pow(denom0, opts.beta).toFloat
+    	  iderivFMat.data(k1) += derivFMat.data(k1) / denom;
+    	  val ddenom = - derivFMat.data(k1) * opts.alpha * opts.beta / (denom * denom0);
+    	  k = 0;
+    	  while (k < opts.dim && k + j < idims(0)) {
+    	    iderivFMat.data(k + ij) += ddenom;
+    	    k += 1;
+    	  }
+    	  k = j + opts.dim - idims(0) - 1;
+    	  while (k >= 0) {
+    	  	iderivFMat.data(k + ii) += ddenom;
+    	    k -= 1;   
+    	  }    	  
+    		j += 1;
+    	} 
+      i += 1;
+    } 
+  }
 	
-	override def forward = {
-		val start = toc;
+	def forwardGPU = {
 		if (cudnnMainHandle.asInstanceOf[AnyRef] == null) initHandles();
-		inplaceNoConnectGetOutput();
 		
     var xDesc:cudnnTensorDescriptor = null;
     var yDesc:cudnnTensorDescriptor = null;
@@ -95,13 +194,9 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
       if (yDesc != null) cudnnDestroyTensorDescriptor(yDesc);
       if (xDesc != null) cudnnDestroyTensorDescriptor(xDesc);
     }
-    forwardtime += toc - start;
   }
 	  
-	    
-  override def backward = {
-		val start = toc;
-		inplaceNoConnectGetInputDerivs();
+  def backwardGPU = {
 		
 		if (inputDeriv.asInstanceOf[AnyRef] != null) {
 			var xDesc:cudnnTensorDescriptor = null;
@@ -167,9 +262,6 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
 				if (xDesc != null) cudnnDestroyTensorDescriptor(xDesc);                       
 			}
 		}
-		
-		inplaceNoConnectReleaseDeriv();
-		backwardtime += toc - start;
   }
   
   override def clear {

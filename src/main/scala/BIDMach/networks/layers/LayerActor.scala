@@ -45,7 +45,7 @@ class LayerActor(val layer:Layer) extends Actor {
   import LayerActor._
   layer.myActor = self;
   val inputActors = Set(layer.inputs.map(_.layer.myActor):_*);
-  val ninputs = inputActors.size;
+  def ninputs = inputActors.size;
   var outputActors = Set.empty[ActorRef];
   var todoInputs = Set.empty[ActorRef];
   var todoOutputs = Set.empty[ActorRef];
