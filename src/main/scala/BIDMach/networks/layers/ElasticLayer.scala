@@ -1,0 +1,110 @@
+package BIDMach.networks.layers
+
+
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat,FFilter,Filter,GFilter}
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMach.datasources._
+import BIDMach.updaters._
+import BIDMach.mixins._
+import BIDMach.models._
+import BIDMach._
+import edu.berkeley.bid.CPUMACH
+import edu.berkeley.bid.CUMACH
+import jcuda._
+import jcuda.runtime._
+import jcuda.runtime.JCuda._
+import jcuda.jcudnn._
+import jcuda.jcudnn.JCudnn._
+import scala.util.hashing.MurmurHash3
+import java.util.HashMap
+import BIDMach.networks._
+import java.util.Arrays
+
+
+class ElasticLayer(override val net:Net, override val opts:ElasticNodeOpts = new ElasticNode ) extends Layer(net, opts) {
+
+  var reducedmats:Array[Mat] = null;
+  
+	def initReducedMats {
+	  reducedmats = net.modelmats.map(_.copy);
+	}
+	
+	
+	override def forward = {
+    val start = toc; 
+    if (reducedmats.asInstanceOf[AnyRef] == null) initReducedMats;
+    
+    /* start an allreduce in here */
+    
+    forwardtime += toc - start;
+	}
+	
+	override def backward = {
+    val start = toc; 
+    
+    /* allreduce hopefully done */
+    
+    val modelmats = net.modelmats;
+    
+    for (i <- 0 until modelmats.length) {
+      var diff:Mat = null;
+      reducedmats(i).synchronized {
+      	diff = reducedmats(i) - modelmats(i);
+      }
+      diff ~ diff *@ opts.elastic_weight;
+      modelmats(i) ~ modelmats(i) + diff;
+    }
+    
+    backwardtime += toc - start;
+	}
+	
+	
+	
+  override def toString = {
+    "Elastic@" + Integer.toHexString(hashCode() % 0x10000)
+  }
+  
+}
+
+trait ElasticNodeOpts extends ModelNodeOpts {
+  var elastic_weight = 0f
+
+  def copyOpts(opts:ElasticNodeOpts):ElasticNodeOpts = {
+  		super.copyOpts(opts);
+  		opts.elastic_weight = elastic_weight;
+  		opts;
+  }
+
+}
+
+class ElasticNode extends Node with ElasticNodeOpts {
+
+  def copyTo(opts:ElasticNode):ElasticNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
+
+  override def clone:ElasticNode = {
+    copyTo(new ElasticNode ).asInstanceOf[ElasticNode]
+  }
+  
+  override def create(net:Net):ElasticLayer = {
+    ElasticLayer(net, this)
+  }
+
+  override def toString = {
+    "Elastic@" + Integer.toHexString(hashCode() % 0x10000)
+  }
+
+
+}
+
+object ElasticLayer {
+  
+  def apply(net:Net) = new ElasticLayer(net, new ElasticNode);
+  
+  def apply(net:Net, opts:ElasticNodeOpts) = new ElasticLayer(net, opts);
+
+}
