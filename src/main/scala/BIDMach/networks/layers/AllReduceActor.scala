@@ -77,7 +77,7 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
           val jend = math.round(1f * (j + 1) * (iend - istart) / ngroups);
           val msg = new Array[Float](iend - istart);
           System.arraycopy(src, istart + jstart, msg, 0, jend - jstart);
-          nbrSelection(i) ! ReduceBlock(a.guid, j, istart+jstart, istart+jend, msg);
+          nbrSelection(i) ! ScatterBlock(a.guid, j, istart+jstart, istart+jend, msg);
           iblocksSent += 1;
         }
       }
@@ -85,7 +85,7 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
     }
     
     
-    case r:ReduceBlock => {
+    case r:ScatterBlock => {
       val accumOpt = blockSums.get((r.guid, r.part))
       if (accumOpt.isEmpty) {
         blockSums += ((r.guid, r.part) -> (1, r.data));
@@ -94,12 +94,12 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
         addArray(r.data, pair._2);
         val nnew = pair._1+1;
         blockSums((r.guid, r.part)) = (nnew, pair._2);
-        if (nnew == nnbrs) nbrSelection.foreach(_ ! Scatter(r.guid, r.part, r.istart, r.iend, r.data))
+        if (nnew == nnbrs) nbrSelection.foreach(_ ! GatherBlock(r.guid, r.part, r.istart, r.iend, r.data))
         blockSums.remove((r.guid, r.part));
       }
     }
     
-    case s:Scatter => {
+    case s:GatherBlock => {
       val recvr = receivers.get(s.guid).get;
       System.arraycopy(s.data, 0, recvr, s.istart, s.iend - s.istart);
       blocksRecvd(s.guid) = blocksRecvd(s.guid) + 1;
@@ -123,8 +123,8 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
 object AllReduceActor {
   case class SetAddresses(val alist:Array[String]);
   case class AllReduce(val guid:Long);
-  case class ReduceBlock(val guid:Long, val part:Int,  val istart:Int, val iend:Int, val data:Array[Float]);
-  case class Scatter(val guid:Long, val part:Int, val istart:Int, val iend:Int, val data:Array[Float]);
+  case class ScatterBlock(val guid:Long, val part:Int,  val istart:Int, val iend:Int, val data:Array[Float]);
+  case class GatherBlock(val guid:Long, val part:Int, val istart:Int, val iend:Int, val data:Array[Float]);
   case class Completed(val guid:Long);
   case object ImDone;
 
