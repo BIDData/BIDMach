@@ -9,8 +9,8 @@ import edu.berkeley.bid.CUMACH
 /**
  * Our fast MH test. See:
  *
- *  	An Efficient Minibatch Acceptance Test for Metropolis-Hastings, arXiv 2016
- *  	Haoyu Chen, Daniel Seita, Xinlei Pan, John Canny
+ *  	An Efficient Minibatch Acceptance Test for Metropolis-Hastings, UAI 2017
+ *  	Daniel Seita, Xinlei Pan, Haoyu Chen, John Canny
  *
  * This should be working for logistic regression. Here are a couple of
  * highlights for John Canny:
