@@ -49,7 +49,6 @@ val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4"
 
 {
 import BIDMach.networks.layers.Node._;
-val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 Net.initDefaultNodeSet;
 
@@ -101,7 +100,7 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 val sgd = nn.updater.asInstanceOf[Grad];
 
 
-//nn.launchTrain;
+nn.launchTrain;
 
 println("Examine the 'nn' variable to track learning state.\n");
 

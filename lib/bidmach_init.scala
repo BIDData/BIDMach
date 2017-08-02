@@ -3,7 +3,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
 import BIDMat.Plotting._
-import BIDMach.Learner
+import BIDMach.{Learner,ParLearner}
 import BIDMach.models.{Click,FM,GLM,KMeans,KMeansw,LDA,LDAgibbs,Model,NMF,SFA,RandomForest,SVD}
 import BIDMach.networks.{Net}
 import BIDMach.datasources.{DataSource,MatSource,FileSource,SFileSource}
