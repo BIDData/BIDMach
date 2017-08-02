@@ -23,9 +23,8 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef,ActorSelection};
  * 
  */
 
-class AllReduceActor(val layer:ElasticLayer) extends Actor {
+class AllReduceActor(val layer:ElasticLayer) extends LayerActor(layer) {
   import AllReduceActor._
-  layer.myActor = self;
   var nbrSelection:Array[ActorSelection] = null;
   var nbrAddresses:Array[String] = null;
   var blockSums = HashMap.empty[(Long, Int), (Int, Array[Float])];
@@ -36,16 +35,40 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
   var dest:Array[Float] = null;
   var nnbrs = -1;
   var myPosInGroup = -1;
-  var recvArray:Array[Float] = null;
   var msgSize = 1000000;
   var chunk = 512;
   
-  def addArray(in:Array[Float], out:Array[Float]) = {
-    if (in.length != out.length) throw new RuntimeException("addArray lengths not equal %d %d" format (in.length, out.length));
-    var i = 0;
-    while (i < in.length) {
-      out(i) += in(i);
-      i += 1;
+  def attach(layer:ElasticLayer) = {
+  	src = layer.dataToAllReduce;
+  	dest = layer.dataFromAllReduce;
+  }
+  
+  def reduceArray(in:Array[Float], out:Array[Float], reduction:Int) = {
+    reduction match {
+    case ReduceSum => {   // Addition
+    	if (in.length != out.length) throw new RuntimeException("reduceArray lengths not equal %d %d" format (in.length, out.length));
+    	var i = 0;
+    	while (i < in.length) {
+    		out(i) += in(i);
+    		i += 1;
+    	}
+    }
+    case ReduceMax => {   // Max
+    	if (in.length != out.length) throw new RuntimeException("reduceArray lengths not equal %d %d" format (in.length, out.length));
+    	var i = 0;
+    	while (i < in.length) {
+    		out(i) = math.max(out(i), in(i));
+    		i += 1;
+    	}
+    }
+    case ReduceMin => {   // Min
+    	if (in.length != out.length) throw new RuntimeException("reduceArray lengths not equal %d %d" format (in.length, out.length));
+    	var i = 0;
+    	while (i < in.length) {
+    		out(i) = math.min(out(i), in(i));
+    		i += 1;
+    	}
+    }
     }
   }
   
@@ -77,7 +100,7 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
           val jend = math.round(1f * (j + 1) * (iend - istart) / ngroups);
           val msg = new Array[Float](iend - istart);
           System.arraycopy(src, istart + jstart, msg, 0, jend - jstart);
-          nbrSelection(i) ! ScatterBlock(a.guid, j, istart+jstart, istart+jend, msg);
+          nbrSelection(i) ! ScatterBlock(a.guid, j, istart+jstart, istart+jend, msg, a.reduction);
           iblocksSent += 1;
         }
       }
@@ -91,7 +114,7 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
         blockSums += ((r.guid, r.part) -> (1, r.data));
       } else {
         val pair = accumOpt.get;
-        addArray(r.data, pair._2);
+        reduceArray(r.data, pair._2, r.reduction);
         val nnew = pair._1+1;
         blockSums((r.guid, r.part)) = (nnew, pair._2);
         if (nnew == nnbrs) nbrSelection.foreach(_ ! GatherBlock(r.guid, r.part, r.istart, r.iend, r.data))
@@ -114,19 +137,19 @@ class AllReduceActor(val layer:ElasticLayer) extends Actor {
 
     case _ => {}
   }
-  
-  def partition() = {
-    
-  }
 }
 
 object AllReduceActor {
   case class SetAddresses(val alist:Array[String]);
-  case class AllReduce(val guid:Long);
-  case class ScatterBlock(val guid:Long, val part:Int,  val istart:Int, val iend:Int, val data:Array[Float]);
+  case class AllReduce(val guid:Long, val reduction:Int);
+  case class ScatterBlock(val guid:Long, val part:Int,  val istart:Int, val iend:Int, val data:Array[Float], val reduction:Int);
   case class GatherBlock(val guid:Long, val part:Int, val istart:Int, val iend:Int, val data:Array[Float]);
   case class Completed(val guid:Long);
   case object ImDone;
+  
+  final val ReduceSum = 0;
+  final val ReduceMax = 1;
+  final val ReduceMin = 2;
 
   def props(layer: ElasticLayer): Props = Props(new AllReduceActor(layer));
 }

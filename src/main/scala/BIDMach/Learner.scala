@@ -363,12 +363,13 @@ case class Learner(
 
 case class ParLearner(
     val datasource:DataSource,
-    val models:Array[Model],
-    val mixins:Array[Array[Mixin]],
-    val updaters:Array[Updater],
+    val models0:Seq[Model],
+    val mixins:Seq[Array[Mixin]],
+    val updaters:Seq[Updater],
     val datasink:DataSink,
     val opts:ParLearner.Opts = new ParLearner.Options) extends Serializable {
 
+  val models = models0.toArray;
 	var myLogger = Mat.consoleLogger;
   var fut:Future[_] = null;
   var um:Array[Mat] = null;
@@ -421,6 +422,33 @@ case class ParLearner(
     	um(i) = zeros(mm0.dims)
     }
     ParLearner.syncmodels(models, mm, um, 0, useGPU)
+  }
+  
+   def launch(fn:()=>Unit) = {
+    val nthreads = opts match {
+      case mopts:FileSource.Opts => mopts.lookahead + opts.nthreads + 2;
+      case _ => opts.nthreads + 2;
+    }
+    val tmp = myLogger;
+    myLogger = Mat.getFileLogger(opts.logfile);
+  	val executor = Executors.newFixedThreadPool(nthreads);
+  	val runner = new Runnable{
+  	  def run() = {
+  	    try {
+  	    	fn();
+  	    } catch {
+  	      case e:Throwable => myLogger.severe("Learner thread failed: %s" format Learner.printStackTrace(e));
+  	    }
+    	  myLogger = tmp;
+    	}
+  	}
+  	fut = executor.submit(runner);
+  	fut;
+  }
+  
+  def launchTrain = {
+    println("\nRunning training in the background.\nLogging to file %s in the current directory." format opts.logfile);
+    launch(()=>this.train);
   }
 
   def train = {

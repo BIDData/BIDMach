@@ -25,9 +25,32 @@ import java.util.Arrays
 class ElasticLayer(override val net:Net, override val opts:ElasticNodeOpts = new ElasticNode ) extends Layer(net, opts) {
 
   var reducedmats:Array[Mat] = null;
+  var dataToAllReduce:Array[Float];
+  var dataFromAllReduce:Array[Float];
+  var onGPU = false;
+  var block = 512;
   
 	def initReducedMats {
 	  reducedmats = net.modelmats.map(_.copy);
+	  val totalsize0 = net.modelmats.map(_.length).reduce(_+_);
+	  val totalsize = block * (1 + (totalsize0 - 1)/block);
+	  val packedSrc = if (onGPU) GMat(block, totalsize/block) else FMat(block, totalsize/block);
+	  var istart = 0;
+	  for (i <- 0 until reducedmats.length) {
+	  	val len = net.modelmats(i).length;
+	    (net.modelmats(i), packedSrc) match {
+	      case (fromdata:GMat, todata:GMat) => {	    
+	      	cudaMemcpy(todata.pdata.withByteOffset(istart * 4), fromdata.pdata, len * 4, cudaMemcpyKind.cudaMemcpyDeviceToDevice);
+	      }
+	      case (fromdata:GMat, todata:FMat) => {	    
+	      	cudaMemcpy(Pointer.to(todata.data).withByteOffset(istart * 4), fromdata.pdata, len * 4, cudaMemcpyKind.cudaMemcpyDeviceToHost);
+	      }
+	      case (fromdata:FMat, todata:FMat) => {	    
+	      	System.arraycopy(fromdata.data, 0, todata.data, istart, len);
+	      }
+	    }
+	    istart += len;
+	  } 
 	}
 	
 	
