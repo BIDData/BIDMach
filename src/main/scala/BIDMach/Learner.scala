@@ -372,6 +372,8 @@ case class ParLearner(
   val models = models0.toArray;
 	var myLogger = Mat.consoleLogger;
   var fut:Future[_] = null;
+	var workers:Array[Future[_]] = null;
+	var executor:ExecutorService = null;
   var um:Array[Mat] = null;
   var mm:Array[Mat] = null;
   var results:FMat = null;
@@ -380,13 +382,15 @@ case class ParLearner(
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
   var lastCheckPoint = 0;
-  var done = false;
-  var paused = false;
-  var ipass = 0;
-  var here = 0L;
-  var lasti = 0;
-  var bytes = 0L;
-  var nsamps = 0L;
+  @volatile var done = false;
+  @volatile var paused = false;
+  @volatile var ipass = 0;
+  @volatile var istep = 0;
+  @volatile var here = 0L;
+  @volatile var lasti = 0;
+  @volatile var bytes = 0L;
+  @volatile var nsamps = 0L;
+  @volatile var dones:IMat = null;
   var cacheState = false;
   var cacheGPUstate = false;
   var debugMemState = false;
@@ -411,7 +415,8 @@ case class ParLearner(
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
     useGPU = models(0).useGPU;
-
+    if (executor.asInstanceOf[AnyRef] == null) executor = Executors.newFixedThreadPool(opts.nthreads+4);
+    if (workers.asInstanceOf[AnyRef] == null) workers = new Array[Future[_] ](opts.nthreads)
     if (useGPU) setGPU(thisGPU)
     val mml = models(0).modelmats.length
     um = new Array[Mat](mml)
@@ -424,14 +429,14 @@ case class ParLearner(
     ParLearner.syncmodels(models, mm, um, 0, useGPU)
   }
   
-   def launch(fn:()=>Unit) = {
+  def launch(fn:()=>Unit) = {
     val nthreads = opts match {
       case mopts:FileSource.Opts => mopts.lookahead + opts.nthreads + 2;
       case _ => opts.nthreads + 2;
     }
     val tmp = myLogger;
     myLogger = Mat.getFileLogger(opts.logfile);
-  	val executor = Executors.newFixedThreadPool(nthreads);
+  	if (executor.asInstanceOf[AnyRef] == null) executor = Executors.newFixedThreadPool(nthreads);
   	val runner = new Runnable{
   	  def run() = {
   	    try {
@@ -471,8 +476,9 @@ case class ParLearner(
 //	      if (i != thisGPU) connect(i)
 	    }
 	  }
-    @volatile var dones = iones(opts.nthreads, 1)
+    iones(opts.nthreads, 1)
     ipass = 0
+    istep = 0
     here = 0L
     lasti = 0
     bytes = 0L
@@ -483,13 +489,13 @@ case class ParLearner(
     	if (updaters != null && updaters(i) != null) updaters(i).clear
     }
     setGPU(thisGPU)
-    var istep = 0
     var lastp = 0f
     var progress = 0f;
     var gprogress = 0f;
-
-    (0 until opts.nthreads).par.foreach((ithread)=> {
-    		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
+    
+    class LearnThread(val ithread:Int) extends Runnable {
+      def run() = {
+        if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
     		while (!done) {
     			while (dones(ithread) == 1) Thread.sleep(1)
     			try {
@@ -516,14 +522,19 @@ case class ParLearner(
     				for (i <- 0 until 8) {
     					myLogger.severe("thread %d, %s" format (ithread, se(i).toString));
     				}
-    				restart(ithread)
+
     				myLogger.severe("Restarted: Keep on truckin...")
     			}
     			}
     			dones(ithread) = 1
     		}
-    	});
+    	}
+    }
     
+    for (i <- 0 until opts.nthreads) {
+      workers(i) = executor.submit(new LearnThread(i));
+    }
+
     while (ipass < opts.npasses) {
     	datasource.reset
       istep = 0
