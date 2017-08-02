@@ -426,7 +426,7 @@ case class ParLearner(
     	mm(i) = zeros(mm0.dims)
     	um(i) = zeros(mm0.dims)
     }
-    dones = iones(opts.nthreads)
+    dones = iones(1, opts.nthreads)
     ParLearner.syncmodels(models, mm, um, 0, useGPU)
   }
   
