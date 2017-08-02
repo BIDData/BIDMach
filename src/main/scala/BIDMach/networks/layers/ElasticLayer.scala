@@ -25,8 +25,8 @@ import java.util.Arrays
 class ElasticLayer(override val net:Net, override val opts:ElasticNodeOpts = new ElasticNode ) extends Layer(net, opts) {
 
   var reducedmats:Array[Mat] = null;
-  var dataToAllReduce:Array[Float];
-  var dataFromAllReduce:Array[Float];
+  var dataToAllReduce:Array[Float] = null;
+  var dataFromAllReduce:Array[Float] = null;
   var onGPU = false;
   var block = 512;
   

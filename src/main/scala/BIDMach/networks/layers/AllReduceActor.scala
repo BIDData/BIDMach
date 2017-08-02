@@ -23,7 +23,7 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef,ActorSelection};
  * 
  */
 
-class AllReduceActor(val layer:ElasticLayer) extends LayerActor(layer) {
+class AllReduceActor(layer0:ElasticLayer) extends LayerActor(layer0) {
   import AllReduceActor._
   var nbrSelection:Array[ActorSelection] = null;
   var nbrAddresses:Array[String] = null;
@@ -72,7 +72,7 @@ class AllReduceActor(val layer:ElasticLayer) extends LayerActor(layer) {
     }
   }
   
-  def receive = {
+  override def receive = {
 
     case s:SetAddresses => {
       nbrAddresses = s.alist;
