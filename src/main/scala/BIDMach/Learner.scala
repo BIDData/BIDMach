@@ -560,7 +560,7 @@ case class ParLearner(
       	if (istep % opts.syncStep == 0) ParLearner.syncmodels(models, mm, um, istep/opts.syncStep, useGPU, opts.elastic_weight)
       	if (datasource.progress > lastp + opts.pstep) {
       		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
-      		val gf = gflop
+      		val gf = BIDMat.MatFunctions.gflop;
       		if (reslist.length > lasti) {
       			val perfStr = ("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
       					100f*lastp,
@@ -625,7 +625,7 @@ case class ParLearner(
   def safeCopy(m:Mat, ithread:Int):Mat = {
     m match {
       case ss:SMat => {
-        val out = SMat.newOrCheckSMat(ss.nrows, ss.ncols, ss.nnz, null, m.GUID, ithread, "safeCopy".##)
+        val out = SMat.newOrCheckSMat(ss.nrows, ss.ncols, ss.nnz, null, m.GUID, ithread, "safeCopy".##, true)
         ss.copyTo(out)
       }
       case ss:SDMat => {
@@ -633,19 +633,19 @@ case class ParLearner(
         ss.copyTo(out)
       }
       case ss:FMat => {
-        val out = FMat.newOrCheckFMat(ss.dims, null, m.GUID, ithread, "safeCopy".##)
+        val out = FMat.newOrCheckFMat(ss.dims, null, m.GUID, ithread, "safeCopy".##, true)
         ss.copyTo(out)
       }
       case ss:DMat => {
-        val out = DMat.newOrCheckDMat(ss.dims, null, m.GUID, ithread, "safeCopy".##)
+        val out = DMat.newOrCheckDMat(ss.dims, null, m.GUID, ithread, "safeCopy".##, true)
         ss.copyTo(out)
       }
       case ss:BMat => {
-        val out = BMat.newOrCheckBMat(ss.dims, null, m.GUID, ithread, "safeCopy".##)
+        val out = BMat.newOrCheckBMat(ss.dims, null, m.GUID, ithread, "safeCopy".##, true)
         ss.copyTo(out)
       }
       case ss:IMat => {
-        val out = IMat.newOrCheckIMat(ss.nrows, ss.ncols, null, m.GUID, ithread, "safeCopy".##)
+        val out = IMat.newOrCheckIMat(ss.nrows, ss.ncols, null, m.GUID, ithread, "safeCopy".##, true)
         ss.copyTo(out)
       }
     }
