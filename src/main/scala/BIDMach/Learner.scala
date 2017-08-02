@@ -565,9 +565,9 @@ case class ParLearner(
       			val perfStr = ("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
       					100f*lastp,
       					Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
-      					gf._1,
       					gf._2,
-      					bytes*1e9,
+      					nsamps/gf._2,
+      					gf._1,
       					bytes/gf._2*1e-6));
       		  val gpuStr = if (useGPU) {
       		    (0 until math.min(opts.nthreads, Mat.hasCUDA)).map((i)=>{
