@@ -543,7 +543,8 @@ case class ParLearner(
     	while (datasource.hasNext) {
     		for (ithread <- 0 until opts.nthreads) {
     			if (datasource.hasNext) {
-    				val mats = datasource.next
+    				val mats = datasource.next;
+    				nsamps += mats(0).ncols;
             progress = datasource.progress
             gprogress = (ipass + progress)/opts.npasses
     				for (j <- 0 until mats.length) {
