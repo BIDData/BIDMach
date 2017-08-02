@@ -477,7 +477,6 @@ case class ParLearner(
 //	      if (i != thisGPU) connect(i)
 	    }
 	  }
-    iones(opts.nthreads, 1)
     ipass = 0
     istep = 0
     here = 0L
@@ -574,7 +573,7 @@ case class ParLearner(
       		    (0 until math.min(opts.nthreads, Mat.hasCUDA)).map((i)=>{
       		      setGPU(i);
       		      if (i==0) (", GPUmem=%3.2f" format GPUmem._1) else (", %3.2f" format GPUmem._1)
-      		    });
+      		    }).reduce(_+_);
       		  } else "";
       		  myLogger.info(perfStr + gpuStr);
       			if (useGPU) setGPU(thisGPU);
