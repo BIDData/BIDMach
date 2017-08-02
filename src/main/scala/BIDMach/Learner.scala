@@ -463,7 +463,7 @@ case class ParLearner(
   }
 
   def retrain = {
-    flip
+    BIDMat.MatFunctions.flip;
     val mm0 = models(0).modelmats(0)
     var cacheState = Mat.useCache;
     var cacheGPUstate = Mat.useGPUcache;
