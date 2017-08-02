@@ -506,8 +506,9 @@ case class ParLearner(
     						while (paused) Thread.sleep(1000);
     						if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress);
     					}
-    					val scores = models(ithread).evalbatchg(cmats(ithread), ipass, here);
-    					reslist.synchronized { reslist.append(scores(0)) }
+    					val tmpscores = models(ithread).evalbatchg(cmats(ithread), ipass, here);
+    					val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
+    					reslist.synchronized { reslist.append(scores.newcopy) }
     					samplist.synchronized { samplist.append(here) }
     				} else {
     					models(ithread).dobatchg(cmats(ithread), ipass, here)
