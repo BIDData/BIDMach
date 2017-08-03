@@ -32,6 +32,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var inputDim:IMat = null; // Should be three numbers
     var backwardfiltertime = 0.0;
     var backwarddatatime = 0.0;
+    var bwdFilterWS:Mat = null;
 //    var outputDim:IMat = null; //Should be three numbers
 
   var cudnnMainHandle:cudnnHandle = null;
@@ -85,6 +86,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     		updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
     		opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
     	}
+    	bwdFilterWS = modelmats(0).zeros(filter_h\filter_w\1\channel_out);
     }
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
@@ -131,7 +133,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
       updateBias(deriv, update_bias_mat);
     }
     
-    updateFFilter.convolveMfork(inputData, deriv, false);
+    updateFFilter.convolveMfork(inputData, deriv, false, bwdFilterWS);
     backwardfiltertime += toc - start;
     
     if (inputDeriv.asInstanceOf[AnyRef] != null) {  
