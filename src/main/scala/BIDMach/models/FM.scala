@@ -403,10 +403,10 @@ object FM {
     opts.links.set(d)
   	val nn = new ParLearnerF(
   	    new MatSource(Array(mat0), opts), 
-  	    opts, mkFMModel _,
-  	    opts, mkRegularizer _,
-  	    opts, mkUpdater _, 
-  	    null, null,
+  	    () => mkFMModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -420,10 +420,10 @@ object FM {
     opts.links.set(d)
     val nn = new ParLearnerF(
         new MatSource(Array(mat0, targ), opts), 
-        opts, mkFMModel _,
-        opts, mkRegularizer _,
-        opts, mkUpdater _, 
-        null, null,
+  	    () => mkFMModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
         opts)
     (nn, opts)
   }
@@ -458,10 +458,10 @@ object FM {
   	val opts = new LearnFParOptions
   	val nn = new ParLearnerF(
   	    Experiments.Twitter.twitterWords(nstart, nend),
-  	    opts, mkFMModel _, 
-        opts, mkRegularizer _,
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkFMModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts
   	)
   	(nn, opts)

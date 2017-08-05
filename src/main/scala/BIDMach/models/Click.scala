@@ -266,10 +266,10 @@ object Click  {
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
   	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkClickmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkClickmodel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -287,13 +287,12 @@ object Click  {
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
   	opts.resFile = "../results.mat"
-  	implicit val threads = threadPool(4)
   	val nn = new ParLearnerF(
   	    new SFileSource(opts),
-  	    opts, mkClickmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkClickmodel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts
   	)
   	(nn, opts)

@@ -198,10 +198,10 @@ object KMeansw  {
     opts.power = 0.5f
   	val nn = new ParLearnerF(
   	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkKMeansModel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkKMeansModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts)
     (nn, opts)
   } 

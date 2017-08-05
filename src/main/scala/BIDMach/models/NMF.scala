@@ -134,7 +134,7 @@ object NMF  {
   
   class Options extends Opts {}
   
-  def mkNMFmodel(fopts:Model.Opts) = {
+  def mkNMFModel(fopts:Model.Opts) = {
   	new NMF(fopts.asInstanceOf[NMF.Opts])
   } 
    
@@ -203,10 +203,10 @@ object NMF  {
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
   	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkNMFmodel _, 
-  			null, null, 
-  			opts, mkUpdater _,
-  			null, null,
+  	    () => mkNMFModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   			opts)
     (nn, opts)
   }

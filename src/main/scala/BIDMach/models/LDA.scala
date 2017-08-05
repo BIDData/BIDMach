@@ -143,7 +143,7 @@ object LDA  {
   class Options extends Opts {}
   
   /** Creates a new LDA model. */
-  def mkLDAmodel(fopts:Model.Opts) = {
+  def mkLDAModel(fopts:Model.Opts) = {
   	new LDA(fopts.asInstanceOf[LDA.Opts])
   }
   
@@ -244,11 +244,11 @@ object LDA  {
     opts.batchSize = math.min(100000, mat0.ncols/30/opts.nthreads + 1)
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
-  	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkLDAmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    new MatSource(Array(mat0:Mat), opts),  
+  	    () => mkLDAModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -269,10 +269,10 @@ object LDA  {
   	implicit val threads = threadPool(12)
   	val nn = new ParLearnerF(
   	    new SFileSource(opts),
-  	    opts, mkLDAmodel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkLDAModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts
   	)
   	(nn, opts)

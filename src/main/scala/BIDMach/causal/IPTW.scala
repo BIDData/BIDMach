@@ -150,10 +150,10 @@ object IPTW {
     opts.lrate = 1f
   	val nn = new ParLearnerF(
   	    new MatSource(Array(mat0), opts), 
-  	    opts, mkModel _,
-  	    opts, mkRegularizer _,
-  	    opts, mkUpdater _, 
-  	    null, null,
+  	    () => mkModel(opts), 
+  	    () => mkRegularizer(opts),
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -168,10 +168,10 @@ object IPTW {
     opts.links.set(d)
     val nn = new ParLearnerF(
         new MatSource(Array(mat0, targ), opts), 
-        opts, mkModel _,
-        opts, mkRegularizer _,
-        opts, mkUpdater _,
-        null, null,
+        () => mkModel(opts), 
+  	    () => mkRegularizer(opts),
+  	    () => mkUpdater(opts),
+  	    null,
         opts)
     (nn, opts)
   }
@@ -209,10 +209,10 @@ object IPTW {
   	opts.lrate = 1f
   	val nn = new ParLearnerF(
   	    Experiments.Twitter.twitterWords(nstart, nend),
-  	    opts, mkModel _, 
-        opts, mkRegularizer _,
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkModel(opts), 
+  	    () => mkRegularizer(opts),
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts
   	)
   	(nn, opts)

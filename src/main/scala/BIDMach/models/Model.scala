@@ -79,7 +79,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   var runtimes:FMat = null;
 
-  def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, elastic_weight:Float = 1f):Unit = {
+  def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, elastic_weight:Float = 1f, weights:FMat = null):Unit = {
     val mlen = models(0).modelmats.length;
     val thisGPU = getGPU;
     for (j <- 0 until mlen) {
@@ -87,9 +87,14 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       for (i <- 0 until models.length) {
         if (useGPU && i < Mat.hasCUDA) setGPU(i);
       	um(j) <-- models(i).modelmats(j);
+      	if (weights.asInstanceOf[AnyRef] != null) {
+      	  um(j) ~ um(j) *@ weights(i)
+      	}
       	mm(j) ~ mm(j) + um(j);
       }
-      mm(j) ~ mm(j) * (1f/models.length);
+      if (weights.asInstanceOf[AnyRef] == null) {
+      	mm(j) ~ mm(j) * (1f/models.length);
+      }
       for (i <- 0 until models.length) {
         if (elastic_weight != 1f) {
         	um(j) <-- models(i).modelmats(j);

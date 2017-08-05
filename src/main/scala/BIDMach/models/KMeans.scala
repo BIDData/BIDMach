@@ -85,7 +85,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
     mmnorm ~ mm dotr mm;
   }
   
-  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, elastic_weight:Float) = {}
+  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, elastic_weight:Float, wts:FMat) = {}
   
   override def mergeModelPassFn(models:Array[Model], mmx:Array[Mat], umx:Array[Mat], ipass:Int) = {
     val nmodels = models.length;
@@ -258,10 +258,10 @@ object KMeans  {
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
   	val nn = new ParLearnerF(
   	    new MatSource(Array(mat0:Mat), opts), 
-  	    opts, mkKMeansModel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkKMeansModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }
@@ -278,13 +278,12 @@ object KMeans  {
     opts.npasses = 10
     opts.fnames = fnames
     opts.batchSize = 20000;
-    implicit val threads = threadPool(12);
   	val nn = new ParLearnerF(
   	    new FileSource(opts), 
-  	    opts, mkKMeansModel _, 
-  	    null, null, 
-  	    opts, mkUpdater _,
-  	    null, null,
+  	    () => mkKMeansModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
   	    opts)
     (nn, opts)
   }

@@ -534,7 +534,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     nz
   }
   
-  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, elastic_weight:Float):Unit = {
+  override def mergeModelFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, elastic_weight:Float, wts:FMat):Unit = {
     val headlen = if (istep > 0) math.max(opts.headlen, opts.headlen << trailingZeros(istep)) else 0;
     val mlen = models(0).modelmats.length;
     val thisGPU = getGPU;
@@ -1304,10 +1304,10 @@ object Word2Vec  {
     implicit val threads = threadPool(4)
     val nn = new ParLearnerF(
         new FileSource(opts), 
-        opts, mkModel _,
-        null, null,
-        null, null,
-        null, null,
+        () => mkModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
         opts)
     (nn, opts)
   }

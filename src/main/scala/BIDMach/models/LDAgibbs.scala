@@ -171,7 +171,7 @@ object LDAgibbs  {
     Mat.nflops += 12L * C.nnz * A.nrows    // Charge 10 for Poisson RNG
   }
   
-  def mkGibbsLDAmodel(fopts:Model.Opts) = {
+  def mkGibbsLDAModel(fopts:Model.Opts) = {
   	new LDAgibbs(fopts.asInstanceOf[LDAgibbs.Opts])
   }
   
@@ -231,10 +231,10 @@ object LDAgibbs  {
     opts.coolit = 0 // Assume we dont need cooling on a matrix input
     val nn = new ParLearnerF(
         new MatSource(Array(mat0:Mat), opts), 
-        opts, mkGibbsLDAmodel _, 
-            null, null, 
-            opts, mkUpdater _,
-            null, null,
+        () => mkGibbsLDAModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
             opts)
     (nn, opts)
   }
@@ -255,7 +255,7 @@ object LDAgibbs  {
     val nn = new ParLearnerxF(
     		null, 
     		(dopts:DataSource.Opts, i:Int) => Experiments.Twitter.twitterWords(nstart, nend, opts.nthreads, i), 
-    		opts, mkGibbsLDAmodel _, 
+    		opts, mkGibbsLDAModel _, 
     		null, null, 
     		opts, mkUpdater _,
     		null, null,
@@ -279,10 +279,10 @@ object LDAgibbs  {
     opts.resFile = "/big/twitter/test/results.mat"
     val nn = new ParLearnerF(
         Experiments.Twitter.twitterWords(nstart, nend), 
-        opts, mkGibbsLDAmodel _, 
-        null, null, 
-        opts, mkUpdater _,
-        null, null,
+        () => mkGibbsLDAModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
         opts
     )
     (nn, opts)

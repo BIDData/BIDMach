@@ -900,10 +900,10 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
     opts.fnames = fnames;
     val nn = new ParLearnerF(
         new FileSource(opts),
-        opts, mkNetModel _,
-        null, null,
-        opts, mkUpdater _,
-        null, null,
+       () => mkNetModel(opts), 
+  	    null, 
+  	    () => mkUpdater(opts),
+  	    null,
         opts)
     (nn, opts)
   }

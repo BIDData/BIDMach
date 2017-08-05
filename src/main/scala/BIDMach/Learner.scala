@@ -363,13 +363,15 @@ case class Learner(
 
 case class ParLearner(
     val datasource:DataSource,
-    val models0:Seq[Model],
-    val mixins:Seq[Array[Mixin]],
-    val updaters:Seq[Updater],
+    val mkModelFn:(Int)=>Model,
+    val mkMixinsFn:(Int)=>Array[Mixin],
+    val mkUpdaterFn:(Int)=>Updater,
     val datasink:DataSink,
     val opts:ParLearner.Opts = new ParLearner.Options) extends Serializable {
 
-  val models = models0.toArray;
+  var models:Array[Model] = null;
+  var mixins:Array[Array[Mixin]] = null;
+  var updaters:Array[Updater] = null;
 	var myLogger = Mat.consoleLogger;
   var fut:Future[_] = null;
 	var workers:Array[Future[_]] = null;
@@ -409,6 +411,9 @@ case class ParLearner(
     val thisGPU = if (useGPU) getGPU else 0;
     cmats = new Array[Array[Mat]](nthreads);
     val mats = datasource.next;
+    models = Array.tabulate(nthreads)(i => mkModelFn(i));
+    if (mkMixinsFn.asInstanceOf[AnyRef] != null) mixins = Array.tabulate(nthreads)(i => mkMixinsFn(i));
+    if (mkUpdaterFn.asInstanceOf[AnyRef] != null) updaters = Array.tabulate(nthreads)(i => mkUpdaterFn(i));
     for (i <- 0 until nthreads) {
     	cmats(i) = new Array[Mat](datasource.omats.length);
     	if (useGPU && i < Mat.hasCUDA) setGPU(i);
@@ -696,6 +701,18 @@ case class ParLearner(
   def modelmat = models(0).modelmats(0)
 }
 
+/**
+ * Parallel Learner with simplified Function arguments
+ */
+class ParLearnerF(
+    datasource:DataSource,
+    mkModelFn:()=>Model,
+    mkMixinsFn:()=>Array[Mixin],
+    mkUpdaterFn:()=>Updater,
+    datasink:DataSink,
+    opts:ParLearner.Opts = new ParLearner.Options) extends 
+    ParLearner(datasource, (i:Int)=>mkModelFn(), (i:Int)=>mkMixinsFn(), (i:Int)=>mkUpdaterFn(), datasink, opts) {}
+
 
 /**
  * Parallel Learner class with multiple datasources, models, mixins, and updaters.
@@ -735,6 +752,7 @@ case class ParLearnerx(
     	mm(i) = zeros(mm0.nrows, mm0.ncols)
     	um(i) = zeros(mm0.nrows, mm0.ncols)
     }
+  	ParLearner.initmodels(models, mm, um, 0, useGPU)
   }
 
   def train = {
@@ -956,51 +974,6 @@ class ParLearnerxF(
 }
 
 
-/**
- * Single-datasource parallel Learner which takes function arguments.
- */
-
-class ParLearnerF(
-		val ds:DataSource,
-		val mopts:Model.Opts,
-		mkmodel:(Model.Opts)=>Model,
-		ropts:Mixin.Opts,
-		mkreg:(Mixin.Opts)=>Array[Mixin],
-		val uopts:Updater.Opts,
-		mkupdater:(Updater.Opts)=>Updater,
-		val sopts:DataSink.Opts,
-		val ss:DataSink,
-		val lopts:ParLearner.Options = new ParLearner.Options) extends Serializable {
-  var models:Array[Model] = null
-  var mixins:Array[Array[Mixin]] = null
-  var updaters:Array[Updater] = null
-  var learner:ParLearner = null
-
-  def setup = {
-    models = new Array[Model](lopts.nthreads)
-    if (mkreg != null) mixins = new Array[Array[Mixin]](lopts.nthreads)
-    if (mkupdater != null) updaters = new Array[Updater](lopts.nthreads)
-    val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
-    for (i <- 0 until lopts.nthreads) {
-      if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
-    	models(i) = mkmodel(mopts)
-    	if (mkreg != null) mixins(i) = mkreg(ropts)
-    	if (mkupdater != null) updaters(i) = mkupdater(uopts)
-    }
-    if (0 < Mat.hasCUDA) setGPU(thisGPU)
-    learner = new ParLearner(ds, models, mixins, updaters, ss, lopts)
-  }
-
-  def init =	learner.init
-
-  def train = {
-    init
-    retrain
-  }
-
-  def retrain = learner.retrain
-}
-
 object Learner {
 
   trait Opts extends BIDMat.Opts {
@@ -1104,6 +1077,12 @@ object ParLearner {
 
   def syncmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, useGPU:Boolean, elastic_weight:Float=1f) = {
     models(0).mergeModelFn(models, mm, um, istep, elastic_weight);
+  }
+  
+  def initmodels(models:Array[Model], mm:Array[Mat], um:Array[Mat], istep:Long, useGPU:Boolean) = {
+    val weights = zeros(1, models.length);
+    weights(0) = 1;
+    models(0).mergeModelFn(models, mm, um, istep, 1f, weights);
   }
 
 }
