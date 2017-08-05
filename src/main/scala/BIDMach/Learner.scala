@@ -407,8 +407,7 @@ case class ParLearner(
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useCache;
     datasource.init;
-    useGPU = opts.asInstanceOf[Model.Options].useGPU;
-    val thisGPU = if (useGPU) getGPU else 0;
+    val thisGPU = getGPU;
     cmats = new Array[Array[Mat]](nthreads);
     val mats = datasource.next;
     models = new Array[Model](nthreads)
@@ -416,7 +415,7 @@ case class ParLearner(
     if (mkUpdaterFn.asInstanceOf[AnyRef] != null) updaters = new Array[Updater](nthreads);
     for (i <- 0 until nthreads) {
     	cmats(i) = new Array[Mat](datasource.omats.length);
-    	if (useGPU && i < Mat.hasCUDA) setGPU(i);
+    	if (i < Mat.hasCUDA) setGPU(i);
     	models(i) = mkModelFn(i);
     	for (j <- 0 until mats.length) {
     		cmats(i)(j) = safeCopy(mats(j), i);
@@ -433,13 +432,14 @@ case class ParLearner(
     	  updaters(i).init(models(i));
     	}
     }
+    useGPU = models(0).opts.useGPU;
     datasource.reset;
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
     useGPU = models(0).useGPU;
     if (executor.asInstanceOf[AnyRef] == null) executor = Executors.newFixedThreadPool(nthreads+4);
     if (workers.asInstanceOf[AnyRef] == null) workers = new Array[Future[_] ](nthreads)
-    if (useGPU) setGPU(thisGPU)
+    setGPU(thisGPU)
     val mml = models(0).modelmats.length
     um = new Array[Mat](mml)
     mm = new Array[Mat](mml)
