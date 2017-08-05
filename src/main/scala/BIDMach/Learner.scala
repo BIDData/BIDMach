@@ -559,7 +559,7 @@ case class ParLearner(
       	while (mini(dones).v == 0) Thread.sleep(1)
       	Thread.sleep(opts.coolit)
       	istep += opts.nthreads
-      	if (istep % opts.syncStep == 0) ParLearner.syncmodels(models, mm, um, istep/opts.syncStep, useGPU, opts.elastic_weight)
+      	if ((istep/opts.nthreads) % opts.syncStep == 0) ParLearner.syncmodels(models, mm, um, istep/opts.syncStep, useGPU, opts.elastic_weight)
       	if (datasource.progress > lastp + opts.pstep) {
       		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
       		val gf = BIDMat.MatFunctions.gflop;
@@ -1065,9 +1065,9 @@ object ParLearner {
   trait Opts extends
   Learner.Opts {
   	var nthreads = math.max(0, Mat.hasCUDA)
-  	var syncStep = 32
-  	var elastic_weight = 1f;
-  	var coolit = 60
+  	var syncStep = 2
+  	var elastic_weight = 0.1f;
+  	var coolit = 0
   }
   
   class Options extends Opts{}
