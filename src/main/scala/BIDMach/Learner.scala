@@ -402,16 +402,24 @@ case class ParLearner(
     Mat.useCache = opts.useCache;
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useCache;
-    datasource.init
-    useGPU = models(0).opts.useGPU
-    val thisGPU = if (useGPU) getGPU else 0
+    datasource.init;
+    useGPU = models(0).opts.useGPU;
+    val thisGPU = if (useGPU) getGPU else 0;
+    cmats = new Array[Array[Mat]](opts.nthreads);
+    val mats = datasource.next;
     for (i <- 0 until opts.nthreads) {
-      if (useGPU && i < Mat.hasCUDA) setGPU(i)
-    	models(i).bind(datasource)
-    	models(i).init
-    	if (mixins != null) mixins(i) map (_ init(models(i)))
-    	if (updaters != null && updaters(i) != null) updaters(i).init(models(i))
+	cmats(i) = new Array[Mat](datasource.omats.length);
+	if (useGPU && i < Mat.hasCUDA) setGPU(i);
+	for (j <- 0 until mats.length) {
+	    cmats(i)(j) = safeCopy(mats(j), i);
+	}
+	models(i).bind(datasource);
+	models(i).mats = cmats(i);
+    	models(i).init;
+    	if (mixins != null) mixins(i) map (_ init(models(i)));
+    	if (updaters != null && updaters(i) != null) updaters(i).init(models(i));
     }
+    datasource.reset;
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
     useGPU = models(0).useGPU;
@@ -469,8 +477,6 @@ case class ParLearner(
     var cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useGPUcache;
     Mat.useCache = opts.useCache
-    cmats = new Array[Array[Mat]](opts.nthreads)
-    for (i <- 0 until opts.nthreads) cmats(i) = new Array[Mat](datasource.omats.length)
     val thisGPU = if (useGPU) getGPU else 0
 	  if (useGPU) {
 	    for (i <- 0 until opts.nthreads) {
@@ -546,8 +552,8 @@ case class ParLearner(
     			if (datasource.hasNext) {
     				val mats = datasource.next;
     				nsamps += mats(0).ncols;
-            progress = datasource.progress
-            gprogress = (ipass + progress)/opts.npasses
+				progress = datasource.progress
+				gprogress = (ipass + progress)/opts.npasses
     				for (j <- 0 until mats.length) {
     				  cmats(ithread)(j) = safeCopy(mats(j), ithread)
     				}
