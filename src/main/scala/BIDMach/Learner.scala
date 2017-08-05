@@ -622,16 +622,17 @@ case class ParLearner(
     		           reslist.synchronized {
     		          	 Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore)
     		           },
-    		           gf._1,
     		           gf._2,
-    		           bytes*1e9,
+    		           nsamps/gf._2,
+    		           gf._1,
     		           bytes/gf._2*1e-6));
     val gpuStr = if (useGPU) {
     	             (0 until math.min(nthreads, Mat.hasCUDA)).map((i)=>{
     	            	 setGPU(i);
     	            	 if (i==0) (", GPUmem=%3.2f" format GPUmem._1) else (", %3.2f" format GPUmem._1)
-    	             });
+    	             }).reduce(_+_);
     } else "";
+    setGPU(thisGPU);
     myLogger.info(perfStr + gpuStr);
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
