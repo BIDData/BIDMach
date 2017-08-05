@@ -509,7 +509,7 @@ case class ParLearner(
     					if (opts.updateAll) {
     						models(ithread).dobatchg(cmats(ithread), ipass, here)
     						if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here));
-    						while (paused) Thread.sleep(1000);
+    						while (paused || (opts.pauseAt > 0 && opts.pauseAt <= istep)) Thread.sleep(1000);
     						if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress);
     					}
     					val tmpscores = models(ithread).evalbatchg(cmats(ithread), ipass, here);
@@ -519,7 +519,7 @@ case class ParLearner(
     				} else {
     					models(ithread).dobatchg(cmats(ithread), ipass, here)
     					if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here));
-    					while (paused) Thread.sleep(1000);
+    					while (paused || (opts.pauseAt > 0 && opts.pauseAt <= istep)) Thread.sleep(1000);
     					if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress);
     				}
     			} catch {
@@ -628,6 +628,19 @@ case class ParLearner(
     } else "";
     myLogger.info(perfStr + gpuStr);
     results = Learner.scores2FMat(reslist) on row(samplist.toList)
+  }
+  
+  def pause = {
+    paused = true;
+    Thread.sleep(500);
+  }
+  
+  def unpause = {
+    paused = false;
+  }
+  
+  def stop = {
+    done = true;
   }
 
   def safeCopy(m:Mat, ithread:Int):Mat = {
