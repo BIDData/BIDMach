@@ -407,24 +407,31 @@ case class ParLearner(
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useCache;
     datasource.init;
-    useGPU = models(0).opts.useGPU;
+    useGPU = opts.asInstanceOf[Model.Options].useGPU;
     val thisGPU = if (useGPU) getGPU else 0;
     cmats = new Array[Array[Mat]](nthreads);
     val mats = datasource.next;
-    models = Array.tabulate(nthreads)(i => mkModelFn(i));
-    if (mkMixinsFn.asInstanceOf[AnyRef] != null) mixins = Array.tabulate(nthreads)(i => mkMixinsFn(i));
-    if (mkUpdaterFn.asInstanceOf[AnyRef] != null) updaters = Array.tabulate(nthreads)(i => mkUpdaterFn(i));
+    models = new Array[Model](nthreads)
+    if (mkMixinsFn.asInstanceOf[AnyRef] != null) mixins = new Array[Array[Mixin]](nthreads)
+    if (mkUpdaterFn.asInstanceOf[AnyRef] != null) updaters = new Array[Updater](nthreads);
     for (i <- 0 until nthreads) {
     	cmats(i) = new Array[Mat](datasource.omats.length);
     	if (useGPU && i < Mat.hasCUDA) setGPU(i);
+    	models(i) = mkModelFn(i);
     	for (j <- 0 until mats.length) {
     		cmats(i)(j) = safeCopy(mats(j), i);
     	}
     	models(i).bind(datasource);
     	models(i).mats = cmats(i);
     	models(i).init;
-    	if (mixins != null) mixins(i) map (_ init(models(i)));
-    	if (updaters != null && updaters(i) != null) updaters(i).init(models(i));
+    	if (mixins != null) {
+    	  mixins(i) = mkMixinsFn(i);
+    	  mixins(i) map (_ init(models(i)));
+    	}
+    	if (updaters != null && updaters(i) != null) {
+    		updaters(i) = mkUpdaterFn(i);
+    	  updaters(i).init(models(i));
+    	}
     }
     datasource.reset;
     Mat.useCache = cacheState;
