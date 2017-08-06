@@ -626,7 +626,10 @@ case class ParLearner(
     	}
     }
     if (opts.autoReset && useGPU) {
-      Learner.toCPU(models(0).modelmats)
+      for (i <- 0 until nthreads) {
+        setGPU(i)
+      	Learner.toCPU(models(i).modelmats)
+      }
       resetGPUs
     }
     val perfStr = ("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
