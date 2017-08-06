@@ -1,6 +1,6 @@
 package BIDMach.models
 
-import BIDMat.{BMat,Mat,SBMat,CMat,CSMat,DMat,FMat,FFilter,GMat,GFilter,GDMat,GIMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
+import BIDMat.{BMat,Mat,SBMat,CMat,CSMat,DMat,FMat,FFilter,GMat,GFilter,GDMat,GIMat,GLMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.datasources._
@@ -24,6 +24,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   var _lr_scales:FMat = null;
 
   var parent_model:Model = null;
+  
+  var elastic_tmp:Mat = null;
+  
+  var allreduce_tmp:Mat = null;
 
   def modelmats:Array[Mat] = {
     if (_modelmats != null) {
@@ -111,6 +115,87 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   }
 
   def mergeModelPassFn(models:Array[Model], mm:Array[Mat], um:Array[Mat], ipass:Int) {}
+  
+  def preAllreduce(mm:Array[Mat], istep:Long, weights:FMat = null, imodel:Int, nmodels:Int):Unit = {
+    val mlen = modelmats.length;
+    val wt = if (weights.asInstanceOf[AnyRef] != null) {
+      weights(imodel);
+    } else {
+      1f / nmodels;
+    }
+    for (i <- 0 until mlen) {
+    	if (modelmats(i).asInstanceOf[AnyRef] != null) {
+    		mm(i) ~ modelmats(i) *@ wt; 
+    	}
+    }
+  }
+  
+  def sizeTo(tmp:Mat, m:Mat):Mat = {
+    tmp match {
+    case gm:GMat => new GMat(m.dims.data, gm.pdata, tmp.length);
+    case gm:GDMat => new GDMat(m.dims.data, gm.pdata, tmp.length);
+    case gm:GIMat => new GIMat(m.dims.data, gm.pdata, tmp.length);
+    case gm:GLMat => new GLMat(m.dims.data, gm.pdata, tmp.length);
+    case fm:FMat => new FMat(m.dims.data, fm.data);
+    case fm:DMat => new DMat(m.dims.data, fm.data);
+    case fm:IMat => new IMat(m.dims.data, fm.data);
+    case fm:LMat => new LMat(m.dims.data, fm.data);
+    }
+  }
+  
+  def postAllreduce(mm:Array[Mat], istep:Long, elastic_weight:Float):Unit = {
+    val mlen = modelmats.length;
+    if (elastic_tmp.asInstanceOf[AnyRef] == null) {
+      val maxlen = modelmats.map((x) => if (x.asInstanceOf[AnyRef] != null) x.length else 0).reduce((x,y) => math.max(x,y));
+      elastic_tmp = modelmats(0).zeros(1, maxlen);
+    }
+    for (i <- 0 until mlen) {
+    	if (modelmats(i).asInstanceOf[AnyRef] != null) {
+    		val tmp = sizeTo(elastic_tmp, modelmats(i));
+    		tmp ~ mm(i) - modelmats(i);
+    		tmp ~ tmp *@ elastic_weight;
+    		modelmats(i) ~ modelmats(i) + tmp;
+    	}
+    }
+  }
+  
+  def allreduce(mms:Array[Array[Mat]], models:Array[Model]):Unit = {
+    val nthreads = mms.length;
+    val nmodels = mms(0).length;
+    val toMats = new Array[GMat](nthreads);
+    val fromMats = new Array[GMat](nthreads);
+    if (useGPU) {
+    	val thisGPU = getGPU;
+    	for (j <- 0 until nthreads) {
+    	  setGPU(j);
+    		if (models(j).allreduce_tmp.asInstanceOf[AnyRef] == null) {
+    			val maxlen = models(j).modelmats.map((x) => if (x.asInstanceOf[AnyRef] != null) x.length else 0).reduce((x,y) => math.max(x,y));
+    			models(j).allreduce_tmp = models(j).modelmats(0).zeros(1, maxlen);
+    		}
+    	} 
+    	setGPU(thisGPU);
+    }
+  	for (i <- 0 until nmodels) {
+  	  mms(0)(i) match {
+  	    case a:FMat => {
+  	      for (j <- 1 until nthreads) {
+  	        mms(j)(i) ~ mms(j)(i) + mms(j-1)(i);
+  	      }
+  	      for (j <- 0 until (nthreads-1)) {
+  	        mms(j)(i) <-- mms(nthreads-1)(i);
+  	      }
+  	    }
+  	    case b:GMat => {
+  	      for (j <- 0 until nthreads) {
+  	        fromMats(j) = mms(j)(i).asInstanceOf[GMat];
+  	        toMats(j) = sizeTo(models(j).allreduce_tmp, fromMats(j)).asInstanceOf[GMat];
+  	        ncclAllReduce(fromMats, toMats);
+  	        fromMats(j) <-- toMats(j);
+  	      }
+  	    }
+  	  }
+  	}
+  }
 
   def copyTo(mod:Model) = {
     mod.datasource = datasource;
