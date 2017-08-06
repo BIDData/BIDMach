@@ -423,11 +423,11 @@ case class ParLearner(
     	models(i).bind(datasource);
     	models(i).mats = cmats(i);
     	models(i).init;
-    	if (mixins != null) {
+    	if (mixins.asInstanceOf[AnyRef] != null) {
     	  mixins(i) = mkMixinsFn(i);
     	  mixins(i) map (_ init(models(i)));
     	}
-    	if (updaters != null && updaters(i) != null) {
+    	if (updaters.asInstanceOf[AnyRef] != null) {
     		updaters(i) = mkUpdaterFn(i);
     	  updaters(i).init(models(i));
     	}
