@@ -1,6 +1,6 @@
 package BIDMach.extern
 
-import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat}
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,JSON,SMat,SDMat,TMat,FFilter,Filter,GFilter}
 import BIDMat.MatFunctions._
 import BIDMach._
 import BIDMach.networks.layers._
@@ -39,7 +39,7 @@ object CaffeIO {
         case "Convolution" => {
           val convParam = layer.getConvolutionParam()
           
-          nodes += new ConvNode {
+          val convNode = new ConvNode {
             noutputs = convParam.getNumOutput()
             hasBias = convParam.getBiasTerm()
             if (convParam.hasPadW()) {
@@ -71,11 +71,35 @@ object CaffeIO {
           
           if (layer.getBlobsCount() > 0) {
             // TODO: avoid hardcoding mat count
-            if (layer.getBlobsCount() != 2) {
-              throw new IllegalArgumentException("Convolution layer needs 2 matrices")
+            if (!convNode.hasBias && layer.getBlobsCount() != 1) {
+              throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
             }
-            blobs2Mats(modelMats, nodes.last.asInstanceOf[ModelNode], layer)
+            if (convNode.hasBias && layer.getBlobsCount() != 2) {
+              throw new IllegalArgumentException("Convolution layer with bias needs 2 matrices")
+            }
+            
+            convNode.imodel = modelMats.length
+
+            // TODO: avoid duplicating code with ConvLayer here
+            // XXX: refactor CaffeIO sufficiently so that we can check net.opts.useGPU
+            val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue())
+            val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
+            modelMats += (if (/*net.opts.useGPU &&*/ Mat.hasCUDA > 0 && Mat.hasCUDNN) {
+              // TODO: do we need to set tensor format
+              val x = GFilter(filter)
+              x.convType = convNode.convType
+              x
+            } else {
+              filter
+            })
+            
+            if (convNode.hasBias) {
+              val n = layer.getBlobs(1).getShape().getDim(0).toInt
+              modelMats += row(layer.getBlobs(1).getDataList().map(_.floatValue()).toArray).reshapeView(n, 1, 1, 1)
+            }
           }
+          
+          nodes += convNode
         }
         case "Pooling" => {
           val poolingParam = layer.getPoolingParam()
@@ -151,17 +175,46 @@ object CaffeIO {
 
         case "InnerProduct" => {
           val ipp = layer.getInnerProductParam()
-          nodes += new LinNode {
+          val linNode = new LinNode {
             outdim = ipp.getNumOutput()
             hasBias = ipp.getBiasTerm()
           }
           if (layer.getBlobsCount() > 0) {
             // TODO: avoid hardcoding mat count
-            if (layer.getBlobsCount() != 1) {
-              throw new IllegalArgumentException("Linear layer needs 1 matrix")
+            linNode.imodel = modelMats.length
+            if (!linNode.hasBias) {
+              if (layer.getBlobsCount() != 1) {
+                throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
+              }
+              blobs2Mats(modelMats, linNode, layer)
+              modelMats += null
+            } else {
+              if (layer.getBlobsCount() != 2) {
+                throw new IllegalArgumentException("Linear layer without bias needs 2 matrices")
+              }
+              if (layer.getBlobs(0).getShape().getDim(0) != layer.getBlobs(1).getShape().getDim(0)) {
+                throw new IllegalArgumentException("Weight and bias dimensions for linear layer don't agree")
+              }
+              if ((layer.getBlobs(0).getDoubleDataCount() > 0) != (layer.getBlobs(1).getDoubleDataCount() > 0)) {
+                throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
+              }
+              
+              val outDim = layer.getBlobs(0).getShape().getDim(0).intValue()
+              val modelCols = layer.getBlobs(0).getShape().getDim(1).intValue()
+              if (layer.getBlobs(0).getDoubleDataCount() > 0) {
+                val weightDMat = new DMat(outDim, modelCols, layer.getBlobs(0).getDoubleDataList().map(_.doubleValue()).toArray)
+                val biasDMat = new DMat(outDim, 1, layer.getBlobs(1).getDoubleDataList().map(_.doubleValue()).toArray)
+                modelMats += weightDMat
+                modelMats += biasDMat
+              } else {
+                val weightDMat = new FMat(outDim, modelCols, layer.getBlobs(0).getDataList().map(_.floatValue()).toArray)
+                val biasDMat = new FMat(outDim, 1, layer.getBlobs(1).getDataList().map(_.floatValue()).toArray)
+                modelMats += weightDMat
+                modelMats += biasDMat
+              }
             }
-            blobs2Mats(modelMats, nodes.last.asInstanceOf[ModelNode], layer)
           }
+          nodes += linNode
         }
         case "Split" => nodes += new CopyNode
         case "Softmax" => nodes += new SoftmaxNode
@@ -259,6 +312,7 @@ object CaffeIO {
   }
   
   private def blobs2Mats(modelMats:mutable.Buffer[Mat], node:ModelNode, layer:Caffe.LayerParameter) = {
+    node.imodel = modelMats.length
     for (blob <- layer.getBlobsList()) {
       val dimList = blob.getShape().getDimList()
       val dims = if (dimList.size() == 4) {
