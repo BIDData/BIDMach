@@ -246,6 +246,18 @@ object CaffeIO {
         case _ => throw new NotImplementedError("\"%s\" is not implemented yet" format layer.getType())
       }
       
+      if (nodes.last.isInstanceOf[ModelNode]) {
+        val modelNode = nodes.last.asInstanceOf[ModelNode]
+        
+        if (layer.getParamCount() >= 1) {
+          modelNode.lr_scale = layer.getParam(0).getLrMult()
+          
+          if (layer.getParamCount() >= 2) {
+            modelNode.bias_scale = layer.getParam(1).getLrMult()
+          }
+        }
+      }
+      
       for (t <- layer.getTopList()) {
         nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer) += nodes.last
       }
