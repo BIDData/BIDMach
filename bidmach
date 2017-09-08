@@ -28,7 +28,7 @@ if [ "$ARCH" = "" ]; then
 fi
 if [[ "$OSS" == Darwin* ]] ; then
     if [[ "$OSS" == *x86_64 ]] ; then
-	    ARCH="x86_64"
+        ARCH="x86_64"
     fi
     OSS="apple"
 elif [[ "$OSS" == Linux* ]] ; then
@@ -37,7 +37,7 @@ elif [[ "$OSS" == CYGWIN* ]] ; then
     if [[ "$OSS" == *WOW* ]] ; then
         ARCH="x86_64"
     fi
-	OSS="windows"
+    OSS="windows"
 else
     echo "OS not supported" $OSS
     exit 1
@@ -47,7 +47,7 @@ popd > /dev/null
 if [ "$OSS" = "windows" ]; then
     if [ ! "${JAVA_HOME}" = "" ]; then
         JAVA_HOME=`${BIDMACH_ROOT}/shortpath.bat "${JAVA_HOME}"`
-	    export JAVA_HOME=`echo ${JAVA_HOME} | sed 's_\\\\_/_g'`/bin
+        export JAVA_HOME=`echo ${JAVA_HOME} | sed 's_\\\\_/_g'`/bin
     fi
 fi
 
@@ -77,8 +77,8 @@ ${BIDMACH_LIBS}"
 
 if [ "$OSS" = "windows" ]; then
     if [ ! "${CUDA_PATH}" = "" ]; then
-	    NEWPATH=`${BIDMACH_ROOT}/shortpath.bat "${CUDA_PATH}"`
-	    NEWPATH=`echo $NEWPATH | sed 's_\\\\_/_g'`/bin
+        NEWPATH=`${BIDMACH_ROOT}/shortpath.bat "${CUDA_PATH}"`
+        NEWPATH=`echo $NEWPATH | sed 's_\\\\_/_g'`/bin
     fi
 else
     TOOL_LIBS=`echo "${TOOL_LIBS}" | sed 's/;/:/g'`
@@ -86,13 +86,26 @@ else
 fi
 
 if [ "$1" = "notebook" ]; then
+    JUPYTER_DIR=${BIDMACH_ROOT}/jupyter
+
     shift 1
     if [ ! -z "$@" ]; then
         KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\", \"$@\"]"
     else
         KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\"]"
     fi
-    ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
+
+    mkdir -p ${JUPYTER_DIR}/kernels/scala
+    cat > ${JUPYTER_DIR}/kernels/scala/kernel.json <<EOF
+{
+    "argv": ${KERNEL_CMD},
+    "display_name": "Scala",
+    "language": "scala"
+}
+EOF
+
+    export JUPYTER_PATH="${JUPYTER_DIR}:${JUPYTER_PATH}"
+    jupyter notebook
 else
     ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 -nobootcp -toolcp "${TOOL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  "$@"
 fi
