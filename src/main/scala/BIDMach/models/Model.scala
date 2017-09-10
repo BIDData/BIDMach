@@ -177,20 +177,20 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
   	for (i <- 0 until nmodels) {
   	  mms(0)(i) match {
-  	    case a:FMat => {
-  	      for (j <- 1 until nthreads) {
-  	        mms(j)(i) ~ mms(j)(i) + mms(j-1)(i);
-  	      }
-  	      for (j <- 0 until (nthreads-1)) {
-  	        mms(j)(i) <-- mms(nthreads-1)(i);
-  	      }
-  	    }
-  	    case b:GMat => {
+  	    case _:GMat => {
   	      for (j <- 0 until nthreads) {
   	        fromMats(j) = mms(j)(i).asInstanceOf[GMat];
   	        toMats(j) = sizeTo(models(j).allreduce_tmp, fromMats(j)).asInstanceOf[GMat];
   	        ncclAllReduce(fromMats, toMats);
   	        fromMats(j) <-- toMats(j);
+  	      }
+  	    }
+  	    case _:FMat => {
+  	      for (j <- 1 until nthreads) {
+  	        mms(j)(i) ~ mms(j)(i) + mms(j-1)(i);
+  	      }
+  	      for (j <- 0 until (nthreads-1)) {
+  	        mms(j)(i) <-- mms(nthreads-1)(i);
   	      }
   	    }
   	  }
