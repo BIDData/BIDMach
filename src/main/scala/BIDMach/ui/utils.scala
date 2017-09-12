@@ -8,7 +8,7 @@ import BIDMach.networks._
 import BIDMach.networks.layers._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.collection.immutable.HashMap
+import scala.collection.mutable.HashMap
 
 
 object utils {
@@ -46,7 +46,9 @@ object utils {
                              "layers" -> layersInfo,
                              "id" -> "graph")
           case m:Net =>
-              val layersInfo = m.layers.map(getLayerInfo(_))    
+              val layersInfo = m.layers.map(getLayerInfo(_))   
+              for(i<-0 until m.layers.length) layersInfo(i)("layerId") = i
+
               HashMap[String,Any]("model" -> m.getClass.getSimpleName,
                              "layers" -> layersInfo,
                              "id" -> "graph")
