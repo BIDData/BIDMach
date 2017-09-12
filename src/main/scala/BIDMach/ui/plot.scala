@@ -138,7 +138,7 @@ object Plot{
         val p = new MyPlot;
         val data = fn()
         p.frame = new PlotFrame(name, p);
-        val img = new BufferedImage(data.nrows,data.ncols,BufferedImage.TYPE_INT_ARGB)
+        val img = new BufferedImage(data.ncols,data.nrows,BufferedImage.TYPE_INT_ARGB)
         val buf=img.getRaster().getDataBuffer().asInstanceOf[java.awt.image.DataBufferInt].getData()
         val datat = data.t
         Array.copy(datat.data,0,buf,0,buf.length)
