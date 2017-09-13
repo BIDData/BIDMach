@@ -83,9 +83,14 @@ object CaffeIO {
             convNode.imodel = modelMats.length
 
             // TODO: avoid duplicating code with ConvLayer here
-            val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue())
+            val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
             val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
             // TODO: is this an abstraction barrier violation
+//            // Caffe stores filters in NCHW format in row-major order. Since we use column-major order, when we
+//            // read the filter in, it becomes WHCN format. Our filters use CHWN format internally, so we then do
+//            // the appropriate transposition.
+//            val filterDataWHCN = new FMat(shape.reverse, layer.getBlobs(0).getDataList().map(_.floatValue()).toArray)
+//            filter <-- filterDataWHCN.transpose(2, 1, 0, 3)
             layer.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
             modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
               val x = GFilter(filter)
@@ -98,7 +103,7 @@ object CaffeIO {
             
             if (convNode.hasBias) {
               val n = layer.getBlobs(1).getShape().getDim(0).toInt
-              modelMats += row(layer.getBlobs(1).getDataList().map(_.floatValue()).toArray).reshapeView(n, 1, 1, 1)
+              modelMats += blob2Mat(layer.getBlobs(1)).reshapeView(n, 1, 1, 1)
             } else {
               modelMats += null
             }
@@ -199,7 +204,7 @@ object CaffeIO {
               if (layer.getBlobsCount() != 1) {
                 throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
               }
-              blobs2Mats(modelMats, linNode, layer)
+              addMatsFromBlobs(modelMats, linNode, layer)
               modelMats += null
             } else {
               if (layer.getBlobsCount() != 2) {
@@ -212,19 +217,13 @@ object CaffeIO {
                 throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
               }
               
+              // We unfortunately can't use addMatsFromBlobs here because Caffe's bias blob is 1D, while BIDMach wants
+              // a 2D bias where the second dimension is 1.
               val outDim = layer.getBlobs(0).getShape().getDim(0).intValue()
-              val modelCols = layer.getBlobs(0).getShape().getDim(1).intValue()
-              if (layer.getBlobs(0).getDoubleDataCount() > 0) {
-                val weightDMat = new DMat(outDim, modelCols, layer.getBlobs(0).getDoubleDataList().map(_.doubleValue()).toArray)
-                val biasDMat = new DMat(outDim, 1, layer.getBlobs(1).getDoubleDataList().map(_.doubleValue()).toArray)
-                modelMats += weightDMat
-                modelMats += biasDMat
-              } else {
-                val weightDMat = new FMat(outDim, modelCols, layer.getBlobs(0).getDataList().map(_.floatValue()).toArray)
-                val biasDMat = new FMat(outDim, 1, layer.getBlobs(1).getDataList().map(_.floatValue()).toArray)
-                modelMats += weightDMat
-                modelMats += biasDMat
-              }
+              val weightMat = blob2Mat(layer.getBlobs(0))
+              val biasMat = blob2Mat(layer.getBlobs(1)).reshape(outDim, 1)
+              modelMats += weightMat
+              modelMats += biasMat
             }
           }
           nodes += linNode
@@ -340,20 +339,35 @@ object CaffeIO {
     }
   }
   
-  private def blobs2Mats(modelMats:mutable.Buffer[Mat], node:ModelNode, layer:Caffe.LayerParameter) = {
+  /**
+   * Converts each blob in the given layer to a Mat, and appends these Mats to {@code modelMats}.
+   * Additionally sets the {@code imodel} value of {@code node} to the correct value.
+   * Automatically converts data from row-major order to column-major order.
+   */
+  private def addMatsFromBlobs(modelMats:mutable.Buffer[Mat], node:ModelNode, layer:Caffe.LayerParameter) = {
     node.imodel = modelMats.length
     for (blob <- layer.getBlobsList()) {
-      val dimList = blob.getShape().getDimList()
-      val dims = dimList.map(_.intValue()).toArray
-      if (blob.getDoubleDataCount() > 0) {
-        val data = blob.getDoubleDataList().map(_.doubleValue()).toArray
-        // TODO: what kind of Mat should I be instantiating
-        modelMats += new DMat(dims, data)
-      } else {
-        val data = blob.getDataList().map(_.floatValue()).toArray
-        // TODO: what kind of Mat should I be instantiating
-        modelMats += new FMat(dims, data)
-      }
+      modelMats += blob2Mat(blob)
+    }
+  }
+  
+  /**
+   * Converts the given blob into a Mat.
+   * Automatically converts data from row-major order to column-major order.
+   */
+  private def blob2Mat(blob:Caffe.BlobProto):Mat = {
+    // We convert from row-major to column-major by creating a Mat with reversed dimensions,
+    // loading it up with the row-major data, and then performing a deep transpose
+    val dimList = blob.getShape().getDimList()
+    val reverseDims = dimList.map(_.intValue()).reverse.toArray
+    if (blob.getDoubleDataCount() > 0) {
+      val data = blob.getDoubleDataList().map(_.doubleValue()).toArray
+      // TODO: should I bother with GDMat
+      new DMat(reverseDims, data).transpose((reverseDims.length - 1) to 0 by -1)
+    } else {
+      val data = blob.getDataList().map(_.floatValue()).toArray
+      // TODO: should I bother with GFMat
+      new FMat(reverseDims, data).transpose((reverseDims.length - 1) to 0 by -1)
     }
   }
 }
