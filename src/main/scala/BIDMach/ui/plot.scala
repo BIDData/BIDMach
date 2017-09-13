@@ -62,7 +62,7 @@ class GraphFrame(val layers:Array[HashMap[String,Any]])extends JFrame("Graph"){
 
 object Plot{
     var tot = 0
-    var interval = 4
+    var interval = 0.5
     val useWeb = false
     var currentLearner: Learner = null 
     var currentNet: Net = null   
@@ -159,10 +159,16 @@ object Plot{
         p.fut = Image.getService.submit(runme);
         p
     }
+    
+    def getV(f:Double) = {
+        val d = (f*1000).toInt+128
+        if (d>256) 256 else d
+    }
+    
 
     def getFilterImg(data:Mat) = {
         val in_channel = data.dims(0)
-        val bw = 5
+        val bw = 20
         val h = data.dims(1)
         val w = data.dims(2)
         val num = data.dims(3)
@@ -177,10 +183,14 @@ object Plot{
                     val ii = i*h+r
                     val jj = j*w+c
                     //println(i,j,ii,jj,out.nrows,out.ncols)
-                    var res  = ((data(0,r,c,k)+0.5f).dv*256).toInt
+                    var res  = getV(data(0,r,c,k).dv)
+                    res += getV(data(1,r,c,k).dv)*256
+                    res += getV(data(2,r,c,k).dv)*256*256
+                    res += 255*256*256*256
+                    /*var res  = ((data(0,r,c,k)+0.5f).dv*256).toInt
                     res += ((data(1,r,c,k)+0.5f).dv*256).toInt*256
                     res += ((data(2,r,c,k)+0.5f).dv*256).toInt*256*256
-                    res += 255*256*256*256
+                    res += 255*256*256*256*/
                     out(ii*bw->(ii*bw+bw),jj*bw->(jj*bw+bw)) = res
                 }
             j+=1
