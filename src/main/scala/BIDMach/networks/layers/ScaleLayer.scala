@@ -17,8 +17,8 @@ import java.util.HashMap;
 import BIDMach.networks._ 
 
 /**
- * Linear layer. 
- * Includes a model matrix that contains the linear map. 
+ * Scaling layer. 
+ * Scales the input by some matrix.
  */
 
 class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new ScaleNode) extends ModelLayer(net, opts, 2) {
