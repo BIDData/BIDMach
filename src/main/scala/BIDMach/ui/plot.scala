@@ -194,6 +194,13 @@ object Plot{
             ()=>getFilterImg(MatFunctions.cpu(fn())),
             name)    
     }
+
+    def plot_loss(nn:Learner) = {
+        Plotting.plot(()=>{
+            val res = nn.reslist.toArray.map(_.dv.toFloat).grouped(100).map(x=>x.reduce(_+_)/x.length).toArray
+            FMat(Array(1,res.length),res)
+        }
+    }
     
     def plot_layer(layerId: Int) = {
         var layer = currentNet.layers(layerId)
