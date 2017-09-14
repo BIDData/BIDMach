@@ -161,14 +161,13 @@ object Plot{
     }
     
     def getV(f:Double) = {
-        val d = (f*1000).toInt+128
-        if (d>256) 256 else d
+        val d = (f*256).toInt+128
+        if (d>255) 255 else d
     }
     
 
-    def getFilterImg(data:Mat) = {
+    def getFilterImg(data:Mat,bw:Int = 1) = {
         val in_channel = data.dims(0)
-        val bw = 20
         val h = data.dims(1)
         val w = data.dims(2)
         val num = data.dims(3)
@@ -201,15 +200,22 @@ object Plot{
 
     def plot_filters(fn:()=>Mat,name:String = "conv") {
         plot_image(
-            ()=>getFilterImg(MatFunctions.cpu(fn())),
+            ()=>getFilterImg(MatFunctions.cpu(fn()),15),
             name)    
     }
 
-    def plot_loss(nn:Learner) = {
+    def plot_loss(nn:Learner,group: Int = 10) = {
         Plotting.plot(()=>{
-            val res = nn.reslist.toArray.map(_.dv.toFloat).grouped(100).map(x=>x.reduce(_+_)/x.length).toArray
+            val res = nn.reslist.toArray.map(_.dv.toFloat).grouped(group).map(x=>x.reduce(_+_)/x.length).toArray
             FMat(Array(1,res.length),res)
-        }
+        })
+    }
+    
+    def plot_input(data:Mat,name:String) {
+        plot_image(
+            ()=>getFilterImg(data/256f-0.5f),
+            name
+        )
     }
     
     def plot_layer(layerId: Int) = {
@@ -219,6 +225,13 @@ object Plot{
         if (layerName == "ConvLayer"){
             val cl = layer.asInstanceOf[ConvLayer]
             plot_filters(()=>{currentNet.modelmats(cl.imodel)},"Conv@"+layerId)
+        } else if (layerName == "InputLayer") {
+            val il = layer.asInstanceOf[InputLayer]
+            //plot_input(il.output,"Input")
+            il.deriv = GMat(il.output).copy()
+            il.deriv(?) = 0f
+            plot_filters(()=>il.deriv,"InputGradient")
+                
         }
         else plot_code(bidmachURL + "scala/BIDMach/networks/layers/" + layerName + ".scala")
     }
