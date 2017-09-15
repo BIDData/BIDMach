@@ -1,56 +1,47 @@
-//:silent
-val odir = "/home/manytrees/data/crowdstrike/data/crowdstrike/"
-val mdir = "/home/manytrees/data/cs/bidmach/"
-val mydir = "d:/data/manytrees/cs/";
+:silent
+val dir="../data/rcv1/"
 
-val dat0 = loadSMat(mydir+"traindat2.smat.lz4")
-val labels0 = FMat(loadIMat(mydir+"trainlabels.imat.lz4"));
+val a0 = loadSMat(dir + "docs.smat.lz4")
+val c0 = loadFMat(dir + "cats.fmat.lz4")(0->100,?)
+val rr = rand(c0.ncols,1);
+val (ss, ii) = sort2(rr);
+val a = a0(?,ii);
+val c = c0(?,ii);
 
-val testdat0 = loadSMat(mydir+"testdat2.smat.lz4")
-val testlabels0 = FMat(loadIMat(mydir+"testlabels.imat.lz4"));
+val ta = loadSMat(dir + "testdocs.smat.lz4")
+val tc = loadFMat(dir + "testcats.fmat.lz4")(0->100,?)
 
-val mind0 = mini(dat0,2);
-val dat1 = dat0 - mind0;
-val maxd0 = max(maxi(dat1,2),1);
+setNumThreads(1)
+val (nn,opts)=GLM.learner(a,c,1)
 
-val dat = dat1 / maxd0;
-val testdat = (testdat0 - mind0) / maxd0;
-max(testdat.contents, 0f, testdat.contents);
-min(testdat.contents, 1f, testdat.contents);
-
-val labels = (labels0 + 1) / 2
-val testlabels = (testlabels0 + 1) / 2
-
-val (nn,opts)=GLM.learnerX(dat,labels,1)
-
-opts.batchSize=2000
-opts.lrate = 0.01
-opts.texp = 0.4f
-opts.npasses = 10 
+opts.batchSize=20000
+opts.lrate = 0.02f
+opts.npasses = 4
 opts.reg1weight = 0.0
-opts.links = iones(1,1)
+opts.links = iones(103,1)
 opts.addConstFeat=true;
-opts.aopts = opts;
+//opts.aopts = opts;
+//opts.doVariance = true;
+//opts.evalStep = 3;
+//opts.debugMem = true
+//opts.useGPU = false
+//Mat.useMKL = false
+opts.autoReset=false
 
-opts.hashFeatures = 10000000;
-opts.hashBound1 = 1000000;
-opts.hashBound2 = 10000000;
-
+val model = nn.model.asInstanceOf[GLM]
 nn.train
 
-val pc = zeros(testlabels.nrows, testlabels.ncols);
-val (mm, mopts) = GLM.predictor(nn.model, testdat, pc)
+val (mm, mopts) = GLM.predictor(nn.model, ta)
 mopts.addConstFeat=opts.addConstFeat;
-mopts.batchSize=5000
+mopts.batchSize=20000
 mopts.links = opts.links
 mm.predict
 
-val rc = roc2(pc, testlabels, 1-testlabels, 100000)
+val pc = FMat(mm.preds(0))
 
-//:silent
-
-val keys = loadIMat(mydir + "testhashes.imat.lz4");
-val len = keys.length
-val ekeys = find((keys(0, 1->len) \ -1) != keys).t;
-
-:load testlrx.ssc
+//val tc2= tmap * tc
+val rc = roc2(pc, tc, 1-tc, 1000)
+val nc = sum(tc,2);
+val wmean = mean(rc)*nc/sum(nc)
+:silent
+println("roc6 = %5.4f, roc weighted mean = %5.4f" format (mean(rc)(6), wmean.v))
