@@ -51,7 +51,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   def setmodelmats(a:Array[Mat]) = {
     _modelmats = a;
-    _lr_scales = zeros(1, _modelmats.length);
+    _lr_scales = ones(1, _modelmats.length);
   }
 
   var updatemats:Array[Mat] = null;
@@ -177,20 +177,20 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
   	for (i <- 0 until nmodels) {
   	  mms(0)(i) match {
-  	    case a:FMat => {
-  	      for (j <- 1 until nthreads) {
-  	        mms(j)(i) ~ mms(j)(i) + mms(j-1)(i);
-  	      }
-  	      for (j <- 0 until (nthreads-1)) {
-  	        mms(j)(i) <-- mms(nthreads-1)(i);
-  	      }
-  	    }
   	    case b:GMat => {
   	      for (j <- 0 until nthreads) {
   	        fromMats(j) = mms(j)(i).asInstanceOf[GMat];
   	        toMats(j) = sizeTo(models(j).allreduce_tmp, fromMats(j)).asInstanceOf[GMat];
   	        ncclAllReduce(fromMats, toMats);
   	        fromMats(j) <-- toMats(j);
+  	      }
+  	    }
+  	    case a:FMat => {
+  	      for (j <- 1 until nthreads) {
+  	        mms(j)(i) ~ mms(j)(i) + mms(j-1)(i);
+  	      }
+  	      for (j <- 0 until (nthreads-1)) {
+  	        mms(j)(i) <-- mms(nthreads-1)(i);
   	      }
   	    }
   	  }
