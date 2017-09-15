@@ -21,7 +21,7 @@ min(testdat.contents, 1f, testdat.contents);
 val labels = (labels0 + 1) / 2
 val testlabels = (testlabels0 + 1) / 2
 
-val (nn,opts)=GLM.learnerX(dat,labels,1)
+val (nn,opts)=GLM.learner(dat,labels,1)
 
 opts.batchSize=2000
 opts.lrate = 0.01
@@ -30,7 +30,7 @@ opts.npasses = 10
 opts.reg1weight = 0.0
 opts.links = iones(1,1)
 opts.addConstFeat=true;
-opts.aopts = opts;
+//opts.aopts = opts;
 
 opts.hashFeatures = 10000000;
 opts.hashBound1 = 1000000;
