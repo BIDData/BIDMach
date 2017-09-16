@@ -67,6 +67,7 @@ object Plot{
     var currentLearner: Learner = null 
     var currentNet: Net = null   
     val d3category10 = Array(2062260, 16744206, 2924588, 14034728, 9725885, 9197131, 14907330, 8355711, 12369186, 1556175)
+    var tensorFormat = Net.TensorNCHW
     //https://github.com/d3/d3-scale/blob/master/README.md#schemeCategory10
     //val color=Array("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
         
@@ -168,9 +169,10 @@ object Plot{
 
     def getFilterImg(data:Mat,bw:Int = 1) = {
         val in_channel = data.dims(0)
-        val h = data.dims(1)
-        val w = data.dims(2)
+        val w = data.dims(1)
+        val h = data.dims(2)
         val num = data.dims(3)
+        val new_data = data.reshape(Array(w,h,in_channel,num))
         val col = Math.sqrt(num).toInt
         val row = Math.ceil(num*1f/col).toInt
         val out = IMat(row*h*bw,col*w*bw)
@@ -182,9 +184,9 @@ object Plot{
                     val ii = i*h+r
                     val jj = j*w+c
                     //println(i,j,ii,jj,out.nrows,out.ncols)
-                    var res  = getV(data(0,r,c,k).dv)
-                    res += getV(data(1,r,c,k).dv)*256
-                    res += getV(data(2,r,c,k).dv)*256*256
+                    var res  = getV(new_data(r,c,0,k).dv)
+                    res += getV(new_data(r,c,1,k).dv)*256
+                    res += getV(new_data(r,c,2,k).dv)*256*256
                     res += 255*256*256*256
                     /*var res  = ((data(0,r,c,k)+0.5f).dv*256).toInt
                     res += ((data(1,r,c,k)+0.5f).dv*256).toInt*256
@@ -198,9 +200,9 @@ object Plot{
         out
     }
 
-    def plot_filters(fn:()=>Mat,name:String = "conv") {
+    def plot_filters(fn:()=>Mat,name:String = "conv",bw:Int = 10) {
         plot_image(
-            ()=>getFilterImg(MatFunctions.cpu(fn()),15),
+            ()=>getFilterImg(MatFunctions.cpu(fn()),bw),
             name)    
     }
 
@@ -230,8 +232,7 @@ object Plot{
             //plot_input(il.output,"Input")
             il.deriv = GMat(il.output).copy()
             il.deriv(?) = 0f
-            plot_filters(()=>il.deriv,"InputGradient")
-                
+            plot_filters(()=>il.deriv,"InputGradient",5)       
         }
         else plot_code(bidmachURL + "scala/BIDMach/networks/layers/" + layerName + ".scala")
     }
