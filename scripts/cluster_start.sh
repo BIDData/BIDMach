@@ -5,5 +5,5 @@ if [[ "$CLUSTER" == "" ]]; then
 fi
 
 # start the cluster
-python bidmach_ec2.py -k "dss2_rsa" -i ~/.ssh/dss2_rsa --region=us-west-2 start $CLUSTER
+python bidmach_ec2.py -k "dss2_rsa" -i ~/.ssh/dss2_rsa --region=us-west-2 --private-ips start $CLUSTER
 

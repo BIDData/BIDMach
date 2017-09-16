@@ -69,6 +69,7 @@ from boto import ec2
 
 
 spark_install_dir='/code/spark'
+bidmach_install_dir='/code/BIDMach'
 hadoop_install_dir='/code/hadoop'
 
 
@@ -651,7 +652,8 @@ def get_existing_cluster(conn, opts, cluster_name, die_on_error=True):
 # Deploy configuration files and run setup scripts on a newly launched
 # or started EC2 cluster.
 def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfiles):
-    master = get_dns_name(master_nodes[0], opts.private_ips)
+    master = get_dns_name(master_nodes[0], False)
+    local_master = get_dns_name(master_nodes[0], opts.private_ips)
     if deploy_ssh_key:
         print("Generating cluster's SSH key on master...")
         key_setup = """
@@ -664,22 +666,24 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
         dot_ssh_tar = ssh_read(master, opts, ['tar', 'c', '.ssh'])
         print("Transferring cluster's SSH key to slaves...")
         for slave in slave_nodes:
-            slave_address = get_dns_name(slave, opts.private_ips)
+#            slave_address = get_dns_name(slave, opts.private_ips)
+            slave_address = get_dns_name(slave, False)
             print(slave_address)
             ssh_write(slave_address, opts, ['tar', 'x'], dot_ssh_tar)
 
     print("configuring master %s" % master);
 
-    slave_names = [get_dns_name(i, opts.private_ips) for i in slave_nodes];
-    slaves_string = reduce(lambda x,y : x + "\n" + y, slave_names);
+    slave_names = [get_dns_name(i, False) for i in slave_nodes];
+    local_slave_names = [get_dns_name(i, opts.private_ips) for i in slave_nodes];
+    slaves_string = reduce(lambda x,y : x + "\n" + y, local_slave_names);
     
-#    hscommand="echo -e '%s' > %s/conf/slaves" % (slaves_string, spark_install_dir)
-#    ssh(master, opts, hscommand.encode('ascii','ignore'))
+    bscommand="mkdir -p %s/conf; echo -e '%s' > %s/conf/slaves" % (bidmach_install_dir, slaves_string, bidmach_install_dir)
+    ssh(master, opts, bscommand.encode('ascii','ignore'))
 
-    sscommand="echo -e '%s' > %s/etc/hadoop/slaves" % (slaves_string, hadoop_install_dir)
-    ssh(master, opts, sscommand.encode('ascii','ignore'))
+    hscommand="echo -e '%s' > %s/etc/hadoop/slaves" % (slaves_string, hadoop_install_dir)
+    ssh(master, opts, hscommand.encode('ascii','ignore'))
 
-    core_conf = core_site % master
+    core_conf = core_site % local_master
     hccommand="echo '%s' >  %s/etc/hadoop/core-site.xml" % (core_conf, hadoop_install_dir)
     ssh(master, opts, hccommand.encode('ascii','ignore'))
 
@@ -688,7 +692,8 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
         print("configuring slave %s" % slave)
         ssh(slave, opts, """rm -f ~/.ssh/known_hosts""")
         ssh(slave, opts, hccommand.encode('ascii','ignore'))
-        ssh(slave, opts, sscommand.encode('ascii','ignore'))
+        ssh(slave, opts, hscommand.encode('ascii','ignore'))
+        ssh(slave, opts, bscommand.encode('ascii','ignore'))
 
     print("Done!")
 
@@ -727,7 +732,8 @@ def is_cluster_ssh_available(cluster_instances, opts):
     Check if SSH is available on all the instances in a cluster.
     """
     for i in cluster_instances:
-        dns_name = get_dns_name(i, opts.private_ips)
+#        dns_name = get_dns_name(i, opts.private_ips)
+        dns_name = get_dns_name(i, False)
         if not is_ssh_available(host=dns_name, opts=opts):
             return False
     else:
