@@ -1,0 +1,15 @@
+import BIDMach.networks.Net
+import BIDMat.MatFunctions._
+def save(net:Net,fname:String) {
+    for (i <- 0 until net.modelmats.length) {
+      val mat = net.modelmats(i);
+      saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
+    }
+}
+
+def load(net:Net,fname:String) {
+    for (i <- 0 until net.modelmats.length) {
+        val data = loadMat(fname+"modelmat%02d.lz4" format i);
+        net.modelmats(i)<--data
+    }
+}
