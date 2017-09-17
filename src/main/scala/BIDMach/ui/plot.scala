@@ -62,7 +62,7 @@ class GraphFrame(val layers:Array[HashMap[String,Any]])extends JFrame("Graph"){
 
 object Plot{
     var tot = 0
-    var interval = 0.5
+    var interval = 2
     val useWeb = false
     var currentLearner: Learner = null 
     var currentNet: Net = null   
@@ -184,9 +184,9 @@ object Plot{
                     val ii = i*h+r
                     val jj = j*w+c
                     //println(i,j,ii,jj,out.nrows,out.ncols)
-                    var res  = getV(new_data(r,c,0,k).dv)
-                    res += getV(new_data(r,c,1,k).dv)*256
-                    res += getV(new_data(r,c,2,k).dv)*256*256
+                    var res  = getV(new_data(c,r,0,k).dv)
+                    res += getV(new_data(c,r,1,k).dv)*256
+                    res += getV(new_data(c,r,2,k).dv)*256*256
                     res += 255*256*256*256
                     /*var res  = ((data(0,r,c,k)+0.5f).dv*256).toInt
                     res += ((data(1,r,c,k)+0.5f).dv*256).toInt*256
@@ -215,8 +215,11 @@ object Plot{
     
     def plot_input(data:Mat,name:String) {
         plot_image(
-            ()=>getFilterImg(data/256f-0.5f),
-            name
+            ()=>{
+                val idata = MatFunctions.cpu(data)
+                getFilterImg(idata(?,?,?,0->4)/256f-0.5f)
+            }
+            ,name
         )
     }
     
@@ -226,13 +229,12 @@ object Plot{
         val bidmachURL = "https://raw.githubusercontent.com/BIDData/BIDMach/master/src/main/"
         if (layerName == "ConvLayer"){
             val cl = layer.asInstanceOf[ConvLayer]
-            plot_filters(()=>{currentNet.modelmats(cl.imodel)},"Conv@"+layerId)
+            plot_filters(()=>{currentNet.modelmats(cl.imodel)},"Conv@"+layerId,2)
         } else if (layerName == "InputLayer") {
             val il = layer.asInstanceOf[InputLayer]
-            //plot_input(il.output,"Input")
-            il.deriv = GMat(il.output).copy()
-            il.deriv(?) = 0f
-            plot_filters(()=>il.deriv,"InputGradient",5)       
+//            val idata = MatFunctions.cpu()
+            plot_input(il.output,"Input")
+            plot_filters(()=>(MatFunctions.cpu(il.deriv) * 1000000)(?,?,?,0->4),"InputGradient",1)
         }
         else plot_code(bidmachURL + "scala/BIDMach/networks/layers/" + layerName + ".scala")
     }

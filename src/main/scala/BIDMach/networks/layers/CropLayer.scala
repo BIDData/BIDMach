@@ -106,10 +106,26 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
 				}
 				}
 			}
-
+            inplaceNoConnectSetupDerivs()
 			forwardtime += toc - start;
 	}
-	
+    
+    override def backward = {
+        val start = toc;    
+        if (net.opts.input_need_grads && inputDeriv.asInstanceOf[AnyRef] != null){
+            if (net.opts.tensorFormat == Net.TensorNHWC) {
+                inputDeriv(blockInds(0), blockInds(1), blockInds(2), blockInds(3)) = deriv
+            }
+            else{
+                val dims = inputData.dims;
+                val reshaped = inputDeriv.reshapeView(dims(1), dims(2), dims(0), dims(3));
+                val odims = output.dims
+                reshaped(blockInds(1), blockInds(2), blockInds(0), blockInds(3)) = deriv.reshapeView(odims(1), odims(2), odims(0), odims(3))
+            }
+        }
+        backwardtime += toc - start;
+    }
+            
 	override def clear = {
 	  clearMats;
 	  blockInds = null;

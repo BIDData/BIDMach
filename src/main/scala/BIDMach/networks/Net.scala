@@ -219,6 +219,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 			  layers(i).forward;
 			  i += 1;
 		  }
+          if (opts.input_need_grads) {
+              for (i <- 0 until input_layers.length) {
+                    val layer = input_layers(i)
+                    if (layer.deriv.asInstanceOf[AnyRef] == null) 
+                        layer.deriv = layer.output.zeros(layer.output.dims)
+                    layer.deriv.clear
+              }
+          }
   }
   
   def clearUpdatemats {
@@ -445,6 +453,7 @@ object Net  {
     var tensorFormat:Int = Net.TensorNHWC;
     var convType = CrossCorrelation;
     var inplace = NoInPlace;
+    var input_need_grads = false
   }
    
   final val UseNetFormat = 0;
