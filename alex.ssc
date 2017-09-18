@@ -29,13 +29,14 @@ opts.batchSize= 128;
 opts.npasses = 80;
 opts.lrate = 1e-4f;
 opts.texp = 0f;
-opts.pstep = 0.05f
+opts.pstep = 0.001f
 opts.hasBias = true;
 opts.l2reg = 0.0005f;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
-opts.useCache = false;
+opts.useCache = true;
+opts.input_need_grads = true
 val inplace = 1;
 
 :silent
@@ -54,9 +55,9 @@ val scalef =    const(row(0.01f));
 //val sdin =      din *@ scalef;
 //val fin =       format(in)();
 val cin =       crop(din)(randoffsets=irow(0,32,32,-1));
-val min =       randmirror(cin)();
+//val min =       randmirror(cin)();
 
-val conv1 =     conv(min)(w=11,h=11,nch=96,stride=4,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);
+val conv1 =     conv(cin)(w=11,h=11,nch=96,stride=4,convType=convt,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);
 val relu1 =     relu(conv1)(inplace);
 val pool1 =     pool(relu1)(w=3,h=3,stride=2);
 val norm1 =     LRNacross(pool1)(dim=5,alpha=0.0001f,beta=0.75f);
@@ -95,8 +96,17 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 val sgd = nn.updater.asInstanceOf[Grad];
 import BIDMach.ui.Plot
 
+def load(net:Net,fname:String) {
+    for (i <- 0 until net.modelmats.length) {
+        val data = loadMat(fname+"modelmat%02d.lz4" format i);
+        net.modelmats(i)<--data
+    }
+}
+
+
+//nn.train
 nn.launchTrain;
-//Plot.plot_loss(nn,1)
+Plot.plot_loss(nn,1)
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 //mopts.batchSize= opts.batchSize;
