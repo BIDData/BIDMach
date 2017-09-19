@@ -20,6 +20,8 @@ import BIDMach.networks._
  */
 
 class InputLayer(override val net:Net, override val opts:InputNodeOpts = new InputNode) extends Layer(net, opts) {
+    var derivCPU: Mat = null
+    var outputCPU: Mat = null
     override def toString = {
     "input@"+Integer.toHexString(hashCode % 0x10000).toString
   }

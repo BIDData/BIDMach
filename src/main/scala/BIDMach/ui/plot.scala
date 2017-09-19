@@ -67,7 +67,9 @@ object Plot{
     var currentLearner: Learner = null 
     var currentNet: Net = null   
     val d3category10 = Array(2062260, 16744206, 2924588, 14034728, 9725885, 9197131, 14907330, 8355711, 12369186, 1556175)
-    var tensorFormat = Net.TensorNCHW
+    var tensorFormat = Net.TensorNCHW;
+    var gradient_scale = 5000f
+    
     //https://github.com/d3/d3-scale/blob/master/README.md#schemeCategory10
     //val color=Array("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
         
@@ -172,7 +174,7 @@ object Plot{
         val w = data.dims(1)
         val h = data.dims(2)
         val num = data.dims(3)
-        val new_data = data.reshape(Array(w,h,in_channel,num))
+        val new_data = (data.reshape(Array(w,h,in_channel,num))).asInstanceOf[FMat]
         val col = Math.sqrt(num).toInt
         val row = Math.ceil(num*1f/col).toInt
         val out = IMat(row*h*bw,col*w*bw)
@@ -184,10 +186,17 @@ object Plot{
                     val ii = i*h+r
                     val jj = j*w+c
                     //println(i,j,ii,jj,out.nrows,out.ncols)
-                    var res  = getV(new_data(c,r,0,k).dv)
+                        
+                    val ind = c+w*r+k*w*h*3
+                    var res = getV(new_data.data(ind))
+                    res += getV(new_data.data(ind+w*h))*256
+                    res += getV(new_data.data(ind+w*h*2))*256*256
+                    res += 255*256*256*256
+                        
+                    /*var res  = getV(new_data(c,r,0,k).dv)
                     res += getV(new_data(c,r,1,k).dv)*256
                     res += getV(new_data(c,r,2,k).dv)*256*256
-                    res += 255*256*256*256
+                    res += 255*256*256*256*/
                     /*var res  = ((data(0,r,c,k)+0.5f).dv*256).toInt
                     res += ((data(1,r,c,k)+0.5f).dv*256).toInt*256
                     res += ((data(2,r,c,k)+0.5f).dv*256).toInt*256*256
@@ -230,11 +239,23 @@ object Plot{
         if (layerName == "ConvLayer"){
             val cl = layer.asInstanceOf[ConvLayer]
             plot_filters(()=>{currentNet.modelmats(cl.imodel)},"Conv@"+layerId,2)
+            if (cl.nearestImg.asInstanceOf[AnyRef]!=null)
+                Plot.plot_filters(()=>cl.nearestImg.reshapeView(3,11,11,96)/256f-0.5f,"imgs",2);
         } else if (layerName == "InputLayer") {
             val il = layer.asInstanceOf[InputLayer]
 //            val idata = MatFunctions.cpu()
-            plot_input(il.output,"Input")
-            plot_filters(()=>(MatFunctions.cpu(il.deriv) * 1000000)(?,?,?,0->4),"InputGradient",1)
+            val buf = il.derivCPU.zeros((il.derivCPU(?,?,?,0->4)).dims)
+            plot_image(()=>{
+                buf(?,?,?,0->2) = il.outputCPU(?,?,?,0->2)/256f-0.5f;
+                buf(?,?,?,2->4) = (il.derivCPU*gradient_scale)(?,?,?,0->2);
+                getFilterImg(buf,1)
+            },
+            "InputGradient")                                
+            /*plot_input(il.output,"Input")
+            plot_image(
+                ()=>getFilterImg((il.derivCPU*1000)(?,?,?,0->4),1),
+                "InputGradient")*/
+            //plot_filters(()=>(MatFunctions.cpu(il.deriv) * 300000)(?,?,?,0->4),"InputGradient",1)
         }
         else plot_code(bidmachURL + "scala/BIDMach/networks/layers/" + layerName + ".scala")
     }
