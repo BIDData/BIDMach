@@ -103,10 +103,22 @@ def load(net:Net,fname:String) {
     }
 }
 
+def run(){
+    nn.pause
+    java.lang.Thread.sleep(500)
+    Plot.plot(nn)
+    load(net,"models/alex10p/")
+    nn.unpause
+}
+
 
 //nn.train
 nn.launchTrain;
 Plot.plot_loss(nn,1)
+java.lang.Thread.sleep(1000)
+run()
+
+//opts.vel_decay = 0f;net.opts.guided_bp = true
 
 //val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
 //mopts.batchSize= opts.batchSize;

@@ -33,6 +33,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var backwardfiltertime = 0.0;
     var backwarddatatime = 0.0;
     var bwdFilterWS:Mat = null;
+    var nearestImg : FMat = null;
 //    var outputDim:IMat = null; //Should be three numbers
 
   var cudnnMainHandle:cudnnHandle = null;
@@ -121,8 +122,30 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     if (opts.hasBias) {
       applyBias(bias_mat, output);
     }
-
     forwardtime += toc - start
+    if (net.opts.showimg && imodel == 0){
+        val dims = output.dims
+        val data = if (net.opts.tensorFormat == Net.TensorNHWC) output else output.asInstanceOf[FMat].fromNCHWtoNHWC
+        val (d,i) = maxi2(data.reshapeView(dims(0),dims(1)*dims(2)*dims(3)),2);
+        val id = IMat(i);
+        val w = irow(id.data.map(_%dims(1)));  
+        val h = irow(id.data.map(_%(dims(1)*dims(2))/dims(1)));  
+        val n = irow(id.data.map(_/(dims(1)*dims(2))));
+        val ww = -ffilter.pad(1) + (w+ffilter.outPad(1)) * ffilter.stride(1)
+        ww~ww+(ww<0)
+        val hh = -ffilter.pad(2) + (h+ffilter.outPad(2)) * ffilter.stride(2)
+        hh~hh+(hh<0)
+        val res = FMat.zeros(irow(ffilter.inDims(1),ffilter.inDims(2),ffilter.inDims(0),dims(0)))
+        val offset = net.layers(1).output.reshapeView(256,256,3,1)
+        val bl = net.layers(4).asInstanceOf[CropLayer].blockInds
+        val idata = FMat(inputData.reshapeView(inputData.dims(1),inputData.dims(2),inputData.dims(0),inputData.dims(3))+
+                         offset(bl(1),bl(2),?,?)
+                        )
+        for(k<-0 until dims(0)){
+            res(?,?,?,k) = idata(ww(k)->(ww(k)+ffilter.inDims(1)),hh(k)->(hh(k)+ffilter.inDims(2)),?,n(k))
+        }
+        nearestImg = res
+    }
   }
 
   override def backward = {
