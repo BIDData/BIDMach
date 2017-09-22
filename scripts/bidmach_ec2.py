@@ -715,7 +715,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
     ssh(master, opts, hccommand.encode('ascii','ignore'))
 
     akka_master_conf = akka_conf % (local_master, local_master, local_master)
-    amcommand="echo '%s' >  %s/lib/application.conf" % (akka_master_conf, bidmach_install_dir)
+    amcommand="echo '%s' >  %s/src/main/resources/application.conf" % (akka_master_conf, bidmach_install_dir)
     ssh(master, opts,amcommand.encode('ascii','ignore'))
 
     ssh(master, opts, """rm -f ~/.ssh/known_hosts""")
@@ -729,7 +729,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
         ssh(slave, opts, bscommand.encode('ascii','ignore'))
         ssh(slave, opts, bmcommand.encode('ascii','ignore'))
         akka_slave_conf = akka_conf % (local_slave, local_master, local_master)
-        ascommand="echo '%s' >  %s/lib/application.conf" % (akka_slave_conf, bidmach_install_dir)
+        ascommand="echo '%s' >  %s/src/main/resources/application.conf" % (akka_slave_conf, bidmach_install_dir)
         ssh(slave, opts, ascommand.encode('ascii','ignore'))
 
     print("Done!")
