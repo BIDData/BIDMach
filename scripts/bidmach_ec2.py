@@ -680,6 +680,9 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
     bscommand="mkdir -p %s/conf; echo -e '%s' > %s/conf/slaves" % (bidmach_install_dir, slaves_string, bidmach_install_dir)
     ssh(master, opts, bscommand.encode('ascii','ignore'))
 
+    bmcommand="echo -e '%s' > %s/conf/master" % (local_master, bidmach_install_dir)
+    ssh(master, opts, bmcommand.encode('ascii','ignore'))
+
     hscommand="echo -e '%s' > %s/etc/hadoop/slaves" % (slaves_string, hadoop_install_dir)
     ssh(master, opts, hscommand.encode('ascii','ignore'))
 
@@ -694,6 +697,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
         ssh(slave, opts, hccommand.encode('ascii','ignore'))
         ssh(slave, opts, hscommand.encode('ascii','ignore'))
         ssh(slave, opts, bscommand.encode('ascii','ignore'))
+        ssh(slave, opts, bmcommand.encode('ascii','ignore'))
 
     print("Done!")
 
