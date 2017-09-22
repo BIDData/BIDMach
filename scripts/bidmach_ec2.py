@@ -721,7 +721,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
     ssh(master, opts, """rm -f ~/.ssh/known_hosts""")
     for i in range(len(slave_names)):
         slave = slave_name[i];
-        local_slave = local_slave_name[i];
+        local_slave = local_slave_names[i];
         print("configuring slave %s" % slave)
         ssh(slave, opts, """rm -f ~/.ssh/known_hosts""")
         ssh(slave, opts, hccommand.encode('ascii','ignore'))
