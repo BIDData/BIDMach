@@ -82,6 +82,30 @@ core_site = """
 </configuration>
 """
 
+akka_conf = """
+akka {
+  actor {
+    provider = "cluster"
+  }
+  remote {
+    log-remote-lifecycle-events = off
+    netty.tcp {
+      hostname = "%s"
+      port = 0
+    }
+  }
+  cluster {
+    seed-nodes = [
+      "akka.tcp://ClusterSystem@%s:2551",
+      "akka.tcp://ClusterSystem@%s:2552"]
+  }
+}
+# Disable legacy metrics in akka-cluster.
+akka.cluster.metrics.enabled=off
+# Enable metrics extension in akka-cluster-metrics.
+akka.extensions=["akka.cluster.metrics.ClusterMetricsExtension"]
+"""
+
 
 BIDMACH_EC2_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -690,14 +714,23 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key, copyfil
     hccommand="echo '%s' >  %s/etc/hadoop/core-site.xml" % (core_conf, hadoop_install_dir)
     ssh(master, opts, hccommand.encode('ascii','ignore'))
 
+    akka_master_conf = akka_conf % (local_master, local_master, local_master)
+    amcommand="echo '%s' >  %s/lib/application.conf" % (akka_master_conf, bidmach_install_dir)
+    ssh(master, opts,amcommand.encode('ascii','ignore'))
+
     ssh(master, opts, """rm -f ~/.ssh/known_hosts""")
-    for slave in slave_names:
+    for i in range(len(slave_names)):
+        slave = slave_name[i];
+        local_slave = local_slave_name[i];
         print("configuring slave %s" % slave)
         ssh(slave, opts, """rm -f ~/.ssh/known_hosts""")
         ssh(slave, opts, hccommand.encode('ascii','ignore'))
         ssh(slave, opts, hscommand.encode('ascii','ignore'))
         ssh(slave, opts, bscommand.encode('ascii','ignore'))
         ssh(slave, opts, bmcommand.encode('ascii','ignore'))
+        akka_slave_conf = akka_conf % (local_slave, local_master, local_master)
+        ascommand="echo '%s' >  %s/lib/application.conf" % (akka_slave_conf, bidmach_install_dir)
+        ssh(slave, opts, ascommand.encode('ascii','ignore'))
 
     print("Done!")
 
