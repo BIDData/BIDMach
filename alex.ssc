@@ -39,7 +39,6 @@ opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = true;
-opts.input_need_grads = true
 val inplace = 1;
 
 :silent

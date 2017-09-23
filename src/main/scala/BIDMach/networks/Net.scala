@@ -219,14 +219,6 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 			  layers(i).forward;
 			  i += 1;
 		  }          
-          if (opts.input_need_grads) {
-              for (i <- 0 until input_layers.length) {
-                    val layer = input_layers(i)
-                    if (layer.deriv.asInstanceOf[AnyRef] == null) 
-                        layer.deriv = layer.output.zeros(layer.output.dims)
-                    layer.deriv.clear
-              }
-          }
   }
   
   def clearUpdatemats {
@@ -261,34 +253,17 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   
   def backward(ipass:Int = 0, pos:Long = 0) {
     var i = layers.length;
-    val guided_bp = opts.guided_bp
     while (i > 1) {
     	i -= 1;
     	if (opts.debug > 0) {
     		println("dobatch backward %d %s" format (i, layers(i).getClass))
     	}
-        if (guided_bp){
-            if (layers(i).deriv.asInstanceOf[AnyRef] != null){
-                max(layers(i).deriv,0,layers(i).deriv);
-                layers(i).deriv ~ layers(i).deriv *@ (layers(i).output>=0)                    
-            }
-        }
     	layers(i).backward(ipass, pos);
-    }
-    if (opts.input_need_grads) {
-        val layer = layers(0).asInstanceOf[InputLayer];
-        layer.outputCPU = cpu(layer.output)
-        layer.derivCPU = cpu(layer.deriv)
-    }
-    if (guided_bp){
-        updatemats.map(_.clear)
     }
     if (mask.asInstanceOf[AnyRef] != null) {
     	updatemats(0) ~ updatemats(0) ∘ mask;
     }
-  }
-  
-  
+  }    
 
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
@@ -468,10 +443,6 @@ object Net  {
     var tensorFormat:Int = Net.TensorNHWC;
     var convType = CrossCorrelation;
     var inplace = NoInPlace;
-    var input_need_grads = false;
-    var guided_bp = false;    
-    var showimg = false;
-      
   }
    
   final val UseNetFormat = 0;

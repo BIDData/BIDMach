@@ -112,7 +112,7 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
     
     override def backward = {
         val start = toc;    
-        if (net.opts.input_need_grads && inputDeriv.asInstanceOf[AnyRef] != null){
+        if (inputDeriv.asInstanceOf[AnyRef] != null){
             if (net.opts.tensorFormat == Net.TensorNHWC) {
                 inputDeriv(blockInds(0), blockInds(1), blockInds(2), blockInds(3)) = deriv
             }

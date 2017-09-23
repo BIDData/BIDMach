@@ -75,7 +75,7 @@ object utils {
         val w = data.dims(1)
         val h = data.dims(2)
         val num = data.dims(3)
-        val new_data = (data.reshape(Array(w,h,in_channel,num))).asInstanceOf[FMat]
+        val new_data = (cpu(data).reshape(Array(w,h,in_channel,num))).asInstanceOf[FMat]
         val col = Math.sqrt(num).toInt
         val row = Math.ceil(num*1f/col).toInt
         val out = IMat(row*h*bw,col*w*bw)

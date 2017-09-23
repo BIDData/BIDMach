@@ -12,7 +12,7 @@ abstract class Visualization {
     //Perform some initial check to make sure data type is correct
     def check(model:Model,mats:Array[Mat]):Int 
         
-    def init(model:Model,mats:Array[Mat]) 
+    def init(model:Model,mats:Array[Mat]) {}
        
     def update(model:Model,mats:Array[Mat],ipass:Int, pos:Long){
         if (checkStatus == 0){
@@ -21,14 +21,19 @@ abstract class Visualization {
         }
         if (checkStatus == 1) {
             if (cnt == 0) {
-                try { 
+                doUpdate(model, mats, ipass, pos)
+                /*try { 
                     doUpdate(model, mats, ipass, pos)
                 }
                 catch {
-                    case e:Exception=> println(e.toString)
-                }
+                    case e:Exception=> {
+                        checkStatus = 2
+                        println(e.toString)
+                    }
+                }*/
             }
             cnt = (cnt + 1) % interval           
         }
     }
 }
+

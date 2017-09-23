@@ -287,6 +287,7 @@ case class Learner(
   def add_plot(v: Visualization) = {
       if (viz.asInstanceOf[AnyRef] == null) viz = new ListBuffer[Visualization]()
       viz+=v
+      v
   }
 
   def predict() = {

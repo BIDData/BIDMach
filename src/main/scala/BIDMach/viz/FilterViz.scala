@@ -9,8 +9,9 @@ import BIDMach.networks.layers._;
 /***
     Visualizing the filters within a ConvLayer
 **/
-class FilterViz(val layerId:Int, val name: String = "filter") extends Visualization{
-    val plot = new Plot(name)
+class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends Visualization{
+    val _name = if (name.length > 0) name else "Conv@" + layerId
+    val plot = new Plot(_name)
         
     override def check(model:Model, mats:Array[Mat]) = {
         model match {
@@ -35,15 +36,11 @@ class FilterViz(val layerId:Int, val name: String = "filter") extends Visualizat
             } 
         }                
     }
-    
-    override def init(model:Model, mats:Array[Mat]) = {
-        
-    }
-    
+       
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {
         val net = model.asInstanceOf[Net];
         val layer = net.layers(layerId).asInstanceOf[ConvLayer];
-        val img = utils.filter2img(cpu(net.modelmats(layer.imodel)),net.opts.tensorFormat);
+        val img = utils.filter2img(cpu(net.modelmats(layer.imodel)),net.opts.tensorFormat,bw);
         if (layer.imodel == 0){
             val dims = layer.output.dims
             val data = if (net.opts.tensorFormat == Net.TensorNHWC) layer.output 
@@ -60,17 +57,22 @@ class FilterViz(val layerId:Int, val name: String = "filter") extends Visualizat
             hh~hh+(hh<0)
             val res = FMat.zeros(irow(ffilter.inDims(1),ffilter.inDims(2),ffilter.inDims(0),dims(0)))
             val offset = net.layers(1).output.reshapeView(256,256,3,net.layers(1).output.dims(3))
-            val bl = net.layers(4).asInstanceOf[CropLayer].blockInds
+            val bl = net.layers(4) match {
+                case l:CropLayer=>l.blockInds
+                case l:CropMirrorLayer=>l.blockInds
+            }
             val idata = cpu(layer.inputData.reshapeView(layer.inputData.dims(1),layer.inputData.dims(2),
                                                          layer.inputData.dims(0),layer.inputData.dims(3))+
                              offset(bl(1),bl(2),?,?)
                             )
             for(k<-0 until dims(0)){
-                res(?,?,?,k) = idata(ww(k)->(ww(k)+ffilter.inDims(1)),hh(k)->(hh(k)+ffilter.inDims(2)),?,n(k))
+                res(?,?,?,k) = idata(ww(k)->(ww(k)+ffilter.inDims(1)),hh(k)->(hh(k)+ffilter.inDims(2)),?,n(k))                 
             }
-            ///nearestImg = res
+            val input = utils.filter2img((res/256f-0.5f).reshapeView(ffilter.inDims(0),ffilter.inDims(1),ffilter.inDims(2),dims(0)),net.opts.tensorFormat,bw);
+            plot.plot_image(img on input)
         }
-        plot.plot_image(img)
+        else
+            plot.plot_image(img)
     }
     
 }
