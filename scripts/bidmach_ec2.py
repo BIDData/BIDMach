@@ -1246,7 +1246,7 @@ def real_main():
         opts.master_instance_type = existing_master_type
         opts.instance_type = existing_slave_type
 
-        setup_cluster(conn, master_nodes, slave_nodes, opts, True, False)
+        setup_cluster(conn, master_nodes, slave_nodes, opts, False, False)
 
     else:
         print("Invalid action: %s" % action, file=stderr)
