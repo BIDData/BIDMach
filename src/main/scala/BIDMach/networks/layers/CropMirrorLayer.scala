@@ -116,7 +116,7 @@ class CropMirrorLayer(override val net:Net, override val opts:CropMirrorNodeOpts
 				}
 				}
 			}
-
+            inplaceNoConnectSetupDerivs()
 			forwardtime += toc - start;
 	}
     
