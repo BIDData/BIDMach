@@ -69,7 +69,7 @@ for lib in jcuda jcublas jcufft jcurand jcusolver jcusparse jcudnn; do
     JCUDA_LIBS="${JCUDA_LIBS};${LIBDIR}/${lib}-${JCUDA_VERSION}.jar;${LIBDIR}/${lib}-natives-${JCUDA_VERSION}-${OSS}-${ARCH}.jar"
 done
 
-TOOL_LIBS="${JAVA_HOME}/lib/tools.jar;${LIBDIR}/IScala-1.0.0.jar"
+TOOL_LIBS="${BIDMACH_ROOT}/src/main/resources;${JAVA_HOME}/lib/tools.jar;${LIBDIR}/IScala-1.0.0.jar"
 
 ALL_LIBS="${TOOL_LIBS};\
 ${JCUDA_LIBS};\
