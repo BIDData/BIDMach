@@ -15,7 +15,7 @@ opts.batchSize= 100
 opts.npasses = 100
 opts.lrate = 1e-4f 
 
-opts.vel_decay = 0f
+opts.vel_decay = 0.9f
 opts.gsq_decay = 0.99f
 opts.texp = 0.0f
 opts.pstep = 0.1f
@@ -30,7 +30,7 @@ val in = input;
 val scalef = constant(row(0.01f));
 val inscale = in *@ scalef
 
-val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=0,initv=1f,convType=convt);
+val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=0,initv=0.01f,convType=convt);
 val pool1 = pool(conv1)(w=2,h=2,stride=2);
 //val norm1 = batchNormScale(pool1)();
 val relu1 = relu(pool1)();
@@ -56,9 +56,10 @@ val nodes = (in     \ scalef \ inscale on
 opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
 nn.launchTrain
-Thread.sleep(10000)
-nn.pause
+//nn.train
+//Thread.sleep(10000)
+//nn.pause
 :silent
-import BIDMach.ui.Plot
-Plot.plot(nn)
+import BIDMach.viz._
+//Plot.plot(nn)
 

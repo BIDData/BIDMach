@@ -1,4 +1,4 @@
-package BIDMach.ui
+package BIDMach.viz
 
 import BIDMat.{BMat,Mat,SBMat,CMat,DMat,FMat,FFilter,IMat,HMat,GDMat,GFilter,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat,Image}
 import BIDMat.MatFunctions._
@@ -60,7 +60,7 @@ class GraphFrame(val layers:Array[HashMap[String,Any]])extends JFrame("Graph"){
                           }); 
 }
 
-object Plot{
+object Plot_active{
     var tot = 0
     var interval = 2
     val useWeb = false

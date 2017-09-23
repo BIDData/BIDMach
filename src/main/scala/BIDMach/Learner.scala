@@ -10,6 +10,7 @@ import BIDMach.updaters._
 import BIDMach.datasources._
 import BIDMach.datasinks._
 import BIDMach.mixins._
+import BIDMach.viz._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import java.util.concurrent.ExecutorService;
@@ -45,6 +46,7 @@ case class Learner(
   var useGPU = false
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
+  var viz:ListBuffer[Visualization] = null; 
   var lastCheckPoint = 0;
   @volatile var done = false;
   @volatile var paused = false;
@@ -196,6 +198,9 @@ case class Learner(
         while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
         if (updater != null) updater.update(ipass, here, gprogress);
       }
+      if (viz.asInstanceOf[AnyRef] != null) {
+          viz.foreach(_.update(model,mats,ipass,here))
+      }
       istep += 1
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
@@ -277,6 +282,11 @@ case class Learner(
     val b = zeros(n, results.ncols/n);
     b(?) = results(0,0->b.length);
     plot(mean(b))
+  }
+    
+  def add_plot(v: Visualization) = {
+      if (viz.asInstanceOf[AnyRef] == null) viz = new ListBuffer[Visualization]()
+      viz+=v
   }
 
   def predict() = {
