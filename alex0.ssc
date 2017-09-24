@@ -99,7 +99,6 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 import BIDMach.viz._
-net.opts.input_need_grads = true
 
 nn.launchTrain;
 

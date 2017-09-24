@@ -52,11 +52,11 @@ class InputViz(val name: String = "Input") extends Visualization{
             }
             net.updatemats.foreach(_.clear)
         }
-        val layer = layers(0).asInstanceOf[InputLayer];        
+        val layer = layers(0).asInstanceOf[InputLayer];
         _gradient_scale(0,0) = gradient_scale
         val img = utils.filter2img(layer.output(?,?,?,0->2)/256f-0.5f,net.opts.tensorFormat) \
                   utils.filter2img(layer.deriv(?,?,?,0->2)*@_gradient_scale,net.opts.tensorFormat)
         plot.plot_image(img)
         layer.deriv.clear
-    }                
+    }
 }

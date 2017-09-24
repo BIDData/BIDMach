@@ -144,7 +144,8 @@ object Plot{
         if (layerName == "ConvLayer"){
             currentLearner.add_plot(new FilterViz(layerId))
         } else if (layerName == "InputLayer") {
-            currentLearner.add_plot(new InputViz())            
+            val v = currentLearner.add_plot(new InputViz()).asInstanceOf[InputViz];
+            v.guided_bp =true                
         }
         else plot_code(bidmachURL + "scala/BIDMach/networks/layers/" + layerName + ".scala")
     }
