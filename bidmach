@@ -5,7 +5,6 @@
 MEMSIZE="-Xmx14G"
 export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8 ${JAVA_OPTS}" # Set as much memory as possible
 BIDMACH_ROOT="${BASH_SOURCE[0]}"
-AKKA_VERSION="2.5.4"
 if [ ! `uname` = "Darwin" ]; then
   BIDMACH_ROOT=`readlink -f "${BIDMACH_ROOT}"`
 else
@@ -17,13 +16,9 @@ BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 pushd "${BIDMACH_ROOT}"  > /dev/null
 BIDMACH_ROOT=`pwd -P`
 BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed 's+/cygdrive/\(.\)+\1:+' )"
-JCUDA_LIBDIR="${BIDMACH_ROOT}/lib"
 LIBDIR="${BIDMACH_ROOT}/lib"
 
-JCUDA_VERSION=`echo lib/jcuda-natives-*.jar | sed 's/.*jcuda-natives-//' | sed 's/-.*\.jar//'`
 BIDMAT_VERSION=`echo lib/BIDMat-*-cpu-*.jar | sed 's/.*BIDMat-//' | sed 's/-cpu.*\.jar//'`
-cd lib
-BIDMACH_JARS=`echo *.jar`
 
 OSS=`uname -a`
 if [ "$ARCH" = "" ]; then
@@ -46,7 +41,6 @@ else
     exit 1
 fi
 
-popd > /dev/null
 if [ "$OSS" = "windows" ]; then
     if [ ! "${JAVA_HOME}" = "" ]; then
         JAVA_HOME=`${BIDMACH_ROOT}/shortpath.bat "${JAVA_HOME}"`
@@ -54,12 +48,16 @@ if [ "$OSS" = "windows" ]; then
     fi
 fi
 
+cd lib
+BIDMACH_JARS=`echo *.jar`
 BIDMACH_LIBS="${BIDMACH_ROOT}/target/BIDMach-${BIDMAT_VERSION}.jar"
 for lib in ${BIDMACH_JARS}; do
     if [[ "$lib" != IScala* && "$lib" != scala* ]]; then
 	BIDMACH_LIBS="${BIDMACH_LIBS};${LIBDIR}/${lib}"
     fi
 done
+
+popd > /dev/null
 
 TOOL_LIBS="${BIDMACH_ROOT}/conf;${JAVA_HOME}/lib/tools.jar;${LIBDIR}/IScala-1.0.0.jar"
 

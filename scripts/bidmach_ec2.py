@@ -101,9 +101,9 @@ akka {
   }
 }
 # Disable legacy metrics in akka-cluster.
-akka.cluster.metrics.enabled=off
+#akka.cluster.metrics.enabled=off
 # Enable metrics extension in akka-cluster-metrics.
-akka.extensions=["akka.cluster.metrics.ClusterMetricsExtension"]
+#akka.extensions=["akka.cluster.metrics.ClusterMetricsExtension"]
 """
 
 
