@@ -1,0 +1,57 @@
+
+import akka.actor.{Actor,ActorRef,Props,Address,ActorSystem,ActorSelection}
+import akka.cluster.{Cluster,MemberStatus}	
+import akka.cluster.ClusterEvent._
+import com.typesafe.config.ConfigFactory
+import akka.event.Logging
+import akka.actor.ActorLogging
+
+case class SendVal(val v:Int) {
+}
+
+case class RecvVal(val v:Int) {
+}
+
+case class SendTo(val dest:ActorRef, val v:Int) {
+}
+
+case class GetVal() {
+    var v = 0;
+}
+
+
+class TestActor extends Actor with ActorLogging {
+    var v = 0;
+    def receive = {
+    case x:SendTo => {
+	    x.dest ! new SendVal(x.v);
+	}
+    case x:SendVal => {
+	    val m = new RecvVal(x.v * 2);
+	    sender ! m;
+	}
+    case x:RecvVal => {
+	    v = x.v;
+	}
+    case x:GetVal => {
+	    x.v = v;
+	}
+    case _ => {}
+    }
+}
+
+def startup(ports: Seq[String]) = {
+    ports map { port =>
+		// Override the configuration of the port
+		val config = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port).
+		withFallback(ConfigFactory.load())
+		
+		// Create an Akka system
+		val system = ActorSystem("ClusterSystem", config)
+		// Create an actor that handles cluster domain events
+		system.actorOf(Props[TestActor], name = "testActor")
+    }
+}
+
+val nodes = startup(Seq("2553","2554"));
+    

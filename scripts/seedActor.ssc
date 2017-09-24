@@ -1,32 +1,56 @@
 
-import akka.actor.{Actor,Props,ActorSystem}
-import akka.cluster.Cluster
+import akka.actor.{Actor,ActorRef,Props,Address,ActorSystem}
+import akka.cluster.{Cluster,MemberStatus}	
 import akka.cluster.ClusterEvent._
 import com.typesafe.config.ConfigFactory
 import akka.event.Logging
 import akka.actor.ActorLogging
 
+case class GetNodes() {
+  var nodes:Set[Address] = null;
+
+  def query(a:ActorRef) = {
+      a ! this;
+      nodes;
+  }	
+}
 
 class SimpleClusterListener extends Actor with ActorLogging {
 
   val cluster = Cluster(context.system)
 
+  var nodes = Set.empty[Address];
+
   // subscribe to cluster changes, re-subscribe when restart 
   override def preStart(): Unit = {
-    cluster.subscribe(self, initialStateMode = InitialStateAsEvents,
-      classOf[MemberEvent], classOf[UnreachableMember])
-  }
-  override def postStop(): Unit = cluster.unsubscribe(self)
+    cluster.subscribe(self, classOf[MemberEvent], classOf[UnreachableMember])
+    }
+
+  override def postStop(): Unit = cluster.unsubscribe(self);
 
   def receive = {
-    case MemberUp(member) =>
-      log.info("Member is Up: {}", member.address)
-    case UnreachableMember(member) =>
-      log.info("Member detected as unreachable: {}", member)
-    case MemberRemoved(member, previousStatus) =>
-      log.info("Member is Removed: {} after {}",
-        member.address, previousStatus)
-    case _: MemberEvent => // ignore
+  case state: CurrentClusterState => {
+	  nodes = state.members.collect {
+	  case m if m.status == MemberStatus.Up => m.address
+	  }
+	  log.info("Member init: {} nodes", nodes.size);
+      }
+  case MemberUp(member) => {
+      nodes += member.address;
+      log.info("Member is Up: {}", member.address);
+  }
+  case UnreachableMember(member) => {
+      nodes -= member.address;
+      log.info("Member detected as unreachable: {}", member);
+  }
+  case MemberRemoved(member, previousStatus) => {
+      nodes -= member.address;
+      log.info("Member is Removed: {} after {}", member.address, previousStatus)
+  }
+  case _: MemberEvent => {}// ignore
+  case x:GetNodes => {
+      x.nodes = nodes;
+  }
   }
 }
 
@@ -43,4 +67,6 @@ def startup(ports: Seq[String]) = {
     }
 }
 
-val monitors = startup(Seq("2551","2552","0"))
+val seeds = startup(Seq("2551","2552"));
+    
+val gn = new GetNodes();
