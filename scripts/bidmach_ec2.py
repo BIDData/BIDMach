@@ -99,6 +99,9 @@ akka {
       "akka.tcp://ClusterSystem@%s:2551",
       "akka.tcp://ClusterSystem@%s:2552"]
   }
+  loglevel = DEBUG
+  loggers = ["akka.event.jul.JavaLogger"]
+  logging-filter = "akka.event.jul.JavaLoggingFilter"
 }
 # Disable legacy metrics in akka-cluster.
 #akka.cluster.metrics.enabled=off
