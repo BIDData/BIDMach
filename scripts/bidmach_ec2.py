@@ -99,7 +99,7 @@ akka {
       "akka.tcp://ClusterSystem@%s:2551",
       "akka.tcp://ClusterSystem@%s:2552"]
   }
-  loglevel = DEBUG
+  loglevel = INFO
   loggers = ["akka.event.jul.JavaLogger"]
   logging-filter = "akka.event.jul.JavaLoggingFilter"
 }
