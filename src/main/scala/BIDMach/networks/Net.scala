@@ -443,6 +443,7 @@ object Net  {
     var tensorFormat:Int = Net.TensorNHWC;
     var convType = CrossCorrelation;
     var inplace = NoInPlace;
+    var compute_input_gradient = false;
   }
    
   final val UseNetFormat = 0;

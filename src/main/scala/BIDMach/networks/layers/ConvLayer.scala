@@ -33,7 +33,6 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     var backwardfiltertime = 0.0;
     var backwarddatatime = 0.0;
     var bwdFilterWS:Mat = null;
-    var nearestImg : FMat = null;
 //    var outputDim:IMat = null; //Should be three numbers
 
   var cudnnMainHandle:cudnnHandle = null;
