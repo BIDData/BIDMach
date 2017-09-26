@@ -40,6 +40,10 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
             } 
         }                
     }
+    
+    def reshapeNCHW(a:Mat) = {
+        a.reshapeView(a.dims(1),a.dims(2),a.dims(0),a.dims(3))
+    }
        
     def getBestActivation(layer: ConvLayer, tensorFormat: Int) = {
         val dims = layer.output.dims;
@@ -63,16 +67,18 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
         val (d,ww,hh,n) = getBestActivation(layer, net.opts.tensorFormat)
         val nFilters = layer.output.dims(0);
         val ffilter = layer.ffilter;
-        val offset = net.layers(1).output.reshapeView(256,256,3,net.layers(1).output.dims(3));
-        val bl = net.layers(4) match {
-            case l:CropLayer=>l.blockInds;
-            case l:CropMirrorLayer=>l.blockInds
-        }
-        val idataOriginal = layer.inputData.reshapeView(layer.inputData.dims(1),layer.inputData.dims(2),
-                                    layer.inputData.dims(0),layer.inputData.dims(3))+
-                            offset(bl(1),bl(2),?,?)
-        val idata = layer.inputData.reshapeView(layer.inputData.dims(1),layer.inputData.dims(2),
-                                        layer.inputData.dims(0),layer.inputData.dims(3));            
+        val cropLayerId = net.layers.indexWhere(_.toString.startsWith("crop"))
+        val src = reshapeNCHW(net.layers(0).output);           
+        val idataOriginal = 
+            if (cropLayerId < 0 ) src
+            else {       
+                val bl = net.layers(cropLayerId) match {
+                    case l:CropLayer=>l.blockInds;
+                    case l:CropMirrorLayer=>l.blockInds
+                }
+                src(bl(1),bl(2),?,?)
+            }
+        val idata = reshapeNCHW(layer.inputData)
         val res = idata.zeros(irow(ffilter.inDims(1),ffilter.inDims(2),ffilter.inDims(0),nFilters));
         val resOri = idata.zeros(irow(ffilter.inDims(1),ffilter.inDims(2),ffilter.inDims(0),nFilters));
         for(k<-0 until nFilters){
