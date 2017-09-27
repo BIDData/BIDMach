@@ -72,7 +72,6 @@ object CaffeIO {
           }
           
           if (layer.getBlobsCount() > 0) {
-            // TODO: avoid hardcoding mat count
             if (!convNode.hasBias && layer.getBlobsCount() != 1) {
               throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
             }
@@ -86,11 +85,6 @@ object CaffeIO {
             val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
             val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
             // TODO: is this an abstraction barrier violation
-//            // Caffe stores filters in NCHW format in row-major order. Since we use column-major order, when we
-//            // read the filter in, it becomes WHCN format. Our filters use CHWN format internally, so we then do
-//            // the appropriate transposition.
-//            val filterDataWHCN = new FMat(shape.reverse, layer.getBlobs(0).getDataList().map(_.floatValue()).toArray)
-//            filter <-- filterDataWHCN.transpose(2, 1, 0, 3)
             layer.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
             modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
               val x = GFilter(filter)
@@ -198,7 +192,6 @@ object CaffeIO {
             hasBias = ipp.getBiasTerm()
           }
           if (layer.getBlobsCount() > 0) {
-            // TODO: avoid hardcoding mat count
             linNode.imodel = modelMats.length
             if (!linNode.hasBias) {
               if (layer.getBlobsCount() != 1) {
@@ -270,7 +263,6 @@ object CaffeIO {
       // XXX this should account for multiple bottom blobs
       if (layer.getBottomCount() >= 1) {
         val bottom = layer.getBottom(0)
-        // TODO: check this code further
         if (layer.getTopList().contains(bottom)) {
           val j = blobIterIndices.getOrElse(bottom, 0)
           curNode.inputs(0) = nodesWithTop(bottom)(j)
