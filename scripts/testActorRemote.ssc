@@ -100,3 +100,26 @@ implicit val timeout = Timeout(5 seconds)
 actorRefSec ! new SendToRemote(s"akka.tcp://$clusterName@127.0.0.1:2553/user/$actorName", 10)
 
 
+/**
+  * Deal with ips
+  */
+def findMasterIp(): String = {
+    import scala.collection.JavaConversions._
+    import java.nio.charset.Charset
+    import java.nio.file.{Files, Paths}
+    val masterFilePath = Paths.get("/code/BIDMach/conf", "master")
+    val charset = Charset.forName("ISO-8859-1")
+    val lines = Files.readAllLines(masterFilePath, charset)
+    lines(0)
+}
+
+def findCurrentIp(): String = {
+    import java.net._
+    val ip = InetAddress.getLocalHost()
+    ip.getHostAddress
+}
+
+println(findCurrentIp())
+println(findMasterIp())
+
+
