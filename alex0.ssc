@@ -32,7 +32,7 @@ opts.npasses = 80;
 //opts.nend = 10;
 opts.lrate = 1e-4f;
 opts.texp = 0f;
-opts.pstep = 0.001f
+opts.pstep = 0.05f
 opts.hasBias = true;
 opts.l2reg = 0.0005f;
 opts.vel_decay = 0.9f;
@@ -40,8 +40,8 @@ opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
 opts.convType = Net.CrossCorrelation;
-opts.inplace = Net.BackwardCaching;
-opts.inplace = Net.InPlace;
+//opts.inplace = Net.BackwardCaching;
+//opts.inplace = Net.InPlace;
 
 :silent
 
@@ -101,6 +101,24 @@ val sgd = nn.updater.asInstanceOf[Grad];
 import BIDMach.viz._
 
 nn.launchTrain;
+
+def load(net:Net,fname:String) {
+    for (i <- 0 until net.modelmats.length) {
+        val data = loadMat(fname+"modelmat%02d.lz4" format i);
+        net.modelmats(i)<--data
+    }
+}
+
+
+def run(){
+    java.lang.Thread.sleep(4000)
+    nn.pause
+    java.lang.Thread.sleep(500)
+    load(net,"models/alex32p/")
+    nn.unpause
+}
+run()
+val v = nn.add_plot(new FilterViz(5,bw=3)).asInstanceOf[FilterViz]
 
 println("Examine the 'nn' variable to track learning state.\n");
 
