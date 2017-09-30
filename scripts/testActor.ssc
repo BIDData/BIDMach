@@ -12,7 +12,7 @@ case class SendVal(val v:Int) {
 case class RecvVal(val v:Int) {
 }
 
-case class SendTo(val dest:ActorRef, val v:Int) {
+case class SendTo(val dest:String, val v:Int) {
 }
 
 case class GetVal() {
@@ -24,14 +24,16 @@ class TestActor extends Actor with ActorLogging {
     var v = 0;
     def receive = {
     case x:SendTo => {
-	    x.dest ! new SendVal(x.v);
+	    val sel = context.system.actorSelection(x.dest);
+	    sel ! new SendVal(x.v);
 	}
     case x:SendVal => {
 	    val m = new RecvVal(x.v * 2);
+	    println("Got a sendval msg");
 	    sender ! m;
 	}
     case x:RecvVal => {
-	    v = x.v;
+	    v =  x.v;
 	}
     case x:GetVal => {
 	    x.v = v;
