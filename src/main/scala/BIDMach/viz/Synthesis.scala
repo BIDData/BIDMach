@@ -12,7 +12,8 @@ import BIDMach.networks.layers._;
 
 class Synthesis(val name: String = "Input") extends Visualization{
     val plot = new Plot(name);
-    var lrate = 0.1f;
+    var lrate = 10f;
+    var iter = 10
     var _lrate: Mat = null;
     
     def check(model:Model, mats:Array[Mat]) = 1
@@ -35,11 +36,11 @@ class Synthesis(val name: String = "Input") extends Visualization{
         val layer = net.layers(0).asInstanceOf[InputLayer];
         val srcImg = utils.filter2img(layer.output(?,?,?,0->2)/256f-0.5f,net.opts.tensorFormat);
         _lrate(0,0) = lrate;
-        for(t<-0 until 10){
+        for(t<-0 until iter){
             net.forward;
             net.setderiv()
             net.backward(ipass, pos);
-            layer.output~layer.output + (layer.deriv *@ _lrate)
+            layer.output~layer.output - (layer.deriv *@ _lrate)
         }
         
         val img = srcImg \ utils.filter2img(layer.output(?,?,?,0->2)/256f-0.5f,net.opts.tensorFormat)
