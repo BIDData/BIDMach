@@ -30,7 +30,7 @@ class TestActor extends Actor with ActorLogging {
     case x:SendVal => {
 	    val m = new RecvVal(x.v * 2);
 	    println("%s got a sendval msg %d from %s" format (self, x.v, sender().toString));
-	    sender ! m;
+	    sender() ! m;
 	}
     case x:RecvVal => {
     	    println("%s got a recval msg %d from %s" format (self, x.v, sender().toString));
@@ -56,5 +56,5 @@ def startup(ports: Seq[String]) = {
     }
 }
 
-val nodes = startup(Seq("2553","2554"));
+val nodes = startup(Seq("2555","2556"));
     
