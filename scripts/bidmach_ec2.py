@@ -107,6 +107,7 @@ akka {
 #akka.cluster.metrics.enabled=off
 # Enable metrics extension in akka-cluster-metrics.
 #akka.extensions=["akka.cluster.metrics.ClusterMetricsExtension"]
+akka.cluster.jmx.multi-mbeans-in-same-jvm = on
 """
 
 
