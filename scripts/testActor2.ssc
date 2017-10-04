@@ -1,5 +1,6 @@
 import BIDMach.allreduce.TestActor
 import scala.io.Source
+import com.cedarsoftware.util.io.JsonReader
 
 val nodes = TestActor.startup(Seq("2555","2556"));
 
