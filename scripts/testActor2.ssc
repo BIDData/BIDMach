@@ -6,7 +6,10 @@ import com.typesafe.config.ConfigFactory
 
 
 val conf = ConfigFactory.load()
-val seedaddr = conf.getConfig("seed-nodes").withFallback(conf)
+val seeds = conf.getList("akka.cluster.seed-nodes").unwrapped
+val seedhostPort = seeds.get(0).toString
+val seedhost = seedhostPort.substring(0, seedhostPort.lastIndexOf(":"));
+
 
 //val sv = new TestActor.SendTo("akka.tcp://ClusterSystem@10.0.0.62:2553/user/testActor",101)
 
