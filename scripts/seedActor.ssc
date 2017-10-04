@@ -4,3 +4,7 @@ import BIDMach.allreduce.SeedActor
 val seeds = SeedActor.startup(Seq("2551","2552"));
     
 val gn = new SeedActor.GetNodes();
+
+def queryHosts() = {
+gn.query(seeds(0));
+}
