@@ -4,7 +4,7 @@ import scala.io.Source
 val nodes = TestActor.startup(Seq("2555","2556"));
 
 val json = Source.fromFile("/code/BIDMach/conf/application.conf").getLines.reduce(_+_)
-Object conf = JsonReader.jsonToJava(json, [(JsonReader.USE_MAPS): true])
+Object conf = JsonReader.jsonToJava(json){USE_MAPS=true}
 
 val sv = new TestActor.SendTo("akka.tcp://ClusterSystem@10.0.0.62:2553/user/testActor",101)
 
