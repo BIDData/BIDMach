@@ -1,4 +1,4 @@
-package sample.cluster.grid
+package BIDMach.allreduce
 
 import akka.actor.ActorRef
 
