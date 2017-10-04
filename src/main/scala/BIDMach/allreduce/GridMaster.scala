@@ -1,7 +1,8 @@
-package sample.cluster.grid
+package BIDMach.allreduce
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.Done
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, RootActorPath, Terminated}
 import akka.cluster.ClusterEvent.{CurrentClusterState, MemberUp}
 import akka.cluster.{Cluster, Member, MemberStatus}
@@ -29,17 +30,17 @@ class GridMaster extends Actor {
     // Organize grid
     case command: OrganizeGridWorker =>
       if (workers.isEmpty) {
-        sender() ! GridOrganizationFailed("No workers unavailable, try again later", command)
+        sender() ! GridOrganizationFailed("No workers available, try again later", command)
       } else {
         workers foreach { each =>
-          println(s"Sending neigbor addresses to work.. Worker $each has these neighbors: $workers")
           each ! GridNeighborAddresses(workers.toSeq)
         }
+        sender() ! Done
       }
 
     // Cluster management
     case state: CurrentClusterState =>
-      println(s"Getting current state $state")
+      println(s"Current state $state")
       state.members.filter(_.status != MemberStatus.Up) foreach register
 
     case MemberUp(m) => register(m)
