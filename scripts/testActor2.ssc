@@ -2,7 +2,7 @@ import BIDMach.allreduce.TestActor
 import scala.io.Source
 import com.typesafe.config.ConfigFactory
 
-val nodes = TestActor.startup(Seq("2553","2554"));
+val nodes = TestActor.startup(Seq("2555","2556"));
 
 
 val conf = ConfigFactory.load()

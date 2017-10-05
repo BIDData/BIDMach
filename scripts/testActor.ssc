@@ -8,8 +8,9 @@ val seeds = conf.getList("akka.cluster.seed-nodes").unwrapped
 val seedhostPort = seeds.get(0).toString
 val seedhost = seedhostPort.substring(0, seedhostPort.lastIndexOf(":"));
 
+val msize = 100000
+val sv = new TestActor.SendData(seedhost + ":2553/user/testActor",zeros(1,msize),100);
 
-val sv = new TestActor.SendTo(seedhost + ":2553/user/testActor",101)
 
 def sendIt() = {
     nodes(0) ! sv;
