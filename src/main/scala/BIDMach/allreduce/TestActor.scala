@@ -35,6 +35,7 @@ class TestActor extends Actor with ActorLogging {
 	    x.v = v;
 	}
     case x:DataPacket => {
+	    println("%s got a datapacket msg %d from %s" format (self, x.n, sender().toString));
 	    if (x.n > 0) {
 		val y = new DataPacket(x.d, x.n-1);
 		sender ! y;
