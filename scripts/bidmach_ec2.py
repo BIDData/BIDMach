@@ -86,6 +86,11 @@ akka_conf = """
 akka {
   actor {
     provider = "cluster"
+    serializers {
+      java = "akka.serialization.JavaSerializer"
+      proto = "akka.remote.serialization.ProtobufSerializer"
+      kryo = "akka.serialization.JavaSerializer"
+    }
   }
   remote {
     log-remote-lifecycle-events = off
