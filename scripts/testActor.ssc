@@ -9,7 +9,8 @@ val seedhostPort = seeds.get(0).toString
 val seedhost = seedhostPort.substring(0, seedhostPort.lastIndexOf(":"));
 
 val msize = 100000
-val sv = new TestActor.SendData(seedhost + ":2553/user/testActor",zeros(1,msize),10);
+//val sv = new TestActor.SendData(seedhost + ":2553/user/testActor",zeros(1,msize),10);
+val sv = new TestActor.SendTo(seedhost + ":2553/user/testActor",10);
 
 
 def sendIt() = {
