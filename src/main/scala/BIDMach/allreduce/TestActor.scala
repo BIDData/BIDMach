@@ -90,5 +90,8 @@ def startup(ports: Seq[String]) = {
 		actor
     }
 }
+def shutdown = {
+   actorSystems.map(_.terminate);
+}
 
 }
