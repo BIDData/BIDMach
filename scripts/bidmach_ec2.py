@@ -108,16 +108,16 @@ akka {
       # If set it will use the UnsafeInput and UnsafeOutput
       # The unsafe IO usually creates bigger payloads but is faster
       # for some types, e.g. native arrays.
-      use-unsafe = false
-      post-serialization-transformations = "lz4,aes"
+      use-unsafe = true
+      # post-serialization-transformations = "lz4"
       # Settings for aes encryption, if included in transformations AES
-      encryption {
-          aes {
-              mode = "AES/CBC/PKCS5Padding"
-              key = j68KkRjq21ykRGAQ
-              IV-length = 16
-          }
-      }
+      # encryption {
+      #    aes {
+      #        mode = "AES/CBC/PKCS5Padding"
+      #        key = j68KkRjq21ykRGAQ
+      #        IV-length = 16
+      #    }
+      # }
       # Log implicitly registered classes. Useful, if you want to know all
       implicit-registration-logging = false
       # If enabled, Kryo logs a lot of information about serialization process.

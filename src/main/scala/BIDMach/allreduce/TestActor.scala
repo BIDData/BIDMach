@@ -9,6 +9,7 @@ import BIDMat.SciFunctions._
 import com.typesafe.config.ConfigFactory
 import akka.event.Logging
 import akka.actor.ActorLogging
+import scala.collection.mutable.ListBuffer
 import TestActor._
 
 
@@ -70,6 +71,10 @@ case class DataPacket(val d:FMat, val n:Int) {}
 
 case class SendData(val dest:String, val d:FMat, val n:Int) {}
 
+val actorSystems = new ListBuffer[ActorSystem];
+
+val actors = new ListBuffer[ActorRef];
+
 def startup(ports: Seq[String]) = {
     ports map { port =>
 		// Override the configuration of the port
@@ -77,9 +82,12 @@ def startup(ports: Seq[String]) = {
 		withFallback(ConfigFactory.load())
 		
 		// Create an Akka system
-		val system = ActorSystem("ClusterSystem", config)
+		val system = ActorSystem("ClusterSystem", config);
+		actorSystems += system;
 		// Create an actor that handles cluster domain events
-		system.actorOf(Props[TestActor], name = "testActor")
+		val actor = system.actorOf(Props[TestActor], name = "testActor");
+		actors += actor;
+		actor
     }
 }
 
