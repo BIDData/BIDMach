@@ -116,7 +116,6 @@ akka {
               mode = "AES/CBC/PKCS5Padding"
               key = j68KkRjq21ykRGAQ
               IV-length = 16
-              custom-key-class = "CustomAESKeyClass"
           }
       }
       # Log implicitly registered classes. Useful, if you want to know all
