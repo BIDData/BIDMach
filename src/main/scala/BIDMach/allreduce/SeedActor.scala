@@ -6,6 +6,7 @@ import akka.cluster.ClusterEvent._
 import com.typesafe.config.ConfigFactory
 import akka.event.Logging
 import akka.actor.ActorLogging
+import scala.collection.mutable.ListBuffer
 import SeedActor._
 
 
@@ -49,6 +50,10 @@ class SeedActor extends Actor with ActorLogging {
 }
 
 object SeedActor {
+val actorSystems = new ListBuffer[ActorSystem];
+
+val actors = new ListBuffer[ActorRef];
+
 case class GetNodes() {
   var nodes:Set[Address] = null;
 
@@ -66,8 +71,11 @@ def startup(ports: Seq[String]) = {
 		
 		// Create an Akka system
 		val system = ActorSystem("ClusterSystem", config)
+		actorSystems += system
 		// Create an actor that handles cluster domain events
-		system.actorOf(Props[SeedActor], name = "clusterListener")
+		val actor = system.actorOf(Props[SeedActor], name = "clusterListener")
+		actors += actor
+		actor
     }
 }
 }
