@@ -98,23 +98,18 @@ akka {
     kryo  {
       # Possibles values for type are: graph or nograph
       type = "graph"
-
       # Possible values for idstrategy are:
       # default, explicit, incremental, automatic
       idstrategy = "default"
-
       # Define a default size for byte buffers used during serialization
       buffer-size = 4096
       max-buffer-size = -1
       use-manifests = false
-
       # If set it will use the UnsafeInput and UnsafeOutput
       # The unsafe IO usually creates bigger payloads but is faster
       # for some types, e.g. native arrays.
       use-unsafe = false
-
       post-serialization-transformations = "lz4,aes"
-
       # Settings for aes encryption, if included in transformations AES
       encryption {
           aes {
@@ -124,19 +119,14 @@ akka {
               custom-key-class = "CustomAESKeyClass"
           }
       }
-
       # Log implicitly registered classes. Useful, if you want to know all
       implicit-registration-logging = false
-
       # If enabled, Kryo logs a lot of information about serialization process.
       kryo-trace = false
-
       # If proviced, Kryo uses the class specified by a fully qualified
-      kryo-custom-serializer-init = "CustomKryoSerializerInitFQCN"
-
+      # kryo-custom-serializer-init = "CustomKryoSerializerInitFQCN"
       # If enabled, allows Kryo to resolve subclasses of registered Types.
       resolve-subclasses = false
-
     }
   }
   remote {
