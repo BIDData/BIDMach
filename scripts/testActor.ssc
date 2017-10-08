@@ -10,7 +10,7 @@ val seedhost = seedhostPort.substring(0, seedhostPort.lastIndexOf(":"));
 
 // The default message size for Akka is about 100 kB, so stay under 25k.
 val msize = 20000
-val sv = new TestActor.SendData(seedhost + ":2553/user/testActor",zeros(1,msize),1000);
+val sv = new TestActor.SendData(seedhost + ":2553/user/testActor",rand(1,msize),1000);
 //val sv = new TestActor.SendTo(seedhost + ":2553/user/testActor",10);
 
 
