@@ -81,10 +81,13 @@ object GridMaster {
     system.scheduler.schedule(2.seconds, 2.seconds) {
       implicit val timeout = Timeout(5 seconds)
       (master ? OrganizeGridWorker("counter-" + counter.incrementAndGet())) onComplete {
-        case Success(result) => println(result)
+        case Success(result) => println(s"Master at $port: $result")
         case Failure(e) => println(s"Error $e")
       }
     }
+  }
 
+  def startUp(ports: List[String] = List("2551","2552")): Unit = {
+    ports foreach( eachPort => main(Array(eachPort)))
   }
 }

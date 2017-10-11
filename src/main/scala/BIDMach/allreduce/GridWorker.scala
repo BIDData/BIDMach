@@ -53,6 +53,7 @@ object GridWorker {
     val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [worker]")).
       withFallback(ConfigFactory.load())
+    //src/resources/conf/application.conf
 
     val system = ActorSystem("ClusterSystem", config)
     val backend = system.actorOf(Props[GridWorker], name = "worker")
@@ -64,4 +65,10 @@ object GridWorker {
       }
     }
   }
+
+  def startUp() = {
+    main(Array())
+  }
+
+
 }
