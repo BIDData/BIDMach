@@ -38,124 +38,9 @@ object CaffeIO {
     val nodesWithTop = new mutable.HashMap[String,mutable.Buffer[Node]]
     for (layer <- netParam.getLayerList()) {
       layer.getType() match {
-        case "Convolution" => {
-          val convParam = layer.getConvolutionParam()
-          
-          val convNode = new ConvNode {
-            noutputs = convParam.getNumOutput()
-            hasBias = convParam.getBiasTerm()
-            if (convParam.hasPadW()) {
-              pad = convParam.getPadW() \ convParam.getPadH()
-            } else if (convParam.getPadCount() == 0) {
-              pad = irow(0)
-            } else {
-              pad = irow(convParam.getPadList().map(_.intValue()).toList)
-            }
-            if (convParam.hasKernelW()) {
-              kernel = convParam.getKernelW() \ convParam.getKernelH()
-            } else {
-              kernel = irow(convParam.getKernelSizeList().map(_.intValue()).toList)
-            }
-            if (convParam.hasStrideW()) {
-              stride = convParam.getStrideW() \ convParam.getStrideH()
-            } else if (convParam.getStrideCount() == 0) {
-              pad = irow(1)
-            } else {
-              stride = irow(convParam.getStrideList().map(_.intValue()).toList)
-            }
-            dilation = irow(convParam.getDilationList().map(_.intValue()).toList)
-            
-            // BIDMach (currently) only supports xavier initialization
-            if (convParam.getWeightFiller().getType() != "xavier") {
-              throw new NotImplementedError("Only xavier initialization is currently implemented for convolution layers")
-            }
-          }
-          
-          if (layer.getBlobsCount() > 0) {
-            if (!convNode.hasBias && layer.getBlobsCount() != 1) {
-              throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
-            }
-            if (convNode.hasBias && layer.getBlobsCount() != 2) {
-              throw new IllegalArgumentException("Convolution layer with bias needs 2 matrices")
-            }
-            
-            convNode.imodel = modelMats.length
-
-            // TODO: avoid duplicating code with ConvLayer here
-            val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
-            val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
-            // TODO: is this an abstraction barrier violation
-            layer.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
-            modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
-              val x = GFilter(filter)
-              x.convType = convNode.convType
-              x.setTensorFormat(Net.getCUDNNformat(convNode.tensorFormat, net.opts.tensorFormat));
-              x
-            } else {
-              filter
-            })
-            
-            if (convNode.hasBias) {
-              val n = layer.getBlobs(1).getShape().getDim(0).toInt
-              modelMats += blob2Mat(layer.getBlobs(1)).reshapeView(n, 1, 1, 1)
-            } else {
-              modelMats += null
-            }
-          }
-          
-          nodes += convNode
-        }
-        case "Pooling" => {
-          val poolingParam = layer.getPoolingParam()
-          nodes += new PoolingNode {
-            if (poolingParam.hasPadH()) {
-              pady = poolingParam.getPadH()
-              padx = poolingParam.getPadW()
-            } else {
-              pady = poolingParam.getPad()
-              padx = pady
-            }
-            
-            if (poolingParam.hasKernelH()) {
-              h = poolingParam.getKernelH()
-              w = poolingParam.getKernelW()
-            } else {
-              h = poolingParam.getKernelSize()
-              w = h
-            }
-            
-            if (poolingParam.hasStrideH()) {
-              stridey = poolingParam.getStrideH()
-              stridex = poolingParam.getStrideW()
-            } else {
-              stridey = poolingParam.getStride()
-              stridex = stridey
-            }
-
-            poolingMode = poolingParam.getPool() match {
-              case PoolMethod.MAX => cudnnPoolingMode.CUDNN_POOLING_MAX
-              case PoolMethod.AVE => cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
-              case PoolMethod.STOCHASTIC => throw new NotImplementedError("Stochastic pooling is not supported yet")
-            }
-          }
-        }
-        case "LRN" => {
-          val lrnParam = layer.getLrnParam()
-          if (lrnParam.getNormRegion() == NormRegion.WITHIN_CHANNEL) {
-            nodes += new LRNwithinNode {
-              dim = lrnParam.getLocalSize()
-              alpha = lrnParam.getAlpha()
-              beta = lrnParam.getBeta()
-            }
-          } else {
-            nodes += new LRNacrossNode {
-              dim = lrnParam.getLocalSize()
-              alpha = lrnParam.getAlpha()
-              beta = lrnParam.getBeta()
-              k = lrnParam.getK()
-            }
-          }
-        }
+        case "Convolution" => translateConvolution(layer, nodes, modelMats, net)
+        case "Pooling" => translatePooling(layer, nodes)
+        case "LRN" => translateLRN(layer, nodes)
         case "BatchNorm" => {
           val bnParam = layer.getBatchNormParam()
           nodes += new BatchNormNode {
@@ -185,42 +70,7 @@ object CaffeIO {
         case "MemoryData" => nodes += new InputNode
         case "HDF5Data" => nodes += new InputNode
 
-        case "InnerProduct" => {
-          val ipp = layer.getInnerProductParam()
-          val linNode = new LinNode {
-            outdim = ipp.getNumOutput()
-            hasBias = ipp.getBiasTerm()
-          }
-          if (layer.getBlobsCount() > 0) {
-            linNode.imodel = modelMats.length
-            if (!linNode.hasBias) {
-              if (layer.getBlobsCount() != 1) {
-                throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
-              }
-              addMatsFromBlobs(modelMats, linNode, layer)
-              modelMats += null
-            } else {
-              if (layer.getBlobsCount() != 2) {
-                throw new IllegalArgumentException("Linear layer without bias needs 2 matrices")
-              }
-              if (layer.getBlobs(0).getShape().getDim(0) != layer.getBlobs(1).getShape().getDim(0)) {
-                throw new IllegalArgumentException("Weight and bias dimensions for linear layer don't agree")
-              }
-              if ((layer.getBlobs(0).getDoubleDataCount() > 0) != (layer.getBlobs(1).getDoubleDataCount() > 0)) {
-                throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
-              }
-              
-              // We unfortunately can't use addMatsFromBlobs here because Caffe's bias blob is 1D, while BIDMach wants
-              // a 2D bias where the second dimension is 1.
-              val outDim = layer.getBlobs(0).getShape().getDim(0).intValue()
-              val weightMat = blob2Mat(layer.getBlobs(0))
-              val biasMat = blob2Mat(layer.getBlobs(1)).reshape(outDim, 1)
-              modelMats += weightMat
-              modelMats += biasMat
-            }
-          }
-          nodes += linNode
-        }
+        case "InnerProduct" => translateInnerProduct(layer, nodes, modelMats)
         case "Split" => nodes += new CopyNode
         case "Softmax" => nodes += new SoftmaxNode
         case "Dropout" => {
@@ -329,6 +179,164 @@ object CaffeIO {
       net.setmodelmats(modelMats.toArray)
       net.opts.nmodelmats = modelMats.length
     }
+  }
+  
+  private def translateConvolution(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node], modelMats:mutable.Buffer[Mat], net:Net) = {
+    val convParam = layer.getConvolutionParam()
+    
+    val convNode = new ConvNode {
+      noutputs = convParam.getNumOutput()
+      hasBias = convParam.getBiasTerm()
+      if (convParam.hasPadW()) {
+        pad = convParam.getPadW() \ convParam.getPadH()
+      } else if (convParam.getPadCount() == 0) {
+        pad = irow(0)
+      } else {
+        pad = irow(convParam.getPadList().map(_.intValue()).toList)
+      }
+      if (convParam.hasKernelW()) {
+        kernel = convParam.getKernelW() \ convParam.getKernelH()
+      } else {
+        kernel = irow(convParam.getKernelSizeList().map(_.intValue()).toList)
+      }
+      if (convParam.hasStrideW()) {
+        stride = convParam.getStrideW() \ convParam.getStrideH()
+      } else if (convParam.getStrideCount() == 0) {
+        pad = irow(1)
+      } else {
+        stride = irow(convParam.getStrideList().map(_.intValue()).toList)
+      }
+      dilation = irow(convParam.getDilationList().map(_.intValue()).toList)
+      
+      // BIDMach (currently) only supports xavier initialization
+      if (convParam.getWeightFiller().getType() != "xavier") {
+        throw new NotImplementedError("Only xavier initialization is currently implemented for convolution layers")
+      }
+    }
+    
+    if (layer.getBlobsCount() > 0) {
+      if (!convNode.hasBias && layer.getBlobsCount() != 1) {
+        throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
+      }
+      if (convNode.hasBias && layer.getBlobsCount() != 2) {
+        throw new IllegalArgumentException("Convolution layer with bias needs 2 matrices")
+      }
+      
+      convNode.imodel = modelMats.length
+
+      // TODO: avoid duplicating code with ConvLayer here
+      val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
+      val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
+      // TODO: is this an abstraction barrier violation
+      layer.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
+      modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
+        val x = GFilter(filter)
+        x.convType = convNode.convType
+        x.setTensorFormat(Net.getCUDNNformat(convNode.tensorFormat, net.opts.tensorFormat));
+        x
+      } else {
+        filter
+      })
+      
+      if (convNode.hasBias) {
+        val n = layer.getBlobs(1).getShape().getDim(0).toInt
+        modelMats += blob2Mat(layer.getBlobs(1)).reshapeView(n, 1, 1, 1)
+      } else {
+        modelMats += null
+      }
+    }
+    
+    nodes += convNode
+  }
+  
+  private def translatePooling(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node]) = {
+    val poolingParam = layer.getPoolingParam()
+    nodes += new PoolingNode {
+      if (poolingParam.hasPadH()) {
+        pady = poolingParam.getPadH()
+        padx = poolingParam.getPadW()
+      } else {
+        pady = poolingParam.getPad()
+        padx = pady
+      }
+      
+      if (poolingParam.hasKernelH()) {
+        h = poolingParam.getKernelH()
+        w = poolingParam.getKernelW()
+      } else {
+        h = poolingParam.getKernelSize()
+        w = h
+      }
+      
+      if (poolingParam.hasStrideH()) {
+        stridey = poolingParam.getStrideH()
+        stridex = poolingParam.getStrideW()
+      } else {
+        stridey = poolingParam.getStride()
+        stridex = stridey
+      }
+
+      poolingMode = poolingParam.getPool() match {
+        case PoolMethod.MAX => cudnnPoolingMode.CUDNN_POOLING_MAX
+        case PoolMethod.AVE => cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
+        case PoolMethod.STOCHASTIC => throw new NotImplementedError("Stochastic pooling is not supported yet")
+      }
+    }
+  }
+  
+  private def translateLRN(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node]) = {
+    val lrnParam = layer.getLrnParam()
+    if (lrnParam.getNormRegion() == NormRegion.WITHIN_CHANNEL) {
+      nodes += new LRNwithinNode {
+        dim = lrnParam.getLocalSize()
+        alpha = lrnParam.getAlpha()
+        beta = lrnParam.getBeta()
+      }
+    } else {
+      nodes += new LRNacrossNode {
+        dim = lrnParam.getLocalSize()
+        alpha = lrnParam.getAlpha()
+        beta = lrnParam.getBeta()
+        k = lrnParam.getK()
+      }
+    }
+  }
+  
+  private def translateInnerProduct(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node], modelMats:mutable.Buffer[Mat]) = {
+    val ipp = layer.getInnerProductParam()
+    val linNode = new LinNode {
+      outdim = ipp.getNumOutput()
+      hasBias = ipp.getBiasTerm()
+    }
+    if (layer.getBlobsCount() > 0) {
+      linNode.imodel = modelMats.length
+      if (!linNode.hasBias) {
+        if (layer.getBlobsCount() != 1) {
+          throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
+        }
+        addMatsFromBlobs(modelMats, linNode, layer)
+        modelMats += null
+      } else {
+        if (layer.getBlobsCount() != 2) {
+          throw new IllegalArgumentException("Linear layer without bias needs 2 matrices")
+        }
+        if (layer.getBlobs(0).getShape().getDim(0) != layer.getBlobs(1).getShape().getDim(0)) {
+          throw new IllegalArgumentException("Weight and bias dimensions for linear layer don't agree")
+        }
+        if ((layer.getBlobs(0).getDoubleDataCount() > 0) != (layer.getBlobs(1).getDoubleDataCount() > 0)) {
+          throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
+        }
+        
+        // We unfortunately can't use addMatsFromBlobs here because Caffe's bias blob is 1D, while BIDMach wants
+        // a 2D bias where the second dimension is 1.
+        val outDim = layer.getBlobs(0).getShape().getDim(0).intValue()
+        val weightMat = blob2Mat(layer.getBlobs(0))
+        val biasMat = blob2Mat(layer.getBlobs(1)).reshape(outDim, 1)
+        modelMats += weightMat
+        modelMats += biasMat
+      }
+    }
+    nodes += linNode
   }
   
   /**
