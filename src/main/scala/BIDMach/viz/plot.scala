@@ -1,4 +1,6 @@
 package BIDMach.viz
+/**
+**/
 
 import BIDMat.{BMat,Mat,SBMat,CMat,DMat,FMat,FFilter,IMat,HMat,GDMat,GFilter,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat,Image}
 import BIDMat.MatFunctions._
@@ -9,6 +11,7 @@ import BIDMach.Learner
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
 import javax.swing._;
+import javax.swing.event._
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.view.mxGraph;
 import scala.collection.mutable.HashMap
@@ -60,14 +63,20 @@ class GraphFrame(val layers:Array[HashMap[String,Any]])extends JFrame("Graph"){
 }
 
 class Plot(name: String = "plot") {
+    val id = {Plot.tot+=1;Plot.tot}
     val frame = new JFrame(name)
     var img: BufferedImage = null
-    
+    var server = {if (Plot.server == null) Plot.server = new WebServer(); Plot.server}
+    val imgPanel = new JPanel();frame.getContentPane().add(imgPanel)
+    val controlPanel = new JPanel();frame.getContentPane().add(controlPanel)
+    frame.getContentPane().setLayout(new BoxLayout(frame.getContentPane(),BoxLayout.PAGE_AXIS))        
+    controlPanel.setLayout(new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS))        
+        
     def plot_image(data:IMat) {
         if (img == null || img.getWidth != data.ncols || img.getHeight != data.nrows){
             img = new BufferedImage(data.ncols,data.nrows,BufferedImage.TYPE_INT_ARGB)
-            frame.getContentPane().removeAll
-            frame.getContentPane().add(new JLabel(new ImageIcon(img)))
+            imgPanel.removeAll
+            imgPanel.add(new JLabel(new ImageIcon(img)))
             frame.pack()
             frame.setVisible(true);
         }
@@ -75,6 +84,26 @@ class Plot(name: String = "plot") {
         val datat = data.t;
         Array.copy(datat.data,0,buf,0,buf.length);
         frame.repaint();
+        plot_web(data)
+    }
+    
+    def plot_web(data:IMat) {
+        //server.send(scala.util.parsing.json.JSONObject())
+    }    
+    
+    def add_slider(name:String,callback:Int=>Unit) {
+        val p = new JPanel();
+        val sliderLabel = new JLabel(name, SwingConstants.CENTER);
+        val slider = new JSlider(SwingConstants.HORIZONTAL,0,100,50);
+        slider.addChangeListener(new ChangeListener{
+                                    override def stateChanged(e:ChangeEvent){
+                                        val source = e.getSource().asInstanceOf[JSlider];
+                                        callback(source.getValue())
+                                    }})
+        p.add(sliderLabel);
+        p.add(slider);
+        controlPanel.add(p)
+        frame.pack                        
     }
 }
 
@@ -85,6 +114,7 @@ object Plot{
     var currentLearner: Learner = null 
     var currentNet: Net = null   
     val d3category10 = Array(2062260, 16744206, 2924588, 14034728, 9725885, 9197131, 14907330, 8355711, 12369186, 1556175)
+    var server: WebServer = null    
     //https://github.com/d3/d3-scale/blob/master/README.md#schemeCategory10
     //val color=Array("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
 

@@ -67,7 +67,7 @@ object utils {
     
   def getV(f:Double) = {
       val d = (f*256).toInt+128;
-      if (d>255) 255 else d
+      if (d>255) 255 else if (d<0) 0 else d
   }  
     
   def filter2img(data: Mat, tensorFormat: Int, bw: Int = 1) = {
@@ -88,12 +88,16 @@ object utils {
                     val jj = j*w+c
                     //println(i,j,ii,jj,out.nrows,out.ncols)
                         
-                    val ind = c+w*r+k*w*h*3
-                    var res = getV(new_data.data(ind))
-                    res += getV(new_data.data(ind+w*h))*256
-                    res += getV(new_data.data(ind+w*h*2))*256*256
+                    val ind = c+w*r+k*w*h*in_channel
+                    var res = getV(new_data.data(ind));
+                    if (in_channel == 3) {                           
+                        res += getV(new_data.data(ind+w*h))*256
+                        res += getV(new_data.data(ind+w*h*2))*256*256
+                    }                         
+                    else {
+                        res = res * (1+256+256*256)
+                    }
                     res += 255*256*256*256
-                        
                     /*var res  = getV(new_data(c,r,0,k).dv)
                     res += getV(new_data(c,r,1,k).dv)*256
                     res += getV(new_data(c,r,2,k).dv)*256*256

@@ -16,6 +16,7 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
     var bestImgOri: Mat = null;
     var filter_scale = 1f        
     var _filter_scale: Mat = null;
+    val ind = irow(0)
         
     override def check(model:Model, mats:Array[Mat]) = {
         model match {
@@ -54,12 +55,15 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
         val w = irow(id.data.map(_%dims(1)));  
         val h = irow(id.data.map(_%(dims(1)*dims(2))/dims(1)));  
         val n = irow(id.data.map(_/(dims(1)*dims(2))));
+        //val i0 = i.asInstanceOf[IMat]
         val ffilter = layer.ffilter;
-        val ww = -ffilter.pad(1) + (w+ffilter.outPad(1)) * ffilter.stride(1);
+//        val ww = i0+0;ww<--( -ffilter.pad(1) + (w+ffilter.outPad(1)) * ffilter.stride(1) );
+        val ww = ( -ffilter.pad(1) + (w+ffilter.outPad(1)) * ffilter.stride(1) );
         ww~ww+(ww<0);
-        val hh = -ffilter.pad(2) + (h+ffilter.outPad(2)) * ffilter.stride(2);
+        //val hh = i0+1;hh<--( -ffilter.pad(2) + (h+ffilter.outPad(2)) * ffilter.stride(2) );
+        val hh = ( -ffilter.pad(2) + (h+ffilter.outPad(2)) * ffilter.stride(2) );
         hh~hh+(hh<0);
-        (d,ww,hh,n)        
+        (d,ww,hh,n)
     }
     
     def getBestImg(net:Net) = {
@@ -69,7 +73,7 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
         val ffilter = layer.ffilter;
         val cropLayerId = net.layers.indexWhere(_.toString.startsWith("crop"))
         val src = reshapeNCHW(net.layers(0).output);           
-        val idataOriginal = 
+        val idataOriginal = cpu(
             if (cropLayerId < 0 ) src
             else {       
                 val bl = net.layers(cropLayerId) match {
@@ -77,13 +81,14 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
                     case l:CropMirrorLayer=>l.blockInds
                 }
                 src(bl(1),bl(2),?,?)
-            }
-        val idata = reshapeNCHW(layer.inputData)
+            })
+        val idata = cpu(reshapeNCHW(layer.inputData))
         val res = idata.zeros(irow(ffilter.inDims(1),ffilter.inDims(2),ffilter.inDims(0),nFilters));
         val resOri = idata.zeros(irow(ffilter.inDims(1),ffilter.inDims(2),ffilter.inDims(0),nFilters));
         for(k<-0 until nFilters){
-            res(?,?,?,k) = idata(ww(k)->(ww(k)+ffilter.inDims(1)),hh(k)->(hh(k)+ffilter.inDims(2)),?,n(k))                 
-            resOri(?,?,?,k) = idataOriginal(ww(k)->(ww(k)+ffilter.inDims(1)),hh(k)->(hh(k)+ffilter.inDims(2)),?,n(k))    
+            ind(0)=k
+            res(?,?,?,ind) = idata(ww(k)->(ww(k)+ffilter.inDims(1)),hh(k)->(hh(k)+ffilter.inDims(2)),?,n(k))                 
+            resOri(?,?,?,ind) = idataOriginal(ww(k)->(ww(k)+ffilter.inDims(1)),hh(k)->(hh(k)+ffilter.inDims(2)),?,n(k))    
         }
         (res.reshapeView(ffilter.inDims(0),ffilter.inDims(1),ffilter.inDims(2),nFilters),
         resOri.reshapeView(ffilter.inDims(0),ffilter.inDims(1),ffilter.inDims(2),nFilters))
@@ -98,18 +103,18 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
         val aa = a.reshapeView(a.nrows,a.ncols);
         val bb = b.reshapeView(b.nrows,b.ncols);
         aa~aa*@(1-comp);
-        aa~aa+(bb*@comp)
+        aa~aa +(bb*@comp)
     }
     
     def getBestImgAll(net: Net) = {
-        val (res,resOri) = getBestImg(net);        
+        val (res,resOri) = getBestImg(net);   
         if (bestImg == null){
             bestImg = res.zeros(res.dims);
             bestImgOri = resOri.zeros(resOri.dims)
         }
         val layer = net.layers(layerId).asInstanceOf[ConvLayer];
-        val filter = net.modelmats(layer.imodel)
-        val comp = sum(bestImg*@filter)<=sum(res*@filter);
+        val filter = cpu(net.modelmats(layer.imodel))
+        val comp = (sum(bestImg*@filter)<=sum(res*@filter));
         merge(bestImg,res,comp);
         merge(bestImgOri,resOri,comp);
         utils.filter2img((bestImgOri/256f-0.5f),net.opts.tensorFormat,bw)

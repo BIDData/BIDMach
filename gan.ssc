@@ -1,0 +1,37 @@
+import BIDMach.viz._
+
+
+def start(name:String = "cifar") = {
+    val s=new Synthesis(modelname=name)
+    s.init(model,null)
+    s
+}
+
+import BIDMach.networks.layers._
+def score(layer:Layer) = {
+    val inds = int(layer.target) + layer.asInstanceOf[SoftmaxOutputLayer].coloffsets;
+    mean(layer.output(inds))
+}
+
+
+def pimg(s:Synthesis) = {
+    val d = FMat(s.D.layers(0).output(?,?,?,s.ten)).data.max
+    val img = utils.filter2img(s.D.layers(0).output(?,?,?,s.ten)/d-0.5f,s.D.opts.tensorFormat);
+    s.plot.plot_image(img)
+}
+
+def gen(s:Synthesis,random:Boolean = true) = {
+    s.generate(model,random)
+    pimg(s)
+    //(score(s.D.output_layers(0)),score(model.output_layers(0)))    
+    (mean(s.D.output_layers(0).score),mean(model.output_layers(0).score))    
+}
+
+
+import scala.collection.mutable.ListBuffer   
+
+def plotscore(score:ListBuffer[Float]){
+    plot(()=>FMat(Array(1,score.length),score.toArray))
+}
+
+//val s = start
