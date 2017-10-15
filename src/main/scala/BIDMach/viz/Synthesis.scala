@@ -34,7 +34,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var dWeight = 1f;
     var _dWeight: Mat = null;        
     var noise: Mat = null;
-    var done = false
+    var done = false;
+    var ipass = 0;
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -99,7 +100,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }
     }
     
-    def generate(model:Model,random: Boolean = true) = {
+    def generate(model:Model,random: Boolean = true,targetScore:Float = 0.75f) = {
         val net = model.asInstanceOf[Net];
         reset(random);
         if (!random)
@@ -108,7 +109,9 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         D.output_layers(0).target(?)=1;
         accClassifier(?) = 0;
         accDiscriminator(?) = 0;
-        for(t<-0 until iter){
+        var curScore = 0f;
+        var t = 0;
+        while(curScore < targetScore && t < iter){
             net.forward;
             net.layers(0).deriv.clear;
             net.setderiv()
@@ -117,12 +120,13 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             D.layers(0).deriv.clear;
             D.setderiv()
             D.backward(0, 0);
+            curScore = mean(D.output_layers(0).output(1,?)).dv.toFloat;  
             _lrate(0,0) = lrate;
             _langevin(0,0) = langevin;
             accClassifier ~ (accClassifier * 0.9f) + ((net.layers(0).deriv *@ net.layers(0).deriv) * 0.1f);
             accDiscriminator ~ (accDiscriminator * 0.9f) + ((D.layers(0).deriv *@ D.layers(0).deriv) * 0.1f);
-            net.layers(0).deriv ~ net.layers(0).deriv / ((accClassifier+1e-7f)^0.5f);
-            D.layers(0).deriv ~ D.layers(0).deriv / ((accDiscriminator+1e-7f)^0.5f);
+            net.layers(0).deriv ~ net.layers(0).deriv / ((accClassifier+1e-5f)^0.5f);
+            D.layers(0).deriv ~ D.layers(0).deriv / ((accDiscriminator+1e-5f)^0.5f);
             _dWeight(0,0) = dWeight;
             val grad = net.layers(0).deriv + (_dWeight *@ D.layers(0).deriv)
             normrnd(0,langevin,noise);
@@ -141,7 +145,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 d(1->s,?,?,0) = (d(0->(s-1),?,?,0) + d(1->s,?,?,0))*0.5f
                 d(?,1->s,?,0) = (d(?,0->(s-1),?,0) + d(?,1->s,?,0))*0.5f
             }
-                
+            t += 1   
             D.layers(0).output<--net.layers(0).output
         }
         net.layers(0).output
@@ -150,28 +154,42 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     def trainD() = {
         val ds = D.datasource;
         done = true
+        ipass += 1
         for(t<-0 until 1){
             ds.reset;
             var here = 0
             while (ds.hasNext && done) {
-                here += ds.opts.batchSize
-                val batch = ds.next
-                batch(1)(?) = 1;
+                val batchSize = ds.opts.batchSize
+                here += batchSize
+                val batch = ds.next;
+                val data = if (here/ds.opts.batchSize % 2 == 0) generate(_net,targetScore = 0.7f); else generate(_net,targetScore = 0.2f);
+                val gscore = mean(D.output_layers(0).output(1,?)).dv.toFloat;
+                gscores+=gscore;
+                /*batch(1)(?) = 1;
+                batch(0)(?,?,?,0->(batchSize/2)) = cpu(data(?,?,?,0->(batchSize/2)))
+                batch(1)(?,0->(batchSize/2)) = 0;                
                 D.layers(0).deriv.clear;
-                D.dobatchg(batch,here,0);
-                updater.update(0,here,0);     
-                val dloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;                
+                D.dobatchg(batch,here,0);*/
+                D.layers(0).output(?,?,?,(batchSize/2)->batchSize) = batch(0)(?,?,?,0->(batchSize/2))
+                D.output_layers(0).target(?) = 1
+                D.output_layers(0).target(?,0->(batchSize/2)) = 0; 
+                D.layers(0).deriv.clear;
+                D.forward;D.setderiv();D.backward(0, 0);
+                updater.update(ipass,here,0);     
+                val dscore = mean(D.output_layers(0).score).dv.toFloat
+                dscores+=dscore
+                
+                /*val dloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;                
                 val dscore = mean(D.output_layers(0).score).dv.toFloat
                 dscores+=dscore
                     
-                val data = generate(_net);
                 D.output_layers(0).target(?) = 0;
                 D.layers(0).deriv.clear;
                 D.forward;D.setderiv();D.backward(0, 0);
                 val gloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 val gscore = mean(D.output_layers(0).score).dv.toFloat
                 gscores+=gscore;
-                updater.update(0,here,0);
+                updater.update(0,here,0);*/
                 if (here/ds.opts.batchSize % 20 == 0 ) {
                     println("Trained %d samples. Real samples score: %.3f, Generate samples score: %.3f".format(here,dscore,gscore));
                     val img = utils.filter2img(D.layers(0).output(?,?,?,ten)/256f-0.5f,D.opts.tensorFormat);
@@ -228,7 +246,7 @@ object Synthesis {
         opts.lrate = 1e-4f;
         opts.vel_decay = 0.9f
         opts.gsq_decay = 0.99f
-        opts.texp = 0.0f
+        opts.texp = 0.1f
         Mat.useCache = true;
         Mat.useGPUcache = true;
 
@@ -277,14 +295,14 @@ object Synthesis {
         val opts = new MyOpts;
         val ds = new MatSource(Array(train0, trainlabels0), opts);
         val updater = new ADAGrad(opts);
-        opts.batchSize = 100;
+        opts.batchSize = 32;
         opts.hasBias = true;
         opts.tensorFormat = Net.TensorNCHW;
         opts.convType = Net.CrossCorrelation;
-        opts.lrate = 1e-4f;
+        opts.lrate = 1e-3f;
         opts.vel_decay = 0.9f;
         opts.gsq_decay = 0.99f;
-        opts.texp = 0.0f;
+        opts.texp = 0.1f
         Mat.useCache = true;
         Mat.useGPUcache = true;
 
@@ -295,30 +313,32 @@ object Synthesis {
 
             val in = input;
 
-            val conv1 = conv(in)(w=5,h=5,nch=6,stride=1,pad=2,initv=0.01f,convType=convt);
+            val conv1 = conv(in)(w=5,h=5,nch=32,stride=1,pad=2,initv=0.01f,convType=convt);
             val pool1 = pool(conv1)(w=2,h=2,stride=2,pad=0);
-            val bns1 = batchNormScale(pool1)();
-            val relu1 = relu(bns1)();
+//            val bns1 = batchNormScale(pool1)();
+            val relu1 = relu(pool1)();
 
-            val conv2 = conv(relu1)(w=5,h=5,nch=16,stride=1,pad=2,convType=convt);   
+            val conv2 = conv(relu1)(w=5,h=5,nch=64,stride=1,pad=2,convType=convt);   
             val pool2 = pool(conv2)(w=2,h=2,stride=2,pad=0);
-            val bns2 = batchNormScale(pool2)();
-            val relu2 = relu(bns2)();
+//            val bns2 = batchNormScale(pool2)();
+            val relu2 = relu(pool2)();
 
-            val fc3 = linear(relu2)(outdim=120,initv=4e-2f);
+            val fc3 = linear(relu2)(outdim=1024,initv=4e-2f);
             val relu3 = relu(fc3)();
 
-            val fc4 = linear(relu3)(outdim=84,initv=1e-1f);
-            val relu4  = relu(fc4)();
+//            val fc4 = linear(relu3)(outdim=84,initv=1e-1f);
+//            val relu4  = relu(fc4)();
+            
+            val drop6 =  dropout(relu3)(0.5f);
 
-            val fc5  = linear(relu4)(outdim=2,initv=1e-1f);
+            val fc5  = linear(drop6)(outdim=2,initv=1e-1f);
             val out = softmaxout(fc5)(scoreType=1);
 
             val nodes = (in     \ null    \ null   \ null    on
-                         conv1  \ pool1   \ bns1   \ relu1   on
-                         conv2  \ pool2   \ bns2   \ relu2   on
+                         conv1  \ pool1   \ null   \ relu1   on
+                         conv2  \ pool2   \ null   \ relu2   on
                          fc3    \ relu3   \ null   \ null    on
-                         fc4    \ relu4   \ null   \ null    on
+                         drop6    \ null   \ null    \ null    on
                      fc5    \ out     \ null   \ null).t
 
             opts.nodemat = nodes;

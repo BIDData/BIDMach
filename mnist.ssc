@@ -19,7 +19,7 @@ val (nn,opts) = Net.learner(train,trainlabels);
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
-opts.batchSize= 100
+opts.batchSize= 32
 opts.npasses = 10
 opts.lrate = 1e-4f 
 opts.texp = 0.1f
@@ -72,6 +72,11 @@ val v = nn.add_plot(new FilterViz(1,bw=5)).asInstanceOf[FilterViz]
 :load gan.ssc
 val s = start("mnist")
 load(model,"models/mnist/")
+plotscore(s.dscores)
+plotscore(s.gscores)
+s.lrate=0.1f
+s.iter=40
+s.langevin = 0
 
 :silent
 

@@ -20,11 +20,11 @@ def pimg(s:Synthesis) = {
     s.plot.plot_image(img)
 }
 
-def gen(s:Synthesis,random:Boolean = true) = {
-    s.generate(model,random)
+def gen(s:Synthesis,random:Boolean = true,target:Float =0.75f) = {
+    s.generate(model,random,target)
     pimg(s)
     //(score(s.D.output_layers(0)),score(model.output_layers(0)))    
-    (mean(s.D.output_layers(0).score),mean(model.output_layers(0).score))    
+    (mean(s.D.output_layers(0).score),mean(model.output_layers(0).score),score(s.D.output_layers(0)),score(model.output_layers(0)))    
 }
 
 
