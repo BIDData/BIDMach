@@ -8,7 +8,8 @@ final case class OrganizeGridWorker(text: String)
 final case class GridOrganizationFailed(reason: String, job: OrganizeGridWorker)
 
 // worker messages
-final case class GridNeighborAddresses(addresses: Seq[ActorRef])
-final case class HelloFromNeighbor(text: String)
-case object GreetNeighbor
+//final case class GridNeighborAddresses(addresses: Seq[ActorRef])
+final case class GridGroupAddresses(group: GridGroup, addresses: Set[ActorRef])
+final case class HelloFromGroup(text: String)
+case class GreetGroups()
 //#messages

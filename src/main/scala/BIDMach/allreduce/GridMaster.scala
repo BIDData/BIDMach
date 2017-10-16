@@ -15,11 +15,13 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
-class GridMaster extends Actor {
+class GridMaster(layout: GridLayout) extends Actor {
 
-  var workers: Set[ActorRef] = Set.empty[ActorRef]
+  var workers: collection.mutable.Map[Integer, ActorRef] = collection.mutable.Map[Integer, ActorRef]()
+  var broadcasted: Boolean = false
 
   val cluster = Cluster(context.system)
+
 
   override def preStart(): Unit = cluster.subscribe(self, classOf[MemberUp])
 
@@ -27,28 +29,38 @@ class GridMaster extends Actor {
 
   def receive = {
 
-    // Organize grid
-    case command: OrganizeGridWorker =>
-      if (workers.isEmpty) {
-        sender() ! GridOrganizationFailed("No workers available, try again later", command)
-      } else {
-        workers foreach { each =>
-          each ! GridNeighborAddresses(workers.toSeq)
-        }
-        sender() ! Done
-      }
-
     // Cluster management
     case state: CurrentClusterState =>
       println(s"Current state $state")
       state.members.filter(_.status != MemberStatus.Up) foreach register
 
-    case MemberUp(m) => register(m)
+    case MemberUp(m) =>
+      if(!broadcasted) {
+        register(m)
+        if (workers.size == layout.total) {
+          println(s"expect member up, start broadcasting layout")
+          setupLayout()
+          broadcasted = true
+        }
+      } // unimplemented recover phase here
 
     case Terminated(a) =>
       println(s"$a is terminated, removing it from the set")
-      workers = workers.filterNot(_ == a)
+      for ((idx, worker) <- workers){
+        if(worker == a) workers -= idx
+      }
+  }
 
+  def setupLayout(): Unit =
+  // Organize grid
+  for((idx, worker) <- workers){
+    val groups = layout.groups(idx)
+    for (group <- groups){
+      val member_idxs = layout.members(group)
+      var members = Set[ActorRef]()
+      for(member_id <- member_idxs) members+=workers(member_id)
+      worker ! GridGroupAddresses(group, members)
+    }
   }
 
   def register(member: Member): Unit =
@@ -57,7 +69,9 @@ class GridMaster extends Actor {
       context.actorSelection(RootActorPath(member.address) / "user" / "worker").resolveOne().onComplete {
         case Success(workerRef: ActorRef) =>
           context watch workerRef
-          workers = workers + workerRef
+          val new_idx: Integer = workers.size
+          workers(new_idx) = workerRef
+        case Failure(_) => {}
       }
     }
 
@@ -87,7 +101,7 @@ object GridMaster {
     }
   }
 
-  def startUp(ports: List[String] = List("2551","2552")): Unit = {
+  def startUp(ports: List[String] = List("2551")): Unit = {
     ports foreach( eachPort => main(Array(eachPort)))
   }
 }
