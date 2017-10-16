@@ -15,3 +15,5 @@ data
 !data/factorNet
 !data/MHTestCorrections
 /bin
+*.xml
+*.iml

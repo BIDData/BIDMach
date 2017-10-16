@@ -13,37 +13,42 @@ import scala.language.postfixOps
 
 class GridWorker extends Actor {
 
-  var myNeighbors: Set[ActorRef] = Set.empty[ActorRef]
-  val counter = new AtomicInteger
+  var myGroups: collection.mutable.Map[GridGroup, collection.mutable.Set[ActorRef]] = collection.mutable.Map.empty[GridGroup, collection.mutable.Set[ActorRef]]
 
   def receive = {
 
     // Do work
-    case GreetNeighbor =>
-      myNeighbors foreach { each =>
-        each ! HelloFromNeighbor(s"greeting! ${counter.getAndIncrement()}")
+    case GreetGroups() =>
+      for((group_name, group)  <- myGroups){
+        for(member <- group) {
+          if (member != self) {
+            member ! HelloFromGroup(s"${group_name.index}-${group_name.dim}")
+          }
+        }
       }
 
-    case HelloFromNeighbor(msg) =>
+    case HelloFromGroup(msg) =>
       println(s"Receiving greeting from ${sender()} msg: $msg")
 
     // Manage neighbors
-    case GridNeighborAddresses(list) =>
-      list foreach register
+    case GridGroupAddresses(group, addresses) =>
+      println(s"Receiving new group of $group with addresses: $addresses")
+      if(!myGroups.contains(group)){
+        myGroups(group)=addresses.asInstanceOf[collection.mutable.Set[ActorRef]]
+        for(address <- addresses){
+          context.watch(address)
+        }
+      }else{
+        assert(false) // update new group is not available now
+      }
 
     case Terminated(a) =>
-      println(s"Neighbor $a is terminated, removing it from the set")
-      myNeighbors = myNeighbors - a
+      println(s"Neighbor $a is terminated, removing it from all the groups")
+      for((group_name, group)  <- myGroups){
+        if(group.contains(a)) group -= a
+      }
 
   }
-
-  def register(neighborRef: ActorRef): Unit = {
-    if (!myNeighbors.contains(neighborRef) && neighborRef != self) {
-      context watch neighborRef
-      myNeighbors = myNeighbors + neighborRef
-    }
-  }
-
 }
 
 object GridWorker {
@@ -60,7 +65,7 @@ object GridWorker {
 
     system.scheduler.schedule(2.seconds, 2.seconds) {
       implicit val timeout = Timeout(5 seconds)
-      backend ? GreetNeighbor onSuccess {
+      backend ? GreetGroups onSuccess {
         case s => println(s)
       }
     }
