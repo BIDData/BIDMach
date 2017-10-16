@@ -1,5 +1,6 @@
 package BIDMach.allreduce
 
+import java.awt.GridLayout
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.Done
@@ -21,7 +22,7 @@ class GridMaster(layout: GridLayout) extends Actor {
   var broadcasted: Boolean = false
 
   val cluster = Cluster(context.system)
-
+  println(s"current layout: ${layout.scale}, ${layout.dim}")
 
   override def preStart(): Unit = cluster.subscribe(self, classOf[MemberUp])
 
@@ -36,9 +37,10 @@ class GridMaster(layout: GridLayout) extends Actor {
 
     case MemberUp(m) =>
       if(!broadcasted) {
+        println(s"detect member up")
         register(m)
         if (workers.size == layout.total) {
-          println(s"expect member up, start broadcasting layout")
+          println(s"expected members up, start broadcasting layout")
           setupLayout()
           broadcasted = true
         }
@@ -86,9 +88,10 @@ object GridMaster {
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [master]")).
       withFallback(ConfigFactory.load())
 
-    val system = ActorSystem("ClusterSystem", config)
-    val master = system.actorOf(Props[GridMaster], name = "master")
+    val layout: GridLayout = new GridLayout(2,2); // current fixed layout for four machines
 
+    val system = ActorSystem("ClusterSystem", config)
+    val master = system.actorOf(Props(classOf[GridMaster],layout), name = "master")
 
     // To constantly try to organize grid workers
     val counter = new AtomicInteger
