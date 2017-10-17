@@ -91,9 +91,10 @@ class Plot(name: String = "plot") {
         //server.send(scala.util.parsing.json.JSONObject())
     }    
     
-    def add_slider(name:String,callback:Int=>Unit) {
+    def add_slider(name:String,callback:Int=>Unit,range:Int = 100) {
         val p = new JPanel();
         val sliderLabel = new JLabel(name, SwingConstants.CENTER);
+        val rangeLabel = new JLabel(range.toString, SwingConstants.CENTER);
         val slider = new JSlider(SwingConstants.HORIZONTAL,0,100,50);
         slider.addChangeListener(new ChangeListener{
                                     override def stateChanged(e:ChangeEvent){
@@ -102,6 +103,7 @@ class Plot(name: String = "plot") {
                                     }})
         p.add(sliderLabel);
         p.add(slider);
+        p.add(rangeLabel);
         controlPanel.add(p)
         frame.pack                        
     }

@@ -15,13 +15,13 @@ def score(layer:Layer) = {
 
 
 def pimg(s:Synthesis) = {
-    val d = FMat(s.D.layers(0).output(?,?,?,s.ten)).data.max
+    val d = 64//FMat(s.D.layers(0).output(?,?,?,s.ten)).data.max
     val img = utils.filter2img(s.D.layers(0).output(?,?,?,s.ten)/d-0.5f,s.D.opts.tensorFormat);
     s.plot.plot_image(img)
 }
 
-def gen(s:Synthesis,random:Boolean = true,target:Float =0.75f) = {
-    s.generate(model,random,target)
+def gen(s:Synthesis,random:Boolean = true,target:Float =0.75f,p:Boolean = false) = {
+    s.generate(model,random,target,p)
     pimg(s)
     //(score(s.D.output_layers(0)),score(model.output_layers(0)))    
     (mean(s.D.output_layers(0).score),mean(model.output_layers(0).score),score(s.D.output_layers(0)),score(model.output_layers(0)))    
@@ -32,6 +32,10 @@ import scala.collection.mutable.ListBuffer
 
 def plotscore(score:ListBuffer[Float]){
     plot(()=>FMat(Array(1,score.length),score.toArray))
+}
+
+def plothist(m:Mat) {
+    hist(()=>FMat(m).reshapeView(m.length),20)
 }
 
 //val s = start

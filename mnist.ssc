@@ -15,11 +15,11 @@ train ~ train - mt;
 test ~ test - mt;
 
 val (nn,opts) = Net.learner(train,trainlabels);
-
+    
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
-opts.batchSize= 32
+opts.batchSize= 100
 opts.npasses = 10
 opts.lrate = 1e-4f 
 opts.texp = 0.1f
@@ -32,28 +32,32 @@ opts.tensorFormat = Net.TensorNCHW;
 import BIDMach.networks.layers.Node._;
 
 val in = input;
+//val rin = relu(in)()
+//val scalef = constant(row(1f/256));
+//val inscale = rin *@ scalef
 
-val conv1 = conv(in)(w=5,h=5,nch=6,stride=1,pad=2,initv=0.01f,convType=convt);
+val conv1 = conv(in)(w=5,h=5,nch=6,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
 val pool1 = pool(conv1)(w=2,h=2,stride=2,pad=0);
 val bns1 = batchNormScale(pool1)();
 val relu1 = relu(bns1)();
 
-val conv2 = conv(relu1)(w=5,h=5,nch=16,stride=1,pad=2,convType=convt);   
+val conv2 = conv(relu1)(w=5,h=5,nch=16,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);   
 val pool2 = pool(conv2)(w=2,h=2,stride=2,pad=0);
 val bns2 = batchNormScale(pool2)();
 val relu2 = relu(bns2)();
 
-val fc3 = linear(relu2)(outdim=120,initv=4e-2f);
+val fc3 = linear(relu2)(outdim=120,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
 val relu3 = relu(fc3)();
 
-val fc4 = linear(relu3)(outdim=84,initv=1e-1f);
+val fc4 = linear(relu3)(outdim=84,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
 val relu4  = relu(fc4)();
 
-val fc5  = linear(relu4)(outdim=10,initv=1e-1f);
+val fc5  = linear(relu4)(outdim=10,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
 val out = softmaxout(fc5)(scoreType=1);
 //val out = softmaxout(fc5 )();
 
 val nodes = (in     \ null    \ null   \ null    on
+//val nodes = (in     \ rin    \ scalef   \ inscale    on
              conv1  \ pool1   \ bns1   \ relu1   on
              conv2  \ pool2   \ bns2   \ relu2   on
              fc3    \ relu3   \ null   \ null    on
@@ -64,6 +68,7 @@ val nodes = (in     \ null    \ null   \ null    on
 
 opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
+//nn.train
 nn.launchTrain;
 nn.pause
 import BIDMach.viz._
@@ -74,9 +79,13 @@ val s = start("mnist")
 load(model,"models/mnist/")
 plotscore(s.dscores)
 plotscore(s.gscores)
-s.lrate=0.1f
-s.iter=40
+plotscore(s.gsteps)
+plothist(s.gdata)
+s.lrate=20f
+s.iter=100
 s.langevin = 0
+s.dWeight = 0.5f
+gen(s)
 
 :silent
 

@@ -23,7 +23,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var langevin = 0.1f
     var _langevin: Mat = null;
     val zero = irow(0);
-    val ten = irow(0->10);
+    val ten = irow(0->100);
     var _net: Net = null;
     var D: Net = null;
     var updater:Grad = null;
@@ -31,11 +31,17 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     val gscores : ListBuffer[Float] = new ListBuffer[Float];
     var accClassifier: Mat = null;
     var accDiscriminator: Mat = null;
-    var dWeight = 1f;
+    var momentum: Mat = null;
+    var vWeight = 0.9f;
+    var _vWeight: Mat = null;
+    var dWeight = 0.5f;
     var _dWeight: Mat = null;        
     var noise: Mat = null;
     var done = false;
     var ipass = 0;
+    var trans : Mat=>Mat = null;
+    var gsteps : ListBuffer[Float] = new ListBuffer[Float];
+    var gdata : Mat = null;        
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -57,9 +63,12 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         _lrate = net.layers(0).output.zeros(1,1);
         _langevin = net.layers(0).output.zeros(1,1);  
         _dWeight = net.layers(0).output.zeros(1,1);  
+        _vWeight = net.layers(0).output.zeros(1,1);  
         accClassifier = net.layers(0).output.zeros(net.layers(0).output.dims);
         accDiscriminator = net.layers(0).output.zeros(net.layers(0).output.dims);
+        momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
         noise = net.layers(0).output.zeros(net.layers(0).output.dims);
+        gdata = net.layers(0).output.zeros(net.layers(0).output.dims);
         
         val (_D,_updater) = if (modelname == "cifar") Synthesis.buildCifarDiscriminator(); else Synthesis.buildMnistDiscriminator()
             
@@ -68,9 +77,10 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         setInputGradient(net);
         setInputGradient(D);
         
-        plot.add_slider("lrate",(x:Int)=>{lrate=x/10f});
-        plot.add_slider("iter",(x:Int)=>{iter=x+1});
-        plot.add_slider("langevin",(x:Int)=>{langevin=x/10f});
+        plot.add_slider("lrate",(x:Int)=>{lrate=x/10f},10);
+        plot.add_slider("iter",(x:Int)=>{iter=(x+1)*10},1000);
+        plot.add_slider("langevin",(x:Int)=>{langevin=x/10f},10);
+        plot.add_slider("discriminatorWeight",(x:Int)=>{dWeight=x/100f},1);
     }
 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        
@@ -100,10 +110,10 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }
     }
     
-    def generate(model:Model,random: Boolean = true,targetScore:Float = 0.75f) = {
+    def generate(model:Model,random: Boolean = true,targetScore:Float = 0.75f,p:Boolean = false) = {
         val net = model.asInstanceOf[Net];
         reset(random);
-        if (!random)
+        if (random)
             net.output_layers(0).target<--row(irow(0->net.datasource.opts.batchSize).data.map(_%10))        
         D.layers(0).output<--net.layers(0).output;
         D.output_layers(0).target(?)=1;
@@ -111,6 +121,11 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         accDiscriminator(?) = 0;
         var curScore = 0f;
         var t = 0;
+        D.layers(D.layers.length-3) match {
+            case dl:DropoutLayer=>dl.opts.frac = 1f;
+            case _=>                
+        }
+        gsteps.clear
         while(curScore < targetScore && t < iter){
             net.forward;
             net.layers(0).deriv.clear;
@@ -121,17 +136,23 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             D.setderiv()
             D.backward(0, 0);
             curScore = mean(D.output_layers(0).output(1,?)).dv.toFloat;  
-            _lrate(0,0) = lrate;
+            val ol = D.layers(D.layers.length-2)
+            val cs = mean(ol.output(1,?)-ol.output(0,?)).dv.toFloat;  
+            _lrate <-- lrate/((t+1f)^0.5f);
             _langevin(0,0) = langevin;
+            _vWeight(0,0) = vWeight
             accClassifier ~ (accClassifier * 0.9f) + ((net.layers(0).deriv *@ net.layers(0).deriv) * 0.1f);
             accDiscriminator ~ (accDiscriminator * 0.9f) + ((D.layers(0).deriv *@ D.layers(0).deriv) * 0.1f);
-            net.layers(0).deriv ~ net.layers(0).deriv / ((accClassifier+1e-5f)^0.5f);
-            D.layers(0).deriv ~ D.layers(0).deriv / ((accDiscriminator+1e-5f)^0.5f);
+            net.layers(0).deriv ~ net.layers(0).deriv / ((accClassifier+1e-8f)^0.5f);
+            D.layers(0).deriv ~ D.layers(0).deriv / ((accDiscriminator+1e-8f)^0.5f);
             _dWeight(0,0) = dWeight;
-            val grad = net.layers(0).deriv + (_dWeight *@ D.layers(0).deriv)
+            val grad = (net.layers(0).deriv *@ (1f - _dWeight)) + (_dWeight *@ D.layers(0).deriv)
             normrnd(0,langevin,noise);
             grad ~ grad + noise;
-            net.layers(0).output~net.layers(0).output + (grad *@ _lrate);
+            grad ~ grad * 0.1f;
+            momentum ~ momentum * 0.9f;
+            momentum ~ momentum + grad
+            net.layers(0).output~net.layers(0).output + (momentum *@ _lrate);
             max(net.layers(0).output,0,net.layers(0).output);
             min(net.layers(0).output,255,net.layers(0).output);            
             val dims = net.layers(0).output.dims;
@@ -146,9 +167,22 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 d(?,1->s,?,0) = (d(?,0->(s-1),?,0) + d(?,1->s,?,0))*0.5f
             }
             t += 1   
-            D.layers(0).output<--net.layers(0).output
+            D.layers(0).output<--net.layers(0).output;
+            if (p && t%10 == 0) {
+                println(curScore,cs);
+                val da = D.layers(0).output / 64f
+                val img = utils.filter2img(da-0.5f,D.opts.tensorFormat);
+                plot.plot_image(img)   
+            }
+            gsteps+=cs
         }
-        net.layers(0).output
+        D.layers(D.layers.length-3) match {
+            case dl:DropoutLayer=>dl.opts.frac = 0.5f
+            case _=>                
+        }
+        D.clearUpdatemats            
+        gdata<--net.layers(0).output;
+        gdata
     }
     
     def trainD() = {
@@ -162,7 +196,14 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 val batchSize = ds.opts.batchSize
                 here += batchSize
                 val batch = ds.next;
-                val data = if (here/ds.opts.batchSize % 2 == 0) generate(_net,targetScore = 0.7f); else generate(_net,targetScore = 0.2f);
+                //val data = if (here/ds.opts.batchSize % 2 == 0) generate(_net,targetScore = 0.7f); else generate(_net,targetScore = 0.2f);
+                val data = generate(_net,targetScore = 0.7f);
+                
+                val da = FMat(data(?,?,?,ten));
+                val da2 = if (trans == null) da/da.data.max else trans(da)
+                val img = utils.filter2img(da2-0.5f,D.opts.tensorFormat);
+                plot.plot_image(img)
+                    
                 val gscore = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 gscores+=gscore;
                 /*batch(1)(?) = 1;
@@ -190,10 +231,9 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 val gscore = mean(D.output_layers(0).score).dv.toFloat
                 gscores+=gscore;
                 updater.update(0,here,0);*/
-                if (here/ds.opts.batchSize % 20 == 0 ) {
+                
+                if (here/ds.opts.batchSize % 1 == 0 ) {
                     println("Trained %d samples. Real samples score: %.3f, Generate samples score: %.3f".format(here,dscore,gscore));
-                    val img = utils.filter2img(D.layers(0).output(?,?,?,ten)/256f-0.5f,D.opts.tensorFormat);
-                    plot.plot_image(img)
                 }
             }
         }        
@@ -295,11 +335,11 @@ object Synthesis {
         val opts = new MyOpts;
         val ds = new MatSource(Array(train0, trainlabels0), opts);
         val updater = new ADAGrad(opts);
-        opts.batchSize = 32;
+        opts.batchSize = 100;
         opts.hasBias = true;
         opts.tensorFormat = Net.TensorNCHW;
         opts.convType = Net.CrossCorrelation;
-        opts.lrate = 1e-3f;
+        opts.lrate = 1e-4f;
         opts.vel_decay = 0.9f;
         opts.gsq_decay = 0.99f;
         opts.texp = 0.1f
@@ -312,18 +352,21 @@ object Synthesis {
             val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
             val in = input;
+            //val rin = relu(in)()
+            //val scalef = constant(row(1f/256));
+            //val inscale = rin *@ scalef
 
-            val conv1 = conv(in)(w=5,h=5,nch=32,stride=1,pad=2,initv=0.01f,convType=convt);
+            val conv1 = conv(in)(w=5,h=5,nch=32,stride=1,pad=2,initfn=Net.gaussian, initv=0.1f,convType=convt,initbiasv=0.1f);
             val pool1 = pool(conv1)(w=2,h=2,stride=2,pad=0);
-//            val bns1 = batchNormScale(pool1)();
+            //val bns1 = batchNormScale(pool1)();
             val relu1 = relu(pool1)();
 
-            val conv2 = conv(relu1)(w=5,h=5,nch=64,stride=1,pad=2,convType=convt);   
+            val conv2 = conv(relu1)(w=5,h=5,nch=64,stride=1,pad=2,convType=convt,initfn=Net.gaussian,initv=0.1f, initbiasv=0.1f);   
             val pool2 = pool(conv2)(w=2,h=2,stride=2,pad=0);
-//            val bns2 = batchNormScale(pool2)();
+            //val bns2 = batchNormScale(pool2)();
             val relu2 = relu(pool2)();
 
-            val fc3 = linear(relu2)(outdim=1024,initv=4e-2f);
+            val fc3 = linear(relu2)(outdim=1024,initfn=Net.gaussian,initv=0.1f, initbiasv=0.1f);
             val relu3 = relu(fc3)();
 
 //            val fc4 = linear(relu3)(outdim=84,initv=1e-1f);
@@ -331,7 +374,7 @@ object Synthesis {
             
             val drop6 =  dropout(relu3)(0.5f);
 
-            val fc5  = linear(drop6)(outdim=2,initv=1e-1f);
+            val fc5  = linear(drop6)(outdim=2,initfn=Net.gaussian,initv=0.1f, initbiasv=0.1f);
             val out = softmaxout(fc5)(scoreType=1);
 
             val nodes = (in     \ null    \ null   \ null    on
