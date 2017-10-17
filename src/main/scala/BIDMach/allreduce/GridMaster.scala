@@ -1,20 +1,16 @@
 package BIDMach.allreduce
 
-import java.awt.GridLayout
-import java.util.concurrent.atomic.AtomicInteger
-
 import akka.Done
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, RootActorPath, Terminated}
 import akka.cluster.ClusterEvent.{CurrentClusterState, MemberUp}
 import akka.cluster.{Cluster, Member, MemberStatus}
-import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Failure, Success}
 
 class GridMaster(layout: GridLayout) extends Actor {
 
@@ -37,14 +33,16 @@ class GridMaster(layout: GridLayout) extends Actor {
 
     case MemberUp(m) =>
       if(!broadcasted) {
-        println(s"detect member up")
-        register(m)
-        if (workers.size == layout.total) {
-          println(s"expected members up, start broadcasting layout")
-          setupLayout()
-          broadcasted = true
+        println(s"detect member up, currently ${workers.size}")
+        register(m).onSuccess {
+          case Done =>
+            if (workers.size == layout.total) {
+              println(s"expected members up, start broadcasting layout")
+              setupLayout()
+              broadcasted = true
+            }
         }
-      } // unimplemented recover phase here
+      }
 
     case Terminated(a) =>
       println(s"$a is terminated, removing it from the set")
@@ -61,26 +59,30 @@ class GridMaster(layout: GridLayout) extends Actor {
       val member_idxs = layout.members(group)
       var members = Set[ActorRef]()
       for(member_id <- member_idxs) members+=workers(member_id)
-      worker ! GridGroupAddresses(group, members)
+      val addresses = GridGroupAddresses(group, members)
+      println(s"To worker $idx $worker: Sending group address: $addresses")
+      worker ! addresses
     }
   }
 
-  def register(member: Member): Unit =
+  def register(member: Member): Future[Done] =
     if (member.hasRole("worker")) {
       implicit val timeout = Timeout(5.seconds)
-      context.actorSelection(RootActorPath(member.address) / "user" / "worker").resolveOne().onComplete {
-        case Success(workerRef: ActorRef) =>
+      context.actorSelection(RootActorPath(member.address) / "user" / "worker").resolveOne().map { workerRef =>
           context watch workerRef
           val new_idx: Integer = workers.size
-          workers(new_idx) = workerRef
-        case Failure(_) => {}
+          workers.update(new_idx, workerRef)
+          Done
       }
+    } else {
+      Future.successful(Done)
     }
 
 }
 
 
 object GridMaster {
+
   def main(args: Array[String]): Unit = {
     // Override the configuration of the port when specified as program argument
     val port = if (args.isEmpty) "0" else args(0)
@@ -93,15 +95,6 @@ object GridMaster {
     val system = ActorSystem("ClusterSystem", config)
     val master = system.actorOf(Props(classOf[GridMaster],layout), name = "master")
 
-    // To constantly try to organize grid workers
-    val counter = new AtomicInteger
-    system.scheduler.schedule(2.seconds, 2.seconds) {
-      implicit val timeout = Timeout(5 seconds)
-      (master ? OrganizeGridWorker("counter-" + counter.incrementAndGet())) onComplete {
-        case Success(result) => println(s"Master at $port: $result")
-        case Failure(e) => println(s"Error $e")
-      }
-    }
   }
 
   def startUp(ports: List[String] = List("2551")): Unit = {

@@ -1,33 +1,33 @@
 package BIDMach.allreduce
 
-class GridGroup(val index: Integer, val dim: Integer){}
+case class GridGroup(val index: Integer, val dim: Integer){}
 
-class GridLayout(val scale: Integer, val dim: Integer) {
-  val total: Integer = scale * dim
-  type GridMember = Array[Integer]
+class GridLayout(val scale: Int, val dim: Int) {
+  val total: Int = Math.pow(scale, dim).toInt
+  type GridMember = Array[Int]
   private val members: Array[GridMember] = genMembers(dim)
 
-  private def genMembers(dim: Integer): Array[Array[Integer]] =  {
+  private def genMembers(dim: Int): Array[Array[Int]] =  {
     if(dim == 0){
       Array(Array())
     }
     else{
-      var ret: Array[Array[Integer]] = Array()
+      var ret: Array[Array[Int]] = Array()
       for(x <- genMembers(dim -1)){
         for(i <- 0 until scale){
-          ret :+= (x:+i).asInstanceOf[Array[Integer]]
-      }
+          ret :+= (x:+i)
+        }
       }
       ret
     }
   }
 
-  def members(group: GridGroup):Array[Integer]={
+  def members(group: GridGroup):Array[Int]={
     //given a group, return the members it have, O(total) naiive implemetation
-    var ret = Array[Integer]()
+    var ret = Array[Int]()
     for((member, i) <- members.zipWithIndex){
       if(member(group.dim) == group.index){
-        ret :+= i.asInstanceOf[Integer]
+        ret :+= i.asInstanceOf[Int]
       }
     }
     ret

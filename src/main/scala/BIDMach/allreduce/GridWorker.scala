@@ -1,7 +1,5 @@
 package BIDMach.allreduce
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -22,7 +20,7 @@ class GridWorker extends Actor {
       for((group_name, group)  <- myGroups){
         for(member <- group) {
           if (member != self) {
-            member ! HelloFromGroup(s"${group_name.index}-${group_name.dim}")
+            member ! HelloFromGroup(s"Index: ${group_name.index}, Dimension: ${group_name.dim}")
           }
         }
       }
@@ -32,14 +30,13 @@ class GridWorker extends Actor {
 
     // Manage neighbors
     case GridGroupAddresses(group, addresses) =>
-      println(s"Receiving new group of $group with addresses: $addresses")
       if(!myGroups.contains(group)){
-        myGroups(group)=addresses.asInstanceOf[collection.mutable.Set[ActorRef]]
+        myGroups(group) = collection.mutable.Set(addresses.toArray:_*)
         for(address <- addresses){
           context.watch(address)
         }
-      }else{
-        assert(false) // update new group is not available now
+      } else{
+        println(s"Found duplicate group given: $group with $addresses")
       }
 
     case Terminated(a) =>
@@ -61,11 +58,11 @@ object GridWorker {
     //src/resources/conf/application.conf
 
     val system = ActorSystem("ClusterSystem", config)
-    val backend = system.actorOf(Props[GridWorker], name = "worker")
+    val worker = system.actorOf(Props[GridWorker], name = "worker")
 
     system.scheduler.schedule(2.seconds, 2.seconds) {
       implicit val timeout = Timeout(5 seconds)
-      backend ? GreetGroups onSuccess {
+      worker ? GreetGroups() onSuccess {
         case s => println(s)
       }
     }
