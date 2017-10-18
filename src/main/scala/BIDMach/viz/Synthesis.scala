@@ -23,7 +23,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var langevin = 0.1f
     var _langevin: Mat = null;
     val zero = irow(0);
-    val ten = irow(0->100);
+    //val ten = irow(0->100);
     var _net: Net = null;
     var D: Net = null;
     var updater:Grad = null;
@@ -35,13 +35,17 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var vWeight = 0.9f;
     var _vWeight: Mat = null;
     var dWeight = 0.5f;
-    var _dWeight: Mat = null;        
+    var _dWeight: Mat = null;
+    var scale = 64f;
+    var _scale: Mat = null;
     var noise: Mat = null;
     var done = false;
     var ipass = 0;
     var trans : Mat=>Mat = null;
     var gsteps : ListBuffer[Float] = new ListBuffer[Float];
-    var gdata : Mat = null;        
+    var gdata : Mat = null;
+    var trainDis = true;
+    
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -64,13 +68,18 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         _langevin = net.layers(0).output.zeros(1,1);  
         _dWeight = net.layers(0).output.zeros(1,1);  
         _vWeight = net.layers(0).output.zeros(1,1);  
+        _scale = net.layers(0).output.zeros(1,1);  
         accClassifier = net.layers(0).output.zeros(net.layers(0).output.dims);
         accDiscriminator = net.layers(0).output.zeros(net.layers(0).output.dims);
         momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
         noise = net.layers(0).output.zeros(net.layers(0).output.dims);
         gdata = net.layers(0).output.zeros(net.layers(0).output.dims);
         
-        val (_D,_updater) = if (modelname == "cifar") Synthesis.buildCifarDiscriminator(); else Synthesis.buildMnistDiscriminator()
+        val (_D,_updater) = modelname match {
+            case "cifar" => Synthesis.buildCifarDiscriminator(); 
+            case "mnist" => Synthesis.buildMnistDiscriminator();
+            case "imagenet" => Synthesis.buildImageNetDiscriminator();
+        }
             
         D = _D;updater = _updater;
         
@@ -110,23 +119,29 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }
     }
     
-    def generate(model:Model,random: Boolean = true,targetScore:Float = 0.75f,p:Boolean = false) = {
+    def mcmc(model:Model,targetScore:Float = 0.75f,p:Boolean = false,assignTarget: Boolean = true) = {
         val net = model.asInstanceOf[Net];
-        reset(random);
-        if (random)
-            net.output_layers(0).target<--row(irow(0->net.datasource.opts.batchSize).data.map(_%10))        
-        D.layers(0).output<--net.layers(0).output;
+        if (assignTarget){
+            net.output_layers(0).target match {
+                case t:IMat=> t<--irow(irow(0->net.datasource.opts.batchSize).data.map(_%10));
+                case t:FMat=> t<-- row(irow(0->net.datasource.opts.batchSize).data.map(_%10));
+            }
+        }
+        D.layers(0).output<--gdata;
+        net.layers(0).output<--gdata;
         D.output_layers(0).target(?)=1;
-        accClassifier(?) = 0;
-        accDiscriminator(?) = 0;
-        var curScore = 0f;
-        var t = 0;
+//        accClassifier(?) = 0;
+//        accDiscriminator(?) = 0;
+        //var curScore = 0f;
         D.layers(D.layers.length-3) match {
             case dl:DropoutLayer=>dl.opts.frac = 1f;
             case _=>                
         }
-        gsteps.clear
-        while(curScore < targetScore && t < iter){
+//        gsteps.clear
+        var curScore = 0f
+        var t = 0;
+//        while(curScore < targetScore && t < iter){
+        while(t < iter) {
             net.forward;
             net.layers(0).deriv.clear;
             net.setderiv()
@@ -136,9 +151,9 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             D.setderiv()
             D.backward(0, 0);
             curScore = mean(D.output_layers(0).output(1,?)).dv.toFloat;  
-            val ol = D.layers(D.layers.length-2)
-            val cs = mean(ol.output(1,?)-ol.output(0,?)).dv.toFloat;  
-            _lrate <-- lrate/((t+1f)^0.5f);
+            val logit = D.layers(D.layers.length-2)
+            val margin = mean(logit.output(1,?)-logit.output(0,?)).dv.toFloat;  
+            _lrate <-- lrate// /((t+1f)^0.5f);
             _langevin(0,0) = langevin;
             _vWeight(0,0) = vWeight
             accClassifier ~ (accClassifier * 0.9f) + ((net.layers(0).deriv *@ net.layers(0).deriv) * 0.1f);
@@ -154,71 +169,79 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             momentum ~ momentum + grad
             net.layers(0).output~net.layers(0).output + (momentum *@ _lrate);
             max(net.layers(0).output,0,net.layers(0).output);
-            min(net.layers(0).output,255,net.layers(0).output);            
+            min(net.layers(0).output,255,net.layers(0).output);
             val dims = net.layers(0).output.dims;
             val s = dims(1);
             val d = net.layers(0).output.reshapeView(dims(1),dims(2),dims(0),dims(3))
             if (t % 2 == 0) {
-                d(0->(s-1),?,?,0) = (d(0->(s-1),?,?,0) + d(1->s,?,?,0))*0.5f
-                d(?,0->(s-1),?,0) = (d(?,0->(s-1),?,0) + d(?,1->s,?,0))*0.5f
+                d(0->(s-1),?,?,0) = (d(0->(s-1),?,?,0)*0.9f + d(1->s,?,?,0)*0.1f)//*0.5f
+                d(?,0->(s-1),?,0) = (d(?,0->(s-1),?,0)*0.9f + d(?,1->s,?,0)*0.1f)//*0.5f
             }
             else {
-                d(1->s,?,?,0) = (d(0->(s-1),?,?,0) + d(1->s,?,?,0))*0.5f
-                d(?,1->s,?,0) = (d(?,0->(s-1),?,0) + d(?,1->s,?,0))*0.5f
+                d(1->s,?,?,0) = (d(0->(s-1),?,?,0)*0.9f + d(1->s,?,?,0)*0.1f)//*0.5f
+                d(?,1->s,?,0) = (d(?,0->(s-1),?,0)*0.9f + d(?,1->s,?,0)*0.1f)//*0.5f
             }
             t += 1   
             D.layers(0).output<--net.layers(0).output;
             if (p && t%10 == 0) {
-                println(curScore,cs);
-                val da = D.layers(0).output / 64f
+                println(curScore,margin);
+                _scale(0,0) = scale;
+                val da = D.layers(0).output / _scale;
                 val img = utils.filter2img(da-0.5f,D.opts.tensorFormat);
                 plot.plot_image(img)   
             }
-            gsteps+=cs
+            gsteps+=margin
         }
         D.layers(D.layers.length-3) match {
             case dl:DropoutLayer=>dl.opts.frac = 0.5f
             case _=>                
         }
-        D.clearUpdatemats            
+        D.clearUpdatemats
         gdata<--net.layers(0).output;
         gdata
     }
     
     def trainD() = {
         val ds = D.datasource;
-        done = true
-        ipass += 1
-        for(t<-0 until 1){
+        done = false
+        while(!done){
             ds.reset;
             var here = 0
-            while (ds.hasNext && done) {
-                val batchSize = ds.opts.batchSize
-                here += batchSize
-                val batch = ds.next;
+            ipass += 1
+            while (ds.hasNext && !done) {
                 //val data = if (here/ds.opts.batchSize % 2 == 0) generate(_net,targetScore = 0.7f); else generate(_net,targetScore = 0.2f);
-                val data = generate(_net,targetScore = 0.7f);
+                val data = mcmc(_net,targetScore = 0.7f);
                 
-                val da = FMat(data(?,?,?,ten));
-                val da2 = if (trans == null) da/da.data.max else trans(da)
+                val da = FMat(data(?,?,?,?));
+                _scale(0,0) = scale;
+                val da2 = if (trans == null) da/_scale else trans(da)
                 val img = utils.filter2img(da2-0.5f,D.opts.tensorFormat);
                 plot.plot_image(img)
-                    
+                                        
                 val gscore = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 gscores+=gscore;
+                
                 /*batch(1)(?) = 1;
                 batch(0)(?,?,?,0->(batchSize/2)) = cpu(data(?,?,?,0->(batchSize/2)))
                 batch(1)(?,0->(batchSize/2)) = 0;                
                 D.layers(0).deriv.clear;
                 D.dobatchg(batch,here,0);*/
-                D.layers(0).output(?,?,?,(batchSize/2)->batchSize) = batch(0)(?,?,?,0->(batchSize/2))
-                D.output_layers(0).target(?) = 1
-                D.output_layers(0).target(?,0->(batchSize/2)) = 0; 
-                D.layers(0).deriv.clear;
-                D.forward;D.setderiv();D.backward(0, 0);
-                updater.update(ipass,here,0);     
-                val dscore = mean(D.output_layers(0).score).dv.toFloat
-                dscores+=dscore
+                if (trainDis) {
+                    val batchSize = ds.opts.batchSize;
+                    here += batchSize;
+                    val batch = ds.next;
+                    D.layers(0).output(?,?,?,(batchSize/2)->batchSize) = batch(0)(?,?,?,0->(batchSize/2))
+                    D.output_layers(0).target(?) = 1
+                    D.output_layers(0).target(?,0->(batchSize/2)) = 0;
+                    D.layers(0).deriv.clear;
+                    D.forward;D.setderiv();D.backward(0, 0);
+                    updater.update(ipass,here,0);
+                    val dscore = mean(D.output_layers(0).score).dv.toFloat
+                    dscores+=dscore;
+                    println("Trained %d samples. Real samples score: %.3f, Generate samples score: %.3f".format(here,dscore,gscore));
+                }
+                else
+                    println("Generate samples score: %.3f".format(gscore));
                 
                 /*val dloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;                
                 val dscore = mean(D.output_layers(0).score).dv.toFloat
@@ -232,9 +255,6 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 gscores+=gscore;
                 updater.update(0,here,0);*/
                 
-                if (here/ds.opts.batchSize % 1 == 0 ) {
-                    println("Trained %d samples. Real samples score: %.3f, Generate samples score: %.3f".format(here,dscore,gscore));
-                }
             }
         }        
     }
@@ -244,11 +264,11 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     }
     
     def stop = {
-        done = false
+        done = true
     }
     
     def reset(random:Boolean = true) {
-        val data = _net.layers(0).output;
+        val data = gdata//_net.layers(0).output;
         if (random){
             val scale = 256f//maxi(data).dv.toFloat
             data<--rand(data.nrows,data.ncols).reshapeView(data.dims)*scale
@@ -394,16 +414,21 @@ object Synthesis {
     }
     
     def buildImageNetDiscriminator() = {
-        class MyOpts extends Net.Opts with FileSource.Opts// with Grad.Opts;
+        class MyOpts extends Net.Opts with FileSource.Opts with ADAGrad.Opts;
         val traindir = "/code/BIDMach/data/ImageNet/train/";
         val traindata = traindir+"partNCHW%04d.bmat.lz4";
         val trainlabels = traindir+"label%04d.imat.lz4";
         val opts = new MyOpts;
         val ds = FileSource(traindata, trainlabels, opts);
+        val updater = new ADAGrad(opts);
         opts.batchSize = 1;
         opts.hasBias = true;
         opts.tensorFormat = Net.TensorNCHW;
         opts.convType = Net.CrossCorrelation;
+        opts.lrate = 1e-4f;
+        opts.vel_decay = 0.9f;
+        opts.gsq_decay = 0.99f;
+        opts.texp = 0.1f
         Mat.useCache = true;
         Mat.useGPUcache = true;            
             
@@ -447,7 +472,7 @@ object Synthesis {
             val relu7  =    relu(fc7)();
             val drop7 =     dropout(relu7)(0.5f);
 
-            val fc8  =      linear(drop7)(outdim=1000,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
+            val fc8  =      linear(drop7)(outdim=2,initfn=Net.gaussian,initv=0.01f,initbiasv=1f);
             val out =       softmaxout(fc8)(scoreType=1,lossType=1);
 
             opts.nodeset=Net.getDefaultNodeSet
@@ -455,10 +480,8 @@ object Synthesis {
         ds.init
         net.bind(ds)
         net.init;
-        load(net,"models/alex32p/");
-        net            
+        updater.init(net)
+        //load(net,"models/alex32p/");
+        (net,updater)
     }
 }
-    
-    
-    

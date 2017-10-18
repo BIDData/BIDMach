@@ -19,7 +19,7 @@ val nn = new Learner(ds, net, null, grad, null, opts);
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 20) {
-      1e-2f
+      0f//1e-2f
   } else if (ipass < 40) {
       1e-3f
   } else 1e-4f;
@@ -27,21 +27,21 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet.txt";
-opts.batchSize= 128;
+opts.batchSize= 1;
 opts.npasses = 80;
 //opts.nend = 10;
-opts.lrate = 1e-4f;
+opts.lrate = 0//1e-4f;
 opts.texp = 0f;
 opts.pstep = 0.05f
 opts.hasBias = true;
-opts.l2reg = 0.0005f;
-opts.vel_decay = 0.9f;
+opts.l2reg = 0f//0.0005f;
+opts.vel_decay = 0f//0.9f;
 opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
-opts.useCache = false;
+opts.useCache = true;
 opts.convType = Net.CrossCorrelation;
-//opts.inplace = Net.BackwardCaching;
-//opts.inplace = Net.InPlace;
+opts.inplace = Net.BackwardCaching;
+opts.inplace = Net.InPlace;
 
 :silent
 
@@ -118,7 +118,23 @@ def run(){
     nn.unpause
 }
 run()
-val v = nn.add_plot(new FilterViz(5,bw=3)).asInstanceOf[FilterViz]
+//val v = nn.add_plot(new FilterViz(5,bw=3)).asInstanceOf[FilterViz]
+//v.interval = 100
+//val s = nn.add_plot(new Synthesis).asInstanceOf[Synthesis]
+//s.lrate = 1000f
+val model = net
+:load save.ssc
+:load gan.ssc
+val s = start("imagenet")
+plotscore(s.dscores)
+plotscore(s.gscores)
+plotscore(s.gsteps)
+plothist(s.gdata)
+s.lrate=20f
+s.iter=100
+s.langevin = 0
+s.dWeight = 0.5f
+//gen(s)
 
 println("Examine the 'nn' variable to track learning state.\n");
 
