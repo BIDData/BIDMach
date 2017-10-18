@@ -140,6 +140,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
 //        gsteps.clear
         var curScore = 0f
         var t = 0;
+        println("here")
 //        while(curScore < targetScore && t < iter){
         while(t < iter) {
             net.forward;
@@ -150,6 +151,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             D.layers(0).deriv.clear;
             D.setderiv()
             D.backward(0, 0);
+            println("here2")
             curScore = mean(D.output_layers(0).output(1,?)).dv.toFloat;  
             val logit = D.layers(D.layers.length-2)
             val margin = mean(logit.output(1,?)-logit.output(0,?)).dv.toFloat;  
@@ -168,6 +170,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             momentum ~ momentum * 0.9f;
             momentum ~ momentum + grad
             net.layers(0).output~net.layers(0).output + (momentum *@ _lrate);
+            println("here3")
             max(net.layers(0).output,0,net.layers(0).output);
             min(net.layers(0).output,255,net.layers(0).output);
             val dims = net.layers(0).output.dims;

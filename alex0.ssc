@@ -40,8 +40,8 @@ opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = true;
 opts.convType = Net.CrossCorrelation;
-opts.inplace = Net.BackwardCaching;
-opts.inplace = Net.InPlace;
+//opts.inplace = Net.BackwardCaching;
+//opts.inplace = Net.InPlace;
 
 :silent
 

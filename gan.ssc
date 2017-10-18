@@ -16,7 +16,7 @@ def score(layer:Layer) = {
 
 def pimg(s:Synthesis) = {
     val d = s.scale//FMat(s.D.layers(0).output(?,?,?,s.ten)).data.max
-    val img = utils.filter2img(FMat(s.D.layers(0).output(?,?,?,s.ten))/d-0.5f,s.D.opts.tensorFormat);
+    val img = utils.filter2img(FMat(s.D.layers(0).output(?,?,?,?))/d-0.5f,s.D.opts.tensorFormat);
     s.plot.plot_image(img)
 }
 
