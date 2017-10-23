@@ -33,12 +33,12 @@ val inscale = in *@ scalef
 val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=0,initv=1f,convType=convt);
 val pool1 = pool(conv1)(w=2,h=2,stride=2);
 //val norm1 = batchNormScale(pool1)();
-val relu1 = relu(pool1);
+val relu1 = relu(pool1)();
 
 val conv2 = conv(relu1)(w=5,h=5,nch=32,stride=1,pad=0,convType=convt);
 val pool2 = pool(conv2)(w=2,h=2,stride=2);
 //val norm2 = batchNormScale(pool2)();
-val relu2 = relu(pool2);
+val relu2 = relu(pool2)();
 
 val conv3 = conv(relu2)(w=5,h=5,nch=32,stride=1,pad=2,convType=convt);
 val pool3 = pool(conv3)(w=3,h=3,stride=2);
