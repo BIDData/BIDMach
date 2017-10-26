@@ -91,15 +91,16 @@ class Plot(name: String = "plot") {
         //server.send(scala.util.parsing.json.JSONObject())
     }    
     
-    def add_slider(name:String,callback:Int=>Unit,range:Int = 100) {
+    def add_slider(name:String,callback:Int=>Float,initV:Int = 50, precision:Int = 2) {
         val p = new JPanel();
         val sliderLabel = new JLabel(name, SwingConstants.CENTER);
-        val rangeLabel = new JLabel(range.toString, SwingConstants.CENTER);
-        val slider = new JSlider(SwingConstants.HORIZONTAL,0,100,50);
+        val rangeLabel = new JLabel(("%."+precision+"f") format callback(initV), SwingConstants.CENTER);
+        val slider = new JSlider(SwingConstants.HORIZONTAL,0,100,initV);
         slider.addChangeListener(new ChangeListener{
                                     override def stateChanged(e:ChangeEvent){
                                         val source = e.getSource().asInstanceOf[JSlider];
-                                        callback(source.getValue())
+                                        val v = callback(source.getValue());
+                                        rangeLabel.setText(("%."+precision+"f") format v)
                                     }})
         p.add(sliderLabel);
         p.add(slider);
