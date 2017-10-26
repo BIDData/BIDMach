@@ -1,5 +1,6 @@
 :silent
-val datadir = "../../data/CIFAR10/parts/"
+
+val datadir = "../../data/CIFAR10/parts/";
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";
 val labelsfname = datadir + "labels%d.imat.lz4";
 val testfname = datadir + "testNCHW%d.fmat.lz4";
@@ -42,7 +43,7 @@ val lin3 =   linear(sig2)(outdim=3);
 val out =    glm(lin3)(); 
 
 
-opts.nodemat = nodes;
+opts.nodeset=Net.getDefaultNodeSet;
 val model = nn.model.asInstanceOf[Net];
 nn.train;
 
