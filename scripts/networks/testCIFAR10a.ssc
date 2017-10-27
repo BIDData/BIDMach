@@ -31,7 +31,7 @@ import BIDMach.networks.layers.Node._;
 
 Net.initDefaultNodeSet;
 
-val in =     input;
+val in =     input();
 val lin1 =   linear(in)(outdim=20);
 val sig1 =   sigmoid(lin1);
 

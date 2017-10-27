@@ -196,7 +196,7 @@ object Node {
   
   def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
   
-  def input = new InputNode;
+  def input() = new InputNode;
   
   def format(a:NodeTerm)(conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
     val con = conversion;

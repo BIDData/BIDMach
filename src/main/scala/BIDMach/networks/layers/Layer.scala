@@ -558,7 +558,7 @@ object Layer {
   
   def input(a:LayerTerm) = new InputLayer(null){inputs(0) = a;};
   
-  def input = new InputLayer(null);
+  def input() = new InputLayer(null);
   
   def linear(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null,
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
