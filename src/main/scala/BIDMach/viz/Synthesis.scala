@@ -48,7 +48,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     val vizs = new ListBuffer[Visualization];
     val resetInterval = 10;
     var mcmcSteps = 0;
-        
+    var endLayer = 0;    
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -77,7 +77,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
         noise = net.layers(0).output.zeros(net.layers(0).output.dims);
         gdata = net.layers(0).output.zeros(net.layers(0).output.dims);
-        
+        endLayer = net.layers.length - 1
+            
         val (_D,_updater) = modelname match {
             case "cifar" => Synthesis.buildCifarDiscriminator(); 
             case "mnist" => Synthesis.buildMnistDiscriminator();
@@ -122,6 +123,15 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }
     }
     
+    def backward(net:Net,end:Int) {
+        var i = end;
+        net.layers(end).deriv <-- net.layers(end).output
+        while (i>=1) {
+            net.layers(i).backward(0, 0);
+            i -= 1;
+        }
+    }
+    
     def mcmc(model:Model,targetScore:Float = 0.75f,p:Boolean = false,assignTarget: Boolean = true) = {
         if (mcmcSteps % resetInterval == 0) {
             reset()
@@ -152,8 +162,10 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         while(t < iter) {
             net.forward;
             net.layers(0).deriv.clear;
-            net.setderiv()
-            net.backward(0, 0);
+            net.setderiv();
+            backward(net, endLayer);
+            //net.backward(0, 0);
+                
             D.forward;
             D.layers(0).deriv.clear;
             D.setderiv()
@@ -171,7 +183,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             D.layers(0).deriv ~ D.layers(0).deriv / ((accDiscriminator+1e-8f)^0.5f);
             _dWeight(0,0) = dWeight;
             val grad = (net.layers(0).deriv *@ (1f - _dWeight)) + (_dWeight *@ D.layers(0).deriv)
-            normrnd(0,langevin/(1+t),noise);
+            normrnd(0,langevin/(1),noise);
             grad ~ grad + noise;
             grad ~ grad * 0.1f;
             momentum ~ momentum * 0.9f;
@@ -289,9 +301,13 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }
         else{
             _net.datasource.reset;
-            val d = _net.datasource.next;
-            data<--d(0);
-            _net.output_layers(0).target<--d(1)
+            val batch = _net.datasource.next 
+            val d = batch(0) match {
+                        case m:FMat=>m;
+                        case m:BMat=>unsignedFloat(m,true);
+                    }
+            data<--d;
+            _net.output_layers(0).target<--batch(1)
                 
         }
     }
