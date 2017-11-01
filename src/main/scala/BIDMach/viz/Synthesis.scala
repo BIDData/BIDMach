@@ -90,7 +90,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         setInputGradient(net);
         setInputGradient(D);
         
-        plot.add_slider("lrate",(x:Int)=>{lrate=x;lrate},10);
+        plot.add_slider("lrate",(x:Int)=>{lrate=(10f^(x/20f-4))(0);lrate},60,4);
         plot.add_slider("iter",(x:Int)=>{iter=(x+1)*10;iter},9,0);
         plot.add_slider("noise",(x:Int)=>{langevin=(10f^(x/20f-4))(0);langevin},60,4);
         plot.add_slider("discriminatorWeight",(x:Int)=>{dWeight=x/100f;dWeight});
@@ -174,7 +174,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             curScore = mean(D.output_layers(0).output(1,?)).dv.toFloat;  
             val logit = D.layers(D.layers.length-2)
             val margin = mean(logit.output(1,?)-logit.output(0,?)).dv.toFloat;  
-            _lrate <-- lrate// /((t+1f)^0.5f);
+            _lrate <-- lrate * 256f// /((t+1f)^0.5f);
             _langevin(0,0) = langevin;
             _vWeight(0,0) = vWeight
             accClassifier ~ (accClassifier * 0.9f) + ((net.layers(0).deriv *@ net.layers(0).deriv) * 0.1f);
