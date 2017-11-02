@@ -87,6 +87,27 @@ s.langevin = 0
 s.dWeight = 0.5f
 s.scale = 256
 gen(s)
+def setConv(filter:Int) = {
+    val func : Layer => Unit = (layer:Layer) => {
+        val dims = layer.deriv.dims;
+        layer.deriv.set(0);
+        layer.deriv.reshapeView(dims(1),dims(2),dims(0),dims(3))(?,?,filter,?)=1f;
+    }
+    func
+}
+
+def setConvI(filter:Int,x:Int = 7,y:Int = 7) = {
+    val func : Layer => Unit = (layer:Layer) => {
+        val dims = layer.deriv.dims;
+        layer.deriv.set(0);
+        layer.deriv.reshapeView(dims(1),dims(2),dims(0),dims(3))(x,y,filter,0->50)=1f;
+        layer.deriv.reshapeView(dims(1),dims(2),dims(0),dims(3))(x,y,filter,50->100)=1f;
+    }
+    func
+}
+
+
+
 
 :silent
 

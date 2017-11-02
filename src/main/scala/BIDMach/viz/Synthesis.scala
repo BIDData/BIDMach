@@ -49,6 +49,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     val resetInterval = 10;
     var mcmcSteps = 0;
     var endLayer = 0;    
+    var derivFunc: Layer=>Unit = null;
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -123,9 +124,12 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }
     }
     
-    def backward(net:Net,end:Int) {
+    def backward(net:Net,end:Int,set:Layer=>Unit = null) {
         var i = end;
-        net.layers(end).deriv <-- net.layers(end).output
+        if (set == null)
+            net.layers(end).deriv.set(1f);
+        else
+            set(net.layers(end))
         while (i>=1) {
             net.layers(i).backward(0, 0);
             i -= 1;
@@ -163,7 +167,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             net.forward;
             net.layers(0).deriv.clear;
             net.setderiv();
-            backward(net, endLayer);
+            backward(net, endLayer,derivFunc);
             //net.backward(0, 0);
                 
             D.forward;
