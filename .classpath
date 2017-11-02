@@ -35,7 +35,16 @@
 	<classpathentry kind="lib" path="lib/scalacheck_2.11-1.11.6.jar"/>
 	<classpathentry kind="lib" path="lib/scalatest_2.11-2.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/junit-4.11.jar"/>
-	<classpathentry kind="lib" path="lib/akka-actor_2.11-2.5.3.jar"/>
-	<classpathentry kind="lib" path="lib/BIDMat-2.0.8-cuda8.0beta.jar"/>
+	<classpathentry kind="lib" path="lib/akka-actor_2.11-2.5.4.jar"/>
+	<classpathentry kind="lib" path="lib/akka-cluster_2.11-2.5.4.jar"/>
+	<classpathentry kind="lib" path="lib/akka-http_2.11-10.0.9.jar"/>
+	<classpathentry kind="lib" path="lib/akka-http-core_2.11-10.0.9.jar"/>
+	<classpathentry kind="lib" path="lib/akka-kryo-serialization_2.11-0.5.0.jar"/>
+	<classpathentry kind="lib" path="lib/akka-parsing_2.11-10.0.9.jar"/>
+	<classpathentry kind="lib" path="lib/akka-protobuf_2.11-2.5.4.jar"/>
+	<classpathentry kind="lib" path="lib/akka-remote_2.11-2.5.4.jar"/>
+	<classpathentry kind="lib" path="lib/akka-stream_2.11-2.5.4.jar"/>
+	<classpathentry kind="lib" path="lib/BIDMat-2.0.10-cuda8.0beta.jar"/>
+	<classpathentry kind="lib" path="lib/config-1.3.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
