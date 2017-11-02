@@ -77,14 +77,15 @@ val v = nn.add_plot(new FilterViz(1,bw=5)).asInstanceOf[FilterViz]
 :load gan.ssc
 val s = start("mnist")
 load(model,"models/mnist/")
-plotscore(s.dscores)
-plotscore(s.gscores)
-plotscore(s.gsteps)
-plothist(s.gdata)
+//plotscore(s.dscores)
+//plotscore(s.gscores)
+//plotscore(s.gsteps)
+//plothist(s.gdata)
 s.lrate=20f
 s.iter=100
 s.langevin = 0
 s.dWeight = 0.5f
+s.scale = 256
 gen(s)
 
 :silent
