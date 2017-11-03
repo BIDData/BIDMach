@@ -102,11 +102,11 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
 	
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
-    	val mm0 = rand(opts.dim, nfeats-1);
+    	val mm0 = rand(opts.dim, nfeats);
     	mm0 ~ mm0 - 0.5f;
     	mm0 ~ mm0 / opts.dim;
     	modelmats(0) = mm0;                                                    // 
-    	modelmats(1) = zeros(opts.dim, nfeats);                                //
+    	modelmats(1) = zeros(opts.dim, nfeats+1);                                //
     }
     modelmats(0) = convertMat(modelmats(0));                                   // At most the first two will be GPU-based
     modelmats(1) = convertMat(modelmats(1)); 

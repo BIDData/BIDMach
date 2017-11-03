@@ -172,6 +172,12 @@ object Node {
   
   def exp(a:NodeTerm) = new ExpNode{inputs(0) = a;};
   
+  def format(a:NodeTerm)(conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
+    val con = conversion;
+    val fmt = inputFormat;
+    new TensorFormatNode{inputs(0) = a; conversion = con; inputFormat = fmt;}
+  }
+  
   def forward(a:NodeTerm) = new ForwardNode{inputs(0) = a;}
   
   def fn(a:NodeTerm)(fwdfn:(Mat)=>Mat=null, bwdfn:(Mat,Mat,Mat)=>Mat=null) = {
@@ -197,12 +203,6 @@ object Node {
   def input(a:NodeTerm) = new InputNode{inputs(0) = a;};
   
   def input() = new InputNode;
-  
-  def format(a:NodeTerm)(conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC) = {
-    val con = conversion;
-    val fmt = inputFormat;
-    new TensorFormatNode{inputs(0) = a; conversion = con; inputFormat = fmt;}
-  }
   
   def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, withInteractions:Boolean=false, 
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,

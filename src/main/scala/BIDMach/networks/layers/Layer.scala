@@ -18,33 +18,36 @@ import BIDMach.networks._
 import akka.actor.{Actor,Props,ActorSystem,ActorRef};
 
 /**
- * Net Layer class. There are currently 46 layer types:
+ * Net Layer class. Here are the current Layer types:
  * 
  - AbsLayer: Absolute value of input. 
  - AddLayer: Sum two inputs element-wise.
  - BatchNormLayer: Batch normalization.
  - BatchNormScaleLayer: Batch normalization with scaling and bias.
+ - CompoundLayer: A layer wrapping a sub-network, such as an LSTM.
  - ConstantLayer: Wraps a constant or externally-set matrix (can be updated between forward steps). 
  - ConvLayer: Convolution Layer.
  - CopyLayer: Copies inputs forward and derivatives backward.
  - CropLayer: Crops its input. 
+ - CropMirror: Crop and (randomly) mirror the input. 
  - DivLayer: Computes the quotient of its two inputs. 
  - DotLayer: Dot product (element-wise product followed by sum over columns).
  - DropoutLayer: A layer that implements random dropout. No learnable params, but dropout fraction can be specified.  
+ - EfnLayer: Layer that applies a float-valued function to each pixel of its input. 
+ - ElasticLayer: Layer that implements an elastic update. 
  - ExpLayer: exponential function of input.
  - FnLayer: Applies its fwdfn argument to one input. Can also use bwdfn1 and bwdfn2 for backward data and model updates. 
  - Fn2Layer: Applies its fwdfn argument to two inputs. Can also use bwdfn1 and bwdfn2 for backward data and model updates. 
- - FormatLayer: Corrects Tensor Format (NCHW or NHWC)
  - ForwardLayer: Goes forward only.
  - GLMLayer: a one-to-one layer with GLM mappings (linear, logistic, abs-logistic and SVM). No learnable params. 
  - InputLayer: just a placeholder for the first layer which is loaded with input output blocks. No learnable params. 
  - LinLayer: Linear layer. Has a matrix of learnable params which is the input-output map. 
  - LnLayer: natural logarithm.
  - LSTMLayer: an LSTM layer.
- - MaxLayer: computes the max of two inputs;
+ - MaxLayer: computes the element-wise max of two inputs;
  - MaxiLayer: computes the max element in each column;
  - Maxi2Layer: computes the max element in each column as output(0), output(1) is a row of integer indices of the maxs.
- - MinLayer: computes the min of two inputs;
+ - MinLayer: computes the element-wise min of two inputs;
  - MiniLayer: computes the min element in each column;
  - Mini2Layer: computes the min element in each column as output(0), output(1) is a row of integer indices of the mins.
  - MulLayer: computes the product of its inputs. 
@@ -52,12 +55,16 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  - NormLayer: normalizing layer that adds a derivative term based on the difference between current layer norm and a target norm. 
  - MulLayer: multiplies input layers element-wise. Will also perform edge operations (one input can be a scalar).
  - OnehotLayer: Converts an integer array of feature values to a sparse matrix whose columns are the instances with one non-zero in the feature position.
- - PoolLayer: Pooling layer.
+ - PoolingLayer: Pooling layer.
+ - PowerLayer: Raise its input to a power.
+ - RandomMirrorLayer: Randomly mirror the input horizontally. 
  - RectLayer: Rectifying one-to-one layer. No params. 
  - ScaleLayer: Scale-Bias layer, usually used with BatchNorm. 
  - SelectLayer: Use second (integer) matrix input to select elements from columns of first input. 
- - SoftmaxLayer: a softmax (normalized exponential) layer.
  - SigmoidLayer: Logistic function non-linearity.
+ - SignLayer: Compute the sign of the input.
+ - SoftmaxLayer: a softmax (normalized exponential) layer.
+ - SoftmaxOutputLayer: a softmax (normalized exponential) output layer.
  - SoftplusLayer: smooth ReLU unit. 
  - SplitHorizLayer: Split the input into nparts horizontally.
  - SplitVertLayer: Split the input into nparts vertically. 
@@ -66,57 +73,143 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  - SubLayer: Subtract inputs > 1 from first input. 
  - SumLayer: column-wise sum.
  - TanhLayer: Hyperbolic tangent non-linearity.
+ - TensorFormatLayer: Corrects Tensor Format (NCHW or NHWC)
  * 
  * Shorthand operators and functions for Layer creation have been defined in Node.scala and Layer.scala. 
- * They are as follows (x and y are floating point input NodeTerms or LayerTerms, i is an integer input matrix):
  * 
+ * The syntax for most layers is layername(inputs)(optional args)
+ *  
+ * The shortcuts are as follows (x and y are input NodeTerms or LayerTerms with float data, i is an input node with integer data):
  * 
  - AbsLayer:                     abs(y) 
  - AddLayer:                     x + y
- - BatchNormLayer:               batchnorm(x)
- - BatchNormScaleLayer:          bns(x)
+ - BatchNormLayer:               batchnorm(x)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL)
+ - BatchNormScaleLayer:          bns(x)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean=true,
+                                        lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing)
  - ConstantLayer:                const(1e-3f)
- - ConvLayer:                    conv(x)(args...)
+ - ConvLayer:                    conv(x)(name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true, 
+                                         initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
+                                         initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+                                         lr_scale:Float=1f, bias_scale:Float=1f,
+                                         convType:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION)
  - CopyLayer:                    copy(x)
- - CropLayer:                    crop(x)(args...)
+ - CropLayer:                    crop(x)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1), randoffsets:IMat=null)
+ - CropMirror:                   cropmirror(x)(sizes:IMat=irow(3,224,224,0), offsets:IMat=irow(0,-1,-1,-1), randoffsets:IMat=null)
  - DivLayer:                     x / y 
  - DotLayer:                     x dot y     or     x ∙ y
- - DropoutLayer:                 dropout(x) 
+ - DropoutLayer:                 dropout(x)(frac:Float=0.5f)
+ - EfnLayer:                     efn(x)(fwdfn:(Float)=>Float=null, bwdfn:(Float,Float,Float)=>Float=null)
  - ExpLayer:                     exp(x)
- - FnLayer:                      fn(x)(fwdfn=fnname)
- - Fn2Layer:                     fn2(x)(fwdfn=fnname) 
- - FormatLayer:                  format(x)(args...)
+ - FnLayer:                      fn(x)(fwdfn:(Mat)=>Mat=null, bwdfn:(Mat,Mat,Mat)=>Mat=null)
+ - Fn2Layer:                     fn2(x)(fwdfn:(Mat,Mat)=>Mat=null, bwdfn1:(Mat,Mat,Mat,Mat)=>Mat=null, bwdfn2:(Mat,Mat,Mat,Mat)=>Mat=null) 
  - ForwardLayer:                 forward(x)
- - GLMLayer:                     glm(x) 
- - InputLayer:                   input 
- - LinLayer:                     linear(x)(args...) 
+ - GLMLayer:                     glm(x)(links:IMat)
+ - InputLayer:                   input()
+ - LinLayer:                     linear(x)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, withInteractions:Boolean=false, 
+                                           initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
+                                           initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
+                                           lr_scale:Float=1f, bias_scale:Float=1f,
+                                           tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null)
  - LnLayer:                      ln(x)
- - LSTMLayer:                    lstm(x,y,z,name(string))
- - MaxLayer:                     max(x, y)
+ - LRNacrossLayer:               LRNacross(x)(dim:Int=5, alpha:Float=1f, beta:Float=0.5f, k:Float=2f)
+ - LRNwithinLayer:               LRNwithin(x)(dim:Int=5, alpha:Float=1f, beta:Float=0.5f)
+ - LSTMLayer:                    lstm(x,y,z,name:String)(opts:LSTMNodeOpts)
+ - MaxLayer:                     max(x,y)
  - MaxiLayer:                    maxi(x)
  - Maxi2Layer:                   maxi2(x)
  - MinLayer:                     min(x,y)
  - MiniLayer:                    mini(x)
  - Mini2Layer:                   mini2(x)
  - MulLayer:                     x *@ y 
- - NegsampOutputLayer:           negsamp(x) 
- - NormLayer:                    norm(x) 
+ - NegsampOutputLayer:           negsamp(x)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, nsamps:Int=100, 
+                                            expt:Float=0.5f, lr_scale:Float=1f, bias_scale:Float=1f, scoreType:Int=0, doCorrect:Boolean=true)
+ - NormLayer:                    norm(x)(targetNorm:Float = 1f, weight:Float = 1f)
  - OnehotLayer:                  onehot(x)
- - PoolLayer:                    pool(x)(args...)
- - RectLayer:                    rect(x)    or    relu(x) 
- - ScaleLayer:                   scale(x)
+ - PoolLayer:                    pool(x)(h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
+                                         poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
+                                         poolingNaN:Int = cudnnNanPropagation.CUDNN_PROPAGATE_NAN,
+                                         tensorFormat:Int = Net.UseNetFormat)
+ - RandMirror:                   randmirror(x)(prob:Float=0.5f)
+ - RectLayer:                    rect(x)(inplace:Int=Net.UseNetPlacing)    or    relu(x)(inplace:Int=Net.UseNetPlacing) 
+ - ScaleLayer:                   scale(x)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
+                                          lr_scale:Float=1f, bias_scale:Float=1f)
  - SelectLayer:                  x(i) 
- - SoftmaxLayer:                 softmax(x)
+ - SignLayer:                    sign(x)
  - SigmoidLayer:                 sigmoid(x)
+ - SoftmaxLayer:                 softmax(x)
+ - SoftmaxOutputLayer:           softmaxout(x)(scoreType:Int=0, lossType:Int=0)
  - SoftplusLayer:                softplus(x) 
- - SplitHorizLayer:              splithoriz(x)(nparts=...)
- - SplitVertLayer:               splitvert(x)(nparts=...)
+ - SplitHorizLayer:              splithoriz(x)(nparts:Int)
+ - SplitVertLayer:               splitvert(x)(nparts:Int)
  - SqrtLayer:                    sqrt(x)
  - StackLayer:                   x on y
  - SubLayer:                     x - y 
  - SumLayer:                     sum(x)
  - TanhLayer:                    tanh(x)
+ - TensorFormatLayer:            format(x)(conversion:Int = TensorFormatLayer.AUTO, inputFormat:Int = Net.TensorNHWC)
+ *
+ * General arguments are as follows:
  * 
+ - aopts:ADAGrad.Opts=null       ADAGRAD options instance. Used for just-in-time model updates without an updater. 
+ - avgFactor:Float               Specifies the moving average factor for Batch Norm.
+ - bias_scale:Float              Scale the global learning rate by this factor when updating the bias for this layer. 
+ - hasBias:Boolean               Specifies whether this (model) layer has a bias term or not. 
+ - initfn:(Mat,Float)=>Mat       Initializer for the model matrix for this layer. Takes the model matrix as input, and an init value.
+                                 Values: Net.xavier, Net.constant
+ - initbiasfn:(Mat,Float)=>Mat   Initializer for the bias matrix for this layer. Takes the bias matrix as input, and an init value.
+                                 Values: Net.xavier, Net.constant
+ - initv:Float                   The initialization value (a scale factor) for the model matrix, which is passed to the initfn.
+ - initbiasv:Float               The initialization value (a scale factor) for the bias matrix, which is passed to the initbiasfn. 
+ - inplace:Int                   Specifies the memory-sharing model for this node.
+ - lr_scale:Float                Scale the global learning rate by this factor when updating the model for this layer. 
+ - name:String                   A name for this node. Model nodes with the same name share parameters. 
+ - normMode:Int                  The kind of Batch Normalization: BatchNormLayer.SPATIAL or BatchNormLayer.PER_ACTIVATION
+ - nparts:Int                    Number of parts to split this layer into, for splitvert and splithoriz. 
+ - tensorFormat:Int              The tensor format. Net.tensorNCHW or Net.tensorNHWC or Net.useNetFormat
+ - 
+ * 
+ * Arguments for particular layers:
+ * ConvLayer
+ - w:Int                         Width of the kernel
+ - h:Int                         Height of the kernel
+ - nch:Int                       Number of filters (output dimension)
+ - stride:IMat = irow(1)         The stride, can be a 1x1 matrix.
+ - pad:IMat = irow(1)            The padding
+ - convType:Int                  Convolution type: Net.CrossCorrelation or Net.Convolution or Net.useNetConvType
+ *
+ * PoolLayer
+ - w:Int                         Width of the kernel
+ - h:Int                         Height of the kernel
+ - stride:Int                    The stride
+ - pad:Int                       The padding
+ - poolingMode:Int               The pooling mode: cudnnPoolingMode.CUDNN_POOLING_MAX or CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING;
+ - poolingNaN:Int                Whether to propagate NaNs, cudnnNanPropagation.CUDNN_PROPAGATE_NAN
+ *
+ * Crop and CropMirror Layers:
+ - sizes:IMat=irow(3,224,224,0)  Size of the cropped image
+ - offsets:IMat=irow(0,-1,-1,-1) Offsets from the input image boundaries. -1 means center the cropped window in this dimension.
+ - randoffsets:IMat=null         Magnitude of random offsets in each dimension. 
+ * 
+ * LinLayer
+ - withInteractions:Boolean=false model interactions between features.
+ - tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) Shape for a TMat (Tiled matrix) for this layer's model. 
+ - 
+ * LRNLayers:
+ - dim:Int=5
+ - alpha:Float=1f 
+ - beta:Float=0.5f
+ - k:Float=2f
+ *
+ * SoftmaxOutput layer
+ - lossType:Int                  What kind of loss to optimize:
+                                   SoftmaxOutputLayer.CrossEntropyLoss
+                                   SoftmaxOutputLayer.CaffeMultinomialLogisticLoss
+                                   SoftmaxOutputLayer.MultinomialLoss
+                                   
+ - scoreType:Int                 What score to report:
+                                   SoftmaxOutputLayer.CrossEntropyScore
+                                   SoftmaxOutputLayer.AccuracyScore
+ *
  * Many of these functions need a parent Net instance, but you can create that automatically using:
  * 
  * 	 import BIDMach.networks.layers.Layer._;
@@ -124,10 +217,11 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  *
  * then define some layers using the functions above:
  * 
- *     val input1 = input;
- *     val input2 = input;
+ *     val input1 = input();
+ *     val input2 = input();
  *     val const1 = constant(5f);
- *     val s2 =     sum(input1, input2) *@ const1;
+ *     val s2 =     (input1 + input2) *@ const1;
+ *     val s3 = exp(s2)
  *     ...          ...
  * 
  * Finally, to retrieve the Net instance containing these layers, do:
