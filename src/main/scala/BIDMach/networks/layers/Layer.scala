@@ -18,7 +18,10 @@ import BIDMach.networks._
 import akka.actor.{Actor,Props,ActorSystem,ActorRef};
 
 /**
- * Net Layer class. Here are the current Layer types:
+ * Layer class. Layers are fully-functional elements of a Neural Net, and include storage for activations. 
+ * They differ from Nodes which contain only the Options needed to create a Layer. 
+ * 
+ * Here are the current Layer types:
  * 
  - AbsLayer: Absolute value of input. 
  - AddLayer: Sum two inputs element-wise.
