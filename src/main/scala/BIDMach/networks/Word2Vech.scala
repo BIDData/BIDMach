@@ -45,15 +45,20 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
   
   var firstPos = -1L;
   var wordtab:IMat = null;
-  var randpermute:Mat = null;
-  var ubound:Mat = null;
-  var minusone:Mat = null;
-  var wordmask:Mat = null;
-  var allones:Mat = null;
-  var randwords:Mat = null;
-  var randsamp:Mat = null;
+  var minusone:IMat = null;
+  var wordmask:IMat = null;
+  var allones:IMat = null;
+  var lastblock:IMat = null;
+  var lastblockinds:IMat = null;
+  var skipwords:IMat = null;
+  var skipwordinds:IMat = null;
+  var centerwords:IMat = null;
+  var centerwordinds:IMat = null;
+  var wordvecs:FMat = null;
+  var nodevecs:FMat = null;
   var nfreqs:FMat = null;
   var itree:IMat = null;
+  var iancestors:IMat = null;
 //  var retEvalPos:GMat = null;
 //  var retEvalNeg:GMat = null;
   var nfeats = 0;
@@ -98,20 +103,27 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     nfreqs((nfeats-1)->(2*nfeats-1),0) = FMat(opts.freqs / sum(opts.freqs));
     itree = izeros(2*nfeats-1, 1);
     
-    Word2Vech.buildTree(nfreqs, itree);
+    iancestors = Word2Vech.buildHierarchy(nfreqs, itree);
 	
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
     	val mm0 = rand(opts.dim, nfeats);
     	mm0 ~ mm0 - 0.5f;
     	mm0 ~ mm0 / opts.dim;
-    	modelmats(0) = mm0;                                                    // 
-    	modelmats(1) = zeros(opts.dim, nfeats+1);                                //
+    	modelmats(0) = mm0;                                                   
+    	modelmats(1) = zeros(opts.dim, nfeats+1);                               
     }
-    modelmats(0) = convertMat(modelmats(0));                                   // At most the first two will be GPU-based
+    modelmats(0) = convertMat(modelmats(0));                                   
     modelmats(1) = convertMat(modelmats(1)); 
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
+    val skipcol = icol((-nskip) to -1) on icol(1 to nskip);
+    wordmask = convertIMat(skipcol * iones(1, ncols));                     // columns = distances from center word
+    lastblock = convertIMat(izeros(2, nskip*2));
+    lastblockinds = convertIMat(irow(ncols->(ncols+2*nskip)));
+    skipwordinds = wordmask + convertIMat(irow(0->ncols)+nskip);
+    centerwordinds = convertIMat(irow(opts.nskip->(ncols+nskip)));
+    allones = convertIMat(iones(1, ncols+2*nskip));
     times = zeros(1, ntimes);
     delays = zeros(1, ntimes);
     log = ArrayBuffer();
@@ -124,7 +136,9 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     	val nsteps = 1f * pos / firstPos;
     	val gopts = opts.asInstanceOf[ADAGrad.Opts];
     	val lrate = gopts.lrate.dv.toFloat * math.pow(nsteps, - gopts.texp.dv).toFloat;
-    	wordMats(gmats, ipass, pos);
+    	val (ancestors, skipwords) = wordMats(gmats, ipass, pos);
+      val nodevectors = nodevecs(?, ancestors.contents);
+      val skipwordvectors = wordvecs(?, skipwords.contents);
     }
   }
   
@@ -136,60 +150,36 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
   	} else row(0);
   }
   
-  def wordMats(mats:Array[Mat], ipass:Int, pos:Long) = {
+  def wordMats(mats:Array[Mat], ipass:Int, pos:Long):(IMat, IMat) = {
   
-    val wordsens = mats(0);
+	  // Set OOV samples to -1
+    val wordsens = lastblock \ mats(0).asInstanceOf[IMat];
     val words = if (opts.iflip) wordsens(1,?) else wordsens(0,?);
-    val wgood = words < opts.vocabSize;                                        // Find OOV words 
+    val wgood = words < opts.vocabSize;      
+    words ~ (wgood ∘ (words + 1)) - 1;                                        
     addTime(1);
 
-    rand(randsamp);                                                            // Take a random sample
-    val wrat = float(words+1) * salpha;
-    wrat ~ sqrt(wrat) + wrat;
-    wgood ~ wgood ∘ int(randsamp < wrat);
-    words ~ (wgood ∘ (words + 1)) - 1;                                         // Set OOV or skipped samples to -1
-    addTime(2);
-        
-    rand(ubound);                                                              // get random upper and lower bounds   
-    val ubrand = min(opts.nskip, int(ubound * opts.nskip) + 1);
-    val lbrand = - ubrand;
-    addTime(3);
-
-    val sentencenum = if (opts.iflip) wordsens(0,?) else wordsens(1,?);        // Get the nearest sentence boundaries
+    // Get the nearest sentence boundaries
+    val sentencenum = if (opts.iflip) wordsens(0,?) else wordsens(1,?);        
     val lbsentence = - cumsumByKey(allones, sentencenum) + 1;
     val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
-    val lb = max(lbrand, lbsentence);                                          // Combine the bounds
-    val ub = min(ubrand, ubsentence);
+    val lb = max(lbsentence(centerwordinds), -opts.nskip);
+    val ub = min(ubsentence(centerwordinds), opts.nskip);
     test3 = lb
     test4 = ub
-    addTime(4);
+    addTime(2);
+    
+    // Build the center and skip word matrices, set words to -1 across sentence boundaries
+    centerwords = words(centerwordinds);
+    val ancestors = iancestors(?, centerwords);
+    skipwords = words(skipwordinds);
+    val pgood = (wordmask >= lb) ∘ (wordmask <= ub);
+    skipwords ~ (pgood ∘ (skipwords + 1)) - 1; 
+    addTime(3);
+    
+    lastblock = wordsens(?, lastblockinds);
 
-    (words, lb, ub) match {
-    case (giwords:GIMat, gilb:GIMat, giub:GIMat) => {
-
-    	val iwords = minusone \ words \ minusone;                              // Build a convolution matrix.
-    	val cwords = iwords(wordtab);
-    	val pgoodwords = (wordmask >= lb) ∘ (wordmask <= ub) ∘ (cwords >= 0) ∘ (words >= 0);  // Find context words satisfying the bound
-    	// and check that context and center word are good.
-    	val fgoodwords = float(pgoodwords);
-    	addTime(5);
-
-    	test1 = cwords;
-
-    	rand(randpermute);                                                      // Prepare a random permutation of context words for negative sampling
-    	randpermute ~ (fgoodwords ∘ (randpermute + 1f)) - 1f;                   // set the values for bad words to -1.
-    	val (vv, ii) = sortdown2(randpermute.view(randpermute.length, 1));      // Permute the good words
-    	val ngood = sum(vv >= 0f).dv.toInt;                                     // Count of the good words
-    	val cwi = cwords(ii);
-
-    	test2 = cwi
-    			addTime(6);
-
-    	rand(randwords);                                                        // Compute some random negatives
-    	val irandwords = min(nfeats-1, int(nfeats * (randwords ^ expt))); 
-    	addTime(7);
-      }
-    }
+    (ancestors, skipwords);
   }
   
  
@@ -208,15 +198,22 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
 
 object Word2Vech  {
   trait Opts extends Model.Opts {
-    var aopts:ADAGrad.Opts = null;
     var nskip = 5; 
     var vocabSize = 100000;
-    var freqs:DMat = null;
-    var iflip = false;
+    var freqs:DMat = null;             // Frequencies of words in the vocab
+    var iflip = false;                 // Whether rows are flipped. If false, first row is word id, second is sentence id. 
 
   }
   
   class Options extends Opts {}
+  
+  def buildHierarchy(nfreqs:FMat, itree:IMat):IMat = {
+    buildTree(nfreqs, itree);
+    val d = treeDepth(itree);
+    val hierarchy = izeros(d, nfreqs.length);
+    fillHierarchy(itree, d, hierarchy);
+    hierarchy;
+  }
   
   def buildTree(nfreqs:FMat, itree:IMat) = {
     val nfeats = (nfreqs.length + 1) / 2;
@@ -252,6 +249,26 @@ object Word2Vech  {
         j += 1;
       }
       depth = math.max(depth, j);
+      i += 1;
+    }
+    depth;
+  }
+  
+  def fillHierarchy(itree:IMat, depth:Int, hier:IMat) = {
+    val nfeats = (itree.length + 1) / 2;
+    var i = 0;
+    while (i < nfeats) {
+      var j = 0;
+      var ptr = itree(i);
+      while (ptr >= 0) {
+        hier(j, i) = ptr;
+        ptr = itree(ptr);
+        j += 1;
+      }
+      while (j < depth) {
+        hier(j, i) = -1;
+        j += 1;
+      }
       i += 1;
     }
     depth;
