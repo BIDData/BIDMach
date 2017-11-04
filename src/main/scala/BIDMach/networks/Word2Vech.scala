@@ -107,14 +107,17 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
 	
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
-    	val mm0 = rand(opts.dim, nfeats);
+    	val mm0 = rand(opts.dim, nfeats+1);
     	mm0 ~ mm0 - 0.5f;
     	mm0 ~ mm0 / opts.dim;
+      mm0(?,0) = 0f;
     	modelmats(0) = mm0;                                                   
-    	modelmats(1) = zeros(opts.dim, nfeats+1);                               
+    	modelmats(1) = zeros(opts.dim, nfeats);                               
     }
     modelmats(0) = convertMat(modelmats(0));                                   
     modelmats(1) = convertMat(modelmats(1)); 
+    wordvecs = modelmats(0).asInstanceOf[FMat];
+    nodevecs = modelmats(1).asInstanceOf[FMat];
     val nskip = opts.nskip;
     val nwindow = nskip * 2 + 1;
     val skipcol = icol((-nskip) to -1) on icol(1 to nskip);
@@ -139,6 +142,9 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     	val (ancestors, skipwords) = wordMats(gmats, ipass, pos);
       val nodevectors = nodevecs(?, ancestors.contents);
       val skipwordvectors = wordvecs(?, skipwords.contents);
+      // blockMultTN(depth, nskip*2, opts.dim, nodevectors, skipwordvectors, prods);
+      // blockMultNN(opts.dim, nskip*2, depth, nodevectors, prods, skipdiffs);
+      // blockMultNT(opts.dim, depth, nskip*2, skipwordvectors, prods, nodediffs);
     }
   }
   
