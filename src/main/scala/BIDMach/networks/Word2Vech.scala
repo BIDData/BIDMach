@@ -43,39 +43,37 @@ import scala.concurrent.duration.Duration
 
 class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extends Model(opts) {
   
-  var firstPos = -1L;
-  var wordtab:IMat = null;
-  var minusone:IMat = null;
-  var wordmask:IMat = null;
-  var allones:IMat = null;
-  var lastblock:IMat = null;
+  // Hierarchical softmax tree data.
+	var nfreqs:FMat = null;                                  // Normalized node frequencies
+  var uptree:IMat = null;                                  // Tree of parent links
+  var downtree:IMat = null;                                // Tree of child links
+  var iancestors:IMat = null;                              // Matrix whose columns correspond to words, each column is the tree ancestors of that word.
+  var isigns:FMat = null;                                  // Matrix of signs of the ancestors. 
+  
+  var lastblock:IMat = null;                               // Save a window of 2*nskip from the previous minibatch
   var lastblockinds:IMat = null;
-  var skipwords:IMat = null;
+  
+  var worddists:IMat = null;                               // Distances of skip words from the center word
+  
+  var skipwords:IMat = null;                               // Matrix of skip words
   var skipwordinds:IMat = null;
-  var centerwords:IMat = null;
+  var centerwords:IMat = null;                             // Matrix of center words
   var centerwordinds:IMat = null;
-  var wordvecs:FMat = null;
-  var nodevecs:FMat = null;
-  var skipworddiffs:FMat = null;
-  var nodediffs:FMat = null;
+  
+  var wordvecs:FMat = null;                                // Matrix (dim x vocabSize) of word embeddings
+  var nodevecs:FMat = null;                                // Matrix (dim x (vocabSize-1)) of node embeddings
   var prods:FMat = null;
-  var nfreqs:FMat = null;
-  var uptree:IMat = null;
-  var downtree:IMat = null;
-  var iancestors:IMat = null;
-  var isigns:IMat = null;
-//  var retEvalPos:GMat = null;
-//  var retEvalNeg:GMat = null;
+  
+  var skipworddiffs:FMat = null;                           // Matrix of derivatives for word and node matrices
+  var nodediffs:FMat = null;
+
+  var allones:IMat = null;
+
+  var firstPos = -1L;
   var nfeats = 0;
   var nskip = 0;
   var depth = 0;
   var ncols = 0;
-  var expt = 0f;
-  var vexp = 0f;
-  var salpha = 0f;
-  var maxCols = 0;
-  var nmmats = 1;
-  var fmm:Array[Array[Float]] = null;
   
   var ntimes = 12;
   var times:FMat = null;
@@ -118,7 +116,7 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     buildTrees(nfreqs, uptree, downtree);
     depth = treeDepth(uptree);
     iancestors = izeros(depth, ncols);
-    isigns = izeros(depth, ncols);
+    isigns = zeros(depth, ncols);
     fillHierarchy(uptree, downtree, depth, iancestors, isigns);
 	
     if (refresh) {
@@ -135,14 +133,14 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     wordvecs = modelmats(0).asInstanceOf[FMat];
     nodevecs = modelmats(1).asInstanceOf[FMat];
     prods = convertMat(zeros(2 * nskip * depth, ncols)).asInstanceOf[FMat];
-    skipworddiffs = wordvecs.zeros(opts.dim, ncols);
-    nodediffs = nodevecs.zeros(opts.dim, ncols);
+    skipworddiffs = wordvecs.zeros(opts.dim, 2*nskip, ncols);
+    nodediffs = nodevecs.zeros(opts.dim, depth, ncols);
 
     val skipcol = icol((-nskip) to -1) on icol(1 to nskip);
-    wordmask = convertIMat(skipcol * iones(1, ncols));                     // columns = distances from center word
+    worddists = convertIMat(skipcol * iones(1, ncols));                     // columns = distances from center word
     lastblock = convertIMat(izeros(2, nskip*2));
     lastblockinds = convertIMat(irow(ncols->(ncols+2*nskip)));
-    skipwordinds = wordmask + convertIMat(irow(0->ncols)+nskip);
+    skipwordinds = worddists + convertIMat(irow(0->ncols)+nskip);
     centerwordinds = convertIMat(irow(opts.nskip->(ncols+nskip)));
     allones = convertIMat(iones(1, ncols+2*nskip));
     times = zeros(1, ntimes);
@@ -160,18 +158,38 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     	val (ancestors, skipwords) = wordMats(gmats, ipass, pos);
       val nodevectors = nodevecs(?, ancestors.contents + 1);
       val skipwordvectors = wordvecs(?, skipwords.contents + 1);
-      blockMultTN(depth, nskip*2, opts.dim, nodevectors, skipwordvectors, prods);
       
+      blockMultTN(nskip*2, depth, opts.dim, skipwordvectors, nodevectors, prods);  // All pairs of inner products between skip word and ancestor vecs
+
+      val lprods = logistic(prods).reshapeView(nskip*2, depth, ncols);             // Compute the gradient multipliers
+      val codes = isigns(ancestors+1).reshapeView(1, depth, ncols);
+      val grads = codes - lprods;
+      grads ~ grads *@ lrate;
+ 
+      blockMultNT(opts.dim, nskip*2, depth, nodevectors, grads, skipworddiffs);    // Update the word vectors
+      val skipmult = oneHot(skipwords.contents + 1, nfeats+1);
+      skipworddiffs.reshapeView(opts.dim, 2*nskip*ncols).maddT(skipmult, wordvecs);
+      wordvecs(?,0) = 0f;
       
-      blockMultNN(opts.dim, nskip*2, depth, nodevectors, prods, skipworddiffs);
-      blockMultNT(opts.dim, depth, nskip*2, skipwordvectors, prods, nodediffs);
+      blockMultNN(opts.dim, depth, nskip*2, skipwordvectors, grads, nodediffs);    // Update hierarchy vectors
+      val nodemult = oneHot(ancestors.contents + 1, nfeats);
+      nodediffs.reshapeView(opts.dim, depth*ncols).maddT(nodemult, nodevecs);
+      nodevecs(?,0) = 0f;
     }
   }
   
   def evalbatch(gmats:Array[Mat], ipass:Int, pos:Long):FMat = {
   	addTime(0);
   	if (gmats(0).ncols == ncols) {
-  		wordMats(gmats, ipass, pos);
+  	  val (ancestors, skipwords) = wordMats(gmats, ipass, pos);
+      val nodevectors = nodevecs(?, ancestors.contents + 1);
+      val skipwordvectors = wordvecs(?, skipwords.contents + 1);
+      
+      blockMultTN(nskip*2, depth, opts.dim, skipwordvectors, nodevectors, prods);
+      val lprods = logistic(prods).reshapeView(nskip*2, depth, ncols);
+      val codes = isigns(ancestors+1).reshapeView(1, depth, ncols);
+      val grads = codes - lprods;
+
   		row(1)
   	} else row(0);
   }
@@ -195,11 +213,11 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     test4 = ub
     addTime(2);
     
-    // Build the center and skip word matrices, set words to -1 across sentence boundaries
+    // Build the ancestor and skip word matrices, set words to -1 across sentence boundaries
     centerwords = words(centerwordinds);
     val ancestors = iancestors(?, centerwords);
     skipwords = words(skipwordinds);
-    val pgood = (wordmask >= lb) ∘ (wordmask <= ub);
+    val pgood = (worddists >= lb) ∘ (worddists <= ub);
     skipwords ~ (pgood ∘ (skipwords + 1)) - 1; 
     addTime(3);
     
@@ -207,19 +225,6 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
 
     (ancestors, skipwords);
   }
-  
- 
-  
-  def trailingZeros(a:Long):Int = {
-    var aa = a;
-    var nz = 0;
-    while ((aa & 1L) == 0) {
-      aa = aa >> 1;
-      nz += 1;
-    }
-    nz
-  }
-
 }
 
 object Word2Vech  {
@@ -228,7 +233,6 @@ object Word2Vech  {
     var vocabSize = 100000;
     var freqs:DMat = null;             // Frequencies of words in the vocab
     var iflip = false;                 // Whether rows are flipped. If false, first row is word id, second is sentence id. 
-
   }
   
   class Options extends Opts {}
@@ -273,7 +277,7 @@ object Word2Vech  {
     depth;
   }
   
-  def fillHierarchy(uptree:IMat, downtree:IMat, depth:Int, iancestors:IMat, isigns:IMat) = {
+  def fillHierarchy(uptree:IMat, downtree:IMat, depth:Int, iancestors:IMat, isigns:FMat) = {
     val nfeats = (uptree.length + 1) / 2;
     var i = 0;
     while (i < nfeats) {
@@ -282,13 +286,13 @@ object Word2Vech  {
       while (ptr >= 0) {
         iancestors(j, i) = ptr;
         val ptr0 = uptree(ptr,0);
-        isigns(j, i) = if (ptr0 < 0 || ptr == downtree(ptr0, 0)) 1 else -1;
+        isigns(j, i) = if (ptr0 < 0 || ptr == downtree(ptr0, 0)) 1f else -1f;
         ptr = ptr0;
         j += 1;
       }
       while (j < depth) {
         iancestors(j, i) = -1;
-        isigns(j, i) = 1;
+        isigns(j, i) = 1f;
         j += 1;
       }
       i += 1;
@@ -301,7 +305,6 @@ object Word2Vech  {
   import edu.berkeley.bid.CBLAS._
   import edu.berkeley.bid.CBLAS.TRANSPOSE._
 
-  
   def blockMultTN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
     (left, right, prod) match {
       case (gleft:GMat, gright:GMat, gprod:GMat) => {
