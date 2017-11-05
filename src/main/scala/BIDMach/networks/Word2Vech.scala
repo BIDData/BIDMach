@@ -98,6 +98,7 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
   var test4:Mat = null;
  
   import Word2Vech._
+  
 
   override def init() = {
     val mats = datasource.next;
@@ -132,9 +133,9 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     modelmats(1) = convertMat(modelmats(1)); 
     wordvecs = modelmats(0).asInstanceOf[FMat];
     nodevecs = modelmats(1).asInstanceOf[FMat];
-    prods = convertMat(zeros(2 * nskip * depth, ncols)).asInstanceOf[FMat];
-    skipworddiffs = wordvecs.zeros(opts.dim, 2*nskip, ncols);
-    nodediffs = nodevecs.zeros(opts.dim, depth, ncols);
+    prods = convertMat(zeros((2 * nskip) \ depth \ ncols)).asInstanceOf[FMat];
+    skipworddiffs = wordvecs.zeros(opts.dim \ (2*nskip) \ ncols);
+    nodediffs = nodevecs.zeros(opts.dim \ depth \ ncols);
 
     val skipcol = icol((-nskip) to -1) on icol(1 to nskip);
     worddists = convertIMat(skipcol * iones(1, ncols));                     // columns = distances from center word
@@ -161,7 +162,7 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
       
       blockMultTN(nskip*2, depth, opts.dim, skipwordvectors, nodevectors, prods);  // All pairs of inner products between skip word and ancestor vecs
 
-      val lprods = logistic(prods).reshapeView(nskip*2, depth, ncols);             // Compute the gradient multipliers
+      val lprods = logistic(prods)                                                 // Compute the gradient multipliers
       val codes = isigns(ancestors+1).reshapeView(1, depth, ncols);
       val grads = codes - lprods;
       grads ~ grads *@ lrate;
