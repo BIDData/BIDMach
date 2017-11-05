@@ -392,14 +392,14 @@ object Word2Vech  {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
-  class LearnOptions extends Learner.Options with Word2Vec.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
+  class LearnOptions extends Learner.Options with Word2Vech.Opts with MatSource.Opts with ADAGrad.Opts;
   
   def learner(mat0:Mat, targ:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = math.min(100000, mat0.ncols/30 + 1);
   	val nn = new Learner(
   	    new MatSource(Array(mat0, targ), opts), 
-  	    new Word2Vec(opts), 
+  	    new Word2Vech(opts), 
   	    null,
   	    null, 
   	    null,
@@ -407,7 +407,7 @@ object Word2Vech  {
     (nn, opts)
   }
   
-  class FDSopts extends Learner.Options with Word2Vec.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
+  class FDSopts extends Learner.Options with Word2Vech.Opts with FileSource.Opts with ADAGrad.Opts
   
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
   
@@ -420,7 +420,7 @@ object Word2Vech  {
     val ds = new FileSource(opts);
   	val nn = new Learner(
   			ds, 
-  	    new Word2Vec(opts), 
+  	    new Word2Vech(opts), 
   	    null,
   	    null, 
   	    null,
@@ -429,20 +429,18 @@ object Word2Vech  {
   }
   
   def predictor(model0:Model, mat0:Mat, preds:Mat):(Learner, LearnOptions) = {
-    val model = model0.asInstanceOf[Word2Vec];
+    val model = model0.asInstanceOf[Word2Vech];
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)
     if (mat0.asInstanceOf[AnyRef] != null) opts.putBack = 1;
     
-    val newmod = new Word2Vec(opts);
+    val newmod = new Word2Vech(opts);
     newmod.refresh = false;
     newmod.copyFrom(model);
     val mopts = model.opts.asInstanceOf[Word2Vec.Opts];
     opts.dim = mopts.dim;
     opts.vocabSize = mopts.vocabSize;
     opts.nskip = mopts.nskip;
-    opts.nneg = mopts.nneg;
-    opts.nreuse = mopts.nreuse;
     val nn = new Learner(
         new MatSource(Array(mat0, preds), opts), 
         newmod, 
@@ -457,19 +455,13 @@ object Word2Vech  {
     val model = model0.asInstanceOf[Word2Vec];
     val opts = new LearnOptions;
     opts.batchSize = math.min(10000, mat0.ncols/30 + 1)    
-    val newmod = new Word2Vec(opts);
+    val newmod = new Word2Vech(opts);
     newmod.refresh = false;
     newmod.copyFrom(model);
     val mopts = model.opts.asInstanceOf[Word2Vec.Opts];
     opts.dim = mopts.dim;
     opts.vocabSize = mopts.vocabSize;
     opts.nskip = mopts.nskip;
-    opts.nneg = mopts.nneg;
-    opts.nreuse = mopts.nreuse;
-    opts.maxArraySize = mopts.maxArraySize;
-    opts.iSlice = mopts.iSlice;
-    opts.nSlices = mopts.nSlices;
-    opts.nHeadTerms = mopts.nHeadTerms;
     val nn = new Learner(
         new MatSource(Array(mat0), opts), 
         newmod, 
