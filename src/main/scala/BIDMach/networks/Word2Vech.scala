@@ -280,6 +280,84 @@ object Word2Vech  {
     depth;
   }
   
+  import jcuda.jcublas.cublasOperation._;
+  import jcuda.jcublas.JCublas2._;
+  import edu.berkeley.bid.CBLAS._
+  import edu.berkeley.bid.CBLAS.TRANSPOSE._
+
+  
+  def blockMultTN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat) = {
+    (left, right, prod) match {
+      case (gleft:GMat, gright:GMat, gprod:GMat) => {
+        cublasSgemmStridedBatched(gleft.getHandle,
+                          CUBLAS_OP_T, CUBLAS_OP_N,
+                          nr, nc, nk,
+                          GMat.pONE,
+                          gleft.pdata, nk, gleft.nrows,
+                          gright.pdata, nk, gright.nrows,
+                          GMat.pZERO,
+                          gprod.pdata, nr, gprod.nrows,
+                          gleft.ncols);
+        cudaDeviceSynchronize;
+      }
+      case _ => {
+        blockSgemm(Trans, NoTrans, 
+        		nr, nc, nk, left.ncols, 
+        		left.data, 0, nk, left.nrows,
+        		right.data, 0, nk, right.nrows,
+        		prod.data, 0, nr, prod.nrows);
+      }
+    }
+  }
+  
+  def blockMultNN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat) = {
+    (left, right, prod) match {
+      case (gleft:GMat, gright:GMat, gprod:GMat) => {
+        cublasSgemmStridedBatched(gleft.getHandle,
+                          CUBLAS_OP_N, CUBLAS_OP_N,
+                          nr, nc, nk,
+                          GMat.pONE,
+                          gleft.pdata, nr, gleft.nrows,
+                          gright.pdata, nk, gright.nrows,
+                          GMat.pZERO,
+                          gprod.pdata, nr, gprod.nrows,
+                          gleft.ncols);
+        cudaDeviceSynchronize;
+      }
+      case _ => {
+        blockSgemm(NoTrans, NoTrans, 
+        		nr, nc, nk, left.ncols, 
+        		left.data, 0, nr, left.nrows,
+        		right.data, 0, nk, right.nrows,
+        		prod.data, 0, nr, prod.nrows);
+      }
+    }
+  }
+  
+   def blockMultNT(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat) = {
+    (left, right, prod) match {
+      case (gleft:GMat, gright:GMat, gprod:GMat) => {
+        cublasSgemmStridedBatched(gleft.getHandle,
+                          CUBLAS_OP_N, CUBLAS_OP_T,
+                          nr, nc, nk,
+                          GMat.pONE,
+                          gleft.pdata, nr, gleft.nrows,
+                          gright.pdata, nc, gright.nrows,
+                          GMat.pZERO,
+                          gprod.pdata, nr, gprod.nrows,
+                          gleft.ncols);
+        cudaDeviceSynchronize;
+      }
+      case _ => {
+        blockSgemm(NoTrans, Trans, 
+        		nr, nc, nk, left.ncols, 
+        		left.data, 0, nr, left.nrows,
+        		right.data, 0, nc, right.nrows,
+        		prod.data, 0, nr, prod.nrows);
+      }
+    }
+  }
+  
   def mkModel(fopts:Model.Opts) = {
     new Word2Vec(fopts.asInstanceOf[Word2Vec.Opts])
   }
