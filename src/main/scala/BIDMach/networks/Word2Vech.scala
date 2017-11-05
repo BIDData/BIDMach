@@ -160,19 +160,19 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
       val nodevectors = nodevecs(?, ancestors.contents + 1);
       val skipwordvectors = wordvecs(?, skipwords.contents + 1);
       
-      blockMultTN(nskip*2, depth, opts.dim, skipwordvectors, nodevectors, prods);  // All pairs of inner products between skip word and ancestor vecs
+      blockMult(true, false, nskip*2, depth, opts.dim, skipwordvectors, nodevectors, prods);  // All pairs of inner products between skip word and ancestor vecs
 
-      val lprods = logistic(prods)                                                 // Compute the gradient multipliers
+      val lprods = logistic(prods)                                                            // Compute the gradient multipliers
       val codes = isigns(ancestors+1).reshapeView(1, depth, ncols);
       val grads = codes - lprods;
       grads ~ grads *@ lrate;
  
-      blockMultNT(opts.dim, nskip*2, depth, nodevectors, grads, skipworddiffs);    // Update the word vectors
+      blockMult(false, true, opts.dim, nskip*2, depth, nodevectors, grads, skipworddiffs);    // Update the word vectors
       val skipmult = oneHot(skipwords.contents + 1, nfeats+1);
       skipworddiffs.reshapeView(opts.dim, 2*nskip*ncols).maddT(skipmult, wordvecs);
       wordvecs(?,0) = 0f;
       
-      blockMultNN(opts.dim, depth, nskip*2, skipwordvectors, grads, nodediffs);    // Update hierarchy vectors
+      blockMult(false, false, opts.dim, depth, nskip*2, skipwordvectors, grads, nodediffs);   // Update hierarchy vectors
       val nodemult = oneHot(ancestors.contents + 1, nfeats);
       nodediffs.reshapeView(opts.dim, depth*ncols).maddT(nodemult, nodevecs);
       nodevecs(?,0) = 0f;
@@ -186,7 +186,7 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
       val nodevectors = nodevecs(?, ancestors.contents + 1);
       val skipwordvectors = wordvecs(?, skipwords.contents + 1);
       
-      blockMultTN(nskip*2, depth, opts.dim, skipwordvectors, nodevectors, prods);
+      blockMult(true, false, nskip*2, depth, opts.dim, skipwordvectors, nodevectors, prods);
       val lprods = logistic(prods).reshapeView(nskip*2, depth, ncols);
       val codes = isigns(ancestors+1).reshapeView(1, depth, ncols);
       val grads = codes - lprods;
@@ -210,8 +210,6 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     val ubsentence = reverse(cumsumByKey(allones, reverse(sentencenum))) - 1;
     val lb = max(lbsentence(centerwordinds), -opts.nskip);
     val ub = min(ubsentence(centerwordinds), opts.nskip);
-    test3 = lb
-    test4 = ub
     addTime(2);
     
     // Build the ancestor and skip word matrices, set words to -1 across sentence boundaries
@@ -222,7 +220,7 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     skipwords ~ (pgood ∘ (skipwords + 1)) - 1; 
     addTime(3);
     
-    lastblock = wordsens(?, lastblockinds);
+    lastblock <-- wordsens(?, lastblockinds);
 
     (ancestors, skipwords);
   }
@@ -306,75 +304,27 @@ object Word2Vech  {
   import edu.berkeley.bid.CBLAS._
   import edu.berkeley.bid.CBLAS.TRANSPOSE._
 
-  def blockMultTN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
+  def blockMult(ltrans:Boolean, rtrans:Boolean, nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
     (left, right, prod) match {
       case (gleft:GMat, gright:GMat, gprod:GMat) => {
         cublasSgemmStridedBatched(gleft.getHandle,
-                          CUBLAS_OP_T, CUBLAS_OP_N,
+                          (if (ltrans) CUBLAS_OP_T else CUBLAS_OP_N),
+                          (if (rtrans) CUBLAS_OP_T else CUBLAS_OP_N),
                           nr, nc, nk,
                           GMat.pONE,
-                          gleft.pdata, nk, gleft.nrows,
-                          gright.pdata, nk, gright.nrows,
+                          gleft.pdata, if (ltrans) nk else nr, gleft.nrows,
+                          gright.pdata, if (rtrans) nc else nk, gright.nrows,
                           GMat.pZERO,
                           gprod.pdata, nr, gprod.nrows,
                           gleft.ncols);
         cudaDeviceSynchronize;
       }
       case _ => {
-        blockSgemm(Trans, NoTrans, 
+        blockSgemm(if (ltrans) Trans else NoTrans, 
+        		if (rtrans) Trans else NoTrans,
         		nr, nc, nk, left.ncols, 
-        		left.data, 0, nk, left.nrows,
-        		right.data, 0, nk, right.nrows,
-        		prod.data, 0, nr, prod.nrows);
-      }
-    }
-    Mat.nflops += 2L * nr * nc * nk * left.ncols;
-  }
-  
-  def blockMultNN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
-    (left, right, prod) match {
-      case (gleft:GMat, gright:GMat, gprod:GMat) => {
-        cublasSgemmStridedBatched(gleft.getHandle,
-                          CUBLAS_OP_N, CUBLAS_OP_N,
-                          nr, nc, nk,
-                          GMat.pONE,
-                          gleft.pdata, nr, gleft.nrows,
-                          gright.pdata, nk, gright.nrows,
-                          GMat.pZERO,
-                          gprod.pdata, nr, gprod.nrows,
-                          gleft.ncols);
-        cudaDeviceSynchronize;
-      }
-      case _ => {
-        blockSgemm(NoTrans, NoTrans, 
-        		nr, nc, nk, left.ncols, 
-        		left.data, 0, nr, left.nrows,
-        		right.data, 0, nk, right.nrows,
-        		prod.data, 0, nr, prod.nrows);
-      }
-    }
-    Mat.nflops += 2L * nr * nc * nk * left.ncols;
-  }
-  
-   def blockMultNT(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
-    (left, right, prod) match {
-      case (gleft:GMat, gright:GMat, gprod:GMat) => {
-        cublasSgemmStridedBatched(gleft.getHandle,
-                          CUBLAS_OP_N, CUBLAS_OP_T,
-                          nr, nc, nk,
-                          GMat.pONE,
-                          gleft.pdata, nr, gleft.nrows,
-                          gright.pdata, nc, gright.nrows,
-                          GMat.pZERO,
-                          gprod.pdata, nr, gprod.nrows,
-                          gleft.ncols);
-        cudaDeviceSynchronize;
-      }
-      case _ => {
-        blockSgemm(NoTrans, Trans, 
-        		nr, nc, nk, left.ncols, 
-        		left.data, 0, nr, left.nrows,
-        		right.data, 0, nc, right.nrows,
+        		left.data, 0,  if (ltrans) nk else nr, left.nrows,
+        		right.data, 0, if (rtrans) nc else nk, right.nrows,
         		prod.data, 0, nr, prod.nrows);
       }
     }
