@@ -56,12 +56,19 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
   var centerwordinds:IMat = null;
   var wordvecs:FMat = null;
   var nodevecs:FMat = null;
+  var skipworddiffs:FMat = null;
+  var nodediffs:FMat = null;
+  var prods:FMat = null;
   var nfreqs:FMat = null;
-  var itree:IMat = null;
+  var uptree:IMat = null;
+  var downtree:IMat = null;
   var iancestors:IMat = null;
+  var isigns:IMat = null;
 //  var retEvalPos:GMat = null;
 //  var retEvalNeg:GMat = null;
   var nfeats = 0;
+  var nskip = 0;
+  var depth = 0;
   var ncols = 0;
   var expt = 0f;
   var vexp = 0f;
@@ -91,19 +98,28 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
   var test2:Mat = null;
   var test3:Mat = null;
   var test4:Mat = null;
-  
+ 
+  import Word2Vech._
 
   override def init() = {
     val mats = datasource.next;
 	  nfeats = opts.vocabSize;
 	  ncols = mats(0).ncols;
 	  datasource.reset;
+	  
+	  nskip = opts.nskip;
+    val nwindow = nskip * 2 + 1;
     
     nfreqs = zeros(2*nfeats-1,1);
     nfreqs((nfeats-1)->(2*nfeats-1),0) = FMat(opts.freqs / sum(opts.freqs));
-    itree = izeros(2*nfeats-1, 1);
+    uptree = izeros(2*nfeats-1, 1);
+    downtree = izeros(nfeats-1, 1);
     
-    iancestors = Word2Vech.buildHierarchy(nfreqs, itree);
+    buildTrees(nfreqs, uptree, downtree);
+    depth = treeDepth(uptree);
+    iancestors = izeros(depth, ncols);
+    isigns = izeros(depth, ncols);
+    fillHierarchy(uptree, downtree, depth, iancestors, isigns);
 	
     if (refresh) {
     	setmodelmats(new Array[Mat](2));
@@ -118,8 +134,10 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     modelmats(1) = convertMat(modelmats(1)); 
     wordvecs = modelmats(0).asInstanceOf[FMat];
     nodevecs = modelmats(1).asInstanceOf[FMat];
-    val nskip = opts.nskip;
-    val nwindow = nskip * 2 + 1;
+    prods = convertMat(zeros(2 * nskip * depth, ncols)).asInstanceOf[FMat];
+    skipworddiffs = wordvecs.zeros(opts.dim, ncols);
+    nodediffs = nodevecs.zeros(opts.dim, ncols);
+
     val skipcol = icol((-nskip) to -1) on icol(1 to nskip);
     wordmask = convertIMat(skipcol * iones(1, ncols));                     // columns = distances from center word
     lastblock = convertIMat(izeros(2, nskip*2));
@@ -140,11 +158,13 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
     	val gopts = opts.asInstanceOf[ADAGrad.Opts];
     	val lrate = gopts.lrate.dv.toFloat * math.pow(nsteps, - gopts.texp.dv).toFloat;
     	val (ancestors, skipwords) = wordMats(gmats, ipass, pos);
-      val nodevectors = nodevecs(?, ancestors.contents);
-      val skipwordvectors = wordvecs(?, skipwords.contents);
-      // blockMultTN(depth, nskip*2, opts.dim, nodevectors, skipwordvectors, prods);
-      // blockMultNN(opts.dim, nskip*2, depth, nodevectors, prods, skipdiffs);
-      // blockMultNT(opts.dim, depth, nskip*2, skipwordvectors, prods, nodediffs);
+      val nodevectors = nodevecs(?, ancestors.contents + 1);
+      val skipwordvectors = wordvecs(?, skipwords.contents + 1);
+      blockMultTN(depth, nskip*2, opts.dim, nodevectors, skipwordvectors, prods);
+      
+      
+      blockMultNN(opts.dim, nskip*2, depth, nodevectors, prods, skipworddiffs);
+      blockMultNT(opts.dim, depth, nskip*2, skipwordvectors, prods, nodediffs);
     }
   }
   
@@ -213,15 +233,7 @@ object Word2Vech  {
   
   class Options extends Opts {}
   
-  def buildHierarchy(nfreqs:FMat, itree:IMat):IMat = {
-    buildTree(nfreqs, itree);
-    val d = treeDepth(itree);
-    val hierarchy = izeros(d, nfreqs.length);
-    fillHierarchy(itree, d, hierarchy);
-    hierarchy;
-  }
-  
-  def buildTree(nfreqs:FMat, itree:IMat) = {
+  def buildTrees(nfreqs:FMat, uptree:IMat, downtree:IMat) = {
     val nfeats = (nfreqs.length + 1) / 2;
     val pq = collection.mutable.PriorityQueue[Tuple2[Float,Int] ]();
     var i = 0;
@@ -234,24 +246,25 @@ object Word2Vech  {
       i -= 1;
       val v1 = pq.dequeue;
       val v2 = pq.dequeue;
-      itree(v1._2, 0) = i;
-      itree(v2._2, 0) = i;
+      uptree(v1._2, 0) = i;
+      uptree(v2._2, 0) = i;
+      downtree(i, 0) = v1._2;
       val newv = -(v1._1 + v2._1);
       nfreqs(i, 0) = newv;
       pq += new Tuple2(- newv, i);
     }
-    itree(0,0) = -1;
+    uptree(0,0) = -1;
   }
   
-  def treeDepth(itree:IMat):Int = {
-	  val nfeats = (itree.length + 1) / 2;
+  def treeDepth(uptree:IMat):Int = {
+	  val nfeats = (uptree.length + 1) / 2;
     var i = nfeats - 1;
     var depth = 0;
     while (i < 2*nfeats - 1) {
       var j = 0;
-      var ptr = itree(i);
+      var ptr = uptree(i);
       while (ptr >= 0) {
-        ptr = itree(ptr);
+        ptr = uptree(ptr);
         j += 1;
       }
       depth = math.max(depth, j);
@@ -260,19 +273,22 @@ object Word2Vech  {
     depth;
   }
   
-  def fillHierarchy(itree:IMat, depth:Int, hier:IMat) = {
-    val nfeats = (itree.length + 1) / 2;
+  def fillHierarchy(uptree:IMat, downtree:IMat, depth:Int, iancestors:IMat, isigns:IMat) = {
+    val nfeats = (uptree.length + 1) / 2;
     var i = 0;
     while (i < nfeats) {
       var j = 0;
-      var ptr = itree(i);
+      var ptr = uptree(i);
       while (ptr >= 0) {
-        hier(j, i) = ptr;
-        ptr = itree(ptr);
+        iancestors(j, i) = ptr;
+        val ptr0 = uptree(ptr,0);
+        isigns(j, i) = if (ptr0 < 0 || ptr == downtree(ptr0, 0)) 1 else -1;
+        ptr = ptr0;
         j += 1;
       }
       while (j < depth) {
-        hier(j, i) = -1;
+        iancestors(j, i) = -1;
+        isigns(j, i) = 1;
         j += 1;
       }
       i += 1;
@@ -286,7 +302,7 @@ object Word2Vech  {
   import edu.berkeley.bid.CBLAS.TRANSPOSE._
 
   
-  def blockMultTN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat) = {
+  def blockMultTN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
     (left, right, prod) match {
       case (gleft:GMat, gright:GMat, gprod:GMat) => {
         cublasSgemmStridedBatched(gleft.getHandle,
@@ -308,9 +324,10 @@ object Word2Vech  {
         		prod.data, 0, nr, prod.nrows);
       }
     }
+    Mat.nflops += 2L * nr * nc * nk * left.ncols;
   }
   
-  def blockMultNN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat) = {
+  def blockMultNN(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
     (left, right, prod) match {
       case (gleft:GMat, gright:GMat, gprod:GMat) => {
         cublasSgemmStridedBatched(gleft.getHandle,
@@ -332,9 +349,10 @@ object Word2Vech  {
         		prod.data, 0, nr, prod.nrows);
       }
     }
+    Mat.nflops += 2L * nr * nc * nk * left.ncols;
   }
   
-   def blockMultNT(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat) = {
+   def blockMultNT(nr:Int, nc:Int, nk:Int, left:FMat, right:FMat, prod:FMat):Unit = {
     (left, right, prod) match {
       case (gleft:GMat, gright:GMat, gprod:GMat) => {
         cublasSgemmStridedBatched(gleft.getHandle,
@@ -356,6 +374,7 @@ object Word2Vech  {
         		prod.data, 0, nr, prod.nrows);
       }
     }
+    Mat.nflops += 2L * nr * nc * nk * left.ncols;
   }
   
   def mkModel(fopts:Model.Opts) = {
