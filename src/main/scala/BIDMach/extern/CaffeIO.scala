@@ -30,6 +30,9 @@ object CaffeIO {
   }
 
   private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, net:Net) = {
+    // Caffe only supports CrossCorrelation convolution
+    net.opts.convType = Net.CrossCorrelation
+
     // TODO: enforce NCHW if necessary
     // Translate every layer and build a mapping of blobs to layers feeding into them
     val nodes = new mutable.ArrayBuffer[Node]
@@ -231,7 +234,7 @@ object CaffeIO {
       layer.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
       modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
         val x = GFilter(filter)
-        x.convType = convNode.convType
+        x.convType = Net.CrossCorrelation
         x.setTensorFormat(Net.getCUDNNformat(convNode.tensorFormat, net.opts.tensorFormat));
         x
       } else {
