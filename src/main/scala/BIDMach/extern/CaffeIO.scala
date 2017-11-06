@@ -317,7 +317,7 @@ object CaffeIO {
         if (layer.getBlobsCount() != 1) {
           throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
         }
-        addMatsFromBlobs(modelMats, linNode, layer)
+        modelMats += blob2MatTranspose(layer.getBlobs(0))
         modelMats += null
       } else {
         if (layer.getBlobsCount() != 2) {
@@ -330,11 +330,9 @@ object CaffeIO {
           throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
         }
         
-        // We unfortunately can't use addMatsFromBlobs here because Caffe's bias blob is 1D, while BIDMach wants
-        // a 2D bias where the second dimension is 1.
         val outDim = layer.getBlobs(0).getShape().getDim(0).intValue()
-        val weightMat = blob2Mat(layer.getBlobs(0))
-        val biasMat = blob2Mat(layer.getBlobs(1)).reshape(outDim, 1)
+        val weightMat = blob2MatTranspose(layer.getBlobs(0))
+        val biasMat = blob2MatTranspose(layer.getBlobs(1)).reshape(outDim, 1)
         modelMats += weightMat
         modelMats += biasMat
       }
@@ -343,22 +341,23 @@ object CaffeIO {
   }
   
   /**
-   * Converts each blob in the given layer to a Mat, and appends these Mats to {@code modelMats}.
-   * Additionally sets the {@code imodel} value of {@code node} to the correct value.
-   * Automatically converts data from row-major order to column-major order.
+   * Converts the given blob into a Mat. Does not perform any transposition.
    */
-  private def addMatsFromBlobs(modelMats:mutable.Buffer[Mat], node:ModelNode, layer:Caffe.LayerParameter) = {
-    node.imodel = modelMats.length
-    for (blob <- layer.getBlobsList()) {
-      modelMats += blob2Mat(blob)
+  private def blob2Mat(blob:Caffe.BlobProto):Mat = {
+    val dims = blob.getShape().getDimList().map(_.intValue()).toArray
+    if (blob.getDoubleDataCount() > 0) {
+      // TODO: should I bother with GDMat
+      new DMat(dims, blob.getDoubleDataList().map(_.doubleValue()).toArray)
+    } else {
+      // TODO: should I bother with GFMat
+      new FMat(dims, blob.getDataList().map(_.floatValue()).toArray)
     }
   }
   
   /**
-   * Converts the given blob into a Mat.
-   * Automatically converts data from row-major order to column-major order.
+   * Converts the given blob into a Mat, transposing data from row-major order to column-major order.
    */
-  private def blob2Mat(blob:Caffe.BlobProto):Mat = {
+  private def blob2MatTranspose(blob:Caffe.BlobProto):Mat = {
     // We convert from row-major to column-major by creating a Mat with reversed dimensions,
     // loading it up with the row-major data, and then performing a deep transpose
     val dimList = blob.getShape().getDimList()
