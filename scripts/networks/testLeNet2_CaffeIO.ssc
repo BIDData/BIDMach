@@ -43,7 +43,7 @@ try {
     f.close()
   }
 }
-// XXX this appears to be missing support in the protobuf
+// XXX CaffeIO needs to be fixed to automatically figure this out
 model.opts.nodeset(9).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
 
 
@@ -52,6 +52,7 @@ nn.train;
 
 val (mm, mopts) =  Net.predictor(model, test, testlabels);
 mopts.batchSize = 64;
+mopts.autoReset = false
 val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 
