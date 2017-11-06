@@ -202,7 +202,7 @@ object CaffeIO {
       if (convParam.hasStrideW()) {
         stride = convParam.getStrideW() \ convParam.getStrideH()
       } else if (convParam.getStrideCount() == 0) {
-        pad = irow(1)
+        stride = irow(1)
       } else {
         stride = irow(convParam.getStrideList().map(_.intValue()).toList)
       }
