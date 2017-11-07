@@ -70,17 +70,17 @@ def load(net:Net,fname:String) {
 
 nn.pause
 Thread.sleep(1000)
-load(model,"models/cifar/")
 :load gan.ssc
 val s = start("cifar")
-load(model,"models/cifar/")
-plotscore(s.dscores)
-plotscore(s.gscores)
-plotscore(s.gsteps)
-s.lrate=10f
+//plotscore(s.dscores)
+//plotscore(s.gscores)
+//plotscore(s.gsteps)
+s.lrate=0.1f
 s.iter=100
 s.langevin = 0
-s.dWeight=4
+s.dWeight=0.5f
+s.scale = 256
+load(model,"models/cifar/")
 gen(s)
 
 :silent
