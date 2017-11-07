@@ -38,6 +38,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var _dWeight: Mat = null;
     var scale = 64f;
     var _scale: Mat = null;
+    var l2lambda = 0f;
+    var _l2lambda: Mat = null;
     var noise: Mat = null;
     var done = false;
     var ipass = 0;
@@ -50,6 +52,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var mcmcSteps = 0;
     var endLayer = 0;    
     var derivFunc: Layer=>Unit = null;
+    
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -73,6 +76,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         _dWeight = net.layers(0).output.zeros(1,1);  
         _vWeight = net.layers(0).output.zeros(1,1);  
         _scale = net.layers(0).output.zeros(1,1);  
+        _l2lambda = net.layers(0).output.zeros(1,1);  
         accClassifier = net.layers(0).output.zeros(net.layers(0).output.dims);
         accDiscriminator = net.layers(0).output.zeros(net.layers(0).output.dims);
         momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
@@ -91,9 +95,10 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         setInputGradient(net);
         setInputGradient(D);
         
-        plot.add_slider("lrate",(x:Int)=>{lrate=(10f^(x/20f-4))(0);lrate},60,4);
         plot.add_slider("iter",(x:Int)=>{iter=(x+1)*10;iter},9,0);
+        plot.add_slider("lrate",(x:Int)=>{lrate=(10f^(x/20f-4))(0);lrate},60,4);
         plot.add_slider("noise",(x:Int)=>{langevin=(10f^(x/20f-4))(0);langevin},60,4);
+        plot.add_slider("L2 norm",(x:Int)=>{l2lambda=(10f^(x/20f-7))(0);l2lambda},60,7);
         plot.add_slider("discriminatorWeight",(x:Int)=>{dWeight=x/100f;dWeight});
     }
 
@@ -188,17 +193,27 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             _dWeight(0,0) = dWeight;
             val grad = (net.layers(0).deriv *@ (1f - _dWeight)) + (_dWeight *@ D.layers(0).deriv)
             normrnd(0,langevin/(1),noise);
+            _l2lambda(0,0) = l2lambda*2f;
             grad ~ grad + noise;
+            grad ~ grad - (net.layers(0).output *@ _l2lambda)
             grad ~ grad * 0.1f;
             momentum ~ momentum * 0.9f;
             momentum ~ momentum + grad
             net.layers(0).output~net.layers(0).output + (momentum *@ _lrate);
             //println("here3")
-            max(net.layers(0).output,0,net.layers(0).output);
+            max(net.layers(0).output,-255,net.layers(0).output);
             min(net.layers(0).output,255,net.layers(0).output);
             val dims = net.layers(0).output.dims;
             val s = dims(1);
             val d = net.layers(0).output.reshapeView(dims(1),dims(2),dims(0),dims(3))
+            /*if (t % 2 == 0) {
+                d(0->(s-1),?,?,?) = (d(0->(s-1),?,?,?)*0.5f + d(1->s,?,?,?)*0.5f)// *0.5f
+                d(?,0->(s-1),?,?) = (d(?,0->(s-1),?,?)*0.5f + d(?,1->s,?,?)*0.5f)// *0.5f
+            }
+            else {
+                d(1->s,?,?,?) = (d(0->(s-1),?,?,?)*0.5f + d(1->s,?,?,?)*0.5f)// *0.5f
+                d(?,1->s,?,?) = (d(?,0->(s-1),?,?)*0.5f + d(?,1->s,?,?)*0.5f)// *0.5f
+            }*/
             if (t % 2 == 0) {
                 d(0->(s-1),?,?,0) = (d(0->(s-1),?,?,0)*0.5f + d(1->s,?,?,0)*0.5f)// *0.5f
                 d(?,0->(s-1),?,0) = (d(?,0->(s-1),?,0)*0.5f + d(?,1->s,?,0)*0.5f)// *0.5f
@@ -207,12 +222,13 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 d(1->s,?,?,0) = (d(0->(s-1),?,?,0)*0.5f + d(1->s,?,?,0)*0.5f)// *0.5f
                 d(?,1->s,?,0) = (d(?,0->(s-1),?,0)*0.5f + d(?,1->s,?,0)*0.5f)// *0.5f
             }
+            
             t += 1
             D.layers(0).output<--net.layers(0).output;
             if (p && t%10 == 0) {
                 println(curScore,margin);
                 _scale(0,0) = scale;
-                val da = D.layers(0).output / _scale;
+                val da = (D.layers(0).output/2f + 128f) / _scale;
                 val img = utils.filter2img(da-0.5f,D.opts.tensorFormat);
                 plot.plot_image(img)
             }
