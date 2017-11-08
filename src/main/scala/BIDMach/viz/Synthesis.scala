@@ -201,8 +201,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             momentum ~ momentum + grad
             net.layers(0).output~net.layers(0).output + (momentum *@ _lrate);
             //println("here3")
-            max(net.layers(0).output,-255,net.layers(0).output);
-            min(net.layers(0).output,255,net.layers(0).output);
+//            max(net.layers(0).output,-255,net.layers(0).output);
+//            min(net.layers(0).output,255,net.layers(0).output);
             val dims = net.layers(0).output.dims;
             val s = dims(1);
             val d = net.layers(0).output.reshapeView(dims(1),dims(2),dims(0),dims(3))
@@ -228,6 +228,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             if (p && t%10 == 0) {
                 println(curScore,margin);
                 _scale(0,0) = scale;
+                //val da = (D.layers(0).output) / _scale;
                 val da = (D.layers(0).output/2f + 128f) / _scale;
                 val img = utils.filter2img(da-0.5f,D.opts.tensorFormat);
                 plot.plot_image(img)
