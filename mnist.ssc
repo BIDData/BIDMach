@@ -29,41 +29,42 @@ opts.hasBias = true;
 opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
 
-import BIDMach.networks.layers.Node._;
+val nodes = {
+    import BIDMach.networks.layers.Node._;
 
-val in = input;
-//val rin = relu(in)()
-//val scalef = constant(row(1f/256));
-//val inscale = rin *@ scalef
+    val in = input;
+    //val rin = relu(in)()
+    //val scalef = constant(row(1f/256));
+    //val inscale = rin *@ scalef
 
-val conv1 = conv(in)(w=5,h=5,nch=6,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
-val pool1 = pool(conv1)(w=2,h=2,stride=2,pad=0);
-val bns1 = batchNormScale(pool1)();
-val relu1 = relu(bns1)();
+    val conv1 = conv(in)(w=5,h=5,nch=6,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val pool1 = pool(conv1)(w=2,h=2,stride=2,pad=0);
+    val bns1 = batchNormScale(pool1)();
+    val relu1 = relu(bns1)();
 
-val conv2 = conv(relu1)(w=5,h=5,nch=16,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);   
-val pool2 = pool(conv2)(w=2,h=2,stride=2,pad=0);
-val bns2 = batchNormScale(pool2)();
-val relu2 = relu(bns2)();
+    val conv2 = conv(relu1)(w=5,h=5,nch=16,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);   
+    val pool2 = pool(conv2)(w=2,h=2,stride=2,pad=0);
+    val bns2 = batchNormScale(pool2)();
+    val relu2 = relu(bns2)();
 
-val fc3 = linear(relu2)(outdim=120,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
-val relu3 = relu(fc3)();
+    val fc3 = linear(relu2)(outdim=120,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val relu3 = relu(fc3)();
 
-val fc4 = linear(relu3)(outdim=84,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
-val relu4  = relu(fc4)();
+    val fc4 = linear(relu3)(outdim=84,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val relu4  = relu(fc4)();
 
-val fc5  = linear(relu4)(outdim=10,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
-val out = softmaxout(fc5)(scoreType=1);
-//val out = softmaxout(fc5 )();
+    val fc5  = linear(relu4)(outdim=10,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val out = softmaxout(fc5)(scoreType=1);
+    //val out = softmaxout(fc5 )();
 
-val nodes = (in     \ null    \ null   \ null    on
-//val nodes = (in     \ rin    \ scalef   \ inscale    on
-             conv1  \ pool1   \ bns1   \ relu1   on
-             conv2  \ pool2   \ bns2   \ relu2   on
-             fc3    \ relu3   \ null   \ null    on
-             fc4    \ relu4   \ null   \ null    on
-	     fc5    \ out     \ null   \ null).t
-
+            (in     \ null    \ null   \ null    on
+    //val nodes = (in     \ rin    \ scalef   \ inscale    on
+                 conv1  \ pool1   \ bns1   \ relu1   on
+                 conv2  \ pool2   \ bns2   \ relu2   on
+                 fc3    \ relu3   \ null   \ null    on
+                 fc4    \ relu4   \ null   \ null    on
+             fc5    \ out     \ null   \ null).t
+}
 
 
 opts.nodemat = nodes;
@@ -106,7 +107,9 @@ def setConvI(filter:Int,x:Int = 7,y:Int = 7) = {
     func
 }
 
-
+load(s.D,"models/mnist_discri2/")
+s.iter = 5000
+s.endLayer=5
 
 
 :silent
