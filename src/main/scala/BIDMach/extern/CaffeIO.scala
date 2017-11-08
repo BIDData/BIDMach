@@ -39,27 +39,28 @@ object CaffeIO {
     // TODO: make sure that either everything is trained or nothing is
     val modelMats = new mutable.ArrayBuffer[Mat]
     val nodesWithTop = new mutable.HashMap[String,mutable.Buffer[Node]]
+    implicit def nodeOnly(node:Node):(Node,Seq[Mat]) = (node, null)
     for (layer <- netParam.getLayerList()) {
-      layer.getType() match {
-        case "Convolution" => translateConvolution(layer, nodes, modelMats, net)
-        case "Pooling" => translatePooling(layer, nodes)
-        case "LRN" => translateLRN(layer, nodes)
+      var (newNode, newMats):(Node,Seq[Mat]) = layer.getType() match {
+        case "Convolution" => translateConvolution(layer, net)
+        case "Pooling" => translatePooling(layer)
+        case "LRN" => translateLRN(layer)
         case "BatchNorm" => {
           val bnParam = layer.getBatchNormParam()
-          nodes += new BatchNormNode {
+          new BatchNormNode {
             epsilon = bnParam.getEps()
             expAvgFactor = bnParam.getMovingAverageFraction()
           }
         }
 
-        case "SoftmaxWithLoss" => nodes += new SoftmaxOutputNode
-        case "HingeLoss" => nodes += new GLMNode { links = irow(3) }
-        case "Accuracy" => nodes += new AccuracyNode
+        case "SoftmaxWithLoss" => new SoftmaxOutputNode
+        case "HingeLoss" => new GLMNode { links = irow(3) }
+        case "Accuracy" => new AccuracyNode
 
-        case "ReLU" => nodes += new RectNode
-        case "Sigmoid" => nodes += new SigmoidNode
-        case "TanH" => nodes += new TanhNode
-        case "BNLL" => nodes += new SoftplusNode
+        case "ReLU" => new RectNode
+        case "Sigmoid" => new SigmoidNode
+        case "TanH" => new TanhNode
+        case "BNLL" => new SoftplusNode
 
         case "Data" => {
           val dataParam = layer.getDataParam()
@@ -68,31 +69,31 @@ object CaffeIO {
             net.opts.asInstanceOf[DataSource.Opts].batchSize = dataParam.getBatchSize()
           }
           
-          nodes += new InputNode
+          new InputNode
         }
-        case "MemoryData" => nodes += new InputNode
-        case "HDF5Data" => nodes += new InputNode
+        case "MemoryData" => new InputNode
+        case "HDF5Data" => new InputNode
 
-        case "InnerProduct" => translateInnerProduct(layer, nodes, modelMats)
-        case "Split" => nodes += new CopyNode
-        case "Softmax" => nodes += new SoftmaxNode
+        case "InnerProduct" => translateInnerProduct(layer)
+        case "Split" => new CopyNode
+        case "Softmax" => new SoftmaxNode
         case "Dropout" => {
           val dropoutParam = layer.getDropoutParam()
-          nodes += new DropoutNode { frac = dropoutParam.getDropoutRatio() }
+          new DropoutNode { frac = dropoutParam.getDropoutRatio() }
         }
         // TODO: implement base, shift, scale for the following two
-        case "Exp" => nodes += new ExpNode
-        case "Log" => nodes += new LnNode
+        case "Exp" => new ExpNode
+        case "Log" => new LnNode
         case "Scale" => {
           val scaleParam = layer.getScaleParam()
-          nodes += new ScaleNode { hasBias = scaleParam.getBiasTerm() }
+          new ScaleNode { hasBias = scaleParam.getBiasTerm() }
         }
         // TODO: change once we implement all layer types
         case _ => throw new NotImplementedError("\"%s\" is not implemented yet" format layer.getType())
       }
       
-      if (nodes.last.isInstanceOf[ModelNode]) {
-        val modelNode = nodes.last.asInstanceOf[ModelNode]
+      if (newNode.isInstanceOf[ModelNode]) {
+        val modelNode = newNode.asInstanceOf[ModelNode]
         
         if (layer.getParamCount() >= 1) {
           modelNode.lr_scale = layer.getParam(0).getLrMult()
@@ -101,11 +102,18 @@ object CaffeIO {
             modelNode.bias_scale = layer.getParam(1).getLrMult()
           }
         }
+        
+        if (newMats != null) {
+          modelNode.imodel = modelMats.length
+          modelMats ++= newMats
+        }
       }
       
       for (t <- layer.getTopList()) {
-        nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer) += nodes.last
+        nodesWithTop.getOrElseUpdate(t, new mutable.ArrayBuffer) += newNode
       }
+      
+      nodes += newNode
     }
     
     // Assign layer inputs based on which Caffe blobs each layer links to.
@@ -184,7 +192,7 @@ object CaffeIO {
     }
   }
   
-  private def translateConvolution(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node], modelMats:mutable.Buffer[Mat], net:Net) = {
+  private def translateConvolution(layer:Caffe.LayerParameter, net:Net) = {
     val convParam = layer.getConvolutionParam()
     
     val convNode = new ConvNode {
@@ -217,6 +225,7 @@ object CaffeIO {
       }
     }
     
+    val modelMats = new mutable.ArrayBuffer[Mat]
     if (layer.getBlobsCount() > 0) {
       if (!convNode.hasBias && layer.getBlobsCount() != 1) {
         throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
@@ -224,8 +233,6 @@ object CaffeIO {
       if (convNode.hasBias && layer.getBlobsCount() != 2) {
         throw new IllegalArgumentException("Convolution layer with bias needs 2 matrices")
       }
-      
-      convNode.imodel = modelMats.length
 
       // TODO: avoid duplicating code with ConvLayer here
       val shape = layer.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
@@ -249,12 +256,12 @@ object CaffeIO {
       }
     }
     
-    nodes += convNode
+    (convNode, modelMats)
   }
   
-  private def translatePooling(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node]) = {
+  private def translatePooling(layer:Caffe.LayerParameter) = {
     val poolingParam = layer.getPoolingParam()
-    nodes += new PoolingNode {
+    new PoolingNode {
       if (poolingParam.hasPadH()) {
         pady = poolingParam.getPadH()
         padx = poolingParam.getPadW()
@@ -287,16 +294,16 @@ object CaffeIO {
     }
   }
   
-  private def translateLRN(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node]) = {
+  private def translateLRN(layer:Caffe.LayerParameter) = {
     val lrnParam = layer.getLrnParam()
     if (lrnParam.getNormRegion() == NormRegion.WITHIN_CHANNEL) {
-      nodes += new LRNwithinNode {
+      new LRNwithinNode {
         dim = lrnParam.getLocalSize()
         alpha = lrnParam.getAlpha()
         beta = lrnParam.getBeta()
       }
     } else {
-      nodes += new LRNacrossNode {
+      new LRNacrossNode {
         dim = lrnParam.getLocalSize()
         alpha = lrnParam.getAlpha()
         beta = lrnParam.getBeta()
@@ -305,20 +312,19 @@ object CaffeIO {
     }
   }
   
-  private def translateInnerProduct(layer:Caffe.LayerParameter, nodes:mutable.Buffer[Node], modelMats:mutable.Buffer[Mat]) = {
+  private def translateInnerProduct(layer:Caffe.LayerParameter) = {
     val ipp = layer.getInnerProductParam()
     val linNode = new LinNode {
       outdim = ipp.getNumOutput()
       hasBias = ipp.getBiasTerm()
     }
+    var modelMats:Seq[Mat] = null
     if (layer.getBlobsCount() > 0) {
-      linNode.imodel = modelMats.length
       if (!linNode.hasBias) {
         if (layer.getBlobsCount() != 1) {
           throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
         }
-        modelMats += blob2MatTranspose(layer.getBlobs(0))
-        modelMats += null
+        modelMats = Array(blob2MatTranspose(layer.getBlobs(0)), null)
       } else {
         if (layer.getBlobsCount() != 2) {
           throw new IllegalArgumentException("Linear layer without bias needs 2 matrices")
@@ -333,11 +339,10 @@ object CaffeIO {
         val outDim = layer.getBlobs(0).getShape().getDim(0).intValue()
         val weightMat = blob2MatTranspose(layer.getBlobs(0))
         val biasMat = blob2MatTranspose(layer.getBlobs(1)).reshape(outDim, 1)
-        modelMats += weightMat
-        modelMats += biasMat
+        modelMats = Array(weightMat, biasMat)
       }
     }
-    nodes += linNode
+    (linNode, modelMats)
   }
   
   /**
