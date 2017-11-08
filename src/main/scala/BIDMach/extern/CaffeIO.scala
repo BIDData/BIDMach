@@ -20,7 +20,8 @@ import jcuda.jcudnn.cudnnPoolingMode
 object CaffeIO {
   private class CaffeLayer(val param:Caffe.LayerParameter) {
     val inputs = new mutable.ArrayBuffer[CaffeLayer]
-    var node:NodeTerm = null
+    var inodeFirst = -1
+    var inodeLast = -1
   }
 
   def loadUntrainedModel(fin:Readable, net:Net):Unit = {
@@ -47,13 +48,13 @@ object CaffeIO {
     val nodes = new mutable.ArrayBuffer[Node]
     // TODO: make sure that either everything is trained or nothing is
     val modelMats = new mutable.ArrayBuffer[Mat]
-    implicit def nodeOnly(node:Node):(Node,Seq[Mat]) = (node, null)
+    implicit def nodeOnly(node:Node):(Array[Node],Seq[Mat]) = (Array(node), null)
     var i = 0
     while (i < layers.length) {
       val layer = layers(i)
       var incr = 1
 
-      var (newNode, newMats):(Node,Seq[Mat]) = layer.param.getType() match {
+      var (newNodes, newMats):(Array[Node],Seq[Mat]) = layer.param.getType() match {
         case "Convolution" => translateConvolution(layer, net)
         case "Pooling" => translatePooling(layer)
         case "LRN" => translateLRN(layer)
@@ -64,7 +65,8 @@ object CaffeIO {
             incr = 2
             val scaleParam = layers(i + 1).param.getScaleParam()
             val node = translateBatchNorm(layer, scaleParam)
-            layers(i + 1).node = node
+            layers(i + 1).inodeFirst = nodes.length
+            layers(i + 1).inodeLast = nodes.length
             node
           } else {
             translateBatchNorm(layer, null)
@@ -87,7 +89,7 @@ object CaffeIO {
             net.opts.asInstanceOf[DataSource.Opts].batchSize = dataParam.getBatchSize()
           }
           
-          new InputNode
+          (addTransformNodes(layer.param.getTransformParam(), new InputNode), null)
         }
         case "MemoryData" => new InputNode
         case "HDF5Data" => new InputNode
@@ -110,29 +112,32 @@ object CaffeIO {
         case unknownType => throw new NotImplementedError("\"%s\" is not implemented yet" format unknownType)
       }
       
-      if (newNode.isInstanceOf[ModelNode]) {
-        val modelNode = newNode.asInstanceOf[ModelNode]
-        
-        if (layer.param.getParamCount() >= 1) {
-          modelNode.lr_scale = layer.param.getParam(0).getLrMult()
+      newNodes match {
+        case Array(modelNode:ModelNode) => {
+          if (layer.param.getParamCount() >= 1) {
+            modelNode.lr_scale = layer.param.getParam(0).getLrMult()
+            
+            if (layer.param.getParamCount() >= 2) {
+              modelNode.bias_scale = layer.param.getParam(1).getLrMult()
+            }
+          }
           
-          if (layer.param.getParamCount() >= 2) {
-            modelNode.bias_scale = layer.param.getParam(1).getLrMult()
+          if (newMats ne null) {
+            modelNode.imodel = modelMats.length
+            modelMats ++= newMats
           }
         }
-        
-        if (newMats ne null) {
-          modelNode.imodel = modelMats.length
-          modelMats ++= newMats
-        }
+        case _ =>
       }
       
-      layer.node = newNode
+      layer.inodeFirst = nodes.length
+      layer.inodeLast = nodes.length + newNodes.length - 1
+
       for ((input, i) <- layer.inputs.zipWithIndex) {
-        newNode.inputs(i) = input.node
+        newNodes(0).inputs(i) = nodes(input.inodeLast)
       }
       
-      nodes += newNode
+      nodes ++= newNodes
       i += incr
     }
 
@@ -290,7 +295,7 @@ object CaffeIO {
       }
     }
     
-    (convNode, modelMats)
+    (Array[Node](convNode), modelMats)
   }
   
   private def translatePooling(layer:CaffeLayer) = {
@@ -376,7 +381,7 @@ object CaffeIO {
         modelMats = Array(weightMat, biasMat)
       }
     }
-    (linNode, modelMats)
+    (Array[Node](linNode), modelMats)
   }
   
   private def translateBatchNorm(layer:CaffeLayer, scaleParam:Caffe.ScaleParameter) = {
@@ -402,6 +407,43 @@ object CaffeIO {
         batchNormMode = mode
       }
     }
+  }
+  
+  private def addTransformNodes(transformParam:Caffe.TransformationParameter, subjectNode:Node) = {
+    val newNodeList = new mutable.ListBuffer[Node]
+    newNodeList += subjectNode
+
+    if (transformParam.hasCropSize()) {
+      val cropSize = transformParam.getCropSize()
+      // TODO: use the correct dimensions
+      val sizeMat = 0 \ cropSize \ cropSize \ 0
+      // TODO: do I have to worry about offsets
+      if (transformParam.getMirror()) {
+        newNodeList += new CropMirrorNode {
+          inputs(0) = newNodeList.last
+          sizes = sizeMat
+        }
+      } else {
+        newNodeList += new CropNode {
+          inputs(0) = newNodeList.last
+          sizes = sizeMat
+        }
+      }
+    }
+
+    // TODO: implement mean
+
+    if (transformParam.hasScale()) {
+      val constNode = new ConstantNode {
+        value = transformParam.getScale()
+        cache = true // TODO: verify
+      }
+      val mulNode = newNodeList.last ∘ constNode
+      newNodeList += constNode
+      newNodeList += mulNode
+    }
+
+    newNodeList.toArray
   }
   
   /** Converts the given blob into a Mat. Does not perform any transposition. */

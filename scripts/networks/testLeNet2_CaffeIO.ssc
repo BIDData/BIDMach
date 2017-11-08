@@ -44,7 +44,7 @@ try {
   }
 }
 // XXX CaffeIO needs to be fixed to automatically figure this out
-model.opts.nodeset(9).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
+model.opts.nodeset(11).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
 
 
 

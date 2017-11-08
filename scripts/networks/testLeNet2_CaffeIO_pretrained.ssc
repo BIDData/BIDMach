@@ -5,9 +5,9 @@ import java.io.FileInputStream
 
 val traindir = "../../data/MNIST/"
 
-val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000) / 256;
+val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
 val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
-val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000) / 256;
+val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
 val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
 
 val rp = randperm(60000);
@@ -39,7 +39,7 @@ try {
   }
 }
 // XXX CaffeIO needs to be fixed to automatically figure this out
-model.opts.nodeset(8).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
+model.opts.nodeset(10).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
 
 
 val (mm, mopts) = Net.predictor(model, test, testlabels);
