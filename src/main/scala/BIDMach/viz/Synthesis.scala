@@ -36,8 +36,10 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var _vWeight: Mat = null;
     var dWeight = 0.5f;
     var _dWeight: Mat = null;
-    var scale = 64f;
+    var scale = 1f;
     var _scale: Mat = null;
+    var base = 0f;
+    var _base: Mat = null;    
     var l2lambda = 0f;
     var _l2lambda: Mat = null;
     var noise: Mat = null;
@@ -48,7 +50,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var gdata : Mat = null;
     var trainDis = true;
     val vizs = new ListBuffer[Visualization];
-    val resetInterval = 10;
+    var resetInterval = 10;
     var mcmcSteps = 0;
     var endLayer = 0;    
     var derivFunc: Layer=>Unit = null;
@@ -76,6 +78,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         _dWeight = net.layers(0).output.zeros(1,1);  
         _vWeight = net.layers(0).output.zeros(1,1);  
         _scale = net.layers(0).output.zeros(1,1);  
+        _base = net.layers(0).output.zeros(1,1);  
         _l2lambda = net.layers(0).output.zeros(1,1);  
         accClassifier = net.layers(0).output.zeros(net.layers(0).output.dims);
         accDiscriminator = net.layers(0).output.zeros(net.layers(0).output.dims);
@@ -96,6 +99,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         setInputGradient(D);
         
         plot.add_slider("iter",(x:Int)=>{iter=(x+1)*10;iter},9,0);
+        plot.add_slider("scale",(x:Int)=>{scale=x/100f;scale},50,1);
+        plot.add_slider("base",(x:Int)=>{base=x*4;base},32,0);
         plot.add_slider("lrate",(x:Int)=>{lrate=(10f^(x/20f-4))(0);lrate},60,4);
         plot.add_slider("noise",(x:Int)=>{langevin=(10f^(x/20f-4))(0);langevin},60,4);
         plot.add_slider("L2 norm",(x:Int)=>{l2lambda=(10f^(x/20f-7))(0);l2lambda},60,7);
@@ -103,7 +108,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     }
 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        
-        val net = model.asInstanceOf[Net];
+        /*val net = model.asInstanceOf[Net];
         val layer = net.layers(0).asInstanceOf[InputLayer];
         val srcImg = utils.filter2img(layer.output(?,?,?,zero)/256f-0.5f,net.opts.tensorFormat);
         for(t<-0 until iter){
@@ -126,7 +131,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             }
             val img = srcImg \ utils.filter2img(layer.output(?,?,?,zero)/256f-0.5f,net.opts.tensorFormat)
             plot.plot_image(img)
-        }
+        }*/
     }
     
     def backward(net:Net,end:Int,set:Layer=>Unit = null) {
@@ -201,8 +206,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             momentum ~ momentum + grad
             net.layers(0).output~net.layers(0).output + (momentum *@ _lrate);
             //println("here3")
-//            max(net.layers(0).output,-255,net.layers(0).output);
-//            min(net.layers(0).output,255,net.layers(0).output);
+            max(net.layers(0).output,0,net.layers(0).output);
+            min(net.layers(0).output,255,net.layers(0).output);
             val dims = net.layers(0).output.dims;
             val s = dims(1);
             val d = net.layers(0).output.reshapeView(dims(1),dims(2),dims(0),dims(3))
@@ -228,10 +233,9 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             if (p && t%10 == 0) {
                 println(curScore,margin);
                 _scale(0,0) = scale;
-                //val da = (D.layers(0).output) / _scale;
-                val da = (D.layers(0).output/2f + 128f) / _scale;
-                val img = utils.filter2img(da-0.5f,D.opts.tensorFormat);
-                plot.plot_image(img)
+                _base(0,0) = base;
+                val da = (D.layers(0).output *@ _scale + _base);
+                plot.plot_image(da)
             }
             gsteps+=margin
         }
@@ -244,7 +248,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         gdata
     }
     
-    def trainD() = {
+    def start() = {
         val ds = D.datasource;
         done = false
         while(!done){
@@ -255,11 +259,10 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 //val data = if (here/ds.opts.batchSize % 2 == 0) generate(_net,targetScore = 0.7f); else generate(_net,targetScore = 0.2f);
                 val data = mcmc(_net,targetScore = 0.7f);
                 
-                val da = FMat(data(?,?,?,?));
                 _scale(0,0) = scale;
-                val da2 = if (trans == null) da/_scale else trans(da)
-                val img = utils.filter2img(da2-0.5f,D.opts.tensorFormat);
-                plot.plot_image(img)
+                _base(0,0) = base;
+                val da = (data *@ _scale + _base);
+                plot.plot_image(da)
                                         
                 val gscore = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 gscores+=gscore;
@@ -306,12 +309,26 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }        
     }
     
-    def launchTrain ={
-        Future{trainD()}
+    def launch ={
+        Future{start()}
     }
     
     def stop = {
         done = true
+    }
+    
+    def startTrain = {
+        done = false;
+        trainDis = true;
+        resetInterval = 10;
+        launch
+    }
+    
+    def startGenerate = {
+        done = false;
+        trainDis = false;
+        resetInterval = 1000000000;
+        launch
     }
     
     def reset(random:Boolean = true) {

@@ -15,10 +15,11 @@ import javax.swing.event._
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.view.mxGraph;
 import scala.collection.mutable.HashMap
-import java.awt.event._
+import java.awt.event._;
+import java.awt._;    
 import java.awt.image.BufferedImage
 import ptolemy.plot._
-import BIDMat.{Plotting,MyPlot}
+import BIDMat.{Plotting,MyPlot,Image}
 
 class GraphFrame(val layers:Array[HashMap[String,Any]])extends JFrame("Graph"){
     val graph = new mxGraph();
@@ -64,27 +65,26 @@ class GraphFrame(val layers:Array[HashMap[String,Any]])extends JFrame("Graph"){
 
 class Plot(name: String = "plot") {
     val id = {Plot.tot+=1;Plot.tot}
-    val frame = new JFrame(name)
-    var img: BufferedImage = null
     var server = {if (Plot.server == null) Plot.server = new WebServer(); Plot.server}
-    val imgPanel = new JPanel();frame.getContentPane().add(imgPanel)
-    val controlPanel = new JPanel();frame.getContentPane().add(controlPanel)
-    frame.getContentPane().setLayout(new BoxLayout(frame.getContentPane(),BoxLayout.PAGE_AXIS))        
-    controlPanel.setLayout(new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS))        
+    var img: Image = null;
+    var controlPanel: JPanel = new JPanel();
+    var frame: JFrame = null;
+    
+    def init(data: FMat) {
+        img = Image(data);
+        img.show;
+        frame = img.frame;
+        frame.getContentPane().add(controlPanel)
+        frame.getContentPane().setLayout(new BoxLayout(frame.getContentPane(),BoxLayout.PAGE_AXIS))        
+        controlPanel.setLayout(new FlowLayout)//new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
+        frame.pack
+    }
         
-    def plot_image(data:IMat) {
-        if (img == null || img.getWidth != data.ncols || img.getHeight != data.nrows){
-            img = new BufferedImage(data.ncols,data.nrows,BufferedImage.TYPE_INT_ARGB)
-            imgPanel.removeAll
-            imgPanel.add(new JLabel(new ImageIcon(img)))
-            frame.pack()
-            frame.setVisible(true);
-        }
-        val buf=img.getRaster().getDataBuffer().asInstanceOf[java.awt.image.DataBufferInt].getData()
-        val datat = data.t;
-        Array.copy(datat.data,0,buf,0,buf.length);
-        frame.repaint();
-        plot_web(data)
+    def plot_image(data_ :Mat, tensorFormat: Int = 1) {
+        val data = utils.packImages(data_, tensorFormat)
+        if (img == null)
+            init(data);
+        img.redraw(data);    
     }
     
     def plot_web(data:IMat) {
@@ -106,7 +106,7 @@ class Plot(name: String = "plot") {
         p.add(slider);
         p.add(rangeLabel);
         controlPanel.add(p)
-        frame.pack                        
+        if (frame != null)frame.pack                  
     }
 }
 

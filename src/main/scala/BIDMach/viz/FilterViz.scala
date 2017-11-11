@@ -96,7 +96,8 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
     
     def getBestImgBatch(net:Net) = {
         val (_,res) = getBestImg(net)
-        utils.filter2img((res/256f-0.5f),net.opts.tensorFormat,bw);
+        res
+        //utils.filter2img((res/256f-0.5f),net.opts.tensorFormat,bw);
     }
     
     def merge(a:Mat, b:Mat, comp:Mat) {
@@ -117,7 +118,8 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
         val comp = (sum(bestImg*@filter)<=sum(res*@filter));
         merge(bestImg,res,comp);
         merge(bestImgOri,resOri,comp);
-        utils.filter2img((bestImgOri/256f-0.5f),net.opts.tensorFormat,bw)
+        bestImgOri
+        //utils.filter2img((bestImgOri/256f-0.5f),net.opts.tensorFormat,bw)
     }
        
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {
@@ -125,14 +127,15 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
         val layer = net.layers(layerId).asInstanceOf[ConvLayer];
         if (_filter_scale == null) _filter_scale = net.modelmats(layer.imodel).zeros(1,1);
          _filter_scale(0,0) = filter_scale;            
-        val img = utils.filter2img(net.modelmats(layer.imodel)*@_filter_scale,net.opts.tensorFormat,bw);
+//        val img = utils.filter2img(net.modelmats(layer.imodel)*@_filter_scale,net.opts.tensorFormat,bw);
+        val img = FMat(cpu((net.modelmats(layer.imodel)*@_filter_scale+0.5f) * 256f))
         if (layer.imodel == 0){
 //            val input = getBestImgBatch(net)
             val input = getBestImgAll(net)
-            plot.plot_image(img on input)
+            plot.plot_image(img \ input,net.opts.tensorFormat)
         }
         else
-            plot.plot_image(img)
+            plot.plot_image(img,net.opts.tensorFormat)
     }    
 }
 

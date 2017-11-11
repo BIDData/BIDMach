@@ -82,11 +82,10 @@ load(model,"models/mnist/")
 //plotscore(s.gscores)
 //plotscore(s.gsteps)
 //plothist(s.gdata)
-s.lrate=20f
+s.lrate=1f
 s.iter=100
 s.langevin = 0
 s.dWeight = 0.5f
-s.scale = 256
 gen(s)
 def setConv(filter:Int) = {
     val func : Layer => Unit = (layer:Layer) => {
@@ -107,10 +106,8 @@ def setConvI(filter:Int,x:Int = 7,y:Int = 7) = {
     func
 }
 
-load(s.D,"models/mnist_discri2/")
-s.iter = 5000
-s.endLayer=5
-
+load(s.D,"models/mnist_discri3/")
+//s.endLayer=5
 
 :silent
 

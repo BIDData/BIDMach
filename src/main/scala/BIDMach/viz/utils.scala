@@ -4,6 +4,7 @@ import BIDMach.Learner
 import BIDMat.{FMat, GMat, Mat,IMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
+import BIDMat.Image
 import BIDMach.networks._
 import BIDMach.networks.layers._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -68,9 +69,36 @@ object utils {
   def getV(f:Double) = {
       val d = (f*256).toInt+128;
       if (d>255) 255 else if (d<0) 0 else d
-  }  
+  } 
     
-  def filter2img(data: Mat, tensorFormat: Int, bw: Int = 1) = {
+  def packImages(data_ : Mat,tensorFormat: Int = 1) = {     
+      if (data_.dims.length == 4) {
+          val data = FMat(if (tensorFormat == 1) cpu(FMat(data_).fromNCHWtoNHWC) else cpu(data_))
+          val w = data.dims(1);
+          val h = data.dims(2);
+          val num = data.dims(3);
+          val col = Math.sqrt(num).toInt;
+          val row = Math.ceil(num*1f/col).toInt;
+          val out = FMat(Array(data.dims(0),row*h,col*w),new Array[Float](data.dims(0)*row*h*col*w));
+          for(k<-0 until num){
+              val i = k / col;
+              val j = k % col;
+              out(?,i*w->(i+1)*w,j*h->(j+1)*h) = data(?,?,?,k)
+          }
+          out
+      }
+      else
+          FMat(cpu(data_))
+  }
+    
+  def show(data : Mat, tensorFormat: Int = 1) = {      
+      val out = packImages(data, tensorFormat)
+      val img = Image(out);
+      img.show;
+      img
+  }
+    
+  def filter2img_old(data: Mat, tensorFormat: Int, bw: Int = 1) = {
         val in_channel = data.dims(0)
         val w = data.dims(1)
         val h = data.dims(2)

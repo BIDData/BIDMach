@@ -27,7 +27,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet.txt";
-opts.batchSize= 1;
+opts.batchSize= 2;
 opts.npasses = 80;
 //opts.nend = 10;
 opts.lrate = 0//1e-4f;
@@ -126,15 +126,17 @@ val model = net
 :load save.ssc
 :load gan.ssc
 val s = start("imagenet")
-plotscore(s.dscores)
+/*plotscore(s.dscores)
 plotscore(s.gscores)
 plotscore(s.gsteps)
-plothist(s.gdata)
-s.lrate=20f
+plothist(s.gdata)*/
+s.lrate=0.1f
 s.iter=100
 s.langevin = 0
 s.dWeight = 0.5f
 //gen(s)
+s.endLayer = 27
+s.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(1,?)=1f}
 
 println("Examine the 'nn' variable to track learning state.\n");
 
