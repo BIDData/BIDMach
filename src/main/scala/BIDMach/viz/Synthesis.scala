@@ -54,7 +54,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var mcmcSteps = 0;
     var endLayer = 0;    
     var derivFunc: Layer=>Unit = null;
-    
+    var guidebp = false;
+    var printInfo = true;
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -141,7 +142,14 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         else
             set(net.layers(end))
         while (i>=1) {
+            if (guidebp && (net.layers(i).deriv != null) )
+                net.layers(i).deriv~net.layers(i).deriv*@(net.layers(i).output>=0);                        
             net.layers(i).backward(0, 0);
+            if (guidebp) {
+                if (net.layers(i).input != null) {
+                    max(net.layers(i).inputDeriv,0,net.layers(i).inputDeriv);
+                }
+            }
             i -= 1;
         }
     }
@@ -289,10 +297,12 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                     val dscore = mean(D.output_layers(0).score).dv.toFloat
                     dscores+=dscore;
                     vizs.foreach(_.update(D,batch,ipass,here))
-                    println("Trained %d samples. Real samples score: %.3f, Generate samples score: %.3f".format(here,dscore,gscore));
+                    if (printInfo)
+                        println("Trained %d samples. Real samples score: %.3f, Generate samples score: %.3f".format(here,dscore,gscore));
                 }
                 else
-                    println("Generate samples score: %.3f".format(gscore));
+                    if (printInfo)
+                        println("Generate samples score: %.3f".format(gscore));
                 
                 /*val dloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;                
                 val dscore = mean(D.output_layers(0).score).dv.toFloat

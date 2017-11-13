@@ -106,7 +106,7 @@ def setConvI(filter:Int,x:Int = 7,y:Int = 7) = {
     func
 }
 
-load(s.D,"models/mnist_discri3/")
+//load(s.D,"models/mnist_discri3/")
 //s.endLayer=5
 
 :silent

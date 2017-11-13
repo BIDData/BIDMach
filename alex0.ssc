@@ -115,7 +115,6 @@ def run(){
     nn.pause
     java.lang.Thread.sleep(500)
     load(net,"models/alex32p/")
-    nn.unpause
 }
 run()
 //val v = nn.add_plot(new FilterViz(5,bw=3)).asInstanceOf[FilterViz]
@@ -135,8 +134,9 @@ s.iter=100
 s.langevin = 0
 s.dWeight = 0.5f
 //gen(s)
-s.endLayer = 27
+s.endLayer = 23
 s.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(1,?)=1f}
+s.printInfo = false
 
 println("Examine the 'nn' variable to track learning state.\n");
 
