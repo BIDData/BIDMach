@@ -76,7 +76,8 @@ class Plot(name: String = "plot") {
         frame = img.frame;
         frame.getContentPane().add(controlPanel)
         frame.getContentPane().setLayout(new BoxLayout(frame.getContentPane(),BoxLayout.PAGE_AXIS))        
-        controlPanel.setLayout(new FlowLayout)//new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
+        //controlPanel.setLayout(new FlowLayout)//new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
+        controlPanel.setLayout(new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
         frame.pack
     }
         
@@ -108,6 +109,26 @@ class Plot(name: String = "plot") {
         controlPanel.add(p)
         if (frame != null)frame.pack                  
     }
+    
+    def add_combobox(items: Array[String],callback:(Int, String)=>Unit) = {
+        //val p = new JPanel();
+        //val label = new JLabel("test", SwingConstants.CENTER);
+        val box = new JComboBox(items);
+        box.addItemListener(new ItemListener{
+            override def itemStateChanged(e:ItemEvent){ 
+                if (e.getStateChange() == ItemEvent.SELECTED) {
+                    callback(box.getSelectedIndex,e.getItem.toString)                        
+                }
+            }
+        });
+        ///p.add(label);
+        //p.add(box);           
+        controlPanel.add(box);
+        if (frame != null)frame.pack;
+        box            
+    }
+    
+    
 }
 
 object Plot{

@@ -88,6 +88,6 @@ val ii = IMat(FMat(model.layers(12).target + irow(0->100)*10))
 s.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
 s.endLayer = 11
 s.base = 0
-s.guidebp = true
+s.guidebp = false
 
 :silent

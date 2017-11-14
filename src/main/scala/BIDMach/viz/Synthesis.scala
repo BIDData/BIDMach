@@ -42,6 +42,8 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var _base: Mat = null;    
     var l2lambda = 0f;
     var _l2lambda: Mat = null;
+    var dissimilarity = 0f;
+    var _dissimilarity: Mat = null;
     var noise: Mat = null;
     var done = false;
     var ipass = 0;
@@ -56,6 +58,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     var derivFunc: Layer=>Unit = null;
     var guidebp = false;
     var printInfo = true;
+    var resetFlag = false
         
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -81,6 +84,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         _scale = net.layers(0).output.zeros(1,1);  
         _base = net.layers(0).output.zeros(1,1);  
         _l2lambda = net.layers(0).output.zeros(1,1);  
+        _dissimilarity = net.layers(0).output.zeros(1,1); 
         accClassifier = net.layers(0).output.zeros(net.layers(0).output.dims);
         accDiscriminator = net.layers(0).output.zeros(net.layers(0).output.dims);
         momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
@@ -99,13 +103,48 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         setInputGradient(net);
         setInputGradient(D);
         
+        plot.plot_image(net.layers(0).output)
+        if (modelname == "imagenet") {
+            import javax.swing._
+            val classNames = scala.io.Source.fromFile("models/imagenet.txt").getLines.map(_.split(": ")(1)).toArray;
+            val display = classNames.zipWithIndex.map(x=>"fc8 "+x._2+": "+x._1.slice(1,x._1.length-2));
+            var box2: JComboBox[String] = null;         
+            val m = net.modelmats(net.modelmats.length-2); //1000*4096 matrix
+            val (_,tmp) = sortdown2(m.t);
+            val topFeatures = IMat(cpu(tmp));            
+            val (_,tmp2) = sortdown2(m);
+            val topClasses = IMat(cpu(tmp2))
+            plot.add_combobox(display,
+                              (i:Int,v:String)=>{
+                                  box2.removeAllItems;   
+                                  topFeatures(0->20,i).data.foreach(x=>box2.addItem("fc7 "+x.toString+": "+topClasses(0->3,x).data.map(classNames(_)).reduce(_+";"+_)))
+                                  endLayer = net.layers.length - 2;
+                                  derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(i,?)=1f}
+                                  resetFlag = true
+                              });
+            box2 = plot.add_combobox(Array(),
+                              (i:Int,v:String)=>{
+                                  endLayer = 23;
+                                  val id = v.split(": ")(0).split(" ")(1).toInt
+                                  derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(id,?)=1f}
+                                  resetFlag = true
+                              });
+            plot.add_combobox(irow(0->256).data.map("Conv5 "+_),
+                              (i:Int,v:String)=>{
+                                  endLayer = 17;                                  
+                                  derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m.reshapeView(13,13,256,m.dims(3))(6,6,i,?)=1f}
+                                  resetFlag = true
+                              });
+        }
         plot.add_slider("iter",(x:Int)=>{iter=(x+1)*10;iter},9,0);
         plot.add_slider("scale",(x:Int)=>{scale=x/100f;scale},50,1);
         plot.add_slider("base",(x:Int)=>{base=x*4;base},32,0);
         plot.add_slider("lrate",(x:Int)=>{lrate=(10f^(x/20f-4))(0);lrate},60,4);
         plot.add_slider("noise",(x:Int)=>{langevin=(10f^(x/20f-4))(0);langevin},60,4);
         plot.add_slider("L2 norm",(x:Int)=>{l2lambda=(10f^(x/20f-7))(0);l2lambda},60,7);
+        plot.add_slider("Dissimilarity",(x:Int)=>{dissimilarity=(10f^(x/20f-7))(0);dissimilarity},0,7);
         plot.add_slider("discriminatorWeight",(x:Int)=>{dWeight=x/100f;dWeight});
+        
     }
 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        
@@ -182,6 +221,12 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         //println("here")
 //        while(curScore < targetScore && t < iter){
         while(t < iter) {
+            if (resetFlag) {
+                val d = D.layers(0).output;
+                d<--rand(d.nrows,d.ncols).reshapeView(d.dims)*256f;
+                net.layers(0).output<--d;
+                resetFlag = false;             
+            }
             net.forward;
             net.layers(0).deriv.clear;
             net.setderiv();
@@ -208,7 +253,11 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             normrnd(0,langevin/(1),noise);
             _l2lambda(0,0) = l2lambda*2f;
             grad ~ grad + noise;
-            grad ~ grad - (net.layers(0).output *@ _l2lambda)
+            grad ~ grad - (net.layers(0).output *@ _l2lambda);
+            val img = net.layers(0).output.reshapeView(net.layers(0).output.nrows,net.layers(0).output.ncols);
+            _dissimilarity(0,0) = dissimilarity/(img.ncols-1);
+            val tmp = (sum(img,2)-img)*@ _dissimilarity                
+            grad ~ grad - (tmp.reshapeView(grad.dims))
             grad ~ grad * 0.1f;
             momentum ~ momentum * 0.9f;
             momentum ~ momentum + grad
@@ -345,7 +394,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         val data = gdata//_net.layers(0).output;
         if (random){
             val scale = 256f//maxi(data).dv.toFloat
-            data<--rand(data.nrows,data.ncols).reshapeView(data.dims)*scale
+            data<--rand(data.nrows,data.ncols).reshapeView(data.dims)*scale;
         }
         else{
             _net.datasource.reset;
@@ -506,7 +555,7 @@ object Synthesis {
         val opts = new MyOpts;
         val ds = new MatSource(Array(loadBMat("data/ImageNet/classes/dataNCHW1.bmat.lz4"),IMat(1,100)+1),opts)
         val updater = new ADAGrad(opts);
-        opts.batchSize = 2;
+        opts.batchSize = 4;
         opts.hasBias = true;
         opts.tensorFormat = Net.TensorNCHW;
         opts.convType = Net.CrossCorrelation;

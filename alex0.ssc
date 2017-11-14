@@ -27,7 +27,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet.txt";
-opts.batchSize= 2;
+opts.batchSize= 4;
 opts.npasses = 80;
 //opts.nend = 10;
 opts.lrate = 0//1e-4f;
@@ -137,6 +137,10 @@ s.dWeight = 0.5f
 s.endLayer = 23
 s.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(1,?)=1f}
 s.printInfo = false
+s.base = 0
+s.scale = 1
+//s.endLayer = 17
+//s.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m.reshapeView(13,13,256,2)(6,6,0,?)=1f}
 
 println("Examine the 'nn' variable to track learning state.\n");
 
