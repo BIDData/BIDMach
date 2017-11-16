@@ -93,6 +93,10 @@ o.printInfo = false
 
 :silent
 
+def reset() {
+    val ii = IMat(FMat(model.layers(12).target + irow(0->100)*10))
+    o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
+}
 
 //:load gan.ssc
 //val s = start("cifar")
