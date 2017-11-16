@@ -73,20 +73,26 @@ val model = nn.model.asInstanceOf[Net];
 nn.launchTrain;
 nn.pause
 import BIDMach.viz._
-val v = nn.add_plot(new FilterViz(1,bw=5)).asInstanceOf[FilterViz]
+import BIDMach.networks.layers._
+
+//val v = nn.add_plot(new FilterViz(1,bw=5)).asInstanceOf[FilterViz]
 :load save.ssc
-:load gan.ssc
-val s = start("mnist")
 load(model,"models/mnist/")
+val s = new Synthesis("mnist")
+val o = s.opts
 //plotscore(s.dscores)
 //plotscore(s.gscores)
 //plotscore(s.gsteps)
 //plothist(s.gdata)
-s.lrate=1f
-s.iter=100
-s.langevin = 0
-s.dWeight = 0.5f
-gen(s)
+o.realImagesPath = "/code/BIDMach/data/MNIST/";
+o.pretrainedDiscriminatorPath = "models/mnist_discri2/";
+s.init(model,null);
+
+o.lrate=1f
+o.iter=100
+o.langevin = 0
+o.dWeight = 0.5f
+
 def setConv(filter:Int) = {
     val func : Layer => Unit = (layer:Layer) => {
         val dims = layer.deriv.dims;

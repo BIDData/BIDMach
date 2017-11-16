@@ -67,18 +67,19 @@ class Plot(name: String = "plot") {
     val id = {Plot.tot+=1;Plot.tot}
     var server = {if (Plot.server == null) Plot.server = new WebServer(); Plot.server}
     var img: Image = null;
-    var controlPanel: JPanel = new JPanel();
-    var frame: JFrame = null;
+    val controlPanel: JPanel = new JPanel();
+    val frame: JFrame = new JFrame;
     
     def init(data: FMat) {
         img = Image(data);
         img.show;
-        frame = img.frame;
+        //frame = img.frame;
         frame.getContentPane().add(controlPanel)
         frame.getContentPane().setLayout(new BoxLayout(frame.getContentPane(),BoxLayout.PAGE_AXIS))        
         //controlPanel.setLayout(new FlowLayout)//new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
         controlPanel.setLayout(new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
-        frame.pack
+        frame.pack;
+        frame.setVisible(true);            
     }
         
     def plot_image(data_ :Mat, tensorFormat: Int = 1) {
@@ -106,8 +107,9 @@ class Plot(name: String = "plot") {
         p.add(sliderLabel);
         p.add(slider);
         p.add(rangeLabel);
-        controlPanel.add(p)
-        if (frame != null)frame.pack                  
+        controlPanel.add(p);
+        //if (frame != null)frame.pack                  
+        frame.pack
     }
     
     def add_combobox(items: Array[String],callback:(Int, String)=>Unit) = {
@@ -124,7 +126,8 @@ class Plot(name: String = "plot") {
         ///p.add(label);
         //p.add(box);           
         controlPanel.add(box);
-        if (frame != null)frame.pack;
+        //if (frame != null)frame.pack;
+        frame.pack
         box            
     }
     

@@ -51,7 +51,7 @@ val nodes = {
     conv2  \ pool2  \ relu2  on
     conv3  \ pool3  \ null   on
     fc3    \ out    \ null   ).t;
-    }
+}
 
 
 
@@ -60,6 +60,7 @@ val model = nn.model.asInstanceOf[Net];
 nn.launchTrain;
 
 import BIDMach.viz._
+import BIDMach.networks.layers._
 //val v = nn.add_plot(new FilterViz(3,bw=5)).asInstanceOf[FilterViz]
 //v.interval = 100
 
@@ -72,22 +73,30 @@ def load(net:Net,fname:String) {
 
 nn.pause
 Thread.sleep(1000)
-:load gan.ssc
-val s = start("cifar")
+val s = new Synthesis("cifar")
+val o = s.opts
+load(model,"models/cifar2/")
+o.endLayer = 11
+o.guidebp = false
+o.realImagesPath = "/code/BIDMach/data/CIFAR10/parts/"
+o.pretrainedDiscriminatorPath = "models/cifar_discri2/"
+s.init(model,null)
+o.base = 0
+o.scale = 1
+o.iter=30
+o.langevin = 0
+o.dWeight=0.5f
+s.mcmc(model)
+val ii = IMat(FMat(model.layers(12).target + irow(0->100)*10))
+o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
+o.printInfo = false
+
+:silent
+
+
+//:load gan.ssc
+//val s = start("cifar")
 //plotscore(s.dscores)
 //plotscore(s.gscores)
 //plotscore(s.gsteps)
 //s.lrate=0.1f
-s.iter=30
-s.langevin = 0
-s.dWeight=0.5f
-s.scale = 1
-load(model,"models/cifar2/")
-gen(s)
-val ii = IMat(FMat(model.layers(12).target + irow(0->100)*10))
-s.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
-s.endLayer = 11
-s.base = 0
-s.guidebp = false
-
-:silent

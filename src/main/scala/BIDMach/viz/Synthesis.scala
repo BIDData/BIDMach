@@ -15,51 +15,39 @@ import scala.concurrent.ExecutionContext.Implicits.global
     Synthesizing the image
 **/
 
-class Synthesis(val name: String = "Input",val modelname: String = "cifar") extends Visualization{
-    val plot = new Plot(name);
-    var iter = 100
-    var lrate = 10f;
-    var _lrate: Mat = null;
-    var langevin = 0.1f
-    var _langevin: Mat = null;
+class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Synthesis.Options) extends Visualization{
+    val plot = new Plot("Input Synthesis");
     val zero = irow(0);
-    //val ten = irow(0->100);
+
     var _net: Net = null;
-    var D: Net = null;
-    var updater:Grad = null;
+    var D: Net = null;        //Discriminator
+    var updater:Grad = null;  //Updater for the discriminator
+    
     val dscores : ListBuffer[Float] = new ListBuffer[Float];
     val gscores : ListBuffer[Float] = new ListBuffer[Float];
     var accClassifier: Mat = null;
     var accDiscriminator: Mat = null;
     var momentum: Mat = null;
-    var vWeight = 0.9f;
-    var _vWeight: Mat = null;
-    var dWeight = 0.5f;
-    var _dWeight: Mat = null;
-    var scale = 1f;
-    var _scale: Mat = null;
-    var base = 0f;
-    var _base: Mat = null;    
-    var l2lambda = 0f;
-    var _l2lambda: Mat = null;
-    var dissimilarity = 0f;
-    var _dissimilarity: Mat = null;
     var noise: Mat = null;
+
     var done = false;
     var ipass = 0;
-    var trans : Mat=>Mat = null;
+    var mcmcSteps = 0;
+    var resetFlag = false;            
     var gsteps : ListBuffer[Float] = new ListBuffer[Float];
     var gdata : Mat = null;
-    var trainDis = true;
     val vizs = new ListBuffer[Visualization];
-    var resetInterval = 10;
-    var mcmcSteps = 0;
-    var endLayer = 0;    
-    var derivFunc: Layer=>Unit = null;
-    var guidebp = false;
-    var printInfo = true;
-    var resetFlag = false
-        
+
+    // Helper matrix for caching purpose
+    var _lrate: Mat = null;
+    var _langevin: Mat = null;
+    var _vWeight: Mat = null;
+    var _dWeight: Mat = null;
+    var _scale: Mat = null;
+    var _base: Mat = null;    
+    var _l2lambda: Mat = null;
+    var _dissimilarity: Mat = null;
+            
         
     def check(model:Model, mats:Array[Mat]) = 1  
         
@@ -74,7 +62,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     }
        
     override def init(model:Model, mats:Array[Mat]) = {
-        interval  = 100;
+        interval  = opts.updateInterval;
         val net = model.asInstanceOf[Net];
         _net = net;
         _lrate = net.layers(0).output.zeros(1,1);
@@ -90,20 +78,23 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
         noise = net.layers(0).output.zeros(net.layers(0).output.dims);
         gdata = net.layers(0).output.zeros(net.layers(0).output.dims);
-        endLayer = net.layers.length - 1
-            
+        
+        val batchSize = model.datasource.opts.batchSize
         val (_D,_updater) = modelname match {
-            case "cifar" => Synthesis.buildCifarDiscriminator(); 
-            case "mnist" => Synthesis.buildMnistDiscriminator();
-            case "imagenet" => Synthesis.buildImageNetDiscriminator();
+            case "cifar" => Synthesis.buildCifarDiscriminator(opts.realImagesPath,batchSize); 
+            case "mnist" => Synthesis.buildMnistDiscriminator(opts.realImagesPath,batchSize);
+            case "imagenet" => Synthesis.buildImageNetDiscriminator(opts.realImagesPath,batchSize);
         }
             
         D = _D;updater = _updater;
         
         setInputGradient(net);
-        setInputGradient(D);
-        
-        plot.plot_image(net.layers(0).output)
+        setInputGradient(D);        
+        if (opts.pretrainedDiscriminatorPath != null)
+            Synthesis.load(D,opts.pretrainedDiscriminatorPath)
+
+        show(net.layers(0).output);
+            
         if (modelname == "imagenet") {
             import javax.swing._
             val classNames = scala.io.Source.fromFile("models/imagenet.txt").getLines.map(_.split(": ")(1)).toArray;
@@ -118,36 +109,61 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                               (i:Int,v:String)=>{
                                   box2.removeAllItems;   
                                   topFeatures(0->20,i).data.foreach(x=>box2.addItem("fc7 "+x.toString+": "+topClasses(0->3,x).data.map(classNames(_)).reduce(_+";"+_)))
-                                  endLayer = net.layers.length - 2;
-                                  derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(i,?)=1f}
+                                  opts.endLayer = net.layers.length - 2;
+                                  opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(i,?)=1f}
                                   resetFlag = true
                               });
             box2 = plot.add_combobox(Array(),
                               (i:Int,v:String)=>{
-                                  endLayer = 23;
+                                  opts.endLayer = 23;
                                   val id = v.split(": ")(0).split(" ")(1).toInt
-                                  derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(id,?)=1f}
-                                  resetFlag = true
-                              });
-            plot.add_combobox(irow(0->256).data.map("Conv5 "+_),
-                              (i:Int,v:String)=>{
-                                  endLayer = 17;                                  
-                                  derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m.reshapeView(13,13,256,m.dims(3))(6,6,i,?)=1f}
+                                  opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(id,?)=1f}
                                   resetFlag = true
                               });
         }
-        plot.add_slider("iter",(x:Int)=>{iter=(x+1)*10;iter},9,0);
-        plot.add_slider("scale",(x:Int)=>{scale=x/100f;scale},50,1);
-        plot.add_slider("base",(x:Int)=>{base=x*4;base},32,0);
-        plot.add_slider("lrate",(x:Int)=>{lrate=(10f^(x/20f-4))(0);lrate},60,4);
-        plot.add_slider("noise",(x:Int)=>{langevin=(10f^(x/20f-4))(0);langevin},60,4);
-        plot.add_slider("L2 norm",(x:Int)=>{l2lambda=(10f^(x/20f-7))(0);l2lambda},60,7);
-        plot.add_slider("Dissimilarity",(x:Int)=>{dissimilarity=(10f^(x/20f-7))(0);dissimilarity},0,7);
-        plot.add_slider("discriminatorWeight",(x:Int)=>{dWeight=x/100f;dWeight});
-        
+            //val convLayers = List(5,9,13,15,17)
+        val convLayers = net.layers.zipWithIndex.filter(_._1.isInstanceOf[ConvLayer]).map(_._2);
+
+        val filterBox = plot.add_combobox(irow(0->256).data.map("ConvFilter "+_),
+                              (i:Int,v:String)=>{
+                                  if (convLayers.contains(opts.endLayer) && net.layers(opts.endLayer).deriv.dims(0)>i) {
+                                      opts.derivFunc = (a:Layer)=>{
+                                          val m = a.deriv;m.set(0f);
+                                          val rm = m.reshapeView(m.dims(1),m.dims(2),m.dims(0),m.dims(3));
+                                          rm(m.dims(1)/2,m.dims(2)/2,i,0->(m.dims(3)/2))=1f;
+                                          rm(m.dims(1)/2,m.dims(2)/2,i,(m.dims(3)/2)->m.dims(3))=1f;      
+                                      //Weird bug, 4d slice for GMat can't support bigger than 64 items if the last index is ?
+                                      }
+                                      resetFlag = true
+                                  }
+                              });
+        plot.add_combobox(irow(1->(convLayers.length+1)).data.map("Conv"+_),
+                              (i:Int,v:String)=>{
+                                  opts.endLayer = convLayers(i);                                  
+                                  opts.derivFunc = (a:Layer)=>{
+                                      val m = a.deriv;m.set(0f);
+                                      val rm = m.reshapeView(m.dims(1),m.dims(2),m.dims(0),m.dims(3));
+                                      rm(m.dims(1)/2,m.dims(2)/2,i,0->(m.dims(3)/2))=1f;
+                                      rm(m.dims(1)/2,m.dims(2)/2,i,(m.dims(3)/2)->m.dims(3))=1f
+                                      //Weird bug, 4d slice for GMat can't support bigger than 64 items if the last index is ?
+                                  }
+                                  resetFlag = true;
+                                  filterBox.setSelectedItem("ConvFilter 0")
+                              });
+        plot.add_slider("iter",(x:Int)=>{opts.iter=(x+1)*10;opts.iter},9,0);
+        plot.add_slider("scale",(x:Int)=>{opts.scale=x/100f;opts.scale},50,1);
+        plot.add_slider("base",(x:Int)=>{opts.base=x*4;opts.base},32,0);
+        plot.add_slider("lrate",(x:Int)=>{opts.lrate=(10f^(x/20f-4))(0);opts.lrate},60,4);
+        plot.add_slider("noise",(x:Int)=>{opts.langevin=(10f^(x/20f-4))(0);opts.langevin},60,4);
+        plot.add_slider("L2 norm",(x:Int)=>{opts.l2lambda=(10f^(x/20f-7))(0);opts.l2lambda},60,7);
+        plot.add_slider("Dissimilarity",(x:Int)=>{opts.dissimilarity=(10f^(x/20f-7))(0);opts.dissimilarity},0,7);
+        plot.add_slider("discriminatorWeight",(x:Int)=>{opts.dWeight=x/100f;opts.dWeight});        
     }
 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        
+        resetFlag = true
+        val data = mcmc(_net,targetScore = 0.7f);
+        show(data);
         /*val net = model.asInstanceOf[Net];
         val layer = net.layers(0).asInstanceOf[InputLayer];
         val srcImg = utils.filter2img(layer.output(?,?,?,zero)/256f-0.5f,net.opts.tensorFormat);
@@ -174,17 +190,19 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }*/
     }
     
-    def backward(net:Net,end:Int,set:Layer=>Unit = null) {
+    def backward(net:Net,end:Int,setDeriv:Layer=>Unit = null) {
         var i = end;
-        if (set == null)
-            net.layers(end).deriv.set(1f);
+        if (i < 0) 
+            i += net.layers.length;
+        if (setDeriv == null)
+            net.layers(i).deriv.set(1f);
         else
-            set(net.layers(end))
+            setDeriv(net.layers(i))
         while (i>=1) {
-            if (guidebp && (net.layers(i).deriv != null) )
+            if (opts.guidebp && (net.layers(i).deriv != null) )
                 net.layers(i).deriv~net.layers(i).deriv*@(net.layers(i).output>=0);                        
             net.layers(i).backward(0, 0);
-            if (guidebp) {
+            if (opts.guidebp) {
                 if (net.layers(i).input != null) {
                     max(net.layers(i).inputDeriv,0,net.layers(i).inputDeriv);
                 }
@@ -193,8 +211,16 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         }
     }
     
+    def show(data:Mat) = {
+        _scale(0,0) = opts.scale;
+        _base(0,0) = opts.base;
+        val data_ = if (modelname=="imagenet") data(?,?,?,0->4) else data
+        val da = (data_ *@ _scale + _base);
+        plot.plot_image(da)
+    }
+    
     def mcmc(model:Model,targetScore:Float = 0.75f,p:Boolean = false,assignTarget: Boolean = true) = {
-        if (mcmcSteps % resetInterval == 0) {
+        if (mcmcSteps % opts.resetInterval == 0) {
             reset()
         }
         mcmcSteps += 1;
@@ -220,7 +246,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
         var t = 0;
         //println("here")
 //        while(curScore < targetScore && t < iter){
-        while(t < iter) {
+        while(t < opts.iter) {
             if (resetFlag) {
                 val d = D.layers(0).output;
                 d<--rand(d.nrows,d.ncols).reshapeView(d.dims)*256f;
@@ -230,7 +256,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             net.forward;
             net.layers(0).deriv.clear;
             net.setderiv();
-            backward(net, endLayer,derivFunc);
+            backward(net, opts.endLayer,opts.derivFunc);
             //net.backward(0, 0);
                 
             D.forward;
@@ -241,21 +267,21 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             curScore = mean(D.output_layers(0).output(1,?)).dv.toFloat;  
             val logit = D.layers(D.layers.length-2)
             val margin = mean(logit.output(1,?)-logit.output(0,?)).dv.toFloat;  
-            _lrate <-- lrate * 256f// /((t+1f)^0.5f);
-            _langevin(0,0) = langevin;
-            _vWeight(0,0) = vWeight
+            _lrate <-- opts.lrate * 256f// /((t+1f)^0.5f);
+            _langevin(0,0) = opts.langevin;
+            _vWeight(0,0) = opts.vWeight
             accClassifier ~ (accClassifier * 0.9f) + ((net.layers(0).deriv *@ net.layers(0).deriv) * 0.1f);
             accDiscriminator ~ (accDiscriminator * 0.9f) + ((D.layers(0).deriv *@ D.layers(0).deriv) * 0.1f);
             net.layers(0).deriv ~ net.layers(0).deriv / ((accClassifier+1e-8f)^0.5f);
             D.layers(0).deriv ~ D.layers(0).deriv / ((accDiscriminator+1e-8f)^0.5f);
-            _dWeight(0,0) = dWeight;
+            _dWeight(0,0) = opts.dWeight;
             val grad = (net.layers(0).deriv *@ (1f - _dWeight)) + (_dWeight *@ D.layers(0).deriv)
-            normrnd(0,langevin/(1),noise);
-            _l2lambda(0,0) = l2lambda*2f;
+            normrnd(0,opts.langevin/(1f),noise);
+            _l2lambda(0,0) = opts.l2lambda*2f;
             grad ~ grad + noise;
             grad ~ grad - (net.layers(0).output *@ _l2lambda);
             val img = net.layers(0).output.reshapeView(net.layers(0).output.nrows,net.layers(0).output.ncols);
-            _dissimilarity(0,0) = dissimilarity/(img.ncols-1);
+            _dissimilarity(0,0) = opts.dissimilarity/(img.ncols-1);
             val tmp = (sum(img,2)-img)*@ _dissimilarity                
             grad ~ grad - (tmp.reshapeView(grad.dims))
             grad ~ grad * 0.1f;
@@ -289,10 +315,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
             D.layers(0).output<--net.layers(0).output;
             if (p && t%10 == 0) {
                 println(curScore,margin);
-                _scale(0,0) = scale;
-                _base(0,0) = base;
-                val da = (D.layers(0).output *@ _scale + _base);
-                plot.plot_image(da)
+                show(D.layers(0).output)
             }
             gsteps+=margin
         }
@@ -316,10 +339,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 //val data = if (here/ds.opts.batchSize % 2 == 0) generate(_net,targetScore = 0.7f); else generate(_net,targetScore = 0.2f);
                 val data = mcmc(_net,targetScore = 0.7f);
                 
-                _scale(0,0) = scale;
-                _base(0,0) = base;
-                val da = (data *@ _scale + _base);
-                plot.plot_image(da)
+                show(data)
                                         
                 val gscore = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 gscores+=gscore;
@@ -329,7 +349,7 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                 batch(1)(?,0->(batchSize/2)) = 0;                
                 D.layers(0).deriv.clear;
                 D.dobatchg(batch,here,0);*/
-                if (trainDis) {
+                if (opts.trainDis) {
                     val batchSize = ds.opts.batchSize;
                     here += batchSize;
                     val batch = ds.next;
@@ -346,11 +366,11 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
                     val dscore = mean(D.output_layers(0).score).dv.toFloat
                     dscores+=dscore;
                     vizs.foreach(_.update(D,batch,ipass,here))
-                    if (printInfo)
+                    if (opts.printInfo)
                         println("Trained %d samples. Real samples score: %.3f, Generate samples score: %.3f".format(here,dscore,gscore));
                 }
                 else
-                    if (printInfo)
+                    if (opts.printInfo)
                         println("Generate samples score: %.3f".format(gscore));
                 
                 /*val dloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;                
@@ -378,15 +398,15 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
     
     def startTrain = {
         done = false;
-        trainDis = true;
-        resetInterval = 10;
+        opts.trainDis = true;
+        opts.resetInterval = 10;
         launch
     }
     
     def startGenerate = {
         done = false;
-        trainDis = false;
-        resetInterval = 1000000000;
+        opts.trainDis = false;
+        opts.resetInterval = 1000000000;
         launch
     }
     
@@ -415,22 +435,46 @@ class Synthesis(val name: String = "Input",val modelname: String = "cifar") exte
 }
 
 object Synthesis {
-    def load(net:Net,fname:String) {
+    trait Opts extends Model.Opts {
+        var iter = 100
+        var lrate = 10f;
+        var langevin = 0.1f
+        var vWeight = 0.9f;
+        var dWeight = 0.5f;
+        var scale = 1f;
+        var base = 0f;
+        var l2lambda = 0f;
+        var dissimilarity = 0f;
+        var trans : Mat=>Mat = null;
+        var trainDis = true;
+        var resetInterval = 10;
+        var updateInterval = 100;
+        var endLayer = -1; // -1 means the last layer, -2 means the second-to-last, 0 means the first.
+        var derivFunc: Layer=>Unit = null;
+        var guidebp = false;
+        var printInfo = true;
+        var realImagesPath:String = null;
+        var pretrainedDiscriminatorPath:String = null;      
+      }
+    
+    class Options extends Opts {}
+    
+    def load(net:Net,path:String) {
         for (i <- 0 until net.modelmats.length) {
-            val data = loadMat(fname+"modelmat%02d.lz4" format i);
+            val data = loadMat(path+"/modelmat%02d.lz4" format i);
             net.modelmats(i)<--data
         }
     }
     
-    def buildCifarDiscriminator() = {
+    def buildCifarDiscriminator(datadir:String,batchSize:Int) = {
         class MyOpts extends Net.Opts with FileSource.Opts with ADAGrad.Opts;
-        val datadir = "/code/BIDMach/data/CIFAR10/parts/"
+        //val datadir = "/code/BIDMach/data/CIFAR10/parts/"
         val trainfname = datadir + "trainNCHW%d.fmat.lz4";
         val labelsfname = datadir + "labels%d.imat.lz4";
         val opts = new MyOpts;
         val ds = FileSource(trainfname, labelsfname, opts);
         val updater = new ADAGrad(opts)
-        opts.batchSize = 100;
+        opts.batchSize = batchSize;
         opts.hasBias = true;
         opts.tensorFormat = Net.TensorNCHW;
         opts.convType = Net.CrossCorrelation;
@@ -444,7 +488,8 @@ object Synthesis {
         val net = new Net(opts);
         {
             import BIDMach.networks.layers.Node._;
-            val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
+            val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
+            Net.initDefaultNodeSet;
             val in = input;
             val scalef = constant(row(0.01f));
             val inscale = in *@ scalef
@@ -464,12 +509,13 @@ object Synthesis {
             val fc3 =   linear(pool3)(outdim=2,initv=3e-2f);
             val out =   softmaxout(fc3)(scoreType=1); 
 
-            val nodes = (in     \ scalef \ inscale on
+            /*val nodes = (in     \ scalef \ inscale on
                          conv1  \ pool1  \ relu1  on
                          conv2  \ pool2  \ relu2  on
                          conv3  \ pool3  \ null   on
                          fc3    \ out    \ null   ).t
-            opts.nodemat = nodes;
+            opts.nodemat = nodes;*/
+            opts.nodeset=Net.getDefaultNodeSet
         }        
         ds.init
         net.bind(ds)
@@ -478,15 +524,15 @@ object Synthesis {
         (net,updater)
     }
     
-    def buildMnistDiscriminator() = {
+    def buildMnistDiscriminator(traindir:String,batchSize: Int) = {
         class MyOpts extends Net.Opts with MatSource.Opts with ADAGrad.Opts;
-        val traindir = "/code/BIDMach/data/MNIST/"
+        //val traindir = "/code/BIDMach/data/MNIST/"
         val train0 = loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
         val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
         val opts = new MyOpts;
         val ds = new MatSource(Array(train0, trainlabels0), opts);
         val updater = new ADAGrad(opts);
-        opts.batchSize = 100;
+        opts.batchSize = batchSize;
         opts.hasBias = true;
         opts.tensorFormat = Net.TensorNCHW;
         opts.convType = Net.CrossCorrelation;
@@ -501,7 +547,7 @@ object Synthesis {
         {
             import BIDMach.networks.layers.Node._;
             val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
-
+            Net.initDefaultNodeSet;
             val in = input;
             //val rin = relu(in)()
             //val scalef = constant(row(1f/256));
@@ -528,14 +574,14 @@ object Synthesis {
             val fc5  = linear(drop6)(outdim=2,initfn=Net.gaussian,initv=0.1f, initbiasv=0.1f);
             val out = softmaxout(fc5)(scoreType=1);
 
-            val nodes = (in     \ null    \ null   \ null    on
+            /*val nodes = (in     \ null    \ null   \ null    on
                          conv1  \ pool1   \ null   \ relu1   on
                          conv2  \ pool2   \ null   \ relu2   on
                          fc3    \ relu3   \ null   \ null    on
                          drop6    \ null   \ null    \ null    on
                      fc5    \ out     \ null   \ null).t
-
-            opts.nodemat = nodes;
+            opts.nodemat = nodes;*/
+            opts.nodeset=Net.getDefaultNodeSet
         }        
         ds.init
         net.bind(ds)
@@ -544,18 +590,20 @@ object Synthesis {
         (net,updater)
     }
     
-    def buildImageNetDiscriminator() = {
-/*        class MyOpts extends Net.Opts with FileSource.Opts with ADAGrad.Opts;
-        val traindir = "/code/BIDMach/data/ImageNet/train/";
+    def buildImageNetDiscriminator(traindir:String,batchSize:Int) = {
+        class MyOpts extends Net.Opts with FileSource.Opts with ADAGrad.Opts;
+//        val traindir = "/code/BIDMach/data/ImageNet/train/";
         val traindata = traindir+"partNCHW%04d.bmat.lz4";
         val trainlabels = traindir+"label%04d.imat.lz4";
-        val ds = FileSource(traindata, trainlabels, opts);*/
-        class MyOpts extends Net.Opts with MatSource.Opts with ADAGrad.Opts;
+        val opts = new MyOpts;
+        val ds = FileSource(traindata, trainlabels, opts);
+        
+/*        class MyOpts extends Net.Opts with MatSource.Opts with ADAGrad.Opts;
         val traindir = "/code/BIDMach/data/ImageNet/train/";
         val opts = new MyOpts;
-        val ds = new MatSource(Array(loadBMat("data/ImageNet/classes/dataNCHW1.bmat.lz4"),IMat(1,100)+1),opts)
+        val ds = new MatSource(Array(loadBMat("data/ImageNet/classes/dataNCHW1.bmat.lz4"),IMat(1,100)+1),opts)*/
         val updater = new ADAGrad(opts);
-        opts.batchSize = 4;
+        opts.batchSize = batchSize;
         opts.hasBias = true;
         opts.tensorFormat = Net.TensorNCHW;
         opts.convType = Net.CrossCorrelation;
