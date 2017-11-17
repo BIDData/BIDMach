@@ -47,6 +47,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
     var _base: Mat = null;    
     var _l2lambda: Mat = null;
     var _dissimilarity: Mat = null;
+    var _wClip: Mat = null;
             
         
     def check(model:Model, mats:Array[Mat]) = 1  
@@ -73,6 +74,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
         _base = net.layers(0).output.zeros(1,1);  
         _l2lambda = net.layers(0).output.zeros(1,1);  
         _dissimilarity = net.layers(0).output.zeros(1,1); 
+        _wClip = net.layers(0).output.zeros(1,1); 
         accClassifier = net.layers(0).output.zeros(net.layers(0).output.dims);
         accDiscriminator = net.layers(0).output.zeros(net.layers(0).output.dims);
         momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
@@ -363,6 +365,14 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                     D.layers(0).deriv.clear;
                     D.forward;D.setderiv();D.backward(0, 0);
                     updater.update(ipass,here,0);
+                    if (opts.wClip > 0){
+                        _wClip(0,0) = opts.wClip;
+                        for(i<-0 until D.modelmats.length)
+                            min(D.modelmats(i),_wClip,D.modelmats(i))
+                        _wClip(0,0) = -opts.wClip;
+                        for(i<-0 until D.modelmats.length)
+                            max(D.modelmats(i),_wClip,D.modelmats(i))
+                    }
                     val dscore = mean(D.output_layers(0).score).dv.toFloat
                     dscores+=dscore;
                     vizs.foreach(_.update(D,batch,ipass,here))
@@ -454,7 +464,8 @@ object Synthesis {
         var guidebp = false;
         var printInfo = true;
         var realImagesPath:String = null;
-        var pretrainedDiscriminatorPath:String = null;      
+        var pretrainedDiscriminatorPath:String = null;  
+        var wClip  = -1f;
       }
     
     class Options extends Opts {}

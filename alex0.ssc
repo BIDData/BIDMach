@@ -124,7 +124,7 @@ val model = net
 val s = new Synthesis("imagenet")
 val o = s.opts
 o.realImagesPath = "/code/BIDMach/data/ImageNet/train/"
-o.discriminatorBatchSize = opts.batchSize
+//o.discriminatorBatchSize = opts.batchSize
 s.init(model,null);
 
 o.base = 0
