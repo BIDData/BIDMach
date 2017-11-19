@@ -21,7 +21,7 @@ opts.tensorFormat = Net.TensorNCHW;
 
 import BIDMach.networks.layers.Node._;
 
-val in = input;
+val in = input();
 val crop1 = crop(in)(sizes=irow(3,224,224,0),offsets=irow(0,-1,-1,-1));
 val means1 = constant(means);
 

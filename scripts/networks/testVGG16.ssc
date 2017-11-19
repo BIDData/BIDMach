@@ -53,7 +53,7 @@ import BIDMach.networks.layers.Node._;
 
 Net.initDefaultNodeSet;
 
-val in =        input;
+val in =        input();
 val meanv =     const(means);
 val din =       in - meanv;
 val scalef =    const(row(0.01f));

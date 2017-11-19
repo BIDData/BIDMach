@@ -1,0 +1,19 @@
+import BIDMach.allreduce.TestActor
+import scala.io.Source
+import com.typesafe.config.ConfigFactory
+
+val nodes = TestActor.startup(Seq("2555","2556"));
+
+
+val conf = ConfigFactory.load()
+val seeds = conf.getList("akka.cluster.seed-nodes").unwrapped
+val seedhostPort = seeds.get(0).toString
+val seedhost = seedhostPort.substring(0, seedhostPort.lastIndexOf(":"));
+
+
+val sv = new TestActor.SendTo(seedhost + ":2553/user/testActor",101)
+
+def sendIt() = {
+    nodes(0) ! sv;
+    }
+    
