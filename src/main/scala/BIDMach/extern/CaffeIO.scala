@@ -8,6 +8,7 @@ import BIDMach.networks.Net
 import BIDMach.networks.layers._
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import scala.language.implicitConversions
 import scala.Option
 import scala.util.control.Breaks._
 import java.io.InputStream
