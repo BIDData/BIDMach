@@ -12,8 +12,21 @@ declare -a scalac_args
 declare -a sbt_commands
 declare java_cmd=java
 declare java_version
-declare -r sbt_bin_dir="$(dirname "$(realpath "$0")")"
-declare -r sbt_home="$sbt_bin_dir"
+declare init_sbt_version="1.0.2"
+
+declare SCRIPT=$0
+while [ -h "$SCRIPT" ] ; do
+  ls=$(ls -ld "$SCRIPT")
+  # Drop everything prior to ->
+  link=$(expr "$ls" : '.*-> \(.*\)$')
+  if expr "$link" : '/.*' > /dev/null; then
+    SCRIPT="$link"
+  else
+    SCRIPT=$(dirname "$SCRIPT")/"$link"
+  fi
+done
+declare -r sbt_bin_dir="$(dirname "$SCRIPT")"
+declare -r sbt_home="$(dirname "$sbt_bin_dir")"
 
 echoerr () {
   echo 1>&2 "$@"
@@ -26,7 +39,7 @@ dlog () {
 }
 
 jar_file () {
-  echo "$(cygwinpath "${sbt_home}/lib/sbt-launch.jar")"
+  echo "$(cygwinpath "${sbt_home}/sbt-pkg/bin/sbt-launch.jar")"
 }
 
 acquire_sbt_jar () {
@@ -36,6 +49,10 @@ acquire_sbt_jar () {
     echoerr "Could not find launcher jar: $sbt_jar"
     exit 2
   fi
+}
+
+rt_export_file () {
+  echo "${sbt_bin_dir}/java9-rt-export.jar"
 }
 
 execRunner () {
@@ -94,7 +111,7 @@ get_mem_opts () {
     local arg_xms=$([[ "${java_args[@]}" == *-Xms* ]] && echo "" || echo "-Xms${mem}m")
     local arg_xmx=$([[ "${java_args[@]}" == *-Xmx* ]] && echo "" || echo "-Xmx${mem}m")
     local arg_rccs=$([[ "${java_args[@]}" == *-XX:ReservedCodeCacheSize* ]] && echo "" || echo "-XX:ReservedCodeCacheSize=${codecache}m")
-    local arg_meta=$([[ "${java_args[@]}" == *-XX:${class_metadata_opt}* ]] && echo "" || echo "-XX:${class_metadata_opt}=${class_metadata_size}m")
+    local arg_meta=$([[ "${java_args[@]}" == *-XX:${class_metadata_opt}* && ! "$java_version" < "1.8" ]] && echo "" || echo "-XX:${class_metadata_opt}=${class_metadata_size}m")
 
     echo "${arg_xms} ${arg_xmx} ${arg_rccs} ${arg_meta}"
   fi
@@ -128,22 +145,44 @@ process_args () {
 
        -sbt-jar) require_arg path "$1" "$2" && sbt_jar="$2" && shift 2 ;;
    -sbt-version) require_arg version "$1" "$2" && sbt_version="$2" && shift 2 ;;
-     -java-home) require_arg path "$1" "$2" && java_cmd="$2/bin/java" && shift 2 ;;
+     -java-home) require_arg path "$1" "$2" &&
+                 java_cmd="$2/bin/java" &&
+                 export JAVA_HOME="$2" &&
+                 export JDK_HOME="$2" &&
+                 export PATH="$2/bin:$PATH" &&
+                 shift 2 ;;
 
-            -D*) addJava "$1" && shift ;;
+          "-D*") addJava "$1" && shift ;;
             -J*) addJava "${1:2}" && shift ;;
               *) addResidual "$1" && shift ;;
     esac
   done
-  
+
   is_function_defined process_my_args && {
     myargs=("${residual_args[@]}")
     residual_args=()
     process_my_args "${myargs[@]}"
   }
 
-  java_version=$("$java_cmd" -Xmx512M -version 2>&1 | awk -F '"' '/version/ {print $2}')
+  ## parses 1.7, 1.8, 9, etc out of java version "1.8.0_91"
+  java_version=$("$java_cmd" -Xmx512M -version 2>&1 | grep ' version "' | sed 's/.*version "\([0-9]*\)\(\.[0-9]*\)\{0,1\}\(.*\)*"/\1\2/; 1q')
   vlog "[process_args] java_version = '$java_version'"
+}
+
+syncPreloaded() {
+  if [[ "$init_sbt_version" == "" ]]; then
+    # FIXME: better $init_sbt_version detection
+    init_sbt_version="$(ls -1 "$sbt_home/lib/local-preloaded/org.scala-sbt/sbt/")"
+  fi
+  [[ -f "$HOME/.sbt/preloaded/org.scala-sbt/sbt/$init_sbt_version/jars/sbt.jar" ]] || {
+    # lib/local-preloaded exists (This is optional)
+    [[ -d "$sbt_home/lib/local-preloaded/" ]] && {
+      command -v rsync >/dev/null 2>&1 && {
+        mkdir -p "$HOME/.sbt/preloaded"
+        rsync -a --ignore-existing "$sbt_home/lib/local-preloaded/" "$HOME/.sbt/preloaded"
+      }
+    }
+  }
 }
 
 # Detect that we have java installed.
@@ -156,7 +195,7 @@ checkJava() {
     echo Please go to http://www.java.com/getjava/ and download
     echo
     exit 1
-  elif [[ ! "$java_version" > "$required_version" ]]; then
+  elif [[ "$java_version" < "$required_version" ]]; then
     echo
     echo The java installation you have is not up to date
     echo $script_name requires at least version $required_version+, you have
@@ -169,8 +208,30 @@ checkJava() {
   fi
 }
 
+copyRt() {
+  if [[ "$java_version" == "9" ]]; then
+    rtexport=$(rt_export_file)
+    java9_ext=$("$java_cmd" ${JAVA_OPTS} ${SBT_OPTS:-$default_sbt_opts} ${java_args[@]} \
+      -jar "$rtexport" --rt-ext-dir)
+    java9_rt=$(echo "$java9_ext/rt.jar")
+    vlog "[copyRt] java9_rt = '$java9_rt'"
+    if [[ ! -f "$java9_rt" ]]; then
+      echo Copying runtime jar.
+      mkdir -p "$java9_ext"
+      execRunner "$java_cmd" \
+        ${JAVA_OPTS} \
+        ${SBT_OPTS:-$default_sbt_opts} \
+        ${java_args[@]} \
+        -jar "$rtexport" \
+        "${java9_rt}"
+    fi
+    addJava "-Dscala.ext.dirs=${java9_ext}"
+  fi
+}
 
 run() {
+  syncPreloaded
+
   # no jar? download it.
   [[ -f "$sbt_jar" ]] || acquire_sbt_jar "$sbt_version" || {
     # still no jar? uh-oh.
@@ -185,6 +246,9 @@ run() {
 
   # TODO - java check should be configurable...
   checkJava "1.6"
+
+  # Java 9 support
+  copyRt
 
   #If we're in cygwin, we should use the windows config, and terminal hacks
   if [[ "$CYGWIN_FLAG" == "true" ]]; then
@@ -201,8 +265,8 @@ run() {
     ${java_args[@]} \
     -jar "$sbt_jar" \
     "${sbt_commands[@]}" \
-    "${residual_args[@]}"  
-  
+    "${residual_args[@]}"
+
   exit_code=$?
 
   # Clean up the terminal from cygwin hacks.

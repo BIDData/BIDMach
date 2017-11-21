@@ -276,7 +276,7 @@ class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new
   }
 }
 
-trait LRNacrossNodeOpts extends CompoundNodeOpts {
+trait LRNacrossNodeOpts extends NodeOpts {
     var dim = 5;
     var alpha = 1f;
     var beta = 0.5f;
@@ -292,7 +292,7 @@ trait LRNacrossNodeOpts extends CompoundNodeOpts {
     }
 }
 
-class LRNacrossNode extends CompoundNode with LRNacrossNodeOpts {	
+class LRNacrossNode extends Node with LRNacrossNodeOpts {	
 	 
 	  override def clone:LRNacrossNode = {
 		  copyTo(new LRNacrossNode).asInstanceOf[LRNacrossNode];

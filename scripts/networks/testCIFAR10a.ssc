@@ -1,5 +1,6 @@
 :silent
-val datadir = "../../data/CIFAR10/parts/"
+
+val datadir = "../../data/CIFAR10/parts/";
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";
 val labelsfname = datadir + "labels%d.imat.lz4";
 val testfname = datadir + "testNCHW%d.fmat.lz4";
@@ -25,33 +26,24 @@ opts.pstep = 0.1f
 opts.hasBias = true;
 opts.tensorFormat = Net.TensorNCHW;
 
+{
 import BIDMach.networks.layers.Node._;
 
-val in = input;
+Net.initDefaultNodeSet;
 
-val conv1 = conv(in)(w=5,h=5,nch=32,stride=1,pad=2,initv=0.01f,convType=convtype);
-val pool1 = pool(conv1)(w=3,h=3,stride=2);
-val norm1 = batchNormScale(pool1)();
-val relu1 = relu(norm1);
+val in =     input();
+val lin1 =   linear(in)(outdim=20);
+val sig1 =   sigmoid(lin1);
 
-val conv2 = conv(relu1)(w=5,h=5,nch=32,stride=1,pad=2,convType=convtype);
-val pool2 = pool(conv2)(w=3,h=3,stride=2,poolingMode=avgpool);
-val norm2 = batchNormScale(pool2)();
-val relu2 = relu(norm2);
-
-val conv3 = conv(relu2)(w=5,h=5,nch=32,stride=1,pad=2,convType=convtype);
-val pool3 = pool(conv3)(w=3,h=3,stride=2,poolingMode=avgpool);
-val fc3 =   linear(pool3)(outdim=10,initv=3e-2f);
-val out =   softmaxout(fc3)(scoreType=1); 
-
-val nodes = (in     \ null   \ null   \ null   on
-             conv1  \ pool1  \ norm1  \ relu1  on
-             conv2  \ pool2  \ norm2  \ relu2  on
-             conv3  \ pool3  \ fc3    \ out    ).t
+val lin2 =   linear(sig1)(outdim=30);
+val sig2 =   sigmoid(lin2);
 
 
+val lin3 =   linear(sig2)(outdim=3);
+val out =    glm(lin3)(); 
 
-opts.nodemat = nodes;
+
+opts.nodeset=Net.getDefaultNodeSet;
 val model = nn.model.asInstanceOf[Net];
 nn.train;
 
