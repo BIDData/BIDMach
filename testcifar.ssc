@@ -24,8 +24,9 @@ opts.tensorFormat = Net.TensorNCHW;
 opts.autoReset = false;
 opts.debugMem = false;
 
-val nodes = {
+{
     import BIDMach.networks.layers.Node._;
+    Net.initDefaultNodeSet;
 
     val in = input;
     val scalef = constant(row(0.01f));
@@ -46,16 +47,17 @@ val nodes = {
     val fc3 =   linear(pool3)(outdim=10,initv=3e-2f);
     val out =   softmaxout(fc3)(scoreType=1); 
 
-    (in     \ scalef \ inscale on
+    /*(in     \ scalef \ inscale on
     conv1  \ pool1  \ relu1  on
     conv2  \ pool2  \ relu2  on
     conv3  \ pool3  \ null   on
-    fc3    \ out    \ null   ).t;
+    fc3    \ out    \ null   ).t;*/
+    opts.nodeset=Net.getDefaultNodeSet
+
 }
 
 
-
-opts.nodemat = nodes;
+//opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
 nn.launchTrain;
 
@@ -80,6 +82,7 @@ o.endLayer = 11
 o.guidebp = false
 o.realImagesPath = "/code/BIDMach/data/CIFAR10/parts/"
 o.pretrainedDiscriminatorPath = "models/cifar_discri2/"
+//o.wClip = 0.01f
 s.init(model,null)
 o.base = 0
 o.scale = 1
@@ -98,6 +101,9 @@ def reset() {
     o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
     o.endLayer = 11;
 }
+
+var threhold=1;
+hist(()=>row(FMat(model.layers(0).output).data.filter(math.abs(_)>threhold)),100)
 
 //:load gan.ssc
 //val s = start("cifar")
