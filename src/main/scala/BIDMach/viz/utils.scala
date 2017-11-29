@@ -72,6 +72,7 @@ object utils {
   } 
     
   def packImages(data_ : Mat,tensorFormat: Int = 1) = {     
+      var padding = 2;
       if (data_.dims.length == 4) {
           val data = FMat(if (tensorFormat == 1) cpu(FMat(data_).fromNCHWtoNHWC) else cpu(data_))
           val w = data.dims(1);
@@ -79,11 +80,13 @@ object utils {
           val num = data.dims(3);
           val col = Math.sqrt(num).toInt;
           val row = Math.ceil(num*1f/col).toInt;
-          val out = FMat(Array(data.dims(0),row*h,col*w),new Array[Float](data.dims(0)*row*h*col*w));
+          val h0 = h*row + (row + 1) * padding
+          val w0 = w*col + (col + 1) * padding
+          val out = FMat(Array(data.dims(0),h0,w0),new Array[Float](data.dims(0)*h0*w0));
           for(k<-0 until num){
               val i = k / col;
               val j = k % col;
-              out(?,i*w->(i+1)*w,j*h->(j+1)*h) = data(?,?,?,k)
+              out(?,(padding+i*(w+padding))->(i+1)*(w+padding),(padding+j*(h+padding))->(j+1)*(h+padding)) = data(?,?,?,k)
           }
           out
       }

@@ -79,7 +79,7 @@ class Plot(name: String = "plot") {
         //controlPanel.setLayout(new FlowLayout)//new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
         controlPanel.setLayout(new BoxLayout(controlPanel,BoxLayout.PAGE_AXIS));
         frame.pack;
-        frame.setVisible(true);            
+        frame.setVisible(true);
     }
         
     def plot_image(data_ :Mat, tensorFormat: Int = 1) {
@@ -108,7 +108,6 @@ class Plot(name: String = "plot") {
         p.add(slider);
         p.add(rangeLabel);
         controlPanel.add(p);
-        //if (frame != null)frame.pack                  
         frame.pack
     }
     

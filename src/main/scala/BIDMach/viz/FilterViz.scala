@@ -17,6 +17,7 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
     var filter_scale = 1f        
     var _filter_scale: Mat = null;
     val ind = irow(0)
+    plot.add_slider("filter_scale",(x:Int)=>{filter_scale=x/20f;filter_scale},20,2);
         
     override def check(model:Model, mats:Array[Mat]) = {
         model match {
