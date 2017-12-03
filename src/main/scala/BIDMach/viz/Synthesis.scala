@@ -49,6 +49,8 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
     var _l2lambda: Mat = null;
     var _dissimilarity: Mat = null;
     var _wClip: Mat = null;
+    var _averagingWeight: Mat = null;
+    var averaging: Mat = null;
     var selecter = irow(0);
             
         
@@ -76,12 +78,15 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
         _l2lambda = net.layers(0).output.zeros(1,1);  
         _dissimilarity = net.layers(0).output.zeros(1,1); 
         _wClip = net.layers(0).output.zeros(1,1); 
+        _averagingWeight = net.layers(0).output.zeros(1,1); 
         accClassifier = net.layers(0).output.zeros(net.layers(0).output.dims);
         accDiscriminator = net.layers(0).output.zeros(net.layers(0).output.dims);
         momentum = net.layers(0).output.zeros(net.layers(0).output.dims);
         noise = net.layers(0).output.zeros(net.layers(0).output.dims);
         gdata = net.layers(0).output.zeros(net.layers(0).output.dims);
         gdata<--rand(gdata.nrows,gdata.ncols).reshapeView(gdata.dims)*256f;
+        averaging = net.layers(0).output.zeros(net.layers(0).output.dims);
+        averaging<--gdata;
         interval  = opts.updateInterval;
 
         val batchSize = model.datasource.opts.batchSize
@@ -166,6 +171,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
         plot.add_slider("L2 norm",(x:Int)=>{opts.l2lambda=(10f^(x/20f-4))(0);opts.l2lambda},60,4);
         plot.add_slider("Dissimilarity",(x:Int)=>{opts.dissimilarity=(10f^(x/20f-7))(0);opts.dissimilarity},0,7);
         plot.add_slider("discriminatorWeight",(x:Int)=>{opts.dWeight=x/100f;opts.dWeight});        
+        plot.add_slider("averagingWeight",(x:Int)=>{opts.averagingWeight=x/100f;opts.resetAveraging=true;opts.averagingWeight});        
     }
 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        
@@ -264,6 +270,10 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                 net.layers(0).output<--d;
                 resetFlag = false;             
             }
+            if (opts.resetAveraging) {
+                averaging<--net.layers(0).output;
+                opts.resetAveraging = false;
+            }
             net.forward;
             net.layers(0).deriv.clear;
             net.setderiv();
@@ -304,6 +314,9 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                 max(net.layers(0).output,0,net.layers(0).output);
                 min(net.layers(0).output,255,net.layers(0).output);
             }
+            _averagingWeight(0,0) = opts.averagingWeight
+            averaging ~ averaging *@ _averagingWeight
+            averaging ~ averaging + (net.layers(0).output *@ ( 1 - _averagingWeight ) )
             val dims = net.layers(0).output.dims;
             val s = dims(1);
             val d = net.layers(0).output.reshapeView(dims(1),dims(2),dims(0),dims(3))
@@ -328,7 +341,10 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             D.layers(0).output<--net.layers(0).output;
             if (p && t%10 == 0) {
                 println(curScore,margin);
-                show(D.layers(0).output)
+                if (opts.displayAveraging)
+                    show(averaging)
+                else
+                    show(D.layers(0).output)
             }
             gsteps+=margin
         }
@@ -352,7 +368,10 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                 //val data = if (here/ds.opts.batchSize % 2 == 0) generate(_net,targetScore = 0.7f); else generate(_net,targetScore = 0.2f);
                 val data = mcmc(_net,targetScore = 0.7f);
                 
-                show(data)
+                if (opts.displayAveraging)
+                    show(averaging)
+                else
+                    show(data)
                                         
                 val gscore = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 gscores+=gscore;
@@ -479,6 +498,9 @@ object Synthesis {
         var wClip  = -1f;
         var clipping = true;
         var detailed = 1;
+        var resetAveraging = false;
+        var displayAveraging = false;
+        var averagingWeight = 0.9f
       }
     
     class Options extends Opts {}
