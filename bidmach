@@ -81,6 +81,15 @@ else
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
 fi
 
+userargs=""
+if [ "$2" != "" ]; then
+    j=0;
+    for i in ${*:2}; do
+	userargs="$userargs -Duser.arg$j=$i"
+	j=$((j+1))
+    done
+fi
+
 if [ "$1" = "notebook" ]; then
     shift 1
     if [ ! -z "$@" ]; then
@@ -90,5 +99,5 @@ if [ "$1" = "notebook" ]; then
     fi
     ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 -nobootcp -toolcp "${TOOL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  "$@"
+    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${TOOL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  "$1"
 fi
