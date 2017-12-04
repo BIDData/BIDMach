@@ -83,8 +83,9 @@ fi
 
 userargs=""
 if [ "$2" != "" ]; then
-    j=0;
-    for i in ${*:2}; do
+    userargs="-Duser.arg0=$2"
+    j=1;
+    for i in ${*:3}; do
 	userargs="$userargs -Duser.arg$j=$i"
 	j=$((j+1))
     done
