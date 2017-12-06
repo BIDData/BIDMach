@@ -100,5 +100,5 @@ if [ "$1" = "notebook" ]; then
     fi
     ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${TOOL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  "$1"
+    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${TOOL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  ${1}
 fi
