@@ -326,7 +326,7 @@ object Node {
   
 	def abs(a:NodeTerm) = new AbsNode{inputs(0) = a;};
 	
-	def add(a:Array[NodeTerm]) = new AddNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
+	def add(a:Array[_ <: NodeTerm]) = new AddNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
   
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
@@ -507,8 +507,16 @@ object Node {
     new MaxNode{inputs(0) = a; inputs(1) = b;};
   }
   
+  def max(a:Array[_ <: NodeTerm]) = {
+    new MaxNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
+  }
+  
   def min(a:NodeTerm,b:NodeTerm) = {
     new MinNode{inputs(0) = a; inputs(1) = b;};
+  }
+  
+  def min(a:Array[_ <: NodeTerm]) = {
+    new MinNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
   }
   
   def maxi(a:NodeTerm) = {
@@ -615,7 +623,7 @@ object Node {
   
   def sqrt(a:NodeTerm) = new SqrtNode{inputs(0) = a;};
   
-  def stack(a:Array[NodeTerm]) = new StackNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
+  def stack(a:Array[_ <: NodeTerm]) = new StackNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
   
   def sum(a:NodeTerm) = new SumNode{inputs(0) = a;}
   
