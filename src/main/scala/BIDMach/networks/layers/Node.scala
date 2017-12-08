@@ -325,6 +325,8 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
 object Node {
   
 	def abs(a:NodeTerm) = new AbsNode{inputs(0) = a;};
+	
+	def add(a:Array[NodeTerm]) = new AddNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
   
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
@@ -612,6 +614,8 @@ object Node {
   def splitvert(a:NodeTerm)(np:Int) = new SplitVertNode{inputs(0) = a; nparts = np};
   
   def sqrt(a:NodeTerm) = new SqrtNode{inputs(0) = a;};
+  
+  def stack(a:Array[NodeTerm]) = new StackNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
   
   def sum(a:NodeTerm) = new SumNode{inputs(0) = a;}
   
