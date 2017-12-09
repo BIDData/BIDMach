@@ -326,7 +326,11 @@ object Node {
   
 	def abs(a:NodeTerm) = new AbsNode{inputs(0) = a;};
 	
-	def add(a:Array[_ <: NodeTerm]) = new AddNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
+	def add(a:Array[_ <: NodeTerm]) = {
+	  val n = new AddNode{ninputs = a.length; override val inputs = new Array[NodeTerm](a.length);}
+	  Array.copy(a, 0, n.inputs, 0, a.length);
+	  n;
+	}
   
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode}    
@@ -623,7 +627,12 @@ object Node {
   
   def sqrt(a:NodeTerm) = new SqrtNode{inputs(0) = a;};
   
-  def stack(a:Array[_ <: NodeTerm]) = new StackNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
+  def stack(a:Array[_ <: NodeTerm]) = {
+    val n = new StackNode{override val inputs = new Array[NodeTerm](a.length)};
+    n.ninputs = a.length;
+    Array.copy(a, 0, n.inputs, 0, a.length);
+    n;
+  }
   
   def sum(a:NodeTerm) = new SumNode{inputs(0) = a;}
   
