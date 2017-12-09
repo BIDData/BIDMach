@@ -327,9 +327,7 @@ object Node {
 	def abs(a:NodeTerm) = new AbsNode{inputs(0) = a;};
 	
 	def add(a:Array[_ <: NodeTerm]) = {
-	  val n = new AddNode{ninputs = a.length; override val inputs = new Array[NodeTerm](a.length);}
-	  Array.copy(a, 0, n.inputs, 0, a.length);
-	  n;
+	  new AddNode{override val inputs = a; ninputs = a.length;}
 	}
   
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
@@ -512,7 +510,7 @@ object Node {
   }
   
   def max(a:Array[_ <: NodeTerm]) = {
-    new MaxNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
+    new MaxNode{override val inputs = a; ninputs = a.length;};
   }
   
   def min(a:NodeTerm,b:NodeTerm) = {
@@ -520,7 +518,7 @@ object Node {
   }
   
   def min(a:Array[_ <: NodeTerm]) = {
-    new MinNode{ninputs = a.length; Array.copy(a, 0, inputs, 0, a.length);};
+    new MinNode{override val inputs = a; ninputs = a.length;};
   }
   
   def maxi(a:NodeTerm) = {
@@ -627,12 +625,7 @@ object Node {
   
   def sqrt(a:NodeTerm) = new SqrtNode{inputs(0) = a;};
   
-  def stack(a:Array[_ <: NodeTerm]) = {
-    val n = new StackNode{override val inputs = new Array[NodeTerm](a.length)};
-    n.ninputs = a.length;
-    Array.copy(a, 0, n.inputs, 0, a.length);
-    n;
-  }
+  def stack(a:Array[_ <: NodeTerm]) = new StackNode{override val inputs = a; ninputs = a.length};
   
   def sum(a:NodeTerm) = new SumNode{inputs(0) = a;}
   
