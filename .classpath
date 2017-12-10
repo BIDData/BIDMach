@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src/main/java">
+	<classpathentry kind="src" output="target/classes" path="src/main/java">
 		<attributes>
-			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="c:/code/CUDA7/bin"/>
+			<attribute name="optional" value="true"/>
+			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="src" path="src/main/scala">
@@ -10,41 +11,33 @@
 			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="C:/code/BIDMach/lib"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="src" output="target/test-classes" path="src/test/java">
+		<attributes>
+			<attribute name="optional" value="true"/>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="src" path="src/test/scala"/>
+	<classpathentry excluding="**" kind="src" output="target/classes" path="lib">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry excluding="**" kind="src" output="target/classes" path="cbin">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="lib/lz4-1.3.jar"/>
-	<classpathentry kind="lib" path="lib/jfreechart-1.0.19.jar"/>
-	<classpathentry kind="lib" path="lib/jhdf5-3.2.1.jar"/>
-	<classpathentry kind="lib" path="lib/jline-2.10.jar"/>
-	<classpathentry kind="lib" path="lib/jocl-2.0.0.jar"/>
-	<classpathentry kind="lib" path="lib/json-io-4.5.0.jar"/>
-	<classpathentry kind="lib" path="lib/ptplot-1.0.jar"/>
-	<classpathentry kind="lib" path="lib/ptplotapplication-1.0.jar"/>
-	<classpathentry kind="lib" path="lib/scala-arm_2.11-1.4.jar"/>
-	<classpathentry kind="lib" path="lib/scala-compiler-2.11.0-M8.jar"/>
-	<classpathentry kind="lib" path="lib/jcublas-0.8.0.jar"/>
-	<classpathentry kind="lib" path="lib/jcuda-0.8.0.jar"/>
-	<classpathentry kind="lib" path="lib/jcudnn-0.8.0.jar"/>
-	<classpathentry kind="lib" path="lib/jcufft-0.8.0.jar"/>
-	<classpathentry kind="lib" path="lib/jcurand-0.8.0.jar"/>
-	<classpathentry kind="lib" path="lib/jcusparse-0.8.0.jar"/>
-	<classpathentry kind="lib" path="lib/protobuf-java-3.1.0.jar"/>
-	<classpathentry kind="lib" path="lib/asm-5.1.jar"/>
-	<classpathentry kind="lib" path="lib/commons-io-2.1.jar"/>
-	<classpathentry kind="lib" path="lib/scalacheck_2.11-1.11.6.jar"/>
-	<classpathentry kind="lib" path="lib/scalatest_2.11-2.2.1.jar"/>
-	<classpathentry kind="lib" path="lib/junit-4.11.jar"/>
-	<classpathentry kind="lib" path="lib/akka-actor_2.11-2.5.4.jar"/>
-	<classpathentry kind="lib" path="lib/akka-cluster_2.11-2.5.4.jar"/>
-	<classpathentry kind="lib" path="lib/akka-http_2.11-10.0.9.jar"/>
-	<classpathentry kind="lib" path="lib/akka-http-core_2.11-10.0.9.jar"/>
-	<classpathentry kind="lib" path="lib/akka-kryo-serialization_2.11-0.5.0.jar"/>
-	<classpathentry kind="lib" path="lib/akka-parsing_2.11-10.0.9.jar"/>
-	<classpathentry kind="lib" path="lib/akka-protobuf_2.11-2.5.4.jar"/>
-	<classpathentry kind="lib" path="lib/akka-remote_2.11-2.5.4.jar"/>
-	<classpathentry kind="lib" path="lib/akka-stream_2.11-2.5.4.jar"/>
-	<classpathentry kind="lib" path="lib/config-1.3.1.jar"/>
-	<classpathentry kind="lib" path="lib/BIDMat-2.0.11-cuda8.0beta.jar"/>
-	<classpathentry kind="output" path="bin"/>
+	<classpathentry kind="output" path="target/classes"/>
 </classpath>

@@ -320,12 +320,12 @@ object Word2Vech  {
         cudaDeviceSynchronize;
       }
       case _ => {
-        blockSgemm(if (ltrans) Trans else NoTrans, 
-        		if (rtrans) Trans else NoTrans,
-        		nr, nc, nk, left.ncols, 
-        		left.data, 0,  if (ltrans) nk else nr, left.nrows,
-        		right.data, 0, if (rtrans) nc else nk, right.nrows,
-        		prod.data, 0, nr, prod.nrows);
+        left.blockGemm(if (ltrans) 1 else 0, if (rtrans) 1 else 0,
+        		nr, nc, left.ncols, 
+        		0,  if (ltrans) nk else nr, left.nrows,
+        		right, 0, if (rtrans) nc else nk, right.nrows,
+        		prod, 0, nr, prod.nrows, true
+        		);
       }
     }
     Mat.nflops += 2L * nr * nc * nk * left.ncols;

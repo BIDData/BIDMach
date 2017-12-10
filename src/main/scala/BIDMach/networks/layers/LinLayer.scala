@@ -31,18 +31,25 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var waitsteps = 0;
   var epsilon = 0f;
   var ADAinitialized = false;
+  var ngroups = 0;
+  
 
   def initModelMat(nr:Int, nc:Int, initv:Float):Mat = {
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
     	lr_scales(imodel+1) = opts.bias_scale;
     }
+    ngroups = math.max(opts.ngroups, 1);
     if (opts.tmatShape != null) {
       val (y, x, h, w) = opts.tmatShape(nr, nc);
       val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
       out;
     } else {
-    	zeros(nr, nc);
+      if (opts.ngroups <= 1) {
+      	zeros(nr, nc);
+      } else {
+        zeros(nr \ nc \ ngroups);
+      }
     }
   }
 
@@ -55,20 +62,28 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   		updatemats(imodel) = convertMat(modelmats(imodel).copy);
   		opts.initfn(modelmats(imodel), opts.initv);
   		if (opts.hasBias) {
-  			modelmats(imodel+1) = convertMat(zeros(outdim, 1));
-  			updatemats(imodel+1) = convertMat(zeros(outdim, 1));
+  			modelmats(imodel+1) = convertMat(zeros(outdim, ngroups));
+  			updatemats(imodel+1) = convertMat(zeros(outdim, ngroups));
   			opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
   		}
   	}
   	if (opts.aopts != null && !ADAinitialized) initADAGrad;
   	val mm = modelmats(imodel);
-  	createOutput(mm.nrows \ inputData.ncols);
+  	if (opts.ngroups <= 1) {
+  		createOutput(mm.nrows \ inputData.ncols);
+  	} else {
+  	  createOutput(mm.nrows \ inputData.ncols \ ngroups);
+  	}
   	inplaceNoConnectGetOutput(true);
   	
   	if (opts.withInteractions) {
   		GLM.pairMult(mm, inputData, output);
   	} else {
-  		output ~ mm * inputData;
+  	  if (opts.ngroups <= 1) {
+  	  	output ~ mm * inputData;
+  	  } else {
+  	    output.blockmult(mm, inputData, opts.ngroups);
+  	  }
   	}
   	if (opts.hasBias) {
   		output ~ output + modelmats(imodel+1);
@@ -82,7 +97,11 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     
     val mm = modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      mm.madd(deriv, inputDeriv, true, false);
+      if (opts.ngroups <= 1) {
+      	mm.madd(deriv, inputDeriv, true, false);
+      } else {
+        mm.blockmadd(deriv, inputDeriv, opts.ngroups, true, false);
+      }
     }
     if (opts.aopts != null) {
       if (firststep <= 0) firststep = pos.toFloat;
@@ -94,10 +113,13 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       }
     } else {
     	val um = updatemats(imodel);
-    	deriv.madd(inputData, um, false, true);
+    	if (opts.ngroups <= 1) {
+    		deriv.madd(inputData, um, false, true);
+    	} else {
+    	  mm.blockmadd(deriv, inputDeriv, opts.ngroups, true, false);
+    	}
       if (opts.hasBias) updatemats(imodel+1) ~ updatemats(imodel+1) + sum(deriv,2);
-    }
-    
+    }    
     inplaceNoConnectReleaseDeriv();
     backwardtime += toc - start;
   }
@@ -146,6 +168,7 @@ trait LinNodeOpts extends ModelNodeOpts {
   var initv:Float = 1f;
   var initbiasfn:(Mat,Float)=>Mat = Net.constant;
   var initbiasv:Float = 0f;
+  var ngroups = 0;
   
   def copyOpts(opts:LinNodeOpts):LinNodeOpts = {
   		super.copyOpts(opts);
@@ -154,7 +177,11 @@ trait LinNodeOpts extends ModelNodeOpts {
   		opts.outdim = outdim;
   		opts.tmatShape = tmatShape;
   		opts.withInteractions = withInteractions;
+  		opts.initfn = initfn;
   		opts.initv = initv;
+  		opts.initbiasfn = initbiasfn;
+  		opts.initbiasv = initbiasv;
+  		opts.ngroups = ngroups;
   		opts;
   }
 }
