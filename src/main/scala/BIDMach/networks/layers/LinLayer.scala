@@ -67,9 +67,9 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   		  	updatemats(imodel+1) = convertMat(zeros(outdim, 1));
   		  } else {
   		  	modelmats(imodel+1) = convertMat(zeros(outdim \ ngroups \ 1));
-  		  	updatemats(imodel+1) = convertMat(zeros(outdim \ ngroups \ 1));  		    
+  		  	updatemats(imodel+1) = convertMat(zeros(outdim \ ngroups \ 1));
   		  } 		 
-  			opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
+		  opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);	
   		}
   	}
   	if (opts.aopts != null && !ADAinitialized) initADAGrad;
@@ -119,9 +119,9 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     } else {
     	val um = updatemats(imodel);
     	if (ngroups <= 1) {
-    		deriv.madd(inputData, um, false, true);
+	    deriv.madd(inputData, um, false, true);
     	} else {
-    	  mm.blockmadd(deriv, inputDeriv, ngroups, true, false);
+	    deriv.blockmadd(inputData, um, opts.ngroups, false, true);
     	}
       if (opts.hasBias) updatemats(imodel+1) ~ updatemats(imodel+1) + deriv.sum(irow(1));
     }    
