@@ -45,10 +45,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
       out;
     } else {
-      if (opts.ngroups <= 1) {
+      if (ngroups <= 1) {
       	zeros(nr, nc);
       } else {
-        zeros(nr \ nc \ ngroups);
+        zeros(nr \ ngroups \ nc);
       }
     }
   }
@@ -62,32 +62,32 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   		updatemats(imodel) = convertMat(modelmats(imodel).copy);
   		opts.initfn(modelmats(imodel), opts.initv);
   		if (opts.hasBias) {
-  		  if (opts.ngroups <= 1) {
+  		  if (ngroups <= 1) {
   		  	modelmats(imodel+1) = convertMat(zeros(outdim, 1));
   		  	updatemats(imodel+1) = convertMat(zeros(outdim, 1));
   		  } else {
-  		  	modelmats(imodel+1) = convertMat(zeros(outdim \1 \ ngroups));
-  		  	updatemats(imodel+1) = convertMat(zeros(outdim \ 1 \ ngroups));  		    
+  		  	modelmats(imodel+1) = convertMat(zeros(outdim \ ngroups \ 1));
+  		  	updatemats(imodel+1) = convertMat(zeros(outdim \ ngroups \ 1));  		    
   		  } 		 
   			opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
   		}
   	}
   	if (opts.aopts != null && !ADAinitialized) initADAGrad;
   	val mm = modelmats(imodel);
-  	if (opts.ngroups <= 1) {
+  	if (ngroups <= 1) {
   		createOutput(mm.nrows \ inputData.ncols);
   	} else {
-  	  createOutput(mm.nrows \ inputData.ncols \ ngroups);
+  	  createOutput(mm.nrows \ ngroups \ inputData.ncols);
   	}
   	inplaceNoConnectGetOutput(true);
   	
   	if (opts.withInteractions) {
   		GLM.pairMult(mm, inputData, output);
   	} else {
-  	  if (opts.ngroups <= 1) {
+  	  if (ngroups <= 1) {
   	  	output ~ mm * inputData;
   	  } else {
-  	    output.blockmult(mm, inputData, opts.ngroups);
+  	    output.blockmult(mm, inputData, ngroups);
   	  }
   	}
   	if (opts.hasBias) {
@@ -102,10 +102,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     
     val mm = modelmats(imodel);
     if (inputDeriv.asInstanceOf[AnyRef] != null) {
-      if (opts.ngroups <= 1) {
+      if (ngroups <= 1) {
       	mm.madd(deriv, inputDeriv, true, false);
       } else {
-        mm.blockmadd(deriv, inputDeriv, opts.ngroups, true, false);
+        mm.blockmadd(deriv, inputDeriv, ngroups, true, false);
       }
     }
     if (opts.aopts != null) {
@@ -118,10 +118,10 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
       }
     } else {
     	val um = updatemats(imodel);
-    	if (opts.ngroups <= 1) {
+    	if (ngroups <= 1) {
     		deriv.madd(inputData, um, false, true);
     	} else {
-    	  mm.blockmadd(deriv, inputDeriv, opts.ngroups, true, false);
+    	  mm.blockmadd(deriv, inputDeriv, ngroups, true, false);
     	}
       if (opts.hasBias) updatemats(imodel+1) ~ updatemats(imodel+1) + deriv.sum(irow(1));
     }    
