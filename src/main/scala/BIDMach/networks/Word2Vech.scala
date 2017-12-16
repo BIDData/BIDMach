@@ -321,10 +321,10 @@ object Word2Vech  {
       }
       case _ => {
         left.blockGemm(if (ltrans) 1 else 0, if (rtrans) 1 else 0,
-        		nr, nc, nk, left.ncols, 
+        		nr, nc, nk, 1f,
         		0,  if (ltrans) nk else nr, left.nrows,
         		right, 0, if (rtrans) nc else nk, right.nrows,
-        		prod, 0, nr, prod.nrows, true
+        		1f, prod, 0, nr, prod.nrows, left.ncols 
         		);
       }
     }
