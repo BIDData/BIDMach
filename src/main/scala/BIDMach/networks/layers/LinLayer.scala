@@ -32,60 +32,59 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   var epsilon = 0f;
   var ADAinitialized = false;
   var ngroups = 0;
-  
 
   def initModelMat(nr:Int, nc:Int, initv:Float):Mat = {
-    if (lr_scales.asInstanceOf[AnyRef] != null) {
-    	lr_scales(imodel) = opts.lr_scale;
-    	lr_scales(imodel+1) = opts.bias_scale;
-    }
-    ngroups = math.max(opts.ngroups, 1);
-    if (opts.tmatShape != null) {
-      val (y, x, h, w) = opts.tmatShape(nr, nc);
-      val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
-      out;
-    } else {
-    	zeros(nr, nc);
-    }
+      if (lr_scales.asInstanceOf[AnyRef] != null) {
+	  lr_scales(imodel) = opts.lr_scale;
+	  lr_scales(imodel+1) = opts.bias_scale;
+      }
+      ngroups = math.max(opts.ngroups, 1);
+      if (opts.tmatShape != null) {
+	  val (y, x, h, w) = opts.tmatShape(nr, nc);
+	  val out = TMat(nr, nc, y, x, h, w, zeros(1,1));
+	  out;
+      } else {
+	  zeros(nr, nc);
+      }
   }
 
   override def forward = {
-  	val start = toc;
-	ngroups = math.max(opts.ngroups, 1);
-  	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-  	  if (inputData.nrows % ngroups != 0) {
-  	    throw new RuntimeException("LinLayer forward: input data dim %d not a multiple of ngroups %d" format (inputData.nrows, ngroups));
-  	  }
-  		val modelcols = inputData.nrows/ngroups;
-  		val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
-  		modelmats(imodel) = convertMat(initModelMat(outdim, modelcols, opts.initv));
-  		updatemats(imodel) = convertMat(modelmats(imodel).copy);
-  		opts.initfn(modelmats(imodel), opts.initv*math.sqrt(ngroups).toFloat);
-  		if (opts.hasBias) {
-  			modelmats(imodel+1) = convertMat(zeros(outdim, 1));
-  			updatemats(imodel+1) = convertMat(zeros(outdim, 1));		 
-  			opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);	
-  		}
-  	}
-  	if (opts.aopts != null && !ADAinitialized) initADAGrad;
-  	val mm = modelmats(imodel);
-  	createOutput(mm.nrows,  inputData.ncols);
-  	inplaceNoConnectGetOutput(true);
+	  val start = toc;
+	  ngroups = math.max(opts.ngroups, 1);
+	  if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+	      if (inputData.nrows % ngroups != 0) {
+		  throw new RuntimeException("LinLayer forward: input data dim %d not a multiple of ngroups %d" format (inputData.nrows, ngroups));
+	      }
+	      val modelcols = inputData.nrows/ngroups;
+	      val outdim = if (opts.outdim == 0) inputData.nrows else opts.outdim;
+	      modelmats(imodel) = convertMat(initModelMat(outdim, modelcols, opts.initv));
+	      updatemats(imodel) = convertMat(modelmats(imodel).copy);
+	      opts.initfn(modelmats(imodel), opts.initv*math.sqrt(ngroups).toFloat);
+	      if (opts.hasBias) {
+		  modelmats(imodel+1) = convertMat(zeros(outdim, 1));
+		  updatemats(imodel+1) = convertMat(zeros(outdim, 1));		 
+		  opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);	
+	      }
+	  }
+	  if (opts.aopts != null && !ADAinitialized) initADAGrad;
+	  val mm = modelmats(imodel);
+	  createOutput(mm.nrows \ inputData.ncols);
+	  inplaceNoConnectGetOutput(true);
   	
-  	if (opts.withInteractions) {
-  		GLM.pairMult(mm, inputData, output);
-  	} else {
-  	  if (ngroups <= 1) {
-  	  	output ~ mm * inputData;
-  	  } else {
-  	    mm.blockmult(inputData, output, ngroups);
-  	  }
-  	}
-  	if (opts.hasBias) {
-  		output ~ output + modelmats(imodel+1);
-  	}
-  	forwardtime += toc - start;
-  }
+	  if (opts.withInteractions) {
+	      GLM.pairMult(mm, inputData, output);
+	  } else {
+	      if (ngroups <= 1) {
+		  output ~ mm * inputData;
+	      } else {
+		  mm.blockmult(inputData, output, ngroups);
+	      }
+	  }
+	  if (opts.hasBias) {
+	      output ~ output + modelmats(imodel+1);
+	  }
+	  forwardtime += toc - start;
+      }
 
   override def backward(ipass:Int, pos:Long) = {
     val start = toc;
