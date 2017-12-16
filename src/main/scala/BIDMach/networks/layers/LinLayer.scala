@@ -119,12 +119,18 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
     } else {
     	val um = updatemats(imodel);
     	if (ngroups <= 1) {
-	    deriv.madd(inputData, um, false, true);
+    		deriv.madd(inputData, um, false, true);
     	} else {
-	    deriv.blockmadd(inputData, um, opts.ngroups, false, true);
+    		deriv.blockmadd(inputData, um, opts.ngroups, false, true);
     	}
-      if (opts.hasBias) updatemats(imodel+1) ~ updatemats(imodel+1) + deriv.sum(irow(1));
-    }    
+      if (opts.hasBias) {
+    	  if (ngroups <= 1) {
+    		  updatemats(imodel+1) ~ updatemats(imodel+1) + sum(deriv,2);
+    	  } else {
+    		  updatemats(imodel+1) ~ updatemats(imodel+1) + deriv.sum(irow(2));
+    	  }
+      }
+    }
     inplaceNoConnectReleaseDeriv();
     backwardtime += toc - start;
   }
@@ -153,7 +159,6 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   		texp = null;
   		lrate = null;
   		modelcols = null;
-
   		mask = null;
   		dprod = null;
   }
