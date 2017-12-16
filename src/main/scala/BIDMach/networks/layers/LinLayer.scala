@@ -51,6 +51,7 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
 
   override def forward = {
   	val start = toc;
+	ngroups = math.max(opts.ngroups, 1);
   	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
   	  if (inputData.nrows % ngroups != 0) {
   	    throw new RuntimeException("LinLayer forward: input data dim %d not a multiple of ngroups %d" format (inputData.nrows, ngroups));
