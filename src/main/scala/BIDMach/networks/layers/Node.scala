@@ -440,7 +440,7 @@ object Node {
   def linear(a:NodeTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null, withInteractions:Boolean=false, 
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
       initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
-      lr_scale:Float=1f, bias_scale:Float=1f,
+      lr_scale:Float=1f, bias_scale:Float=1f, ngroups:Int=1,
       tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -454,9 +454,10 @@ object Node {
     val initbiasv0 = initbiasv;
     val lrs = lr_scale;
   	val bs = bias_scale;
+  	val ng = ngroups;
     new LinNode{inputs(0)=a; modelName = mname; outdim=odim; hasBias=hBias; 
     initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; lr_scale=lrs; bias_scale=bs;
-    aopts=aaopts; withInteractions = wi; tmatShape = tms};
+    aopts=aaopts; withInteractions = wi; tmatShape = tms; ngroups = ng};
   }
   
   def linear_(a:NodeTerm)(implicit opts:LinNodeOpts) = {

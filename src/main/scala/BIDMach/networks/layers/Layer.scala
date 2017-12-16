@@ -660,7 +660,7 @@ object Layer {
   def linear(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null,
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
       initbiasfn:(Mat,Float)=>Mat = Net.constant, initbiasv:Float = 0f,
-      lr_scale:Float=1f, bias_scale:Float=1f,
+      lr_scale:Float=1f, bias_scale:Float=1f, ngroups:Int = 1,
       withInteractions:Boolean=false, tmatShape:(Int,Int)=>(Array[Int], Array[Int], Array[Int], Array[Int]) = null, net:Net = null) = {
     val odim = outdim;
     val hBias = hasBias;
@@ -674,9 +674,10 @@ object Layer {
     val initbiasv0 = initbiasv;
     val lrs = lr_scale;
   	val bs = bias_scale;
+  	val ng = ngroups;
     new LinLayer(net, new LinNode{modelName = mname; outdim=odim; hasBias=hBias; 
     initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; 
-    lr_scale=lrs; bias_scale=bs;
+    lr_scale=lrs; bias_scale=bs; ngroups=ng;
     aopts=aaopts; withInteractions=wi; tmatShape = tms}){inputs(0)=a;};
   }
   
