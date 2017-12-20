@@ -273,7 +273,7 @@ object AllreduceWorker {
     
     val source: DataSource = createDataSource(sourceDataSize)
     val sink: DataSink = r => {
-      system.log.info(s"\n----Data output at #${r.iteration}: ${r.data.toList}")
+      println(s"----Data output at #${r.iteration}: ${r.data.toList}")
     }
 
     val worker = system.actorOf(Props(classOf[AllreduceWorker], source, sink), name = "worker")
