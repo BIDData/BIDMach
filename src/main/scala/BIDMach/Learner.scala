@@ -27,7 +27,7 @@ import java.util.logging.Level;
  */
 
 @SerialVersionUID(100L)
-case class Learner(
+class Learner(
     val datasource:DataSource,
     val model:Model,
     val mixins:Array[Mixin],
@@ -361,7 +361,7 @@ case class Learner(
  * Parallel Learner with a single datasource.
  */
 
-case class ParLearner(
+class ParLearner(
     val datasource:DataSource,
     val mkModelFn:(Int)=>Model,
     val mkMixinsFn:(Int)=>Array[Mixin],
@@ -729,7 +729,7 @@ class ParLearnerF(
  * i.e. several independent Learners whose models are synchronized periodically.
  */
 
-case class ParLearnerx(
+class ParLearnerx(
     val datasources:Array[DataSource],
     val models:Array[Model],
     val mixins:Array[Array[Mixin]],
