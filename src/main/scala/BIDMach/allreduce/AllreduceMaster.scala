@@ -39,9 +39,9 @@ class AllreduceMaster(
       log.info(s"\n----Detect member ${m.address} up")
       register(m).onSuccess {
         case Done =>
-          if (workers.size >= (totalWorkers * thAllreduce).toInt) {
-            log.info(s"\n----${workers.size} (out of ${totalWorkers}) workers are up")
-            init_workers()
+          if (workers.size >= totalWorkers && round == -1) {
+            println(s"----${workers.size} (out of ${totalWorkers}) workers are up")
+            initWorkers()
             round = 0
             startAllreduce()
           }
@@ -56,11 +56,11 @@ class AllreduceMaster(
       }
 
     case c : CompleteAllreduce =>
-      log.info(s"\n----Node ${c.srcId} completes allreduce round ${c.round}")
+      log.debug(s"\n----Node ${c.srcId} completes allreduce round ${c.round}")
       if (c.round == round) {
         numComplete += 1
         if (numComplete >= totalWorkers * thAllreduce && round < maxRound) {
-          log.info(s"\n----${numComplete} (out of ${totalWorkers}) workers complete round ${round}\n")
+          log.info(s"----${numComplete} (out of ${totalWorkers}) workers complete round ${round}\n")
           round += 1
           startAllreduce()
         }
@@ -72,8 +72,8 @@ class AllreduceMaster(
       implicit val timeout = Timeout(5.seconds)
       context.actorSelection(RootActorPath(member.address) / "user" / "worker").resolveOne().map { workerRef =>
         context watch workerRef
-        val new_idx: Integer = workers.size
-        workers = workers.updated(new_idx, workerRef)
+        val newId: Integer = workers.size
+        workers = workers.updated(newId, workerRef)
         log.info(s"\n----current size = ${workers.size}")
         Done
       }
@@ -81,7 +81,7 @@ class AllreduceMaster(
       Future.successful(Done)
     }
 
-  private def init_workers() = {
+  private def initWorkers() = {
     for ((idx, worker) <- workers) {
       log.info(s"\n----Init worker $idx $worker")
       worker ! InitWorkers(workers, totalWorkers, self, idx, thReduce, thComplete, maxLag, dataSize, maxChunkSize)
@@ -89,9 +89,9 @@ class AllreduceMaster(
   }
 
   private def startAllreduce() = {
-    log.info(s"\n----Start allreduce round ${round}")
+    println(s"\n----Start allreduce round ${round}")
     numComplete = 0
-    for ((idx, worker) <- workers) {
+    for ((_, worker) <- workers) {
       worker ! StartAllreduce(round)
     }
   }

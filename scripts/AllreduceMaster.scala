@@ -11,14 +11,14 @@ val threshold = ThresholdConfig(
 )
 
 val dataConfig = DataConfig(
-  dataSize = 150,
-  maxChunkSize = 2,
+  dataSize = 60000000,
+  maxChunkSize = 20000,
   maxRound = 10000
 )
 
 val workerConfig = WorkerConfig(
   totalSize = 4,
-  maxLag = 1
+  maxLag = 3
 )
 
 AllreduceMaster.startUp("2551", threshold, dataConfig, workerConfig)

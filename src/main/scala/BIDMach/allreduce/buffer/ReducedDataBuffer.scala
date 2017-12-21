@@ -10,7 +10,7 @@ case class ReducedDataBuffer(maxBlockSize: Int,
                              completionThreshold: Float,
                              maxChunkSize: Int) extends AllReduceBuffer(maxBlockSize, peerSize, maxLag, maxChunkSize) {
 
-  private val minChunksRequired: Int = {
+  val minChunkRequired: Int = {
     val minNumChunks = getNumChunk(minBlockSize)
     val totalChunks = numChunks * (peerSize - 1) + minNumChunks
     (completionThreshold * totalChunks).toInt
@@ -62,7 +62,7 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     for (i <- 0 until countFilled(row).length) {
       chunksCompleteReduce += countFilled(timeIdx(row))(i);
     }
-    chunksCompleteReduce == minChunksRequired
+    chunksCompleteReduce == minChunkRequired
   }
 }
 

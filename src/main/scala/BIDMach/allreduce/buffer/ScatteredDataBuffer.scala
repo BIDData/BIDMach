@@ -6,10 +6,10 @@ case class ScatteredDataBuffer(dataSize: Int,
                                reducingThreshold: Float,
                                maxChunkSize: Int) extends AllReduceBuffer(dataSize, peerSize, maxLag, maxChunkSize) {
 
-  private val minRequired: Int = (reducingThreshold * peerSize).toInt
+  val minChunkRequired: Int = (reducingThreshold * peerSize).toInt
 
   def reachReducingThreshold(row: Int, chunkId: Int): Boolean = {
-    countFilled(timeIdx(row))(chunkId) == minRequired
+    countFilled(timeIdx(row))(chunkId) == minChunkRequired
   }
 
 
