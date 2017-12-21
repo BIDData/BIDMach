@@ -5,7 +5,8 @@ import akka.actor.ActorRef
 
 // worker messages
 final case class InitWorkers(
-	workers: Map[Int, ActorRef], 
+	workers: Map[Int, ActorRef],
+	workerNum: Int,
 	master : ActorRef,
 	destId : Int, 
 	thReduce : Float, 

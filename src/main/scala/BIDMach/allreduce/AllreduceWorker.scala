@@ -7,11 +7,13 @@ import com.typesafe.config.ConfigFactory
 import scala.language.postfixOps
 
 class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
-                      dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging{
+                      dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging {
+
 
   var id = -1 // node id
   var master: Option[ActorRef] = None
   var peers = Map[Int, ActorRef]() // workers in the same row/col, including self
+  var peerNum = 0
   var thReduce = 1f // pct of scattered data needed to start reducing
   var thComplete = 1f // pct of reduced data needed to complete current round
   var maxLag = 0 // number of rounds allowed for a worker to fall behind
@@ -34,58 +36,64 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   def receive = {
 
     case init: InitWorkers =>
-      id = init.destId
-      master = Some(init.master)
-      peers = init.workers
-      thReduce = init.thReduce
-      thComplete = init.thComplete
-      maxLag = init.maxLag
-      round = 0 // clear round info to start over
-      maxRound = -1
-      maxScattered = -1
-      completed = Set[Int]()
 
-      dataSize = init.dataSize
-      data = initArray(dataSize)
-      dataRange = initDataBlockRanges()
-      myBlockSize = blockSize(id)
-      maxBlockSize = blockSize(0)
-      minBlockSize = blockSize(peers.size - 1)
+      if (id == -1) {
+        id = init.destId
+        master = Some(init.master)
+        peerNum = init.workerNum
+        peers = init.workers
+        thReduce = init.thReduce
+        thComplete = init.thComplete
+        maxLag = init.maxLag
+        round = 0 // clear round info to start over
+        maxRound = -1
+        maxScattered = -1
+        completed = Set[Int]()
 
-      maxChunkSize = init.maxChunkSize
+        dataSize = init.dataSize
+        data = initArray(dataSize)
+        dataRange = initDataBlockRanges()
+        myBlockSize = blockSize(id)
+        maxBlockSize = blockSize(0)
+        minBlockSize = blockSize(peerNum - 1)
 
-      scatterBlockBuf = ScatteredDataBuffer(
-        dataSize = myBlockSize,
-        peerSize = peers.size,
-        maxLag = maxLag + 1,
-        reducingThreshold = thReduce,
-        maxChunkSize = maxChunkSize
-      )
+        maxChunkSize = init.maxChunkSize
 
-      reduceBlockBuf = ReducedDataBuffer(
-        maxBlockSize = maxBlockSize,
-        minBlockSize = minBlockSize,
-        totalDataSize = dataSize,
-        peerSize = peers.size,
-        maxLag = maxLag + 1,
-        completionThreshold = thComplete,
-        maxChunkSize = maxChunkSize
-      )
+        scatterBlockBuf = ScatteredDataBuffer(
+          dataSize = myBlockSize,
+          peerSize = peerNum,
+          maxLag = maxLag + 1,
+          reducingThreshold = thReduce,
+          maxChunkSize = maxChunkSize
+        )
 
-      log.info(s"\n----Actor id = ${id}")
-      for (i <- 0 until peers.size) {
-        log.debug(s"\n----Peers[${i}] = ${peers(i)}")
+        reduceBlockBuf = ReducedDataBuffer(
+          maxBlockSize = maxBlockSize,
+          minBlockSize = minBlockSize,
+          totalDataSize = dataSize,
+          peerSize = peerNum,
+          maxLag = maxLag + 1,
+          completionThreshold = thComplete,
+          maxChunkSize = maxChunkSize
+        )
+
+        log.info(s"\n----Actor id = ${id}")
+        for (i <- 0 until peers.size) {
+          log.debug(s"\n----Peers[${i}] = ${peers(i)}")
+        }
+        log.info(s"\n----Number of peers / total peers = ${peers.size} / $peerNum")
+        log.info(s"\n----Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}, maxLag = ${maxLag}")
+        log.info(s"\n----Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}")
+        log.info(s"\n----Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}")
+      } else {
+        peers = init.workers
       }
-      log.info(s"\n----Number of peers = ${peers.size}")
-      log.info(s"\n----Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}, maxLag = ${maxLag}")
-      log.info(s"\n----Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}")
-      log.info(s"\n----Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}")
 
     case s: StartAllreduce =>
       try {
         log.debug(s"\n----Start allreduce round ${s.round}")
         if (id == -1) {
-          log.warning(s"\n----Actor is not initialized")
+          log.debug(s"\n----Actor is not initialized")
           self ! s
         } else {
           maxRound = math.max(maxRound, s.round)
@@ -103,21 +111,20 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
           }
         }
         completed = completed.filterNot(e => e < round)
-      } catch
-        {
-          case e: Throwable => log.error(e, "error in startall reduce")
-        }
+      } catch {
+        case e: Throwable => log.error(e, "error in startall reduce")
+      }
 
     case s: ScatterBlock =>
       try {
         log.debug(s"\n----receive scattered data from round ${s.round}: value = ${s.value.toList}, srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, current round = $round")
         if (id == -1) {
-          log.warning(s"\n----Have not initialized!")
+          log.debug(s"\n----Have not initialized!")
           self ! s
         } else {
           assert(s.destId == id)
           if (s.round < round || completed.contains(s.round)) {
-            log.warning(s"\n----Outdated scattered data")
+            log.debug(s"\n----Outdated scattered data")
           } else if (s.round <= maxRound) {
             val row = s.round - round
             scatterBlockBuf.store(s.value, row, s.srcId, s.chunkId)
@@ -131,22 +138,21 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
             self ! s
           }
         }
-      }catch
-        {
-          case e: Throwable =>
-            import java.io.PrintWriter
-            import java.io.StringWriter
-            val sw = new StringWriter
-            e.printStackTrace(new PrintWriter(sw))
-            val stackTrace = sw.toString
-            log.error(e, s"error in scatter block ${e.getMessage}, $stackTrace")
-        }
+      } catch {
+        case e: Throwable =>
+          import java.io.PrintWriter
+          import java.io.StringWriter
+          val sw = new StringWriter
+          e.printStackTrace(new PrintWriter(sw))
+          val stackTrace = sw.toString
+          log.error(e, s"error in scatter block ${e.getMessage}, $stackTrace")
+      }
 
     case r: ReduceBlock =>
       try {
         log.debug(s"\n----Receive reduced data from round ${r.round}: value = ${r.value.toList}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
         if (id == -1) {
-          log.warning(s"\n----Have not initialized!")
+          log.debug(s"\n----Have not initialized!")
           self ! r
         } else {
 
@@ -156,7 +162,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
             throw new RuntimeException(s"Message with destination ${r.destId} was incorrectly routed to node $id")
           }
           if (r.round < round || completed.contains(r.round)) {
-            log.warning(s"\n----Outdated reduced data")
+            log.debug(s"\n----Outdated reduced data")
           } else if (r.round <= maxRound) {
             val row = r.round - round
             reduceBlockBuf.store(r.value, row, r.srcId, r.chunkId, r.count)
@@ -169,16 +175,15 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
             self ! r
           }
         }
-      }catch
-        {
-          case e: Throwable =>
-            import java.io.PrintWriter
-            import java.io.StringWriter
-            val sw = new StringWriter
-            e.printStackTrace(new PrintWriter(sw))
-            val stackTrace = sw.toString
-            log.error(e, s"error in reduced block ${e.getMessage}, $stackTrace")
-        }
+      } catch {
+        case e: Throwable =>
+          import java.io.PrintWriter
+          import java.io.StringWriter
+          val sw = new StringWriter
+          e.printStackTrace(new PrintWriter(sw))
+          val stackTrace = sw.toString
+          log.error(e, s"error in reduced block ${e.getMessage}, $stackTrace")
+      }
 
 
     case Terminated(a) =>
@@ -215,8 +220,8 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   }
 
   private def scatter() = {
-    for( i <- 0 until peers.size){
-      val idx = (i+id) % peers.size
+    for (i <- 0 until peers.size) {
+      val idx = (i + id) % peers.size
       val worker = peers.get(idx).get
       val dataBlock = getDataBlock(idx)
       //Partition the dataBlock if it is too big
@@ -254,11 +259,11 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
   private def broadcast(data: Array[Float], chunkId: Int, bcastRound: Int, reduceCount: Int) = {
     log.debug(s"\n----Start broadcasting")
-    for( i <- 0 until peers.size){
-        val idx = (i+id) % peers.size
-        var worker = peers.get(idx).get
-        log.debug(s"\n----Broadcast data:${data.toList}, src: ${id}, dest: ${idx}, chunkId: ${chunkId}, round: ${bcastRound}")
-        worker ! ReduceBlock(data, id, idx, chunkId, bcastRound, reduceCount)
+    for (i <- 0 until peers.size) {
+      val idx = (i + id) % peers.size
+      var worker = peers.get(idx).get
+      log.debug(s"\n----Broadcast data:${data.toList}, src: ${id}, dest: ${idx}, chunkId: ${chunkId}, round: ${bcastRound}")
+      worker ! ReduceBlock(data, id, idx, chunkId, bcastRound, reduceCount)
     }
   }
 
@@ -311,7 +316,7 @@ object AllreduceWorker {
         val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
         println(s"----Data output at #${r.iteration}: ${r.data.toList} - $timeElapsed s")
         val bytes = r.data.length * 4.0 * checkpoint
-        println("%2.1f Mbytes in %2.1f seconds at %4.3f MBytes/sec" format (bytes/1.0e6, timeElapsed, bytes/1.0e6/timeElapsed));
+        println("%2.1f Mbytes in %2.1f seconds at %4.3f MBytes/sec" format(bytes / 1.0e6, timeElapsed, bytes / 1.0e6 / timeElapsed));
         tic = System.currentTimeMillis()
       }
     }
@@ -319,7 +324,7 @@ object AllreduceWorker {
     system.actorOf(Props(classOf[AllreduceWorker], source, sink), name = "worker")
   }
 
-  private def createDataSource(size: Int) : DataSource = {
+  private def createDataSource(size: Int): DataSource = {
     req => {
       val floats = Array.range(0, size).map(_ + req.iteration.toFloat)
       AllReduceInput(floats)

@@ -13,15 +13,15 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class AllreduceMaster(
-  totalWorkers : Int,
-  thAllreduce : Float,
-  thReduce : Float, 
-  thComplete : Float,
-  maxLag : Int,
-  dataSize: Int,
-  maxRound: Int,
-  maxChunkSize: Int
-) extends Actor with akka.actor.ActorLogging{
+                       totalWorkers : Int,
+                       thAllreduce : Float,
+                       thReduce : Float,
+                       thComplete : Float,
+                       maxLag : Int,
+                       dataSize: Int,
+                       maxRound: Int,
+                       maxChunkSize: Int
+                     ) extends Actor with akka.actor.ActorLogging{
 
   var workers = Map[Int, ActorRef]()
   val cluster = Cluster(context.system)
@@ -71,31 +71,32 @@ class AllreduceMaster(
     if (member.hasRole("worker")) {
       implicit val timeout = Timeout(5.seconds)
       context.actorSelection(RootActorPath(member.address) / "user" / "worker").resolveOne().map { workerRef =>
-          context watch workerRef
-          val new_idx: Integer = workers.size
-          workers = workers.updated(new_idx, workerRef)
-          log.info(s"\n----current size = ${workers.size}")
-          Done
+        context watch workerRef
+        val new_idx: Integer = workers.size
+        workers = workers.updated(new_idx, workerRef)
+        log.info(s"\n----current size = ${workers.size}")
+        Done
       }
     } else {
       Future.successful(Done)
     }
 
-    private def init_workers() = {
-      for ((idx, worker) <- workers) {
-        log.info(s"\n----Init worker $idx $worker")
-        worker ! InitWorkers(workers, self, idx, thReduce, thComplete, maxLag, dataSize, maxChunkSize)
-      }
+  private def init_workers() = {
+    for ((idx, worker) <- workers) {
+      log.info(s"\n----Init worker $idx $worker")
+      worker ! InitWorkers(workers, totalWorkers, self, idx, thReduce, thComplete, maxLag, dataSize, maxChunkSize)
     }
+  }
 
-    private def startAllreduce() = {
-      log.info(s"\n----Start allreduce round ${round}")
-      numComplete = 0
-      for ((idx, worker) <- workers) {
-        worker ! StartAllreduce(round)
-      }
+  private def startAllreduce() = {
+    log.info(s"\n----Start allreduce round ${round}")
+    numComplete = 0
+    for ((idx, worker) <- workers) {
+      worker ! StartAllreduce(round)
     }
+  }
 }
+
 
 
 object AllreduceMaster {
