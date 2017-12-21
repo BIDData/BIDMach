@@ -82,10 +82,10 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
           for (i <- 0 until peers.size) {
             log.debug(s"\n----Peers[${i}] = ${peers(i)}")
           }
-          log.info(s"\n----Number of peers / total peers = ${peers.size} / $peerNum")
-          log.info(s"\n----Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}, maxLag = ${maxLag}")
-          log.info(s"\n----Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}. threshold : ${scatterBlockBuf.minChunkRequired}")
-          log.info(s"\n----Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}. threshold: ${reduceBlockBuf.minChunkRequired}")
+          println(s"----Number of peers / total peers = ${peers.size} / $peerNum")
+          println(s"\n----Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}, maxLag = ${maxLag}")
+          println(s"\n----Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}. threshold : ${scatterBlockBuf.minChunkRequired}")
+          println(s"\n----Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}. threshold: ${reduceBlockBuf.minChunkRequired}")
         } else {
           peers = init.workers
         }
@@ -286,7 +286,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
         val sw = new StringWriter
         e.printStackTrace(new PrintWriter(sw))
         val stackTrace = sw.toString
-        log.error(e, s"error in $location, $stackTrace")
+        println(e, s"error in $location, $stackTrace")
     }
   }
 
@@ -306,7 +306,7 @@ object AllreduceWorker {
 
   }
 
-  private def initWorker(port: String, sourceDataSize: Int) = {
+  private def initWorker(port: String, sourceDataSize: Int, checkpoint: Int = 50) = {
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [worker]")).
       withFallback(ConfigFactory.load())
@@ -318,7 +318,6 @@ object AllreduceWorker {
 
     var tic = System.currentTimeMillis()
     val sink: DataSink = r => {
-      val checkpoint = 1000
       if (r.iteration % checkpoint == 0) {
         val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
         println(s"----Data output at #${r.iteration} - $timeElapsed s")
@@ -335,8 +334,8 @@ object AllreduceWorker {
     main(Array(port))
   }
 
-  def startUp(port: String, dataSize: Int) = {
-    initWorker(port, dataSize)
+  def startUp(port: String, dataSize: Int, checkpoint: Int = 50) = {
+    initWorker(port, dataSize, checkpoint)
   }
 
 }
