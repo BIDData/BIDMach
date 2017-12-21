@@ -1,6 +1,5 @@
 package BIDMach.allreduce
 
-import BIDMach.allreduce.AllreduceWorker.main
 import akka.Done
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, RootActorPath, Terminated}
 import akka.cluster.ClusterEvent.MemberUp
@@ -103,9 +102,6 @@ object AllreduceMaster {
   def main(args: Array[String]): Unit = {
     // Override the configuration of the port when specified as program argument
     
-    val thAllreduce = 1f
-    val thReduce = 1f
-    val thComplete = 0.8f
     val maxLag = 1
     val maxRound = 100
     
@@ -114,25 +110,34 @@ object AllreduceMaster {
     val dataSize = if (args.length <= 2) totalWorkers * 5 else args(2).toInt
     val maxChunkSize = if (args.length <= 3) 2 else args(3).toInt
 
+
+    val thresholds = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 0.8f)
+    val dataConfig = DataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize, maxRound=maxRound)
+    val workerConfig = WorkerConfig(totalSize = totalWorkers, maxLag = maxLag)
+
+    initMaster(port, thresholds, dataConfig, workerConfig)
+  }
+
+  private def initMaster(port: String, thresholds: ThresholdConfig, dataConfig: DataConfig, workerConfig: WorkerConfig) = {
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [master]")).
       withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
 
-    system.log.info(s"-------\n Port = ${port} \n Number of Workers = ${totalWorkers} \n Message Size = ${dataSize} \n Max Chunk Size = ${maxChunkSize}");
-    val master = system.actorOf(
+    system.log.info(s"-------\n Port = ${port} \n Number of Workers = ${workerConfig.totalSize} \n Message Size = ${dataConfig.dataSize} \n Max Chunk Size = ${dataConfig.maxChunkSize}");
+    system.actorOf(
       Props(
-        classOf[AllreduceMaster], 
-        totalWorkers, 
-        thAllreduce,
-        thReduce, 
-        thComplete, 
-        maxLag,
-        dataSize,
-        maxRound,
-        maxChunkSize
-      ), 
+        classOf[AllreduceMaster],
+        workerConfig.totalSize,
+        thresholds.thAllreduce,
+        thresholds.thReduce,
+        thresholds.thComplete,
+        workerConfig.maxLag,
+        dataConfig.dataSize,
+        dataConfig.maxRound,
+        dataConfig.maxChunkSize
+      ),
       name = "master"
     )
   }
@@ -141,4 +146,12 @@ object AllreduceMaster {
     main(Array())
   }
 
+  def startUp(port: String, thresholds: ThresholdConfig, dataConfig: DataConfig, workerConfig: WorkerConfig): Unit = {
+    initMaster(port: String, thresholds: ThresholdConfig, dataConfig: DataConfig, workerConfig: WorkerConfig)
+  }
+
 }
+
+case class ThresholdConfig(thAllreduce: Float, thReduce: Float, thComplete: Float)
+case class DataConfig(dataSize: Int, maxChunkSize: Int, maxRound: Int)
+case class WorkerConfig(totalSize: Int, maxLag: Int)

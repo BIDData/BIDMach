@@ -7,7 +7,7 @@ abstract class AllReduceBuffer(dataSize: Int,
 
   type Buffer = Array[Array[Float]]
   var temporalOffset = 0
-  val numChunks = math.ceil(1f * dataSize / maxChunkSize).toInt
+  val numChunks = getNumChunk(dataSize)
   var temporalBuffer: Array[Buffer] = {
     Array.fill(maxLag) {
       initializePeerBuffer()
@@ -24,11 +24,17 @@ abstract class AllReduceBuffer(dataSize: Int,
 
   def store(data: Array[Float], row: Int, srcId: Int, chunkId: Int) = {
     val array = temporalBuffer(timeIdx(row))(srcId)
-    System.arraycopy(
-      data, 0,
-      array, chunkId * maxChunkSize,
-      data.size)
-    countFilled(timeIdx(row))(chunkId) += 1
+    try {
+      System.arraycopy(
+        data, 0,
+        array, chunkId * maxChunkSize,
+        data.size)
+      countFilled(timeIdx(row))(chunkId) += 1
+    } catch {
+      case e: Throwable => throw new Exception(s"data size: ${data.size}, array to copy: ${array.length}, pos: ${chunkId * maxChunkSize}, " +
+        s"chunkId: $chunkId, maxChunkSize: $maxChunkSize ", e)
+
+    }
   }
 
   protected def timeIdx(row: Int) = {
@@ -41,4 +47,7 @@ abstract class AllReduceBuffer(dataSize: Int,
     countFilled(timeIdx(maxLag - 1)) = Array.fill(numChunks)(0);
   }
 
+  protected def getNumChunk(size: Int) = {
+    math.ceil(1f * size / maxChunkSize).toInt
+  }
 }
