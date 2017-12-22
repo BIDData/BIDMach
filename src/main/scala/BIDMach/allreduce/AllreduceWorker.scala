@@ -318,7 +318,7 @@ object AllreduceWorker {
 
     var tic = System.currentTimeMillis()
     val sink: DataSink = r => {
-      if (r.iteration % checkpoint == 0) {
+      if (r.iteration % checkpoint == 0 && r.iteration != 0) {
         val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
         println(s"----Data output at #${r.iteration} - $timeElapsed s")
         val bytes = r.data.length * 4.0 * checkpoint
