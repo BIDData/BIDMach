@@ -18,27 +18,19 @@ case class ScatteredDataBuffer(dataSize: Int,
   }
 
   def reduce(row : Int, chunkId: Int) : (Array[Float], Int) = {
-    val countVal = count(row, chunkId)
-    val (unreduced, unreducedChunkSize) = get(row, chunkId)
-    val reduced = Array.fill[Float](unreducedChunkSize)(0)
+
+    val chunkStartPos = chunkId * maxChunkSize
+    val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
+    val chunkSize = chunkEndPos - chunkStartPos
+    val reducedArr = Array.fill[Float](chunkSize)(0)
     for (i <- 0 until peerSize) {
-      for (j <- 0 until unreducedChunkSize) {
-        reduced(j) += unreduced(i)(j)
+      for (j <- 0 until chunkSize) {
+        reducedArr(j) += temporalBuffer(timeIdx(row))(i)(chunkStartPos + j)
       }
     }
-    (reduced, countVal)
+    (reducedArr, count(row, chunkId))
   }
 
-  private def get(row: Int, chunkId: Int): (Buffer, Int) = {
-    val endPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
-    val length = endPos - chunkId * maxChunkSize
-    val outputSize = temporalBuffer(row).length
-    val output: Array[Array[Float]] = new Array[Array[Float]](outputSize)
-    for (i <- 0 until outputSize) {
-      output(i) = temporalBuffer(timeIdx(row))(i).slice(chunkId * maxChunkSize, endPos)
-    }
-    (output, length)
-  }
 
 }
 

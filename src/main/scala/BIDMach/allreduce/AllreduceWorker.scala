@@ -4,8 +4,6 @@ import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.config.ConfigFactory
 
-import scala.language.postfixOps
-
 class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
                       dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging{
 
@@ -211,14 +209,15 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
       val idx = (i+id) % peerNum
       peers.get(idx) match {
         case Some(worker) =>
-          val dataBlock = getDataBlock(idx)
           //Partition the dataBlock if it is too big
-          val peerNumChunks =  math.ceil(1f * dataBlock.length / maxChunkSize).toInt
+          val (blockStart, blockEnd) = range(idx)
+          val peerBlockSize = blockEnd - blockStart
+          val peerNumChunks =  math.ceil(1f * peerBlockSize / maxChunkSize).toInt
           for (i <- 0 until peerNumChunks) {
-            val chunkStart = math.min(i * maxChunkSize, dataBlock.length - 1);
-            val chunkEnd = math.min((i + 1) * maxChunkSize - 1, dataBlock.length - 1);
+            val chunkStart = math.min(i * maxChunkSize, peerBlockSize - 1);
+            val chunkEnd = math.min((i + 1) * maxChunkSize - 1, peerBlockSize - 1);
             val chunk = new Array[Float](chunkEnd - chunkStart + 1);
-            System.arraycopy(dataBlock, chunkStart, chunk, 0, chunk.length);
+            System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunk.length);
             log.debug(s"\n----send msg ${chunk.toList} from ${id} to ${idx}, chunkId: ${i}")
             worker ! ScatterBlock(chunk, id, idx, i, maxScattered + 1);
           }
@@ -230,13 +229,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   private def initDataBlockRanges() = {
     val stepSize = math.ceil(dataSize * 1f / peerNum).toInt
     Array.range(0, dataSize, stepSize)
-  }
-
-  private def getDataBlock(idx: Int): Array[Float] = {
-    val (start, end) = range(idx)
-    val block = new Array[Float](end - start)
-    System.arraycopy(data, start, block, 0, end - start)
-    block
   }
 
   private def range(idx: Int): (Int, Int) = {
@@ -306,16 +298,18 @@ object AllreduceWorker {
 
   }
 
-  private def initWorker(port: String, sourceDataSize: Int, checkpoint: Int = 50) = {
+  private def initWorker(port: String, sourceDataSize: Int, checkpoint: Int = 50, assertMultiple: Int = 0) = {
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [worker]")).
       withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
 
+    // Specify data source
     lazy val floats = Array.range(0, sourceDataSize).map(_.toFloat)
     val source: DataSource = _ => AllReduceInput(floats)
 
+    // Specify data sink
     var tic = System.currentTimeMillis()
     val sink: DataSink = r => {
       if (r.iteration % checkpoint == 0 && r.iteration != 0) {
@@ -323,6 +317,11 @@ object AllreduceWorker {
         println(s"----Data output at #${r.iteration} - $timeElapsed s")
         val bytes = r.data.length * 4.0 * checkpoint
         println("%2.1f Mbytes in %2.1f seconds at %4.3f MBytes/sec" format(bytes / 1.0e6, timeElapsed, bytes / 1.0e6 / timeElapsed));
+
+        if (assertMultiple > 0) {
+          assert(floats.map(_* assertMultiple).toList == r.data.toList, "Expected output should be multiple of input. Check if all thresholds are 1")
+          assert(r.count.toList == Array.fill(sourceDataSize)(assertMultiple), "Counts should equal expected multiples for all data element. Check if all thresholds are 1")
+        }
         tic = System.currentTimeMillis()
       }
     }
@@ -334,7 +333,15 @@ object AllreduceWorker {
     main(Array(port))
   }
 
-  def startUp(port: String, dataSize: Int, checkpoint: Int = 50) = {
+  /**
+    * Test start up method
+    * @param port port number
+    * @param dataSize number of elements in input array from each node to be reduced
+    * @param checkpoint interval at which timing is calculated
+    * @param assertMultiple optional expected multiple of input as reduced results
+    * @return
+    */
+  def startUp(port: String, dataSize: Int, checkpoint: Int = 50, assertMultiple: Int=0) = {
     initWorker(port, dataSize, checkpoint)
   }
 

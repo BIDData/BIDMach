@@ -24,17 +24,11 @@ abstract class AllReduceBuffer(dataSize: Int,
 
   def store(data: Array[Float], row: Int, srcId: Int, chunkId: Int) = {
     val array = temporalBuffer(timeIdx(row))(srcId)
-    try {
-      System.arraycopy(
-        data, 0,
-        array, chunkId * maxChunkSize,
-        data.size)
-      countFilled(timeIdx(row))(chunkId) += 1
-    } catch {
-      case e: Throwable => throw new Exception(s"data size: ${data.size}, array to copy: ${array.length}, pos: ${chunkId * maxChunkSize}, " +
-        s"chunkId: $chunkId, maxChunkSize: $maxChunkSize ", e)
-
-    }
+    System.arraycopy(
+      data, 0,
+      array, chunkId * maxChunkSize,
+      data.size)
+    countFilled(timeIdx(row))(chunkId) += 1
   }
 
   protected def timeIdx(row: Int) = {
