@@ -1,14 +1,11 @@
 package BIDMach.allreduce
 
-import akka.Done
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, RootActorPath, Terminated}
 import akka.cluster.ClusterEvent.MemberUp
 import akka.cluster.{Cluster, Member}
-import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -25,6 +22,7 @@ class AllreduceMaster(
 
   var workers = Map[Int, ActorRef]()
   val cluster = Cluster(context.system)
+  val registrationTimeout: FiniteDuration = 5.seconds
 
   var round = -1
   var numComplete = 0
@@ -37,14 +35,12 @@ class AllreduceMaster(
 
     case MemberUp(m) =>
       log.info(s"\n----Detect member ${m.address} up")
-      register(m).onSuccess {
-        case Done =>
-          if (workers.size >= totalWorkers && round == -1) {
-            println(s"----${workers.size} (out of ${totalWorkers}) workers are up")
-            initWorkers()
-            round = 0
-            startAllreduce()
-          }
+      register(m)
+      if (workers.size >= totalWorkers && round == -1) {
+        println(s"----${workers.size} (out of ${totalWorkers}) workers are up")
+        initWorkers()
+        round = 0
+        startAllreduce()
       }
 
     case Terminated(a) =>
@@ -67,18 +63,14 @@ class AllreduceMaster(
       }
   }
 
-  private def register(member: Member): Future[Done] =
+  private def register(member: Member): Unit =
     if (member.hasRole("worker")) {
-      implicit val timeout = Timeout(5.seconds)
-      context.actorSelection(RootActorPath(member.address) / "user" / "worker").resolveOne().map { workerRef =>
-        context watch workerRef
-        val newId: Integer = workers.size
-        workers = workers.updated(newId, workerRef)
-        log.info(s"\n----current size = ${workers.size}")
-        Done
-      }
-    } else {
-      Future.successful(Done)
+      // awaiting here to prevent concurrent futures (from another message) trying to add to worker set at the same time
+      val workerRef: ActorRef = Await.result(context.actorSelection(RootActorPath(member.address) / "user" / "worker").resolveOne(registrationTimeout), registrationTimeout + 1.second)
+      context watch workerRef
+      val newId: Integer = workers.size
+      workers = workers.updated(newId, workerRef)
+      log.info(s"\n----current size = ${workers.size}")
     }
 
   private def initWorkers() = {
@@ -102,10 +94,10 @@ class AllreduceMaster(
 object AllreduceMaster {
   def main(args: Array[String]): Unit = {
     // Override the configuration of the port when specified as program argument
-    
+
     val maxLag = 1
     val maxRound = 100
-    
+
     val port = if (args.isEmpty) "2551" else args(0)
     val totalWorkers = if (args.length <= 1) 2 else args(1).toInt
     val dataSize = if (args.length <= 2) totalWorkers * 5 else args(2).toInt

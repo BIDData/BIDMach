@@ -148,7 +148,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
           log.warning(s"\n----Have not initialized!")
           self ! r
         } else {
-
           if (r.value.size > maxChunkSize) {
             throw new RuntimeException(s"Reduced block of size ${r.value.size} is larger than expected.. Max msg size is $maxChunkSize")
           } else if (r.destId != id) {
@@ -342,7 +341,7 @@ object AllreduceWorker {
     * @return
     */
   def startUp(port: String, dataSize: Int, checkpoint: Int = 50, assertMultiple: Int=0) = {
-    initWorker(port, dataSize, checkpoint)
+    initWorker(port, dataSize, checkpoint, assertMultiple)
   }
 
 }
