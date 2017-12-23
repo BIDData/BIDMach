@@ -24,8 +24,11 @@ case class ScatteredDataBuffer(dataSize: Int,
     val chunkSize = chunkEndPos - chunkStartPos
     val reducedArr = Array.fill[Float](chunkSize)(0)
     for (i <- 0 until peerSize) {
-      for (j <- 0 until chunkSize) {
-        reducedArr(j) += temporalBuffer(timeIdx(row))(i)(chunkStartPos + j)
+      val tbuf = temporalBuffer(timeIdx(row))(i);
+      var j = 0;
+      while (j < chunkSize) {
+        reducedArr(j) += tbuf(chunkStartPos + j);
+        j += 1;
       }
     }
     (reducedArr, count(row, chunkId))

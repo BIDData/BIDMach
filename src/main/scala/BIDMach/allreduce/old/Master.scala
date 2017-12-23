@@ -1,4 +1,4 @@
-package BIDMach.allreduce
+package BIDMach.allreduce.old
 
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,HMat,GDMat,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat}
 import BIDMat.MatFunctions._

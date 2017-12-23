@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package BIDMach.allreduce
+package BIDMach.allreduce.old
 import java.io._
 
 import scala.collection.mutable.{Map, Set, Stack}

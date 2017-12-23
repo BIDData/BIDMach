@@ -32,110 +32,118 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
   def receive = {
 
-    case init: InitWorkers =>
+    case init: InitWorkers => {
+    	try {
+    		if (id == -1) {
+    			id = init.destId;
+    			master = Some(init.master);
+    			peerNum = init.workerNum;
+    			peers = init.workers;
+    			thReduce = init.thReduce;
+    			thComplete = init.thComplete;
+    			maxLag = init.maxLag;
+    			round = 0; // clear round info to start over
+    			maxRound = -1;
+    			maxScattered = -1;
+    			completed = Set[Int]();
 
-      tryCatch("init worker") { _ =>
+    			dataSize = init.dataSize;
+    			data = initArray(dataSize);
+    			dataRange = initDataBlockRanges();
+    			myBlockSize = blockSize(id);
+    			maxBlockSize = blockSize(0);
+    			minBlockSize = blockSize(peerNum - 1);
 
-        if (id == -1) {
-          id = init.destId
-          master = Some(init.master)
-          peerNum = init.workerNum
-          peers = init.workers
-          thReduce = init.thReduce
-          thComplete = init.thComplete
-          maxLag = init.maxLag
-          round = 0 // clear round info to start over
-          maxRound = -1
-          maxScattered = -1
-          completed = Set[Int]()
+    			maxChunkSize = init.maxChunkSize;
 
-          dataSize = init.dataSize
-          data = initArray(dataSize)
-          dataRange = initDataBlockRanges()
-          myBlockSize = blockSize(id)
-          maxBlockSize = blockSize(0)
-          minBlockSize = blockSize(peerNum - 1)
+    			scatterBlockBuf = ScatteredDataBuffer(
+    					dataSize = myBlockSize,
+    					peerSize = peerNum,
+    					maxLag = maxLag + 1,
+    					reducingThreshold = thReduce,
+    					maxChunkSize = maxChunkSize
+    					);
 
-          maxChunkSize = init.maxChunkSize
+    			reduceBlockBuf = ReducedDataBuffer(
+    					maxBlockSize = maxBlockSize,
+    					minBlockSize = minBlockSize,
+    					totalDataSize = dataSize,
+    					peerSize = peerNum,
+    					maxLag = maxLag + 1,
+    					completionThreshold = thComplete,
+    					maxChunkSize = maxChunkSize
+    					);
 
-          scatterBlockBuf = ScatteredDataBuffer(
-            dataSize = myBlockSize,
-            peerSize = peerNum,
-            maxLag = maxLag + 1,
-            reducingThreshold = thReduce,
-            maxChunkSize = maxChunkSize
-          )
+    			log.info(s"\n----Actor id = ${id}")
+    			for (i <- 0 until peers.size) {
+    				log.debug(s"\n----Peers[${i}] = ${peers(i)}")
+    			}
+    			println(s"----Number of peers / total peers = ${peers.size} / $peerNum");
+    			println(s"\n----Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}, maxLag = ${maxLag}");
+    			println(s"\n----Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}. threshold : ${scatterBlockBuf.minChunkRequired}")
+    			println(s"\n----Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}. threshold: ${reduceBlockBuf.minChunkRequired}")
+    		} else {
+    			peers = init.workers
+    		}
+    	} catch {
+    	case e:Throwable =>  printStackTrace("init worker", e)
+    	}
+    }
 
-          reduceBlockBuf = ReducedDataBuffer(
-            maxBlockSize = maxBlockSize,
-            minBlockSize = minBlockSize,
-            totalDataSize = dataSize,
-            peerSize = peerNum,
-            maxLag = maxLag + 1,
-            completionThreshold = thComplete,
-            maxChunkSize = maxChunkSize
-          )
+    case s: StartAllreduce => {
+    	try {
+    		log.debug(s"\n----Start allreduce round ${s.round}");
+    		if (id == -1) {
+    			log.warning(s"\n----Actor is not initialized");
+    			self ! s;
+    		} else {
+    			maxRound = math.max(maxRound, s.round);
+    			while (round < maxRound - maxLag) { // fall behind too much, catch up
+    				for (k <- 0 until scatterBlockBuf.numChunks) {
+    					val (reducedData, reduceCount) = scatterBlockBuf.reduce(0, k);
+    					broadcast(reducedData, k, round, reduceCount);
+    				}
+    				complete(round, 0);
+    			}
+    			while (maxScattered < maxRound) {
+    				fetch(maxScattered + 1);
+    				scatter();
+    				maxScattered += 1;
+    			}
+    		}
+    		completed = completed.filterNot(e => e < round);
+    	} catch {
+    	case e:Throwable => printStackTrace("start all reduce", e);
+    	}
+    }
 
-          log.info(s"\n----Actor id = ${id}")
-          for (i <- 0 until peers.size) {
-            log.debug(s"\n----Peers[${i}] = ${peers(i)}")
-          }
-          println(s"----Number of peers / total peers = ${peers.size} / $peerNum")
-          println(s"\n----Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}, maxLag = ${maxLag}")
-          println(s"\n----Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}. threshold : ${scatterBlockBuf.minChunkRequired}")
-          println(s"\n----Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}. threshold: ${reduceBlockBuf.minChunkRequired}")
-        } else {
-          peers = init.workers
-        }
-      }
+    case s: ScatterBlock => {
+    	try {
+    		log.debug(s"\n----receive scattered data from round ${s.round}: value = ${s.value.toList}, srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, current round = $round")
+    		if (id == -1) {
+    			log.warning(s"\n----Have not initialized!");
+    			self ! s;
+    		} else {
+    			handleScatterBlock(s);
+    		}
+    	} catch {
+    	case e:Throwable => printStackTrace("scatter block", e);
+    	}
+    }
 
-    case s: StartAllreduce =>
-      tryCatch("start all reduce") { _ =>
-        log.debug(s"\n----Start allreduce round ${s.round}")
-        if (id == -1) {
-          log.warning(s"\n----Actor is not initialized")
-          self ! s
-        } else {
-          maxRound = math.max(maxRound, s.round)
-          while (round < maxRound - maxLag) { // fall behind too much, catch up
-            for (k <- 0 until scatterBlockBuf.numChunks) {
-              val (reducedData, reduceCount) = scatterBlockBuf.reduce(0, k)
-              broadcast(reducedData, k, round, reduceCount)
-            }
-            complete(round, 0)
-          }
-          while (maxScattered < maxRound) {
-            fetch(maxScattered + 1)
-            scatter()
-            maxScattered += 1
-          }
-        }
-        completed = completed.filterNot(e => e < round)
-      }
-
-    case s: ScatterBlock =>
-
-      tryCatch("scatter block") { _ =>
-        log.debug(s"\n----receive scattered data from round ${s.round}: value = ${s.value.toList}, srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, current round = $round")
-        if (id == -1) {
-          log.warning(s"\n----Have not initialized!")
-          self ! s
-        } else {
-          handleScatterBlock(s)
-        }
-      }
-
-    case r: ReduceBlock =>
-
-      tryCatch("reduce block") { _ =>
-        log.debug(s"\n----Receive reduced data from round ${r.round}: value = ${r.value.toList}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
-        if (id == -1) {
-          log.warning(s"\n----Have not initialized!")
-          self ! r
-        } else {
-          handleReduceBlock(r)
-        }
-      }
+    case r: ReduceBlock => {
+    	try {
+    		log.debug(s"\n----Receive reduced data from round ${r.round}: value = ${r.value.toList}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
+    		if (id == -1) {
+    			log.warning(s"\n----Have not initialized!");
+    			self ! r;
+    		} else {
+    			handleReduceBlock(r);
+    		}
+    	} catch {
+    	case e:Throwable => printStackTrace("reduce block", e);
+    	}
+    }
 
 
     case Terminated(a) =>
@@ -284,20 +292,14 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     }
   }
 
-  private def tryCatch(location: String)(work: Any => Unit): Unit = {
-    try {
-      work()
-    } catch {
-      case e: Throwable =>
-        import java.io.PrintWriter
-        import java.io.StringWriter
-        val sw = new StringWriter
-        e.printStackTrace(new PrintWriter(sw))
-        val stackTrace = sw.toString
-        println(e, s"error in $location, $stackTrace")
-    }
+  private def printStackTrace(location: String, e:Throwable): Unit = {
+		  import java.io.PrintWriter
+		  import java.io.StringWriter
+		  val sw = new StringWriter
+		  e.printStackTrace(new PrintWriter(sw))
+		  val stackTrace = sw.toString
+		  println(e, s"error in $location, $stackTrace")
   }
-
 }
 
 object AllreduceWorker {
