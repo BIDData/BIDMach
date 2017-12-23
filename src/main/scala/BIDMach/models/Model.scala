@@ -472,6 +472,10 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   def convertMat(a:Mat):Mat = {
   	Model.convertMat(a, useGPU, opts.useDouble).asInstanceOf[Mat];
   }
+  
+  def convertIMat(a:IMat):IMat = {
+    Model.convertMat(a, useGPU, opts.useDouble).asInstanceOf[IMat];
+  }
 
   def combineModels(ipass:Int, model: Model):Model = this;
   def combineModels(model: Model):Model = combineModels(0, model);

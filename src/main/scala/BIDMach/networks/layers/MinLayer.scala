@@ -20,13 +20,14 @@ import BIDMach.networks._
 
 class MinLayer(override val net:Net, override val opts:MinNodeOpts = new MinNode) extends Layer(net, opts) {  
   
-	override val _inputs = new Array[LayerTerm](2);
+	override val _inputs = new Array[LayerTerm](opts.ninputs);
 
 	override def forward = {
     val start = toc;
     inplaceNoConnectGetOutput();
 	        
 	  min(inputData, inputDatas(1), output);
+	  (2 until inputlength).map((i:Int) => min(output, inputDatas(i), output));
 	  
 	  forwardtime += toc - start;
 	}
@@ -41,6 +42,10 @@ class MinLayer(override val net:Net, override val opts:MinNodeOpts = new MinNode
     if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + squash((output == inputData) ∘ deriv, inputDerivs(0));
     if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + squash((output == inputDatas(1)) ∘ deriv, inputDerivs(1));
     
+    (2 until inputlength).map((i:Int) => {
+    	if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + squash((output == inputDatas(i)) ∘ deriv, inputDerivs(i));
+    });
+    
     inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
 	}
@@ -50,11 +55,12 @@ class MinLayer(override val net:Net, override val opts:MinNodeOpts = new MinNode
   }
 }
 
-trait MinNodeOpts extends NodeOpts {  
+trait MinNodeOpts extends NodeOpts { 
+  var ninputs = 2;
 }
 
 class MinNode extends Node with MinNodeOpts {
-  override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
+  override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
   def copyTo(opts:MinNode):MinNode = {
       super.copyTo(opts);

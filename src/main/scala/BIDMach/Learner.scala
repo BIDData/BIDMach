@@ -27,7 +27,7 @@ import java.util.logging.Level;
  */
 
 @SerialVersionUID(100L)
-case class Learner(
+class Learner(
     val datasource:DataSource,
     val model:Model,
     val mixins:Array[Mixin],
@@ -200,7 +200,7 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%3.2f" format (
           100f*lastp,
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._2,
@@ -324,7 +324,7 @@ case class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep);
-        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
+        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%3.2f" format (
         		100f*lastp,
         		Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
         		gf._2,
@@ -361,7 +361,7 @@ case class Learner(
  * Parallel Learner with a single datasource.
  */
 
-case class ParLearner(
+class ParLearner(
     val datasource:DataSource,
     val mkModelFn:(Int)=>Model,
     val mkMixinsFn:(Int)=>Array[Mixin],
@@ -729,7 +729,7 @@ class ParLearnerF(
  * i.e. several independent Learners whose models are synchronized periodically.
  */
 
-case class ParLearnerx(
+class ParLearnerx(
     val datasources:Array[DataSource],
     val models:Array[Model],
     val mixins:Array[Array[Mixin]],

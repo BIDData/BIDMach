@@ -112,7 +112,7 @@ def convBlock(in:Node, dim:Int, imgdim:Int = 0, firstBlock:Boolean = false):Node
 Net.initDefaultNodeSet;
 var thisnode:Node = null;
 
-val in =        input;
+val in =        input();
 val meanv =     const(means);
 val din =       in - meanv;
 //val scalef =    const(row(0.01f));

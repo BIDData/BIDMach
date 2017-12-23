@@ -31,7 +31,7 @@ opts.tensorFormat = Net.TensorNCHW;
 
 import BIDMach.networks.layers.Node._;
 
-val in = input;
+val in = input();
 
 val conv1 = conv(in)(w=5,h=5,nch=6,stride=1,pad=2,initv=0.01f,convType=convt);
 val pool1 = pool(conv1)(w=2,h=2,stride=2,pad=0);

@@ -1,7 +1,7 @@
 
 name := "BIDMach"
 
-version := "1.1.0"
+version := "2.0.10-cuda8.0beta"
 
 organization := "edu.berkeley.bid"
 
@@ -15,24 +15,6 @@ resolvers ++= Seq(
   "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
   "Scala Mirror" at "https://oss.sonatype.org/content/repositories/releases/"
 )
-
-libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
-  deps :+ ("org.scala-lang" % "scala-compiler" % sv)
-}
-
-libraryDependencies += "jline" % "jline" % "2.11"
-
-libraryDependencies += "org.apache.commons" % "commons-math3" % "3.2"
-
-//libraryDependencies += "org.scalatest" %% "scalatest" % "2.0" % "test"
-
-//libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.11.2" % "test"
-
-libraryDependencies += "junit" % "junit" % "4.5" % "test"
-
-libraryDependencies += "net.jpountz.lz4" % "lz4" % "1.3"
-
-//libraryDependencies += "org.scala-saddle" % "jhdf5" % "2.9"
 
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 

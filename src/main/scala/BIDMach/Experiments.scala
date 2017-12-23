@@ -401,7 +401,7 @@ object Twitter {
 	  gopts.rmask = mask
 	  gopts.targmap = mkdiag(ones(ntargets, 1)) ⊗ ones(expts1.length/ntargets, 1)
 	  gopts.targets = targets
-  	Learner(ds, new GLM(gopts), null, new ADAGrad(aopts), null)	  
+  	new Learner(ds, new GLM(gopts), null, new ADAGrad(aopts), null)	  
 	}
 	
 	  
