@@ -121,51 +121,19 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
           log.warning(s"\n----Have not initialized!")
           self ! s
         } else {
-          assert(s.destId == id)
-          if (s.round < round || completed.contains(s.round)) {
-            log.debug(s"\n----Outdated scattered data")
-          } else if (s.round <= maxRound) {
-            val row = s.round - round
-            scatterBlockBuf.store(s.value, row, s.srcId, s.chunkId)
-            if (scatterBlockBuf.reachReducingThreshold(row, s.chunkId)) {
-              log.debug(s"\n----receive ${scatterBlockBuf.count(row, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
-              val (reducedData, reduceCount) = scatterBlockBuf.reduce(row, s.chunkId)
-              broadcast(reducedData, s.chunkId, s.round, reduceCount)
-            }
-          } else {
-            self ! StartAllreduce(s.round)
-            self ! s
-          }
+          handleScatterBlock(s)
         }
       }
 
     case r: ReduceBlock =>
 
       tryCatch("reduce block") { _ =>
-
         log.debug(s"\n----Receive reduced data from round ${r.round}: value = ${r.value.toList}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
         if (id == -1) {
           log.warning(s"\n----Have not initialized!")
           self ! r
         } else {
-          if (r.value.size > maxChunkSize) {
-            throw new RuntimeException(s"Reduced block of size ${r.value.size} is larger than expected.. Max msg size is $maxChunkSize")
-          } else if (r.destId != id) {
-            throw new RuntimeException(s"Message with destination ${r.destId} was incorrectly routed to node $id")
-          }
-          if (r.round < round || completed.contains(r.round)) {
-            log.debug(s"\n----Outdated reduced data")
-          } else if (r.round <= maxRound) {
-            val row = r.round - round
-            reduceBlockBuf.store(r.value, row, r.srcId, r.chunkId, r.count)
-            if (reduceBlockBuf.reachCompletionThreshold(row)) {
-              log.debug(s"\n----Receive enough reduced data (numPeers = ${peers.size}) for round ${r.round}, complete")
-              complete(r.round, row)
-            }
-          } else {
-            self ! StartAllreduce(r.round)
-            self ! r
-          }
+          handleReduceBlock(r)
         }
       }
 
@@ -178,6 +146,44 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
       }
   }
 
+  private def handleReduceBlock(r: ReduceBlock) = {
+    if (r.value.size > maxChunkSize) {
+      throw new RuntimeException(s"Reduced block of size ${r.value.size} is larger than expected.. Max msg size is $maxChunkSize")
+    } else if (r.destId != id) {
+      throw new RuntimeException(s"Message with destination ${r.destId} was incorrectly routed to node $id")
+    }
+    if (r.round < round || completed.contains(r.round)) {
+      log.debug(s"\n----Outdated reduced data")
+    } else if (r.round <= maxRound) {
+      val row = r.round - round
+      reduceBlockBuf.store(r.value, row, r.srcId, r.chunkId, r.count)
+      if (reduceBlockBuf.reachCompletionThreshold(row)) {
+        log.debug(s"\n----Receive enough reduced data (numPeers = ${peers.size}) for round ${r.round}, complete")
+        complete(r.round, row)
+      }
+    } else {
+      self ! StartAllreduce(r.round)
+      self ! r
+    }
+  }
+
+  private def handleScatterBlock(s: ScatterBlock) = {
+    assert(s.destId == id)
+    if (s.round < round || completed.contains(s.round)) {
+      log.debug(s"\n----Outdated scattered data")
+    } else if (s.round <= maxRound) {
+      val row = s.round - round
+      scatterBlockBuf.store(s.value, row, s.srcId, s.chunkId)
+      if (scatterBlockBuf.reachReducingThreshold(row, s.chunkId)) {
+        log.debug(s"\n----receive ${scatterBlockBuf.count(row, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
+        val (reducedData, reduceCount) = scatterBlockBuf.reduce(row, s.chunkId)
+        broadcast(reducedData, s.chunkId, s.round, reduceCount)
+      }
+    } else {
+      self ! StartAllreduce(s.round)
+      self ! s
+    }
+  }
 
   private def blockSize(id: Int) = {
     val (start, end) = range(id)
@@ -204,7 +210,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   }
 
   private def scatter() = {
-    for( i <- 0 until peers.size){
+    for( i <- 0 until peers.size) {
       val idx = (i+id) % peerNum
       peers.get(idx) match {
         case Some(worker) =>
@@ -218,8 +224,14 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
             val chunk = new Array[Float](chunkEnd - chunkStart + 1);
             System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunk.length);
             log.debug(s"\n----send msg ${chunk.toList} from ${id} to ${idx}, chunkId: ${i}")
-            worker ! ScatterBlock(chunk, id, idx, i, maxScattered + 1);
+            val scatterMsg = ScatterBlock(chunk, id, idx, i, maxScattered + 1)
+            if (worker == self) {
+              handleScatterBlock(scatterMsg)
+            } else {
+              worker ! scatterMsg
+            }
           }
+
         case None => Unit
       }
     }
@@ -244,7 +256,12 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
       peers.get(idx) match {
         case Some(worker) =>
           log.debug(s"\n----Broadcast data:${data.toList}, src: ${id}, dest: ${idx}, chunkId: ${chunkId}, round: ${bcastRound}")
-          worker ! ReduceBlock(data, id, idx, chunkId, bcastRound, reduceCount)
+          val reduceMsg = ReduceBlock(data, id, idx, chunkId, bcastRound, reduceCount)
+          if (worker == self) {
+            handleReduceBlock(reduceMsg)
+          } else {
+            worker ! reduceMsg
+          }
         case None => Unit
       }
     }
@@ -319,7 +336,7 @@ object AllreduceWorker {
 
         if (assertMultiple > 0) {
           assert(floats.map(_* assertMultiple).toList == r.data.toList, "Expected output should be multiple of input. Check if all thresholds are 1")
-          assert(r.count.toList == Array.fill(sourceDataSize)(assertMultiple), "Counts should equal expected multiples for all data element. Check if all thresholds are 1")
+          assert(r.count.toList == Array.fill(sourceDataSize)(assertMultiple).toList, s"Counts should equal expected multiples for all data element. Check if all thresholds are 1. ${r.count.toList}")
         }
         tic = System.currentTimeMillis()
       }
@@ -337,7 +354,7 @@ object AllreduceWorker {
     * @param port port number
     * @param dataSize number of elements in input array from each node to be reduced
     * @param checkpoint interval at which timing is calculated
-    * @param assertMultiple optional expected multiple of input as reduced results
+    * @param assertMultiple expected multiple of input as reduced results
     * @return
     */
   def startUp(port: String, dataSize: Int, checkpoint: Int = 50, assertMultiple: Int=0) = {
