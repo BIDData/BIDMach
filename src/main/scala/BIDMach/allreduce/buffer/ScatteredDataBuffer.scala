@@ -8,30 +8,30 @@ case class ScatteredDataBuffer(dataSize: Int,
 
   val minChunkRequired: Int = (reducingThreshold * peerSize).toInt
 
-  def reachReducingThreshold(row: Int, chunkId: Int): Boolean = {
-    countFilled(timeIdx(row))(chunkId) == minChunkRequired
+  def reachReducingThreshold(round: Int, chunkId: Int): Boolean = {
+    countFilled(timeIdx(round))(chunkId) == minChunkRequired
   }
 
 
-  def count(row: Int, chunkId: Int): Int = {
-    countFilled(timeIdx(row))(chunkId)
+  def count(round: Int, chunkId: Int): Int = {
+    countFilled(timeIdx(round))(chunkId)
   }
 
-  def reduce(row : Int, chunkId: Int) : (Array[Float], Int) = {
+  def reduce(round : Int, chunkId: Int) : (Array[Float], Int) = {
 
     val chunkStartPos = chunkId * maxChunkSize
     val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
     val chunkSize = chunkEndPos - chunkStartPos
     val reducedArr = Array.fill[Float](chunkSize)(0)
     for (i <- 0 until peerSize) {
-      val tbuf = temporalBuffer(timeIdx(row))(i);
+      val tbuf = temporalBuffer(timeIdx(round))(i);
       var j = 0;
       while (j < chunkSize) {
         reducedArr(j) += tbuf(chunkStartPos + j);
         j += 1;
       }
     }
-    (reducedArr, count(row, chunkId))
+    (reducedArr, count(round, chunkId))
   }
 
 

@@ -76,7 +76,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
     			log.info(s"\n----Actor id = ${id}")
     			for (i <- 0 until peers.size) {
-    				log.debug(s"\n----Peers[${i}] = ${peers(i)}")
+    				log.debug(s"\n----Peers[${i}] = ${peers.get(i)}")
     			}
     			println(s"----Number of peers / total peers = ${peers.size} / $peerNum");
     			println(s"\n----Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}, maxLag = ${maxLag}");
@@ -100,10 +100,10 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     			maxRound = math.max(maxRound, s.round);
     			while (round < maxRound - maxLag) { // fall behind too much, catch up
     				for (k <- 0 until scatterBlockBuf.numChunks) {
-    					val (reducedData, reduceCount) = scatterBlockBuf.reduce(0, k);
+    					val (reducedData, reduceCount) = scatterBlockBuf.reduce(round, k);
     					broadcast(reducedData, k, round, reduceCount);
     				}
-    				complete(round, 0);
+    				complete(round);
     			}
     			while (maxScattered < maxRound) {
     				fetch(maxScattered + 1);
@@ -163,11 +163,10 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     if (r.round < round || completed.contains(r.round)) {
       log.debug(s"\n----Outdated reduced data")
     } else if (r.round <= maxRound) {
-      val row = r.round - round
-      reduceBlockBuf.store(r.value, row, r.srcId, r.chunkId, r.count)
-      if (reduceBlockBuf.reachCompletionThreshold(row)) {
+      reduceBlockBuf.store(r.value, r.round, r.srcId, r.chunkId, r.count)
+      if (reduceBlockBuf.reachCompletionThreshold(r.round)) {
         log.debug(s"\n----Receive enough reduced data (numPeers = ${peers.size}) for round ${r.round}, complete")
-        complete(r.round, row)
+        complete(r.round)
       }
     } else {
       self ! StartAllreduce(r.round)
@@ -176,15 +175,16 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   }
 
   private def handleScatterBlock(s: ScatterBlock) = {
-    assert(s.destId == id)
+    if (s.destId != id) {
+      throw new RuntimeException(s"Scatter block should be directed to $id, but received ${s.destId}")
+    }
     if (s.round < round || completed.contains(s.round)) {
       log.debug(s"\n----Outdated scattered data")
     } else if (s.round <= maxRound) {
-      val row = s.round - round
-      scatterBlockBuf.store(s.value, row, s.srcId, s.chunkId)
-      if (scatterBlockBuf.reachReducingThreshold(row, s.chunkId)) {
-        log.debug(s"\n----receive ${scatterBlockBuf.count(row, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
-        val (reducedData, reduceCount) = scatterBlockBuf.reduce(row, s.chunkId)
+      scatterBlockBuf.store(s.value, s.round, s.srcId, s.chunkId)
+      if (scatterBlockBuf.reachReducingThreshold(s.round, s.chunkId)) {
+        log.debug(s"\n----receive ${scatterBlockBuf.count(s.round, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
+        val (reducedData, reduceCount) = scatterBlockBuf.reduce(s.round, s.chunkId)
         broadcast(reducedData, s.chunkId, s.round, reduceCount)
       }
     } else {
@@ -211,14 +211,14 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     data = input.data
   }
 
-  private def flush(completedRound: Int, row: Int) = {
-    val (output, counts) = reduceBlockBuf.getWithCounts(row)
+  private def flush(completedRound: Int) = {
+    val (output, counts) = reduceBlockBuf.getWithCounts(completedRound)
     log.debug(s"\n----Flushing ${output.toList} with counts ${counts.toList} at completed round $completedRound")
     dataSink(AllReduceOutput(output, counts, completedRound))
   }
 
   private def scatter() = {
-    for( i <- 0 until peers.size) {
+    for( i <- 0 until peerNum) {
       val idx = (i+id) % peerNum
       peers.get(idx) match {
         case Some(worker) =>
@@ -259,7 +259,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
   private def broadcast(data: Array[Float], chunkId: Int, bcastRound: Int, reduceCount: Int) = {
     log.debug(s"\n----Start broadcasting")
-    for( i <- 0 until peers.size){
+    for( i <- 0 until peerNum){
       val idx = (i+id) % peerNum
       peers.get(idx) match {
         case Some(worker) =>
@@ -275,19 +275,19 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     }
   }
 
-  private def complete(completedRound: Int, row: Int) = {
+  private def complete(completedRound: Int) = {
     log.debug(s"\n----Complete allreduce round ${completedRound}\n")
 
-    flush(completedRound, row)
+    flush(completedRound)
 
     data = Array.empty
     master.orNull ! CompleteAllreduce(id, completedRound)
     completed = completed + completedRound
     if (round == completedRound) {
       do {
+        scatterBlockBuf.up(round)
+        reduceBlockBuf.up(round)
         round += 1
-        scatterBlockBuf.up()
-        reduceBlockBuf.up()
       } while (completed.contains(round))
     }
   }
