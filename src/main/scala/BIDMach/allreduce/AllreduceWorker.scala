@@ -126,7 +126,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
     case s: ScatterBlock => {
     	try {
-    		log.debug(s"\n----receive scattered data from round ${s.round}: value = ${s.value.toList}, srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, current round = $round")
+//    		log.debug(s"\n----receive scattered data from round ${s.round}: value = ${s.value.toList}, srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, current round = $round")
     		if (id == -1) {
     			log.warning(s"\n----Have not initialized!");
     			self ! s;
@@ -140,7 +140,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
     case r: ReduceBlock => {
     	try {
-    		log.debug(s"\n----Receive reduced data from round ${r.round}: value = ${r.value.toList}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
+//    		log.debug(s"\n----Receive reduced data from round ${r.round}: value = ${r.value.toList}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
     		if (id == -1) {
     			log.warning(s"\n----Have not initialized!");
     			self ! r;
@@ -220,7 +220,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
   private def flush(completedRound: Int) = {
     reduceBlockBuf.getWithCounts(completedRound, output, outputCount)
-    log.debug(s"\n----Flushing ${output.toList} with counts ${outputCount.toList} at completed round $completedRound")
+//    log.debug(s"\n----Flushing ${output.toList} with counts ${outputCount.toList} at completed round $completedRound")
     dataSink(AllReduceOutput(output, outputCount, completedRound))
   }
 
@@ -240,7 +240,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
             val chunk: Array[Float] = Array.fill(chunkSize)(0)
 
             System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunkSize);
-            log.debug(s"\n----send msg ${chunk.toList} from ${id} to ${idx}, chunkId: ${i}")
+//            log.debug(s"\n----send msg ${chunk.toList} from ${id} to ${idx}, chunkId: ${i}")
             val scatterMsg = ScatterBlock(chunk, id, idx, i, maxScattered + 1)
             if (worker == self) {
               handleScatterBlock(scatterMsg)
@@ -272,7 +272,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
       val idx = (i+id) % peerNum
       peers.get(idx) match {
         case Some(worker) =>
-          log.debug(s"\n----Broadcast data:${data.toList}, src: ${id}, dest: ${idx}, chunkId: ${chunkId}, round: ${bcastRound}")
+//          log.debug(s"\n----Broadcast data:${data.toList}, src: ${id}, dest: ${idx}, chunkId: ${chunkId}, round: ${bcastRound}")
           val reduceMsg = ReduceBlock(data, id, idx, chunkId, bcastRound, reduceCount)
           if (worker == self) {
             handleReduceBlock(reduceMsg)
