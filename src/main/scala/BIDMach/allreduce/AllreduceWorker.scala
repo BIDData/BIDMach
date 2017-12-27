@@ -52,14 +52,14 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     			completed = Set[Int]();
 
     			dataSize = init.dataSize;
-    			data = initArray(dataSize);
+    			data = new Array(dataSize);
     			dataRange = initDataBlockRanges();
     			myBlockSize = blockSize(id);
     			maxBlockSize = blockSize(0);
     			minBlockSize = blockSize(peerNum - 1);
 
-          output = Array.fill(dataSize)(0)
-          outputCount = Array.fill(dataSize)(0)
+          output = new Array(dataSize)
+          outputCount = new Array(dataSize)
 
     			maxChunkSize = init.maxChunkSize;
 
@@ -205,10 +205,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     end - start
   }
 
-  private def initArray(size: Int) = {
-    Array.fill[Float](size)(0)
-  }
-
   private def fetch(round: Int) = {
     log.debug(s"\nfetch ${round}")
     val input = dataSource(AllReduceInputRequest(round))
@@ -237,7 +233,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
             val chunkStart = math.min(i * maxChunkSize, peerBlockSize - 1);
             val chunkEnd = math.min((i + 1) * maxChunkSize - 1, peerBlockSize - 1);
             val chunkSize = chunkEnd - chunkStart + 1
-            val chunk: Array[Float] = Array.fill(chunkSize)(0)
+            val chunk: Array[Float] = new Array(chunkSize)
 
             System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunkSize);
 //            log.debug(s"\n----send msg ${chunk.toList} from ${id} to ${idx}, chunkId: ${i}")

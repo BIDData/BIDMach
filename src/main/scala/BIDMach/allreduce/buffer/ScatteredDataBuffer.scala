@@ -22,7 +22,7 @@ case class ScatteredDataBuffer(dataSize: Int,
     val chunkStartPos = chunkId * maxChunkSize
     val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
     val chunkSize = chunkEndPos - chunkStartPos
-    val reducedArr = Array.fill[Float](chunkSize)(0)
+    val reducedArr = new Array[Float](chunkSize)
     for (i <- 0 until peerSize) {
       val tbuf = temporalBuffer(timeIdx(round))(i);
       var j = 0;
