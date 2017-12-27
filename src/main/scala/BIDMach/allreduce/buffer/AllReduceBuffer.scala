@@ -1,5 +1,7 @@
 package BIDMach.allreduce.buffer
 
+import java.util
+
 abstract class AllReduceBuffer(dataSize: Int,
                                peerSize: Int,
                                maxLag: Int,
@@ -35,8 +37,11 @@ abstract class AllReduceBuffer(dataSize: Int,
   }
 
   def up(round: Int): Unit = {
-    temporalBuffer(timeIdx(round)) = initializePeerBuffer()
-    countFilled(timeIdx(round)) = Array.fill(numChunks)(0);
+    val tmpBuff = temporalBuffer(timeIdx(round))
+    for (i <- 0 until peerSize) {
+      util.Arrays.fill(tmpBuff(i), 0, dataSize, 0)
+    }
+    util.Arrays.fill(countFilled(timeIdx(round)), 0, numChunks, 0)
   }
 
   protected def getNumChunk(size: Int) = {

@@ -30,6 +30,10 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   var reduceBlockBuf: ReducedDataBuffer = ReducedDataBuffer.empty // store reduced data received
   var maxChunkSize = 1024; // maximum msg size that is allowed on the wire
 
+  // Output
+  var output: Array[Float] = Array.empty //
+  var outputCount: Array[Int] = Array.empty //
+
   def receive = {
 
     case init: InitWorkers => {
@@ -53,6 +57,9 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     			myBlockSize = blockSize(id);
     			maxBlockSize = blockSize(0);
     			minBlockSize = blockSize(peerNum - 1);
+
+          output = Array.fill(dataSize)(0)
+          outputCount = Array.fill(dataSize)(0)
 
     			maxChunkSize = init.maxChunkSize;
 
@@ -212,9 +219,9 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   }
 
   private def flush(completedRound: Int) = {
-    val (output, counts) = reduceBlockBuf.getWithCounts(completedRound)
-    log.debug(s"\n----Flushing ${output.toList} with counts ${counts.toList} at completed round $completedRound")
-    dataSink(AllReduceOutput(output, counts, completedRound))
+    reduceBlockBuf.getWithCounts(completedRound, output, outputCount)
+    log.debug(s"\n----Flushing ${output.toList} with counts ${outputCount.toList} at completed round $completedRound")
+    dataSink(AllReduceOutput(output, outputCount, completedRound))
   }
 
   private def scatter() = {
@@ -229,8 +236,10 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
           for (i <- 0 until peerNumChunks) {
             val chunkStart = math.min(i * maxChunkSize, peerBlockSize - 1);
             val chunkEnd = math.min((i + 1) * maxChunkSize - 1, peerBlockSize - 1);
-            val chunk = new Array[Float](chunkEnd - chunkStart + 1);
-            System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunk.length);
+            val chunkSize = chunkEnd - chunkStart + 1
+            val chunk: Array[Float] = Array.fill(chunkSize)(0)
+
+            System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunkSize);
             log.debug(s"\n----send msg ${chunk.toList} from ${id} to ${idx}, chunkId: ${i}")
             val scatterMsg = ScatterBlock(chunk, id, idx, i, maxScattered + 1)
             if (worker == self) {
