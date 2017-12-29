@@ -1,5 +1,7 @@
 package BIDMach.allreduce.buffer
 
+import java.util
+
 case class ScatteredDataBuffer(dataSize: Int,
                                peerSize: Int,
                                maxLag: Int,
@@ -8,14 +10,30 @@ case class ScatteredDataBuffer(dataSize: Int,
 
   val minChunkRequired: Int = (reducingThreshold * peerSize).toInt
 
-  def reachReducingThreshold(round: Int, chunkId: Int): Boolean = {
-    countFilled(timeIdx(round))(chunkId) == minChunkRequired
+  private val currentRounds: Array[Array[Int]] = {
+    val rounds = new Array[Array[Int]](maxLag)
+    for (i <- 0 until maxLag) {
+      rounds(i) = new Array[Int](numChunks)
+      java.util.Arrays.fill(rounds(i), i)
+    }
+    rounds
   }
 
+  def compareRoundTo(round: Int, chunkId: Int): Int = {
+    currentRounds(timeIdx(round))(chunkId).compareTo(round)
+  }
 
   def count(round: Int, chunkId: Int): Int = {
     countFilled(timeIdx(round))(chunkId)
   }
+
+  override def store(data: Array[Float], round: Int, srcId: Int, chunkId: Int) = {
+    if (compareRoundTo(round, chunkId) > 0) {
+      throw new IllegalArgumentException(s"Unable to store data chunk $chunkId from source $srcId, as given round [$round] is less than current round [${currentRounds(timeIdx(round))(chunkId)}]")
+    }
+    super.store(data, round, srcId, chunkId)
+  }
+
 
   def reduce(round : Int, chunkId: Int) : (Array[Float], Int) = {
 
@@ -34,11 +52,31 @@ case class ScatteredDataBuffer(dataSize: Int,
     (reducedArr, count(round, chunkId))
   }
 
+  def prepareNewRound(round : Int, chunkId: Int) = {
+
+    currentRounds(timeIdx(round))(chunkId) += maxLag
+
+    val chunkStartPos = chunkId * maxChunkSize
+    val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
+    for(peerId <- 0 until peerSize) {
+      util.Arrays.fill(
+        temporalBuffer(timeIdx(round))(peerId),
+        chunkStartPos,
+        chunkEndPos,
+        0
+      )
+    }
+    countFilled(timeIdx(round))(chunkId) = 0
+  }
+
+  def reachReducingThreshold(round: Int, chunkId: Int): Boolean = {
+    countFilled(timeIdx(round))(chunkId) == minChunkRequired
+  }
 
 }
 
 object ScatteredDataBuffer {
   def empty = {
-    ScatteredDataBuffer(0, 0, 0, 0f, 1024)
+    ScatteredDataBuffer(0, 0, 0, 0f, 0)
   }
 }

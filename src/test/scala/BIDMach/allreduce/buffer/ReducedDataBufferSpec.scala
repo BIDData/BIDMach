@@ -119,6 +119,26 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
 
     }
 
+    "be unable to store older round and have buffer cleared after preparation for new round" in {
+
+      val newRoundOfSameMod = rowAtTest + maxLag
+
+      buffer.prepareNewRound(rowAtTest)
+
+      buffer.compareRoundTo(newRoundOfSameMod) shouldEqual 0
+      buffer.compareRoundTo(rowAtTest) shouldEqual 1
+
+      intercept[IllegalArgumentException] {
+        buffer.store(randomFloatArray(maxChunkSize), round = rowAtTest, srcId = 2, chunkId = 1, count = peerSize)
+      }
+
+      buffer.getWithCounts(rowAtTest, outputBuff, outputCount)
+
+      outputBuff.toList shouldEqual Array.fill(totalDataSize)(0)
+      outputCount.toList shouldEqual Array.fill(totalDataSize)(0)
+
+    }
+
   }
 
 

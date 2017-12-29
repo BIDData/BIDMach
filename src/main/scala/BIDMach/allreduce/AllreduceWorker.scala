@@ -4,7 +4,6 @@ import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.config.ConfigFactory
 
-import scala.collection.mutable
 
 class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
                       dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging{
@@ -16,10 +15,8 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   var thReduce = 1f // pct of scattered data needed to start reducing
   var thComplete = 1f // pct of reduced data needed to complete current round
   var maxLag = 0 // number of rounds allowed for a worker to fall behind
-  var round = -1 // current (unfinished) round of allreduce, can potentially be maxRound+1
   var maxRound = -1 // most updated timestamp received for StartAllreduce
   var maxScattered = -1 // most updated timestamp where scatter() has been called
-  val completed = mutable.HashSet[Int]() // set of completed rounds
 
   // Data
   var dataSize = 0
@@ -28,9 +25,9 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   var maxBlockSize = 0
   var minBlockSize = 0
   var myBlockSize = 0
+  var maxChunkSize = 0; // maximum msg size that is allowed on the wire
   var scatterBlockBuf: ScatteredDataBuffer = ScatteredDataBuffer.empty // store scattered data received
   var reduceBlockBuf: ReducedDataBuffer = ReducedDataBuffer.empty // store reduced data received
-  var maxChunkSize = 1024; // maximum msg size that is allowed on the wire
 
   // Output
   var output: Array[Float] = Array.empty //
@@ -48,7 +45,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     			thReduce = init.thReduce;
     			thComplete = init.thComplete;
     			maxLag = init.maxLag;
-    			round = 0; // clear round info to start over
     			maxRound = -1;
     			maxScattered = -1;
 
@@ -106,20 +102,12 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     			self ! s;
     		} else {
     			maxRound = math.max(maxRound, s.round);
-    			while (round < maxRound - maxLag) { // fall behind too much, catch up
-    				for (k <- 0 until scatterBlockBuf.numChunks) {
-    					val (reducedData, reduceCount) = scatterBlockBuf.reduce(round, k);
-    					broadcast(reducedData, k, round, reduceCount);
-    				}
-    				complete(round);
-    			}
     			while (maxScattered < maxRound) {
     				fetch(maxScattered + 1);
     				scatter();
     				maxScattered += 1;
     			}
     		}
-        completed.retain(e => e >= round);
     	} catch {
     	case e:Throwable => printStackTrace("start all reduce", e);
     	}
@@ -127,7 +115,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
     case s: ScatterBlock => {
     	try {
-    		log.debug(s"\n----receive scattered data from round ${s.round} srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, current round = $round")
+    		log.debug(s"\n----receive scattered data from round ${s.round} srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}")
     		if (id == -1) {
     			log.warning(s"\n----Have not initialized!");
     			self ! s;
@@ -168,37 +156,57 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     } else if (r.destId != id) {
       throw new RuntimeException(s"Message with destination ${r.destId} was incorrectly routed to node $id")
     }
-    if (r.round < round || completed.contains(r.round)) {
-      log.debug(s"\n----Outdated reduced data")
-    } else if (r.round <= maxRound) {
-      reduceBlockBuf.store(r.value, r.round, r.srcId, r.chunkId, r.count)
-      if (reduceBlockBuf.reachCompletionThreshold(r.round)) {
-        log.debug(s"\n----Receive enough reduced data (numPeers = ${peers.size}) for round ${r.round}, complete")
-        complete(r.round)
-      }
-    } else {
+
+    if (r.round > maxRound) {
       self ! StartAllreduce(r.round)
       self ! r
+    } else {
+      val comparison = reduceBlockBuf.compareRoundTo(r.round)
+      if (comparison > 0) {
+        log.debug(s"\n----Outdated reduced data")
+      } else {
+        if (comparison < 0) {
+          completeRound(r.round)
+        }
+        reduceBlockBuf.store(r.value, r.round, r.srcId, r.chunkId, r.count)
+        if (reduceBlockBuf.reachCompletionThreshold(r.round)) {
+          log.debug(s"\n----Receive enough reduced data (numPeers = ${peers.size}) for round ${r.round}, complete")
+          completeRound(r.round)
+        }
+      }
     }
+
   }
 
   private def handleScatterBlock(s: ScatterBlock) = {
     if (s.destId != id) {
       throw new RuntimeException(s"Scatter block should be directed to $id, but received ${s.destId}")
     }
-    if (s.round < round || completed.contains(s.round)) {
-      log.debug(s"\n----Outdated scattered data")
-    } else if (s.round <= maxRound) {
-      scatterBlockBuf.store(s.value, s.round, s.srcId, s.chunkId)
-      if (scatterBlockBuf.reachReducingThreshold(s.round, s.chunkId)) {
-        log.debug(s"\n----receive ${scatterBlockBuf.count(s.round, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
-        val (reducedData, reduceCount) = scatterBlockBuf.reduce(s.round, s.chunkId)
-        broadcast(reducedData, s.chunkId, s.round, reduceCount)
-      }
-    } else {
+
+    if (s.round > maxRound) {
       self ! StartAllreduce(s.round)
       self ! s
+    } else {
+      val comparison = scatterBlockBuf.compareRoundTo(s.round, s.chunkId)
+      if (comparison > 0) {
+        log.debug(s"\n----Outdated scattered data")
+      } else {
+        if (comparison < 0) {
+          reduceAndBroadcast(s)
+        }
+        scatterBlockBuf.store(s.value, s.round, s.srcId, s.chunkId)
+        if (scatterBlockBuf.reachReducingThreshold(s.round, s.chunkId)) {
+          log.debug(s"\n----receive ${scatterBlockBuf.count(s.round, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
+          reduceAndBroadcast(s)
+        }
+      }
     }
+  }
+
+  private def reduceAndBroadcast(s: ScatterBlock) = {
+    val (reducedData, reduceCount) = scatterBlockBuf.reduce(s.round, s.chunkId)
+    broadcast(reducedData, s.chunkId, s.round, reduceCount)
+    scatterBlockBuf.prepareNewRound(s.round, s.chunkId)
   }
 
   private def blockSize(id: Int) = {
@@ -245,7 +253,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
               worker ! scatterMsg
             }
           }
-
         case None => Unit
       }
     }
@@ -281,21 +288,11 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     }
   }
 
-  private def complete(completedRound: Int) = {
+  private def completeRound(completedRound: Int) = {
     log.debug(s"\n----Complete allreduce round ${completedRound}\n")
-
     flush(completedRound)
-
-    data = Array.empty
     master.orNull ! CompleteAllreduce(id, completedRound)
-    completed.add(completedRound)
-    if (round == completedRound) {
-      do {
-        scatterBlockBuf.up(round)
-        reduceBlockBuf.up(round)
-        round += 1
-      } while (completed.contains(round))
-    }
+    reduceBlockBuf.prepareNewRound(completedRound)
   }
 
   private def printStackTrace(location: String, e:Throwable): Unit = {
@@ -343,7 +340,9 @@ object AllreduceWorker {
         println("%2.1f Mbytes in %2.1f seconds at %4.3f MBytes/sec" format(bytes / 1.0e6, timeElapsed, bytes / 1.0e6 / timeElapsed));
 
         if (assertMultiple > 0) {
-          assert(floats.map(_* assertMultiple).toList == r.data.toList, "Expected output should be multiple of input. Check if all thresholds are 1")
+          val outputList = r.data.toList
+          println(s"Asserting #${r.iteration} output ${outputList}")
+          assert(floats.map(_* assertMultiple).toList == outputList, "Expected output should be multiple of input. Check if all thresholds are 1")
           assert(r.count.toList == Array.fill(sourceDataSize)(assertMultiple).toList, s"Counts should equal expected multiples for all data element. Check if all thresholds are 1. ${r.count.toList}")
         }
         tic = System.currentTimeMillis()

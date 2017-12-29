@@ -16,14 +16,31 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     (completionThreshold * totalChunks).toInt
   }
 
+  private val currentRounds = {
+    val rounds = new Array[Int](maxLag)
+    for (i <- 0 until maxLag) {
+      rounds(i) = i
+    }
+    rounds
+  }
+
   private val countReduceFilled: Array[Array[Int]] = Array.ofDim[Int](maxLag, peerSize * numChunks)
 
+  def compareRoundTo(round: Int): Int = {
+    currentRounds(timeIdx(round)).compareTo(round)
+  }
+
   def store(data: Array[Float], round: Int, srcId: Int, chunkId: Int, count: Int) = {
+    if (compareRoundTo(round) > 0) {
+      throw new IllegalArgumentException(s"Unable to store data chunk $chunkId from source $srcId, as given round [$round] is less than current round [${currentRounds(timeIdx(round))}]")
+    }
     super.store(data, round, srcId, chunkId)
     countReduceFilled(timeIdx(round))(srcId * numChunks + chunkId) = count
   }
 
   def getWithCounts(round: Int, dataOutput: Array[Float], countOutput: Array[Int]) = {
+
+
     val output = temporalBuffer(timeIdx(round))
     val countOverPeerChunks = countReduceFilled(timeIdx(round))
 
@@ -50,8 +67,18 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     (dataOutput, countOutput)
   }
 
-  override def up(round: Int): Unit = {
-    super.up(round)
+  def prepareNewRound(round: Int): Unit = {
+
+    currentRounds(timeIdx(round)) += maxLag
+
+    // clear peer buffers
+    val tmpBuff = temporalBuffer(timeIdx(round))
+    for (i <- 0 until peerSize) {
+      util.Arrays.fill(tmpBuff(i), 0)
+    }
+
+    // clear two kinds of count
+    util.Arrays.fill(countFilled(timeIdx(round)), 0, numChunks, 0)
     util.Arrays.fill(countReduceFilled(timeIdx(round)), 0, peerSize * numChunks, 0)
   }
 
@@ -66,6 +93,6 @@ case class ReducedDataBuffer(maxBlockSize: Int,
 
 object ReducedDataBuffer {
   def empty = {
-    ReducedDataBuffer(0, 0, 0, 0, 0, 0f, 1024)
+    ReducedDataBuffer(0, 0, 0, 0, 0, 0f, 0)
   }
 }

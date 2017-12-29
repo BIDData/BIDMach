@@ -5,6 +5,8 @@ import akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.util.Random
+import scala.concurrent.duration._
+
 
 class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
@@ -42,6 +44,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     r => {
       val pos = iterations.indexOf(r.iteration)
       pos should be >= 0
+      println(s"output $r with data ${r.data.toList}")
       r.data.toList shouldBe expectedOutput(pos)
       r.count.toList shouldBe expectedCount(pos)
     }
@@ -62,8 +65,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val generator = (idx: Int, iter: Int) => idx + iter.toFloat
       val source = createCustomDataSource(dataSize)(generator)
 
-      val output1 = Array.range(0, dataSize).map(generator(_, 0)).map(_ * workerNum).toList
-      val output2 = Array.range(0, dataSize).map(generator(_, 1)).map(_ * workerNum).toList
+      val output1 = Array.range(0, dataSize).map(generator(_, 0)).map(_ * workerNum).toList // 0, 2, 4
+      val output2 = Array.range(0, dataSize).map(generator(_, 1)).map(_ * workerNum).toList // 2, 4, 6
 
       val counts = List(2, 2, 2)
 
@@ -85,7 +88,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       worker ! ScatterBlock(Array(2f), srcId = 0, destId = 1, chunkId = 0, round=0)
       worker ! ReduceBlock(Array(0f, 2f), srcId = 0, destId = 1, chunkId =0, round=0, count=2)
 
-      fishForMessage() {
+      fishForMessage(60.seconds) {
         case CompleteAllreduce(1, 0) => true
         case _ => false
       }
@@ -94,7 +97,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       worker ! ScatterBlock(Array(3f), srcId = 0, destId = 1, chunkId = 0, round=1)
       worker ! ReduceBlock(Array(2f, 4f), srcId = 0, destId = 1, chunkId =0, round=1, count=2)
 
-      fishForMessage() {
+      fishForMessage(60.seconds) {
         case CompleteAllreduce(1, 1) => true
         case _ => false
       }
@@ -155,12 +158,17 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       }
     }
 
-    "no longer process scatter for early received round" in {
+    "still process scatter for the completed round" in {
 
       for (i <- (idx + 1) until workerNum) {
         worker ! ScatterBlock(Array(2f, 2f), srcId = i, destId = idx, chunkId = 0, futureRound)
       }
-      expectNoMsg()
+      val reduced = receiveWhile() {
+        case r: ReduceBlock => r
+      }
+
+      reduced.map(_.round) shouldEqual Array.fill(workerNum - 1)(futureRound).toList
+
     }
 
     "still process scatter for earlier rounds" in {
@@ -663,81 +671,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     }
 
   }
-
-  "Catch up when message's round is more than maximal lag" should {
-
-    "complete old rounds with current data and start the latest" in {
-      val worker = createNewWorker(source, sink)
-      val workerNum = 4
-      val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
-      val idx = 0
-      val thReduce = 1
-      val thComplete = 1
-      val maxLag = 5
-      val dataSize = 8
-      val maxChunkSize = 2
-      worker ! InitWorkers(workers, workerNum, self, idx, thReduce, thComplete, maxLag, dataSize, maxChunkSize)
-      println("===============start simple catchup test!==============")
-      for (i <- 0 to maxLag) {
-        worker ! StartAllreduce(i)
-        expectBasicSendingScatterBlock(i)
-
-        simulateScatterBlocksFromPeers(worker, i)
-        // intentionally missing self so no completion has been made
-        worker ! ReduceBlock(Array(12.0f, 12.0f), 1, 0, 0, i, 4)
-        worker ! ReduceBlock(Array(12.0f, 12.0f), 2, 0, 0, i, 4)
-        worker ! ReduceBlock(Array(12.0f, 12.0f), 3, 0, 0, i, 4)
-      }
-      expectNoMsg()
-
-      for (catchupRound <- List(6, 7, 8)) {
-        worker ! StartAllreduce(catchupRound)
-
-        // round 0, 1, 2 are completed
-        val oldCompletionRound = catchupRound - (maxLag + 1)
-        expectBasicSendingReduceBlock(oldCompletionRound)
-        expectMsg(CompleteAllreduce(0, oldCompletionRound))
-
-        // start latest
-        expectBasicSendingScatterBlock(catchupRound)
-      }
-    }
-
-
-    "return zero counts doing cold-catchup and start the latest" in {
-      // extreme case of catch up, only for test use
-      val workerNum = 4
-      val worker = createNewWorker(source, sink)
-      val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
-      val idx = 0
-      val thReduce = 1
-      val thComplete = 1
-      val maxLag = 5
-      val dataSize = 8
-      val maxChunkSize = 2
-
-      worker ! InitWorkers(workers, workerNum, self, idx, thReduce, thComplete, maxLag, dataSize, maxChunkSize)
-
-      // trigger the catchup instantly
-      worker ! StartAllreduce(10)
-
-      // currently we send zero-filled array with zero counts
-      for (i <- 0 until maxLag) {
-        expectReduce(ReduceBlock(Array(0f, 0f), 0, 0, 0, i, count= 0))
-        expectReduce(ReduceBlock(Array(0f, 0f), 0, 1, 0, i, count=0))
-        expectReduce(ReduceBlock(Array(0f, 0f), 0, 2, 0, i, count=0))
-        expectReduce(ReduceBlock(Array(0f, 0f), 0, 3, 0, i, count=0))
-        expectMsg(CompleteAllreduce(0, i))
-      }
-
-      // all iterations scatter
-      for (i <- 0 to 10) {
-        expectBasicSendingScatterBlock(i)
-      }
-    }
-
-  }
-
 
   "Sanity Check" must {
 

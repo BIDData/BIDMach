@@ -15,6 +15,7 @@ class ScatteredDataBufferSpec extends WordSpec with Matchers {
     val reducingThreshold = 0.75f
     val maxChunkSize = 3
     val rowAtTest = 1
+    val chunkAtTest = 0
 
     val buffer = ScatteredDataBuffer(blockSize, peerSize, maxLag, reducingThreshold, maxChunkSize)
     val numChunks = buffer.numChunks
@@ -29,11 +30,10 @@ class ScatteredDataBufferSpec extends WordSpec with Matchers {
 
     }
 
-    "initialize round to be zero" in {
+    "initialize rounds to be same as its index" in {
 
-      buffer.compareRoundTo(0) shouldEqual 0
-      for (round <- 1 to maxLag) {
-        buffer.compareRoundTo(round) shouldEqual -1
+      for (round <- 0 until maxLag) {
+        buffer.compareRoundTo(round, chunkAtTest) shouldEqual 0
       }
     }
 
@@ -62,28 +62,32 @@ class ScatteredDataBufferSpec extends WordSpec with Matchers {
     }
 
     "reduce values with correct count" in {
-      val (emptyReduced, emptyCount) = buffer.reduce(0, 0)
+      val (emptyReduced, emptyCount) = buffer.reduce(0, chunkAtTest)
       emptyCount shouldEqual 0
       emptyReduced.sum shouldEqual 0
 
-      val (_, counts) = buffer.reduce(rowAtTest, 0)
+      val (nonEmptyReduced, counts) = buffer.reduce(rowAtTest, chunkAtTest)
       counts shouldEqual expectedCriticalPeerSize
+      nonEmptyReduced.sum shouldNot equal(0)
     }
 
-    "be unable to store older round" in {
+    "be unable to store older round and have buffer at chunk cleared after preparation for new round" in {
 
-      val newRoundOfSameMod = rowAtTest + (maxLag + 1)
+      val newRoundOfSameMod = rowAtTest + maxLag
 
-      buffer.store(randomFloatArray(maxChunkSize), round = newRoundOfSameMod, 0, 0)
+      buffer.prepareNewRound(rowAtTest, chunkAtTest)
 
-      buffer.compareRoundTo(newRoundOfSameMod) shouldEqual 0
+      buffer.compareRoundTo(newRoundOfSameMod, chunkAtTest) shouldEqual 0
+      buffer.compareRoundTo(rowAtTest, chunkAtTest) shouldEqual 1
 
       intercept[IllegalArgumentException] {
-        buffer.store(randomFloatArray(maxChunkSize), round = rowAtTest, 0, 0)
+        buffer.store(randomFloatArray(maxChunkSize), round = rowAtTest, 0, chunkAtTest)
       }
+
+      val (reduced, count) = buffer.reduce(rowAtTest, chunkAtTest)
+      count shouldEqual 0
+      reduced.toList shouldEqual Array.fill(reduced.size)(0)
     }
-
-
 
   }
 
