@@ -4,6 +4,8 @@ import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.config.ConfigFactory
 
+import scala.collection.mutable
+
 class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
                       dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging{
 
@@ -17,7 +19,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
   var round = -1 // current (unfinished) round of allreduce, can potentially be maxRound+1
   var maxRound = -1 // most updated timestamp received for StartAllreduce
   var maxScattered = -1 // most updated timestamp where scatter() has been called
-  var completed = Set[Int]() // set of completed rounds
+  val completed = mutable.HashSet[Int]() // set of completed rounds
 
   // Data
   var dataSize = 0
@@ -49,7 +51,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     			round = 0; // clear round info to start over
     			maxRound = -1;
     			maxScattered = -1;
-    			completed = Set[Int]();
 
     			dataSize = init.dataSize;
     			data = new Array(dataSize);
@@ -118,7 +119,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     				maxScattered += 1;
     			}
     		}
-    		completed = completed.filterNot(e => e < round);
+        completed.retain(e => e >= round);
     	} catch {
     	case e:Throwable => printStackTrace("start all reduce", e);
     	}
@@ -287,7 +288,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
     data = Array.empty
     master.orNull ! CompleteAllreduce(id, completedRound)
-    completed = completed + completedRound
+    completed.add(completedRound)
     if (round == completedRound) {
       do {
         scatterBlockBuf.up(round)

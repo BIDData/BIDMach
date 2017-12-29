@@ -9,16 +9,15 @@ abstract class AllReduceBuffer(dataSize: Int,
 
   type Buffer = Array[Array[Float]]
   val numChunks = getNumChunk(dataSize)
-  var temporalBuffer: Array[Buffer] = {
-    Array.fill(maxLag) {
-      initializePeerBuffer()
+  val temporalBuffer: Array[Buffer] = {
+    val init = new Array[Buffer](maxLag)
+    for (i <- 0 until maxLag) {
+      init(i) = new Array[Array[Float]](peerSize)
+      for (j <- 0 until peerSize) {
+        init(i)(j) = new Array[Float](dataSize)
+      }
     }
-  }
-
-  private def initializePeerBuffer(): Buffer = {
-    Array.fill(peerSize) {
-      Array.fill(dataSize)(0)
-    }
+    init
   }
 
   protected val countFilled: Array[Array[Int]] = Array.ofDim[Int](maxLag, numChunks)
