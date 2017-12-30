@@ -4,6 +4,8 @@ import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.config.ConfigFactory
 
+import scala.collection.mutable
+
 
 class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
                       dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging{
@@ -98,13 +100,12 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     	try {
     		log.debug(s"\n----Start allreduce round ${s.round}");
     		if (id == -1) {
-    			log.warning(s"\n----Actor is not initialized");
     			self ! s;
     		} else {
     			maxRound = math.max(maxRound, s.round);
     			while (maxScattered < maxRound) {
     				fetch(maxScattered + 1);
-    				scatter();
+    				scatter(maxScattered + 1);
     				maxScattered += 1;
     			}
     		}
@@ -117,7 +118,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     	try {
     		log.debug(s"\n----receive scattered data from round ${s.round} srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}")
     		if (id == -1) {
-    			log.warning(s"\n----Have not initialized!");
     			self ! s;
     		} else {
     			handleScatterBlock(s);
@@ -131,7 +131,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     	try {
     		log.debug(s"\n----Receive reduced data from round ${r.round}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
     		if (id == -1) {
-    			log.warning(s"\n----Have not initialized!");
     			self ! r;
     		} else {
     			handleReduceBlock(r);
@@ -166,7 +165,8 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
         log.debug(s"\n----Outdated reduced data")
       } else {
         if (comparison < 0) {
-          completeRound(r.round)
+          val outdatedRound = reduceBlockBuf.getRound(r.round)
+          completeRound(outdatedRound)
         }
         reduceBlockBuf.store(r.value, r.round, r.srcId, r.chunkId, r.count)
         if (reduceBlockBuf.reachCompletionThreshold(r.round)) {
@@ -192,21 +192,22 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
         log.debug(s"\n----Outdated scattered data")
       } else {
         if (comparison < 0) {
-          reduceAndBroadcast(s)
+          val outdatedRound = scatterBlockBuf.getRound(s.round, s.chunkId)
+          reduceAndBroadcast(outdatedRound, s.chunkId)
         }
         scatterBlockBuf.store(s.value, s.round, s.srcId, s.chunkId)
         if (scatterBlockBuf.reachReducingThreshold(s.round, s.chunkId)) {
           log.debug(s"\n----receive ${scatterBlockBuf.count(s.round, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
-          reduceAndBroadcast(s)
+          reduceAndBroadcast(s.round, s.chunkId)
         }
       }
     }
   }
 
-  private def reduceAndBroadcast(s: ScatterBlock) = {
-    val (reducedData, reduceCount) = scatterBlockBuf.reduce(s.round, s.chunkId)
-    broadcast(reducedData, s.chunkId, s.round, reduceCount)
-    scatterBlockBuf.prepareNewRound(s.round, s.chunkId)
+  private def reduceAndBroadcast(round: Int, chunkId: Int) = {
+    val (reducedData, reduceCount) = scatterBlockBuf.reduce(round, chunkId)
+    broadcast(reducedData, chunkId, round, reduceCount)
+    scatterBlockBuf.prepareNewRound(round, chunkId)
   }
 
   private def blockSize(id: Int) = {
@@ -229,7 +230,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     dataSink(AllReduceOutput(output, outputCount, completedRound))
   }
 
-  private def scatter() = {
+  private def scatter(round: Int) = {
     for( i <- 0 until peerNum) {
       val idx = (i+id) % peerNum
       peers.get(idx) match {
@@ -246,7 +247,7 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
 
             System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunkSize);
             log.debug(s"\n----send msg from ${id} to ${idx}, chunkId: ${i}")
-            val scatterMsg = ScatterBlock(chunk, id, idx, i, maxScattered + 1)
+            val scatterMsg = ScatterBlock(chunk, id, idx, i, round)
             if (worker == self) {
               handleScatterBlock(scatterMsg)
             } else {
@@ -316,41 +317,103 @@ object AllreduceWorker {
     val sourceDataSize = if (args.length <= 1) 10 else args(1).toInt
 
     initWorker(port, sourceDataSize)
-
   }
 
-  private def initWorker(port: String, sourceDataSize: Int, checkpoint: Int = 50, assertMultiple: Int = 0) = {
+  private def initWorker(port: String, sourceDataSize: Int, checkpoint: Int = 50, assertCorrectness: Boolean = false) = {
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [worker]")).
       withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
 
+    val (source, sink) = if (assertCorrectness) {
+      testCorrectnessSourceSink(sourceDataSize, checkpoint)
+    } else {
+      testPerformanceSourceSink(sourceDataSize, checkpoint)
+    }
+
+    system.actorOf(Props(classOf[AllreduceWorker], source, sink), name = "worker")
+  }
+
+  private def testCorrectnessSourceSink(sourceDataSize: Int, checkpoint: Int) = {
+
+    val random = new scala.util.Random(100)
+    val totalInputSample = 8
+
+    lazy val randomFloats = {
+      val nestedArray = new Array[Array[Float]](totalInputSample)
+      for (i <- 0 until totalInputSample) {
+        nestedArray(i) = Array.range(0, sourceDataSize).toList.map(_ => random.nextFloat()).toArray
+      }
+      nestedArray
+    }
+
+    def ~=(x: Double, y: Double, precision: Double = 1e-5) = {
+      if ((x - y).abs < precision) true else false
+    }
+
     // Specify data source
+    val inputSet = mutable.HashSet[Int]()
+    val source: DataSource = r => {
+      assert(!inputSet.contains(r.iteration), s"Same data ${r.iteration} is being requested more than once")
+      inputSet.add(r.iteration)
+      AllReduceInput(randomFloats(r.iteration % totalInputSample))
+    }
+
+    // Specify data sink
+    val outputSet = mutable.HashSet[Int]()
+
+    val sink: DataSink = r => {
+      assert(!outputSet.contains(r.iteration), s"Output data ${r.iteration} is being flushed more than once")
+      outputSet.add(r.iteration)
+
+      if (r.iteration % checkpoint == 0) {
+        val inputUsed = randomFloats(r.iteration % totalInputSample)
+        println(s"\n----Asserting #${r.iteration} output...")
+        var zeroCountNum = 0
+        var totalCount = 0
+        for (i <- 0 until sourceDataSize) {
+          val count = r.count(i)
+          val meanActual = r.data(i) / count
+          totalCount += count
+          if (count == 0) {
+            zeroCountNum += 1
+          } else {
+            val expected = inputUsed(i)
+            assert(~=(expected, meanActual), s"Expected [$expected], but actual [$meanActual] at pos $i for iteraton #${r.iteration}")
+          }
+        }
+        val nonZeroCountElementNum = sourceDataSize - zeroCountNum
+        println("OK: Mean of non-zero elements match the expected input!")
+        println(f"Element with non-zero counts: ${nonZeroCountElementNum / sourceDataSize.toFloat}%.2f ($nonZeroCountElementNum/$sourceDataSize)")
+        println(f"Average count value: ${totalCount / nonZeroCountElementNum.toFloat}%2.2f ($totalCount/$nonZeroCountElementNum)")
+      }
+    }
+
+    (source, sink)
+  }
+
+
+  private def testPerformanceSourceSink(sourceDataSize: Int, checkpoint: Int): (DataSource, DataSink) = {
+
     lazy val floats = Array.range(0, sourceDataSize).map(_.toFloat)
     val source: DataSource = _ => AllReduceInput(floats)
 
-    // Specify data sink
     var tic = System.currentTimeMillis()
     val sink: DataSink = r => {
       if (r.iteration % checkpoint == 0 && r.iteration != 0) {
+
         val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
         println(s"----Data output at #${r.iteration} - $timeElapsed s")
         val bytes = r.data.length * 4.0 * checkpoint
         println("%2.1f Mbytes in %2.1f seconds at %4.3f MBytes/sec" format(bytes / 1.0e6, timeElapsed, bytes / 1.0e6 / timeElapsed));
 
-        if (assertMultiple > 0) {
-          val outputList = r.data.toList
-          println(s"Asserting #${r.iteration} output ${outputList}")
-          assert(floats.map(_* assertMultiple).toList == outputList, "Expected output should be multiple of input. Check if all thresholds are 1")
-          assert(r.count.toList == Array.fill(sourceDataSize)(assertMultiple).toList, s"Counts should equal expected multiples for all data element. Check if all thresholds are 1. ${r.count.toList}")
-        }
         tic = System.currentTimeMillis()
       }
     }
-
-    system.actorOf(Props(classOf[AllreduceWorker], source, sink), name = "worker")
+    (source, sink)
   }
+
 
   def startUp(port: String) = {
     main(Array(port))
@@ -361,11 +424,11 @@ object AllreduceWorker {
     * @param port port number
     * @param dataSize number of elements in input array from each node to be reduced
     * @param checkpoint interval at which timing is calculated
-    * @param assertMultiple expected multiple of input as reduced results
+    * @param assertCorrectness expected multiple of input as reduced results
     * @return
     */
-  def startUp(port: String, dataSize: Int, checkpoint: Int = 50, assertMultiple: Int=0) = {
-    initWorker(port, dataSize, checkpoint, assertMultiple)
+  def startUp(port: String, dataSize: Int, checkpoint: Int = 50, assertCorrectness: Boolean=false) = {
+    initWorker(port, dataSize, checkpoint, assertCorrectness)
   }
 
 }

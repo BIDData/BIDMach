@@ -105,6 +105,72 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
   }
 
+  "Overlapping round handling" should {
+
+    val idx = 0
+    val thReduce = 1f
+    val thComplete = 1f
+    val maxLag = 3
+    val dataSize = 8
+    val maxMsgSize = 2
+    val workerNum = 4
+
+    val worker = createNewWorker(source, sink)
+    val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum).updated(idx, worker)
+
+    val firstOverlappingRound = maxLag + 1
+
+    "send outdated reduced block and completion when receiving new reduced block overlapping buffer" in {
+
+      worker ! InitWorkers(workers, workerNum, self, idx, thReduce, thComplete, maxLag, dataSize, maxMsgSize)
+
+      val chunkAtTest = 0
+      worker ! ReduceBlock(Array(11f, 10f), srcId = 1, destId = 0, chunkId = chunkAtTest, firstOverlappingRound, count = 4)
+
+      fishForMessage() {
+        case c: CompleteAllreduce => {
+          c.round shouldBe 0
+          c.srcId shouldBe idx
+          true
+        }
+        case r: ReduceBlock => {
+          r.round shouldBe 0
+          r.srcId shouldBe 0
+          r.chunkId shouldBe chunkAtTest
+          r.count shouldBe 1
+          false
+        }
+        case _: ScatterBlock => false
+
+      }
+
+    }
+
+    "not process scatter of that outdated round" in {
+
+      for (i <- (idx + 1) until workerNum) {
+        worker ! ScatterBlock(Array(2f, 2f), srcId = i, destId = idx, chunkId = 0, round = 0)
+      }
+      expectNoMsg()
+
+    }
+
+    "still process scatter for overlapping rounds" in {
+
+      for (i <- (idx + 1) until workerNum) {
+        worker ! ScatterBlock(Array(2f, 2f), srcId = i, destId = idx, chunkId = 0, firstOverlappingRound)
+      }
+      val reduced = receiveWhile() {
+        case r: ReduceBlock => r
+      }
+
+      reduced.map(_.round) shouldEqual Array.fill(workerNum - 1)(firstOverlappingRound).toList
+
+    }
+
+
+  }
+
   "Early receiving reduce" must {
 
     val idx = 0
@@ -746,27 +812,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
     }
   }
-
-  private def simulateScatterBlocksFromPeers(worker: ActorRef, i: Int) = {
-    worker ! ScatterBlock(Array(1.0f * (i + 1), 1.0f * (i + 1)), 1, 0, 0, i)
-    worker ! ScatterBlock(Array(2.0f * (i + 1), 2.0f * (i + 1)), 2, 0, 0, i)
-    worker ! ScatterBlock(Array(4.0f * (i + 1), 4.0f * (i + 1)), 3, 0, 0, i)
-  }
-
-  private def expectBasicSendingScatterBlock(i: Int) = {
-    expectScatter(ScatterBlock(Array(0f + i, 1f + i), 0, 0, 0, i))
-    expectScatter(ScatterBlock(Array(2f + i, 3f + i), 0, 1, 0, i))
-    expectScatter(ScatterBlock(Array(4f + i, 5f + i), 0, 2, 0, i))
-    expectScatter(ScatterBlock(Array(6f + i, 7f + i), 0, 3, 0, i))
-  }
-
-  private def expectBasicSendingReduceBlock(i: Int) = {
-    expectReduce(ReduceBlock(Array(7.0f * (i + 1), 7.0f * (i + 1)), 0, 0, 0, i, 3))
-    expectReduce(ReduceBlock(Array(7.0f * (i + 1), 7.0f * (i + 1)), 0, 1, 0, i, 3))
-    expectReduce(ReduceBlock(Array(7.0f * (i + 1), 7.0f * (i + 1)), 0, 2, 0, i, 3))
-    expectReduce(ReduceBlock(Array(7.0f * (i + 1), 7.0f * (i + 1)), 0, 3, 0, i, 3))
-  }
-
 
   /**
     * Expect scatter block containing array value. This is needed because standard expectMsg will not be able to match

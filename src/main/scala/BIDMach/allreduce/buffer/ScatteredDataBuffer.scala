@@ -23,6 +23,10 @@ case class ScatteredDataBuffer(dataSize: Int,
     currentRounds(timeIdx(round))(chunkId).compareTo(round)
   }
 
+  def getRound(round: Int, chunkId: Int): Int = {
+    currentRounds(timeIdx(round))(chunkId)
+  }
+
   def count(round: Int, chunkId: Int): Int = {
     countFilled(timeIdx(round))(chunkId)
   }
@@ -42,10 +46,10 @@ case class ScatteredDataBuffer(dataSize: Int,
     val chunkSize = chunkEndPos - chunkStartPos
     val reducedArr = new Array[Float](chunkSize)
     for (i <- 0 until peerSize) {
-      val tbuf = temporalBuffer(timeIdx(round))(i);
+      val tBuf = temporalBuffer(timeIdx(round))(i);
       var j = 0;
       while (j < chunkSize) {
-        reducedArr(j) += tbuf(chunkStartPos + j);
+        reducedArr(j) += tBuf(chunkStartPos + j);
         j += 1;
       }
     }
@@ -58,9 +62,10 @@ case class ScatteredDataBuffer(dataSize: Int,
 
     val chunkStartPos = chunkId * maxChunkSize
     val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
+    val tBuf = temporalBuffer(timeIdx(round))
     for(peerId <- 0 until peerSize) {
       util.Arrays.fill(
-        temporalBuffer(timeIdx(round))(peerId),
+        tBuf(peerId),
         chunkStartPos,
         chunkEndPos,
         0

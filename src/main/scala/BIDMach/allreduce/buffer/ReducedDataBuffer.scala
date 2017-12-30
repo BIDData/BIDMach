@@ -30,6 +30,10 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     currentRounds(timeIdx(round)).compareTo(round)
   }
 
+  def getRound(round: Int) : Int = {
+    currentRounds(timeIdx(round))
+  }
+
   def store(data: Array[Float], round: Int, srcId: Int, chunkId: Int, count: Int) = {
     if (compareRoundTo(round) > 0) {
       throw new IllegalArgumentException(s"Unable to store data chunk $chunkId from source $srcId, as given round [$round] is less than current round [${currentRounds(timeIdx(round))}]")
