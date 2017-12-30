@@ -107,8 +107,8 @@ class ScatteredDataBufferSpec extends WordSpec with Matchers {
 
       for (i <- 0 until peerSize) {
         val arrayToStore = (0 until blockSize).map(_ => i.toFloat).toArray
-        buffer.store(data= arrayToStore, round=rowAtTest, srcId=i,chunkId=chunkAtTest)
-        val (_,count) = buffer.reduce(rowAtTest, chunkId = chunkAtTest)
+        buffer.store(data = arrayToStore, round = rowAtTest, srcId = i, chunkId = chunkAtTest)
+        val (_, count) = buffer.reduce(rowAtTest, chunkId = chunkAtTest)
         count shouldEqual i + 1
       }
 
@@ -129,6 +129,7 @@ class ScatteredDataBufferSpec extends WordSpec with Matchers {
 
 
   }
+
   private def randomFloatArray(maxChunkSize: Int) = {
     Array.range(0, maxChunkSize).toList.map(_ => Random.nextFloat()).toArray
   }

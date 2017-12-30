@@ -39,7 +39,7 @@ case class ScatteredDataBuffer(dataSize: Int,
   }
 
 
-  def reduce(round : Int, chunkId: Int) : (Array[Float], Int) = {
+  def reduce(round: Int, chunkId: Int): (Array[Float], Int) = {
 
     val chunkStartPos = chunkId * maxChunkSize
     val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
@@ -56,14 +56,14 @@ case class ScatteredDataBuffer(dataSize: Int,
     (reducedArr, count(round, chunkId))
   }
 
-  def prepareNewRound(round : Int, chunkId: Int) = {
+  def prepareNewRound(round: Int, chunkId: Int) = {
 
     currentRounds(timeIdx(round))(chunkId) += maxLag
 
     val chunkStartPos = chunkId * maxChunkSize
     val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
     val tBuf = temporalBuffer(timeIdx(round))
-    for(peerId <- 0 until peerSize) {
+    for (peerId <- 0 until peerSize) {
       util.Arrays.fill(
         tBuf(peerId),
         chunkStartPos,

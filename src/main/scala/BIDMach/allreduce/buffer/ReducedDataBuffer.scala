@@ -30,7 +30,7 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     currentRounds(timeIdx(round)).compareTo(round)
   }
 
-  def getRound(round: Int) : Int = {
+  def getRound(round: Int): Int = {
     currentRounds(timeIdx(round))
   }
 
