@@ -5,9 +5,9 @@ import BIDMach.allreduce.WorkerConfig
 
 
 val thresholdConfig = ThresholdConfig(
-  thAllreduce = 0.75f,
-  thReduce = 0.75f,
-  thComplete = 0.75f
+  thAllreduce = 1f,
+  thReduce = 1f,
+  thComplete = 1f
 )
 
 val dataConfig = DataConfig(

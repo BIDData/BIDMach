@@ -1,5 +1,6 @@
 package BIDMach.allreduce
 
+
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.config.ConfigFactory
@@ -237,7 +238,6 @@ class AllreduceWorker(dataSource: AllReduceInputRequest => AllReduceInput,
     dataSink(AllReduceOutput(output, outputCount, completedRound))
   }
 
-
   private def scatter(round: Int) = {
     for (i <- 0 until peerNum) {
       val idx = (i + id) % peerNum
@@ -401,18 +401,39 @@ object AllreduceWorker {
     lazy val floats = Array.range(0, sourceDataSize).map(_.toFloat)
     val source: DataSource = _ => AllReduceInput(floats)
 
+    var cumulativeThroughput: Double = 0
+    var measurementCount: Int = 0
+    val initialDiscard: Int = 10
+
     var tic = System.currentTimeMillis()
     val sink: DataSink = r => {
       if (r.iteration % checkpoint == 0 && r.iteration != 0) {
 
         val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
+
         println(s"----Data output at #${r.iteration} - $timeElapsed s")
         val bytes = r.data.length * 4.0 * checkpoint
-        println("%2.1f Mbytes in %2.1f seconds at %4.3f MBytes/sec" format(bytes / 1.0e6, timeElapsed, bytes / 1.0e6 / timeElapsed));
+        val mBytes = bytes / 1.0e6
+        val throughput = mBytes / timeElapsed
+
+        val report = f"$mBytes%2.1f Mbytes in $timeElapsed%2.1f seconds at $throughput%4.3f MBytes/sec"
+
+        measurementCount += 1
+
+        val avgReport = if (measurementCount > initialDiscard) {
+          cumulativeThroughput += throughput
+          val effectiveCount = measurementCount - initialDiscard
+          val avgThroughput = cumulativeThroughput / effectiveCount
+          f", mean throughput at $avgThroughput%4.3f MBytes/sec from $effectiveCount samples"
+        } else ""
+
+        println(s"$report$avgReport")
 
         tic = System.currentTimeMillis()
       }
     }
+
+
     (source, sink)
   }
 
