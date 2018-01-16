@@ -20,13 +20,14 @@ import BIDMach.networks._
 
 class MaxLayer(override val net:Net, override val opts:MaxNodeOpts = new MaxNode) extends Layer(net, opts) {  
   
-	override val _inputs = new Array[LayerTerm](2);
+	override val _inputs = new Array[LayerTerm](opts.ninputs);
 
 	override def forward = {
     val start = toc;
 	  inplaceNoConnectGetOutput();
 	  
 	  max(inputData, inputDatas(1), output);
+	  (2 until inputlength).map((i:Int) => max(output, inputDatas(i), output));
 
 	  forwardtime += toc - start;
 	}
@@ -39,6 +40,10 @@ class MaxLayer(override val net:Net, override val opts:MaxNodeOpts = new MaxNode
     if (inputDerivs(0).asInstanceOf[AnyRef] != null) inputDerivs(0) ~ inputDerivs(0) + squash((output == inputData) ∘ deriv, inputDerivs(0));
     if (inputDerivs(1).asInstanceOf[AnyRef] != null) inputDerivs(1) ~ inputDerivs(1) + squash((output == inputDatas(1)) ∘ deriv, inputDerivs(1));
 
+    (2 until inputlength).map((i:Int) => {
+    	if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + squash((output == inputDatas(i)) ∘ deriv, inputDerivs(i));
+    });
+    
     inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
 	}
@@ -49,10 +54,11 @@ class MaxLayer(override val net:Net, override val opts:MaxNodeOpts = new MaxNode
 }
 
 trait MaxNodeOpts extends NodeOpts {  
+	var ninputs = 2;
 }
 
 class MaxNode extends Node with MaxNodeOpts {
-  override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
+  override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
   def copyTo(opts:MaxNode):MaxNode = {
       super.copyTo(opts);

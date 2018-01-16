@@ -40,7 +40,9 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		  val start = toc;
 		  inplaceNoConnectGetInputDerivs();
 		  
-		  if (coloffsets.asInstanceOf[AnyRef] == null) coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
+		  if (coloffsets.asInstanceOf[AnyRef] == null) {
+		    coloffsets = int(convertMat(irow(0->output.ncols)*output.nrows));
+		  }
 		  if (inputDeriv.asInstanceOf[AnyRef] != null) {
 		    if (zero.asInstanceOf[AnyRef] == null) {
 		      zero = convertMat(row(0f));

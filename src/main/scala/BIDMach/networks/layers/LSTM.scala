@@ -353,10 +353,8 @@ object LSTMNode {
     	gr(0, k) = input
     }
     
-    val modelName = opts.modelName;
-    
     for (k <- 0 until ncols) {
-    	gr(1, k) = linear(gr(0, k))((modelName format 0) +"_bottom", outdim=idim, hasBias = opts.hasBias)
+    	gr(1, k) = linear(gr(0, k))((opts.modelName format 0) +"_bottom", outdim=idim, hasBias = opts.hasBias)
     }
     
     for (k <- 0 until ncols) {
@@ -372,22 +370,24 @@ object LSTMNode {
       }
     }
     
+    val topModelName = if (opts.bylevel) (opts.modelName format nrows) else (opts.modelName format 0)
+    
     opts.netType match {
       case `gridTypeNoOutput` => {}
       case `gridTypeSoftmaxOutput` => {
         for (k <- 0 until ncols) {
-          gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias = opts.hasBias)
+          gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=topModelName+"_top", outdim=odim, hasBias = opts.hasBias)
           gr(nrows + nlin + 1, k) = softmaxout(gr(nrows + nlin, k))(opts.scoreType);
         }
       }
       case `gridTypeNegsampOutput` => {
         for (k <- 0 until ncols) {
-          gr(nrows + nlin, k) = negsamp(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias=opts.hasBias, scoreType=opts.scoreType)
+          gr(nrows + nlin, k) = negsamp(gr(nrows + nlin - 1, k))(name=topModelName+"_top", outdim=odim, hasBias=opts.hasBias, scoreType=opts.scoreType)
         }
       }
       case `gridTypeSoftmax` => {
         for (k <- 0 until ncols) {
-          gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=opts.modelName+"_top", outdim=odim, hasBias = opts.hasBias)
+          gr(nrows + nlin, k) = linear(gr(nrows + nlin - 1, k))(name=topModelName+"_top", outdim=odim, hasBias = opts.hasBias)
           gr(nrows + nlin + 1, k) = softmax(gr(nrows + nlin, k))
         }
       }

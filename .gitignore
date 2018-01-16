@@ -1,3 +1,4 @@
+.idea/
 cbin
 lib/*.jar
 *.rej
@@ -15,3 +16,5 @@ data
 !data/factorNet
 !data/MHTestCorrections
 /bin
+*.xml
+*.iml

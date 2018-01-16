@@ -264,7 +264,8 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
       	var score = 0f;
       	var j = 0;
       	while (j < dstxn-1) {
-      		score += output_layers(j).score.v;
+      	  val tmpscore = output_layers(j).score;
+      		score += (if (tmpscore.ncols == 1) tmpscore.v else mean(tmpscore).v);
       		j += 1;
       	}
       	row(score/(dstxn-1));
