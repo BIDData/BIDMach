@@ -1,0 +1,172 @@
+:silent
+:load save.ssc
+
+val traindir = "/commuter/MNIST/"
+
+class MyOpts extends Net.Opts with MatSource.Opts with ADAGrad.Opts;
+val train0 = loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
+val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
+val opts = new MyOpts;
+val ds = new MatSource(Array(train0, trainlabels0), opts);
+val updater = new ADAGrad(opts);
+opts.batchSize = 100;
+opts.hasBias = true;
+opts.tensorFormat = Net.TensorNCHW;
+opts.convType = Net.CrossCorrelation;
+opts.lrate = 1e-4f;
+opts.vel_decay = 0.9f;
+opts.gsq_decay = 0.99f;
+opts.texp = 0.1f
+Mat.useCache = true;
+Mat.useGPUcache = true;
+
+val net = new Net(opts);
+{
+    import BIDMach.networks.layers.Node._;
+    val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
+    Net.initDefaultNodeSet;
+    val in = input;
+    val conv1 = conv(in)(w=5,h=5,nch=6,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val pool1 = pool(conv1)(w=2,h=2,stride=2,pad=0);
+    val bns1 = batchNormScale(pool1)();
+    val relu1 = relu(bns1)();
+
+    val conv2 = conv(relu1)(w=5,h=5,nch=16,stride=1,pad=2,convType=convt,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);   
+    val pool2 = pool(conv2)(w=2,h=2,stride=2,pad=0);
+    val bns2 = batchNormScale(pool2)();
+    val relu2 = relu(bns2)();
+
+    val fc3 = linear(relu2)(outdim=120,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val relu3 = relu(fc3)();
+
+    val fc4 = linear(relu3)(outdim=84,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val relu4  = relu(fc4)();
+
+    val fc5  = linear(relu4)(outdim=10,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
+    val out = softmaxout(fc5)(scoreType=1);
+    opts.nodeset=Net.getDefaultNodeSet
+}        
+ds.init
+net.bind(ds)
+net.init;
+updater.init(net)
+(net,updater)
+
+
+def train(){
+    for(i<-0 until 1){
+        ds.reset
+        var here = 0
+        while (ds.hasNext){
+            net.dobatchg(ds.next,i,here);
+            updater.update(i,here,0);
+            here += ds.opts.batchSize        
+        }
+        println(mean(net.output_layers(0).score))
+    }
+}
+
+def test() = {
+    val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
+    val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
+    val (mm, mopts) =  Net.predictor(net, test, testlabels);
+    mopts.pstep = 1f
+    mopts.autoReset = false;
+
+    val mmodel = mm.model.asInstanceOf[Net];
+    mm.predict;
+
+    //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+    mean(mm.results(0,?),2).v
+}
+
+val _averagingModelmats = new Array[Mat](net.modelmats.length);
+val tmp = new Array[Mat](net.modelmats.length);
+for(i<-0 until net.modelmats.length) {
+    _averagingModelmats(i) = net.modelmats(i).zeros(net.modelmats(i).dims)
+    tmp(i) = net.modelmats(i).zeros(net.modelmats(i).dims)
+    _averagingModelmats(i) <-- net.modelmats(i)
+}
+val _averagingWeight = net.modelmats(0).zeros(1,1);
+
+
+def test_avg() = {
+    val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
+    val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
+    val (mm, mopts) =  Net.predictor(net, test, testlabels);
+    mopts.pstep = 1f
+    mopts.autoReset = false;
+
+    val mmodel = mm.model.asInstanceOf[Net];
+    for(i<-0 until mmodel.modelmats.length) {
+        tmp(i)<--mmodel.modelmats(i)
+        mmodel.modelmats(i)<--_averagingModelmats(i)
+    }
+    mm.predict;
+    for(i<-0 until mmodel.modelmats.length) {
+        mmodel.modelmats(i)<--tmp(i)
+        }
+
+    //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+    mean(mm.results(0,?),2).v
+}
+
+def train_merge(interval: Int = 1,rate:Float = 0.99f) = {
+    var s = 0f
+    var s2 = 0f
+    val total = 5
+    for(tt<-0 until total){
+        load(net,"models/mnist/")
+        for(i<-0 until net.modelmats.length) {
+            _averagingModelmats(i) <-- net.modelmats(i)
+        }
+        for(t<-0 until 5){
+            ds.reset
+            var here = 0
+            while (ds.hasNext){
+                net.dobatchg(ds.next,t,here);
+                updater.update(t,here,0);
+                here += ds.opts.batchSize
+                if (here/ds.opts.batchSize % interval == 0)
+                    for(i<-0 until net.modelmats.length){
+                        _averagingWeight(0,0) = rate
+                        _averagingModelmats(i) ~ _averagingModelmats(i) *@ _averagingWeight;
+                        _averagingModelmats(i) ~ _averagingModelmats(i) + (net.modelmats(i) *@ (1f - _averagingWeight))
+                    }
+            }
+            //println(mean(net.output_layers(0).score))
+            if (t == 4) {
+                //println("iter: "+ (t+1))
+                s += test()
+                s2+=test_avg();
+                }
+        }
+    }
+    (s/total,s2/total)
+}
+
+
+
+
+import BIDMach.viz._
+import BIDMach.networks.layers.Layer
+
+
+:silent
+
+val f = List(1,2,5,1,5,10,1,10,50,100,50,100,200)
+val t = List(10,5,2,100,20,10,500,50,10,5,100,50,25)
+import scala.collection.mutable.ListBuffer
+val reg = new ListBuffer[Float]
+val avg = new ListBuffer[Float]
+for(i<-0 until f.length){
+        val interval = f(i)
+        val rate = 1-1f/t(i)
+//for(interval<-List(1,5,10,50))
+//    for(rate<-List(0.5f,0.75f,0.9f,0.95f,0.99f,0.995f)){
+        println("Interval: "+interval + "   Rate: "+rate)
+        val (s,s2) = train_merge(interval,rate)
+        reg.append(s)
+        avg.append(s2)
+    }
+

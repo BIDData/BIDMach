@@ -1,5 +1,5 @@
 :silent
-val traindir = "/code/BIDMach/data/MNIST/"
+val traindir = "/commuter/MNIST/"
 
 val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
 val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
@@ -20,7 +20,7 @@ val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
 
 opts.batchSize= 100
-opts.npasses = 10
+opts.npasses = 1000
 opts.lrate = 1e-4f 
 opts.texp = 0.1f
 opts.pstep = 0.1f
@@ -29,9 +29,9 @@ opts.hasBias = true;
 opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
 
-val nodes = {
+{
     import BIDMach.networks.layers.Node._;
-
+    Net.initDefaultNodeSet;
     val in = input;
     //val rin = relu(in)()
     //val scalef = constant(row(1f/256));
@@ -55,19 +55,9 @@ val nodes = {
 
     val fc5  = linear(relu4)(outdim=10,initfn=Net.gaussian, initv=0.1f,initbiasv=0.1f);
     val out = softmaxout(fc5)(scoreType=1);
-    //val out = softmaxout(fc5 )();
-
-            (in     \ null    \ null   \ null    on
-    //val nodes = (in     \ rin    \ scalef   \ inscale    on
-                 conv1  \ pool1   \ bns1   \ relu1   on
-                 conv2  \ pool2   \ bns2   \ relu2   on
-                 fc3    \ relu3   \ null   \ null    on
-                 fc4    \ relu4   \ null   \ null    on
-             fc5    \ out     \ null   \ null).t
+    opts.nodeset=Net.getDefaultNodeSet
 }
 
-
-opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
 //nn.train
 nn.launchTrain;
@@ -84,14 +74,19 @@ val o = s.opts
 //plotscore(s.gscores)
 //plotscore(s.gsteps)
 //plothist(s.gdata)
-o.realImagesPath = "/code/BIDMach/data/MNIST/";
+o.realImagesPath = "/commuter/MNIST/";
 o.pretrainedDiscriminatorPath = "models/mnist_discri2/";
 s.init(model,null);
 
 o.lrate=1f
-o.iter=100
+o.iter=30
 o.langevin = 0
 o.dWeight = 0.5f
+s.mcmc(model)
+
+val ii = IMat(FMat(model.layers(14).target + irow(0->100)*10))
+o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
+o.endLayer = 13
 
 def setConv(filter:Int) = {
     val func : Layer => Unit = (layer:Layer) => {
@@ -112,7 +107,7 @@ def setConvI(filter:Int,x:Int = 7,y:Int = 7) = {
     func
 }
 
-//load(s.D,"models/mnist_discri3/")
+//load(s.D,"models/mnist_discri2/")
 //s.endLayer=5
 
 :silent
@@ -126,5 +121,23 @@ mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);*/
 
+o.printInfo = false
+o.displayAveraging = true
+o.averagingTime = 1f
+o.resetInterval=1000000000
+o.updateInterval = 10
+
+def test(){
+    val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
+    val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
+    val (mm, mopts) =  Net.predictor(model, test, testlabels);
+    mopts.pstep = 0.2f
+    mopts.autoReset = false;
+
+    val mmodel = mm.model.asInstanceOf[Net];
+    mm.predict;
+
+    println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+}
 
 

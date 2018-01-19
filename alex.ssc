@@ -1,8 +1,8 @@
 import BIDMach.networks.layers._
 
-val traindir = "/code/BIDMach/data/ImageNet/train/";
+val traindir = "/commuter/ImageNet/train/";
 
-val testdir = "/code/BIDMach/data/ImageNet/val/";
+val testdir = "/commuter/ImageNet/val/";
 val traindata = traindir+"partNCHW%04d.bmat.lz4";
 val trainlabels = traindir+"label%04d.imat.lz4";
 val testdata = testdir+"partNCHW%04d.bmat.lz4";

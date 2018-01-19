@@ -26,21 +26,21 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet.txt";
-opts.batchSize= 4;
+opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
-opts.lrate = 0//1e-4f;
+opts.lrate = 1e-4f;
 opts.texp = 0f;
-opts.pstep = 0.05f
+opts.pstep = 0.01f
 opts.hasBias = true;
 opts.l2reg = 0f//0.0005f;
-opts.vel_decay = 0f//0.9f;
+opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = true;
 opts.convType = Net.CrossCorrelation;
 //opts.inplace = Net.BackwardCaching;
-opts.inplace = Net.InPlace;
+//opts.inplace = Net.InPlace;
 
 :silent
 
@@ -116,38 +116,6 @@ def run(){
     load(net,"models/alex32p/")
 }
 run()
-
-
-val model = net
-:load save.ssc
-
-val s = new Synthesis("imagenet")
-val o = s.opts
-o.realImagesPath = "/commuter/ImageNet/train/"
-//o.discriminatorBatchSize = opts.batchSize
-s.init(model,null);
-
-o.base = 0
-o.scale = 1
-o.iter=10
-o.lrate=0.1f
-o.langevin = 0
-o.dWeight = 0.5f
-o.endLayer = 23
-o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(1,?)=1f}
-o.printInfo = false
-//opts.endLayer = 17
-//opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m.reshapeView(13,13,256,2)(6,6,0,?)=1f}
-
-
-val f5 = model.layers(5).asInstanceOf[BIDMach.networks.layers.ConvLayer].filter.asInstanceOf[BIDMat.GFilter]
-f5.setBwdDataAlgo=0
-val df5 = s.D.layers(5).asInstanceOf[BIDMach.networks.layers.ConvLayer].filter.asInstanceOf[BIDMat.GFilter]
-df5.setBwdDataAlgo=0
-net.predicting=true
-
-:silent
-
 
 
 

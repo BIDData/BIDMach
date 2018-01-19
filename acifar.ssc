@@ -1,7 +1,5 @@
 :silent
 
-import jcuda.jcudnn._
-
 val datadir = "/commuter/CIFAR10/parts/"
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";
 val labelsfname = datadir + "labels%d.imat.lz4";
@@ -12,10 +10,10 @@ val predsfname = datadir + "preds%d.fmat.lz4";
 val (nn,opts) = Net.learner(trainfname,labelsfname);
 
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
-
+import jcuda.jcudnn._
 
 opts.batchSize= 100
-opts.npasses = 1000
+opts.npasses = 10
 opts.lrate = 1e-4f 
 
 opts.vel_decay = 0.9f
@@ -69,13 +67,13 @@ opts.debugMem = false;
 
     val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=2,initv=0.01f,convType=convt);
     val pool1 = pool(conv1)(w=3,h=3,stride=2);
-//    val norm1 = batchNormScale(pool1)();
-    val relu1 = relu(pool1)();
+    val norm1 = batchNormScale(pool1)();
+    val relu1 = relu(norm1)();
 
     val conv2 = conv(relu1)(w=5,h=5,nch=32,stride=1,pad=2,initv=0.1f,convType=convt);
     val pool2 = pool(conv2)(w=3,h=3,stride=2,poolingMode=cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING);
-//    val norm2 = batchNormScale(pool2)();
-    val relu2 = relu(pool2)();
+    val norm2 = batchNormScale(pool2)();
+    val relu2 = relu(norm2)();
 
     val conv3 = conv(relu2)(w=5,h=5,nch=64,stride=1,pad=2,initv=0.1f,convType=convt);
     val pool3 = pool(conv3)(w=3,h=3,stride=2,poolingMode=cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING);
@@ -118,6 +116,8 @@ opts.debugMem = false;
 }
 
 
+
+
 //opts.nodemat = nodes;
 val model = nn.model.asInstanceOf[Net];
 nn.launchTrain;
@@ -136,39 +136,110 @@ def load(net:Net,fname:String) {
 
 nn.pause
 Thread.sleep(1000)
-val s = new Synthesis("cifar")
-val o = s.opts
-load(model,"models/cifar_vgg/")
-o.endLayer = -1
-o.guidebp = false
-o.realImagesPath = "/commuter/CIFAR10/parts/"
-o.pretrainedDiscriminatorPath = "models/cifar_discri2/"
-//o.wClip = 0.01f
-s.init(model,null)
-//o.base = 0
-//o.scale = 1
-o.iter=30
-o.langevin = 0
-//o.dWeight=0.5f
-s.mcmc(model)
-val ii = IMat(FMat(model.layers(model.layers.length-1).target + irow(0->100)*10))
-o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
-o.printInfo = false
 
-:silent
 
 def reset() {
     val ii = IMat(FMat(model.layers(12).target + irow(0->100)*10))
-    o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
-    o.endLayer = 11;
+//    o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
+//    o.endLayer = 11;
 }
 
 var threhold=1;
-//hist(()=>row(FMat(model.layers(0).output).data.filter(math.abs(_)>threhold)),100)
 
-//:load gan.ssc
-//val s = start("cifar")
-//plotscore(s.dscores)
-//plotscore(s.gscores)
-//plotscore(s.gsteps)
-//s.lrate=0.1f
+val test =         loadFMat(testfname format 0)
+val testlabels =   IMat(loadFMat(testlabelsfname format 0))
+val (mm, mopts) =  Net.predictor(model, test, testlabels);
+
+def test() = {
+    mopts.pstep = 1f
+    mopts.autoReset = false;
+    val mmodel = mm.model.asInstanceOf[Net];
+    for(i<-0 until mmodel.modelmats.length) {
+        mmodel.modelmats(i)<--model.modelmats(i)
+    }
+    mm.predict;
+//    println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+    mean(mm.results(0,?),2).v
+}
+
+val updater = nn.updater
+val ds = nn.datasource
+val net = model
+val _averagingModelmats = new Array[Mat](net.modelmats.length);
+val tmp = new Array[Mat](net.modelmats.length);
+for(i<-0 until net.modelmats.length) {
+    _averagingModelmats(i) = net.modelmats(i).zeros(net.modelmats(i).dims)
+    tmp(i) = net.modelmats(i).zeros(net.modelmats(i).dims)
+    _averagingModelmats(i) <-- net.modelmats(i)
+}
+val _averagingWeight = net.modelmats(0).zeros(1,1);
+
+def test_avg() = {
+    mopts.pstep = 1f
+    mopts.autoReset = false;
+
+    val mmodel = mm.model.asInstanceOf[Net];
+    for(i<-0 until mmodel.modelmats.length) {
+        tmp(i)<--mmodel.modelmats(i)
+        mmodel.modelmats(i)<--_averagingModelmats(i)
+    }
+    mm.predict;
+    for(i<-0 until mmodel.modelmats.length) {
+        mmodel.modelmats(i)<--tmp(i)
+    }
+    //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+    mean(mm.results(0,?),2).v
+}
+
+def train_merge(interval: Int = 1,rate:Float = 0.99f) = {
+    var s = 0f
+    var s2 = 0f
+    val total = 5
+    for(tt<-0 until total){
+        load(net,"models/cifar_vgg/")
+        for(i<-0 until net.modelmats.length) {
+            _averagingModelmats(i) <-- net.modelmats(i)
+        }
+        for(t<-0 until 5){
+            ds.reset
+            var here = 0
+            while (ds.hasNext){
+                net.dobatchg(ds.next,t,here);
+                updater.update(t,here,0);
+                here += ds.opts.batchSize
+                if (here/ds.opts.batchSize % interval == 0)
+                    for(i<-0 until net.modelmats.length){
+                        _averagingWeight(0,0) = rate
+                        _averagingModelmats(i) ~ _averagingModelmats(i) *@ _averagingWeight;
+                        _averagingModelmats(i) ~ _averagingModelmats(i) + (net.modelmats(i) *@ (1f - _averagingWeight))
+                    }
+            }
+            //println(mean(net.output_layers(0).score))
+            if (t% 10 ==4 || t% 10 == 9) {
+//                println("iter: "+ (t+1))
+                s += test()
+                s2 += test_avg()
+                }
+        }
+    }
+    (s/total,s2/total)
+}
+
+val f = List( 1,2,5,  1, 5,10,  1,10,50,100,   1,  2, 10, 50,100,200,500)
+val t = List(10,5,2,100,20,10,500,50,10,  5,1000,500,500,100, 50, 25, 10)
+//val ff = List(1,1)
+//val tt = List(100,500)
+import scala.collection.mutable.ListBuffer
+val reg = new ListBuffer[Float]
+val avg = new ListBuffer[Float]
+for(i<-f.length-5 until f.length){
+//for(i<-0 until ff.length){
+        val interval = f(i)
+        val rate = 1-1f/t(i)
+        println("Interval: "+interval + "   Rate: "+rate)
+        val (s,s2) = train_merge(interval,rate)
+        println(s,s2)
+        reg.append(s)
+        avg.append(s2)
+    }
+
