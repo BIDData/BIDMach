@@ -16,15 +16,27 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
     var bestImgOri: Mat = null;
     var filter_scale = 1f        
     var _filter_scale: Mat = null;
+    var modelAveragingTime = 0f;
+    var _averagingWeight: Mat = null;
+    var _averagingModelmats: Array[Mat] = null;
     val ind = irow(0)
-    plot.add_slider("filter_scale",(x:Int)=>{filter_scale=x/20f;filter_scale},20,2);
+    plot.add_slider("filter_scale",(x:Int)=>{filter_scale=x/5f;filter_scale},5,2);
+    plot.add_slider("modelAveragingTime",(x:Int)=>{modelAveragingTime=math.exp(x/10).toFloat;modelAveragingTime},0,2);
         
     override def check(model:Model, mats:Array[Mat]) = {
         model match {
             case net:Net => {
                 if (layerId < net.layers.length){
                     net.layers(layerId) match {
-                        case _:ConvLayer => 1;
+                        case _:ConvLayer => {
+                            _averagingWeight = net.modelmats(0).zeros(1,1);
+                            _averagingModelmats = new Array[Mat](net.modelmats.length);
+                            for(i<-0 until net.modelmats.length) {
+                                _averagingModelmats(i) = net.modelmats(i).zeros(net.modelmats(i).dims);
+                                _averagingModelmats(i) <-- net.modelmats(i)
+                            }
+                            1
+                        }
                         case _=>{
                             println("The %d layer of the network is not a ConvLayer" format layerId);
                             2                                
@@ -126,17 +138,22 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {
         val net = model.asInstanceOf[Net];
         val layer = net.layers(layerId).asInstanceOf[ConvLayer];
+        for(i<-0 until model.modelmats.length){
+            _averagingWeight(0,0) = 1-1f/modelAveragingTime
+            _averagingModelmats(i) ~ _averagingModelmats(i) *@ _averagingWeight;
+            _averagingModelmats(i) ~ _averagingModelmats(i) + (model.modelmats(i) *@ (1f - _averagingWeight))
+        }
         if (_filter_scale == null) _filter_scale = net.modelmats(layer.imodel).zeros(1,1);
          _filter_scale(0,0) = filter_scale;            
 //        val img = utils.filter2img(net.modelmats(layer.imodel)*@_filter_scale,net.opts.tensorFormat,bw);
-        val img = FMat(cpu((net.modelmats(layer.imodel)*@_filter_scale+0.5f) * 256f))
+        val img = FMat(cpu((_averagingModelmats(layer.imodel)*@_filter_scale+0.5f) * 256f))
         if (layer.imodel == 0){
 //            val input = getBestImgBatch(net)
             val input = getBestImgAll(net)
             plot.plot_image(img \ input,net.opts.tensorFormat)
         }
         else
-            plot.plot_image(img,net.opts.tensorFormat)
+            plot.plot_image(img.reshapeView(img.dims(1),img.dims(2),img.dims(0),img.dims(3))(?,?,0->3,?).reshapeView(3,img.dims(1),img.dims(2),img.dims(3)),net.opts.tensorFormat)
     }    
 }
 

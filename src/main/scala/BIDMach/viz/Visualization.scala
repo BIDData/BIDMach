@@ -3,7 +3,7 @@ import BIDMach.models.Model;
 import BIDMat.Mat
 
 abstract class Visualization {
-    var interval = 1;
+    var interval = 10;
     var cnt = 0
     var checkStatus = 0 
         

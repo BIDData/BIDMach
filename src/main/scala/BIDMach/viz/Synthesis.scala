@@ -51,6 +51,8 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
     var _wClip: Mat = null;
     var _averagingWeight: Mat = null;
     var averaging: Mat = null;
+    var _mask: Mat = null;
+    var _averagingModelmats: Array[Mat] = null;
     var selecter = irow(0);
             
         
@@ -88,7 +90,21 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
         averaging = net.layers(0).output.zeros(net.layers(0).output.dims);
         averaging<--gdata;
         interval  = opts.updateInterval;
+        accClassifier(?) = 0;
+        accDiscriminator(?) = 0;
+        momentum(?) = 0;
 
+        _mask = net.layers(0).output.zeros(net.layers(0).output.dims);
+        if (_mask.dims(3) == 100)
+            for(i<-0 until 10)
+                _mask(?,?,?,(i*10)->(i+1)*10) = 0.1f*(i+1)
+        
+        _averagingModelmats = new Array[Mat](net.modelmats.length);
+        for(i<-0 until net.modelmats.length) {
+            _averagingModelmats(i) = net.modelmats(i).zeros(net.modelmats(i).dims)
+            _averagingModelmats(i) <-- net.modelmats(i)
+        }
+           
         val batchSize = model.datasource.opts.batchSize
         val (_D,_updater) = modelname match {
             case "cifar" => Synthesis.buildCifarDiscriminator(opts.realImagesPath,batchSize); 
@@ -163,21 +179,34 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                               });
         plot.add_combobox(irow(0->100).data.map("Show result "+_),
                               (i:Int,v:String)=>{opts.detailed = i})
-        plot.add_slider("iter",(x:Int)=>{opts.iter=(x+1)*10;opts.iter},9,0);
-        plot.add_slider("scale",(x:Int)=>{opts.scale=x/100f;opts.scale},100,2);
-        plot.add_slider("base",(x:Int)=>{opts.base=x*4;opts.base},0,0);
+        plot.add_slider("iter",(x:Int)=>{opts.iter=(x+1);opts.iter},1,0);
+        plot.add_slider("scale",(x:Int)=>{opts.scale=x/10f;opts.scale},10,2);
+        plot.add_slider("base",(x:Int)=>{opts.base=x*4;opts.base},32,0);
         plot.add_slider("lrate",(x:Int)=>{opts.lrate=(10f^(x/20f-4))(0);opts.lrate},60,4);
         plot.add_slider("noise",(x:Int)=>{opts.langevin=(10f^(x/20f-4))(0);opts.langevin},60,4);
         plot.add_slider("L2 norm",(x:Int)=>{opts.l2lambda=(10f^(x/20f-4))(0);opts.l2lambda},60,4);
         plot.add_slider("Dissimilarity",(x:Int)=>{opts.dissimilarity=(10f^(x/20f-7))(0);opts.dissimilarity},0,7);
-        plot.add_slider("discriminatorWeight",(x:Int)=>{opts.dWeight=x/100f;opts.dWeight});        
-        plot.add_slider("averagingWeight",(x:Int)=>{opts.averagingWeight=x/100f;opts.resetAveraging=true;opts.averagingWeight});        
+        plot.add_slider("discriminatorWeight",(x:Int)=>{opts.dWeight=x/100f;opts.dWeight},0);        
+        plot.add_slider("averagingTime",(x:Int)=>{opts.averagingTime=math.exp(x/10).toFloat;opts.averagingTime},0,2); 
+        plot.add_slider("modelAveragingTime",(x:Int)=>{opts.modelAveragingTime=math.exp(x/10).toFloat;opts.averagingTime},0,2);        
     }
 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        
         //resetFlag = true
+        
+        for(i<-0 until model.modelmats.length){
+            _averagingWeight(0,0) = 1-1f/opts.modelAveragingTime
+            _averagingModelmats(i) ~ _averagingModelmats(i) *@ _averagingWeight;
+            _averagingModelmats(i) ~ _averagingModelmats(i) + (model.modelmats(i) *@ (1f - _averagingWeight))
+        }
+        val tmp = model.modelmats;
+        model._modelmats = _averagingModelmats
         val data = mcmc(_net);
-        show(data);
+        model._modelmats = tmp;
+        if (opts.displayAveraging)
+            show(averaging)
+        else
+            show(data)
         /*val net = model.asInstanceOf[Net];
         val layer = net.layers(0).asInstanceOf[InputLayer];
         val srcImg = utils.filter2img(layer.output(?,?,?,zero)/256f-0.5f,net.opts.tensorFormat);
@@ -228,11 +257,16 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
     def show(data:Mat) = {
         _scale(0,0) = opts.scale;
         _base(0,0) = opts.base;
-        val data_ = if (modelname=="imagenet") data(?,?,?,0->4) else data
+        val data_ = if (modelname=="imagenet") data(?,?,?,0->4) 
+            else 
+               data               
         val da = (data_ *@ _scale + _base);
         plot.plot_image(da)
         selecter(0,0) = opts.detailed
-        plot2.plot_image(data(?,?,?,selecter)*@ _scale + _base)
+        val d2 = if (modelname=="imagenet")  data(?,?,?,selecter) else 
+            mean(data.reshapeView(data.nrows*10,10),2).reshapeView(data.dims(0),data.dims(1),data.dims(2),10);
+        plot2.plot_image(d2 *@ _scale + _base)
+            
     }
     
     def mcmc(model:Model,targetScore:Float = 0.75f,p:Boolean = false,assignTarget: Boolean = true) = {
@@ -250,9 +284,6 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
         D.layers(0).output<--gdata;
         net.layers(0).output<--gdata;
         D.output_layers(0).target(?)=1;
-        accClassifier(?) = 0;
-        accDiscriminator(?) = 0;
-        momentum(?) = 0;
         //var curScore = 0f;
         D.layers(D.layers.length-3) match {
             case dl:DropoutLayer=>dl.opts.frac = 1f;
@@ -297,8 +328,9 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             D.layers(0).deriv ~ D.layers(0).deriv / ((accDiscriminator+1e-8f)^0.5f);
             _dWeight(0,0) = opts.dWeight;
             val grad = (net.layers(0).deriv *@ (1f - _dWeight)) + (_dWeight *@ D.layers(0).deriv)
-            normrnd(0,opts.langevin/(1f),noise);
+            normrnd(0,opts.langevin/(1f+t*t),noise);
             _l2lambda(0,0) = opts.l2lambda*2f/256f;
+            //noise ~ noise *@ _mask;
             grad ~ grad + noise;
             grad ~ grad - (net.layers(0).output *@ _l2lambda);
             val img = net.layers(0).output.reshapeView(net.layers(0).output.nrows,net.layers(0).output.ncols);
@@ -314,9 +346,6 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                 max(net.layers(0).output,0,net.layers(0).output);
                 min(net.layers(0).output,255,net.layers(0).output);
             }
-            _averagingWeight(0,0) = opts.averagingWeight
-            averaging ~ averaging *@ _averagingWeight
-            averaging ~ averaging + (net.layers(0).output *@ ( 1 - _averagingWeight ) )
             val dims = net.layers(0).output.dims;
             val s = dims(1);
             val d = net.layers(0).output.reshapeView(dims(1),dims(2),dims(0),dims(3))
@@ -348,10 +377,15 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             }
             gsteps+=margin
         }
+        _averagingWeight(0,0) = 1-1f/opts.averagingTime;
+        averaging ~ averaging *@ _averagingWeight;
+        averaging ~ averaging + (net.layers(0).output *@ ( 1 - _averagingWeight ) )
+
         D.layers(D.layers.length-3) match {
             case dl:DropoutLayer=>dl.opts.frac = 0.5f
             case _=>
         }
+        net.clearUpdatemats
         D.clearUpdatemats
         gdata<--net.layers(0).output;
         gdata
@@ -393,6 +427,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                     D.output_layers(0).target(?) = 1
                     D.output_layers(0).target(?,0->(batchSize/2)) = 0;
                     D.layers(0).deriv.clear;
+                    D.clearUpdatemats
                     D.forward;D.setderiv();D.backward(0, 0);
                     updater.update(ipass,here,0);
                     if (opts.wClip > 0){
@@ -487,7 +522,7 @@ object Synthesis {
         var dissimilarity = 0f;
         var trans : Mat=>Mat = null;
         var trainDis = true;
-        var resetInterval = 10;
+        var resetInterval = 1000;
         var updateInterval = 100;
         var endLayer = -1; // -1 means the last layer, -2 means the second-to-last, 0 means the first.
         var derivFunc: Layer=>Unit = null;
@@ -496,11 +531,12 @@ object Synthesis {
         var realImagesPath:String = null;
         var pretrainedDiscriminatorPath:String = null;  
         var wClip  = -1f;
-        var clipping = true;
+        var clipping = false;
         var detailed = 1;
         var resetAveraging = false;
-        var displayAveraging = false;
-        var averagingWeight = 0.9f
+        var displayAveraging = true;
+        var averagingTime = 1f
+        var modelAveragingTime = 1f
       }
     
     class Options extends Opts {}

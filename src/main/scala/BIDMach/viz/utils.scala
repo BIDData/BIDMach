@@ -78,7 +78,7 @@ object utils {
           val w = data.dims(1);
           val h = data.dims(2);
           val num = data.dims(3);
-          val col = Math.sqrt(num).toInt;
+          val col = if (num == 10) 10 else Math.sqrt(num).toInt;
           val row = Math.ceil(num*1f/col).toInt;
           val h0 = h*row + (row + 1) * padding
           val w0 = w*col + (col + 1) * padding
