@@ -9,6 +9,7 @@ case class ScatteredDataBuffer(dataSize: Int,
                                maxChunkSize: Int) extends AllReduceBuffer(dataSize, peerSize, maxLag, maxChunkSize) {
 
   val minChunkRequired: Int = (reducingThreshold * peerSize).toInt
+  var reducedFlag: Array[Boolean] = new Array(numChunks)
 
   private val currentRounds: Array[Array[Int]] = {
     val rounds = new Array[Array[Int]](maxLag)
@@ -53,8 +54,16 @@ case class ScatteredDataBuffer(dataSize: Int,
         j += 1;
       }
     }
+    reducedFlag(chunkId) = true
     (reducedArr, count(round, chunkId))
   }
+
+  def getUnreducedChunkIds(): List[Int] = {
+    val ids = 0 until(numChunks)
+    ids.filterNot(reducedFlag(_)).toList
+  }
+
+
 
   def prepareNewRound(round: Int, chunkId: Int) = {
 
