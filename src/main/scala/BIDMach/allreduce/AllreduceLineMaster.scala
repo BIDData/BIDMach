@@ -12,6 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class AllreduceLineMaster(config: MasterConfig) extends Actor with akka.actor.ActorLogging{
 
+
   val nodeNum = config.nodeNum
   val workerNum = config.workerNum
 
@@ -104,6 +105,7 @@ class AllreduceLineMaster(config: MasterConfig) extends Actor with akka.actor.Ac
   }
 
   private def discoverWorkers(round: Int, nodeMap: Map[Int, ActorRef]): Map[Int, ActorRef] = {
+
     val addressesFut: Seq[Future[(Int, ActorRef)]] = nodeMap.toSeq.map {
       case (nodeId, nodeAddress) =>
         context.actorSelection(nodeAddress.path / s"worker-${round % workerNum}")
@@ -120,7 +122,6 @@ class AllreduceLineMaster(config: MasterConfig) extends Actor with akka.actor.Ac
 object AllreduceLineMaster {
 
   def main(args: Array[String]): Unit = {
-    // Override the configuration of the port when specified as program argument
 
     val workerNum = 1
     val maxRound = 100
@@ -161,20 +162,46 @@ object AllreduceLineMaster {
   }
 
   def startUp(port: String, thresholds: ThresholdConfig, dataConfig: MetaDataConfig, masterConfig: MasterConfig): Unit = {
-
     initMaster(port, masterConfig)
   }
 
 }
 
-case class ThresholdConfig(thAllreduce: Float, thReduce: Float, thComplete: Float)
-case class MetaDataConfig(dataSize: Int, maxChunkSize: Int)
+/**
+  * @param workerNum number of worker equal to allowed lag
+  * @param discoveryTimeout timeout for address discovery time
+  * @param threshold threshold config
+  * @param metaData metadata config
+  */
 case class WorkerConfig(workerNum: Int,
                         discoveryTimeout: FiniteDuration,
                         threshold: ThresholdConfig,
                         metaData: MetaDataConfig)
+
+/**
+  * @param nodeNum number of nodes to join cluster
+  * @param workerNum number of worker equal to allowed lag
+  * @param maxRound when to stop allreduce
+  * @param discoveryTimeout timeout for address discovery time
+  * @param threshold threshold config
+  * @param metaData metadata config
+  */
 case class MasterConfig(nodeNum: Int, workerNum: Int, maxRound: Int,
                         discoveryTimeout: FiniteDuration,
                         threshold: ThresholdConfig,
                         metaData: MetaDataConfig)
+
+/**
+  * @param thAllreduce line master to decide when to progress to next round
+  * @param thReduce worker to decider when to reduce the received scatters
+  * @param thComplete worker to decide when to flush data and complete round
+  */
+case class ThresholdConfig(thAllreduce: Float, thReduce: Float, thComplete: Float)
+
+
+/**
+  * @param dataSize total size of data to be reduced
+  * @param maxChunkSize data sub-array size that can be exchanged through message passing
+  */
+case class MetaDataConfig(dataSize: Int, maxChunkSize: Int)
 
