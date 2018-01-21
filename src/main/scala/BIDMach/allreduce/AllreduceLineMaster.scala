@@ -124,30 +124,29 @@ object AllreduceLineMaster {
 
   def main(args: Array[String]): Unit = {
 
-    val workerNum = 1
+    val nodeNum = 3
+    val workerPerNodeNum = 3
+    val dataSize = 100
+
+    val maxChunkSize = 4
+
     val maxRound = 100
 
-    val port = if (args.isEmpty) "2551" else args(0)
-    val nodeNum = if (args.length <= 1) 2 else args(1).toInt
-    val dataSize = if (args.length <= 2) nodeNum * 5 else args(2).toInt
-    val maxChunkSize = if (args.length <= 3) 2 else args(3).toInt
-
-
-    val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 0.8f)
+    val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
-    val masterConfig = MasterConfig(nodeNum = nodeNum, workerPerNodeNum = workerNum, maxRound,
+    val masterConfig = MasterConfig(nodeNum = nodeNum, workerPerNodeNum = workerPerNodeNum, maxRound,
       discoveryTimeout = 5.seconds,
       threshold = threshold,
       metaData= metaData)
 
-    initMaster(port, masterConfig)
+    AllreduceLineMaster.startUp("2551", threshold, metaData, masterConfig = masterConfig)
   }
 
   private def initMaster(port: String, masterConfig: MasterConfig) = {
+    println(ConfigFactory.systemEnvironment())
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [master]")).
       withFallback(ConfigFactory.load())
-
     val system = ActorSystem("ClusterSystem", config)
 
 

@@ -4,6 +4,7 @@ import BIDMach.allreduce.AllreduceWorker.{DataSink, DataSource}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 
+import scala.concurrent.duration._
 
 class AllreduceNode(workerConfig: WorkerConfig,
                     sources: List[DataSource],
@@ -33,6 +34,7 @@ class AllreduceNode(workerConfig: WorkerConfig,
 
 object AllreduceNode {
 
+
   def startUp(port: String, workerConfig: WorkerConfig) = {
 
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
@@ -54,6 +56,23 @@ object AllreduceNode {
       sinks
     ), name = "node")
 
+  }
+
+  def main(args: Array[String]): Unit = {
+    val workerPerNodeNum = 3
+    val dataSize = 100
+
+    val maxChunkSize = 4
+
+    val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 0.8f)
+    val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
+
+    val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      discoveryTimeout = 5.seconds,
+      threshold = threshold,
+      metaData= metaData)
+
+    AllreduceNode.startUp("0", workerConfig)
   }
 
 
