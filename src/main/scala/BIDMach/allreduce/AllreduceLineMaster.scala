@@ -143,7 +143,6 @@ object AllreduceLineMaster {
   }
 
   private def initMaster(port: String, masterConfig: MasterConfig) = {
-    println(ConfigFactory.systemEnvironment())
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [master]")).
       withFallback(ConfigFactory.load())
