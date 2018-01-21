@@ -16,7 +16,7 @@ final case class InitWorkers(
 	maxChunkSize: Int
 )
 final case class StartAllreduce(round : Int)
-final case class PrepareAllreduce(round: Int, nodeAddresses: Map[Int, ActorRef], nodeId: Int)
+final case class PrepareAllreduce(round: Int, workerAddresses: Map[Int, ActorRef], nodeId: Int)
 final case class ConfirmPreparation(round: Int)
 final case class CompleteAllreduce(srcId : Int, round : Int)
 

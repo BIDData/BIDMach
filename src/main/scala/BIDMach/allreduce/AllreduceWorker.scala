@@ -4,11 +4,8 @@ package BIDMach.allreduce
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.config.ConfigFactory
-import scala.concurrent.ExecutionContext.Implicits.global
-
 
 import scala.collection.mutable
-import scala.concurrent.{Future}
 
 
 class AllreduceWorker(config: WorkerConfig,
@@ -25,7 +22,6 @@ class AllreduceWorker(config: WorkerConfig,
   val workerDiscoveryTimeout = config.discoveryTimeout
 
   var master: Option[ActorRef] = None
-  var nodePeers = Map[Int, ActorRef]()
   var workerPeers = Map[Int, ActorRef]() // workers of the same round across other the nodes
   var workerPeerNum = 0
 
@@ -73,9 +69,8 @@ class AllreduceWorker(config: WorkerConfig,
         // peer organization
         master = Some(sender())
         nodeId = p.nodeId
-        nodePeers = p.nodeAddresses
-        workerPeers = Map() // to be discovered from node peers in start all reduce
-        workerPeerNum = p.nodeAddresses.size // worker peers will be equal to size of node peers
+        workerPeers = p.workerAddresses
+        workerPeerNum = p.workerAddresses.size
 
         // prepare meta-data
         dataRange = initDataBlockRanges()
@@ -122,21 +117,8 @@ class AllreduceWorker(config: WorkerConfig,
       try {
         assert(s.round == currentRound)
 
-        // discover workers
-        val foundWorkerPeerFut: List[Future[(Int, ActorRef)]] = nodePeers.toList.map {
-          case (nodeId: Int, nodeAddress: ActorRef) =>
-            val path = nodeAddress.path / s"worker-${s.round % workerPerNodeNum}"
-            println(s"Path to query ref: $path")
-            context.actorSelection(path).resolveOne(workerDiscoveryTimeout).map(ref => (nodeId, ref))
-        }
-
-        // FIXME: Async updating peers can cause race conditions because meanwhile actor can process other messages during this inconsistent state
-        // Downside of blocking is deadlock where every actor enters this and is unable to respond to address identification (underlying actor selection)
-        Future.sequence(foundWorkerPeerFut).map(res => {
-          workerPeers = res.toMap
           fetch()
           scatter()
-        })
 
       } catch {
         case e: Throwable => printStackTrace("start all reduce", e);

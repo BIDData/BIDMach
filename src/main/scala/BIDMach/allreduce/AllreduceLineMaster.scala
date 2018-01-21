@@ -95,13 +95,10 @@ class AllreduceLineMaster(config: MasterConfig) extends Actor with akka.actor.Ac
     // order nodes and assign id sequentially
     val nodeMap: Map[Int, ActorRef] = nodes.zipWithIndex.map(tup => (tup._2, tup._1)).toMap
 
-    // TODO: pass all worker addresses directly to the worker
-    // Problem here is that when line master is hosted in the same akka system as the worker,
-    // the worker reference becomes a local one, and thus cannot be referred remotely by other workers
     workerMap = discoverWorkers(round, nodeMap)
     for ((nodeIndex, worker) <- workerMap) {
       println(s"\n----Sending prepare msg to worker $worker")
-      worker ! PrepareAllreduce(round, nodeMap, nodeIndex)
+      worker ! PrepareAllreduce(round, workerMap, nodeIndex)
     }
   }
 
