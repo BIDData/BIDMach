@@ -8,25 +8,26 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 
 import scala.collection.mutable
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Future}
 
 
 class AllreduceWorker(config: WorkerConfig,
                       dataSource: AllReduceInputRequest => AllReduceInput,
                       dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging {
 
-  val thReduce = config.threshold.thReduce // pct of scattered data needed to start reducing
-  val thComplete = config.threshold.thComplete // pct of reduced data needed to complete current round
+  val thReduce = config.threshold.thReduce
+  val thComplete = config.threshold.thComplete
 
   val dataSize = config.metaData.dataSize
-  val maxChunkSize = config.metaData.maxChunkSize;
-  val workerNum = config.workerNum
+  val maxChunkSize = config.metaData.maxChunkSize
+
+  val workerPerNodeNum = config.workerPerNodeNum
   val workerDiscoveryTimeout = config.discoveryTimeout
 
-
   var master: Option[ActorRef] = None
-  var peers = Map[Int, ActorRef]() // workers in the same row/col, including self
-  var peerNum = 0
+  var nodePeers = Map[Int, ActorRef]()
+  var workerPeers = Map[Int, ActorRef]() // workers of the same round across other the nodes
+  var workerPeerNum = 0
 
   var nodeId = -1
   var currentRound = -1
@@ -54,16 +55,13 @@ class AllreduceWorker(config: WorkerConfig,
 
     case p: PrepareAllreduce => {
 
-      log.info(s"\n----recieve prepare data round ${p.round}")
-
-
+      log.info(s"\n----Preparing data round ${p.round}")
       try {
-        
+
         assert(p.round > currentRound)
 
         if (!isCompleted) {
-
-          log.warning(s"Force completing round ${p.round}")
+          log.warning(s"\n----Force completing round ${p.round}")
           val unreducedChunkIds = scatterBlockBuf.getUnreducedChunkIds()
           for (i <- unreducedChunkIds) {
             reduceAndBroadcast(i)
@@ -72,22 +70,23 @@ class AllreduceWorker(config: WorkerConfig,
         }
 
         // TODO: to reconsider potential bugs of changing master
+        // peer organization
         master = Some(sender())
-
-        // prepare data meta-data
-        peerNum = p.nodeAddresses.size;
         nodeId = p.nodeId
-        peers = p.nodeAddresses
+        nodePeers = p.nodeAddresses
+        workerPeers = Map() // to be discovered from node peers in start all reduce
+        workerPeerNum = p.nodeAddresses.size // worker peers will be equal to size of node peers
 
-        dataRange = initDataBlockRanges();
-        myBlockSize = blockSize(nodeId);
-        maxBlockSize = blockSize(0);
-        minBlockSize = blockSize(peerNum - 1);
+        // prepare meta-data
+        dataRange = initDataBlockRanges()
+        myBlockSize = blockSize(nodeId)
+        maxBlockSize = blockSize(0)
+        minBlockSize = blockSize(workerPeerNum - 1)
 
-        // start new round
+        // reusing old implementation of buffer defaulting max lag to 1, since this is per-round worker
         scatterBlockBuf = ScatteredDataBuffer(
           dataSize = myBlockSize,
-          peerSize = peerNum,
+          peerSize = workerPeerNum,
           maxLag = 1,
           reducingThreshold = thReduce,
           maxChunkSize = maxChunkSize
@@ -97,22 +96,22 @@ class AllreduceWorker(config: WorkerConfig,
           maxBlockSize = maxBlockSize,
           minBlockSize = minBlockSize,
           totalDataSize = dataSize,
-          peerSize = peerNum,
+          peerSize = workerPeerNum,
           maxLag = 1,
           completionThreshold = thComplete,
           maxChunkSize = maxChunkSize
         )
-        print(s"Seding cofirm to master: $master....")
-
-        master.orNull ! ConfirmPreparation(p.round)
 
         // prepare state for new round
         currentRound = p.round
         isCompleted = false
 
-        println(s"\n----Prepare round ${p.round}")
+        println(s"\n----Prepared round ${p.round}")
         println(s"\n----Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}. threshold : ${scatterBlockBuf.minChunkRequired}")
         println(s"\n----Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}. threshold: ${reduceBlockBuf.minChunkRequired}")
+
+        // acknowledge preparation done
+        master.orNull ! ConfirmPreparation(p.round)
 
       } catch {
         case e: Throwable => printStackTrace("prepare block", e);
@@ -124,16 +123,17 @@ class AllreduceWorker(config: WorkerConfig,
         assert(s.round == currentRound)
 
         // discover workers
-        val addressesFut: List[Future[(Int, ActorRef)]] = peers.toList.map {
-          case (peerId:Int, peerAddress: ActorRef) =>
-            val path = peerAddress.path / s"worker-${s.round % workerNum}"
+        val foundWorkerPeerFut: List[Future[(Int, ActorRef)]] = nodePeers.toList.map {
+          case (nodeId: Int, nodeAddress: ActorRef) =>
+            val path = nodeAddress.path / s"worker-${s.round % workerPerNodeNum}"
             println(s"Path to query ref: $path")
-            context.actorSelection(path)
-              .resolveOne(workerDiscoveryTimeout)
-              .map(ref => (peerId, ref))
+            context.actorSelection(path).resolveOne(workerDiscoveryTimeout).map(ref => (nodeId, ref))
         }
-        Future.sequence(addressesFut).map( res => {
-          peers = res.toMap
+
+        // FIXME: Async updating peers can cause race conditions because meanwhile actor can process other messages during this inconsistent state
+        // Downside of blocking is deadlock where every actor enters this and is unable to respond to address identification (underlying actor selection)
+        Future.sequence(foundWorkerPeerFut).map(res => {
+          workerPeers = res.toMap
           fetch()
           scatter()
         })
@@ -162,9 +162,9 @@ class AllreduceWorker(config: WorkerConfig,
     }
 
     case Terminated(a) =>
-      for ((idx, worker) <- peers) {
+      for ((idx, worker) <- workerPeers) {
         if (worker == a) {
-          peers -= idx
+          workerPeers -= idx
         }
       }
   }
@@ -183,7 +183,7 @@ class AllreduceWorker(config: WorkerConfig,
     } else {
       reduceBlockBuf.store(r.value, r.round, r.srcId, r.chunkId, r.count)
       if (reduceBlockBuf.reachCompletionThreshold(r.round)) {
-        log.debug(s"\n----Receive enough reduced data (numPeers = ${peers.size}) for round ${r.round}, complete")
+        log.debug(s"\n----Receive enough reduced data (numPeers = ${workerPeers.size}) for round ${r.round}, complete")
         completeRound()
       }
     }
@@ -202,7 +202,7 @@ class AllreduceWorker(config: WorkerConfig,
     } else {
       scatterBlockBuf.store(s.value, s.round, s.srcId, s.chunkId)
       if (scatterBlockBuf.reachReducingThreshold(s.round, s.chunkId)) {
-        log.debug(s"\n----receive ${scatterBlockBuf.count(s.round, s.chunkId)} scattered data (numPeers = ${peers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
+        log.debug(s"\n----receive ${scatterBlockBuf.count(s.round, s.chunkId)} scattered data (numPeers = ${workerPeers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
         reduceAndBroadcast(s.chunkId)
       }
     }
@@ -215,12 +215,12 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def initDataBlockRanges() = {
-    val stepSize = math.ceil(dataSize * 1f / peerNum).toInt
+    val stepSize = math.ceil(dataSize * 1f / workerPeerNum).toInt
     Array.range(0, dataSize, stepSize)
   }
 
   private def range(idx: Int): (Int, Int) = {
-    if (idx >= peerNum - 1)
+    if (idx >= workerPeerNum - 1)
       (dataRange(idx), dataSize)
     else
       (dataRange(idx), dataRange(idx + 1))
@@ -242,9 +242,9 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def scatter() = {
-    for (peerId <- 0 until peerNum) {
-      val idx = (peerId + nodeId) % peerNum
-      val worker = peers(idx)
+    for (peerId <- 0 until workerPeerNum) {
+      val idx = (peerId + nodeId) % workerPeerNum
+      val worker = workerPeers(idx)
       //Partition the dataBlock if it is too big
       val (blockStart, blockEnd) = range(idx)
       val peerBlockSize = blockEnd - blockStart
@@ -274,9 +274,9 @@ class AllreduceWorker(config: WorkerConfig,
 
   private def broadcast(data: Array[Float], chunkId: Int, reduceCount: Int) = {
     log.debug(s"\n----Start broadcasting")
-    for (i <- 0 until peerNum) {
-      val peerNodeId = (i + nodeId) % peerNum
-      val worker = peers(peerNodeId)
+    for (i <- 0 until workerPeerNum) {
+      val peerNodeId = (i + nodeId) % workerPeerNum
+      val worker = workerPeers(peerNodeId)
       log.debug(s"\n----Broadcast reduced block src: ${nodeId}, dest: ${peerNodeId}, chunkId: ${chunkId}, round: ${currentRound}")
       val reduceMsg = ReduceBlock(data, nodeId, peerNodeId, chunkId, currentRound, reduceCount)
       if (worker == self) {

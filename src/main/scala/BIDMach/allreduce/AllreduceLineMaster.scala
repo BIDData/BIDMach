@@ -12,9 +12,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class AllreduceLineMaster(config: MasterConfig) extends Actor with akka.actor.ActorLogging{
 
-
   val nodeNum = config.nodeNum
-  val workerNum = config.workerNum
+  val workerNum = config.workerPerNodeNum
 
   val thAllreduce = config.threshold.thAllreduce
   val maxRound = config.maxRound
@@ -22,14 +21,11 @@ class AllreduceLineMaster(config: MasterConfig) extends Actor with akka.actor.Ac
   val cluster = Cluster(context.system)
   val addressDiscoveryTimeOut: FiniteDuration = config.discoveryTimeout
 
-  var nodes = Set[ActorRef]()
-
-
   var round = -1
-  var workerMap: Map[Int, ActorRef] = Map() // workers in the same row/col, including self
+  var nodes = Set[ActorRef]() // nodes to which the workers can be discovered
+  var workerMap: Map[Int, ActorRef] = Map() // workers to be updated for each round
   var completeCount = 0
   var confirmPrepareCount = 0
-
 
   override def preStart(): Unit = cluster.subscribe(self, classOf[MemberUp])
 
@@ -96,7 +92,12 @@ class AllreduceLineMaster(config: MasterConfig) extends Actor with akka.actor.Ac
     println(s"\n----Preparing allreduce round ${round}")
     confirmPrepareCount = 0
 
+    // order nodes and assign id sequentially
     val nodeMap: Map[Int, ActorRef] = nodes.zipWithIndex.map(tup => (tup._2, tup._1)).toMap
+
+    // TODO: pass all worker addresses directly to the worker
+    // Problem here is that when line master is hosted in the same akka system as the worker,
+    // the worker reference becomes a local one, and thus cannot be referred remotely by other workers
     workerMap = discoverWorkers(round, nodeMap)
     for ((nodeIndex, worker) <- workerMap) {
       println(s"\n----Sending prepare msg to worker $worker")
@@ -134,7 +135,7 @@ object AllreduceLineMaster {
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 0.8f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
-    val masterConfig = MasterConfig(nodeNum = nodeNum, workerNum = workerNum, maxRound,
+    val masterConfig = MasterConfig(nodeNum = nodeNum, workerPerNodeNum = workerNum, maxRound,
       discoveryTimeout = 5.seconds,
       threshold = threshold,
       metaData= metaData)
@@ -168,25 +169,25 @@ object AllreduceLineMaster {
 }
 
 /**
-  * @param workerNum number of worker equal to allowed lag
+  * @param workerPerNodeNum number of worker per node, equal to allowed lag
   * @param discoveryTimeout timeout for address discovery time
   * @param threshold threshold config
   * @param metaData metadata config
   */
-case class WorkerConfig(workerNum: Int,
+case class WorkerConfig(workerPerNodeNum: Int,
                         discoveryTimeout: FiniteDuration,
                         threshold: ThresholdConfig,
                         metaData: MetaDataConfig)
 
 /**
   * @param nodeNum number of nodes to join cluster
-  * @param workerNum number of worker equal to allowed lag
+  * @param workerPerNodeNum number of worker per node, equal to allowed lag
   * @param maxRound when to stop allreduce
   * @param discoveryTimeout timeout for address discovery time
   * @param threshold threshold config
   * @param metaData metadata config
   */
-case class MasterConfig(nodeNum: Int, workerNum: Int, maxRound: Int,
+case class MasterConfig(nodeNum: Int, workerPerNodeNum: Int, maxRound: Int,
                         discoveryTimeout: FiniteDuration,
                         threshold: ThresholdConfig,
                         metaData: MetaDataConfig)

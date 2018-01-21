@@ -11,8 +11,8 @@ class AllreduceNode(workerConfig: WorkerConfig,
 
 
   val workers: Array[ActorRef] = {
-    val arr = new Array[ActorRef](workerConfig.workerNum)
-    for (i <- 0 until workerConfig.workerNum) {
+    val arr = new Array[ActorRef](workerConfig.workerPerNodeNum)
+    for (i <- 0 until workerConfig.workerPerNodeNum) {
       val worker = context.actorOf(Props(
         classOf[AllreduceWorker],
         workerConfig,
@@ -45,8 +45,8 @@ object AllreduceNode {
     val source: DataSource = _ => AllReduceInput(floats)
     val sink: DataSink = _ => Unit
 
-    val sources: List[DataSource] = Array.fill(workerConfig.workerNum)(source).toList
-    val sinks:List[DataSink] = Array.fill(workerConfig.workerNum)(sink).toList
+    val sources: List[DataSource] = Array.fill(workerConfig.workerPerNodeNum)(source).toList
+    val sinks:List[DataSink] = Array.fill(workerConfig.workerPerNodeNum)(sink).toList
 
     system.actorOf(Props(classOf[AllreduceNode],
       workerConfig,
