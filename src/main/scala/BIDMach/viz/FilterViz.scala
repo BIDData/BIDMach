@@ -35,22 +35,22 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
                                 _averagingModelmats(i) = net.modelmats(i).zeros(net.modelmats(i).dims);
                                 _averagingModelmats(i) <-- net.modelmats(i)
                             }
-                            1
+                            0
                         }
                         case _=>{
                             println("The %d layer of the network is not a ConvLayer" format layerId);
-                            2                                
+                            1                               
                         }
                     }
                 }
                 else {
                     println("The network only has %d layers while you're accessing %d" format (net.layers.length, layerId))
-                    2
+                    1
                 }                    
             }
             case _=>{
                 println("The model is not a Net");
-                2
+                1
             } 
         }                
     }
@@ -72,10 +72,11 @@ class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends 
         val ffilter = layer.ffilter;
 //        val ww = i0+0;ww<--( -ffilter.pad(1) + (w+ffilter.outPad(1)) * ffilter.stride(1) );
         val ww = ( -ffilter.pad(1) + (w+ffilter.outPad(1)) * ffilter.stride(1) );
-        ww~ww+(ww<0);
-        //val hh = i0+1;hh<--( -ffilter.pad(2) + (h+ffilter.outPad(2)) * ffilter.stride(2) );
+        max(ww, 0, ww)
+        min(ww, layer.inputData.dims(1) - ffilter.inDims(1), ww)
         val hh = ( -ffilter.pad(2) + (h+ffilter.outPad(2)) * ffilter.stride(2) );
-        hh~hh+(hh<0);
+        max(hh, 0, hh)
+        min(hh, layer.inputData.dims(2) - ffilter.inDims(2), hh)
         (d,ww,hh,n)
     }
     

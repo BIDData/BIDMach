@@ -129,11 +129,11 @@ object utils {
                         res = res * (1+256+256*256)
                     }
                     res += 255*256*256*256
-                    /*var res  = getV(new_data(c,r,0,k).dv)
+                    /**var res  = getV(new_data(c,r,0,k).dv)
                     res += getV(new_data(c,r,1,k).dv)*256
                     res += getV(new_data(c,r,2,k).dv)*256*256
                     res += 255*256*256*256*/
-                    /*var res  = ((data(0,r,c,k)+0.5f).dv*256).toInt
+                    /**var res  = ((data(0,r,c,k)+0.5f).dv*256).toInt
                     res += ((data(1,r,c,k)+0.5f).dv*256).toInt*256
                     res += ((data(2,r,c,k)+0.5f).dv*256).toInt*256*256
                     res += 255*256*256*256*/

@@ -20,8 +20,8 @@ class InputViz(val name: String = "Input") extends Visualization{
     
     override def check(model:Model,mats:Array[Mat]) = {
         model match {
-            case _:Net => 1;
-            case _=>{println("Not a network"); 2}                
+            case _:Net => 0;
+            case _=>{println("Not a network"); 1}                
         }
     }
     
@@ -50,14 +50,14 @@ class InputViz(val name: String = "Input") extends Visualization{
                 }
                 layers(i).backward(ipass, pos);
             }
-            net.updatemats.foreach(_.clear)
+            net.updatemats.foreach(_ match{case m:Mat=>m.clear;case null=>})
         }
         val layer = layers(0).asInstanceOf[InputLayer];
         _gradient_scale(0,0) = gradient_scale
 //        val img = utils.filter2img(layer.output(?,?,?,0->2)/256f-0.5f,net.opts.tensorFormat) \
 //                  utils.filter2img(layer.deriv(?,?,?,0->2)*@_gradient_scale,net.opts.tensorFormat)
-        val img = layer.output(?,?,?,0->2) \ 
-                  ((layer.deriv(?,?,?,0->2)*@_gradient_scale + 0.5f) * 256f)
+        val img = FMat(layer.output(?,?,?,0->2)) \ 
+                  FMat((layer.deriv(?,?,?,0->2)*@_gradient_scale + 0.5f) * 256f)
         plot.plot_image(img, net.opts.tensorFormat)
         layer.deriv.clear
     }
