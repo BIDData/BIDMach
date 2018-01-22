@@ -37,7 +37,7 @@ val model = nn.model.asInstanceOf[Net]
 var f:FileReader = null
 try {
   f = new FileReader("lenet_train_test.prototxt")
-  CaffeIO.loadUntrainedModel(f, model)
+  CaffeModel.loadUntrainedModel(f, model)
 } finally {
   if (f != null) {
     f.close()

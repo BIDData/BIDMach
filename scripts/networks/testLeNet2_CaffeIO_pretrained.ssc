@@ -32,7 +32,7 @@ val model = nn.model.asInstanceOf[Net]
 var f:FileInputStream = null
 try {
   f = new FileInputStream("lenet_iter_10000.caffemodel")
-  CaffeIO.loadTrainedModel(f, model)
+  CaffeModel.loadTrainedModel(f, model)
 } finally {
   if (f != null) {
     f.close()

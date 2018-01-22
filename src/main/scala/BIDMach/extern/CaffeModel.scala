@@ -18,7 +18,7 @@ import _root_.caffe.Caffe.PoolingParameter.PoolMethod
 import com.google.protobuf._
 import jcuda.jcudnn.cudnnPoolingMode
 
-object CaffeIO {
+object CaffeModel {
   private class CaffeLayer(val param:Caffe.LayerParameter) {
     val inputs = new mutable.ArrayBuffer[CaffeLayer]
     var inodeFirst = -1
