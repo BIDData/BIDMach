@@ -54,9 +54,6 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
     var _mask: Mat = null;
     var _averagingModelmats: Array[Mat] = null;
     var selecter = irow(0);
-            
-        
-    def check(model:Model, mats:Array[Mat]) = 1  
         
     def setInputGradient(net:Net) {
         for (i <- 0 until net.input_layers.length) {
@@ -122,7 +119,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             
         if (modelname == "imagenet") {
             import javax.swing._
-            val classNames = scala.io.Source.fromFile("models/imagenet.txt").getLines.map(_.split(": ")(1)).toArray;
+            val classNames = scala.io.Source.fromFile("data/imagenet_classname.txt").getLines.map(_.split(": ")(1)).toArray;
             val display = classNames.zipWithIndex.map(x=>"fc8 "+x._2+": "+x._1.slice(1,x._1.length-2));
             var box2: JComboBox[String] = null;         
             val m = net.modelmats(net.modelmats.length-2); //1000*4096 matrix
