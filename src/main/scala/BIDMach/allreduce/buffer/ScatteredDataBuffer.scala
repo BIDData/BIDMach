@@ -9,7 +9,13 @@ case class ScatteredDataBuffer(dataSize: Int,
                                maxChunkSize: Int) extends AllReduceBuffer(dataSize, peerSize, maxLag, maxChunkSize) {
 
   val minChunkRequired: Int = (reducingThreshold * peerSize).toInt
-  var reducedFlag: Array[Boolean] = new Array(numChunks)
+  var reducedFlag: Array[Array[Boolean]] = {
+    val rounds = new Array[Array[Boolean]](maxLag)
+    for (i <- 0 until maxLag) {
+      rounds(i) = new Array[Boolean](numChunks);
+    }
+    rounds
+  }
 
   private val currentRounds: Array[Array[Int]] = {
     val rounds = new Array[Array[Int]](maxLag)
@@ -54,33 +60,37 @@ case class ScatteredDataBuffer(dataSize: Int,
         j += 1;
       }
     }
-    reducedFlag(chunkId) = true
+    reducedFlag(timeIdx(round))(chunkId) = true
     (reducedArr, count(round, chunkId))
   }
 
-  def getUnreducedChunkIds(): List[Int] = {
+  def getUnreducedChunkIds(round : Int): List[Int] = {
     val ids = 0 until(numChunks)
-    ids.filterNot(reducedFlag(_)).toList
+    ids.filterNot(reducedFlag(timeIdx(round))(_)).toList
   }
 
 
 
-  def prepareNewRound(round: Int, chunkId: Int) = {
+  def prepareNewRound(round: Int) = {
+    var chunkId = 0
+    while (chunkId < numChunks) {
+      currentRounds(timeIdx(round))(chunkId) += maxLag
 
-    currentRounds(timeIdx(round))(chunkId) += maxLag
-
-    val chunkStartPos = chunkId * maxChunkSize
-    val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
-    val tBuf = temporalBuffer(timeIdx(round))
-    for (peerId <- 0 until peerSize) {
-      util.Arrays.fill(
-        tBuf(peerId),
-        chunkStartPos,
-        chunkEndPos,
-        0
-      )
+      val chunkStartPos = chunkId * maxChunkSize
+      val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
+      val tBuf = temporalBuffer(timeIdx(round))
+      for (peerId <- 0 until peerSize) {
+        util.Arrays.fill(
+          tBuf(peerId),
+          chunkStartPos,
+          chunkEndPos,
+          0
+        )
+      }
+      countFilled(timeIdx(round))(chunkId) = 0
+      reducedFlag(timeIdx(round))(chunkId) = false
+      chunkId += 1
     }
-    countFilled(timeIdx(round))(chunkId) = 0
   }
 
   def reachReducingThreshold(round: Int, chunkId: Int): Boolean = {

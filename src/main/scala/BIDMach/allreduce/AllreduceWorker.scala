@@ -58,7 +58,7 @@ class AllreduceWorker(config: WorkerConfig,
 
         if (!isCompleted) {
           log.warning(s"\n----Force completing round ${p.round}")
-          val unreducedChunkIds = scatterBlockBuf.getUnreducedChunkIds()
+          val unreducedChunkIds = scatterBlockBuf.getUnreducedChunkIds(currentRound)
           for (i <- unreducedChunkIds) {
             reduceAndBroadcast(i)
           }
@@ -69,33 +69,40 @@ class AllreduceWorker(config: WorkerConfig,
         // peer organization
         master = Some(sender())
         nodeId = p.nodeId
-        workerPeers = p.workerAddresses
-        workerPeerNum = p.workerAddresses.size
 
-        // prepare meta-data
-        dataRange = initDataBlockRanges()
-        myBlockSize = blockSize(nodeId)
-        maxBlockSize = blockSize(0)
-        minBlockSize = blockSize(workerPeerNum - 1)
+        // avoid re-initialization when grid organization doesn't change (i.e. block size doesn't change)
+        if (p.workerAddresses.size != workerPeerNum || p.nodeId != nodeId) {
+          workerPeers = p.workerAddresses
+          workerPeerNum = p.workerAddresses.size
 
-        // reusing old implementation of buffer defaulting max lag to 1, since this is per-round worker
-        scatterBlockBuf = ScatteredDataBuffer(
-          dataSize = myBlockSize,
-          peerSize = workerPeerNum,
-          maxLag = 1,
-          reducingThreshold = thReduce,
-          maxChunkSize = maxChunkSize
-        )
+          // prepare meta-data
+          dataRange = initDataBlockRanges()
+          myBlockSize = blockSize(nodeId)
+          maxBlockSize = blockSize(0)
+          minBlockSize = blockSize(workerPeerNum - 1)
 
-        reduceBlockBuf = ReducedDataBuffer(
-          maxBlockSize = maxBlockSize,
-          minBlockSize = minBlockSize,
-          totalDataSize = dataSize,
-          peerSize = workerPeerNum,
-          maxLag = 1,
-          completionThreshold = thComplete,
-          maxChunkSize = maxChunkSize
-        )
+          // reusing old implementation of buffer defaulting max lag to 1, since this is per-round worker
+          scatterBlockBuf = ScatteredDataBuffer(
+            dataSize = myBlockSize,
+            peerSize = workerPeerNum,
+            maxLag = 1,
+            reducingThreshold = thReduce,
+            maxChunkSize = maxChunkSize
+          )
+
+          reduceBlockBuf = ReducedDataBuffer(
+            maxBlockSize = maxBlockSize,
+            minBlockSize = minBlockSize,
+            totalDataSize = dataSize,
+            peerSize = workerPeerNum,
+            maxLag = 1,
+            completionThreshold = thComplete,
+            maxChunkSize = maxChunkSize
+          )
+        } else {
+          scatterBlockBuf.prepareNewRound(currentRound)
+          reduceBlockBuf.prepareNewRound(currentRound)
+        }
 
         // prepare state for new round
         currentRound = p.round

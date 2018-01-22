@@ -8,6 +8,7 @@ abstract class AllReduceBuffer(dataSize: Int,
 
   type Buffer = Array[Array[Float]]
   val numChunks = getNumChunk(dataSize)
+  // 3D array: maxLag * peerSize * blockSize
   val temporalBuffer: Array[Buffer] = {
     val init = new Array[Buffer](maxLag)
     for (i <- 0 until maxLag) {
@@ -19,6 +20,9 @@ abstract class AllReduceBuffer(dataSize: Int,
     init
   }
 
+  // record number of chunks received for each round
+  // 2D array: maxLag * numChunksOfEachBlock ?? (should be maxLag * numBlocks?)
+  // start reducing block when receive enough chunks for that block of a round
   protected val countFilled: Array[Array[Int]] = Array.ofDim[Int](maxLag, numChunks)
 
   protected def store(data: Array[Float], round: Int, srcId: Int, chunkId: Int) = {

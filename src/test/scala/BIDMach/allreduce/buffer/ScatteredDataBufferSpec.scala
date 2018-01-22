@@ -75,7 +75,7 @@ class ScatteredDataBufferSpec extends WordSpec with Matchers {
 
       val newRoundOfSameMod = rowAtTest + maxLag
 
-      buffer.prepareNewRound(rowAtTest, chunkAtTest)
+      buffer.prepareNewRound(rowAtTest)
 
       buffer.compareRoundTo(newRoundOfSameMod, chunkAtTest) shouldEqual 0
       buffer.compareRoundTo(rowAtTest, chunkAtTest) shouldEqual 1
