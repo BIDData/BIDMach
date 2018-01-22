@@ -290,14 +290,6 @@ object AllreduceWorker {
   type DataSink = AllReduceOutput => Unit
   type DataSource = AllReduceInputRequest => AllReduceInput
 
-
-  def main(args: Array[String]): Unit = {
-    val port = if (args.isEmpty) "2553" else args(0)
-    val sourceDataSize = if (args.length <= 1) 10 else args(1).toInt
-
-    initWorker(port, sourceDataSize)
-  }
-
   private def initWorker(port: String, sourceDataSize: Int, checkpoint: Int = 50, assertCorrectness: Boolean = false) = {
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [worker]")).
@@ -414,11 +406,6 @@ object AllreduceWorker {
     (source, sink)
   }
 
-
-  def startUp(port: String) = {
-    main(Array(port))
-  }
-
   /**
     * Test start up method
     *
@@ -428,7 +415,7 @@ object AllreduceWorker {
     * @param assertCorrectness expected multiple of input as reduced results
     * @return
     */
-  def startUp(port: String, dataSize: Int, checkpoint: Int = 50, assertCorrectness: Boolean = false) = {
+  def startUp(port: String, dataSize: Int, checkpoint: Int =50, assertCorrectness: Boolean = false) = {
     initWorker(port, dataSize, checkpoint, assertCorrectness)
   }
 
