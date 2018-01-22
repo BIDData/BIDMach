@@ -497,8 +497,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
   private def expectReduce(expected: ReduceBlock) = {
     receiveOne(remainingOrDefault) match {
       case r: ReduceBlock =>
-        println(r.value.toList)
-        println(expected.value.toList)
         r.srcId shouldEqual expected.srcId
         r.destId shouldEqual expected.destId
         r.round shouldEqual expected.round
