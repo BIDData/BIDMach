@@ -32,11 +32,6 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
-    <repository>
-        <id>alfresco</id>
-        <name>alfresco</name>
-        <url>https://artifacts.alfresco.com/nexus/content/repositories/public/</url>
-    </repository>
   </repositories>
   <profiles>
     <profile>
@@ -256,11 +251,6 @@
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
       <version>2.1</version>
-    </dependency>
-    <dependency>
-        <groupId>com.mxgraph</groupId>
-        <artifactId>jgraphx</artifactId>
-        <version>1.10.4.2</version>
     </dependency>
   </dependencies>
   <build>
