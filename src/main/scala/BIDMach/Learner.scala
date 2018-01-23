@@ -200,7 +200,7 @@ class Learner(
       }
       if (viz.asInstanceOf[AnyRef] != null) {
           viz.foreach(_.update(model,mats,ipass,here))
-      }  
+      }        
       istep += 1
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
@@ -283,12 +283,12 @@ class Learner(
     b(?) = results(0,0->b.length);
     plot(mean(b))
   }
-    
+
   def add_plot(v: Visualization) = {
       if (viz.asInstanceOf[AnyRef] == null) viz = new ListBuffer[Visualization]()
       viz+=v
       v
-  } 
+  }
 
   def predict() = {
     datasource.init;

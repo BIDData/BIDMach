@@ -218,7 +218,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 			  }
 			  layers(i).forward;
 			  i += 1;
-		  }          
+		  }
   }
   
   def clearUpdatemats {
@@ -263,8 +263,8 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     if (mask.asInstanceOf[AnyRef] != null) {
     	updatemats(0) ~ updatemats(0) ∘ mask;
     }
-  }    
-
+  }
+  
   def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
