@@ -55,7 +55,6 @@ if [ "$OSS" = "windows" ]; then
     fi
 fi
 
-
 cd lib
 BIDMACH_JARS=`echo *.jar`
 BIDMACH_LIBS="${BIDMACH_ROOT}/target/BIDMach-${BIDMAT_VERSION}.jar"
@@ -80,6 +79,16 @@ if [ "$OSS" = "windows" ]; then
 else
     TOOL_LIBS=`echo "${TOOL_LIBS}" | sed 's/;/:/g'`
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
+fi
+
+userargs=""
+if [ "$2" != "" ]; then
+    userargs="-Duser.arg0=$2"
+    j=1;
+    for i in ${*:3}; do
+	userargs="$userargs -Duser.arg$j=$i"
+	j=$((j+1))
+    done
 fi
 
 if [ "$1" = "notebook" ]; then
