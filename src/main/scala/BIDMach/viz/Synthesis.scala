@@ -116,33 +116,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             Synthesis.load(D,opts.pretrainedDiscriminatorPath)
 
         show(net.layers(0).output);
-            
-        if (modelname == "imagenet") {
-            import javax.swing._
-            val classNames = scala.io.Source.fromFile("data/imagenet_classname.txt").getLines.map(_.split(": ")(1)).toArray;
-            val display = classNames.zipWithIndex.map(x=>"fc8 "+x._2+": "+x._1.slice(1,x._1.length-2));
-            var box2: JComboBox[String] = null;         
-            val m = net.modelmats(net.modelmats.length-2); //1000*4096 matrix
-            val (_,tmp) = sortdown2(m.t);
-            val topFeatures = IMat(cpu(tmp));            
-            val (_,tmp2) = sortdown2(m);
-            val topClasses = IMat(cpu(tmp2))
-            plot.add_combobox(display,
-                              (i:Int,v:String)=>{
-                                  box2.removeAllItems;   
-                                  topFeatures(0->20,i).data.foreach(x=>box2.addItem("fc7 "+x.toString+": "+topClasses(0->3,x).data.map(classNames(_)).reduce(_+";"+_)))
-                                  opts.endLayer = net.layers.length - 2;
-                                  opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(i,?)=1f}
-                                  resetFlag = true
-                              });
-            box2 = plot.add_combobox(Array(),
-                              (i:Int,v:String)=>{
-                                  opts.endLayer = 23;
-                                  val id = v.split(": ")(0).split(" ")(1).toInt
-                                  opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(id,?)=1f}
-                                  resetFlag = true
-                              });
-        }
+        
             //val convLayers = List(5,9,13,15,17)
         val convLayers = net.layers.zipWithIndex.filter(_._1.isInstanceOf[ConvLayer]).map(_._2);
 
@@ -204,7 +178,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             show(averaging)
         else
             show(data)
-        /*val net = model.asInstanceOf[Net];
+        /**val net = model.asInstanceOf[Net];
         val layer = net.layers(0).asInstanceOf[InputLayer];
         val srcImg = utils.filter2img(layer.output(?,?,?,zero)/256f-0.5f,net.opts.tensorFormat);
         for(t<-0 until iter){
@@ -338,7 +312,6 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             momentum ~ momentum * 0.9f;
             momentum ~ momentum + grad
             net.layers(0).output~net.layers(0).output + (momentum *@ _lrate);
-            //println("here3")
             if (opts.clipping){
                 max(net.layers(0).output,0,net.layers(0).output);
                 min(net.layers(0).output,255,net.layers(0).output);
@@ -346,23 +319,15 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
             val dims = net.layers(0).output.dims;
             val s = dims(1);
             val d = net.layers(0).output.reshapeView(dims(1),dims(2),dims(0),dims(3))
-            /*if (t % 2 == 0) {
-                d(0->(s-1),?,?,?) = (d(0->(s-1),?,?,?)*0.5f + d(1->s,?,?,?)*0.5f)// *0.5f
-                d(?,0->(s-1),?,?) = (d(?,0->(s-1),?,?)*0.5f + d(?,1->s,?,?)*0.5f)// *0.5f
-            }
-            else {
-                d(1->s,?,?,?) = (d(0->(s-1),?,?,?)*0.5f + d(1->s,?,?,?)*0.5f)// *0.5f
-                d(?,1->s,?,?) = (d(?,0->(s-1),?,?)*0.5f + d(?,1->s,?,?)*0.5f)// *0.5f
-            }*/
+            val smooth_id  = 0  // Use ? if want to smooth all the images.
             if (t % 2 == 0) {
-                d(0->(s-1),?,?,0) = (d(0->(s-1),?,?,0)*0.5f + d(1->s,?,?,0)*0.5f)// *0.5f
-                d(?,0->(s-1),?,0) = (d(?,0->(s-1),?,0)*0.5f + d(?,1->s,?,0)*0.5f)// *0.5f
+                d(0->(s-1),?,?,smooth_id) = (d(0->(s-1),?,?,smooth_id)*0.5f + d(1->s,?,?,smooth_id)*0.5f)// *0.5f
+                d(?,0->(s-1),?,smooth_id) = (d(?,0->(s-1),?,smooth_id)*0.5f + d(?,1->s,?,smooth_id)*0.5f)// *0.5f
             }
             else {
-                d(1->s,?,?,0) = (d(0->(s-1),?,?,0)*0.5f + d(1->s,?,?,0)*0.5f)// *0.5f
-                d(?,1->s,?,0) = (d(?,0->(s-1),?,0)*0.5f + d(?,1->s,?,0)*0.5f)// *0.5f
+                d(1->s,?,?,smooth_id) = (d(0->(s-1),?,?,smooth_id)*0.5f + d(1->s,?,?,smooth_id)*0.5f)// *0.5f
+                d(?,1->s,?,smooth_id) = (d(?,0->(s-1),?,smooth_id)*0.5f + d(?,1->s,?,smooth_id)*0.5f)// *0.5f
             }
-            
             t += 1
             D.layers(0).output<--net.layers(0).output;
             if (p && t%10 == 0) {
@@ -407,7 +372,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                 val gscore = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 gscores+=gscore;
                 
-                /*batch(1)(?) = 1;
+                /**batch(1)(?) = 1;
                 batch(0)(?,?,?,0->(batchSize/2)) = cpu(data(?,?,?,0->(batchSize/2)))
                 batch(1)(?,0->(batchSize/2)) = 0;                
                 D.layers(0).deriv.clear;
@@ -445,7 +410,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                     if (opts.printInfo)
                         println("Generate samples score: %.3f".format(gscore));
                 
-                /*val dloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;                
+                /**val dloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;                
                 val dscore = mean(D.output_layers(0).score).dv.toFloat
                 dscores+=dscore
                     
@@ -519,7 +484,7 @@ object Synthesis {
         var dissimilarity = 0f;
         var trans : Mat=>Mat = null;
         var trainDis = true;
-        var resetInterval = 1000;
+        var resetInterval = 1000000000;
         var updateInterval = 100;
         var endLayer = -1; // -1 means the last layer, -2 means the second-to-last, 0 means the first.
         var derivFunc: Layer=>Unit = null;
@@ -588,7 +553,7 @@ object Synthesis {
             val fc3 =   linear(pool3)(outdim=2,initv=3e-2f);
             val out =   softmaxout(fc3)(scoreType=1); 
 
-            /*val nodes = (in     \ scalef \ inscale on
+            /**val nodes = (in     \ scalef \ inscale on
                          conv1  \ pool1  \ relu1  on
                          conv2  \ pool2  \ relu2  on
                          conv3  \ pool3  \ null   on
@@ -677,7 +642,7 @@ object Synthesis {
         val opts = new MyOpts;
         val ds = FileSource(traindata, trainlabels, opts);
         
-/*        class MyOpts extends Net.Opts with MatSource.Opts with ADAGrad.Opts;
+/**        class MyOpts extends Net.Opts with MatSource.Opts with ADAGrad.Opts;
         val traindir = "/code/BIDMach/data/ImageNet/train/";
         val opts = new MyOpts;
         val ds = new MatSource(Array(loadBMat("data/ImageNet/classes/dataNCHW1.bmat.lz4"),IMat(1,100)+1),opts)*/

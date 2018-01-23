@@ -8,14 +8,15 @@ import BIDMach.networks.layers._;
 
 /***
     Visualizing the input and input gradient
+    By default it uses guided backpropagation (See https://arxiv.org/pdf/1412.6806 for reference)
 **/
 
 class InputViz(val name: String = "Input") extends Visualization{
     val plot = new Plot(name);
     var deriv: Mat = null;
     var output: Mat = null;
-    var guided_bp = false;
-    var gradient_scale = 5000f        
+    var guided_bp = true;
+    var gradient_scale = 200f        
     var _gradient_scale: Mat = null;
     
     override def check(model:Model,mats:Array[Mat]) = {
@@ -34,7 +35,8 @@ class InputViz(val name: String = "Input") extends Visualization{
                 layer.deriv = layer.output.zeros(layer.output.dims);            
             layer.deriv.clear
             _gradient_scale = layer.deriv.ones(1,1);
-        }        
+        }
+        net.opts.compute_input_gradient = true
     }
         
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        

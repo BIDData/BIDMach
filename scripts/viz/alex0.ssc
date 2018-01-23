@@ -1,6 +1,6 @@
 import BIDMach.networks.layers._
 
-val traindir = "/commuter/ImageNet/train/";
+val traindir = "/data/data/ImageNet/train/";
 val testdir = "/code/BIDMach/data/ImageNet/val/";
 val traindata = traindir+"partNCHW%04d.bmat.lz4";
 val trainlabels = traindir+"label%04d.imat.lz4";
@@ -119,23 +119,43 @@ run()
 
 
 val model = net
-:load save.ssc
-
 val s = new Synthesis("imagenet")
 val o = s.opts
-o.realImagesPath = "/commuter/ImageNet/train/"
-//o.discriminatorBatchSize = opts.batchSize
+
+o.realImagesPath = "/data/data/ImageNet/train/"
+{
+    import javax.swing._
+    val classNames = scala.io.Source.fromFile("data/imagenet_classname.txt").getLines.map(_.split(": ")(1)).toArray;
+    val display = classNames.zipWithIndex.map(x=>"fc8 "+x._2+": "+x._1.slice(1,x._1.length-2));
+    var box2: JComboBox[String] = null;         
+    val m = net.modelmats(net.modelmats.length-2); //1000*4096 matrix
+    val (_,tmp) = sortdown2(m.t);
+    val topFeatures = IMat(cpu(tmp));            
+    val (_,tmp2) = sortdown2(m);
+    val topClasses = IMat(cpu(tmp2))
+    s.plot.add_combobox(display,
+                        (i:Int,v:String)=>{
+                            box2.removeAllItems;   
+                            topFeatures(0->20,i).data.foreach(x=>box2.addItem("fc7 "+x.toString+": "+topClasses(0->3,x).data.map(classNames(_)).reduce(_+";"+_)))
+                            s.opts.endLayer = net.layers.length - 2;
+                            s.opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(i,?)=1f}
+                            s.resetFlag = true
+                        });
+    box2 =s.plot.add_combobox(Array(),
+                        (i:Int,v:String)=>{
+                            s.opts.endLayer = 23;
+                            val id = v.split(": ")(0).split(" ")(1).toInt
+                            s.opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(id,?)=1f}
+                            s.resetFlag = true
+                        });
+}
 s.init(model,null);
 
-o.base = 0
-o.scale = 1
-o.iter=10
-o.lrate=0.1f
-o.langevin = 0
-o.dWeight = 0.5f
+
 o.endLayer = 23
 o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(1,?)=1f}
 o.printInfo = false
+o.clipping = true
 //opts.endLayer = 17
 //opts.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m.reshapeView(13,13,256,2)(6,6,0,?)=1f}
 
@@ -144,7 +164,8 @@ val f5 = model.layers(5).asInstanceOf[BIDMach.networks.layers.ConvLayer].filter.
 f5.setBwdDataAlgo=0
 val df5 = s.D.layers(5).asInstanceOf[BIDMach.networks.layers.ConvLayer].filter.asInstanceOf[BIDMat.GFilter]
 df5.setBwdDataAlgo=0
-net.predicting=true
+net.predicting=false
+
 
 :silent
 
@@ -152,13 +173,13 @@ net.predicting=true
 
 
 //---------Useless scripts---------
-println("Examine the 'nn' variable to track learning state.\n");
+//println("Examine the 'nn' variable to track learning state.\n");
 //val v = nn.add_plot(new FilterViz(5,bw=3)).asInstanceOf[FilterViz]
 //v.interval = 100
 //val s = nn.add_plot(new Synthesis).asInstanceOf[Synthesis]
 //s.lrate = 1000f
 //val s = start("imagenet")
-/*plotscore(s.dscores)
+/**plotscore(s.dscores)
 plotscore(s.gscores)
 plotscore(s.gsteps)
 plothist(s.gdata)*/

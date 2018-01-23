@@ -1,5 +1,5 @@
 :silent
-val traindir = "/commuter/MNIST/"
+val traindir = "/data/data/MNIST/"
 
 val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
 val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
@@ -59,34 +59,31 @@ opts.tensorFormat = Net.TensorNCHW;
 }
 
 val model = nn.model.asInstanceOf[Net];
-//nn.train
 nn.launchTrain;
 nn.pause
 import BIDMach.viz._
 import BIDMach.networks.layers._
 
 //val v = nn.add_plot(new FilterViz(1,bw=5)).asInstanceOf[FilterViz]
-:load save.ssc
+
+:load scripts/viz/save.ssc
 load(model,"models/mnist/")
+
 val s = new Synthesis("mnist")
 val o = s.opts
-//plotscore(s.dscores)
-//plotscore(s.gscores)
-//plotscore(s.gsteps)
-//plothist(s.gdata)
-o.realImagesPath = "/commuter/MNIST/";
+o.realImagesPath = "/data/data/MNIST/";
 o.pretrainedDiscriminatorPath = "models/mnist_discri2/";
 s.init(model,null);
-
-o.lrate=1f
-o.iter=30
-o.langevin = 0
-o.dWeight = 0.5f
 s.mcmc(model)
 
 val ii = IMat(FMat(model.layers(14).target + irow(0->100)*10))
 o.derivFunc = (a:Layer)=>{val m = a.deriv;m.set(0f);m(ii)=1f}
 o.endLayer = 13
+o.printInfo = false
+o.displayAveraging = true
+o.averagingTime = 1f
+o.resetInterval=1000000000
+o.updateInterval = 10
 
 def setConv(filter:Int) = {
     val func : Layer => Unit = (layer:Layer) => {
@@ -107,26 +104,6 @@ def setConvI(filter:Int,x:Int = 7,y:Int = 7) = {
     func
 }
 
-//load(s.D,"models/mnist_discri2/")
-//s.endLayer=5
-
-:silent
-
-
-/*val (mm, mopts) =  Net.predictor(model, test, testlabels);
-mopts.autoReset = false;
-
-val mmodel = mm.model.asInstanceOf[Net];
-mm.predict;
-
-println("Accuracy = %f" format mean(mm.results(0,?),2).v);*/
-
-o.printInfo = false
-o.displayAveraging = true
-o.averagingTime = 1f
-o.resetInterval=1000000000
-o.updateInterval = 10
-
 def test(){
     val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
     val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
@@ -139,5 +116,11 @@ def test(){
 
     println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 }
+
+
+:silent
+
+
+
 
 
