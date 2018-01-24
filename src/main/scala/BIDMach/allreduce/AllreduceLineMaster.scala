@@ -121,15 +121,15 @@ object AllreduceLineMaster {
 
   def main(args: Array[String]): Unit = {
 
-    val nodeNum = 3
+    val nodeNum = 4
     val workerPerNodeNum = 3
-    val dataSize = 100
+    val dataSize = 500000
 
-    val maxChunkSize = 4
+    val maxChunkSize = 20000
 
-    val maxRound = 100
+    val maxRound = 3000
 
-    val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
+    val threshold = ThresholdConfig(thAllreduce = 0.5f, thReduce = 0.5f, thComplete = 0.5f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
     val masterConfig = MasterConfig(nodeNum = nodeNum, workerPerNodeNum = workerPerNodeNum, maxRound,
       discoveryTimeout = 5.seconds,
