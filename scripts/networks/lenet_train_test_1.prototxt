@@ -4,9 +4,6 @@ layer {
   type: "Data"
   top: "data"
   top: "label"
-  include {
-    phase: TRAIN
-  }
   transform_param {
     scale: 0.00390625
   }

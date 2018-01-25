@@ -35,9 +35,10 @@ opts.tensorFormat = Net.TensorNCHW;
 val model = nn.model.asInstanceOf[Net]
 
 var f:FileReader = null
+var caffeModel:CaffeModel = null
 try {
   f = new FileReader("lenet_train_test_1.prototxt")
-  CaffeModel.loadUntrainedModel(f, model)
+  caffeModel = CaffeModel.loadUntrainedModel(f, model)
 } finally {
   if (f != null) {
     f.close()
@@ -50,7 +51,7 @@ model.opts.nodeset(17).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutput
 
 nn.train;
 
-val (mm, mopts) =  Net.predictor(model, test, testlabels);
+val (mm, mopts) = caffeModel.predictor(test, testlabels);
 mopts.autoReset = false;
 
 val mmodel = mm.model.asInstanceOf[Net];

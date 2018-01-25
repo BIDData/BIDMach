@@ -35,23 +35,21 @@ opts.tensorFormat = Net.TensorNCHW;
 val model = nn.model.asInstanceOf[Net]
 
 var f:FileReader = null
+var caffeModel:CaffeModel = null
 try {
   f = new FileReader("lenet_train_test.prototxt")
-  CaffeModel.loadUntrainedModel(f, model)
+  caffeModel = CaffeModel.loadUntrainedModel(f, model)
 } finally {
   if (f != null) {
     f.close()
   }
 }
-// XXX CaffeIO needs to be fixed to automatically figure this out
-model.opts.nodeset(11).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
 
 
 
 nn.train;
 
-val (mm, mopts) =  Net.predictor(model, test, testlabels);
-mopts.batchSize = 64;
+val (mm, mopts) = caffeModel.predictor(test, testlabels);
 mopts.autoReset = false
 val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
