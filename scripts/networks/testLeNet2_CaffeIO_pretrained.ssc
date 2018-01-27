@@ -39,12 +39,9 @@ try {
     f.close()
   }
 }
-// XXX CaffeIO needs to be fixed to automatically figure this out
-model.opts.nodeset(10).asInstanceOf[SoftmaxOutputNode].scoreType = SoftmaxOutputLayer.AccuracyScore
 
 
 val (mm, mopts) = caffeModel.predictor(test, testlabels);
-mopts.batchSize = 64;
 mopts.autoReset = false;
 val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;

@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GS
 import BIDMat.MatFunctions._
 import BIDMach._
 import BIDMach.datasources.DataSource
+import BIDMach.models.GLM
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
 import scala.collection.JavaConversions._
@@ -35,8 +36,7 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:S
     for (i <- 0 until net.modelmats.length) {
       if (net.modelmats(i) ne null) net.modelmats(i) = net.convertMat(net.modelmats(i));
     }
-    // TODO: do I have to evalbatch(gmats, 0, 0)?
-    
+
     (nn, opts)
   }
 }
@@ -77,6 +77,9 @@ object CaffeModel {
     val nodes = new mutable.ArrayBuffer[Node]
     // TODO: make sure that either everything is trained or nothing is
     val modelMats = new mutable.ArrayBuffer[Mat]
+    // SoftmaxOutputNode for categorical classification
+    var softmaxOutputNode:SoftmaxOutputNode = null
+    var hasAccuracy = false
     implicit def nodeOnly(node:Node):(Array[Node],Seq[Mat]) = (Array(node), null)
     var i = 0
     while (i < layers.length) {
@@ -103,9 +106,25 @@ object CaffeModel {
           }
         }
 
-        case "SoftmaxWithLoss" => new SoftmaxOutputNode
-        case "HingeLoss" => new GLMNode { links = irow(3) }
-        case "Accuracy" => new AccuracyNode
+        case "MultinomialLogisticLoss" => {
+          softmaxOutputNode = new SoftmaxOutputNode { lossType = SoftmaxOutputLayer.CaffeMultinomialLogisticLoss }
+          softmaxOutputNode
+        }
+        case "SoftmaxWithLoss" => {
+          softmaxOutputNode = new SoftmaxOutputNode
+          softmaxOutputNode
+        }
+        case "EuclideanLoss" => new GLMNode { links = GLM.linear }
+        case "HingeLoss" => {
+          if (layer.param.getHingeLossParam().getNorm() != Caffe.HingeLossParameter.Norm.L1) {
+            throw new UnsupportedOperationException("Only L1 loss is supported")
+          }
+          new GLMNode { links = GLM.svm }
+        }
+        case "Accuracy" => {
+          hasAccuracy = true
+          (Array(), null)
+        }
 
         case "ReLU" => new RectNode
         case "Sigmoid" => new SigmoidNode
@@ -161,11 +180,18 @@ object CaffeModel {
         case _ =>
       }
       
+      // Set accuracy score option if there was one
+      if (hasAccuracy && (softmaxOutputNode ne null)) {
+        softmaxOutputNode.scoreType = SoftmaxOutputLayer.AccuracyScore
+      }
+      
       layer.inodeFirst = nodes.length
       layer.inodeLast = nodes.length + newNodes.length - 1
 
-      for ((input, i) <- layer.inputs.zipWithIndex) {
-        newNodes(0).inputs(i) = nodes(input.inodeLast)
+      if (!newNodes.isEmpty) {
+        for ((input, i) <- layer.inputs.zipWithIndex) {
+          newNodes(0).inputs(i) = nodes(input.inodeLast)
+        }
       }
       
       nodes ++= newNodes
@@ -195,7 +221,7 @@ object CaffeModel {
     var matches = true
     for (fieldDesc <- netStateRule.getAllFields().keys) {
       fieldDesc.getName() match {
-        case "phase" => matches &= netStateRule.getPhase() == phase
+        case "phase" => matches &= ((phase eq null) || netStateRule.getPhase() == phase)
         case _ => println(s"Warning: net state rule ${fieldDesc.getName()} is not implemented")
       }
     }
