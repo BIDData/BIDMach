@@ -18,3 +18,5 @@ data
 /bin
 *.xml
 *.iml
+
+conf/*
