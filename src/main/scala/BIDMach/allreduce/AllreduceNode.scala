@@ -3,48 +3,60 @@ package BIDMach.allreduce
 import BIDMach.allreduce.AllreduceWorker.{DataSink, DataSource}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.collection.mutable
 
-class AllreduceNode(workerConfig: WorkerConfig,
+
+
+class AllreduceNode(nodeConfig: NodeConfig,
+                    lineMasterConfig: LineMasterConfig,
+                    workerConfig: WorkerConfig,
                     sources: List[DataSource],
                     sinks: List[DataSink]) extends Actor with akka.actor.ActorLogging {
 
+  var dimensioNodeMap : Array[ActorRef] = Array.empty
+  var id = -1
+  var dimNum = nodeConfig.dimNum //numDim = # of DimensionNodes PlaceHolder it will spawn
 
-  val workers: Array[ActorRef] = {
-    val arr = new Array[ActorRef](workerConfig.workerPerNodeNum)
-    for (i <- 0 until workerConfig.workerPerNodeNum) {
-      val worker = context.actorOf(Props(
-        classOf[AllreduceWorker],
-        workerConfig,
-        sources(i),
-        sinks(i)),
-        name = s"worker-$i"
-      )
-      println(s"Worker $i created with ${worker.path}")
-      arr(i) = worker
-    }
-    arr
-  }
+  generateDimensionNodes()   //generate dimension nodes when the node initializes
 
   override def receive: Receive = {
     case _ => Unit
+  }
+
+  def generateDimensionNodes(): Unit = {
+    dimensioNodeMap = {
+      val arr = new Array[ActorRef](dimNum)
+      for (i <- 0 until dimNum) {
+          val dimensionNode = context.actorOf(Props(
+            classOf[AllreduceDimensionNode],
+            DimensionNodeConfig(dim = i),
+            lineMasterConfig,
+            workerConfig,
+            sources,
+            sinks),
+            name = s"DimensionNode-dim=${i}"
+          )
+          println(s"-----Node: DimensionNode dim:$i created with ${dimensionNode}")
+          arr(i) = dimensionNode
+      }
+      arr
+    }
   }
 }
 
 object AllreduceNode {
 
-
-  def startUp(port: String, workerConfig: WorkerConfig) = {
+  def startUp(port: String, nodeConfig: NodeConfig, lineMasterConfig: LineMasterConfig, workerConfig: WorkerConfig) = {
 
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
-      withFallback(ConfigFactory.parseString("akka.cluster.roles = [node]")).
+      withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
       withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
 
-    val assertCorrectness = true
+    val assertCorrectness = false
     val checkpoint = 10
 
     def testPerformanceSourceSink(sourceDataSize: Int, checkpoint: Int): (DataSource, DataSink) = {
@@ -88,7 +100,8 @@ object AllreduceNode {
     }
 
     def testCorrectnessSourceSink(sourceDataSize: Int, checkpoint: Int) = {
-
+      assert(false)
+      //"obsoleted"
       val random = new scala.util.Random(100)
       val totalInputSample = 8
 
@@ -151,33 +164,45 @@ object AllreduceNode {
       testPerformanceSourceSink(workerConfig.metaData.dataSize, checkpoint)
     }
 
-    val sources: List[DataSource] = Array.fill(workerConfig.workerPerNodeNum)(source).toList
-    val sinks:List[DataSink] = Array.fill(workerConfig.workerPerNodeNum)(sink).toList
+    val sources: List[DataSource] = Array.fill(lineMasterConfig.workerPerNodeNum * nodeConfig.dimNum)(source).toList
+    val sinks:List[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum * nodeConfig.dimNum)(sink).toList
 
     system.actorOf(Props(classOf[AllreduceNode],
+      nodeConfig,
+      lineMasterConfig,
       workerConfig,
       sources,
       sinks
-    ), name = "node")
-
+    ), name = "Node")
   }
 
   def main(args: Array[String]): Unit = {
+    val dimNum = 2
+    val dataSize = 100
+    val maxChunkSize = 4
     val workerPerNodeNum = 3
-    val dataSize = 500000
+    val maxRound = 100
 
-    val maxChunkSize = 20000
-
-    val threshold = ThresholdConfig(thAllreduce = 0.5f, thReduce = 0.5f, thComplete = 0.5f)
+    val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 0.8f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-    val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+    val nodeConfig = NodeConfig(dimNum = dimNum)
+
+    val workerConfig = WorkerConfig(
       discoveryTimeout = 5.seconds,
       threshold = threshold,
-      metaData= metaData)
+      metaData = metaData)
 
-    AllreduceNode.startUp("0", workerConfig)
+    val lineMasterConfig = LineMasterConfig(
+      workerPerNodeNum = workerPerNodeNum,
+      dim = -1,
+      maxRound = maxRound,
+      discoveryTimeout = 5.seconds,
+      threshold = threshold,
+      metaData = metaData)
+
+
+    AllreduceNode.startUp("0", nodeConfig,lineMasterConfig, workerConfig)
   }
-
-
 }
+

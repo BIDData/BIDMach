@@ -61,7 +61,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-    val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+    val workerConfig = WorkerConfig(
       discoveryTimeout = 5.seconds,
       threshold = threshold,
       metaData = metaData)
@@ -133,7 +133,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-      val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      val workerConfig = WorkerConfig(
         discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
@@ -181,7 +181,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-      val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      val workerConfig = WorkerConfig(
         discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
@@ -216,7 +216,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 0.9f, thComplete = 0.8f)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-      val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      val workerConfig = WorkerConfig(
         discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
@@ -271,7 +271,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-      val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      val workerConfig = WorkerConfig(
         discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
@@ -346,7 +346,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-      val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      val workerConfig = WorkerConfig(
         discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
@@ -393,7 +393,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-      val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      val workerConfig = WorkerConfig(
         discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
@@ -438,7 +438,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-      val workerConfig = WorkerConfig(workerPerNodeNum = workerPerNodeNum,
+      val workerConfig = WorkerConfig(
         discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
