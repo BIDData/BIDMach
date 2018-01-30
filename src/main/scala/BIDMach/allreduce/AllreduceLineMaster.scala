@@ -43,7 +43,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
     }
 
     case c: CompleteAllreduce =>
-      //log.info(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.round}")
+      log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.round}")
       if (c.round == round) {
         completeCount += 1
         if (completeCount >= workerNum * thAllreduce && round < maxRound) {
@@ -54,7 +54,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
       }
 
     case slavesInfo: SlavesInfo =>
-      log.info(s"\n----LineMaster ${self.path}: Receive SlavesInfo from GridMaster.")
+      log.debug(s"\n----LineMaster ${self.path}: Receive SlavesInfo from GridMaster.")
       gridMaster = Some(sender())
       val nodeRefs = slavesInfo.slaveNodesRef
       workerNum = nodeRefs.size
@@ -71,9 +71,8 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   }
 
   private def startAllreduce() = {
-    log.info(s"\n----LineMaster ${self.path}: START ROUND ${round} at time ${System.currentTimeMillis} --------------------")
+    log.debug(s"\n----LineMaster ${self.path}: START ROUND ${round} at time ${System.currentTimeMillis} --------------------")
     completeCount = 0
-
     for (worker <- workerMapAcrossRounds(timeIdx(round)).values) {
       worker ! StartAllreduce(round)
     }
@@ -90,7 +89,6 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
     val roundWorkerMap = workerMapAcrossRounds(timeIdx(round))
 
     for ((nodeIndex, worker) <- roundWorkerMap) {
-      //log.info(s"\n----LineMaster ${self.path}: Sending prepare msg to worker $worker")
       worker ! PrepareAllreduce(round, roundWorkerMap, nodeIndex)
     }
   }
