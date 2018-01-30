@@ -27,4 +27,4 @@ val lineMasterConfig = LineMasterConfig(
   metaData = metaData)
 
 
-AllreduceNode.startUp("0", nodeConfig,lineMasterConfig, workerConfig)
+AllreduceNode.startUp("0", nodeConfig,lineMasterConfig, workerConfig, assertCorrectness=false, checkpoint = 10)

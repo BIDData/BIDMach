@@ -10,8 +10,8 @@ import scala.concurrent.duration._
 class AllreduceNode(nodeConfig: NodeConfig,
                     lineMasterConfig: LineMasterConfig,
                     workerConfig: WorkerConfig,
-                    sources: List[DataSource],
-                    sinks: List[DataSink]) extends Actor with akka.actor.ActorLogging {
+                    sources: List[List[DataSource]],
+                    sinks: List[List[DataSink]]) extends Actor with akka.actor.ActorLogging {
 
   var dimensioNodeMap: Array[ActorRef] = Array.empty
   var id = -1
@@ -32,8 +32,8 @@ class AllreduceNode(nodeConfig: NodeConfig,
           DimensionNodeConfig(dim = i),
           lineMasterConfig,
           workerConfig,
-          sources,
-          sinks),
+          sources(i),
+          sinks(i)),
           name = s"DimensionNode-dim=${i}"
         )
         println(s"-----Node: DimensionNode dim:$i created with ${dimensionNode}")
@@ -49,7 +49,8 @@ object AllreduceNode {
   type DataSink = AllReduceOutput => Unit
   type DataSource = AllReduceInputRequest => AllReduceInput
 
-  def startUp(port: String, nodeConfig: NodeConfig, lineMasterConfig: LineMasterConfig, workerConfig: WorkerConfig) = {
+  def startUp(port: String, nodeConfig: NodeConfig, lineMasterConfig: LineMasterConfig, workerConfig: WorkerConfig,
+              assertCorrectness: Boolean = false, checkpoint: Int = 10) = {
 
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
@@ -57,25 +58,32 @@ object AllreduceNode {
 
     val system = ActorSystem("ClusterSystem", config)
 
-    val assertCorrectness = true
-    val checkpoint = 10
 
-
-    val (source, sink) = if (assertCorrectness) {
+    def getSourceSink(): (DataSource, DataSink) = if (assertCorrectness) {
       testCorrectnessSourceSink(workerConfig.metaData.dataSize, checkpoint)
     } else {
       testPerformanceSourceSink(workerConfig.metaData.dataSize, checkpoint)
     }
 
-    val sources: List[DataSource] = Array.fill(lineMasterConfig.workerPerNodeNum * nodeConfig.dimNum)(source).toList
-    val sinks: List[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum * nodeConfig.dimNum)(sink).toList
+    val (sourceList, sinkList) = {
+      val dimSources: Array[List[DataSource]] = new Array(nodeConfig.dimNum)
+      val dimSinks: Array[List[DataSink]] = new Array(nodeConfig.dimNum)
+      for (i <- 0 until nodeConfig.dimNum) {
+        val (source, sink) = getSourceSink()
+        val sources: Array[DataSource] = Array.fill(lineMasterConfig.workerPerNodeNum)(source)
+        val sinks: Array[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum)(sink)
+        dimSources(i) = sources.toList
+        dimSinks(i) = sinks.toList
+      }
+      (dimSources.toList, dimSinks.toList)
+    }
 
     system.actorOf(Props(classOf[AllreduceNode],
       nodeConfig,
       lineMasterConfig,
       workerConfig,
-      sources,
-      sinks
+      sourceList,
+      sinkList
     ), name = "Node")
   }
 
