@@ -1,5 +1,7 @@
 package BIDMach.allreduce
 
+import java.util
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, RootActorPath, Terminated}
 import akka.cluster.ClusterEvent.MemberUp
 import akka.cluster.{Cluster, Member}
@@ -26,8 +28,10 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   val addressDiscoveryTimeOut: FiniteDuration = config.discoveryTimeout
 
   var round = 0
-  var workerMap: Map[Int, ActorRef] = Map() // workers in the same row/col, including self
-  var nodeMap: Map[Int, ActorRef] = Map()
+
+  // worker address for all rounds
+  var workerMapAcrossRounds: Array[Map[Int, ActorRef]] = new Array(roundNum)
+
   var completeCount = 0
   var confirmPrepareCount = 0
 
@@ -58,38 +62,49 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
     case slavesInfo: SlavesInfo =>
       log.info(s"\n----LineMaster ${self.path}: Receive SlavesInfo from GridMaster.")
       gridMaster = Some(sender())
-      nodeMap = slavesInfo.slaveNodesRef.zipWithIndex.map(tup => (tup._2, tup._1)).toMap
-      //if the LM hasnt begun, initiate PrepareAllreduce. 
+      val nodeRefs = slavesInfo.slaveNodesRef
+      workerNum = nodeRefs.size
+      for (workerRound <- 0 until roundNum) {
+        workerMapAcrossRounds(workerRound) = discoverWorkers(workerRound, nodeRefs.toArray)
+      }
+
+      //if the LM hasnt begun, initiate PrepareAllreduce.
       //Otherwise, we just update the nodeMap and wait for the current round to end
-      if (round == 0){
+      if (round == 0) {
         prepareAllreduce()
       }
-    
 
   }
 
   private def startAllreduce() = {
     log.info(s"\n----LineMaster ${self.path}: START ROUND ${round} at time ${System.currentTimeMillis} --------------------")
     completeCount = 0
-    for (worker <- workerMap.values) {
+
+    for (worker <- workerMapAcrossRounds(timeIdx(round)).values) {
       worker ! StartAllreduce(round)
     }
+  }
+
+  private def timeIdx(round: Int) = {
+    round % roundNum
   }
 
   private def prepareAllreduce() = {
     //log.info(s"\n----LineMaster ${self.path}: Preparing allreduce round ${round}")
     confirmPrepareCount = 0
-    workerNum = nodeMap.size
-    workerMap = discoverWorkers(round, nodeMap)
-    for ((nodeIndex, worker) <- workerMap) {
+
+    val roundWorkerMap = workerMapAcrossRounds(timeIdx(round))
+
+    for ((nodeIndex, worker) <- roundWorkerMap) {
       //log.info(s"\n----LineMaster ${self.path}: Sending prepare msg to worker $worker")
-      worker ! PrepareAllreduce(round, workerMap, nodeIndex)
+      worker ! PrepareAllreduce(round, roundWorkerMap, nodeIndex)
     }
   }
 
-  private def discoverWorkers(round: Int, nodeMap: Map[Int, ActorRef]): Map[Int, ActorRef] = {
-    val addressesFut: Seq[Future[(Int, ActorRef)]] = nodeMap.toSeq.map {
-      case (nodeId, nodeAddress) =>
+  private def discoverWorkers(round: Int, nodeArray: Array[ActorRef]): Map[Int, ActorRef] = {
+    val addressesFut: Seq[Future[(Int, ActorRef)]] =  nodeArray.zipWithIndex.map {
+      case (nodeAddress, nodeId) =>
+
         //nodePath/worker-id-dim
         context.actorSelection(nodeAddress.path / s"DimensionNode-dim=${dim}" / s"Worker-id=${round % roundNum}")
           .resolveOne(addressDiscoveryTimeOut)

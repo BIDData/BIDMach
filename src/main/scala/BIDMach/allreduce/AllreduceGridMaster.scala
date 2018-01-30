@@ -79,7 +79,6 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
     lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(0, 2))))
     lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3))))
 
-
     // debug use only
     // if (nodeMap.size > nodeMap.size){
     // 	lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0,1,2)), (1, ArrayBuffer(0))))
@@ -107,7 +106,6 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
                                             .resolveOne(addressDiscoveryTimeOut), addressDiscoveryTimeOut + 1.second)
     println(s"\n----GridMaster: Discover LineMaster Address : ${lineMaster.path}")
     (lineMaster)
-
   }
 
 }

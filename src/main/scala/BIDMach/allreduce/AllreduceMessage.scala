@@ -14,4 +14,8 @@ final case class ScatterBlock(value : Array[Float], srcId : Int, destId : Int, c
 final case class ReduceBlock(value: Array[Float], srcId : Int, destId : Int, chunkId : Int, round : Int, count: Int)
 
 // GM to LM
+/**
+  * TODO: Rename this for consistency.
+  * This should refer to the node address of [[AllreduceNode]]
+  */
 final case class SlavesInfo(slaveNodesRef: ArrayBuffer[ActorRef])
