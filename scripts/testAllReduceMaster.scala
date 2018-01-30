@@ -1,20 +1,10 @@
-import BIDMach.allreduce.{AllreduceLineMaster, MasterConfig, MetaDataConfig, ThresholdConfig}
+import BIDMach.allreduce._
+
 import scala.concurrent.duration._
 
-val nodeNum = 4
-val workerPerNodeNum = 3
-val dataSize = 500000
+// Override the configuration of the port when specified as program argument
+val port = "2551"
+val nodeNum = 4;
+val masterConfig = MasterConfig(nodeNum = nodeNum, discoveryTimeout = 5.seconds)
 
-val maxChunkSize = 20000
-
-val maxRound = 3000
-
-
-val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
-val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
-val masterConfig = MasterConfig(nodeNum = nodeNum, workerPerNodeNum = workerPerNodeNum, maxRound,
-  discoveryTimeout = 5.seconds,
-  threshold = threshold,
-  metaData= metaData)
-
-AllreduceLineMaster.startUp("2551", threshold, metaData, masterConfig = masterConfig)
+AllreduceGridMaster.startUp(port, masterConfig)
