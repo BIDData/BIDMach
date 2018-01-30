@@ -3,10 +3,9 @@ package BIDMach.allreduce
 import BIDMach.allreduce.AllreduceWorker.{DataSink, DataSource}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration._
-import scala.collection.mutable
 
+import scala.collection.mutable
+import scala.concurrent.duration._
 
 
 class AllreduceNode(nodeConfig: NodeConfig,
@@ -15,11 +14,11 @@ class AllreduceNode(nodeConfig: NodeConfig,
                     sources: List[DataSource],
                     sinks: List[DataSink]) extends Actor with akka.actor.ActorLogging {
 
-  var dimensioNodeMap : Array[ActorRef] = Array.empty
+  var dimensioNodeMap: Array[ActorRef] = Array.empty
   var id = -1
   var dimNum = nodeConfig.dimNum //numDim = # of DimensionNodes PlaceHolder it will spawn
 
-  generateDimensionNodes()   //generate dimension nodes when the node initializes
+  generateDimensionNodes() //generate dimension nodes when the node initializes
 
   override def receive: Receive = {
     case _ => Unit
@@ -29,17 +28,17 @@ class AllreduceNode(nodeConfig: NodeConfig,
     dimensioNodeMap = {
       val arr = new Array[ActorRef](dimNum)
       for (i <- 0 until dimNum) {
-          val dimensionNode = context.actorOf(Props(
-            classOf[AllreduceDimensionNode],
-            DimensionNodeConfig(dim = i),
-            lineMasterConfig,
-            workerConfig,
-            sources,
-            sinks),
-            name = s"DimensionNode-dim=${i}"
-          )
-          println(s"-----Node: DimensionNode dim:$i created with ${dimensionNode}")
-          arr(i) = dimensionNode
+        val dimensionNode = context.actorOf(Props(
+          classOf[AllreduceDimensionNode],
+          DimensionNodeConfig(dim = i),
+          lineMasterConfig,
+          workerConfig,
+          sources,
+          sinks),
+          name = s"DimensionNode-dim=${i}"
+        )
+        println(s"-----Node: DimensionNode dim:$i created with ${dimensionNode}")
+        arr(i) = dimensionNode
       }
       arr
     }
@@ -165,7 +164,7 @@ object AllreduceNode {
     }
 
     val sources: List[DataSource] = Array.fill(lineMasterConfig.workerPerNodeNum * nodeConfig.dimNum)(source).toList
-    val sinks:List[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum * nodeConfig.dimNum)(sink).toList
+    val sinks: List[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum * nodeConfig.dimNum)(sink).toList
 
     system.actorOf(Props(classOf[AllreduceNode],
       nodeConfig,
@@ -202,7 +201,7 @@ object AllreduceNode {
       metaData = metaData)
 
 
-    AllreduceNode.startUp("0", nodeConfig,lineMasterConfig, workerConfig)
+    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig)
   }
 }
 

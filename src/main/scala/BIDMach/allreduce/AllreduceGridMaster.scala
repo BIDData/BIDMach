@@ -5,14 +5,12 @@ import akka.cluster.ClusterEvent.MemberUp
 import akka.cluster.{Cluster, Member}
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
-import scala.language.postfixOps
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 
-class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.ActorLogging{
+class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.ActorLogging {
 
   val nodeNum = config.nodeNum
   val addressDiscoveryTimeOut: FiniteDuration = config.discoveryTimeout
@@ -47,8 +45,8 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
 
     case Terminated(a) =>
       log.info(s"\n----GridMaster: $a is terminated, removing it from the map")
-      for (node <- nodeMap){
-        if(node == a) {
+      for (node <- nodeMap) {
+        if (node == a) {
           log.info(s"\n----GridMaster: $a should be removed. The function is NOT YET COMPLETE")
         }
       }
@@ -68,7 +66,7 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
   0 1
   2 3
   */
-  private def generateLineMasters() : Unit = {
+  private def generateLineMasters(): Unit = {
     //config 1
     // lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1)), (1, ArrayBuffer(0,2))))
     // lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3)), (1, ArrayBuffer(1,3))))
@@ -87,11 +85,11 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
 
   }
 
-  private def initLineMasters() : Unit = {
-    for ((nodeIdx, assignment) <- lineMastersAssignment){
-      for ((dim, slaves) <- assignment){
+  private def initLineMasters(): Unit = {
+    for ((nodeIdx, assignment) <- lineMastersAssignment) {
+      for ((dim, slaves) <- assignment) {
         var slavenodeMapRef = ArrayBuffer[ActorRef]()
-        for (slaveIdx <- slaves){
+        for (slaveIdx <- slaves) {
           slavenodeMapRef += nodeMap(slaveIdx)
         }
         var lineMasterRef = discoverLineMaster(dim, nodeIdx)
@@ -100,10 +98,10 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
     }
   }
 
-  private def discoverLineMaster(dim : Int, masterNodeIdx : Int) : ActorRef = {
+  private def discoverLineMaster(dim: Int, masterNodeIdx: Int): ActorRef = {
     //path: masterNodePath/lineMaster-dim
     val lineMaster: ActorRef = Await.result(context.actorSelection(nodeMap(masterNodeIdx).path / s"DimensionNode-dim=${dim}" / "LineMaster")
-                                            .resolveOne(addressDiscoveryTimeOut), addressDiscoveryTimeOut + 1.second)
+      .resolveOne(addressDiscoveryTimeOut), addressDiscoveryTimeOut + 1.second)
     println(s"\n----GridMaster: Discover LineMaster Address : ${lineMaster.path}")
     (lineMaster)
   }

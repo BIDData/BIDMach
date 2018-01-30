@@ -123,8 +123,8 @@ class AllreduceWorker(config: WorkerConfig,
       try {
         assert(s.round == currentRound)
 
-          fetch()
-          scatter()
+        fetch()
+        scatter()
 
       } catch {
         case e: Throwable => printStackTrace("start all reduce", e);
@@ -282,8 +282,7 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def printStackTrace(location: String, e: Throwable): Unit = {
-    import java.io.PrintWriter
-    import java.io.StringWriter
+    import java.io.{PrintWriter, StringWriter}
     val sw = new StringWriter
     e.printStackTrace(new PrintWriter(sw))
     val stackTrace = sw.toString
@@ -421,7 +420,7 @@ object AllreduceWorker {
     * @param assertCorrectness expected multiple of input as reduced results
     * @return
     */
-  def startUp(port: String, dataSize: Int, checkpoint: Int =50, assertCorrectness: Boolean = false) = {
+  def startUp(port: String, dataSize: Int, checkpoint: Int = 50, assertCorrectness: Boolean = false) = {
     initWorker(port, dataSize, checkpoint, assertCorrectness)
   }
 
