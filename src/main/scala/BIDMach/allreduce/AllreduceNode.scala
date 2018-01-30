@@ -4,6 +4,7 @@ import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 
+import scala.collection.mutable
 import scala.concurrent.duration._
 
 
@@ -150,12 +151,19 @@ object AllreduceNode {
     }
 
     // Specify data source
+    val inputSet = mutable.HashSet[Int]()
     val source: DataSource = r => {
+      assert(!inputSet.contains(r.iteration), s"Same data ${r.iteration} is being requested more than once")
+      inputSet.add(r.iteration)
       AllReduceInput(randomFloats(r.iteration % totalInputSample))
     }
 
     // Specify data sink
+    val outputSet = mutable.HashSet[Int]()
     val sink: DataSink = r => {
+      assert(!outputSet.contains(r.iteration), s"Output data ${r.iteration} is being flushed more than once")
+      outputSet.add(r.iteration)
+
       if (r.iteration % checkpoint == 0) {
         val inputUsed = randomFloats(r.iteration % totalInputSample)
         println(s"\n----Asserting #${r.iteration} output...")
