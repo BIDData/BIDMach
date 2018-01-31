@@ -21,15 +21,18 @@ import _root_.caffe.Caffe.PoolingParameter.PoolMethod
 import com.google.protobuf._
 import jcuda.jcudnn.cudnnPoolingMode
 
-class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[CaffeLayer]) {
+class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:Seq[CaffeLayer]) {
   import CaffeModel._
+  
+  private[extern] val layers = _layers
 
+  // FIXME support other predictor calls
   def predictor(data:Mat, labels:Mat) = {
     val (nn, opts) = Net.predictor(net, data, labels)
 
     val newNet = nn.model.asInstanceOf[Net]
     // It's assumed that model layers between train and test are the same
-    val (_, testNodes, _) = parseProtobuf(netParam, Caffe.Phase.TEST, newNet)
+    val (_, testNodes) = parseProtobuf(netParam, Caffe.Phase.TEST, newNet)
     newNet.opts.nodeset = new NodeSet(testNodes.toArray)
     net.createLayers
     net.layers.map((x:Layer) => if (x != null) x.getModelMats(net))
@@ -42,27 +45,39 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:S
 }
 
 object CaffeModel {
-  def loadUntrainedModel(fin:Readable, net:Net) = {
+  def loadUntrainedModel(modelFile:Readable, net:Net) = {
     val caffeBuilder = Caffe.NetParameter.newBuilder()
-    TextFormat.merge(fin, caffeBuilder)
+    TextFormat.merge(modelFile, caffeBuilder)
 
-    val (layers, nodes, _) = parseProtobuf(caffeBuilder, Caffe.Phase.TRAIN, net)
+    val (layers, nodes) = parseProtobuf(caffeBuilder, Caffe.Phase.TRAIN, net)
     net.opts.nodeset = new NodeSet(nodes.toArray)
 
     new CaffeModel(net, caffeBuilder, layers)
   }
 
-  def loadTrainedModel(fin:InputStream, net:Net) = {
-    val cis = CodedInputStream.newInstance(fin)
+  // FIXME support other predictor calls
+  def loadTrainedModel(modelFile:Readable, weightsFile:InputStream, net:Net, data:Mat, labels:Mat) = {
+    // TODO: why are we asking for a net?
+    val baseModel = loadUntrainedModel(modelFile, net)
+    
+    val cis = CodedInputStream.newInstance(weightsFile)
     cis.setSizeLimit(1 << 30)
-    val netParam = Caffe.NetParameter.parseFrom(cis)
-
-    val (layers, nodes, modelMats) = parseProtobuf(netParam, Caffe.Phase.TEST, net)
-    net.opts.nodeset = new NodeSet(nodes.toArray)
+    val weightNetParam = Caffe.NetParameter.parseFrom(cis)
+    
+    // Build a map of names to layers for the weights
+    val weightLayerForName = Map(weightNetParam.getLayerList().map(layer => (layer.getName(), layer)):_*)
+    val modelMats = new mutable.ArrayBuffer[Mat]
+    for (layer <- baseModel.layers) {
+      // Extract the weights and get them into a modelmats list
+      modelMats ++= extractModelMats(weightLayerForName(layer.param.getName()), net)
+    }
     net.setmodelmats(modelMats.toArray)
     net.opts.nmodelmats = modelMats.length
-
-    new CaffeModel(net, netParam, layers)
+    
+    // TODO: can I directly instantiate a net?
+    val (nn, opts) = baseModel.predictor(data, labels)
+    
+    (nn, opts)
   }
 
   private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net) = {
@@ -75,19 +90,17 @@ object CaffeModel {
     // TODO: enforce NCHW if necessary
     // Translate every layer and build a mapping of blobs to layers feeding into them
     val nodes = new mutable.ArrayBuffer[Node]
-    // TODO: make sure that either everything is trained or nothing is
-    val modelMats = new mutable.ArrayBuffer[Mat]
     // SoftmaxOutputNode for categorical classification
     var softmaxOutputNode:SoftmaxOutputNode = null
     var hasAccuracy = false
-    implicit def nodeOnly(node:Node):(Array[Node],Seq[Mat]) = (Array(node), null)
+    implicit def singleNode(node:Node):Array[Node] = Array(node)
     var i = 0
     while (i < layers.length) {
       val layer = layers(i)
       var incr = 1
 
       // Translate layer according to its layer type
-      var (newNodes, newMats):(Array[Node],Seq[Mat]) = layer.param.getType() match {
+      val newNodes:Array[Node] = layer.param.getType() match {
         case "Convolution" => translateConvolution(layer, net)
         case "Pooling" => translatePooling(layer)
         case "LRN" => translateLRN(layer)
@@ -123,7 +136,7 @@ object CaffeModel {
         }
         case "Accuracy" => {
           hasAccuracy = true
-          (Array(), null)
+          Array()
         }
 
         case "ReLU" => new RectNode
@@ -138,12 +151,18 @@ object CaffeModel {
             net.opts.asInstanceOf[DataSource.Opts].batchSize = dataParam.getBatchSize()
           }
           
-          (addTransformNodes(layer.param.getTransformParam(), new InputNode), null)
+          addTransformNodes(layer.param.getTransformParam(), new InputNode)
         }
         case "MemoryData" => new InputNode
         case "HDF5Data" => new InputNode
 
-        case "InnerProduct" => translateInnerProduct(layer)
+        case "InnerProduct" => {
+          val ipp = layer.param.getInnerProductParam()
+          new LinNode {
+            outdim = ipp.getNumOutput()
+            hasBias = ipp.getBiasTerm()
+          }
+        }
         case "Split" => new CopyNode
         case "Softmax" => new SoftmaxNode
         case "Dropout" => {
@@ -171,11 +190,6 @@ object CaffeModel {
               modelNode.bias_scale = layer.param.getParam(1).getLrMult()
             }
           }
-          
-          if (newMats ne null) {
-            modelNode.imodel = modelMats.length
-            modelMats ++= newMats
-          }
         }
         case _ =>
       }
@@ -198,7 +212,7 @@ object CaffeModel {
       i += incr
     }
 
-    (layers, nodes, modelMats)
+    (layers, nodes)
   }
   
   /** Filters out layers in the given {@code LayerParameter} sequence to only contain ones
@@ -311,6 +325,15 @@ object CaffeModel {
     }
   }
   
+  private def extractModelMats(layerParam:Caffe.LayerParameter, net:Net):Seq[Mat] = {
+    layerParam.getType() match {
+      case "Convolution" => getConvLayerMats(layerParam, net)
+      case "Scale" => List() // UM TODO
+      case "InnerProduct" => getInnerProductLayerMats(layerParam)
+      case _ => List()
+    }
+  }
+  
   private def translateConvolution(layer:CaffeLayer, net:Net) = {
     val convParam = layer.param.getConvolutionParam()
     
@@ -343,39 +366,60 @@ object CaffeModel {
         throw new NotImplementedError("Only xavier initialization is currently implemented for convolution layers")
       }
     }
-    
-    val modelMats = new mutable.ArrayBuffer[Mat]
-    if (layer.param.getBlobsCount() > 0) {
-      if (!convNode.hasBias && layer.param.getBlobsCount() != 1) {
-        throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
-      }
-      if (convNode.hasBias && layer.param.getBlobsCount() != 2) {
-        throw new IllegalArgumentException("Convolution layer with bias needs 2 matrices")
-      }
 
-      // TODO: avoid duplicating code with ConvLayer here
-      val shape = layer.param.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
-      val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), convNode.stride(0), convNode.pad(0))
-      // TODO: is this an abstraction barrier violation
-      layer.param.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
-      modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
-        val x = GFilter(filter)
-        x.convType = Net.CrossCorrelation
-        x.setTensorFormat(Net.getCUDNNformat(convNode.tensorFormat, net.opts.tensorFormat));
-        x
-      } else {
-        filter
-      })
-      
-      if (convNode.hasBias) {
-        val n = layer.param.getBlobs(1).getShape().getDim(0).toInt
-        modelMats += blob2Mat(layer.param.getBlobs(1)).reshapeView(n, 1, 1, 1)
-      } else {
-        modelMats += null
-      }
+    Array[Node](convNode)
+  }
+  
+  private def getConvLayerMats(layerParam:Caffe.LayerParameter, net:Net) = {
+    val convParam = layerParam.getConvolutionParam()
+    val modelMats = new mutable.ArrayBuffer[Mat]
+
+    // TODO: avoid duplication with translateConvolution
+    val hasBias = convParam.getBiasTerm()
+    val stride0 = if (convParam.hasStrideW()) {
+      convParam.getStrideW() 
+    } else if (convParam.getStrideCount() == 0) {
+      1
+    } else {
+      convParam.getStride(0)
     }
+    val pad0 = if (convParam.hasPadW()) {
+      convParam.getPadW() 
+    } else if (convParam.getPadCount() == 0) {
+      0
+    } else {
+      convParam.getPad(0)
+    }
+
+    if (!hasBias && layerParam.getBlobsCount() != 1) {
+      throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
+    }
+    if (hasBias && layerParam.getBlobsCount() != 2) {
+      throw new IllegalArgumentException("Convolution layer with bias needs 2 matrices")
+    }
+
+    // TODO: avoid duplicating code with ConvLayer here
+    val shape = layerParam.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
+    val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), stride0, pad0)
+    // TODO: is this an abstraction barrier violation
+    layerParam.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
+    modelMats += (if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
+      val x = GFilter(filter)
+      x.convType = Net.CrossCorrelation
+      x.setTensorFormat(jcuda.jcudnn.cudnnTensorFormat.CUDNN_TENSOR_NCHW);
+      x
+    } else {
+      filter
+    })
     
-    (Array[Node](convNode), modelMats)
+    if (hasBias) {
+      val n = layerParam.getBlobs(1).getShape().getDim(0).toInt
+      modelMats += blob2Mat(layerParam.getBlobs(1)).reshapeView(n, 1, 1, 1)
+    } else {
+      modelMats += null
+    }
+
+    modelMats
   }
   
   private def translatePooling(layer:CaffeLayer) = {
@@ -431,37 +475,28 @@ object CaffeModel {
     }
   }
   
-  private def translateInnerProduct(layer:CaffeLayer) = {
-    val ipp = layer.param.getInnerProductParam()
-    val linNode = new LinNode {
-      outdim = ipp.getNumOutput()
-      hasBias = ipp.getBiasTerm()
-    }
-    var modelMats:Seq[Mat] = null
-    if (layer.param.getBlobsCount() > 0) {
-      if (!linNode.hasBias) {
-        if (layer.param.getBlobsCount() != 1) {
-          throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
-        }
-        modelMats = Array(blob2MatTranspose(layer.param.getBlobs(0)), null)
-      } else {
-        if (layer.param.getBlobsCount() != 2) {
-          throw new IllegalArgumentException("Linear layer without bias needs 2 matrices")
-        }
-        if (layer.param.getBlobs(0).getShape().getDim(0) != layer.param.getBlobs(1).getShape().getDim(0)) {
-          throw new IllegalArgumentException("Weight and bias dimensions for linear layer don't agree")
-        }
-        if ((layer.param.getBlobs(0).getDoubleDataCount() > 0) != (layer.param.getBlobs(1).getDoubleDataCount() > 0)) {
-          throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
-        }
-        
-        val outDim = layer.param.getBlobs(0).getShape().getDim(0).intValue()
-        val weightMat = blob2MatTranspose(layer.param.getBlobs(0))
-        val biasMat = blob2MatTranspose(layer.param.getBlobs(1)).reshape(outDim, 1)
-        modelMats = Array(weightMat, biasMat)
+  private def getInnerProductLayerMats(layerParam:Caffe.LayerParameter) = {
+    if (!layerParam.getInnerProductParam().getBiasTerm()) {
+      if (layerParam.getBlobsCount() != 1) {
+        throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
       }
+      Array(blob2MatTranspose(layerParam.getBlobs(0)), null)
+    } else {
+      if (layerParam.getBlobsCount() != 2) {
+        throw new IllegalArgumentException("Linear layer without bias needs 2 matrices")
+      }
+      if (layerParam.getBlobs(0).getShape().getDim(0) != layerParam.getBlobs(1).getShape().getDim(0)) {
+        throw new IllegalArgumentException("Weight and bias dimensions for linear layer don't agree")
+      }
+      if ((layerParam.getBlobs(0).getDoubleDataCount() > 0) != (layerParam.getBlobs(1).getDoubleDataCount() > 0)) {
+        throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
+      }
+      
+      val outDim = layerParam.getBlobs(0).getShape().getDim(0).intValue()
+      val weightMat = blob2MatTranspose(layerParam.getBlobs(0))
+      val biasMat = blob2MatTranspose(layerParam.getBlobs(1)).reshape(outDim, 1)
+      Array(weightMat, biasMat)
     }
-    (Array[Node](linNode), modelMats)
   }
   
   private def translateBatchNorm(layer:CaffeLayer, scaleParam:Caffe.ScaleParameter) = {

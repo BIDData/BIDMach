@@ -1,6 +1,7 @@
 //:silent
 import BIDMach.extern._
 import BIDMach.networks.layers._
+import java.io.FileReader
 import java.io.FileInputStream
 
 val traindir = "../../data/MNIST/"
@@ -29,24 +30,25 @@ opts.tensorFormat = Net.TensorNCHW;
 
 val model = nn.model.asInstanceOf[Net]
 
-var f:FileInputStream = null
-var caffeModel:CaffeModel = null
+var f1:FileReader = null
+var f2:FileInputStream = null
 try {
-  f = new FileInputStream("lenet_iter_10000.caffemodel")
-  caffeModel = CaffeModel.loadTrainedModel(f, model)
+  f1 = new FileReader("lenet_train_test.prototxt")
+  f2 = new FileInputStream("lenet_iter_10000.caffemodel")
+  val (mm, mopts) = CaffeModel.loadTrainedModel(f1, f2, model, test, testlabels)
+  mopts.autoReset = false;
+  val mmodel = mm.model.asInstanceOf[Net];
+  mm.predict;
+
+  println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 } finally {
-  if (f != null) {
-    f.close()
+  if (f1 ne null) {
+    f1.close()
+  }
+  if (f2 ne null) {
+  	f2.close()
   }
 }
-
-
-val (mm, mopts) = caffeModel.predictor(test, testlabels);
-mopts.autoReset = false;
-val mmodel = mm.model.asInstanceOf[Net];
-mm.predict;
-
-println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 
 //:silent
 

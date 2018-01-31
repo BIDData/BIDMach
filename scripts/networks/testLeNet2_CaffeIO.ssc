@@ -40,7 +40,7 @@ try {
   f = new FileReader("lenet_train_test.prototxt")
   caffeModel = CaffeModel.loadUntrainedModel(f, model)
 } finally {
-  if (f != null) {
+  if (f ne null) {
     f.close()
   }
 }
