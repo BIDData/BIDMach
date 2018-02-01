@@ -5,9 +5,13 @@
 This scripts requires pretrained models.
 They should be put at models/mnist/   models/mnist_discri/
 Download those models from https://drive.google.com/file/d/1gXxbzZ7MNPPkcxDIpUDrH5m21Q1QT962/view?usp=sharing
+Modified traindir to locate the path to MNIST dataset
 */
 
 val traindir = "/data/data/MNIST/"
+val pretrain_model_dir = "models/mnist/"
+val pretrain_discriminator_dir = "models/mnist_discri/"
+
 
 val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
 val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
@@ -75,12 +79,12 @@ import BIDMach.networks.layers._
 //val v = nn.add_plot(new FilterViz(1,bw=5)).asInstanceOf[FilterViz]
 
 :load scripts/viz/save.ssc
-load(model,"models/mnist/")
+load(model,pretrain_model_dir)
 
 val s = new Synthesis("mnist")
 val o = s.opts
-o.realImagesPath = "/data/data/MNIST/";
-o.pretrainedDiscriminatorPath = "models/mnist_discri/";
+o.realImagesPath = traindir;
+o.pretrainedDiscriminatorPath = pretrain_discriminator_dir;
 s.init(model,null);
 s.mcmc(model)
 

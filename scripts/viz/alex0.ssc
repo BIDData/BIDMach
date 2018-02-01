@@ -2,9 +2,12 @@
 This scripts requires pretrained models.
 They should be put at models/alex32p/   
 Download those models from https://drive.google.com/file/d/1VnXbd2WGbmlkp7HGTp5nHE6SXzzWvOSb/view?usp=sharing
+Modified traindir to locate the path to ImageNet dataset
 */
 
 import BIDMach.networks.layers._
+
+val pretrained_model_dir = "models/alex32p/"
 
 val traindir = "/data/data/ImageNet/train/";
 val testdir = "/code/BIDMach/data/ImageNet/val/";
@@ -119,7 +122,7 @@ def run(){
     java.lang.Thread.sleep(4000)
     nn.pause
     java.lang.Thread.sleep(500)
-    load(net,"models/alex32p/")
+    load(net,pretrained_model_dir)
 }
 run()
 
@@ -128,7 +131,7 @@ val model = net
 val s = new Synthesis("imagenet")
 val o = s.opts
 
-o.realImagesPath = "/data/data/ImageNet/train/"
+o.realImagesPath = traindir
 {
     import javax.swing._
     val classNames = scala.io.Source.fromFile("data/imagenet_classname.txt").getLines.map(_.split(": ")(1)).toArray;
