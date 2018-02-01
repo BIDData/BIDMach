@@ -1,3 +1,9 @@
+/**
+This scripts requires pretrained models.
+They should be put at models/alex32p/   
+Download those models from https://drive.google.com/file/d/1VnXbd2WGbmlkp7HGTp5nHE6SXzzWvOSb/view?usp=sharing
+*/
+
 import BIDMach.networks.layers._
 
 val traindir = "/data/data/ImageNet/train/";

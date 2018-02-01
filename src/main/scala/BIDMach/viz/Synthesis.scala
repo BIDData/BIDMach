@@ -156,10 +156,10 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
         plot.add_slider("lrate",(x:Int)=>{opts.lrate=(10f^(x/20f-4))(0);opts.lrate},60,4);
         plot.add_slider("noise",(x:Int)=>{opts.langevin=(10f^(x/20f-4))(0);opts.langevin},60,4);
         plot.add_slider("L2 norm",(x:Int)=>{opts.l2lambda=(10f^(x/20f-4))(0);opts.l2lambda},60,4);
-        plot.add_slider("Dissimilarity",(x:Int)=>{opts.dissimilarity=(10f^(x/20f-7))(0);opts.dissimilarity},0,7);
+        //plot.add_slider("Dissimilarity",(x:Int)=>{opts.dissimilarity=(10f^(x/20f-7))(0);opts.dissimilarity},0,7);
         plot.add_slider("discriminatorWeight",(x:Int)=>{opts.dWeight=x/100f;opts.dWeight},0);        
-        plot.add_slider("averagingTime",(x:Int)=>{opts.averagingTime=math.exp(x/10).toFloat;opts.averagingTime},0,2); 
-        plot.add_slider("modelAveragingTime",(x:Int)=>{opts.modelAveragingTime=math.exp(x/10).toFloat;opts.averagingTime},0,2);        
+        plot.add_slider("averagingTime",(x:Int)=>{opts.averagingTime=math.exp(x/16f).toFloat;opts.averagingTime},0,2); 
+        //plot.add_slider("modelAveragingTime",(x:Int)=>{opts.modelAveragingTime=math.exp(x/10).toFloat;opts.averagingTime},0,2);        
     }
 
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {        

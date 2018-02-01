@@ -1,4 +1,12 @@
 :silent
+
+
+/**
+This scripts requires pretrained models.
+They should be put at models/mnist/   models/mnist_discri/
+Download those models from https://drive.google.com/file/d/1gXxbzZ7MNPPkcxDIpUDrH5m21Q1QT962/view?usp=sharing
+*/
+
 val traindir = "/data/data/MNIST/"
 
 val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
@@ -72,7 +80,7 @@ load(model,"models/mnist/")
 val s = new Synthesis("mnist")
 val o = s.opts
 o.realImagesPath = "/data/data/MNIST/";
-o.pretrainedDiscriminatorPath = "models/mnist_discri2/";
+o.pretrainedDiscriminatorPath = "models/mnist_discri/";
 s.init(model,null);
 s.mcmc(model)
 
