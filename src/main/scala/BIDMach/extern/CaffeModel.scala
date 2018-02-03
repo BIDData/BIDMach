@@ -4,6 +4,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GS
 import BIDMat.MatFunctions._
 import BIDMach._
 import BIDMach.datasources.DataSource
+import BIDMach.datasources.FileSource
 import BIDMach.models.GLM
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
@@ -26,9 +27,26 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:
   
   private[extern] val layers = _layers
 
-  // FIXME support other predictor calls
   def predictor(data:Mat, labels:Mat) = {
     val (nn, opts) = Net.predictor(net, data, labels)
+    switchLayersToTest(nn.model.asInstanceOf[Net])
+    (nn, opts)
+  }
+  
+  def predictor(infn:String, outfn:String):(Learner, Net.FilePredOptions) = {
+    predictor(List(FileSource.simpleEnum(infn,1,0)), List(FileSource.simpleEnum(outfn,1,0)));
+  }
+
+  def predictor(infn: String, inlb: String, outfn: String): (Learner, Net.FilePredOptions) = {
+    predictor(List(FileSource.simpleEnum(infn, 1, 0), FileSource.simpleEnum(inlb, 1, 0)), List(FileSource.simpleEnum(outfn, 1, 0)));
+  }
+
+  def predLabels(infn: String, inlb: String): (Learner, Net.FilePredOptions) = {
+    predictor(List(FileSource.simpleEnum(infn, 1, 0), FileSource.simpleEnum(inlb, 1, 0)), null);
+  }
+  
+  def predictor(infiles:List[(Int)=>String], outfiles:List[(Int)=>String]):(Learner, Net.FilePredOptions) = {
+    val (nn, opts) = Net.predictor(net, infiles, outfiles)
     switchLayersToTest(nn.model.asInstanceOf[Net])
     (nn, opts)
   }

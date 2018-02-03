@@ -841,6 +841,7 @@ object Net  {
 
   class PredOptions extends Learner.Options with Net.Opts with MatSource.Opts with MatSink.Opts;
 
+  // If any Net predictors are added or removed, make sure to update the corresponding definitions in CaffeModel
   def predictor(model0:Model, data0:Mat, labels0:Mat):(Learner, PredOptions) = {
     val model = model0.asInstanceOf[Net];
     val mopts = model.opts;
