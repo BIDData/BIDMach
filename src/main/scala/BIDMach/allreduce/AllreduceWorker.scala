@@ -2,10 +2,7 @@ package BIDMach.allreduce
 
 
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
-import com.typesafe.config.ConfigFactory
-
-import scala.collection.mutable
+import akka.actor.{Actor, ActorRef, Terminated}
 
 
 class AllreduceWorker(config: WorkerConfig,
@@ -50,7 +47,7 @@ class AllreduceWorker(config: WorkerConfig,
 
     case p: PrepareAllreduce => {
 
-      log.info(s"\n----Worker ${self.path}: Preparing data round ${p.round}")
+      log.debug(s"\n----Worker ${self.path}: Preparing data round ${p.round}")
       try {
 
         assert(p.round > currentRound)
@@ -123,8 +120,8 @@ class AllreduceWorker(config: WorkerConfig,
       try {
         assert(s.round == currentRound)
 
-          fetch()
-          scatter()
+        fetch()
+        scatter()
 
       } catch {
         case e: Throwable => printStackTrace("start all reduce", e);
@@ -282,148 +279,11 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def printStackTrace(location: String, e: Throwable): Unit = {
-    import java.io.PrintWriter
-    import java.io.StringWriter
+    import java.io.{PrintWriter, StringWriter}
     val sw = new StringWriter
     e.printStackTrace(new PrintWriter(sw))
     val stackTrace = sw.toString
     println(e, s"error in $location, $stackTrace")
   }
-}
-
-object AllreduceWorker {
-
-  type DataSink = AllReduceOutput => Unit
-  type DataSource = AllReduceInputRequest => AllReduceInput
-
-  private def initWorker(port: String, sourceDataSize: Int, checkpoint: Int = 50, assertCorrectness: Boolean = false) = {
-    val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
-      withFallback(ConfigFactory.parseString("akka.cluster.roles = [worker]")).
-      withFallback(ConfigFactory.load())
-
-    val system = ActorSystem("ClusterSystem", config)
-
-    val (source, sink) = if (assertCorrectness) {
-      testCorrectnessSourceSink(sourceDataSize, checkpoint)
-    } else {
-      testPerformanceSourceSink(sourceDataSize, checkpoint)
-    }
-
-    system.actorOf(Props(classOf[AllreduceWorker], source, sink), name = "worker")
-  }
-
-  private def testCorrectnessSourceSink(sourceDataSize: Int, checkpoint: Int) = {
-
-    val random = new scala.util.Random(100)
-    val totalInputSample = 8
-
-    lazy val randomFloats = {
-      val nestedArray = new Array[Array[Float]](totalInputSample)
-      for (i <- 0 until totalInputSample) {
-        nestedArray(i) = Array.range(0, sourceDataSize).toList.map(_ => random.nextFloat()).toArray
-      }
-      nestedArray
-    }
-
-    def ~=(x: Double, y: Double, precision: Double = 1e-5) = {
-      if ((x - y).abs < precision) true else false
-    }
-
-    // Specify data source
-    val inputSet = mutable.HashSet[Int]()
-    val source: DataSource = r => {
-      assert(!inputSet.contains(r.iteration), s"Same data ${r.iteration} is being requested more than once")
-      inputSet.add(r.iteration)
-      AllReduceInput(randomFloats(r.iteration % totalInputSample))
-    }
-
-    // Specify data sink
-    val outputSet = mutable.HashSet[Int]()
-
-    val sink: DataSink = r => {
-      assert(!outputSet.contains(r.iteration), s"Output data ${r.iteration} is being flushed more than once")
-      outputSet.add(r.iteration)
-
-      if (r.iteration % checkpoint == 0) {
-        val inputUsed = randomFloats(r.iteration % totalInputSample)
-        println(s"\n----Worker: Asserting #${r.iteration} output...")
-        var zeroCountNum = 0
-        var totalCount = 0
-        for (i <- 0 until sourceDataSize) {
-          val count = r.count(i)
-          val meanActual = r.data(i) / count
-          totalCount += count
-          if (count == 0) {
-            zeroCountNum += 1
-          } else {
-            val expected = inputUsed(i)
-            assert(~=(expected, meanActual), s"Expected [$expected], but actual [$meanActual] at pos $i for iteraton #${r.iteration}")
-          }
-        }
-        val nonZeroCountElementNum = sourceDataSize - zeroCountNum
-        println("OK: Mean of non-zero elements match the expected input!")
-        println(f"Element with non-zero counts: ${nonZeroCountElementNum / sourceDataSize.toFloat}%.2f ($nonZeroCountElementNum/$sourceDataSize)")
-        println(f"Average count value: ${totalCount / nonZeroCountElementNum.toFloat}%2.2f ($totalCount/$nonZeroCountElementNum)")
-      }
-    }
-
-    (source, sink)
-  }
-
-
-  private def testPerformanceSourceSink(sourceDataSize: Int, checkpoint: Int): (DataSource, DataSink) = {
-
-    lazy val floats = Array.range(0, sourceDataSize).map(_.toFloat)
-    val source: DataSource = _ => AllReduceInput(floats)
-
-    var cumulativeThroughput: Double = 0
-    var measurementCount: Int = 0
-    val initialDiscard: Int = 10
-
-    var tic = System.currentTimeMillis()
-    val sink: DataSink = r => {
-      if (r.iteration % checkpoint == 0 && r.iteration != 0) {
-
-        val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
-
-        println(s"----Data output at #${r.iteration} - $timeElapsed s")
-        val bytes = r.data.length * 4.0 * checkpoint
-        val mBytes = bytes / 1.0e6
-        val throughput = mBytes / timeElapsed
-
-        val report = f"$mBytes%2.1f Mbytes in $timeElapsed%2.1f seconds at $throughput%4.3f MBytes/sec"
-
-        measurementCount += 1
-
-        val avgReport = if (measurementCount > initialDiscard) {
-          cumulativeThroughput += throughput
-          val effectiveCount = measurementCount - initialDiscard
-          val avgThroughput = cumulativeThroughput / effectiveCount
-          f", mean throughput at $avgThroughput%4.3f MBytes/sec from $effectiveCount samples"
-        } else ""
-
-        println(s"$report$avgReport")
-
-        tic = System.currentTimeMillis()
-      }
-    }
-
-
-    (source, sink)
-  }
-
-  /**
-    * Test start up method
-    *
-    * @param port              port number
-    * @param dataSize          number of elements in input array from each node to be reduced
-    * @param checkpoint        interval at which timing is calculated
-    * @param assertCorrectness expected multiple of input as reduced results
-    * @return
-    */
-  def startUp(port: String, dataSize: Int, checkpoint: Int =50, assertCorrectness: Boolean = false) = {
-    initWorker(port, dataSize, checkpoint, assertCorrectness)
-  }
-
 }
 

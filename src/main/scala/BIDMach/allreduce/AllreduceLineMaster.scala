@@ -1,21 +1,17 @@
 package BIDMach.allreduce
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, RootActorPath, Terminated}
-import akka.cluster.ClusterEvent.MemberUp
-import akka.cluster.{Cluster, Member}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.language.postfixOps
 
 
+class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.actor.ActorLogging {
 
-class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.actor.ActorLogging{
-
-  var gridMaster : Option[ActorRef] = None
+  var gridMaster: Option[ActorRef] = None
   var workerNum = -1
   var roundNum = config.workerPerNodeNum //the number of rounds (lags) allowed
   var dim = config.dim
@@ -26,15 +22,17 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   val addressDiscoveryTimeOut: FiniteDuration = config.discoveryTimeout
 
   var round = 0
-  var workerMap: Map[Int, ActorRef] = Map() // workers in the same row/col, including self
-  var nodeMap: Map[Int, ActorRef] = Map()
+
+  // worker address for all rounds
+  var workerMapAcrossRounds: Array[Map[Int, ActorRef]] = new Array(roundNum)
+
   var completeCount = 0
   var confirmPrepareCount = 0
 
   def receive = {
 
     case confirm: ConfirmPreparation => {
-      //log.info(s"\n----LineMaster ${self.path} receive confimation from ${sender} with round ${confirm.round}");
+      log.debug(s"\n----LineMaster ${self.path} receive confimation from ${sender} with round ${confirm.round}")
       if (confirm.round == round) {
         confirmPrepareCount += 1
         //log.info(s"\n----LineMaster ${self.path} receive confimation from ${sender}; ${confirmPrepareCount} out of ${workerNum}")
@@ -44,8 +42,8 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
       }
     }
 
-    case c : CompleteAllreduce =>
-      //log.info(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.round}")
+    case c: CompleteAllreduce =>
+      log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.round}")
       if (c.round == round) {
         completeCount += 1
         if (completeCount >= workerNum * thAllreduce && round < maxRound) {
@@ -56,44 +54,53 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
       }
 
     case slavesInfo: SlavesInfo =>
-      log.info(s"\n----LineMaster ${self.path}: Receive SlavesInfo from GridMaster.")
+      log.debug(s"\n----LineMaster ${self.path}: Receive SlavesInfo from GridMaster.")
       gridMaster = Some(sender())
-      nodeMap = slavesInfo.slaveNodesRef.zipWithIndex.map(tup => (tup._2, tup._1)).toMap
-      //if the LM hasnt begun, initiate PrepareAllreduce. 
+      val nodeRefs = slavesInfo.slaveNodesRef
+      workerNum = nodeRefs.size
+      for (workerRound <- 0 until roundNum) {
+        workerMapAcrossRounds(workerRound) = discoverWorkers(workerRound, nodeRefs.toArray)
+      }
+
+      //if the LM hasnt begun, initiate PrepareAllreduce.
       //Otherwise, we just update the nodeMap and wait for the current round to end
-      if (round == 0){
+      if (round == 0) {
         prepareAllreduce()
       }
-    
 
   }
 
   private def startAllreduce() = {
-    log.info(s"\n----LineMaster ${self.path}: START ROUND ${round} at time ${System.currentTimeMillis} --------------------")
+    log.debug(s"\n----LineMaster ${self.path}: START ROUND ${round} at time ${System.currentTimeMillis} --------------------")
     completeCount = 0
-    for (worker <- workerMap.values) {
+    for (worker <- workerMapAcrossRounds(timeIdx(round)).values) {
       worker ! StartAllreduce(round)
     }
+  }
+
+  private def timeIdx(round: Int) = {
+    round % roundNum
   }
 
   private def prepareAllreduce() = {
     //log.info(s"\n----LineMaster ${self.path}: Preparing allreduce round ${round}")
     confirmPrepareCount = 0
-    workerNum = nodeMap.size
-    workerMap = discoverWorkers(round, nodeMap)
-    for ((nodeIndex, worker) <- workerMap) {
-      //log.info(s"\n----LineMaster ${self.path}: Sending prepare msg to worker $worker")
-      worker ! PrepareAllreduce(round, workerMap, nodeIndex)
+
+    val roundWorkerMap = workerMapAcrossRounds(timeIdx(round))
+
+    for ((nodeIndex, worker) <- roundWorkerMap) {
+      worker ! PrepareAllreduce(round, roundWorkerMap, nodeIndex)
     }
   }
 
-  private def discoverWorkers(round: Int, nodeMap: Map[Int, ActorRef]): Map[Int, ActorRef] = {
-    val addressesFut: Seq[Future[(Int, ActorRef)]] = nodeMap.toSeq.map {
-      case (nodeId, nodeAddress) =>
+  private def discoverWorkers(round: Int, nodeArray: Array[ActorRef]): Map[Int, ActorRef] = {
+    val addressesFut: Seq[Future[(Int, ActorRef)]] = nodeArray.zipWithIndex.map {
+      case (nodeAddress, nodeId) =>
+
         //nodePath/worker-id-dim
         context.actorSelection(nodeAddress.path / s"DimensionNode-dim=${dim}" / s"Worker-id=${round % roundNum}")
           .resolveOne(addressDiscoveryTimeOut)
-            .map(ref => (nodeId, ref))
+          .map(ref => (nodeId, ref))
 
     }
     Await.result(Future.sequence(addressesFut), addressDiscoveryTimeOut).toMap
@@ -113,10 +120,10 @@ object AllreduceLineMaster {
 
     val threshold = ThresholdConfig(thAllreduce = 0.5f, thReduce = 0.5f, thComplete = 0.5f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
-    val masterConfig = LineMasterConfig(workerPerNodeNum = workerPerNodeNum, dim=0, maxRound,
+    val masterConfig = LineMasterConfig(workerPerNodeNum = workerPerNodeNum, dim = 0, maxRound,
       discoveryTimeout = 5.seconds,
       threshold = threshold,
-      metaData= metaData)
+      metaData = metaData)
 
     AllreduceLineMaster.startUp("2551", threshold, metaData, masterConfig)
   }
