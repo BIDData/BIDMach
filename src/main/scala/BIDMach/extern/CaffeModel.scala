@@ -29,8 +29,11 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:
   // FIXME support other predictor calls
   def predictor(data:Mat, labels:Mat) = {
     val (nn, opts) = Net.predictor(net, data, labels)
-
-    val newNet = nn.model.asInstanceOf[Net]
+    switchLayersToTest(nn.model.asInstanceOf[Net])
+    (nn, opts)
+  }
+  
+  private def switchLayersToTest(newNet:Net) = {
     // It's assumed that model layers between train and test are the same
     val (_, testNodes) = parseProtobuf(netParam, Caffe.Phase.TEST, newNet)
     newNet.opts.nodeset = new NodeSet(testNodes.toArray)
@@ -39,27 +42,9 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:
     for (i <- 0 until net.modelmats.length) {
       if (net.modelmats(i) ne null) net.modelmats(i) = net.convertMat(net.modelmats(i));
     }
-
-    (nn, opts)
   }
-}
-
-object CaffeModel {
-  def loadUntrainedModel(modelFile:Readable, net:Net) = {
-    val caffeBuilder = Caffe.NetParameter.newBuilder()
-    TextFormat.merge(modelFile, caffeBuilder)
-
-    val (layers, nodes) = parseProtobuf(caffeBuilder, Caffe.Phase.TRAIN, net)
-    net.opts.nodeset = new NodeSet(nodes.toArray)
-
-    new CaffeModel(net, caffeBuilder, layers)
-  }
-
-  // FIXME support other predictor calls
-  def loadTrainedModel(modelFile:Readable, weightsFile:InputStream, net:Net, data:Mat, labels:Mat) = {
-    // TODO: why are we asking for a net?
-    val baseModel = loadUntrainedModel(modelFile, net)
-    
+  
+  def loadWeights(weightsFile:InputStream) = {
     val cis = CodedInputStream.newInstance(weightsFile)
     cis.setSizeLimit(1 << 30)
     val weightNetParam = Caffe.NetParameter.parseFrom(cis)
@@ -67,17 +52,31 @@ object CaffeModel {
     // Build a map of names to layers for the weights
     val weightLayerForName = Map(weightNetParam.getLayerList().map(layer => (layer.getName(), layer)):_*)
     val modelMats = new mutable.ArrayBuffer[Mat]
-    for (layer <- baseModel.layers) {
-      // Extract the weights and get them into a modelmats list
-      modelMats ++= extractModelMats(weightLayerForName(layer.param.getName()), net)
+    for (layer <- layers) {
+      // If layer corresponds to a ModelNode, extract the model mats for this layer
+      if (layer.inodeFirst != -1 && net.opts.nodeset(layer.inodeFirst).isInstanceOf[ModelNode]) {
+        val weightLayer = weightLayerForName.get(layer.param.getName()) match {
+          case Some(wl) => wl
+          case None => throw new IllegalArgumentException(s"Layer ${layer.param.getName()} not found in weights file")
+        }
+        modelMats ++= extractModelMats(weightLayer, net)
+      }
     }
     net.setmodelmats(modelMats.toArray)
     net.opts.nmodelmats = modelMats.length
-    
-    // TODO: can I directly instantiate a net?
-    val (nn, opts) = baseModel.predictor(data, labels)
-    
-    (nn, opts)
+    net.refresh = false
+  }
+}
+
+object CaffeModel {
+  def loadModel(modelFile:Readable, net:Net) = {
+    val caffeBuilder = Caffe.NetParameter.newBuilder()
+    TextFormat.merge(modelFile, caffeBuilder)
+
+    val (layers, nodes) = parseProtobuf(caffeBuilder, Caffe.Phase.TRAIN, net)
+    net.opts.nodeset = new NodeSet(nodes.toArray)
+
+    new CaffeModel(net, caffeBuilder, layers)
   }
 
   private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net) = {
@@ -185,7 +184,6 @@ object CaffeModel {
         case Array(modelNode:ModelNode) => {
           if (layer.param.getParamCount() >= 1) {
             modelNode.lr_scale = layer.param.getParam(0).getLrMult()
-            
             if (layer.param.getParamCount() >= 2) {
               modelNode.bias_scale = layer.param.getParam(1).getLrMult()
             }
@@ -235,7 +233,7 @@ object CaffeModel {
     var matches = true
     for (fieldDesc <- netStateRule.getAllFields().keys) {
       fieldDesc.getName() match {
-        case "phase" => matches &= ((phase eq null) || netStateRule.getPhase() == phase)
+        case "phase" => matches &= (netStateRule.getPhase() == phase)
         case _ => println(s"Warning: net state rule ${fieldDesc.getName()} is not implemented")
       }
     }

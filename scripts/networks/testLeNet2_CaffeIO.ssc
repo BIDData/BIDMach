@@ -38,7 +38,7 @@ var f:FileReader = null
 var caffeModel:CaffeModel = null
 try {
   f = new FileReader("lenet_train_test.prototxt")
-  caffeModel = CaffeModel.loadUntrainedModel(f, model)
+  caffeModel = CaffeModel.loadModel(f, model)
 } finally {
   if (f ne null) {
     f.close()

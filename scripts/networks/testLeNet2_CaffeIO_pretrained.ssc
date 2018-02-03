@@ -21,8 +21,6 @@ val (nn,opts) = Net.learner(train,trainlabels);
 
 opts.npasses = 2
 
-opts.lrate = 1e-3f 
-opts.texp = 0.3f
 opts.pstep = 0.1f
 opts.hasBias = true;
 opts.tensorFormat = Net.TensorNCHW;
@@ -32,15 +30,13 @@ val model = nn.model.asInstanceOf[Net]
 
 var f1:FileReader = null
 var f2:FileInputStream = null
+var caffeModel:CaffeModel = null
 try {
   f1 = new FileReader("lenet_train_test.prototxt")
   f2 = new FileInputStream("lenet_iter_10000.caffemodel")
-  val (mm, mopts) = CaffeModel.loadTrainedModel(f1, f2, model, test, testlabels)
-  mopts.autoReset = false;
-  val mmodel = mm.model.asInstanceOf[Net];
-  mm.predict;
-
-  println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+  
+  caffeModel = CaffeModel.loadModel(f1, model)
+  caffeModel.loadWeights(f2)
 } finally {
   if (f1 ne null) {
     f1.close()
@@ -49,6 +45,11 @@ try {
   	f2.close()
   }
 }
+
+val (mm, mopts) = caffeModel.predictor(test, testlabels)
+mopts.autoReset = false;
+mm.predict
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 
 //:silent
 
