@@ -4,81 +4,50 @@ import java.util
 
 case class ScatteredDataBuffer(dataSize: Int,
                                peerSize: Int,
-                               maxLag: Int,
                                reducingThreshold: Float,
-                               maxChunkSize: Int) extends AllReduceBuffer(dataSize, peerSize, maxLag, maxChunkSize) {
+                               maxChunkSize: Int) extends AllReduceBuffer(dataSize, peerSize, maxChunkSize) {
 
   val minChunkRequired: Int = (reducingThreshold * peerSize).toInt
-  var reducedFlag: Array[Array[Boolean]] = {
-    val rounds = new Array[Array[Boolean]](maxLag)
-    for (i <- 0 until maxLag) {
-      rounds(i) = new Array[Boolean](numChunks);
-    }
-    rounds
+
+  var reducedFlag: Array[Boolean] = new Array[Boolean](numChunks)
+
+  def count(chunkId: Int): Int = {
+    countFilled(chunkId)
   }
 
-  private val currentRounds: Array[Array[Int]] = {
-    val rounds = new Array[Array[Int]](maxLag)
-    for (i <- 0 until maxLag) {
-      rounds(i) = new Array[Int](numChunks)
-      java.util.Arrays.fill(rounds(i), i)
-    }
-    rounds
+  override def store(data: Array[Float], srcId: Int, chunkId: Int) = {
+    super.store(data, srcId, chunkId)
   }
 
-  def compareRoundTo(round: Int, chunkId: Int): Int = {
-    currentRounds(timeIdx(round))(chunkId).compareTo(round)
-  }
-
-  def getRound(round: Int, chunkId: Int): Int = {
-    currentRounds(timeIdx(round))(chunkId)
-  }
-
-  def count(round: Int, chunkId: Int): Int = {
-    countFilled(timeIdx(round))(chunkId)
-  }
-
-  override def store(data: Array[Float], round: Int, srcId: Int, chunkId: Int) = {
-    if (compareRoundTo(round, chunkId) > 0) {
-      throw new IllegalArgumentException(s"Unable to store data chunk $chunkId from source $srcId, as given round [$round] is less than current round [${currentRounds(timeIdx(round))(chunkId)}]")
-    }
-    super.store(data, round, srcId, chunkId)
-  }
-
-
-  def reduce(round: Int, chunkId: Int): (Array[Float], Int) = {
+  def reduce(chunkId: Int): (Array[Float], Int) = {
 
     val chunkStartPos = chunkId * maxChunkSize
     val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
     val chunkSize = chunkEndPos - chunkStartPos
     val reducedArr = new Array[Float](chunkSize)
     for (i <- 0 until peerSize) {
-      val tBuf = temporalBuffer(timeIdx(round))(i);
+      val tBuf = temporalBuffer(i);
       var j = 0;
       while (j < chunkSize) {
         reducedArr(j) += tBuf(chunkStartPos + j);
         j += 1;
       }
     }
-    reducedFlag(timeIdx(round))(chunkId) = true
-    (reducedArr, count(round, chunkId))
+    reducedFlag(chunkId) = true
+    (reducedArr, count(chunkId))
   }
 
-  def getUnreducedChunkIds(round : Int): List[Int] = {
+  def getUnreducedChunkIds(): List[Int] = {
     val ids = 0 until(numChunks)
-    ids.filterNot(reducedFlag(timeIdx(round))(_)).toList
+    ids.filterNot(reducedFlag(_)).toList
   }
 
-
-
-  def prepareNewRound(round: Int) = {
+  def prepareNewRound() = {
     var chunkId = 0
     while (chunkId < numChunks) {
-      currentRounds(timeIdx(round))(chunkId) += maxLag
-
       val chunkStartPos = chunkId * maxChunkSize
       val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
-      val tBuf = temporalBuffer(timeIdx(round))
+      val tBuf = temporalBuffer
       for (peerId <- 0 until peerSize) {
         util.Arrays.fill(
           tBuf(peerId),
@@ -87,20 +56,20 @@ case class ScatteredDataBuffer(dataSize: Int,
           0
         )
       }
-      countFilled(timeIdx(round))(chunkId) = 0
-      reducedFlag(timeIdx(round))(chunkId) = false
+      countFilled(chunkId) = 0
+      reducedFlag(chunkId) = false
       chunkId += 1
     }
   }
 
-  def reachReducingThreshold(round: Int, chunkId: Int): Boolean = {
-    countFilled(timeIdx(round))(chunkId) == minChunkRequired
+  def reachReducingThreshold(chunkId: Int): Boolean = {
+    countFilled(chunkId) == minChunkRequired
   }
 
 }
 
 object ScatteredDataBuffer {
   def empty = {
-    ScatteredDataBuffer(0, 0, 0, 0f, 0)
+    ScatteredDataBuffer(0, 0, 0f, 0)
   }
 }

@@ -54,7 +54,7 @@ class AllreduceWorker(config: WorkerConfig,
 
         if (!isCompleted) {
           log.warning(s"\n----Worker ${self.path}: Force completing round ${p.round}")
-          val unreducedChunkIds = scatterBlockBuf.getUnreducedChunkIds(currentRound)
+          val unreducedChunkIds = scatterBlockBuf.getUnreducedChunkIds()
           for (i <- unreducedChunkIds) {
             reduceAndBroadcast(i)
           }
@@ -81,7 +81,6 @@ class AllreduceWorker(config: WorkerConfig,
           scatterBlockBuf = ScatteredDataBuffer(
             dataSize = myBlockSize,
             peerSize = workerPeerNum,
-            maxLag = 1,
             reducingThreshold = thReduce,
             maxChunkSize = maxChunkSize
           )
@@ -91,13 +90,12 @@ class AllreduceWorker(config: WorkerConfig,
             minBlockSize = minBlockSize,
             totalDataSize = dataSize,
             peerSize = workerPeerNum,
-            maxLag = 1,
             completionThreshold = thComplete,
             maxChunkSize = maxChunkSize
           )
         } else {
-          scatterBlockBuf.prepareNewRound(currentRound)
-          reduceBlockBuf.prepareNewRound(currentRound)
+          scatterBlockBuf.prepareNewRound()
+          reduceBlockBuf.prepareNewRound()
         }
 
         // prepare state for new round
@@ -166,8 +164,8 @@ class AllreduceWorker(config: WorkerConfig,
     if (r.round < currentRound) {
       log.debug(s"\n----Worker ${self.path}: Outdated reduced data")
     } else {
-      reduceBlockBuf.store(r.value, r.round, r.srcId, r.chunkId, r.count)
-      if (reduceBlockBuf.reachCompletionThreshold(r.round)) {
+      reduceBlockBuf.store(r.value, r.srcId, r.chunkId, r.count)
+      if (reduceBlockBuf.reachCompletionThreshold()) {
         log.debug(s"\n----Worker ${self.path}: Receive enough reduced data (numPeers = ${workerPeers.size}) for round ${r.round}, complete")
         completeRound()
       }
@@ -185,9 +183,9 @@ class AllreduceWorker(config: WorkerConfig,
     if (s.round < currentRound) {
       log.debug(s"\n----Worker ${self.path}: Outdated scattered data")
     } else {
-      scatterBlockBuf.store(s.value, s.round, s.srcId, s.chunkId)
-      if (scatterBlockBuf.reachReducingThreshold(s.round, s.chunkId)) {
-        log.debug(s"\n----Worker ${self.path}: receive ${scatterBlockBuf.count(s.round, s.chunkId)} scattered data (numPeers = ${workerPeers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
+      scatterBlockBuf.store(s.value, s.srcId, s.chunkId)
+      if (scatterBlockBuf.reachReducingThreshold(s.chunkId)) {
+        log.debug(s"\n----Worker ${self.path}: receive ${scatterBlockBuf.count(s.chunkId)} scattered data (numPeers = ${workerPeers.size}), chunkId =${s.chunkId} for round ${s.round}, start reducing")
         reduceAndBroadcast(s.chunkId)
       }
     }
@@ -221,7 +219,7 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def flush() = {
-    reduceBlockBuf.getWithCounts(currentRound, output, outputCount)
+    reduceBlockBuf.getWithCounts(output, outputCount)
     log.debug(s"\n----Worker ${self.path}: Flushing output at completed round $currentRound")
     dataSink(AllReduceOutput(output, outputCount, currentRound))
   }
@@ -253,7 +251,7 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def reduceAndBroadcast(chunkId: Int) = {
-    val (reducedData, reduceCount) = scatterBlockBuf.reduce(currentRound, chunkId)
+    val (reducedData, reduceCount) = scatterBlockBuf.reduce(chunkId)
     broadcast(reducedData, chunkId, reduceCount)
   }
 

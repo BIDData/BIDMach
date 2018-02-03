@@ -21,19 +21,18 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
     val outputBuff = new Array[Float](totalDataSize)
     val outputCount = new Array[Int](totalDataSize)
 
-    val buffer = ReducedDataBuffer(maxBlockSize, minBlockSize, totalDataSize, peerSize, maxLag, threshold, maxChunkSize)
+    val buffer = ReducedDataBuffer(maxBlockSize, minBlockSize, totalDataSize, peerSize, threshold, maxChunkSize)
 
     "initialize buffers" in {
 
-      buffer.temporalBuffer.length shouldEqual maxLag
-      buffer.temporalBuffer(0).length shouldEqual peerSize
-      buffer.temporalBuffer(0)(0).length shouldEqual maxBlockSize
+      buffer.temporalBuffer.length shouldEqual peerSize
+      buffer.temporalBuffer(0).length shouldEqual maxBlockSize
 
     }
 
     "have zero counts" in {
 
-      buffer.getWithCounts(rowAtTest, outputBuff, outputCount)
+      buffer.getWithCounts(outputBuff, outputCount)
       outputBuff.sum shouldEqual 0
       outputCount.sum shouldEqual 0
 
@@ -43,8 +42,8 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
       val srcId = 0
       val chunkId = 0
       val toStore: Array[Float] = randomFloatArray(maxChunkSize)
-      buffer.store(toStore, rowAtTest, srcId, chunkId, count = peerSize)
-      buffer.getWithCounts(rowAtTest, outputBuff, outputCount)
+      buffer.store(toStore, srcId, chunkId, count = peerSize)
+      buffer.getWithCounts(outputBuff, outputCount)
       outputBuff.toList.slice(0, maxChunkSize) shouldEqual toStore.toList
 
       for (i <- 0 until maxChunkSize) {
@@ -58,14 +57,14 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
       val chunkId = buffer.numChunks - 1
       intercept[ArrayIndexOutOfBoundsException] {
         val toStore: Array[Float] = randomFloatArray(maxChunkSize)
-        buffer.store(toStore, rowAtTest, srcId, chunkId, count = peerSize)
+        buffer.store(toStore, srcId, chunkId, count = peerSize)
       }
 
       val lastChunkSize = maxBlockSize - (buffer.numChunks - 1) * maxChunkSize
       val toStore: Array[Float] = randomFloatArray(lastChunkSize)
-      buffer.store(toStore, rowAtTest, srcId, chunkId, count = peerSize)
+      buffer.store(toStore, srcId, chunkId, count = peerSize)
 
-      buffer.getWithCounts(rowAtTest, outputBuff, outputCount)
+      buffer.getWithCounts(outputBuff, outputCount)
 
       outputBuff.toList.slice(totalDataSize - lastChunkSize, totalDataSize) shouldEqual toStore.toList
 
@@ -73,23 +72,23 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
 
     "store until reach completion threshold " in {
 
-      buffer.reachCompletionThreshold(rowAtTest) shouldBe false
+      buffer.reachCompletionThreshold() shouldBe false
 
       // 6 chunks of reduced data required
       // 0.7 * 3 * 3 - (threshold * peer size * num chunks)
 
       // peer 0, second chunk
-      buffer.store(randomFloatArray(maxChunkSize), round = 1, srcId = 0, chunkId = 1, count = peerSize)
-      buffer.reachCompletionThreshold(rowAtTest) shouldBe false
+      buffer.store(randomFloatArray(maxChunkSize), srcId = 0, chunkId = 1, count = peerSize)
+      buffer.reachCompletionThreshold() shouldBe false
 
       // peer 1, first, second chunk
-      buffer.store(randomFloatArray(maxChunkSize), round = 1, srcId = 1, chunkId = 0, count = peerSize)
-      buffer.store(randomFloatArray(maxChunkSize), round = 1, srcId = 1, chunkId = 1, count = peerSize)
-      buffer.reachCompletionThreshold(rowAtTest) shouldBe false
+      buffer.store(randomFloatArray(maxChunkSize), srcId = 1, chunkId = 0, count = peerSize)
+      buffer.store(randomFloatArray(maxChunkSize), srcId = 1, chunkId = 1, count = peerSize)
+      buffer.reachCompletionThreshold() shouldBe false
 
       // peer 2, second chunk
-      buffer.store(randomFloatArray(maxChunkSize), round = 1, srcId = 2, chunkId = 1, count = peerSize)
-      buffer.reachCompletionThreshold(rowAtTest) shouldBe true
+      buffer.store(randomFloatArray(maxChunkSize), srcId = 2, chunkId = 1, count = peerSize)
+      buffer.reachCompletionThreshold() shouldBe true
 
     }
 
@@ -99,7 +98,7 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
       // peer 1 - missing 3rd chunk
       // peer 2 - missing 1st chunk
 
-      buffer.getWithCounts(rowAtTest, outputBuff, outputCount)
+      buffer.getWithCounts(outputBuff, outputCount)
 
       val missingIndex = List(4, 9, 10, 11)
       for (i <- missingIndex) {
@@ -123,16 +122,9 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
 
       val newRoundOfSameMod = rowAtTest + maxLag
 
-      buffer.prepareNewRound(rowAtTest)
+      buffer.prepareNewRound()
 
-      buffer.compareRoundTo(newRoundOfSameMod) shouldEqual 0
-      buffer.compareRoundTo(rowAtTest) shouldEqual 1
-
-      intercept[IllegalArgumentException] {
-        buffer.store(randomFloatArray(maxChunkSize), round = rowAtTest, srcId = 2, chunkId = 1, count = peerSize)
-      }
-
-      buffer.getWithCounts(rowAtTest, outputBuff, outputCount)
+      buffer.getWithCounts(outputBuff, outputCount)
 
       outputBuff.toList shouldEqual Array.fill(totalDataSize)(0)
       outputCount.toList shouldEqual Array.fill(totalDataSize)(0)
@@ -154,27 +146,27 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
     val totalDataSize = 16
     val rowAtTest = 1
 
-    val buffer = ReducedDataBuffer(maxBlockSize, minBlockSize, totalDataSize, peerSize, maxLag, threshold, maxChunkSize)
+    val buffer = ReducedDataBuffer(maxBlockSize, minBlockSize, totalDataSize, peerSize, threshold, maxChunkSize)
 
     "store until reach completion threshold " in {
 
-      buffer.reachCompletionThreshold(rowAtTest) shouldBe false
+      buffer.reachCompletionThreshold() shouldBe false
 
       // 8 chunks
 
       // peer 0/1
       for (chunkId <- 0 until 3) {
         for (peerId <- 0 until 2) {
-          buffer.store(randomFloatArray(maxChunkSize), round = rowAtTest, srcId = peerId, chunkId = chunkId, count = peerSize)
-          buffer.reachCompletionThreshold(rowAtTest) shouldBe false
+          buffer.store(randomFloatArray(maxChunkSize), srcId = peerId, chunkId = chunkId, count = peerSize)
+          buffer.reachCompletionThreshold() shouldBe false
         }
       }
 
-      buffer.store(randomFloatArray(maxChunkSize), round = rowAtTest, srcId = 2, chunkId = 0, count = peerSize)
-      buffer.reachCompletionThreshold(rowAtTest) shouldBe false
+      buffer.store(randomFloatArray(maxChunkSize), srcId = 2, chunkId = 0, count = peerSize)
+      buffer.reachCompletionThreshold() shouldBe false
 
-      buffer.store(randomFloatArray(maxChunkSize), round = rowAtTest, srcId = 2, chunkId = 1, count = peerSize)
-      buffer.reachCompletionThreshold(rowAtTest) shouldBe true
+      buffer.store(randomFloatArray(maxChunkSize), srcId = 2, chunkId = 1, count = peerSize)
+      buffer.reachCompletionThreshold() shouldBe true
 
     }
 
