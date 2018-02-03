@@ -7,7 +7,6 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import scala.util.Random
 import scala.concurrent.duration._
 
-
 class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
   override def afterAll {

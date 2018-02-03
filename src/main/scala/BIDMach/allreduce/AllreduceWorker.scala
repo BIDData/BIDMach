@@ -102,10 +102,6 @@ class AllreduceWorker(config: WorkerConfig,
         currentRound = p.round
         isCompleted = false
 
-        // log.info(s"\n----Worker ${self.path}: Prepared round ${p.round}")
-        // log.info(s"\n----Worker ${self.path}: Size of scatter buffer: ${scatterBlockBuf.maxLag} x ${scatterBlockBuf.peerSize} x ${scatterBlockBuf.dataSize}. threshold : ${scatterBlockBuf.minChunkRequired}")
-        // log.info(s"\n----Worker ${self.path}: Size of reduce buffer: ${reduceBlockBuf.maxLag} x ${reduceBlockBuf.peerSize} x ${reduceBlockBuf.maxBlockSize}. threshold: ${reduceBlockBuf.minChunkRequired}")
-        // log.info(s"\n----Worker ${self.path}: My master is ${master}")
         // acknowledge preparation done
         master.orNull ! ConfirmPreparation(p.round)
 

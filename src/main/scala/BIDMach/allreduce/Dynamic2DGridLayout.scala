@@ -201,39 +201,4 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     }
     ret
   }
-
-
-}
-
-object Dynamic2DGridLayout {
-  def main(args: Array[String]): Unit = {
-    var g = new Dynamic2DGridLayout()
-    println("====== Whitebox Addition Test ======")
-    for(i <- 0 until 25){
-      println(s"${g} add ${i}")
-      println(s"need to update on ${g.addNode(i)}")
-      println(s"node map: ${g._node_map}")
-      println("----")
-    }
-    println(g)
-    println("===== Whitebox Random Deletion Test =====")
-    var random = new scala.util.Random(42)
-    val deletion = (0 until 25).toList
-    val random_deletion = random.shuffle(deletion)
-    for(d <- random_deletion){
-      println(s"${g} delete ${d}")
-      println(s"need to update on ${g.removeNode(d)}")
-      println(s"node map: ${g._node_map}")
-      println("----")
-    }
-    print(g)
-    println("===== Addition Performance Test =====")
-    g = new Dynamic2DGridLayout((0 until 10000).toList)
-    println("===== Deletion Performance Test =====")
-    for(i <- 0 until 5000){
-      g.removeNode(i)
-    }
-    println("Test all Cleared.")
-  }
-
 }
