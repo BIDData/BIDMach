@@ -66,8 +66,8 @@ class AllreduceWorker(config: WorkerConfig,
         master = Some(sender())
         workerId = p.nodeId
 
-        // avoid re-initialization when grid organization doesn't change (i.e. block size doesn't change)
-        if (p.workerAddresses.size != workerPeerNum || p.nodeId != workerId) {
+        // only re-initialize buffers when grid size (and thus block size) changes
+        if (p.workerAddresses.size != workerPeerNum) {
           workerPeers = p.workerAddresses
           workerPeerNum = p.workerAddresses.size
 
@@ -93,6 +93,10 @@ class AllreduceWorker(config: WorkerConfig,
             completionThreshold = thComplete,
             maxChunkSize = maxChunkSize
           )
+        } else if (p.nodeId != workerId || workerPeers != p.workerAddresses) {
+          // update peer addresses in case of member changes
+          workerPeers = p.workerAddresses
+          workerPeerNum = p.workerAddresses.size
         } else {
           scatterBlockBuf.prepareNewRound()
           reduceBlockBuf.prepareNewRound()
