@@ -1,12 +1,13 @@
 package BIDMach.allreduce
 
+import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
 import BIDMach.allreduce.ReceivePipeline.{HandledCompletely, Inner}
 import akka.actor.ActorRef
 
 import scala.collection.mutable
 
 
-trait AllreduceWorkerStatsReporting extends ReceivePipeline {
+trait StatsReporting extends ReceivePipeline {
 
   val scatterInCount: mutable.HashMap[Int, Int] = mutable.HashMap[Int, Int]()
   val reducedInCount: mutable.HashMap[Int, Int] = mutable.HashMap[Int, Int]()
@@ -14,11 +15,9 @@ trait AllreduceWorkerStatsReporting extends ReceivePipeline {
   val scatterOutCount: mutable.HashMap[Int, Int] = mutable.HashMap[Int, Int]()
   val reducedOutCount: mutable.HashMap[Int, Int] = mutable.HashMap[Int, Int]()
 
-  val checkPoint = 50
+  def reportingFrequency: Int
 
-  def workerId: Int
-
-  def sendTo(recipient: ActorRef, msg: Any) = {
+  def sendAndCount(recipient: ActorRef, msg: Any) = {
     recipient ! msg
     msg match {
       case s: ScatterBlock => incr(scatterOutCount, s.value.size)
@@ -39,7 +38,7 @@ trait AllreduceWorkerStatsReporting extends ReceivePipeline {
     }
     case start: StartAllreduce => {
 
-      if (start.round % checkPoint == 0 && start.round > checkPoint) {
+      if (start.round % reportingFrequency == 0 && start.round > reportingFrequency) {
         val totalFloatsOut: Long = aggrCount(scatterOutCount) + aggrCount(reducedOutCount)
         val totalFloatsIn: Long = aggrCount(scatterInCount) + aggrCount(reducedInCount)
         context.parent ! AllreduceStats(totalFloatsOut, totalFloatsIn)
@@ -66,10 +65,19 @@ trait AllreduceWorkerStatsReporting extends ReceivePipeline {
 
 }
 
+class AllreduceWorkerWithStats(config: WorkerConfig, dataSource: DataSource, dataSink: DataSink) extends
+  AllreduceWorker(config: WorkerConfig, dataSource: DataSource, dataSink: DataSink) with StatsReporting {
 
-trait AllreduceWorkerStatsAggregator extends ReceivePipeline {
+  override def reportingFrequency: Int = config.statsReportingRoundFrequency
 
-  var count = 0
+  override def sendTo(recipient: ActorRef, msg: Any): Unit = {
+    sendAndCount(recipient, msg)
+  }
+}
+
+
+trait StatsAggregating extends ReceivePipeline {
+
   var tic = System.currentTimeMillis()
   var outgoingFloats: Long = 0
   var incomingFloats: Long = 0
@@ -87,26 +95,40 @@ trait AllreduceWorkerStatsAggregator extends ReceivePipeline {
       outgoingFloats += stats.outgoingFloats
       incomingFloats += stats.incomingFloats
 
-      if (count % 10 == 0 && count > 10) {
+      val secondElapsed = (System.currentTimeMillis() - tic) / 1.0e3
 
-        val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
+      if (secondElapsed >= 10) {
 
-        val (outgoingMbytes, outgoingThroughput) = throughputStats(outgoingFloats, timeElapsed)
-        val (incomingMbytes, incomingThroughput) = throughputStats(incomingFloats, timeElapsed)
+        val (outgoingMbytes, outgoingThroughput) = throughputStats(outgoingFloats, secondElapsed)
+        val (incomingMbytes, incomingThroughput) = throughputStats(incomingFloats, secondElapsed)
 
-        val reportOut = f"Dim$dim: Outgoing $outgoingMbytes%2.1f Mbytes in $timeElapsed%2.1f seconds at $outgoingThroughput%4.3f MBytes/sec"
-        val reportIn = f"Dim$dim: Incoming $incomingMbytes%2.1f Mbytes in $timeElapsed%2.1f seconds at $incomingThroughput%4.3f MBytes/sec"
+        val reportOut = f"Dim$dim: Outgoing $outgoingMbytes%2.1f Mbytes in $secondElapsed%2.1f seconds at $outgoingThroughput%4.3f MBytes/sec"
+        val reportIn = f"Dim$dim: Incoming $incomingMbytes%2.1f Mbytes in $secondElapsed%2.1f seconds at $incomingThroughput%4.3f MBytes/sec"
         println(s"----$reportOut\n----$reportIn")
-        count = 0
         outgoingFloats = 0
         incomingFloats = 0
         tic = System.currentTimeMillis()
       }
 
-      count += 1
-
       HandledCompletely
   }
+}
 
+class AllreduceDimensionNodeWithStats(
+                                       dimensionNodeConfig: DimensionNodeConfig,
+                                       lineMasterConfig: LineMasterConfig,
+                                       workerConfig: WorkerConfig,
+                                       sources: List[DataSource],
+                                       sinks: List[DataSink]
+                                     ) extends
+  AllreduceDimensionNode(
+    dimensionNodeConfig: DimensionNodeConfig,
+    lineMasterConfig: LineMasterConfig,
+    workerConfig: WorkerConfig,
+    sources: List[DataSource],
+    sinks: List[DataSink]) with StatsAggregating {
 
+  override def workerClassProvider() = {
+    classOf[AllreduceWorkerWithStats]
+  }
 }

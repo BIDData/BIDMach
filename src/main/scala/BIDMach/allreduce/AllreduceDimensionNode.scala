@@ -10,7 +10,7 @@ class AllreduceDimensionNode(
                               workerConfig: WorkerConfig,
                               sources: List[DataSource],
                               sinks: List[DataSink]
-                            ) extends Actor with akka.actor.ActorLogging with AllreduceWorkerStatsAggregator {
+                            ) extends Actor with akka.actor.ActorLogging {
 
   var workers: Array[ActorRef] = Array.empty
   var lineMaster: Option[ActorRef] = None
@@ -24,12 +24,16 @@ class AllreduceDimensionNode(
       log.error(s"\n----DimensionNode!dim=${dim}: I AM NOT SUPPOSED TO RECEIVE MSGs")
   }
 
+  protected def workerClassProvider(): Class[_] = {
+    classOf[AllreduceWorker]
+  }
+
   def generateWorkers(): Unit = {
     workers = {
       val arr = new Array[ActorRef](lineMasterConfig.workerPerNodeNum)
       for (i <- 0 until lineMasterConfig.workerPerNodeNum) {
         val worker = context.actorOf(Props(
-          classOf[AllreduceWorker],
+          workerClassProvider(),
           workerConfig,
           sources(i),
           sinks(i)),

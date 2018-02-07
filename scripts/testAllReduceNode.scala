@@ -11,10 +11,11 @@ val maxRound = 10000
 val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
 val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-val nodeConfig = NodeConfig(dimNum = dimNum)
+val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true)
 
 val workerConfig = WorkerConfig(
   discoveryTimeout = 5.seconds,
+  statsReportingRoundFrequency = 10,
   threshold = threshold,
   metaData = metaData)
 
@@ -27,4 +28,4 @@ val lineMasterConfig = LineMasterConfig(
   metaData = metaData)
 
 
-AllreduceNode.startUp("0", nodeConfig,lineMasterConfig, workerConfig, assertCorrectness=false, checkpoint = 100)
+AllreduceNode.startUp("0", nodeConfig,lineMasterConfig, workerConfig, assertCorrectness=false, checkpoint = 10)

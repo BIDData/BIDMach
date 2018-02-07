@@ -1,13 +1,14 @@
 package BIDMach.allreduce
 
 
+import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef, Terminated}
 
 
 class AllreduceWorker(config: WorkerConfig,
-                      dataSource: AllReduceInputRequest => AllReduceInput,
-                      dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging with AllreduceWorkerStatsReporting {
+                      dataSource: DataSource,
+                      dataSink: DataSink) extends Actor with akka.actor.ActorLogging {
 
   val thReduce = config.threshold.thReduce
   val thComplete = config.threshold.thComplete
@@ -285,8 +286,8 @@ class AllreduceWorker(config: WorkerConfig,
     println(e, s"error in $location, $stackTrace")
   }
 
-  override def sendTo(recipient: ActorRef, msg: Any) = {
-    super.sendTo(recipient, msg)
+  protected def sendTo(recipient: ActorRef, msg: Any) = {
+    recipient ! msg
   }
 
 }

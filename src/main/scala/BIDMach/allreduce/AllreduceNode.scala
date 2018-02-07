@@ -24,12 +24,21 @@ class AllreduceNode(nodeConfig: NodeConfig,
     case _ => Unit
   }
 
+  protected def dimensionNodeClassProvider(): Class[_] = {
+
+    if (nodeConfig.reportStats) {
+      classOf[AllreduceDimensionNodeWithStats]
+    } else {
+      classOf[AllreduceDimensionNode]
+    }
+  }
+
   def generateDimensionNodes(): Unit = {
     dimensioNodeMap = {
       val arr = new Array[ActorRef](dimNum)
       for (i <- 0 until dimNum) {
         val dimensionNode = context.actorOf(Props(
-          classOf[AllreduceDimensionNode],
+          dimensionNodeClassProvider(),
           DimensionNodeConfig(dim = i),
           lineMasterConfig,
           workerConfig,
@@ -170,13 +179,14 @@ object AllreduceNode {
     val workerPerNodeNum = 4
     val maxRound = 100000
 
-    val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 0.8f)
+    val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-    val nodeConfig = NodeConfig(dimNum = dimNum)
+    val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true)
 
     val workerConfig = WorkerConfig(
       discoveryTimeout = 5.seconds,
+      statsReportingRoundFrequency = 5,
       threshold = threshold,
       metaData = metaData)
 
@@ -189,7 +199,8 @@ object AllreduceNode {
       metaData = metaData)
 
 
-    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig)
+
+    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10)
   }
 }
 
