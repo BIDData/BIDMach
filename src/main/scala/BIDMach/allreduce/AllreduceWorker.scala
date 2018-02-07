@@ -7,7 +7,7 @@ import akka.actor.{Actor, ActorRef, Terminated}
 
 class AllreduceWorker(config: WorkerConfig,
                       dataSource: AllReduceInputRequest => AllReduceInput,
-                      dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging {
+                      dataSink: AllReduceOutput => Unit) extends Actor with akka.actor.ActorLogging with AllreduceWorkerStatsReporting {
 
   val thReduce = config.threshold.thReduce
   val thComplete = config.threshold.thComplete
@@ -107,7 +107,7 @@ class AllreduceWorker(config: WorkerConfig,
         isCompleted = false
 
         // acknowledge preparation done
-        master.orNull ! ConfirmPreparation(p.round)
+        sendTo(master.orNull, ConfirmPreparation(p.round))
 
       } catch {
         case e: Throwable => printStackTrace("prepare block", e);
@@ -244,7 +244,7 @@ class AllreduceWorker(config: WorkerConfig,
         if (worker == self) {
           handleScatterBlock(scatterMsg)
         } else {
-          worker ! scatterMsg
+          sendTo(worker, scatterMsg)
         }
       }
     }
@@ -265,14 +265,15 @@ class AllreduceWorker(config: WorkerConfig,
       if (worker == self) {
         handleReduceBlock(reduceMsg)
       } else {
-        worker ! reduceMsg
+        sendTo(worker, reduceMsg)
       }
     }
   }
 
+
   private def completeRound() = {
     flush()
-    master.orNull ! CompleteAllreduce(workerId, currentRound)
+    sendTo(master.orNull, CompleteAllreduce(workerId, currentRound))
     isCompleted = true
   }
 
@@ -283,5 +284,10 @@ class AllreduceWorker(config: WorkerConfig,
     val stackTrace = sw.toString
     println(e, s"error in $location, $stackTrace")
   }
+
+  override def sendTo(recipient: ActorRef, msg: Any) = {
+    super.sendTo(recipient, msg)
+  }
+
 }
 

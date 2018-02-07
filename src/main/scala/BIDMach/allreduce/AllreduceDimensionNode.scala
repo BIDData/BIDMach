@@ -10,7 +10,7 @@ class AllreduceDimensionNode(
                               workerConfig: WorkerConfig,
                               sources: List[DataSource],
                               sinks: List[DataSink]
-                            ) extends Actor with akka.actor.ActorLogging {
+                            ) extends Actor with akka.actor.ActorLogging with AllreduceWorkerStatsAggregator {
 
   var workers: Array[ActorRef] = Array.empty
   var lineMaster: Option[ActorRef] = None
