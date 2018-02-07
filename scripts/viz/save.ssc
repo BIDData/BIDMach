@@ -41,3 +41,17 @@ def loadnn(nn:Learner,fname:String,print:Boolean = true) {
         plot(vc)
     }
 }
+
+def savecurve(nn:Learner) {
+    val tc = row(nn.resTlist.map(_.v).toArray)
+    val vc = row( nn.reslist.map(_.v).toArray)
+    saveMat("training_curve.lz4", tc);
+    saveMat("validation_curve.lz4", vc);
+}
+
+def plotcurve() {
+    val tc = loadMat("training_curve.lz4");
+    val vc = loadMat("validation_curve.lz4");
+    plot(tc)
+    plot(vc)
+}
