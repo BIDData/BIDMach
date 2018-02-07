@@ -14,7 +14,7 @@ trait AllreduceWorkerStatsReporting extends ReceivePipeline {
   val scatterOutCount: mutable.HashMap[Int, Int] = mutable.HashMap[Int, Int]()
   val reducedOutCount: mutable.HashMap[Int, Int] = mutable.HashMap[Int, Int]()
 
-  val checkPoint = 10
+  val checkPoint = 50
 
   def workerId: Int
 
@@ -74,20 +74,20 @@ trait AllreduceWorkerStatsAggregator extends ReceivePipeline {
   var outgoingFloats: Long = 0
   var incomingFloats: Long = 0
 
-  def throughputStats(floatSize: Long, secondElapsed: Double) = {
+  def dim: Int
+
+  private def throughputStats(floatSize: Long, secondElapsed: Double) = {
     val bytes = floatSize * 4.0
     val mBytes = bytes / 1.0e6
     (mBytes, mBytes / secondElapsed)
   }
-
-  def dim: Int
 
   pipelineInner {
     case stats: AllreduceStats =>
       outgoingFloats += stats.outgoingFloats
       incomingFloats += stats.incomingFloats
 
-      if (count % 100 == 0 && count > 100) {
+      if (count % 10 == 0 && count > 10) {
 
         val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
 
