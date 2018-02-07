@@ -22,8 +22,8 @@ def savenn(nn:Learner,fname:String) {
       val mat = net.modelmats(i);
       saveMat(fname+"/modelmat%02d.lz4" format i, cpu(mat));
     }
-    val tc = row(nn.resTlist.map(_.v).grouped(interval).map(x=>x.sum/x.length).toArray)
-    val vc = row( nn.reslist.map(_.v).grouped(interval).map(x=>x.sum/x.length).toArray)
+    val tc = row(nn.resTlist.map(_.v).toArray)
+    val vc = row( nn.reslist.map(_.v).toArray)
     saveMat(fname+"/training_curve.lz4", tc);
     saveMat(fname+"/validation_curve.lz4", tc);
 }
@@ -49,9 +49,9 @@ def savecurve(nn:Learner) {
     saveMat("validation_curve.lz4", vc);
 }
 
-def plotcurve() {
-    val tc = loadMat("training_curve.lz4");
-    val vc = loadMat("validation_curve.lz4");
-    plot(tc)
-    plot(vc)
+def plotcurve(interval: Int = 1) {
+    val tc = loadFMat("training_curve.lz4");
+    val vc = loadFMat("validation_curve.lz4");
+    plot(row(tc.data.grouped(interval).map(x=>x.sum/x.length).toArray))
+    plot(row(vc.data.grouped(interval).map(x=>x.sum/x.length).toArray))
 }
