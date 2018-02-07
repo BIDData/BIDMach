@@ -51,7 +51,7 @@ object AllreduceNode {
   type DataSource = AllReduceInputRequest => AllReduceInput
 
   def startUp(port: String, nodeConfig: NodeConfig, lineMasterConfig: LineMasterConfig, workerConfig: WorkerConfig,
-              assertCorrectness: Boolean = false, checkpoint: Int = 10) = {
+              assertCorrectness: Boolean = false, checkpoint: Int = 100) = {
 
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
@@ -60,17 +60,17 @@ object AllreduceNode {
     val system = ActorSystem("ClusterSystem", config)
 
 
-    def getSourceSink(): (DataSource, DataSink) = if (assertCorrectness) {
+    def getSourceSink(dim: Int=0): (DataSource, DataSink) = if (assertCorrectness) {
       testCorrectnessSourceSink(workerConfig.metaData.dataSize, checkpoint)
     } else {
-      testPerformanceSourceSink(workerConfig.metaData.dataSize, checkpoint)
+      dummySourceSink(workerConfig.metaData.dataSize, checkpoint, dim)
     }
 
     val (sourceList, sinkList) = {
       val dimSources: Array[List[DataSource]] = new Array(nodeConfig.dimNum)
       val dimSinks: Array[List[DataSink]] = new Array(nodeConfig.dimNum)
       for (i <- 0 until nodeConfig.dimNum) {
-        val (source, sink) = getSourceSink()
+        val (source, sink) = getSourceSink(i)
         val sources: Array[DataSource] = Array.fill(lineMasterConfig.workerPerNodeNum)(source)
         val sinks: Array[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum)(sink)
         dimSources(i) = sources.toList
@@ -88,40 +88,13 @@ object AllreduceNode {
     ), name = "Node")
   }
 
-  private def testPerformanceSourceSink(sourceDataSize: Int, checkpoint: Int): (DataSource, DataSink) = {
+  private def dummySourceSink(sourceDataSize: Int, checkpoint: Int, dim: Int): (DataSource, DataSink) = {
 
     lazy val floats = Array.range(0, sourceDataSize).map(_.toFloat)
     val source: DataSource = _ => AllReduceInput(floats)
-
-    var cumulativeThroughput: Double = 0
-    var measurementCount: Int = 0
-    val initialDiscard: Int = 10
-
-    var tic = System.currentTimeMillis()
     val sink: DataSink = r => {
       if (r.iteration % checkpoint == 0 && r.iteration != 0) {
-
-        val timeElapsed = (System.currentTimeMillis() - tic) / 1.0e3
-
-        println(s"----Data output at #${r.iteration} - $timeElapsed s")
-        val bytes = r.data.length * 4.0 * checkpoint
-        val mBytes = bytes / 1.0e6
-        val throughput = mBytes / timeElapsed
-
-        val report = f"$mBytes%2.1f Mbytes in $timeElapsed%2.1f seconds at $throughput%4.3f MBytes/sec"
-
-        measurementCount += 1
-
-        val avgReport = if (measurementCount > initialDiscard) {
-          cumulativeThroughput += throughput
-          val effectiveCount = measurementCount - initialDiscard
-          val avgThroughput = cumulativeThroughput / effectiveCount
-          f", mean throughput at $avgThroughput%4.3f MBytes/sec from $effectiveCount samples"
-        } else ""
-
-        println(s"$report$avgReport")
-
-        tic = System.currentTimeMillis()
+        println(s"----Dim$dim: Data output at #${r.iteration}")
       }
     }
 
@@ -194,8 +167,8 @@ object AllreduceNode {
     val dimNum = 2
     val dataSize = 100
     val maxChunkSize = 4
-    val workerPerNodeNum = 3
-    val maxRound = 100
+    val workerPerNodeNum = 4
+    val maxRound = 100000
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 0.8f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
