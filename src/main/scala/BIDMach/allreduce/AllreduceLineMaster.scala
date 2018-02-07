@@ -1,7 +1,6 @@
 package BIDMach.allreduce
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
+import akka.actor.{Actor, ActorRef}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -105,45 +104,4 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
     }
     Await.result(Future.sequence(addressesFut), addressDiscoveryTimeOut).toMap
   }
-}
-
-object AllreduceLineMaster {
-
-  def main(args: Array[String]): Unit = {
-
-    val workerPerNodeNum = 3
-    val dataSize = 500000
-
-    val maxChunkSize = 20000
-
-    val maxRound = 3000
-
-    val threshold = ThresholdConfig(thAllreduce = 0.5f, thReduce = 0.5f, thComplete = 0.5f)
-    val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
-    val masterConfig = LineMasterConfig(workerPerNodeNum = workerPerNodeNum, dim = 0, maxRound,
-      discoveryTimeout = 5.seconds,
-      threshold = threshold,
-      metaData = metaData)
-
-    AllreduceLineMaster.startUp("2551", threshold, metaData, masterConfig)
-  }
-
-  private def initMaster(port: String, lineMasterConfig: LineMasterConfig) = {
-    val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
-      withFallback(ConfigFactory.parseString("akka.cluster.roles = [master]")).
-      withFallback(ConfigFactory.load())
-    val system = ActorSystem("ClusterSystem", config)
-
-
-    system.log.info(s"-------\n Port = ${port} \n Message Size = ${lineMasterConfig.metaData.dataSize} \n Max Chunk Size = ${lineMasterConfig.metaData.maxChunkSize}");
-    system.actorOf(
-      Props(classOf[AllreduceLineMaster], lineMasterConfig),
-      name = "master"
-    )
-  }
-
-  def startUp(port: String, thresholds: ThresholdConfig, dataConfig: MetaDataConfig, lineMasterConfig: LineMasterConfig): Unit = {
-    initMaster(port, lineMasterConfig)
-  }
-
 }
