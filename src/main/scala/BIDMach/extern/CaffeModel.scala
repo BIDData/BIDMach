@@ -55,11 +55,6 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:
     // It's assumed that model layers between train and test are the same
     val (_, testNodes) = parseProtobuf(netParam, Caffe.Phase.TEST, newNet)
     newNet.opts.nodeset = new NodeSet(testNodes.toArray)
-    net.createLayers
-    net.layers.map((x:Layer) => if (x != null) x.getModelMats(net))
-    for (i <- 0 until net.modelmats.length) {
-      if (net.modelmats(i) ne null) net.modelmats(i) = net.convertMat(net.modelmats(i));
-    }
   }
   
   def loadWeights(weightsFile:InputStream) = {
