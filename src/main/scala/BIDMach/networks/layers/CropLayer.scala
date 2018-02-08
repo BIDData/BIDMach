@@ -58,11 +58,12 @@ class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropN
   	val dims = inputData.dims;
   	for (i <- 0 until dims.length) {
   	  val gap = dims(i) - opts.sizes(i);
-      if (opts.randoffsets(i) > 0 && opts.sizes(i) > 0 && gap > 0) { 
+      if (opts.randoffsets.asInstanceOf[AnyRef] != null && opts.randoffsets(i) > 0 && opts.sizes(i) > 0 && gap > 0) { 
         if (net.predicting || opts.randoffsets.asInstanceOf[AnyRef] == null) {
         	roffset.set(offsets(i));
         } else {
-          val ioff = math.max(0, math.min(gap-1, gap/2 + (opts.randoffsets(i) * (random.nextFloat() -0.5f)).toInt)); 
+          val offset_magnitude = math.min(gap, opts.randoffsets(i));
+          val ioff = math.max(0, math.min(gap-1, gap/2 + (offset_magnitude * (random.nextFloat() -0.5f)).toInt)); 
           roffset.set(ioff);
         }
         blockInds(i) ~ baseInds(i) + roffset;
