@@ -505,7 +505,7 @@ object CaffeModel {
       
       val outDim = layerParam.getBlobs(0).getShape().getDim(0).intValue()
       val weightMat = blob2MatTranspose(layerParam.getBlobs(0))
-      val biasMat = blob2MatTranspose(layerParam.getBlobs(1)).reshape(outDim, 1)
+      val biasMat = blob2MatTranspose(layerParam.getBlobs(1)).reshapeView(outDim, 1)
       Array(weightMat, biasMat)
     }
   }
