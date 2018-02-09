@@ -509,8 +509,6 @@ object CaffeModel {
       check(layerParam.getBlobsCount() == 2, layerParam, "linear layer without bias needs 2 matrices")
       check(layerParam.getBlobs(0).getShape().getDim(0) == layerParam.getBlobs(1).getShape().getDim(0),
             layerParam, "weight and bias dimensions for linear layer don't agree")
-      check((layerParam.getBlobs(0).getDoubleDataCount() > 0) == (layerParam.getBlobs(1).getDoubleDataCount() > 0),
-            layerParam, "weight and bias matrices must both be double data or both be single data")
       
       val outDim = layerParam.getBlobs(0).getShape().getDim(0).intValue()
       val weightMat = blob2MatTranspose(layerParam.getBlobs(0))
