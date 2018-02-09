@@ -19,7 +19,7 @@ import java.lang.IllegalArgumentException
 import _root_.caffe.Caffe
 import _root_.caffe.Caffe.LRNParameter.NormRegion
 import _root_.caffe.Caffe.PoolingParameter.PoolMethod
-import com.google.protobuf._
+import com.google.protobuf.{CodedInputStream,TextFormat}
 import jcuda.jcudnn.cudnnPoolingMode
 
 class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:Seq[CaffeLayer]) {
@@ -257,10 +257,9 @@ object CaffeModel {
    */
   private def filterLayers(layerList:Seq[Caffe.LayerParameter], phase:Caffe.Phase) = {
     layerList.withFilter(layer => {
-      if (layer.getIncludeCount() > 0 && layer.getExcludeCount() > 0) {
-        throw new IllegalArgumentException(s"Layer ${layer.getName()}: only include rules xor exclude rules"
-                                           + "can be specified")
-      } else if (layer.getIncludeCount() > 0) {
+      check(!(layer.getIncludeCount() > 0 && layer.getExcludeCount() > 0), layer,
+            "only include rules xor exclude rules can be specified")
+      if (layer.getIncludeCount() > 0) {
         layer.getIncludeList().exists(netStateRule => stateMatchesRule(netStateRule, phase))
       } else {
         !layer.getExcludeList().exists(netStateRule => stateMatchesRule(netStateRule, phase))
@@ -346,7 +345,7 @@ object CaffeModel {
       val postvisited = new mutable.HashSet[CaffeLayer]
       def visit(layer:CaffeLayer):Unit = {
         if (!postvisited.contains(layer)) {
-          if (!previsited.contains(layer)) throw new IllegalArgumentException("Cycle detected")
+          check(!previsited.contains(layer), layer.param, "Cycle detected")
           previsited += layer
           for (input <- layer.inputs) {
             visit(input)
@@ -418,12 +417,11 @@ object CaffeModel {
     } else {
       convParam.getPad(0)
     }
-
-    if (!hasBias && layerParam.getBlobsCount() != 1) {
-      throw new IllegalArgumentException("Convolution layer without bias needs 1 matrix")
-    }
-    if (hasBias && layerParam.getBlobsCount() != 2) {
-      throw new IllegalArgumentException("Convolution layer with bias needs 2 matrices")
+    
+    if (!hasBias) {
+      check(layerParam.getBlobsCount() == 1, layerParam, "convolution layer without bias needs 1 matrix")
+    } else {
+      check(layerParam.getBlobsCount() == 2, layerParam, "convolution layer with bias needs 2 matrices")
     }
 
     // TODO: avoid duplicating code with ConvLayer here
@@ -505,20 +503,14 @@ object CaffeModel {
   
   private def getInnerProductLayerMats(layerParam:Caffe.LayerParameter) = {
     if (!layerParam.getInnerProductParam().getBiasTerm()) {
-      if (layerParam.getBlobsCount() != 1) {
-        throw new IllegalArgumentException("Linear layer without bias needs 1 matrix")
-      }
+      check(layerParam.getBlobsCount() == 1, layerParam, "linear layer without bias needs 1 matrix")
       Array(blob2MatTranspose(layerParam.getBlobs(0)), null)
     } else {
-      if (layerParam.getBlobsCount() != 2) {
-        throw new IllegalArgumentException("Linear layer without bias needs 2 matrices")
-      }
-      if (layerParam.getBlobs(0).getShape().getDim(0) != layerParam.getBlobs(1).getShape().getDim(0)) {
-        throw new IllegalArgumentException("Weight and bias dimensions for linear layer don't agree")
-      }
-      if ((layerParam.getBlobs(0).getDoubleDataCount() > 0) != (layerParam.getBlobs(1).getDoubleDataCount() > 0)) {
-        throw new IllegalArgumentException("Weight and bias matrices must both be double data or both be single data")
-      }
+      check(layerParam.getBlobsCount() == 2, layerParam, "linear layer without bias needs 2 matrices")
+      check(layerParam.getBlobs(0).getShape().getDim(0) == layerParam.getBlobs(1).getShape().getDim(0),
+            layerParam, "weight and bias dimensions for linear layer don't agree")
+      check((layerParam.getBlobs(0).getDoubleDataCount() > 0) == (layerParam.getBlobs(1).getDoubleDataCount() > 0),
+            layerParam, "weight and bias matrices must both be double data or both be single data")
       
       val outDim = layerParam.getBlobs(0).getShape().getDim(0).intValue()
       val weightMat = blob2MatTranspose(layerParam.getBlobs(0))
@@ -548,17 +540,11 @@ object CaffeModel {
   }
   
   private def getBatchNormMats(layerParam:Caffe.LayerParameter) = {
-    if (layerParam.getBlobsCount() != 3) {
-      throw new IllegalArgumentException("Batch norm needs 2 matrices")
-    }
-    if (layerParam.getBlobs(2).getDataCount() < 1) {
-      throw new IllegalArgumentException("Batch norm layer doesn't have a scale factor")
-    }
+    check(layerParam.getBlobsCount() == 3, layerParam, "batch norm needs 2 matrices and scale factor")
+    check(layerParam.getBlobs(2).getDataCount() > 0, layerParam, "batch norm layer doesn't have a scale factor")
 
     val c = layerParam.getBlobs(0).getShape().getDim(0).toInt
-    if (c != layerParam.getBlobs(1).getShape().getDim(0).toInt) {
-      throw new IllegalArgumentException("Batch norm matrices aren't the same shape")
-    }
+    check(c == layerParam.getBlobs(1).getShape().getDim(0).toInt, layerParam, "batch norm matrices aren't the same shape")
     val scale = {
       val rawScale = layerParam.getBlobs(2).getData(0)
       if (rawScale == 0) 0f else 1f / rawScale
@@ -573,18 +559,16 @@ object CaffeModel {
   private def getScaleMats(layerParam:Caffe.LayerParameter) = {
     val hasBias = layerParam.getScaleParam().hasBiasTerm()
     
-    if (hasBias && layerParam.getBlobsCount() != 2) {
-      throw new IllegalArgumentException("Scale layer with bias needs 2 matrices")
-    } else if (!hasBias && layerParam.getBlobsCount() != 1) {
-      throw new IllegalArgumentException("Scale layer without bias needs 1 matrix")
+    if (hasBias) {
+      check(layerParam.getBlobsCount() == 2, layerParam, "scale layer with bias needs 2 matrices")
+    } else {
+      check(layerParam.getBlobsCount() == 1, layerParam, "scale layer without bias needs 1 matrix")
     }
     
     val c = layerParam.getBlobs(0).getShape().getDim(0).toInt
     val scaleMat = blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
     val biasMat = if (hasBias) {
-      if (layerParam.getBlobs(1).getShape().getDim(0).toInt != c) {
-        throw new IllegalArgumentException("Scale layer matrices aren't the same shape")
-      }
+      check(layerParam.getBlobs(1).getShape().getDim(0).toInt == c, layerParam, "scale layer matrices aren't the same shape")
       blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
     } else {
       zeros(c \ 1 \ 1 \ 1)
@@ -656,6 +640,10 @@ object CaffeModel {
       // TODO: should I bother with GFMat
       new FMat(reverseDims, data).transpose((reverseDims.length - 1) to 0 by -1)
     }
+  }
+  
+  private def check(requirement:Boolean, layerParam:Caffe.LayerParameter, message: => Any) = {
+    require(requirement, s"Layer ${layerParam.getName()}: ${message}")
   }
 }
 
