@@ -65,15 +65,41 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:
     // Build a map of names to layers for the weights
     val weightLayerForName = Map(weightNetParam.getLayerList().map(layer => (layer.getName(), layer)):_*)
     val modelMats = new mutable.ArrayBuffer[Mat]
-    for (layer <- layers) {
+    var i = 0
+    while (i < layers.length) {
+      val layer = layers(i)
+      var incr = 1
+
       // If layer corresponds to a ModelNode, extract the model mats for this layer
       if (layer.inodeFirst != -1 && net.opts.nodeset(layer.inodeFirst).isInstanceOf[ModelNode]) {
         val weightLayer = weightLayerForName.get(layer.param.getName()) match {
           case Some(wl) => wl
           case None => throw new IllegalArgumentException(s"Layer ${layer.param.getName()} not found in weights file")
         }
-        modelMats ++= extractModelMats(weightLayer, net)
+        
+        layer.param.getType() match {
+          case "Convolution" => modelMats ++= getConvLayerMats(weightLayer, net)
+          case "BatchNorm" => {
+            if (i + 1 < layers.length && layers(i + 1).param.getType() == "Scale") {
+              // We are loading data into a BatchNormScaleLayer
+              assert(layer.inodeFirst == layers(i + 1).inodeFirst && layer.inodeLast == layers(i + 1).inodeLast)
+              incr = 2
+              val scaleWeightLayer = weightLayerForName.get(layers(i + 1).param.getName()) match {
+                case Some(wl) => wl
+                case None => throw new IllegalArgumentException(s"Layer ${layers(i + 1).param.getName()} not found in weights file")
+              }
+              modelMats ++= getScaleMats(scaleWeightLayer)
+              // Theoretically this line should be outside the if statement, but at present the BatchNorm layer isn't a ModelLayer.
+              modelMats ++= getBatchNormMats(weightLayer)
+            }
+          }
+          case "Scale" => modelMats ++= getScaleMats(weightLayer)
+          case "InnerProduct" => modelMats ++= getInnerProductLayerMats(weightLayer)
+          case _ =>
+        }
       }
+      
+      i += incr
     }
     net.setmodelmats(modelMats.toArray)
     net.opts.nmodelmats = modelMats.length
@@ -336,15 +362,6 @@ object CaffeModel {
     }
   }
   
-  private def extractModelMats(layerParam:Caffe.LayerParameter, net:Net):Seq[Mat] = {
-    layerParam.getType() match {
-      case "Convolution" => getConvLayerMats(layerParam, net)
-      case "Scale" => List() // UM TODO
-      case "InnerProduct" => getInnerProductLayerMats(layerParam)
-      case _ => List()
-    }
-  }
-  
   private def translateConvolution(layer:CaffeLayer, net:Net) = {
     val convParam = layer.param.getConvolutionParam()
     
@@ -528,6 +545,51 @@ object CaffeModel {
         batchNormMode = BatchNormLayer.Spatial
       }
     }
+  }
+  
+  private def getBatchNormMats(layerParam:Caffe.LayerParameter) = {
+    if (layerParam.getBlobsCount() != 3) {
+      throw new IllegalArgumentException("Batch norm needs 2 matrices")
+    }
+    if (layerParam.getBlobs(2).getDataCount() < 1) {
+      throw new IllegalArgumentException("Batch norm layer doesn't have a scale factor")
+    }
+
+    val c = layerParam.getBlobs(0).getShape().getDim(0).toInt
+    if (c != layerParam.getBlobs(1).getShape().getDim(0).toInt) {
+      throw new IllegalArgumentException("Batch norm matrices aren't the same shape")
+    }
+    val scale = {
+      val rawScale = layerParam.getBlobs(2).getData(0)
+      if (rawScale == 0) 0f else 1f / rawScale
+    }
+    val runningMeans = blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
+    runningMeans ~ runningMeans * scale
+    val runningVariances = blob2Mat(layerParam.getBlobs(1)).reshapeView(c, 1, 1, 1)
+    runningVariances ~ runningVariances * scale
+    Array(runningMeans, runningVariances)
+  }
+  
+  private def getScaleMats(layerParam:Caffe.LayerParameter) = {
+    val hasBias = layerParam.getScaleParam().hasBiasTerm()
+    
+    if (hasBias && layerParam.getBlobsCount() != 2) {
+      throw new IllegalArgumentException("Scale layer with bias needs 2 matrices")
+    } else if (!hasBias && layerParam.getBlobsCount() != 1) {
+      throw new IllegalArgumentException("Scale layer without bias needs 1 matrix")
+    }
+    
+    val c = layerParam.getBlobs(0).getShape().getDim(0).toInt
+    val scaleMat = blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
+    val biasMat = if (hasBias) {
+      if (layerParam.getBlobs(1).getShape().getDim(0).toInt != c) {
+        throw new IllegalArgumentException("Scale layer matrices aren't the same shape")
+      }
+      blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
+    } else {
+      zeros(c \ 1 \ 1 \ 1)
+    }
+    Array(scaleMat, biasMat)
   }
   
   private def addTransformNodes(transformParam:Caffe.TransformationParameter, subjectNode:Node) = {
