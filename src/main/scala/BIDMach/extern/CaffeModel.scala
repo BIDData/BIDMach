@@ -583,23 +583,42 @@ object CaffeModel {
 
     if (transformParam.hasCropSize()) {
       val cropSize = transformParam.getCropSize()
-      // TODO: use the correct dimensions
-      val sizeMat = 0 \ cropSize \ cropSize \ 0
-      // TODO: do I have to worry about offsets
+      // XXX: don't hardcode the # of channels
+      val sizeMat = 3 \ cropSize \ cropSize \ 0
       if (transformParam.getMirror()) {
         newNodeList += new CropMirrorNode {
           inputs(0) = newNodeList.last
           sizes = sizeMat
+          offsets = 0 \ -1 \ -1 \ 0
+          // We want the height and width dimensions of randoffsets to be equal to the size of the
+          // image. Since we don't have access to that here, we will set the height and width
+          // dimensions to some number that will get capped to the image height and width.
+          randoffsets = 0 \ Int.MaxValue \ Int.MaxValue \ 0
         }
       } else {
         newNodeList += new CropNode {
           inputs(0) = newNodeList.last
           sizes = sizeMat
+          offsets = 0 \ -1 \ -1 \ 0
+          randoffsets = 0 \ Int.MaxValue \ Int.MaxValue \ 0
         }
       }
     }
 
-    // TODO: implement mean
+    if (transformParam.getMeanValueCount() > 0) {
+      val numMeanValues = transformParam.getMeanValueCount()
+      // Each mean value applies to a channel. Since data matrices are written in CWHN order,
+      // we create a Cx1x1x1 mean value matrix that we subtract from the input.
+      val meanValues = new FMat(transformParam.getMeanValueList().map(_.intValue()).toArray,
+                                Array(numMeanValues, 1, 1, 1))
+      val constNode = new ConstantNode {
+        value = meanValues
+        cache = true // TODO: verify
+      }
+      val subNode = newNodeList.last - constNode
+      newNodeList += constNode
+      newNodeList += subNode
+    }
 
     if (transformParam.hasScale()) {
       val constNode = new ConstantNode {
