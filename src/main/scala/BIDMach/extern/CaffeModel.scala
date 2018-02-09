@@ -512,25 +512,20 @@ object CaffeModel {
   
   private def translateBatchNorm(layer:CaffeLayer, scaleParam:Caffe.ScaleParameter) = {
     val bnParam = layer.param.getBatchNormParam()
-
-    val mode = if (layer.inputs(0).param.getType() == "Convolution") {
-      BatchNormLayer.Spatial
-    } else {
-      BatchNormLayer.PerActivation
-    }
     
     if (scaleParam ne null) {
       new BatchNormScaleNode {
         epsilon = bnParam.getEps()
         expAvgFactor = bnParam.getMovingAverageFraction()
-        batchNormMode = mode
+        // It appears that Caffe always uses Spatial activations
+        batchNormMode = BatchNormLayer.Spatial
         hasBias = scaleParam.getBiasTerm()
       }
     } else {
       new BatchNormNode {
         epsilon = bnParam.getEps()
         expAvgFactor = bnParam.getMovingAverageFraction()
-        batchNormMode = mode
+        batchNormMode = BatchNormLayer.Spatial
       }
     }
   }
