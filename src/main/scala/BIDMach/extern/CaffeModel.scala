@@ -227,6 +227,9 @@ object CaffeModel {
               modelNode.bias_scale = layer.param.getParam(1).getLrMult()
             }
           }
+          if (layer.param.getParamList().filter(_.hasDecayMult()).nonEmpty) {
+            Mat.consoleLogger.warning("The decay_mult option is not implemented")
+          }
         }
         case _ =>
       }
