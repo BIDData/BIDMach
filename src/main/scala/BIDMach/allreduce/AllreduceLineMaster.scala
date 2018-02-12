@@ -31,7 +31,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   def receive = {
 
     case c: CompleteAllreduce =>
-      log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.round}")
+      log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.config.round}")
       if (c.config.round == round) {
         completeCount += 1
         if (completeCount >= workerNum * thAllreduce && round < maxRound) {
@@ -50,7 +50,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
       for (workerRound <- 0 until roundNum) {
         workerMapAcrossRounds(workerRound) = discoverWorkers(workerRound, nodeRefs.toArray)
       }
-      round += 1
+      round = 0
       startAllreduce()
   }
 

@@ -18,7 +18,7 @@ class AllreduceWorker(config: WorkerConfig,
 
   val workerDiscoveryTimeout = config.discoveryTimeout
 
-  var currentConfig: RoundConfig = RoundConfig(-1, -1, self, new Map[Int, ActorRef](), -1)
+  var currentConfig: RoundConfig = RoundConfig(-1, -1, self, Map[Int, ActorRef](), -1)
   var isCurrentRoundCompleted = true
 
   // Data
@@ -71,13 +71,6 @@ class AllreduceWorker(config: WorkerConfig,
         case e: Throwable => printStackTrace("reduce block", e);
       }
     }
-
-    case Terminated(a) =>
-      for ((idx, worker) <- currentConfig.peers) {
-        if (worker == a) {
-          currentConfig.peers -= idx
-        }
-      }
   }
 
   private def handleRoundConfig(config : RoundConfig): Unit = {
@@ -101,10 +94,8 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def handleBuffer(config : RoundConfig) {
-    // re-initialize buffers when grid size (and thus block size) changes
     var numPeers = currentConfig.peers.size
-    if (config.peers.size != numPeers) {
-      currentConfig.peers = config.peers
+    if (config.peers.size != numPeers) { // re-initialize buffers when grid size (and thus block size) changes
       numPeers = config.peers.size
 
       // prepare meta-data
@@ -129,13 +120,7 @@ class AllreduceWorker(config: WorkerConfig,
         completionThreshold = thComplete,
         maxChunkSize = maxChunkSize
       )
-    } else {
-      // update peer addresses in case of member changes
-      if (config.workerId != currentConfig.workerId || currentConfig.peers != config.peers) {
-        currentConfig.peers = config.peers
-      }
-
-      // prepare buffer for new round  
+    } else { // clear buffer for new round
       scatterBlockBuf.prepareNewRound()
       reduceBlockBuf.prepareNewRound()
     }
@@ -187,12 +172,12 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def initDataBlockRanges() = {
-    val stepSize = math.ceil(dataSize * 1f / numPeers).toInt
+    val stepSize = math.ceil(dataSize * 1f / currentConfig.peers.size).toInt
     Array.range(0, dataSize, stepSize)
   }
 
   private def range(idx: Int): (Int, Int) = {
-    if (idx >= numPeers - 1)
+    if (idx >= currentConfig.peers.size - 1)
       (dataRange(idx), dataSize)
     else
       (dataRange(idx), dataRange(idx + 1))

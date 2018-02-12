@@ -15,23 +15,18 @@ final case class AllreduceStats(outgoingFloats: Long, incomingFloats: Long)
 
 final case class RoundConfig(lineMasterVersion : Int, round: Int, lineMaster : ActorRef, peers: Map[Int, ActorRef], workerId: Int) {
   def < (other : RoundConfig): Boolean = {
-  	return true if (self.lineMasterVersion < other.lineMasterVersion || 
-  	  				(self.lineMasterVersion == other.lineMasterVersion && self.round < other.round)) 
-  	  else false
+  	return if (lineMasterVersion < other.lineMasterVersion || 
+  	  		   (lineMasterVersion == other.lineMasterVersion && round < other.round)) {true}
+  	else {false}
   }
 
   def == (other : RoundConfig): Boolean = {
-  	return true if (self.lineMasterVersion == other.lineMasterVersion && self.round == other.round) else false
+  	return if (lineMasterVersion == other.lineMasterVersion && round == other.round) {true} else {false}
   }
 
   def > (other : RoundConfig): Boolean = {
-  	return !(self < other || self == other)
+  	return !(this < other || this == other)
   }
 }
 
-// GM to LM
-/**
-  * TODO: Rename this for consistency.
-  * This should refer to the node address of [[AllreduceNode]]
-  */
 final case class StartAllreduceTask(slaveNodesRef: ArrayBuffer[ActorRef], lineMasterVersion : Int)
