@@ -23,10 +23,11 @@ case class LineMasterConfig(
                              threshold: ThresholdConfig,
                              metaData: MetaDataConfig)
 
-case class NodeConfig(dimNum: Int)
+case class NodeConfig(dimNum: Int, reportStats: Boolean)
 
 case class WorkerConfig(
                          discoveryTimeout: FiniteDuration,
+                         statsReportingRoundFrequency: Int = 10,
                          threshold: ThresholdConfig,
                          metaData: MetaDataConfig)
 
