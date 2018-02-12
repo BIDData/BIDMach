@@ -21,7 +21,8 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
   var nodeMap = Map[Int, ActorRef]()
 
   //Key: NodeIdx
-  //Value: (Dimension, Array[SlavesIdx]) 
+  //Value: (Dimension, Array[SlavesIdx])
+  var lineMasterVersion = -1
   var lineMastersAssignment = Map[Int, ArrayBuffer[(Int, ArrayBuffer[Int])]]()
 
   override def preStart(): Unit = cluster.subscribe(self, classOf[MemberUp])
@@ -40,7 +41,7 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
         generateLineMasters()
         //Step 3
         //propagate the info to all the line masters who are going to be (a) line master 
-        initLineMasters()
+        startAllreduceTask()
       }
 
     case Terminated(a) =>
@@ -85,7 +86,8 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
 
   }
 
-  private def initLineMasters(): Unit = {
+  private def startAllreduceTask(): Unit = {
+    lineMasterVersion += 1
     for ((nodeIdx, assignment) <- lineMastersAssignment) {
       for ((dim, slaves) <- assignment) {
         var slavenodeMapRef = ArrayBuffer[ActorRef]()
@@ -93,7 +95,7 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
           slavenodeMapRef += nodeMap(slaveIdx)
         }
         var lineMasterRef = discoverLineMaster(dim, nodeIdx)
-        lineMasterRef ! SlavesInfo(slavenodeMapRef)
+        lineMasterRef ! StartAllreduceTask(slavenodeMapRef, lineMasterVersion)
       }
     }
   }
