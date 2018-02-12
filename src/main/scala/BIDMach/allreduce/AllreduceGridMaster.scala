@@ -72,10 +72,20 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
     // lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3)), (1, ArrayBuffer(1,3))))
 
     //config 2
-    lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1))))
-    lineMastersAssignment = lineMastersAssignment.updated(1, ArrayBuffer((1, ArrayBuffer(1, 3))))
-    lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(0, 2))))
-    lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3))))
+    //lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1))))
+    //lineMastersAssignment = lineMastersAssignment.updated(1, ArrayBuffer((1, ArrayBuffer(1, 3))))
+    //lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(0, 2))))
+    //lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3))))
+
+    //config 3
+    lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1, 2, 3))))
+    lineMastersAssignment = lineMastersAssignment.updated(5, ArrayBuffer((0, ArrayBuffer(4, 5, 6, 7))))
+    lineMastersAssignment = lineMastersAssignment.updated(10, ArrayBuffer((0, ArrayBuffer(8, 9, 10, 11))))
+    lineMastersAssignment = lineMastersAssignment.updated(15, ArrayBuffer((0, ArrayBuffer(12, 13, 14, 15))))
+    lineMastersAssignment = lineMastersAssignment.updated(4, ArrayBuffer((1, ArrayBuffer(0, 4, 8, 12))))
+    lineMastersAssignment = lineMastersAssignment.updated(9, ArrayBuffer((1, ArrayBuffer(1, 5, 9, 13))))
+    lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(2, 6, 10, 14))))
+    lineMastersAssignment = lineMastersAssignment.updated(11, ArrayBuffer((1, ArrayBuffer(3, 7, 11, 15))))
 
     // debug use only
     // if (nodeMap.size > nodeMap.size){
