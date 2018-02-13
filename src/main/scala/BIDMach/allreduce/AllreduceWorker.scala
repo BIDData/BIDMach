@@ -43,10 +43,12 @@ class AllreduceWorker(config: WorkerConfig,
 
     case s: StartAllreduce => {
       try {
-        handleRoundConfig(s.config)
-        isCurrentRoundCompleted = false
-        fetch()
-        scatter()
+        log.debug(s"\n----Worker ${self.path}: receive StartAllreduce, LM version = ${s.config.lineMasterVersion}, round = ${s.config.round}, workerId = ${s.config.workerId}")
+        if (handleRoundConfig(s.config)) {
+          isCurrentRoundCompleted = false
+          fetch()
+          scatter()
+        }
       } catch {
         case e: Throwable => printStackTrace("start all reduce", e);
       }
@@ -54,9 +56,10 @@ class AllreduceWorker(config: WorkerConfig,
 
     case s: ScatterBlock => {
       try {
-        log.debug(s"\n----Worker ${self.path}: receive scattered data from round ${s.config.round} srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}")
-        handleRoundConfig(s.config)
-        handleScatterBlock(s);
+        log.debug(s"\n----Worker ${self.path}: receive scattered data from round ${s.config.round} srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, myId = ${currentConfig.workerId}")
+        if (handleRoundConfig(s.config)) {
+          handleScatterBlock(s)
+        }
       } catch {
         case e: Throwable => printStackTrace("scatter block", e);
       }
@@ -65,23 +68,26 @@ class AllreduceWorker(config: WorkerConfig,
     case r: ReduceBlock => {
       try {
         log.debug(s"\n----Worker ${self.path}: Receive reduced data from round ${r.config.round}, srcId = ${r.srcId}, destId = ${r.destId}, chunkId=${r.chunkId}")
-        handleRoundConfig(r.config)
-        handleReduceBlock(r);
+        if (handleRoundConfig(r.config)) {
+          handleReduceBlock(r)
+        }
       } catch {
         case e: Throwable => printStackTrace("reduce block", e);
       }
     }
   }
 
-  private def handleRoundConfig(config : RoundConfig): Unit = {
+  private def handleRoundConfig(config : RoundConfig): Boolean = {
     if (config < currentConfig) { // outdated msg, discard
-      return
+      return false
+    } else if (config > currentConfig) {
+      if (!isCurrentRoundCompleted) { // falling behind, catch up
+        catchUp()
+      }
+      prepareBuffer(config)
     }
-    if (config > currentConfig && !isCurrentRoundCompleted) { // falling behind, catch up 
-      catchUp()
-    }
-    handleBuffer(config)
     currentConfig = config
+    return true
   }
 
   private def catchUp() {
@@ -93,21 +99,23 @@ class AllreduceWorker(config: WorkerConfig,
     completeRound()
   }
 
-  private def handleBuffer(config : RoundConfig) {
-    var numPeers = currentConfig.peers.size
-    if (config.peers.size != numPeers) { // re-initialize buffers when grid size (and thus block size) changes
-      numPeers = config.peers.size
-
+  private def prepareBuffer(config : RoundConfig) {
+    var currNumPeers = currentConfig.peers.size
+    var newNumPeers = config.peers.size
+    if (currNumPeers != newNumPeers) { // re-initialize buffers when grid size (and thus block size) changes
+      log.debug(s"\n----Worker ${self.path}: handleBuffer: reinitialize buffer")
       // prepare meta-data
-      dataRange = initDataBlockRanges()
-      myBlockSize = blockSize(currentConfig.workerId)
-      maxBlockSize = blockSize(0)
-      minBlockSize = blockSize(numPeers - 1)
+      dataRange = initDataBlockRanges(newNumPeers)
+      log.debug(s"dataRange = [${dataRange(0)}, ${dataRange(1)}]")
+      myBlockSize = blockSize(config.workerId, newNumPeers)
+      maxBlockSize = blockSize(0, newNumPeers)
+      minBlockSize = blockSize(newNumPeers - 1, newNumPeers)
 
       // reusing old implementation of buffer defaulting max lag to 1, since this is per-round worker
+      log.debug(s"dataSize = ${myBlockSize}, maxBlockSize = ${myBlockSize}, minBlocksize = ${minBlockSize} peerSize = ${newNumPeers}, maxChunkSize = ${maxChunkSize}")
       scatterBlockBuf = ScatteredDataBuffer(
         dataSize = myBlockSize,
-        peerSize = numPeers,
+        peerSize = newNumPeers,
         reducingThreshold = thReduce,
         maxChunkSize = maxChunkSize
       )
@@ -116,7 +124,7 @@ class AllreduceWorker(config: WorkerConfig,
         maxBlockSize = maxBlockSize,
         minBlockSize = minBlockSize,
         totalDataSize = dataSize,
-        peerSize = numPeers,
+        peerSize = newNumPeers,
         completionThreshold = thComplete,
         maxChunkSize = maxChunkSize
       )
@@ -130,9 +138,9 @@ class AllreduceWorker(config: WorkerConfig,
     if (r.value.size > maxChunkSize) {
       throw new RuntimeException(s"Reduced block of size ${r.value.size} is larger than expected.. Max msg size is $maxChunkSize")
     } else if (r.destId != currentConfig.workerId) {
-      throw new RuntimeException(s"Message with destination ${r.destId} was incorrectly routed to node $currentConfig.workerId")
+      throw new RuntimeException(s"Message with destination ${r.destId} was incorrectly routed to node ${currentConfig.workerId}")
     } else if (r.config.round > currentConfig.round) {
-      throw new RuntimeException(s"New round ${r.config.round} should have been prepared, but current round is $currentConfig.round")
+      throw new RuntimeException(s"New round ${r.config.round} should have been prepared, but current round is ${currentConfig.round}")
     }
 
     if (r.config.round < currentConfig.round) {
@@ -147,11 +155,13 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def handleScatterBlock(s: ScatterBlock) = {
-
+    if (s.srcId == s.destId) {
+      log.debug(s"\n----Worker ${self.path}: receive scattered data from round ${s.config.round} srcId = ${s.srcId}, destId = ${s.destId}, chunkId=${s.chunkId}, myId = ${currentConfig.workerId}")
+    }
     if (s.destId != currentConfig.workerId) {
-      throw new RuntimeException(s"Scatter block should be directed to $currentConfig.workerId, but received ${s.destId}")
+      throw new RuntimeException(s"Scatter block should be directed to ${currentConfig.workerId}, but received ${s.destId}")
     } else if (s.config.round > currentConfig.round) {
-      throw new RuntimeException(s"New round ${s.config.round} should have been prepared, but current round is $currentConfig.round")
+      throw new RuntimeException(s"New round ${s.config.round} should have been prepared, but current round is ${currentConfig.round}")
     }
 
     if (s.config.round < currentConfig.round) {
@@ -166,21 +176,22 @@ class AllreduceWorker(config: WorkerConfig,
 
   }
 
-  private def blockSize(id: Int) = {
-    val (start, end) = range(id)
+  private def blockSize(id: Int, numPeers: Int) = {
+    val (start, end) = range(id, numPeers)
     end - start
   }
 
-  private def initDataBlockRanges() = {
-    val stepSize = math.ceil(dataSize * 1f / currentConfig.peers.size).toInt
+  private def initDataBlockRanges(numPeers: Int) = {
+    val stepSize = math.ceil(dataSize * 1f / numPeers).toInt
     Array.range(0, dataSize, stepSize)
   }
 
-  private def range(idx: Int): (Int, Int) = {
-    if (idx >= currentConfig.peers.size - 1)
+  private def range(idx: Int, numPeers: Int) = {
+    if (idx >= numPeers - 1) {
       (dataRange(idx), dataSize)
-    else
+    } else {
       (dataRange(idx), dataRange(idx + 1))
+    }
   }
 
   private def fetch() = {
@@ -194,19 +205,21 @@ class AllreduceWorker(config: WorkerConfig,
 
   private def flush() = {
     reduceBlockBuf.getWithCounts(output, outputCount)
-    log.debug(s"\n----Worker ${self.path}: Flushing output at completed round $currentConfig.round")
+
     dataSink(AllReduceOutput(output, outputCount, currentConfig.round))
   }
 
   private def scatter() = {
     var numPeers = currentConfig.peers.size
+    log.debug(s"scatter: numPeers = ${numPeers}")
     for (peerId <- 0 until numPeers) {
       val idx = (peerId + currentConfig.workerId) % numPeers
       val worker = currentConfig.peers(idx)
       //Partition the dataBlock if it is too big
-      val (blockStart, blockEnd) = range(idx)
+      val (blockStart, blockEnd) = range(idx, numPeers)
       val peerBlockSize = blockEnd - blockStart
       val peerNumChunks = math.ceil(1f * peerBlockSize / maxChunkSize).toInt
+      log.debug(s"scatter: peerNumChunks = ${peerNumChunks}")
       for (i <- 0 until peerNumChunks) {
         val chunkStart = math.min(i * maxChunkSize, peerBlockSize - 1);
         val chunkEnd = math.min((i + 1) * maxChunkSize - 1, peerBlockSize - 1);
@@ -215,7 +228,8 @@ class AllreduceWorker(config: WorkerConfig,
 
         System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunkSize);
         log.debug(s"\n----Worker ${self.path}: send msg from ${currentConfig.workerId} to ${idx}, chunkId: ${i}")
-        val scatterMsg = ScatterBlock(chunk, currentConfig.workerId, idx, i, currentConfig)
+        val scatterConfig = currentConfig.copy(workerId = idx)
+        val scatterMsg = ScatterBlock(chunk, currentConfig.workerId, idx, i, scatterConfig)
         if (worker == self) {
           handleScatterBlock(scatterMsg)
         } else {
@@ -231,13 +245,13 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def broadcast(data: Array[Float], chunkId: Int, reduceCount: Int) = {
-    log.debug(s"\n----Worker ${self.path}: Start broadcasting")
+    log.debug(s"\n----Worker ${self.path}: Start broadcasting, chunkId = ${chunkId}")
     var numPeers = currentConfig.peers.size
     for (i <- 0 until numPeers) {
       val peerworkerId = (i + currentConfig.workerId) % numPeers
       val worker = currentConfig.peers(peerworkerId)
-      log.debug(s"\n----Worker ${self.path}: Broadcast reduced block src: ${currentConfig.workerId}, dest: ${peerworkerId}, chunkId: ${chunkId}, round: ${currentConfig.round}")
-      val reduceMsg = ReduceBlock(data, currentConfig.workerId, peerworkerId, chunkId, currentConfig, reduceCount)
+      val reduceConfig = currentConfig.copy(workerId = peerworkerId)
+      val reduceMsg = ReduceBlock(data, currentConfig.workerId, peerworkerId, chunkId, reduceConfig, reduceCount)
       if (worker == self) {
         handleReduceBlock(reduceMsg)
       } else {
