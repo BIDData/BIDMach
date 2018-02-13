@@ -23,10 +23,6 @@ class AllreduceWorker(config: WorkerConfig,
 
   // Data
   var data: Array[Float] = new Array(dataSize)
-  var dataRange: Array[Int] = Array.empty
-  var maxBlockSize = 0
-  var minBlockSize = 0
-  var myBlockSize = 0
 
   // Buffer
   var scatterBlockBuf: ScatteredDataBuffer = ScatteredDataBuffer.empty // store scattered data received
@@ -105,11 +101,9 @@ class AllreduceWorker(config: WorkerConfig,
     if (currNumPeers != newNumPeers) { // re-initialize buffers when grid size (and thus block size) changes
       log.debug(s"\n----Worker ${self.path}: handleBuffer: reinitialize buffer")
       // prepare meta-data
-      dataRange = initDataBlockRanges(newNumPeers)
-      log.debug(s"dataRange = [${dataRange(0)}, ${dataRange(1)}]")
-      myBlockSize = blockSize(config.workerId, newNumPeers)
-      maxBlockSize = blockSize(0, newNumPeers)
-      minBlockSize = blockSize(newNumPeers - 1, newNumPeers)
+      val myBlockSize = getBlockSize(config.workerId, newNumPeers, dataSize)
+      val maxBlockSize = getBlockSize(0, newNumPeers, dataSize)
+      val minBlockSize = getBlockSize(newNumPeers - 1, newNumPeers, dataSize)
 
       // reusing old implementation of buffer defaulting max lag to 1, since this is per-round worker
       log.debug(s"dataSize = ${myBlockSize}, maxBlockSize = ${myBlockSize}, minBlocksize = ${minBlockSize} peerSize = ${newNumPeers}, maxChunkSize = ${maxChunkSize}")
@@ -176,22 +170,9 @@ class AllreduceWorker(config: WorkerConfig,
 
   }
 
-  private def blockSize(id: Int, numPeers: Int) = {
-    val (start, end) = range(id, numPeers)
-    end - start
-  }
-
-  private def initDataBlockRanges(numPeers: Int) = {
-    val stepSize = math.ceil(dataSize * 1f / numPeers).toInt
-    Array.range(0, dataSize, stepSize)
-  }
-
-  private def range(idx: Int, numPeers: Int) = {
-    if (idx >= numPeers - 1) {
-      (dataRange(idx), dataSize)
-    } else {
-      (dataRange(idx), dataRange(idx + 1))
-    }
+  private def getBlockSize(workerId: Int, numPeers: Int, dataSize: Int): Int = {
+    var blockSize = math.ceil(dataSize * 1f / numPeers).toInt
+    return math.min(blockSize, dataSize - workerId * blockSize)
   }
 
   private def fetch() = {
@@ -216,9 +197,10 @@ class AllreduceWorker(config: WorkerConfig,
       val idx = (peerId + currentConfig.workerId) % numPeers
       val worker = currentConfig.peers(idx)
       //Partition the dataBlock if it is too big
-      val (blockStart, blockEnd) = range(idx, numPeers)
-      val peerBlockSize = blockEnd - blockStart
+      val peerBlockStart = idx * getBlockSize(0, numPeers, dataSize)
+      val peerBlockSize = getBlockSize(idx, numPeers, dataSize)
       val peerNumChunks = math.ceil(1f * peerBlockSize / maxChunkSize).toInt
+
       log.debug(s"scatter: peerNumChunks = ${peerNumChunks}")
       for (i <- 0 until peerNumChunks) {
         val chunkStart = math.min(i * maxChunkSize, peerBlockSize - 1);
@@ -226,7 +208,7 @@ class AllreduceWorker(config: WorkerConfig,
         val chunkSize = chunkEnd - chunkStart + 1
         val chunk: Array[Float] = new Array(chunkSize)
 
-        System.arraycopy(data, blockStart + chunkStart, chunk, 0, chunkSize);
+        System.arraycopy(data, peerBlockStart + chunkStart, chunk, 0, chunkSize);
         log.debug(s"\n----Worker ${self.path}: send msg from ${currentConfig.workerId} to ${idx}, chunkId: ${i}")
         val scatterConfig = currentConfig.copy(workerId = idx)
         val scatterMsg = ScatterBlock(chunk, currentConfig.workerId, idx, i, scatterConfig)
