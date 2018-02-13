@@ -200,7 +200,7 @@ object AllreduceNode {
 
 
 
-    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10)
+    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10, assertCorrectness = false)
   }
 }
 

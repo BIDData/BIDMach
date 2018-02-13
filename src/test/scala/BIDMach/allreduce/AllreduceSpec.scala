@@ -87,7 +87,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       // Replace test actor with the worker itself, it can actually send message to self - not intercepted by testactor
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum).updated(nodeId, worker)
-      var roundConfig = RoundConfig(0, 0, worker, workers, nodeId)
+      var roundConfig = RoundConfig(0, 0, self, workers, nodeId)
 
       worker ! StartAllreduce(roundConfig)
       worker ! ScatterBlock(Array(2f), srcId = 0, destId = 1, chunkId = 0, roundConfig)
@@ -110,7 +110,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
   }
 
-  /*
   "Allreduce worker" must {
 
     "single-round allreduce" in {
@@ -134,7 +133,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val workerNum = 4
 
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
-      var roundConfig = RoundConfig(0, 0, worker, workers, idx)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
       println("============start normal test!===========")
       worker ! StartAllreduce(roundConfig)
 
@@ -190,7 +189,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val workerNum = 2
 
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
-      var roundConfig = RoundConfig(0, 0, worker, workers, idx)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("============start normal test!===========")
       worker ! StartAllreduce(roundConfig)
@@ -223,7 +222,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
-      var roundConfig = RoundConfig(0, 0, worker, workers, idx)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("============start normal test!===========")
       worker ! StartAllreduce(roundConfig)
@@ -284,7 +283,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
-      var roundConfig = RoundConfig(0, 0, worker, workers, idx)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("============start normal test!===========")
       worker ! StartAllreduce(roundConfig)
@@ -373,7 +372,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
-      var roundConfig = RoundConfig(0, 0, worker, workers, idx)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("===============start outdated scatter test!==============")
       worker ! StartAllreduce(roundConfig)
@@ -433,7 +432,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
-      var roundConfig = RoundConfig(0, 0, worker, workers, idx)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("===============start missing test!==============")
       roundConfig = roundConfig.copy(workerId = 0)
@@ -493,7 +492,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
-      var roundConfig = RoundConfig(0, 0, worker, workers, idx)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("===============start missing test!==============")
       worker ! StartAllreduce(roundConfig)
@@ -536,7 +535,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       expectMsg(CompleteAllreduce(0,roundConfig))
     }
   }
-  */
 
 
   /**
