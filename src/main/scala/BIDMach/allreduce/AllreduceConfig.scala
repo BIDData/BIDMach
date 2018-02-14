@@ -37,5 +37,4 @@ case class WorkerConfig(
                          threshold: ThresholdConfig,
                          metaData: MetaDataConfig)
 
-case class DimensionNodeConfig(
-                                dim: Int)
+case class DimensionNodeConfig(dim: Int)

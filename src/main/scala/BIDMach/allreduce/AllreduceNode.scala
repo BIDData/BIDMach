@@ -8,8 +8,10 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 
 /**
-  * Top-level root to all-reduce actor hierarchy, with children as dimension nodes, and grandchildren as round workers
-  * The hierarchy has the following path: user/Node/DimensionNode-dim={}/Worker-id={}
+  * Top-level root to all-reduce actor hierarchy, with children as dimension node actors, and grandchildren as round worker actors
+  * The hierarchy has the following paths;
+  * for round worker [user/Node/DimensionNode-dim={}/Worker-round={}],
+  * and for line master [user/Node/DimensionNode-dim={}/LineMaster]
   * @param dimensionalSources nested list of data source, where the outermost list element corresponds to each dimension, which also has each source for its round worker
   * @param dimensionalSinks nested list of data sink, with similar structure as sources
   */

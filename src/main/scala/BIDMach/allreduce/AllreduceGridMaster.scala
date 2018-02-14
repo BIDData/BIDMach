@@ -95,14 +95,14 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
     lineMasterVersion += 1
     for ((lineMasterNodeId, assignments) <- lineMastersAssignment) {
       for (assignment <- assignments) {
-        val workers = assignment.workerNodeIds
+        val peerNodeIds = assignment.peerNodeIds
         val dim = assignment.dimension
-        var workerNodeRefs = ArrayBuffer[ActorRef]()
-        for (workerId <- workers) {
-          workerNodeRefs += nodeReferenceByIdMap(workerId)
+        var peerNodeRefs = ArrayBuffer[ActorRef]()
+        for (nodeId <- peerNodeIds) {
+          peerNodeRefs += nodeReferenceByIdMap(nodeId)
         }
         val lineMasterRef = discoverLineMaster(dim, lineMasterNodeId)
-        lineMasterRef ! StartAllreduceTask(workerNodeRefs, lineMasterVersion)
+        lineMasterRef ! StartAllreduceTask(peerNodeRefs, lineMasterVersion)
       }
     }
   }
@@ -154,5 +154,5 @@ object AllreduceGridMaster {
 
 }
 
-case class LineAssignment(dimension: Int, workerNodeIds: ArrayBuffer[Int])
+case class LineAssignment(dimension: Int, peerNodeIds: ArrayBuffer[Int])
 

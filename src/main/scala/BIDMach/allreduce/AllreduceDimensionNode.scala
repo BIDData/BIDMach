@@ -3,7 +3,12 @@ package BIDMach.allreduce
 import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
 import akka.actor.{Actor, ActorRef, Props}
 
-
+/**
+  * Generate a set of independent round workers and a line master which may or may not be active depending on the selection.
+  *
+  * @param roundSources data sources, one for each round worker
+  * @param roundSinks   data sinks, one for each round worker
+  */
 class AllreduceDimensionNode(
                               dimensionNodeConfig: DimensionNodeConfig,
                               lineMasterConfig: LineMasterConfig,
@@ -30,18 +35,23 @@ class AllreduceDimensionNode(
   }
 
   def generateRoundWorkers(): Unit = {
+
+    if (roundSources.length != lineMasterConfig.roundWorkerPerDimNum || roundSources.length != roundSinks.length) {
+      throw new IllegalArgumentException(s"Sources and sinks sizes should correspond to the number of round workers, " +
+        s"given ${lineMasterConfig.roundWorkerPerDimNum}, but source size is [${roundSources.length}], and sink [${roundSinks.length}]")
+    }
     roundWorkers = {
       val arr = new Array[ActorRef](lineMasterConfig.roundWorkerPerDimNum)
-      for (i <- 0 until lineMasterConfig.roundWorkerPerDimNum) {
+      for (roundNth <- 0 until lineMasterConfig.roundWorkerPerDimNum) {
         val worker = context.actorOf(Props(
           workerClassProvider(),
           workerConfig,
-          roundSources(i),
-          roundSinks(i)),
-          name = s"Worker-id=${i}"
+          roundSources(roundNth),
+          roundSinks(roundNth)),
+          name = s"Worker-round=${roundNth}"
         )
-        log.info(s"\n----DimensionNode!dim=${assignedDimension}: Worker for round:$i created with ${worker}")
-        arr(i) = worker
+        log.info(s"\n----DimensionNode!dim=${assignedDimension}: Worker for round:$roundNth created with ${worker}")
+        arr(roundNth) = worker
       }
       arr
     }

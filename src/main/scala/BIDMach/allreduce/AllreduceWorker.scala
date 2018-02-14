@@ -94,9 +94,9 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def requiresBufferInitialization(newConfig: RoundConfig): Boolean = {
-    val newNumPeers = newConfig.peers.size
+    val newNumPeers = newConfig.peerWorkers.size
     val newScatterBlockSize = getBlockSize(newConfig.workerId, newNumPeers, dataSize)
-    currentConfig.peers.size != newNumPeers || newScatterBlockSize != scatterBlockBuf.dataSize
+    currentConfig.peerWorkers.size != newNumPeers || newScatterBlockSize != scatterBlockBuf.dataSize
   }
 
   private def prepareBuffer(config: RoundConfig) {
@@ -104,7 +104,7 @@ class AllreduceWorker(config: WorkerConfig,
     if (requiresBufferInitialization(config)) { // re-initialize buffers when grid size (and thus block size) changes
       log.debug(s"\n----Worker ${self.path}: handleBuffer: reinitialize buffer")
 
-      val newNumPeers = config.peers.size
+      val newNumPeers = config.peerWorkers.size
       val newWorkerId = config.workerId
 
       // prepare meta-data
@@ -149,7 +149,7 @@ class AllreduceWorker(config: WorkerConfig,
     } else {
       reduceBlockBuf.store(r.value, r.srcId, r.chunkId, r.count)
       if (reduceBlockBuf.reachCompletionThreshold()) {
-        log.debug(s"\n----Worker ${self.path}: Receive enough reduced data (numPeers = ${currentConfig.peers.size}) for round ${r.config.round}, complete")
+        log.debug(s"\n----Worker ${self.path}: Receive enough reduced data (numPeers = ${currentConfig.peerWorkers.size}) for round ${r.config.round}, complete")
         completeRound()
       }
     }
@@ -170,7 +170,7 @@ class AllreduceWorker(config: WorkerConfig,
     } else {
       scatterBlockBuf.store(s.value, s.srcId, s.chunkId)
       if (scatterBlockBuf.reachReducingThreshold(s.chunkId)) {
-        log.debug(s"\n----Worker ${self.path}: receive ${scatterBlockBuf.count(s.chunkId)} scattered data (numPeers = ${currentConfig.peers.size}), chunkId =${s.chunkId} for round ${s.config.round}, start reducing")
+        log.debug(s"\n----Worker ${self.path}: receive ${scatterBlockBuf.count(s.chunkId)} scattered data (numPeers = ${currentConfig.peerWorkers.size}), chunkId =${s.chunkId} for round ${s.config.round}, start reducing")
         reduceAndBroadcast(s.chunkId)
       }
     }
@@ -198,11 +198,11 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def scatter() = {
-    var numPeers = currentConfig.peers.size
+    var numPeers = currentConfig.peerWorkers.size
     log.debug(s"scatter: numPeers = ${numPeers}")
     for (peerId <- 0 until numPeers) {
       val idx = (peerId + currentConfig.workerId) % numPeers
-      val worker = currentConfig.peers(idx)
+      val worker = currentConfig.peerWorkers(idx)
       //Partition the dataBlock if it is too big
       val peerBlockStart = idx * getBlockSize(0, numPeers, dataSize)
       val peerBlockSize = getBlockSize(idx, numPeers, dataSize)
@@ -235,10 +235,10 @@ class AllreduceWorker(config: WorkerConfig,
 
   private def broadcast(data: Array[Float], chunkId: Int, reduceCount: Int) = {
     log.debug(s"\n----Worker ${self.path}: Start broadcasting, chunkId = ${chunkId}")
-    val numPeers = currentConfig.peers.size
+    val numPeers = currentConfig.peerWorkers.size
     for (i <- 0 until numPeers) {
       val peerWorkerId = (i + currentConfig.workerId) % numPeers
-      val worker = currentConfig.peers(peerWorkerId)
+      val worker = currentConfig.peerWorkers(peerWorkerId)
       val reduceConfig = currentConfig.copy(workerId = peerWorkerId)
       val reduceMsg = ReduceBlock(data, currentConfig.workerId, peerWorkerId, chunkId, reduceConfig, reduceCount)
       if (worker == self) {
