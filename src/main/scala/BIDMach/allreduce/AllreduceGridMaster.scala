@@ -38,7 +38,7 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
         println(s"----${nodeMap.size} (out of ${nodeNum}) nodes are up")
         //Step 1 
         //generate grid info and masters for each dimensions
-        generateLineMasters()
+        generateLineMasters(nodeNum)
         //Step 3
         //propagate the info to all the line masters who are going to be (a) line master 
         startAllreduceTask()
@@ -63,30 +63,25 @@ class AllreduceGridMaster(config: MasterConfig) extends Actor with akka.actor.Ac
     }
   }
 
-  /*
-  0 1
-  2 3
-  */
-  private def generateLineMasters(): Unit = {
-    //config 1
-    // lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1)), (1, ArrayBuffer(0,2))))
-    // lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3)), (1, ArrayBuffer(1,3))))
+  private def generateLineMasters(nodeNum: Int): Unit = {
 
-    //config 2
-    //lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1))))
-    //lineMastersAssignment = lineMastersAssignment.updated(1, ArrayBuffer((1, ArrayBuffer(1, 3))))
-    //lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(0, 2))))
-    //lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3))))
-
-    //config 3
-    lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1, 2, 3))))
-    lineMastersAssignment = lineMastersAssignment.updated(5, ArrayBuffer((0, ArrayBuffer(4, 5, 6, 7))))
-    lineMastersAssignment = lineMastersAssignment.updated(10, ArrayBuffer((0, ArrayBuffer(8, 9, 10, 11))))
-    lineMastersAssignment = lineMastersAssignment.updated(15, ArrayBuffer((0, ArrayBuffer(12, 13, 14, 15))))
-    lineMastersAssignment = lineMastersAssignment.updated(4, ArrayBuffer((1, ArrayBuffer(0, 4, 8, 12))))
-    lineMastersAssignment = lineMastersAssignment.updated(9, ArrayBuffer((1, ArrayBuffer(1, 5, 9, 13))))
-    lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(2, 6, 10, 14))))
-    lineMastersAssignment = lineMastersAssignment.updated(11, ArrayBuffer((1, ArrayBuffer(3, 7, 11, 15))))
+    if (nodeNum == 4) {
+      lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1))))
+      lineMastersAssignment = lineMastersAssignment.updated(1, ArrayBuffer((1, ArrayBuffer(1, 3))))
+      lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(0, 2))))
+      lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer((0, ArrayBuffer(2, 3))))
+    } else if (nodeNum == 16) {
+      lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer((0, ArrayBuffer(0, 1, 2, 3))))
+      lineMastersAssignment = lineMastersAssignment.updated(5, ArrayBuffer((0, ArrayBuffer(4, 5, 6, 7))))
+      lineMastersAssignment = lineMastersAssignment.updated(10, ArrayBuffer((0, ArrayBuffer(8, 9, 10, 11))))
+      lineMastersAssignment = lineMastersAssignment.updated(15, ArrayBuffer((0, ArrayBuffer(12, 13, 14, 15))))
+      lineMastersAssignment = lineMastersAssignment.updated(4, ArrayBuffer((1, ArrayBuffer(0, 4, 8, 12))))
+      lineMastersAssignment = lineMastersAssignment.updated(9, ArrayBuffer((1, ArrayBuffer(1, 5, 9, 13))))
+      lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((1, ArrayBuffer(2, 6, 10, 14))))
+      lineMastersAssignment = lineMastersAssignment.updated(11, ArrayBuffer((1, ArrayBuffer(3, 7, 11, 15))))
+    } else {
+      throw new IllegalArgumentException(s"Hard-coded line master only support 4 and 16 nodes, but given node number is $nodeNum")
+    }
 
     // debug use only
     // if (nodeMap.size > nodeMap.size){
