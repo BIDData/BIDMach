@@ -22,7 +22,7 @@ case class LineMasterConfig(
                              roundWorkerPerDimNum: Int,
                              dim: Int,
                              maxRound: Int,
-                             discoveryTimeout: FiniteDuration,
+                             workerResolutionTimeout: FiniteDuration,
                              threshold: ThresholdConfig,
                              metaData: MetaDataConfig)
 
@@ -33,7 +33,6 @@ case class LineMasterConfig(
 case class NodeConfig(dimNum: Int, reportStats: Boolean)
 
 case class WorkerConfig(
-                         discoveryTimeout: FiniteDuration,
                          statsReportingRoundFrequency: Int = 10,
                          threshold: ThresholdConfig,
                          metaData: MetaDataConfig)

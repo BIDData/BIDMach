@@ -190,7 +190,6 @@ object AllreduceNode {
     val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true)
 
     val workerConfig = WorkerConfig(
-      discoveryTimeout = 5.seconds,
       statsReportingRoundFrequency = 5,
       threshold = threshold,
       metaData = metaData)
@@ -199,7 +198,7 @@ object AllreduceNode {
       roundWorkerPerDimNum = workerPerNodeNum,
       dim = -1,
       maxRound = maxRound,
-      discoveryTimeout = 5.seconds,
+      workerResolutionTimeout = 5.seconds,
       threshold = threshold,
       metaData = metaData)
 

@@ -3,7 +3,7 @@ package BIDMach.allreduce
 
 import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
-import akka.actor.{Actor, ActorRef, Terminated}
+import akka.actor.{Actor, ActorRef}
 
 
 class AllreduceWorker(config: WorkerConfig,
@@ -15,8 +15,6 @@ class AllreduceWorker(config: WorkerConfig,
 
   val dataSize = config.metaData.dataSize
   val maxChunkSize = config.metaData.maxChunkSize
-
-  val workerDiscoveryTimeout = config.discoveryTimeout
 
   var currentConfig: RoundConfig = RoundConfig(-1, -1, self, Map[Int, ActorRef](), -1)
   var isCurrentRoundCompleted = true
@@ -73,7 +71,7 @@ class AllreduceWorker(config: WorkerConfig,
     }
   }
 
-  private def handleRoundConfig(config : RoundConfig): Boolean = {
+  private def handleRoundConfig(config: RoundConfig): Boolean = {
     if (config < currentConfig) { // outdated msg, discard
       return false
     } else if (config > currentConfig) {
@@ -101,7 +99,7 @@ class AllreduceWorker(config: WorkerConfig,
     currentConfig.peers.size != newNumPeers || newScatterBlockSize != scatterBlockBuf.dataSize
   }
 
-  private def prepareBuffer(config : RoundConfig) {
+  private def prepareBuffer(config: RoundConfig) {
 
     if (requiresBufferInitialization(config)) { // re-initialize buffers when grid size (and thus block size) changes
       log.debug(s"\n----Worker ${self.path}: handleBuffer: reinitialize buffer")

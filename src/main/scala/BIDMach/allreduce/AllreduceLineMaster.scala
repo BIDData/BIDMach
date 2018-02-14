@@ -18,7 +18,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   val thAllreduce = config.threshold.thAllreduce
   val maxRound = config.maxRound
 
-  val addressDiscoveryTimeOut: FiniteDuration = config.discoveryTimeout
+  val addressDiscoveryTimeOut: FiniteDuration = config.workerResolutionTimeout
 
   var lineMasterVersion = -1
   var round = -1

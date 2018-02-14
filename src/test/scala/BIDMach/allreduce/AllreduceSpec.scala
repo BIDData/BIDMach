@@ -61,7 +61,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
     val workerConfig = WorkerConfig(
-      discoveryTimeout = 5.seconds,
       threshold = threshold,
       metaData = metaData)
 
@@ -125,7 +124,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -181,7 +179,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -217,7 +214,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -278,7 +274,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -367,7 +362,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -427,7 +421,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -487,7 +480,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
