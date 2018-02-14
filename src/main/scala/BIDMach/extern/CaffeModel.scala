@@ -121,11 +121,12 @@ object CaffeModel {
   private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net) = {
     // Caffe only supports CrossCorrelation convolution
     net.opts.convType = Net.CrossCorrelation
+    // The Caffe tensor format is NCHW
+    net.opts.tensorFormat = Net.TensorNCHW
     
     val layersForPhase = filterLayers(netParam.getLayerList(), phase)
     val layers = toposort(resolveLayerLinks(layersForPhase))
 
-    // TODO: enforce NCHW if necessary
     // Translate every layer and build a mapping of blobs to layers feeding into them
     val nodes = new mutable.ArrayBuffer[Node]
     // SoftmaxOutputNode for categorical classification
