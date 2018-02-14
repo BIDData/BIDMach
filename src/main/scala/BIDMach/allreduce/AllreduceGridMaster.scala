@@ -19,7 +19,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
 
   var nodesByIdMap = Map[Int, ActorRef]()
 
-  // Grid assignment as line assignment for each elected line master denoted by the node id (key)
+  // Grid assignment as line assignment for each selected line master denoted by the node id (key)
   var gridAssignment = Map[Int, ArrayBuffer[LineAssignment]]()
 
   // Line master version (strictly increasing) for downstream to distinguish new grid assignment
@@ -84,10 +84,8 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
     }
 
     // debug use only
-    // if (nodeMap.size > nodeMap.size){
-    // lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer(LineOrganization(0, ArrayBuffer(0,1,2)), LineOrganization(1, ArrayBuffer(0))))
-    // lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer((LineOrganization(1, ArrayBuffer(2)))))
-    // }
+    // gridAssignment = gridAssignment.updated(0, ArrayBuffer(LineAssignment(0, ArrayBuffer(0,1,2)), LineAssignment(1, ArrayBuffer(0))))
+    // gridAssignment = gridAssignment.updated(2, ArrayBuffer((LineAssignment(1, ArrayBuffer(2)))))
 
   }
 
@@ -125,19 +123,19 @@ object AllreduceGridMaster {
     val nodeNum = 4;
     val masterConfig = GridMasterConfig(nodeNum = nodeNum, nodeResolutionTimeout = 5.seconds)
 
-    initMaster(port, masterConfig)
+    initGridMaster(port, masterConfig)
   }
 
-  private def initMaster(port: String, masterConfig: GridMasterConfig) = {
+  private def initGridMaster(port: String, gridMasterConfig: GridMasterConfig) = {
     val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [GridMaster]")).
       withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
 
-    system.log.info(s"-------\n Port = ${port} \n Number of nodes = ${masterConfig.nodeNum} \n ");
+    system.log.info(s"-------\n Port = ${port} \n Number of nodes = ${gridMasterConfig.nodeNum} \n ");
     system.actorOf(
-      Props(classOf[AllreduceGridMaster], masterConfig),
+      Props(classOf[AllreduceGridMaster], gridMasterConfig),
       name = "GridMaster"
     )
   }
@@ -147,7 +145,7 @@ object AllreduceGridMaster {
   }
 
   def startUp(port: String, masterConfig: GridMasterConfig): Unit = {
-    initMaster(port, masterConfig)
+    initGridMaster(port, masterConfig)
   }
 
 }

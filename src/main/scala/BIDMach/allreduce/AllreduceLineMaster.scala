@@ -44,13 +44,13 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
 
     case s: StartAllreduceTask =>
       // Currently assumes here that start all reduce comes at once.
-      log.debug(s"\n----LineMaster ${self.path}: Receive SlavesInfo from GridMaster.")
+      log.debug(s"\n----LineMaster ${self.path}: Receive PeerNodes from GridMaster.")
       gridMaster = Some(sender())
       lineMasterVersion = s.lineMasterVersion
       val peerNodeRefs = s.peerNodes
       peerNodesInLineNum = peerNodeRefs.size
       for (roundNth <- 0 until roundNum) {
-        peerWorkersPerRound(roundNth) = discoverWorkerPeers(roundNth, peerNodeRefs.toArray)
+        peerWorkersPerRound(roundNth) = discoverPeerWorkers(roundNth, peerNodeRefs.toArray)
       }
       round = 0
       startAllreduce()
@@ -70,13 +70,14 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   }
 
   /**
-    * Discover peers from given node refs and assign the worker id sequentially
-    * @param round round at which worker is responsible for
-    * @param nodeArray node references of root actor under which the peer workers live
+    * Discover peers from given peer nodes refs and assign the worker id sequentially.
+    * The peer worker is identified through its root-level node at which it lives, dimension, and the round.
+    * @param round round at which the worker is responsible for
+    * @param peerNodes node references of root actor under which the desired peer workers live
     * @return map of worker id and its refs
     */
-  private def discoverWorkerPeers(round: Int, nodeArray: Array[ActorRef]): Map[Int, ActorRef] = {
-    val refFut: Seq[Future[(Int, ActorRef)]] = nodeArray.zipWithIndex.map {
+  private def discoverPeerWorkers(round: Int, peerNodes: Array[ActorRef]): Map[Int, ActorRef] = {
+    val refFut: Seq[Future[(Int, ActorRef)]] = peerNodes.zipWithIndex.map {
       case (nodeRef, i) =>
         val assignedWorkerId = i
         //nodePath/worker-id-dim

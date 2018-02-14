@@ -198,7 +198,7 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def scatter() = {
-    var numPeers = currentConfig.peerWorkers.size
+    val numPeers = currentConfig.peerWorkers.size
     log.debug(s"scatter: numPeers = ${numPeers}")
     for (peerId <- 0 until numPeers) {
       val idx = (peerId + currentConfig.workerId) % numPeers
