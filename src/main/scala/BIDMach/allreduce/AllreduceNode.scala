@@ -85,10 +85,10 @@ object AllreduceNode {
       val dimSinks: Array[List[DataSink]] = new Array(nodeConfig.dimNum)
       for (i <- 0 until nodeConfig.dimNum) {
         val (source, sink) = getSourceSink(i)
-        val sources: Array[DataSource] = Array.fill(lineMasterConfig.workerPerNodeNum)(source)
-        val sinks: Array[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum)(sink)
-        dimSources(i) = sources.toList
-        dimSinks(i) = sinks.toList
+        val roundSources: Array[DataSource] = Array.fill(lineMasterConfig.roundWorkerPerDimNum)(source)
+        val roundSinks: Array[DataSink] = Array.fill(lineMasterConfig.roundWorkerPerDimNum)(sink)
+        dimSources(i) = roundSources.toList
+        dimSinks(i) = roundSinks.toList
       }
       (dimSources.toList, dimSinks.toList)
     }
@@ -196,7 +196,7 @@ object AllreduceNode {
       metaData = metaData)
 
     val lineMasterConfig = LineMasterConfig(
-      workerPerNodeNum = workerPerNodeNum,
+      roundWorkerPerDimNum = workerPerNodeNum,
       dim = -1,
       maxRound = maxRound,
       discoveryTimeout = 5.seconds,

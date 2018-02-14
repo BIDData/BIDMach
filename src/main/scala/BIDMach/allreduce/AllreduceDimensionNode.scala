@@ -8,38 +8,39 @@ class AllreduceDimensionNode(
                               dimensionNodeConfig: DimensionNodeConfig,
                               lineMasterConfig: LineMasterConfig,
                               workerConfig: WorkerConfig,
-                              sources: List[DataSource],
-                              sinks: List[DataSink]
+                              roundSources: List[DataSource],
+                              roundSinks: List[DataSink]
                             ) extends Actor with akka.actor.ActorLogging {
 
-  var workers: Array[ActorRef] = Array.empty
-  var lineMaster: Option[ActorRef] = None
-  val dim = dimensionNodeConfig.dim
+  val assignedDimension = dimensionNodeConfig.dim
 
-  generateWorkers()
+  var roundWorkers: Array[ActorRef] = Array.empty
+  var lineMaster: Option[ActorRef] = None
+
+  generateRoundWorkers()
   generateLineMaster()
 
   override def receive: Receive = {
     case _ =>
-      log.error(s"\n----DimensionNode!dim=${dim}: I AM NOT SUPPOSED TO RECEIVE MSGs")
+      log.error(s"\n----DimensionNode!dim=${assignedDimension}: I AM NOT SUPPOSED TO RECEIVE MSGs")
   }
 
   protected def workerClassProvider(): Class[_] = {
     classOf[AllreduceWorker]
   }
 
-  def generateWorkers(): Unit = {
-    workers = {
-      val arr = new Array[ActorRef](lineMasterConfig.workerPerNodeNum)
-      for (i <- 0 until lineMasterConfig.workerPerNodeNum) {
+  def generateRoundWorkers(): Unit = {
+    roundWorkers = {
+      val arr = new Array[ActorRef](lineMasterConfig.roundWorkerPerDimNum)
+      for (i <- 0 until lineMasterConfig.roundWorkerPerDimNum) {
         val worker = context.actorOf(Props(
           workerClassProvider(),
           workerConfig,
-          sources(i),
-          sinks(i)),
+          roundSources(i),
+          roundSinks(i)),
           name = s"Worker-id=${i}"
         )
-        log.info(s"\n----DimensionNode!dim=${dim}: Worker for round:$i created with ${worker}")
+        log.info(s"\n----DimensionNode!dim=${assignedDimension}: Worker for round:$i created with ${worker}")
         arr(i) = worker
       }
       arr
@@ -47,19 +48,14 @@ class AllreduceDimensionNode(
   }
 
   def generateLineMaster(): Unit = {
-    var lineMasterConfig_ = LineMasterConfig(
-      workerPerNodeNum = lineMasterConfig.workerPerNodeNum,
-      dim = dim,
-      maxRound = lineMasterConfig.maxRound,
-      discoveryTimeout = lineMasterConfig.discoveryTimeout,
-      threshold = lineMasterConfig.threshold,
-      metaData = lineMasterConfig.metaData)
+
+    val configWithAssignedDimension = lineMasterConfig.copy(dim = assignedDimension)
 
     lineMaster = Some(context.actorOf(Props(
       classOf[AllreduceLineMaster],
-      lineMasterConfig_),
+      configWithAssignedDimension),
       name = "LineMaster"))
 
-    log.info(s"\n----DimensionNode!dim=${dim}: LineMaster is created with ${lineMaster}")
+    log.info(s"\n----DimensionNode!dim=${assignedDimension}: LineMaster is created with ${lineMaster}")
   }
 }

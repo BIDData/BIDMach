@@ -12,7 +12,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
 
   var gridMaster: Option[ActorRef] = None
   var workerNum = -1
-  var roundNum = config.workerPerNodeNum //the number of rounds (lags) allowed
+  var roundNum = config.roundWorkerPerDimNum //the number of rounds (lags) allowed
   var dim = config.dim
 
   val thAllreduce = config.threshold.thAllreduce

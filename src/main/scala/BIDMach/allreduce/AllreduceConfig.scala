@@ -19,7 +19,7 @@ case class MetaDataConfig(
                            maxChunkSize: Int)
 
 case class LineMasterConfig(
-                             workerPerNodeNum: Int,
+                             roundWorkerPerDimNum: Int,
                              dim: Int,
                              maxRound: Int,
                              discoveryTimeout: FiniteDuration,

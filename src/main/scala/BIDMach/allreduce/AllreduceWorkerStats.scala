@@ -82,7 +82,7 @@ trait StatsAggregating extends ReceivePipeline {
   var outgoingFloats: Long = 0
   var incomingFloats: Long = 0
 
-  def dim: Int
+  def assignedDimension: Int
 
   private def throughputStats(floatSize: Long, secondElapsed: Double) = {
     val bytes = floatSize * 4.0
@@ -102,8 +102,8 @@ trait StatsAggregating extends ReceivePipeline {
         val (outgoingMbytes, outgoingThroughput) = throughputStats(outgoingFloats, secondElapsed)
         val (incomingMbytes, incomingThroughput) = throughputStats(incomingFloats, secondElapsed)
 
-        val reportOut = f"Dim$dim: Outgoing $outgoingMbytes%2.1f Mbytes in $secondElapsed%2.1f seconds at $outgoingThroughput%4.3f MBytes/sec"
-        val reportIn = f"Dim$dim: Incoming $incomingMbytes%2.1f Mbytes in $secondElapsed%2.1f seconds at $incomingThroughput%4.3f MBytes/sec"
+        val reportOut = f"Dim$assignedDimension: Outgoing $outgoingMbytes%2.1f Mbytes in $secondElapsed%2.1f seconds at $outgoingThroughput%4.3f MBytes/sec"
+        val reportIn = f"Dim$assignedDimension: Incoming $incomingMbytes%2.1f Mbytes in $secondElapsed%2.1f seconds at $incomingThroughput%4.3f MBytes/sec"
         println(s"----$reportOut\n----$reportIn")
         outgoingFloats = 0
         incomingFloats = 0
