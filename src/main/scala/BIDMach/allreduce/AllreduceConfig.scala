@@ -2,9 +2,12 @@ package BIDMach.allreduce
 
 import scala.concurrent.duration._
 
-case class MasterConfig(
-                         nodeNum: Int,
-                         discoveryTimeout: FiniteDuration)
+
+case class GridMasterConfig(
+                             nodeNum: Int,
+                             nodeResolutionTimeout: FiniteDuration) {
+
+}
 
 case class ThresholdConfig(
                             thAllreduce: Float,
