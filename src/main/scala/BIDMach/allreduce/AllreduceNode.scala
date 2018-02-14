@@ -177,7 +177,7 @@ object AllreduceNode {
     val dataSize = 100
     val maxChunkSize = 4
     val workerPerNodeNum = 4
-    val maxRound = 100000
+    val maxRound = 1000
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
@@ -200,7 +200,7 @@ object AllreduceNode {
 
 
 
-    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10)
+    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10, assertCorrectness = false)
   }
 }
 

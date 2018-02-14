@@ -20,76 +20,51 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
 
   val addressDiscoveryTimeOut: FiniteDuration = config.discoveryTimeout
 
-  var round = 0
+  var lineMasterVersion = -1
+  var round = -1
 
   // worker address for all rounds
   var workerMapAcrossRounds: Array[Map[Int, ActorRef]] = new Array(roundNum)
 
   var completeCount = 0
-  var confirmPrepareCount = 0
 
   def receive = {
 
-    case confirm: ConfirmPreparation => {
-      log.debug(s"\n----LineMaster ${self.path} receive confimation from ${sender} with round ${confirm.round}")
-      if (confirm.round == round) {
-        confirmPrepareCount += 1
-        //log.info(s"\n----LineMaster ${self.path} receive confimation from ${sender}; ${confirmPrepareCount} out of ${workerNum}")
-        if (confirmPrepareCount == workerNum) {
-          startAllreduce()
-        }
-      }
-    }
-
     case c: CompleteAllreduce =>
-      log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.round}")
-      if (c.round == round) {
+      log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.config.round}")
+      if (c.config.round == round) {
         completeCount += 1
         if (completeCount >= workerNum * thAllreduce && round < maxRound) {
           //log.info(s"\n----LineMaster ${self.path}: ${completeCount} (out of ${workerNum}) workers complete round ${round}\n")
           round += 1
-          prepareAllreduce()
+          startAllreduce()
         }
       }
 
-    case slavesInfo: SlavesInfo =>
+    case s: StartAllreduceTask =>
       log.debug(s"\n----LineMaster ${self.path}: Receive SlavesInfo from GridMaster.")
       gridMaster = Some(sender())
-      val nodeRefs = slavesInfo.slaveNodesRef
+      lineMasterVersion = s.lineMasterVersion
+      val nodeRefs = s.slaveNodesRef
       workerNum = nodeRefs.size
       for (workerRound <- 0 until roundNum) {
         workerMapAcrossRounds(workerRound) = discoverWorkers(workerRound, nodeRefs.toArray)
       }
-
-      //if the LM hasnt begun, initiate PrepareAllreduce.
-      //Otherwise, we just update the nodeMap and wait for the current round to end
-      if (round == 0) {
-        prepareAllreduce()
-      }
-
+      round = 0
+      startAllreduce()
   }
 
   private def startAllreduce() = {
     log.debug(s"\n----LineMaster ${self.path}: START ROUND ${round} at time ${System.currentTimeMillis} --------------------")
     completeCount = 0
-    for (worker <- workerMapAcrossRounds(timeIdx(round)).values) {
-      worker ! StartAllreduce(round)
+    val roundWorkerMap = workerMapAcrossRounds(timeIdx(round))
+    for ((nodeIndex, worker) <- roundWorkerMap) {
+      worker ! StartAllreduce(RoundConfig(lineMasterVersion, round, self, roundWorkerMap, nodeIndex))
     }
   }
 
   private def timeIdx(round: Int) = {
     round % roundNum
-  }
-
-  private def prepareAllreduce() = {
-    //log.info(s"\n----LineMaster ${self.path}: Preparing allreduce round ${round}")
-    confirmPrepareCount = 0
-
-    val roundWorkerMap = workerMapAcrossRounds(timeIdx(round))
-
-    for ((nodeIndex, worker) <- roundWorkerMap) {
-      worker ! PrepareAllreduce(round, roundWorkerMap, nodeIndex)
-    }
   }
 
   private def discoverWorkers(round: Int, nodeArray: Array[ActorRef]): Map[Int, ActorRef] = {

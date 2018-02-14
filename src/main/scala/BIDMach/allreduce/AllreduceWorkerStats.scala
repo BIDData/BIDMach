@@ -38,7 +38,7 @@ trait StatsReporting extends ReceivePipeline {
     }
     case start: StartAllreduce => {
 
-      if (start.round % reportingFrequency == 0 && start.round > reportingFrequency) {
+      if (start.config.round % reportingFrequency == 0 && start.config.round > reportingFrequency) {
         val totalFloatsOut: Long = aggrCount(scatterOutCount) + aggrCount(reducedOutCount)
         val totalFloatsIn: Long = aggrCount(scatterInCount) + aggrCount(reducedInCount)
         context.parent ! AllreduceStats(totalFloatsOut, totalFloatsIn)
