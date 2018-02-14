@@ -4,7 +4,7 @@ import BIDMach.allreduce.DataConfig
 import BIDMach.allreduce.WorkerConfig
 
 
-val threshold = ThresholdConfig(
+val thresholdConfig = ThresholdConfig(
   thAllreduce = 1f,
   thReduce = 1f,
   thComplete = 1f
@@ -13,7 +13,7 @@ val threshold = ThresholdConfig(
 val dataConfig = DataConfig(
   dataSize = 500000,
   maxChunkSize = 20000,
-  maxRound = 100
+  maxRound = 100000
 )
 
 val workerConfig = WorkerConfig(
@@ -21,4 +21,4 @@ val workerConfig = WorkerConfig(
   maxLag = 3
 )
 
-AllreduceMaster.startUp("2551", threshold, dataConfig, workerConfig)
+AllreduceMaster.startUp("2551", thresholdConfig, dataConfig, workerConfig)
