@@ -108,17 +108,17 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:
 }
 
 object CaffeModel {
-  def loadModel(modelFile:Readable, net:Net) = {
+  def loadModel(modelFile:Readable, net:Net, means:Mat = null) = {
     val caffeBuilder = Caffe.NetParameter.newBuilder()
     TextFormat.merge(modelFile, caffeBuilder)
 
-    val (layers, nodes) = parseProtobuf(caffeBuilder, Caffe.Phase.TRAIN, net)
+    val (layers, nodes) = parseProtobuf(caffeBuilder, Caffe.Phase.TRAIN, net, means)
     net.opts.nodeset = new NodeSet(nodes.toArray)
 
     new CaffeModel(net, caffeBuilder, layers)
   }
 
-  private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net) = {
+  private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net, means:Mat = null) = {
     // Caffe only supports CrossCorrelation convolution
     net.opts.convType = Net.CrossCorrelation
     // The Caffe tensor format is NCHW
@@ -190,7 +190,7 @@ object CaffeModel {
             net.opts.asInstanceOf[DataSource.Opts].batchSize = dataParam.getBatchSize()
           }
           
-          addTransformNodes(layer.param.getTransformParam(), new InputNode)
+          addTransformNodes(layer.param, means, new InputNode)
         }
         case "MemoryData" => new InputNode
         case "HDF5Data" => new InputNode
@@ -578,7 +578,8 @@ object CaffeModel {
     Array(scaleMat, biasMat)
   }
   
-  private def addTransformNodes(transformParam:Caffe.TransformationParameter, subjectNode:Node) = {
+  private def addTransformNodes(layerParam:Caffe.LayerParameter, means:Mat, subjectNode:Node) = {
+    val transformParam = layerParam.getTransformParam()
     val newNodeList = new mutable.ListBuffer[Node]
     newNodeList += subjectNode
 
@@ -606,14 +607,29 @@ object CaffeModel {
       }
     }
 
+    check(!(transformParam.hasMeanFile() && transformParam.getMeanValueCount() > 0),
+          layerParam, "you cannot specify both a mean value file and mean value counts")
     if (transformParam.getMeanValueCount() > 0) {
       val numMeanValues = transformParam.getMeanValueCount()
-      // Each mean value applies to a channel. Since data matrices are written in CWHN order,
-      // we create a Cx1x1x1 mean value matrix that we subtract from the input.
-      val meanValues = new FMat(transformParam.getMeanValueList().map(_.intValue()).toArray,
-                                Array(numMeanValues, 1, 1, 1))
+      val meanValues:FMat = if (numMeanValues == 1) {
+    	// One global mean value to subtract from every datum
+        transformParam.getMeanValue(0)
+      } else {
+        // Each mean value applies to a channel. Since data matrices are written in CWHN order,
+        // we create a Cx1x1x1 mean value matrix that we subtract from the input.
+        new FMat(Array(numMeanValues, 1, 1, 1), transformParam.getMeanValueList().map(_.floatValue()).toArray)
+      }
       val constNode = new ConstantNode {
         value = meanValues
+        cache = true // TODO: verify
+      }
+      val subNode = newNodeList.last - constNode
+      newNodeList += constNode
+      newNodeList += subNode
+    } else if (transformParam.hasMeanFile()) {
+      check(means ne null, layerParam, "need to specify means")
+      val constNode = new ConstantNode {
+        value = means
         cache = true // TODO: verify
       }
       val subNode = newNodeList.last - constNode
