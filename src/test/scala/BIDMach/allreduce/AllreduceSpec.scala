@@ -55,7 +55,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     val maxChunkSize = 2
 
     val workerNum = 2
-    val workerPerNodeNum = 3
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
@@ -114,9 +113,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     "single-round allreduce" in {
 
       val idx = 0
-      val thReduce = 1f
-      val thComplete = 0.75f
-      val workerPerNodeNum = 5
       val dataSize = 8
       val maxChunkSize = 2
 
@@ -172,7 +168,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val dataSize = 3
       val idx = 1
-      val workerPerNodeNum = 1
       val maxChunkSize = 1
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
@@ -207,7 +202,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val workerNum = 2
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
       val idx = 0
-      val workerPerNodeNum = 5
       val maxChunkSize = 2
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 0.9f, thComplete = 0.8f)
@@ -267,7 +261,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val idx = 0
       val thReduce = 0.7f
       val thComplete = 0.7f
-      val workerPerNodeNum = 5
       val maxChunkSize = 1
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
@@ -354,7 +347,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val idx = 0
       val thReduce = 0.75f
       val thComplete = 0.75f
-      val workerPerNodeNum = 5
       val dataSize = 4
       val maxChunkSize = 2
 
@@ -415,7 +407,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val thComplete = 0.75f
       val dataSize = 4
       val maxChunkSize = 100
-      val workerPerNodeNum = 5
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
@@ -474,7 +465,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val thComplete = 1f
       val dataSize = 6
       val maxChunkSize = 1
-      val workerPerNodeNum = 5
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)

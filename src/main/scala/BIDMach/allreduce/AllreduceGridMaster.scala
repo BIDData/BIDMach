@@ -17,10 +17,10 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
 
   val cluster = Cluster(context.system)
 
-  var nodeReferenceByIdMap = Map[Int, ActorRef]()
+  var nodesByIdMap = Map[Int, ActorRef]()
 
-  // Specifies line assignment for a line master denoted by its node id
-  var lineMastersAssignment = Map[Int, ArrayBuffer[LineAssignment]]()
+  // Grid assignment as line assignment for each elected line master denoted by the node id (key)
+  var gridAssignment = Map[Int, ArrayBuffer[LineAssignment]]()
 
   // Line master version (strictly increasing) for downstream to distinguish new grid assignment
   var lineMasterVersion = -1
@@ -31,11 +31,11 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
 
   def receive = {
 
-    case MemberUp(m) =>
-      log.info(s"\n----GridMaster: Detect node ${m.address} up")
-      register(m)
-      if (nodeReferenceByIdMap.size >= nodeNum) {
-        println(s"----${nodeReferenceByIdMap.size} (out of ${nodeNum}) nodes are up")
+    case MemberUp(joiningNode) =>
+      log.info(s"\n----GridMaster: Detect node ${joiningNode.address} up")
+      register(joiningNode)
+      if (nodesByIdMap.size >= nodeNum) {
+        println(s"----${nodesByIdMap.size} (out of ${nodeNum}) nodes are up")
         //Step 1
         //generate grid info and masters for each dimensions
         generateGridAssignment(nodeNum)
@@ -46,7 +46,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
 
     case Terminated(a) =>
       log.info(s"\n----GridMaster: $a is terminated, removing it from the map")
-      for ((_, nodeRef) <- nodeReferenceByIdMap) {
+      for ((_, nodeRef) <- nodesByIdMap) {
         if (nodeRef == a) {
           log.info(s"\n----GridMaster: $a should be removed. The function is NOT YET COMPLETE")
         }
@@ -58,27 +58,27 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       // awaiting here to prevent concurrent futures (from another message) trying to add to node set at the same time
       val nodeRef: ActorRef = Await.result(context.actorSelection(RootActorPath(node.address) / "user" / "Node").resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second)
       context watch nodeRef
-      nodeReferenceByIdMap = nodeReferenceByIdMap.updated(nodeReferenceByIdMap.size, nodeRef)
-      log.info(s"\n----GridMaster: ${nodeRef} is online. Currently ${nodeReferenceByIdMap.size} nodes are online")
+      nodesByIdMap = nodesByIdMap.updated(nodesByIdMap.size, nodeRef)
+      log.info(s"\n----GridMaster: ${nodeRef} is online. Currently ${nodesByIdMap.size} nodes are online")
     }
   }
 
   private def generateGridAssignment(nodeNum: Int): Unit = {
 
     if (nodeNum == 4) {
-      lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer(LineAssignment(0, ArrayBuffer(0, 1))))
-      lineMastersAssignment = lineMastersAssignment.updated(1, ArrayBuffer(LineAssignment(1, ArrayBuffer(1, 3))))
-      lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer(LineAssignment(1, ArrayBuffer(0, 2))))
-      lineMastersAssignment = lineMastersAssignment.updated(3, ArrayBuffer(LineAssignment(0, ArrayBuffer(2, 3))))
+      gridAssignment = gridAssignment.updated(0, ArrayBuffer(LineAssignment(0, ArrayBuffer(0, 1))))
+      gridAssignment = gridAssignment.updated(1, ArrayBuffer(LineAssignment(1, ArrayBuffer(1, 3))))
+      gridAssignment = gridAssignment.updated(2, ArrayBuffer(LineAssignment(1, ArrayBuffer(0, 2))))
+      gridAssignment = gridAssignment.updated(3, ArrayBuffer(LineAssignment(0, ArrayBuffer(2, 3))))
     } else if (nodeNum == 16) {
-      lineMastersAssignment = lineMastersAssignment.updated(0, ArrayBuffer(LineAssignment(0, ArrayBuffer(0, 1, 2, 3))))
-      lineMastersAssignment = lineMastersAssignment.updated(5, ArrayBuffer(LineAssignment(0, ArrayBuffer(4, 5, 6, 7))))
-      lineMastersAssignment = lineMastersAssignment.updated(10, ArrayBuffer(LineAssignment(0, ArrayBuffer(8, 9, 10, 11))))
-      lineMastersAssignment = lineMastersAssignment.updated(15, ArrayBuffer(LineAssignment(0, ArrayBuffer(12, 13, 14, 15))))
-      lineMastersAssignment = lineMastersAssignment.updated(4, ArrayBuffer(LineAssignment(1, ArrayBuffer(0, 4, 8, 12))))
-      lineMastersAssignment = lineMastersAssignment.updated(9, ArrayBuffer(LineAssignment(1, ArrayBuffer(1, 5, 9, 13))))
-      lineMastersAssignment = lineMastersAssignment.updated(2, ArrayBuffer(LineAssignment(1, ArrayBuffer(2, 6, 10, 14))))
-      lineMastersAssignment = lineMastersAssignment.updated(11, ArrayBuffer(LineAssignment(1, ArrayBuffer(3, 7, 11, 15))))
+      gridAssignment = gridAssignment.updated(0, ArrayBuffer(LineAssignment(0, ArrayBuffer(0, 1, 2, 3))))
+      gridAssignment = gridAssignment.updated(5, ArrayBuffer(LineAssignment(0, ArrayBuffer(4, 5, 6, 7))))
+      gridAssignment = gridAssignment.updated(10, ArrayBuffer(LineAssignment(0, ArrayBuffer(8, 9, 10, 11))))
+      gridAssignment = gridAssignment.updated(15, ArrayBuffer(LineAssignment(0, ArrayBuffer(12, 13, 14, 15))))
+      gridAssignment = gridAssignment.updated(4, ArrayBuffer(LineAssignment(1, ArrayBuffer(0, 4, 8, 12))))
+      gridAssignment = gridAssignment.updated(9, ArrayBuffer(LineAssignment(1, ArrayBuffer(1, 5, 9, 13))))
+      gridAssignment = gridAssignment.updated(2, ArrayBuffer(LineAssignment(1, ArrayBuffer(2, 6, 10, 14))))
+      gridAssignment = gridAssignment.updated(11, ArrayBuffer(LineAssignment(1, ArrayBuffer(3, 7, 11, 15))))
     } else {
       throw new IllegalArgumentException(s"Hard-coded line master only support 4 and 16 nodes, but given node number is $nodeNum")
     }
@@ -93,13 +93,13 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
 
   private def startAllreduceTask(): Unit = {
     lineMasterVersion += 1
-    for ((lineMasterNodeId, assignments) <- lineMastersAssignment) {
+    for ((lineMasterNodeId, assignments) <- gridAssignment) {
       for (assignment <- assignments) {
         val peerNodeIds = assignment.peerNodeIds
         val dim = assignment.dimension
         var peerNodeRefs = ArrayBuffer[ActorRef]()
         for (nodeId <- peerNodeIds) {
-          peerNodeRefs += nodeReferenceByIdMap(nodeId)
+          peerNodeRefs += nodesByIdMap(nodeId)
         }
         val lineMasterRef = discoverLineMaster(dim, lineMasterNodeId)
         lineMasterRef ! StartAllreduceTask(peerNodeRefs, lineMasterVersion)
@@ -108,9 +108,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
   }
 
   private def discoverLineMaster(dim: Int, masterNodeIdx: Int): ActorRef = {
-    //path: masterNodePath/lineMaster-dim
-
-    val lineMaster: ActorRef = Await.result(context.actorSelection(nodeReferenceByIdMap(masterNodeIdx).path / s"DimensionNode-dim=${dim}" / "LineMaster")
+    val lineMaster: ActorRef = Await.result(context.actorSelection(nodesByIdMap(masterNodeIdx).path / s"DimensionNode-dim=${dim}" / "LineMaster")
       .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second)
     println(s"\n----GridMaster: Discover LineMaster Address : ${lineMaster.path}")
     (lineMaster)

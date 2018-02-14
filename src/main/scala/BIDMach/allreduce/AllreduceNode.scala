@@ -8,7 +8,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 
 /**
-  * Top-level root to all-reduce actor hierarchy, with children as dimension node actors, and grandchildren as round worker actors
+  * Top-level root to all-reduce actor hierarchy, with children as dimension node actors, and grandchildren as line masters/round worker actors
   * The hierarchy has the following paths;
   * for round worker [user/Node/DimensionNode-dim={}/Worker-round={}],
   * and for line master [user/Node/DimensionNode-dim={}/LineMaster]
@@ -180,10 +180,11 @@ object AllreduceNode {
   }
 
   def main(args: Array[String]): Unit = {
+
     val dimNum = 2
     val dataSize = 100
     val maxChunkSize = 4
-    val workerPerNodeNum = 4
+    val roundWorkerPerDimNum = 4
     val maxRound = 1000
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
@@ -197,13 +198,12 @@ object AllreduceNode {
       metaData = metaData)
 
     val lineMasterConfig = LineMasterConfig(
-      roundWorkerPerDimNum = workerPerNodeNum,
+      roundWorkerPerDimNum = roundWorkerPerDimNum,
       dim = -1,
       maxRound = maxRound,
       workerResolutionTimeout = 5.seconds,
       threshold = threshold,
       metaData = metaData)
-
 
 
     AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10, assertCorrectness = false)

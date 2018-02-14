@@ -9,6 +9,12 @@ case class GridMasterConfig(
 
 }
 
+/**
+  * Threshold config at various stages of all-reduce
+  * @param thAllreduce th percentage of the peers sending completion at which line master will start a new all reduce round
+  * @param thReduce th percentage of the scatter messages received per chunk at which the worker will reduce results
+  * @param thComplete th percentage of the reduced messages received across the data size at which worker will signal completion to the line master
+  */
 case class ThresholdConfig(
                             thAllreduce: Float,
                             thReduce: Float,
