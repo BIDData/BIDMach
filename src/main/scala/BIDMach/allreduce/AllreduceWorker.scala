@@ -95,13 +95,22 @@ class AllreduceWorker(config: WorkerConfig,
     completeRound()
   }
 
+  private def requiresBufferInitialization(newConfig: RoundConfig): Boolean = {
+    val newNumPeers = newConfig.peers.size
+    val newScatterBlockSize = getBlockSize(newConfig.workerId, newNumPeers, dataSize)
+    currentConfig.peers.size != newNumPeers || newScatterBlockSize != scatterBlockBuf.dataSize
+  }
+
   private def prepareBuffer(config : RoundConfig) {
-    var currNumPeers = currentConfig.peers.size
-    var newNumPeers = config.peers.size
-    if (currNumPeers != newNumPeers) { // re-initialize buffers when grid size (and thus block size) changes
+
+    if (requiresBufferInitialization(config)) { // re-initialize buffers when grid size (and thus block size) changes
       log.debug(s"\n----Worker ${self.path}: handleBuffer: reinitialize buffer")
+
+      val newNumPeers = config.peers.size
+      val newWorkerId = config.workerId
+
       // prepare meta-data
-      val myBlockSize = getBlockSize(config.workerId, newNumPeers, dataSize)
+      val myBlockSize = getBlockSize(newWorkerId, newNumPeers, dataSize)
       val maxBlockSize = getBlockSize(0, newNumPeers, dataSize)
       val minBlockSize = getBlockSize(newNumPeers - 1, newNumPeers, dataSize)
 
@@ -171,7 +180,7 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def getBlockSize(workerId: Int, numPeers: Int, dataSize: Int): Int = {
-    var blockSize = math.ceil(dataSize * 1f / numPeers).toInt
+    val blockSize = math.ceil(dataSize * 1f / numPeers).toInt
     return math.min(blockSize, dataSize - workerId * blockSize)
   }
 
@@ -228,12 +237,12 @@ class AllreduceWorker(config: WorkerConfig,
 
   private def broadcast(data: Array[Float], chunkId: Int, reduceCount: Int) = {
     log.debug(s"\n----Worker ${self.path}: Start broadcasting, chunkId = ${chunkId}")
-    var numPeers = currentConfig.peers.size
+    val numPeers = currentConfig.peers.size
     for (i <- 0 until numPeers) {
-      val peerworkerId = (i + currentConfig.workerId) % numPeers
-      val worker = currentConfig.peers(peerworkerId)
-      val reduceConfig = currentConfig.copy(workerId = peerworkerId)
-      val reduceMsg = ReduceBlock(data, currentConfig.workerId, peerworkerId, chunkId, reduceConfig, reduceCount)
+      val peerWorkerId = (i + currentConfig.workerId) % numPeers
+      val worker = currentConfig.peers(peerWorkerId)
+      val reduceConfig = currentConfig.copy(workerId = peerWorkerId)
+      val reduceMsg = ReduceBlock(data, currentConfig.workerId, peerWorkerId, chunkId, reduceConfig, reduceCount)
       if (worker == self) {
         handleReduceBlock(reduceMsg)
       } else {
