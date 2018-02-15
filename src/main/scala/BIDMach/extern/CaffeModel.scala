@@ -200,6 +200,7 @@ object CaffeModel {
           new LinNode {
             outdim = ipp.getNumOutput()
             hasBias = ipp.getBiasTerm()
+            fillWeightInitOpts(this, ipp.getWeightFiller(), if (hasBias) ipp.getBiasFiller() else null)
           }
         }
         case "Split" => new CopyNode
@@ -392,10 +393,7 @@ object CaffeModel {
       }
       dilation = irow(convParam.getDilationList().map(_.intValue()).toList)
       
-      // BIDMach (currently) only supports xavier initialization
-      if (convParam.getWeightFiller().getType() != "xavier") {
-        throw new NotImplementedError("Only xavier initialization is currently implemented for convolution layers")
-      }
+      fillWeightInitOpts(this, convParam.getWeightFiller(), if (hasBias) convParam.getBiasFiller() else null)
     }
 
     Array[Node](convNode)
@@ -676,6 +674,38 @@ object CaffeModel {
       val data = blob.getDataList().map(_.floatValue()).toArray
       // TODO: should I bother with GFMat
       new FMat(reverseDims, data).transpose((reverseDims.length - 1) to 0 by -1)
+    }
+  }
+  
+  private def fillWeightInitOpts(weightInitOpts:WeightInitOpts,
+                                 weightFillerParam:Caffe.FillerParameter,
+                                 biasFillerParam:Caffe.FillerParameter = null) = {
+    def translate(fp:Caffe.FillerParameter) = {
+      fp.getType() match {
+        case "xavier" => {
+          if (fp.getVarianceNorm() != Caffe.FillerParameter.VarianceNorm.FAN_IN) {
+            Mat.consoleLogger.warning(s"Xavier initialization option ${fp.getVarianceNorm()} is not implemented")
+          }
+          (Net.xavier, 1f)
+        }
+        case "gaussian" => {
+          if (fp.getMean() != 0f) {
+            throw new NotImplementedError("Gaussian initialization with non-zero mean isn't supported")
+          }
+          (Net.gaussian, fp.getStd())
+        }
+        case "constant" => (Net.constant, fp.getValue())
+        case _ => throw new NotImplementedError(s"Initialization method '${fp.getType()}' is not implemented")
+      }
+    }
+    
+    val (initfn, initv) = translate(weightFillerParam)
+    weightInitOpts.initfn = initfn
+    weightInitOpts.initv = initv
+    if (biasFillerParam ne null) {
+      val (initbiasfn, initbiasv) = translate(biasFillerParam)
+      weightInitOpts.initbiasfn = initbiasfn
+      weightInitOpts.initbiasv = initbiasv
     }
   }
   

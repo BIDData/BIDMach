@@ -51,8 +51,6 @@ trait ModelNodeOpts extends NodeOpts {
   var imodel = 0;
   var lr_scale = 1f;
   var bias_scale = 1f;
-  var initfn:(Mat,Float)=>Mat = Net.xavier;
-  var initv:Float = 1f;
   
   def copyOpts(opts:ModelNodeOpts):ModelNodeOpts = {
     super.copyOpts(opts);
@@ -60,12 +58,17 @@ trait ModelNodeOpts extends NodeOpts {
     opts.imodel = imodel;
     opts.lr_scale = lr_scale;
     opts.bias_scale = bias_scale;
-    opts.initfn = initfn;
-    opts.initv = initv;
     opts;
   }
 }
-    
+
+trait WeightInitOpts {
+  var initfn:(Mat,Float)=>Mat = Net.xavier;
+  var initv:Float = 1f;
+  var initbiasfn:(Mat,Float)=>Mat = Net.constant;
+  var initbiasv:Float = 0f;
+}
+
 class ModelNode extends Node with ModelNodeOpts {
   
   def copyTo(opts:ModelNode):ModelNode = {

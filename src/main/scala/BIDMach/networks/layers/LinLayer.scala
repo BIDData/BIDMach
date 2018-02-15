@@ -152,14 +152,12 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
   }
 }
 
-trait LinNodeOpts extends ModelNodeOpts {
+trait LinNodeOpts extends ModelNodeOpts with WeightInitOpts {
 	var hasBias:Boolean = false;
   var aopts:ADAGrad.Opts = null;
   var outdim = 0;
   var tmatShape:(Int, Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
   var withInteractions = false;
-  var initbiasfn:(Mat,Float)=>Mat = Net.constant;
-  var initbiasv:Float = 0f;
   var ngroups = 0;
   
   def copyOpts(opts:LinNodeOpts):LinNodeOpts = {

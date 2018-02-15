@@ -61,7 +61,7 @@ class VariableLayer(override val net:Net, override val opts:VariableNodeOpts = n
 
 }
 
-trait VariableNodeOpts extends ModelNodeOpts {
+trait VariableNodeOpts extends ModelNodeOpts with WeightInitOpts {
   var dims:IMat = irow(1,1)
   
   def copyOpts(opts:VariableNodeOpts):VariableNodeOpts = {
