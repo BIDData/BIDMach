@@ -13,7 +13,7 @@ final case class ReduceBlock(value: Array[Float], srcId : Int, destId : Int, chu
 
 final case class AllreduceStats(outgoingFloats: Long, incomingFloats: Long)
 
-final case class RoundConfig(lineMasterVersion : Int, round: Int, lineMaster : ActorRef, peers: Map[Int, ActorRef], workerId: Int) {
+final case class RoundConfig(lineMasterVersion : Int, round: Int, lineMaster : ActorRef, peerWorkers: Map[Int, ActorRef], workerId: Int) {
   def < (other : RoundConfig): Boolean = {
   	return if (lineMasterVersion < other.lineMasterVersion || 
   	  		   (lineMasterVersion == other.lineMasterVersion && round < other.round)) {true}
@@ -29,4 +29,4 @@ final case class RoundConfig(lineMasterVersion : Int, round: Int, lineMaster : A
   }
 }
 
-final case class StartAllreduceTask(slaveNodesRef: ArrayBuffer[ActorRef], lineMasterVersion : Int)
+final case class StartAllreduceTask(peerNodes: ArrayBuffer[ActorRef], lineMasterVersion : Int)
