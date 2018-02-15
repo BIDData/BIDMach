@@ -55,13 +55,11 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     val maxChunkSize = 2
 
     val workerNum = 2
-    val workerPerNodeNum = 3
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
     val workerConfig = WorkerConfig(
-      discoveryTimeout = 5.seconds,
       threshold = threshold,
       metaData = metaData)
 
@@ -87,31 +85,23 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       // Replace test actor with the worker itself, it can actually send message to self - not intercepted by testactor
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum).updated(nodeId, worker)
+      var roundConfig = RoundConfig(0, 0, self, workers, nodeId)
 
-      worker ! PrepareAllreduce(0, workers , nodeId = nodeId)
-      fishForMessage(60.seconds) {
-        case ConfirmPreparation(0) => true
-        case _ => false
-      }
-      worker ! StartAllreduce(0)
-      worker ! ScatterBlock(Array(2f), srcId = 0, destId = 1, chunkId = 0, round = 0)
-      worker ! ReduceBlock(Array(0f, 2f), srcId = 0, destId = 1, chunkId = 0, round = 0, count = 2)
+      worker ! StartAllreduce(roundConfig)
+      worker ! ScatterBlock(Array(2f), srcId = 0, destId = 1, chunkId = 0, roundConfig)
+      worker ! ReduceBlock(Array(0f, 2f), srcId = 0, destId = 1, chunkId = 0, roundConfig, count = 2)
 
       fishForMessage(60.seconds) {
-        case CompleteAllreduce(1, 0) => true
+        case CompleteAllreduce(1, roundConfig) => true
         case _ => false
       }
-      worker ! PrepareAllreduce(1, workers , nodeId = nodeId)
-      fishForMessage(60.seconds) {
-        case ConfirmPreparation(1) => true
-        case _ => false
-      }
-      worker ! StartAllreduce(1)
-      worker ! ScatterBlock(Array(3f), srcId = 0, destId = 1, chunkId = 0, round = 1)
-      worker ! ReduceBlock(Array(2f, 4f), srcId = 0, destId = 1, chunkId = 0, round = 1, count = 2)
+      roundConfig = roundConfig.copy(round = 1)
+      worker ! StartAllreduce(roundConfig)
+      worker ! ScatterBlock(Array(3f), srcId = 0, destId = 1, chunkId = 0, roundConfig)
+      worker ! ReduceBlock(Array(2f, 4f), srcId = 0, destId = 1, chunkId = 0, roundConfig, count = 2)
 
       fishForMessage(60.seconds) {
-        case CompleteAllreduce(1, 1) => true
+        case CompleteAllreduce(1, roundConfig) => true
         case _ => false
       }
     }
@@ -123,9 +113,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     "single-round allreduce" in {
 
       val idx = 0
-      val thReduce = 1f
-      val thComplete = 0.75f
-      val workerPerNodeNum = 5
       val dataSize = 8
       val maxChunkSize = 2
 
@@ -133,7 +120,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -141,47 +127,53 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val workerNum = 4
 
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
       println("============start normal test!===========")
-      worker ! PrepareAllreduce(0, workers, idx)
-      expectMsg(ConfirmPreparation(0))
-      worker ! StartAllreduce(0)
+      worker ! StartAllreduce(roundConfig)
 
       // expect scattering to other nodes
       for (i <- 0 until 4) {
-        expectScatter(ScatterBlock(Array(2f * i, 2f * i + 1), srcId = 0, destId = i, 0, 0))
+        roundConfig = roundConfig.copy(workerId = i)
+        expectScatter(ScatterBlock(Array(2f * i, 2f * i + 1), srcId = 0, destId = i, 0, roundConfig))
       }
 
       // simulate sending scatter from other nodes
+      roundConfig = roundConfig.copy(workerId = idx)
       for (i <- 0 until 4) {
-        worker ! ScatterBlock(Array(2f * i, 2f * i), srcId = i, destId = 0, 0, 0)
+        worker ! ScatterBlock(Array(2f * i, 2f * i), srcId = i, destId = 0, 0, roundConfig)
       }
 
       // expect sending reduced result to other nodes
-      expectReduce(ReduceBlock(Array(12f, 12f), 0, 0, 0, 0, 4))
-      expectReduce(ReduceBlock(Array(12f, 12f), 0, 1, 0, 0, 4))
-      expectReduce(ReduceBlock(Array(12f, 12f), 0, 2, 0, 0, 4))
-      expectReduce(ReduceBlock(Array(12f, 12f), 0, 3, 0, 0, 4))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(12f, 12f), 0, 0, 0, roundConfig, 4))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(12f, 12f), 0, 1, 0, roundConfig, 4))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectReduce(ReduceBlock(Array(12f, 12f), 0, 2, 0, roundConfig, 4))
+      roundConfig = roundConfig.copy(workerId = 3)
+      expectReduce(ReduceBlock(Array(12f, 12f), 0, 3, 0, roundConfig, 4))
 
       // simulate sending reduced block from other nodes
-      worker ! ReduceBlock(Array(12f, 15f), 0, 0, 0, 0, 4)
-      worker ! ReduceBlock(Array(11f, 10f), 1, 0, 0, 0, 4)
-      worker ! ReduceBlock(Array(10f, 20f), 2, 0, 0, 0, 4)
-      worker ! ReduceBlock(Array(9f, 10f), 3, 0, 0, 0, 4)
-      expectMsg(CompleteAllreduce(0, 0))
+      roundConfig = roundConfig.copy(workerId = idx)
+      worker ! ReduceBlock(Array(12f, 15f), 0, 0, 0, roundConfig, 4)
+      worker ! ReduceBlock(Array(11f, 10f), 1, 0, 0, roundConfig, 4)
+      worker ! ReduceBlock(Array(10f, 20f), 2, 0, 0, roundConfig, 4)
+      worker ! ReduceBlock(Array(9f, 10f), 3, 0, 0, roundConfig, 4)
+      
+      roundConfig = roundConfig.copy(workerId = idx)
+      expectMsg(CompleteAllreduce(0, roundConfig))
     }
 
     "uneven size sending to self first" in {
 
       val dataSize = 3
       val idx = 1
-      val workerPerNodeNum = 1
       val maxChunkSize = 1
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
@@ -189,16 +181,17 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val workerNum = 2
 
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("============start normal test!===========")
-      worker ! PrepareAllreduce(0, workers, idx)
-      expectMsg(ConfirmPreparation(0))
-      worker ! StartAllreduce(0)
+      worker ! StartAllreduce(roundConfig)
 
       // expect scattering to other nodes
-      expectScatter(ScatterBlock(Array(2f), srcId = 1, destId = 1, 0, 0))
-      expectScatter(ScatterBlock(Array(0f), srcId = 1, destId = 0, 0, 0))
-      expectScatter(ScatterBlock(Array(1f), srcId = 1, destId = 0, 1, 0))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectScatter(ScatterBlock(Array(2f), srcId = 1, destId = 1, 0, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectScatter(ScatterBlock(Array(0f), srcId = 1, destId = 0, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(1f), srcId = 1, destId = 0, 1, roundConfig))
 
     }
 
@@ -209,52 +202,56 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val workerNum = 2
       val workers: Map[Int, ActorRef] = initializeWorkersAsSelf(workerNum)
       val idx = 0
-      val workerPerNodeNum = 5
       val maxChunkSize = 2
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 0.9f, thComplete = 0.8f)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("============start normal test!===========")
-      worker ! PrepareAllreduce(0, workers, idx)
-      expectMsg(ConfirmPreparation(0))
-      worker ! StartAllreduce(0)
+      worker ! StartAllreduce(roundConfig)
 
       // expect scattering to other nodes
-      expectScatter(ScatterBlock(Array(0f, 1f), srcId = 0, destId = 0, 0, 0))
-      expectScatter(ScatterBlock(Array(2f), srcId = 0, destId = 0, 1, 0))
-      expectScatter(ScatterBlock(Array(3f, 4f), srcId = 0, destId = 1, 0, 0))
-      expectScatter(ScatterBlock(Array(5f), srcId = 0, destId = 1, 1, 0))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectScatter(ScatterBlock(Array(0f, 1f), srcId = 0, destId = 0, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(2f), srcId = 0, destId = 0, 1, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectScatter(ScatterBlock(Array(3f, 4f), srcId = 0, destId = 1, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(5f), srcId = 0, destId = 1, 1, roundConfig))
 
       // // simulate sending scatter block from other nodes
-      worker ! ScatterBlock(Array(0f, 1f), srcId = 0, destId = 0, 0, 0)
-      worker ! ScatterBlock(Array(2f), srcId = 0, destId = 0, 1, 0)
-      worker ! ScatterBlock(Array(0f, 1f), srcId = 1, destId = 0, 0, 0)
-      worker ! ScatterBlock(Array(2f), srcId = 1, destId = 0, 1, 0)
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ScatterBlock(Array(0f, 1f), srcId = 0, destId = 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(2f), srcId = 0, destId = 0, 1, roundConfig)
+      worker ! ScatterBlock(Array(0f, 1f), srcId = 1, destId = 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(2f), srcId = 1, destId = 0, 1, roundConfig)
 
 
       // expect sending reduced result to other nodes
-      expectReduce(ReduceBlock(Array(0f, 1f), srcId = 0, destId = 0, 0, 0, 1))
-      expectReduce(ReduceBlock(Array(0f, 1f), srcId = 0, destId = 1, 0, 0, 1))
-      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 0, 1, 0, 1))
-      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 1, 1, 0, 1))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(0f, 1f), srcId = 0, destId = 0, 0, roundConfig, 1))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(0f, 1f), srcId = 0, destId = 1, 0, roundConfig, 1))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 0, 1, roundConfig, 1))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 1, 1, roundConfig, 1))
 
       // simulate sending reduced block from other nodes
-      worker ! ReduceBlock(Array(0f, 2f), 0, 0, 0, 0, 1)
-      worker ! ReduceBlock(Array(4f), 0, 0, 1, 0, 1)
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ReduceBlock(Array(0f, 2f), 0, 0, 0, roundConfig, 1)
+      worker ! ReduceBlock(Array(4f), 0, 0, 1, roundConfig, 1)
 
-      worker ! ReduceBlock(Array(6f, 8f), 1, 0, 0, 0, 1)
-      expectMsg(CompleteAllreduce(0, 0))
-      worker ! ReduceBlock(Array(10f), 1, 0, 1, 0, 1)
-
-
+      worker ! ReduceBlock(Array(6f, 8f), 1, 0, 0, roundConfig, 1)
+      roundConfig = roundConfig.copy(workerId = idx)
+      expectMsg(CompleteAllreduce(0, roundConfig))
+      worker ! ReduceBlock(Array(10f), 1, 0, 1, roundConfig, 1)
     }
 
     "single-round allreduce with nasty chunk size contd" in {
@@ -264,71 +261,83 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val idx = 0
       val thReduce = 0.7f
       val thComplete = 0.7f
-      val workerPerNodeNum = 5
       val maxChunkSize = 1
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("============start normal test!===========")
-      worker ! PrepareAllreduce(0, workers, idx)
-      expectMsg(ConfirmPreparation(0))
-      worker ! StartAllreduce(0)
+      worker ! StartAllreduce(roundConfig)
 
       // expect scattering to other nodes
-      expectScatter(ScatterBlock(Array(0f), srcId = 0, destId = 0, 0, 0))
-      expectScatter(ScatterBlock(Array(1f), srcId = 0, destId = 0, 1, 0))
-      expectScatter(ScatterBlock(Array(2f), srcId = 0, destId = 0, 2, 0))
-      expectScatter(ScatterBlock(Array(3f), srcId = 0, destId = 1, 0, 0))
-      expectScatter(ScatterBlock(Array(4f), srcId = 0, destId = 1, 1, 0))
-      expectScatter(ScatterBlock(Array(5f), srcId = 0, destId = 1, 2, 0))
-      expectScatter(ScatterBlock(Array(6f), srcId = 0, destId = 2, 0, 0))
-      expectScatter(ScatterBlock(Array(7f), srcId = 0, destId = 2, 1, 0))
-      expectScatter(ScatterBlock(Array(8f), srcId = 0, destId = 2, 2, 0))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectScatter(ScatterBlock(Array(0f), srcId = 0, destId = 0, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(1f), srcId = 0, destId = 0, 1, roundConfig))
+      expectScatter(ScatterBlock(Array(2f), srcId = 0, destId = 0, 2, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectScatter(ScatterBlock(Array(3f), srcId = 0, destId = 1, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(4f), srcId = 0, destId = 1, 1, roundConfig))
+      expectScatter(ScatterBlock(Array(5f), srcId = 0, destId = 1, 2, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectScatter(ScatterBlock(Array(6f), srcId = 0, destId = 2, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(7f), srcId = 0, destId = 2, 1, roundConfig))
+      expectScatter(ScatterBlock(Array(8f), srcId = 0, destId = 2, 2, roundConfig))
 
       // // simulate sending scatter block from other nodes
-      worker ! ScatterBlock(Array(0f), srcId = 0, destId = 0, 0, 0)
-      worker ! ScatterBlock(Array(1f), srcId = 0, destId = 0, 1, 0)
-      worker ! ScatterBlock(Array(2f), srcId = 0, destId = 0, 2, 0)
-      worker ! ScatterBlock(Array(0f), srcId = 1, destId = 0, 0, 0)
-      worker ! ScatterBlock(Array(1f), srcId = 1, destId = 0, 1, 0)
-      worker ! ScatterBlock(Array(2f), srcId = 1, destId = 0, 2, 0)
-      worker ! ScatterBlock(Array(0f), srcId = 2, destId = 0, 0, 0)
-      worker ! ScatterBlock(Array(1f), srcId = 2, destId = 0, 1, 0)
-      worker ! ScatterBlock(Array(2f), srcId = 2, destId = 0, 2, 0)
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ScatterBlock(Array(0f), srcId = 0, destId = 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(1f), srcId = 0, destId = 0, 1, roundConfig)
+      worker ! ScatterBlock(Array(2f), srcId = 0, destId = 0, 2, roundConfig)
+      worker ! ScatterBlock(Array(0f), srcId = 1, destId = 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(1f), srcId = 1, destId = 0, 1, roundConfig)
+      worker ! ScatterBlock(Array(2f), srcId = 1, destId = 0, 2, roundConfig)
+      worker ! ScatterBlock(Array(0f), srcId = 2, destId = 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(1f), srcId = 2, destId = 0, 1, roundConfig)
+      worker ! ScatterBlock(Array(2f), srcId = 2, destId = 0, 2, roundConfig)
 
 
       // expect sending reduced result to other nodes
       //expectNoMsg()
-      expectReduce(ReduceBlock(Array(0f), srcId = 0, destId = 0, 0, 0, 2))
-      expectReduce(ReduceBlock(Array(0f), srcId = 0, destId = 1, 0, 0, 2))
-      expectReduce(ReduceBlock(Array(0f), srcId = 0, destId = 2, 0, 0, 2))
-      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 0, 1, 0, 2))
-      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 1, 1, 0, 2))
-      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 2, 1, 0, 2))
-      expectReduce(ReduceBlock(Array(4f), srcId = 0, destId = 0, 2, 0, 2))
-      expectReduce(ReduceBlock(Array(4f), srcId = 0, destId = 1, 2, 0, 2))
-      expectReduce(ReduceBlock(Array(4f), srcId = 0, destId = 2, 2, 0, 2))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(0f), srcId = 0, destId = 0, 0, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(0f), srcId = 0, destId = 1, 0, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectReduce(ReduceBlock(Array(0f), srcId = 0, destId = 2, 0, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 0, 1, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 1, 1, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectReduce(ReduceBlock(Array(2f), srcId = 0, destId = 2, 1, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(4f), srcId = 0, destId = 0, 2, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(4f), srcId = 0, destId = 1, 2, roundConfig, 2))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectReduce(ReduceBlock(Array(4f), srcId = 0, destId = 2, 2, roundConfig, 2))
 
 
       // simulate sending reduced block from other nodes
-      worker ! ReduceBlock(Array(0f), srcId = 0, destId = 0, 0, 0, 2)
-      worker ! ReduceBlock(Array(3f), srcId = 0, destId = 0, 1, 0, 2)
-      worker ! ReduceBlock(Array(6f), srcId = 0, destId = 0, 2, 0, 2)
-      worker ! ReduceBlock(Array(9f), srcId = 1, destId = 0, 0, 0, 2)
-      worker ! ReduceBlock(Array(12f), srcId = 1, destId = 0, 1, 0, 2)
-      worker ! ReduceBlock(Array(15f), srcId = 1, destId = 0, 2, 0, 2)
-      worker ! ReduceBlock(Array(18f), srcId = 2, destId = 0, 0, 0, 2)
-      expectMsg(CompleteAllreduce(0, 0))
-      worker ! ReduceBlock(Array(21f), srcId = 2, destId = 0, 1, 0, 2)
-      worker ! ReduceBlock(Array(24f), srcId = 2, destId = 0, 2, 0, 2)
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ReduceBlock(Array(0f), srcId = 0, destId = 0, 0, roundConfig, 2)
+      worker ! ReduceBlock(Array(3f), srcId = 0, destId = 0, 1, roundConfig, 2)
+      worker ! ReduceBlock(Array(6f), srcId = 0, destId = 0, 2, roundConfig, 2)
+      worker ! ReduceBlock(Array(9f), srcId = 1, destId = 0, 0, roundConfig, 2)
+      worker ! ReduceBlock(Array(12f), srcId = 1, destId = 0, 1, roundConfig, 2)
+      worker ! ReduceBlock(Array(15f), srcId = 1, destId = 0, 2, roundConfig, 2)
+      worker ! ReduceBlock(Array(18f), srcId = 2, destId = 0, 0, roundConfig, 2)
+      roundConfig = roundConfig.copy(workerId = idx)
+      expectMsg(CompleteAllreduce(0, roundConfig))
+      worker ! ReduceBlock(Array(21f), srcId = 2, destId = 0, 1, roundConfig, 2)
+      worker ! ReduceBlock(Array(24f), srcId = 2, destId = 0, 2, roundConfig, 2)
       expectNoMsg()
     }
 
@@ -338,7 +347,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val idx = 0
       val thReduce = 0.75f
       val thComplete = 0.75f
-      val workerPerNodeNum = 5
       val dataSize = 4
       val maxChunkSize = 2
 
@@ -346,36 +354,48 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("===============start outdated scatter test!==============")
-      worker ! PrepareAllreduce(0, workers, idx)
-      expectMsg(ConfirmPreparation(0))
-      worker ! StartAllreduce(0)
-      expectScatter(ScatterBlock(Array(0f), 0, 0, 0, 0))
-      expectScatter(ScatterBlock(Array(1f), 0, 1, 0, 0))
-      expectScatter(ScatterBlock(Array(2f), 0, 2, 0, 0))
-      expectScatter(ScatterBlock(Array(3f), 0, 3, 0, 0))
-      worker ! ScatterBlock(Array(0f), 0, 0, 0, 0)
-      expectNoMsg()
-      worker ! ScatterBlock(Array(2f), 1, 0, 0, 0)
-      expectNoMsg()
-      worker ! ScatterBlock(Array(4f), 2, 0, 0, 0)
-      worker ! ScatterBlock(Array(6f), 3, 0, 0, 0)
+      worker ! StartAllreduce(roundConfig)
 
-      expectReduce(ReduceBlock(Array(6f), 0, 0, 0, 0, 3))
-      expectReduce(ReduceBlock(Array(6f), 0, 1, 0, 0, 3))
-      expectReduce(ReduceBlock(Array(6f), 0, 2, 0, 0, 3))
-      expectReduce(ReduceBlock(Array(6f), 0, 3, 0, 0, 3))
-      worker ! ReduceBlock(Array(12f), 0, 0, 0, 0, 3)
-      worker ! ReduceBlock(Array(11f), 1, 0, 0, 0, 3)
-      worker ! ReduceBlock(Array(10f), 2, 0, 0, 0, 3)
-      expectMsg(CompleteAllreduce(0, 0))
-      worker ! ReduceBlock(Array(9f), 3, 0, 0, 0, 3)
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectScatter(ScatterBlock(Array(0f), 0, 0, 0, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectScatter(ScatterBlock(Array(1f), 0, 1, 0, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectScatter(ScatterBlock(Array(2f), 0, 2, 0, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 3)
+      expectScatter(ScatterBlock(Array(3f), 0, 3, 0, roundConfig))
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ScatterBlock(Array(0f), 0, 0, 0, roundConfig)
+      expectNoMsg()
+      worker ! ScatterBlock(Array(2f), 1, 0, 0, roundConfig)
+      expectNoMsg()
+      worker ! ScatterBlock(Array(4f), 2, 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(6f), 3, 0, 0, roundConfig)
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(6f), 0, 0, 0, roundConfig, 3))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(6f), 0, 1, 0, roundConfig, 3))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectReduce(ReduceBlock(Array(6f), 0, 2, 0, roundConfig, 3))
+      roundConfig = roundConfig.copy(workerId = 3)
+      expectReduce(ReduceBlock(Array(6f), 0, 3, 0, roundConfig, 3))
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ReduceBlock(Array(12f), 0, 0, 0, roundConfig, 3)
+      worker ! ReduceBlock(Array(11f), 1, 0, 0, roundConfig, 3)
+      worker ! ReduceBlock(Array(10f), 2, 0, 0, roundConfig, 3)
+      roundConfig = roundConfig.copy(workerId = idx)
+      expectMsg(CompleteAllreduce(0, roundConfig))
+      worker ! ReduceBlock(Array(9f), 3, 0, 0, roundConfig, 3)
       expectNoMsg()
     }
 
@@ -387,41 +407,54 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val thComplete = 0.75f
       val dataSize = 4
       val maxChunkSize = 100
-      val workerPerNodeNum = 5
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("===============start missing test!==============")
-      worker ! PrepareAllreduce(0, workers, idx)
-      expectMsg(ConfirmPreparation(0))
-      worker ! StartAllreduce(0)
-      expectScatter(ScatterBlock(Array(0f), 0, 0, 0, 0))
-      expectScatter(ScatterBlock(Array(1f), 0, 1, 0, 0))
-      expectScatter(ScatterBlock(Array(2f), 0, 2, 0, 0))
-      expectScatter(ScatterBlock(Array(3f), 0, 3, 0, 0))
-      worker ! ScatterBlock(Array(0f), 0, 0, 0, 0)
-      worker ! ScatterBlock(Array(2f), 1, 0, 0, 0)
-      worker ! ScatterBlock(Array(4f), 2, 0, 0, 0)
-      worker ! ScatterBlock(Array(6f), 3, 0, 0, 0)
-      expectReduce(ReduceBlock(Array(12f), 0, 0, 0, 0, 4))
-      expectReduce(ReduceBlock(Array(12f), 0, 1, 0, 0, 4))
-      expectReduce(ReduceBlock(Array(12f), 0, 2, 0, 0, 4))
-      expectReduce(ReduceBlock(Array(12f), 0, 3, 0, 0, 4))
-      worker ! ReduceBlock(Array(12f), 0, 0, 0, 0, 4)
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! StartAllreduce(roundConfig)
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectScatter(ScatterBlock(Array(0f), 0, 0, 0, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectScatter(ScatterBlock(Array(1f), 0, 1, 0, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectScatter(ScatterBlock(Array(2f), 0, 2, 0, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 3)
+      expectScatter(ScatterBlock(Array(3f), 0, 3, 0, roundConfig))
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ScatterBlock(Array(0f), 0, 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(2f), 1, 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(4f), 2, 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(6f), 3, 0, 0, roundConfig)
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(12f), 0, 0, 0, roundConfig, 4))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(12f), 0, 1, 0, roundConfig, 4))
+      roundConfig = roundConfig.copy(workerId = 2)
+      expectReduce(ReduceBlock(Array(12f), 0, 2, 0, roundConfig, 4))
+      roundConfig = roundConfig.copy(workerId = 3)
+      expectReduce(ReduceBlock(Array(12f), 0, 3, 0, roundConfig, 4))
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ReduceBlock(Array(12f), 0, 0, 0, roundConfig, 4)
       expectNoMsg()
-      worker ! ReduceBlock(Array(11f), 1, 0, 0, 0, 4)
+      worker ! ReduceBlock(Array(11f), 1, 0, 0, roundConfig, 4)
       expectNoMsg()
-      worker ! ReduceBlock(Array(10f), 2, 0, 0, 0, 4)
+      worker ! ReduceBlock(Array(10f), 2, 0, 0, roundConfig, 4)
       //worker ! ReduceBlock(Array(9), 3, 0, 0)
-      expectMsg(CompleteAllreduce(0, 0))
+      roundConfig = roundConfig.copy(workerId = idx)
+      expectMsg(CompleteAllreduce(0, roundConfig))
     }
 
     "correctly force stop previous round" in {
@@ -432,44 +465,56 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val thComplete = 1f
       val dataSize = 6
       val maxChunkSize = 1
-      val workerPerNodeNum = 5
 
       val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = thReduce, thComplete = thComplete)
       val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
       val workerConfig = WorkerConfig(
-        discoveryTimeout = 5.seconds,
         threshold = threshold,
         metaData = metaData)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
+      var roundConfig = RoundConfig(0, 0, self, workers, idx)
 
       println("===============start missing test!==============")
-      worker ! PrepareAllreduce(0, workers, idx)
-      expectMsg(ConfirmPreparation(0))
-      worker ! StartAllreduce(0)
-      expectScatter(ScatterBlock(Array(0f), 0, 0, 0, 0))
-      expectScatter(ScatterBlock(Array(1f), 0, 0, 1, 0))
-      expectScatter(ScatterBlock(Array(2f), 0, 0, 2, 0))
-      expectScatter(ScatterBlock(Array(3f), 0, 1, 0, 0))
-      expectScatter(ScatterBlock(Array(4f), 0, 1, 1, 0))
-      expectScatter(ScatterBlock(Array(5f), 0, 1, 2, 0))
+      worker ! StartAllreduce(roundConfig)
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectScatter(ScatterBlock(Array(0f), 0, 0, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(1f), 0, 0, 1, roundConfig))
+      expectScatter(ScatterBlock(Array(2f), 0, 0, 2, roundConfig))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectScatter(ScatterBlock(Array(3f), 0, 1, 0, roundConfig))
+      expectScatter(ScatterBlock(Array(4f), 0, 1, 1, roundConfig))
+      expectScatter(ScatterBlock(Array(5f), 0, 1, 2, roundConfig))
 
       // three things are tested: 1. normal case, 2. half done 3. nothing done.
-      worker ! ScatterBlock(Array(2f), 0, 0, 0, 0)
-      worker ! ScatterBlock(Array(3f), 1, 0, 0, 0)
-      expectReduce(ReduceBlock(Array(5f),0,0,0,0,2))
-      expectReduce(ReduceBlock(Array(5f),0,1,0,0,2))
-      worker ! ScatterBlock(Array(2f), 0, 0, 1, 0)
-      expectNoMsg()
-      worker ! PrepareAllreduce(5, workers, idx)
-      expectReduce(ReduceBlock(Array(2f),0,0,1,0,1))
-      expectReduce(ReduceBlock(Array(2f),0,1,1,0,1))
-      expectReduce(ReduceBlock(Array(0f),0,0,2,0,0))
-      expectReduce(ReduceBlock(Array(0f),0,1,2,0,0))
-      expectMsg(CompleteAllreduce(0,0))
-      expectMsg(ConfirmPreparation(5))
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ScatterBlock(Array(2f), 0, 0, 0, roundConfig)
+      worker ! ScatterBlock(Array(3f), 1, 0, 0, roundConfig)
 
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(5f),0,0,0,roundConfig,2))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(5f),0,1,0,roundConfig,2))
+
+      roundConfig = roundConfig.copy(workerId = 0)
+      worker ! ScatterBlock(Array(2f), 0, 0, 1, roundConfig)
+      expectNoMsg()
+
+      roundConfig = roundConfig.copy(round = 5, workerId = idx)
+      worker ! StartAllreduce(roundConfig)
+
+      roundConfig = roundConfig.copy(round = 0, workerId = 0)
+      expectReduce(ReduceBlock(Array(2f),0,0,1,roundConfig,1))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(2f),0,1,1,roundConfig,1))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectReduce(ReduceBlock(Array(0f),0,0,2,roundConfig,0))
+      roundConfig = roundConfig.copy(workerId = 1)
+      expectReduce(ReduceBlock(Array(0f),0,1,2,roundConfig,0))
+      roundConfig = roundConfig.copy(workerId = 0)
+      expectMsg(CompleteAllreduce(0,roundConfig))
     }
   }
 
@@ -483,7 +528,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       case s: ScatterBlock =>
         s.srcId shouldEqual expected.srcId
         s.destId shouldEqual expected.destId
-        s.round shouldEqual expected.round
+        s.config shouldEqual expected.config
         s.value.toList shouldEqual expected.value.toList
         s.chunkId shouldEqual expected.chunkId
     }
@@ -498,7 +543,7 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       case r: ReduceBlock =>
         r.srcId shouldEqual expected.srcId
         r.destId shouldEqual expected.destId
-        r.round shouldEqual expected.round
+        r.config shouldEqual expected.config
         r.value.toList shouldEqual expected.value.toList
         r.chunkId shouldEqual expected.chunkId
         r.count shouldEqual expected.count

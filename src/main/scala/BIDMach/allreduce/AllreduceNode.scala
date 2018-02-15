@@ -7,18 +7,25 @@ import com.typesafe.config.ConfigFactory
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-
+/**
+  * Top-level root to all-reduce actor hierarchy, with children as dimension node actors, and grandchildren as line masters/round worker actors
+  * The hierarchy has the following paths;
+  * for round worker [user/Node/DimensionNode-dim={}/Worker-round={}],
+  * and for line master [user/Node/DimensionNode-dim={}/LineMaster]
+  * @param dimensionalSources nested list of data source, where the outermost list element corresponds to each dimension, which also has each source for its round worker
+  * @param dimensionalSinks nested list of data sink, with similar structure as sources
+  */
 class AllreduceNode(nodeConfig: NodeConfig,
                     lineMasterConfig: LineMasterConfig,
                     workerConfig: WorkerConfig,
-                    sources: List[List[DataSource]],
-                    sinks: List[List[DataSink]]) extends Actor with akka.actor.ActorLogging {
+                    dimensionalSources: List[List[DataSource]],
+                    dimensionalSinks: List[List[DataSink]]) extends Actor with akka.actor.ActorLogging {
 
-  var dimensioNodeMap: Array[ActorRef] = Array.empty
-  var id = -1
-  var dimNum = nodeConfig.dimNum //numDim = # of DimensionNodes PlaceHolder it will spawn
+  val dimNum = nodeConfig.dimNum
 
-  generateDimensionNodes() //generate dimension nodes when the node initializes
+  var dimensionNodeMap: Array[ActorRef] = Array.empty
+
+  generateDimensionNodes()
 
   override def receive: Receive = {
     case _ => Unit
@@ -34,7 +41,7 @@ class AllreduceNode(nodeConfig: NodeConfig,
   }
 
   def generateDimensionNodes(): Unit = {
-    dimensioNodeMap = {
+    dimensionNodeMap = {
       val arr = new Array[ActorRef](dimNum)
       for (i <- 0 until dimNum) {
         val dimensionNode = context.actorOf(Props(
@@ -42,8 +49,8 @@ class AllreduceNode(nodeConfig: NodeConfig,
           DimensionNodeConfig(dim = i),
           lineMasterConfig,
           workerConfig,
-          sources(i),
-          sinks(i)),
+          dimensionalSources(i),
+          dimensionalSinks(i)),
           name = s"DimensionNode-dim=${i}"
         )
         println(s"-----Node: DimensionNode dim:$i created with ${dimensionNode}")
@@ -70,9 +77,9 @@ object AllreduceNode {
 
 
     def getSourceSink(dim: Int=0): (DataSource, DataSink) = if (assertCorrectness) {
-      testCorrectnessSourceSink(workerConfig.metaData.dataSize, checkpoint)
+      getCorrectnessTestSourceSink(workerConfig.metaData.dataSize, checkpoint)
     } else {
-      dummySourceSink(workerConfig.metaData.dataSize, checkpoint, dim)
+      getDummySourceSink(workerConfig.metaData.dataSize, checkpoint, dim)
     }
 
     val (sourceList, sinkList) = {
@@ -80,10 +87,10 @@ object AllreduceNode {
       val dimSinks: Array[List[DataSink]] = new Array(nodeConfig.dimNum)
       for (i <- 0 until nodeConfig.dimNum) {
         val (source, sink) = getSourceSink(i)
-        val sources: Array[DataSource] = Array.fill(lineMasterConfig.workerPerNodeNum)(source)
-        val sinks: Array[DataSink] = Array.fill(lineMasterConfig.workerPerNodeNum)(sink)
-        dimSources(i) = sources.toList
-        dimSinks(i) = sinks.toList
+        val roundSources: Array[DataSource] = Array.fill(lineMasterConfig.roundWorkerPerDimNum)(source)
+        val roundSinks: Array[DataSink] = Array.fill(lineMasterConfig.roundWorkerPerDimNum)(sink)
+        dimSources(i) = roundSources.toList
+        dimSinks(i) = roundSinks.toList
       }
       (dimSources.toList, dimSinks.toList)
     }
@@ -97,7 +104,7 @@ object AllreduceNode {
     ), name = "Node")
   }
 
-  private def dummySourceSink(sourceDataSize: Int, checkpoint: Int, dim: Int): (DataSource, DataSink) = {
+  private def getDummySourceSink(sourceDataSize: Int, checkpoint: Int, dim: Int): (DataSource, DataSink) = {
 
     lazy val floats = Array.range(0, sourceDataSize).map(_.toFloat)
     val source: DataSource = _ => AllReduceInput(floats)
@@ -111,11 +118,11 @@ object AllreduceNode {
   }
 
   /**
-    * Test correctness of reduced data at the sink
+    * Get source and sink which assert correctness of the reduced data
     * @param sourceDataSize total data size
     * @param checkpoint round frequency at which the data should be checked
     */
-  private def testCorrectnessSourceSink(sourceDataSize: Int, checkpoint: Int) = {
+  private def getCorrectnessTestSourceSink(sourceDataSize: Int, checkpoint: Int) = {
 
     val random = new scala.util.Random(100)
     val totalInputSample = 8
@@ -173,11 +180,12 @@ object AllreduceNode {
   }
 
   def main(args: Array[String]): Unit = {
+
     val dimNum = 2
     val dataSize = 100
     val maxChunkSize = 4
-    val workerPerNodeNum = 4
-    val maxRound = 100000
+    val roundWorkerPerDimNum = 4
+    val maxRound = 1000
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
@@ -185,22 +193,20 @@ object AllreduceNode {
     val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true)
 
     val workerConfig = WorkerConfig(
-      discoveryTimeout = 5.seconds,
       statsReportingRoundFrequency = 5,
       threshold = threshold,
       metaData = metaData)
 
     val lineMasterConfig = LineMasterConfig(
-      workerPerNodeNum = workerPerNodeNum,
+      roundWorkerPerDimNum = roundWorkerPerDimNum,
       dim = -1,
       maxRound = maxRound,
-      discoveryTimeout = 5.seconds,
+      workerResolutionTimeout = 5.seconds,
       threshold = threshold,
       metaData = metaData)
 
 
-
-    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10)
+    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10, assertCorrectness = false)
   }
 }
 
