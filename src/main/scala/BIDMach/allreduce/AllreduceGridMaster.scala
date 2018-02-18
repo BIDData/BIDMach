@@ -105,6 +105,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
   }
 
   private def discoverLineMaster(dim: Int, masterNodeIdx: Int): ActorRef = {
+    //TODO: Fix the potential failure at discoverLineMaster
     val lineMaster: ActorRef = Await.result(context.actorSelection(nodesByIdMap(masterNodeIdx).path / s"DimensionNode-dim=${dim}" / "LineMaster")
       .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second)
     println(s"\n----GridMaster: Discover LineMaster Address : ${lineMaster.path}")

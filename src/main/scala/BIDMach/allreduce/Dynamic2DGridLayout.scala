@@ -192,7 +192,8 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
 
 object Dynamic2DGridLayout{
   type MasterLayout = mutable.HashMap[Int, Tuple2[Option[Set[Int]], Option[Set[Int]]]]
-  // Option.empty means "keep unchanged", and Set() means an empty set, so we are forced to use option here to distinguish the two situations
+  // Option.empty means "keep unchanged", and Set() means an empty peer list, so we are forced to use option here
+  // to distinguish between the two situations
   def calculate_difference(old_layout: MasterLayout, new_layout: MasterLayout) : MasterLayout = {
     var diff : MasterLayout = new_layout.clone()
     for(master_id <- old_layout.keys){
