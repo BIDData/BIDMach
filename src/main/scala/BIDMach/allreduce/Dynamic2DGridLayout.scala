@@ -6,6 +6,7 @@ import scala.collection.mutable
 
 
 class Dynamic2DGridLayout(nodes: List[Int]) {
+  type MasterLayout = Dynamic2DGridLayout.MasterLayout
   var _grid = new mutable.ArrayBuffer[mutable.ArrayBuffer[Option[Int]]]()
   _grid+=mutable.ArrayBuffer.fill(1)(Option.empty)
   var _count = 0
@@ -30,14 +31,14 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     (for (x <- 0 until _grid(0).length if _grid(y)(x).isDefined) yield _grid(y)(x).get).toSet
   }
 
-  private def setMasterNode(value: mutable.HashMap[Int, Tuple2[Set[Int], Set[Int]]], i: Int): Unit = {
+  private def setMasterNode(value: MasterLayout, i: Int): Unit = {
     //exist to help handle n - 1's master properly
     if (i == _N - 1 && _grid.last.last.isEmpty) {
       assert(_grid.last(0).isDefined && _grid(0).last.isDefined)
-      value(_grid.last(0).get) = (getYNodes(_N - 1), Set())
-      value(_grid(0).last.get) = (Set(), getXNodes(_N - 1))
+      value(_grid.last(0).get) = (Some(getYNodes(_N - 1)), Option.empty)
+      value(_grid(0).last.get) = (Option.empty, Some(getXNodes(_N - 1)))
     } else {
-      value(_grid(i)(i).get) = (getYNodes(i), getXNodes(i))
+      value(_grid(i)(i).get) = (Some(getYNodes(i)), Some(getXNodes(i)))
     }
   }
 
@@ -57,9 +58,9 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     }
   }
 
-  def addNode(node: Int): mutable.Map[Int, Tuple2[Set[Int], Set[Int]]] = {
-    //maintain grid, return update for{master_node:[col_neighbours], [row_neighbours]}} pair
-    val ret = mutable.HashMap[Int, Tuple2[Set[Int], Set[Int]]]()
+  def addNode(node: Int): Unit = {
+    //maintain grid
+    val ret = mutable.HashMap[Int, Tuple2[Option[Set[Int]], Option[Set[Int]]]]()
     if (_N * _N == _count) {
       _filled = 0
       for (i <- 0 until _N) {
@@ -79,33 +80,24 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
           _node_map.update(_grid(_grid.length-1)(i).get, (_N - 1, i))
         }
       }
-      for (i <- 1 until _N - 1) {
-        setMasterNode(ret, i)
-      }
     }
 
     if (_N == 1) {
       _grid(0).update(0, Some(node))
       _node_map.update(node, (0, 0))
-      ret.update(_grid(0)(0).get, (getYNodes(0), getXNodes(0)))
       _count += 1
     } else {
       val (y, x) = getPos(_filled, _N)
       _filled += 1
       _grid(y).update(x, Some(node))
       _node_map.update(node, (y, x))
-      setMasterNode(ret, y)
-      setMasterNode(ret, x)
       _count += 1
     }
-    ret
   }
 
-  private def remove(): mutable.HashMap[Int, Tuple2[Set[Int], Set[Int]]] ={
-    //maintain grid, return  return update for{master_node:[col_neighbours], [row_neighbours]}} pair. literally reverse add node
+  private def remove(): Unit ={
     assert(_count>0)
     assert(_filled>0)
-    val ret = mutable.HashMap[Int, Tuple2[Set[Int], Set[Int]]]()
     _count -=1
     if(_N==1){
       _node_map.remove(_grid(0)(0).get)
@@ -135,15 +127,8 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
         }
         _N-=1
         _filled = if (_N>1) 2 * _N -1 else 1
-        for( i <- 1 until _N){
-          setMasterNode(ret, i)
-        }
-      }else{
-        setMasterNode(ret, y)
-        setMasterNode(ret, x)
       }
     }
-    ret
   }
 
   private def nextRemove() : Tuple2[Int, Int] ={
@@ -157,7 +142,7 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     }
   }
 
-  def removeLocation(location : Tuple2[Int, Int]): mutable.Map[Int, Tuple2[Set[Int], Set[Int]]] ={
+  def removeLocation(location : Tuple2[Int, Int]): Unit ={
     val remove_loc = nextRemove()
     if (remove_loc != location){
       val (ry,rx) = remove_loc
@@ -167,22 +152,24 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
       _grid(y)(x) = temp
       _node_map.update(_grid(ry)(rx).get,(ry,rx))
       _node_map.update(_grid(y)(x).get, (y,x))
-      val swapped_groups = Set(rx,ry,x,y)
-      val new_update = remove()
-      for(group <- swapped_groups){
-        if(group < _N){
-          setMasterNode(new_update, group)
-        }
-      }
-      new_update
-    }else{
-      remove()
     }
+    remove()
   }
 
-  def removeNode(node: Int): mutable.Map[Int, Tuple2[Set[Int], Set[Int]]] ={
+  def removeNode(node: Int): Unit ={
     assert(_node_map.contains(node))
     removeLocation(_node_map(node))
+  }
+
+  def currentMasterLayout() : MasterLayout = {
+    val ret : MasterLayout = mutable.HashMap[Int, Tuple2[Option[Set[Int]], Option[Set[Int]]]]()
+    if (_count ==0){ // special case for count=0
+      return ret
+    }
+    for( i <- 0 until _N){
+      setMasterNode(ret, i)
+    }
+    ret
   }
 
   override def toString: String = {
@@ -200,5 +187,37 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
       ret+="]\n"
     }
     ret
+  }
+}
+
+object Dynamic2DGridLayout{
+  type MasterLayout = mutable.HashMap[Int, Tuple2[Option[Set[Int]], Option[Set[Int]]]]
+  // Option.empty means "keep unchanged", and Set() means an empty set, so we are forced to use option here to distinguish the two situations
+  def calculate_difference(old_layout: MasterLayout, new_layout: MasterLayout) : MasterLayout = {
+    var diff : MasterLayout = new_layout.clone()
+    for(master_id <- old_layout.keys){
+      if(!new_layout.contains(master_id)){
+        diff(master_id)=(Some(Set()),Some(Set()))
+        if(old_layout(master_id)._1.isEmpty){
+          diff(master_id) = (Option.empty, diff(master_id)._2)
+        }
+        if(old_layout(master_id)._2.isEmpty){
+          diff(master_id) = (diff(master_id)._1, Option.empty)
+        }
+      }else{
+        // remove master id that does not change
+        if(new_layout(master_id)._1 == old_layout(master_id)._1){
+          diff(master_id) = (Option.empty, diff(master_id)._2)
+        }
+        if(new_layout(master_id)._2 == old_layout(master_id)._2){
+          diff(master_id) = (diff(master_id)._1, Option.empty)
+        }
+        // clear the entry if both doesn't change.
+        if(diff(master_id)._1 == Option.empty && diff(master_id)._2== Option.empty){
+          diff.remove(master_id)
+        }
+      }
+    }
+    diff
   }
 }

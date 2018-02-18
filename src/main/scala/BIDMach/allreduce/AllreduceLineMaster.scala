@@ -28,32 +28,44 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   var round = -1
 
   var lineMasterVersion = -1
+  var isIdle = true
+
 
   def receive = {
 
     case c: CompleteAllreduce =>
-      log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.config.round}")
-      if (c.config.round == round) {
-        completeCount += 1
-        if (completeCount >= peerNodesInLineNum * thAllreduce && round < maxRound) {
-          log.debug(s"\n----LineMaster ${self.path}: ${completeCount} (out of ${peerNodesInLineNum}) nodes complete round ${round}\n")
-          round += 1
-          startAllreduce()
+      if(!isIdle){
+        log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.config.round}")
+        if (c.config.round == round) {
+          completeCount += 1
+          if (completeCount >= peerNodesInLineNum * thAllreduce && round < maxRound) {
+            log.debug(s"\n----LineMaster ${self.path}: ${completeCount} (out of ${peerNodesInLineNum}) nodes complete round ${round}\n")
+            round += 1
+            startAllreduce()
+          }
         }
       }
 
     case s: StartAllreduceTask =>
-      // Currently assumes here that start all reduce comes at once.
-      log.debug(s"\n----LineMaster ${self.path}: Receive PeerNodes from GridMaster.")
-      gridMaster = Some(sender())
-      lineMasterVersion = s.lineMasterVersion
-      val peerNodeRefs = s.peerNodes
-      peerNodesInLineNum = peerNodeRefs.size
-      for (roundNth <- 0 until roundNum) {
-        peerWorkersPerRound(roundNth) = discoverPeerWorkers(roundNth, peerNodeRefs.toArray)
+      log.debug(s"\n----LineMaster ${self.path}: Receive PeerNodes from GridMaster with version ${s.lineMasterVersion}.")
+      if(lineMasterVersion < s.lineMasterVersion){
+        isIdle = false
+        gridMaster = Some(sender())
+        lineMasterVersion = s.lineMasterVersion
+        val peerNodeRefs = s.peerNodes
+        peerNodesInLineNum = peerNodeRefs.size
+        for (roundNth <- 0 until roundNum) {
+          peerWorkersPerRound(roundNth) = discoverPeerWorkers(roundNth, peerNodeRefs.toArray)
+        }
+        round = 0
+        startAllreduce()
       }
-      round = 0
-      startAllreduce()
+    case s : StopAllreduceTask =>
+      log.debug(s"\n----LineMaster ${self.path}: Stop working with version ${s.lineMasterVersion}")
+      if(lineMasterVersion < s.lineMasterVersion) {
+        isIdle = true
+        lineMasterVersion = s.lineMasterVersion
+      }
   }
 
   private def startAllreduce() = {
