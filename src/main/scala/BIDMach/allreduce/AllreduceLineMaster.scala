@@ -34,14 +34,16 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
   def receive = {
 
     case c: CompleteAllreduce =>
-      if(!isIdle){
-        log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.config.round}")
-        if (c.config.round == round) {
-          completeCount += 1
-          if (completeCount >= peerNodesInLineNum * thAllreduce && round < maxRound) {
-            log.debug(s"\n----LineMaster ${self.path}: ${completeCount} (out of ${peerNodesInLineNum}) nodes complete round ${round}\n")
-            round += 1
-            startAllreduce()
+      if(lineMasterVersion == c.config.lineMasterVersion){
+        if(!isIdle){
+          log.debug(s"\n----LineMaster ${self.path}: Node ${c.srcId} completes allreduce round ${c.config.round}")
+          if (c.config.round == round) {
+            completeCount += 1
+            if (completeCount >= peerNodesInLineNum * thAllreduce && round < maxRound) {
+              log.debug(s"\n----LineMaster ${self.path}: ${completeCount} (out of ${peerNodesInLineNum}) nodes complete round ${round}\n")
+              round += 1
+              startAllreduce()
+            }
           }
         }
       }
