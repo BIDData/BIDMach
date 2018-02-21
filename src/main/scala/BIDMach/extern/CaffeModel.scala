@@ -581,30 +581,6 @@ object CaffeModel {
     val newNodeList = new mutable.ListBuffer[Node]
     newNodeList += subjectNode
 
-    if (transformParam.hasCropSize()) {
-      val cropSize = transformParam.getCropSize()
-      // XXX: don't hardcode the # of channels
-      val sizeMat = 3 \ cropSize \ cropSize \ 0
-      if (transformParam.getMirror()) {
-        newNodeList += new CropMirrorNode {
-          inputs(0) = newNodeList.last
-          sizes = sizeMat
-          offsets = 0 \ -1 \ -1 \ 0
-          // We want the height and width dimensions of randoffsets to be equal to the size of the
-          // image. Since we don't have access to that here, we will set the height and width
-          // dimensions to some number that will get capped to the image height and width.
-          randoffsets = 0 \ Int.MaxValue \ Int.MaxValue \ 0
-        }
-      } else {
-        newNodeList += new CropNode {
-          inputs(0) = newNodeList.last
-          sizes = sizeMat
-          offsets = 0 \ -1 \ -1 \ 0
-          randoffsets = 0 \ Int.MaxValue \ Int.MaxValue \ 0
-        }
-      }
-    }
-
     check(!(transformParam.hasMeanFile() && transformParam.getMeanValueCount() > 0),
           layerParam, "you cannot specify both a mean value file and mean value counts")
     if (transformParam.getMeanValueCount() > 0) {
@@ -643,6 +619,30 @@ object CaffeModel {
       val mulNode = newNodeList.last ∘ constNode
       newNodeList += constNode
       newNodeList += mulNode
+    }
+
+    if (transformParam.hasCropSize()) {
+      val cropSize = transformParam.getCropSize()
+      // XXX: don't hardcode the # of channels
+      val sizeMat = 3 \ cropSize \ cropSize \ 0
+      if (transformParam.getMirror()) {
+        newNodeList += new CropMirrorNode {
+          inputs(0) = newNodeList.last
+          sizes = sizeMat
+          offsets = 0 \ -1 \ -1 \ 0
+          // We want the height and width dimensions of randoffsets to be equal to the size of the
+          // image. Since we don't have access to that here, we will set the height and width
+          // dimensions to some number that will get capped to the image height and width.
+          randoffsets = 0 \ Int.MaxValue \ Int.MaxValue \ 0
+        }
+      } else {
+        newNodeList += new CropNode {
+          inputs(0) = newNodeList.last
+          sizes = sizeMat
+          offsets = 0 \ -1 \ -1 \ 0
+          randoffsets = 0 \ Int.MaxValue \ Int.MaxValue \ 0
+        }
+      }
     }
 
     newNodeList.toArray
