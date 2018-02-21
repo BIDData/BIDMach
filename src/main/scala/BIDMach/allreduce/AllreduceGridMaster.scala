@@ -9,6 +9,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Try
 
 
 class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.actor.ActorLogging {
@@ -41,11 +42,11 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       log.info(s"\n----GridMaster: Detect node ${joiningNode.address} up")
       val oldLayout = gridLayout.currentMasterLayout()
       register(joiningNode)
-      if(isInitialized){
+      if (isInitialized) {
         val newLayout = gridLayout.currentMasterLayout()
         val diff = Dynamic2DGridLayout.calculate_difference(oldLayout, newLayout)
         updateAllreduceTask(diff)
-      }else {
+      } else {
         if (nodesByIdMap.size >= nodeNum) {
           println(s"---- all nodes nodes are up")
           updateAllreduceTask(gridLayout.currentMasterLayout())
@@ -61,7 +62,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
           nodesByIdMap.remove(nodeId)
         }
       }
-      if(isInitialized){
+      if (isInitialized) {
         val newLayout = gridLayout.currentMasterLayout()
         val diff = Dynamic2DGridLayout.calculate_difference(oldLayout, newLayout)
         updateAllreduceTask(diff)
@@ -73,9 +74,9 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       // awaiting here to prevent concurrent futures (from another message) trying to add to node set at the same time
       val nodeRef: ActorRef = Await.result(context.actorSelection(RootActorPath(node.address) / "user" / "Node").resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second)
       context watch nodeRef
-      nodesByIdMap(nextNodeId)=nodeRef
+      nodesByIdMap(nextNodeId) = nodeRef
       gridLayout.addNode(nextNodeId)
-      nextNodeId+=1
+      nextNodeId += 1
       log.info(s"\n----GridMaster: ${nodeRef} is online. Currently ${nodesByIdMap.size} nodes are online")
     }
   }
@@ -84,32 +85,42 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
     log.info(s"\n updating Layout: ${diff}")
     lineMasterVersion += 1
     for ((lineMasterNodeId, assignments) <- diff) {
-      if(nodesByIdMap.contains(lineMasterNodeId)) {
+      if (nodesByIdMap.contains(lineMasterNodeId)) {
         for ((iter, dim) <- assignments.productIterator.zipWithIndex) {
           val assignment = iter.asInstanceOf[Option[Set[Int]]]
           if (!assignment.isEmpty) {
             val lineMasterRef = discoverLineMaster(dim, lineMasterNodeId)
-            if (assignment.get.isEmpty) {
-              lineMasterRef ! StopAllreduceTask(lineMasterVersion)
-            } else {
-              var peerNodeRefs = ArrayBuffer[ActorRef]()
-              for (nodeId <- assignment.get) {
-                peerNodeRefs += nodesByIdMap(nodeId)
+            // in case lineMaster dies ignore that line master
+            if (lineMasterRef.isDefined) {
+              if (assignment.get.isEmpty) {
+                lineMasterRef.get ! StopAllreduceTask(lineMasterVersion)
+              } else {
+                var peerNodeRefs = ArrayBuffer[ActorRef]()
+                for (nodeId <- assignment.get) {
+                  peerNodeRefs += nodesByIdMap(nodeId)
+                }
+                lineMasterRef.get ! StartAllreduceTask(peerNodeRefs, lineMasterVersion)
               }
-              lineMasterRef ! StartAllreduceTask(peerNodeRefs, lineMasterVersion)
             }
           }
         }
       }
     }
+    log.info(s"\n update complete")
   }
 
-  private def discoverLineMaster(dim: Int, masterNodeIdx: Int): ActorRef = {
+  private def discoverLineMaster(dim: Int, masterNodeIdx: Int): Option[ActorRef] = {
     //TODO: Fix the potential failure at discoverLineMaster
-    val lineMaster: ActorRef = Await.result(context.actorSelection(nodesByIdMap(masterNodeIdx).path / s"DimensionNode-dim=${dim}" / "LineMaster")
-      .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second)
-    println(s"\n----GridMaster: Discover LineMaster Address : ${lineMaster.path}")
-    (lineMaster)
+    val result: Try[ActorRef] = Await.ready(context.actorSelection(nodesByIdMap(masterNodeIdx).path / s"DimensionNode-dim=${dim}" / "LineMaster")
+      .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second).value.get
+    if (result.isSuccess) {
+      log.info(s"\n----GridMaster: Discover LineMaster ${masterNodeIdx}-${dim} Address to be ${result.get.path}")
+      Some(result.get)
+    } else {
+      log.info(s"\n----GridMaster: Fail to discover LineMaster ${masterNodeIdx}-${dim} Address")
+      Option.empty
+    }
+
   }
 
 }
