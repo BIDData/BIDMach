@@ -158,6 +158,14 @@ object CaffeModel {
           }
         }
 
+        case "Concat" => {
+          val concatParam = layer.param.getConcatParam()
+          if (concatParam.getAxis() != 1) {
+            throw new NotImplementedError("Only axis=1 for Concat layers is currently supported")
+          }
+          new StackNode(layer.param.getBottomCount())
+        }
+
         case "MultinomialLogisticLoss" => {
           softmaxOutputNode = new SoftmaxOutputNode { lossType = SoftmaxOutputLayer.CaffeMultinomialLogisticLoss }
           softmaxOutputNode

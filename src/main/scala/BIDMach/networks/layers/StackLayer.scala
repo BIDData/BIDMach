@@ -124,7 +124,9 @@ trait StackNodeOpts extends NodeOpts {
   var ninputs = 2;
 }
 
-class StackNode extends Node with StackNodeOpts {
+class StackNode(_ninputs:Int = 2) extends Node with StackNodeOpts {
+  ninputs = _ninputs
+
 	override val inputs = new Array[NodeTerm](ninputs);
 
 	override def clone:StackNode = {copyTo(new StackNode).asInstanceOf[StackNode];}
