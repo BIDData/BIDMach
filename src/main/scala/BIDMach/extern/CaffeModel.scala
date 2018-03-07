@@ -253,8 +253,14 @@ object CaffeModel {
       layer.inodeLast = nodes.length + newNodes.length - 1
 
       if (!newNodes.isEmpty) {
-        for ((input, i) <- layer.inputs.zipWithIndex) {
-          newNodes(0).inputs(i) = nodes(input.inodeLast)
+        if (newNodes(0).isInstanceOf[OutputNode]) {
+          // In Caffe, output layers have two inputs (the penultimate layer and the data layer),
+          // while in BIDMach they only have one.
+          newNodes(0).inputs(0) = nodes(layer.inputs(0).inodeLast)
+        } else {
+          for ((input, i) <- layer.inputs.zipWithIndex) {
+            newNodes(0).inputs(i) = nodes(input.inodeLast)
+          }
         }
       }
       
@@ -313,10 +319,11 @@ object CaffeModel {
     // specified in the prototxt.
     val blobIterIndices = new mutable.HashMap[String,Int]
     for (layer <- layerBuf) {
-      // XXX this should account for multiple bottom blobs
-      if (layer.param.getBottomCount() >= 1) {
-        val bottom = layer.param.getBottom(0)
+      var inplaceUsed = false
+      for (bottom <- layer.param.getBottomList()) {
         if (layer.param.getTopList().contains(bottom)) {
+          check(!inplaceUsed, layer.param, "A layer can only have at most one in-place input")
+          inplaceUsed = true
           val j = blobIterIndices.getOrElse(bottom, 0)
           layer.inputs += layersWithTop(bottom)(j)
           blobIterIndices(bottom) = j + 1
@@ -726,4 +733,9 @@ private class CaffeLayer(val param:Caffe.LayerParameter) {
   val inputs = new mutable.ArrayBuffer[CaffeLayer]
   var inodeFirst = -1
   var inodeLast = -1
+  
+  override def toString() = {
+    val strInputs = "[" + inputs.map(_.param.getName()).mkString(", ") + "]"
+    s"CaffeLayer(param.name=${param.getName()}, inputs=${strInputs}, inodeFirst=${inodeFirst}, inodeLast=${inodeLast})"
+  }
 }
