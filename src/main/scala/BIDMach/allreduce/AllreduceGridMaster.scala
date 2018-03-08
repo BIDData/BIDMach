@@ -43,12 +43,16 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       val oldLayout = gridLayout.currentMasterLayout()
       register(joiningNode)
       if (isInitialized) {
+        startTraining(nodesByIdMap.size - 1) // exactly the node just initialized
         val newLayout = gridLayout.currentMasterLayout()
         val diff = Dynamic2DGridLayout.calculate_difference(oldLayout, newLayout)
         updateAllreduceTask(diff)
       } else {
         if (nodesByIdMap.size >= nodeNum) {
-          println(s"---- all nodes nodes are up")
+          println(s"---- all nodes nodes are up, start training")
+          for(nodeIdx <- nodesByIdMap.keys){
+            startTraining(nodeIdx)
+          }
           updateAllreduceTask(gridLayout.currentMasterLayout())
           isInitialized = true
         }
@@ -81,6 +85,16 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
     }
   }
 
+  private def startTraining(masterNodeIdx: Int): Unit ={
+    val result: Try[ActorRef] = Await.ready(context.actorSelection(nodesByIdMap(masterNodeIdx).path / "Trainer")
+      .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second).value.get
+    if (result.isSuccess) {
+      result.get ! StartTraining
+    } else {
+      log.info(s"\n----GridMaster: Fail to discover Trainer ${masterNodeIdx} Address")
+    }
+  }
+
   private def updateAllreduceTask(diff: Dynamic2DGridLayout.MasterLayout): Unit = {
     log.info(s"\n updating Layout: ${diff}")
     lineMasterVersion += 1
@@ -110,7 +124,6 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
   }
 
   private def discoverLineMaster(dim: Int, masterNodeIdx: Int): Option[ActorRef] = {
-    //TODO: Fix the potential failure at discoverLineMaster
     val result: Try[ActorRef] = Await.ready(context.actorSelection(nodesByIdMap(masterNodeIdx).path / s"DimensionNode-dim=${dim}" / "LineMaster")
       .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second).value.get
     if (result.isSuccess) {

@@ -6,15 +6,15 @@ import akka.actor.{Actor, ActorRef, Props}
 /**
   * Generate a set of independent round workers and a line master which may or may not be active depending on the selection.
   *
-  * @param roundSources data sources, one for each round worker
-  * @param roundSinks   data sinks, one for each round worker
+  * @param source data source
+  * @param sink   data sink
   */
 class AllreduceDimensionNode(
                               dimensionNodeConfig: DimensionNodeConfig,
                               lineMasterConfig: LineMasterConfig,
                               workerConfig: WorkerConfig,
-                              roundSources: List[DataSource],
-                              roundSinks: List[DataSink]
+                              source: DataSource,
+                              sink: DataSink
                             ) extends Actor with akka.actor.ActorLogging {
 
   val assignedDimension = dimensionNodeConfig.dim
@@ -36,19 +36,15 @@ class AllreduceDimensionNode(
 
   def generateRoundWorkers(): Unit = {
 
-    if (roundSources.length != lineMasterConfig.roundWorkerPerDimNum || roundSources.length != roundSinks.length) {
-      throw new IllegalArgumentException(s"Sources and sinks sizes should correspond to the number of round workers, " +
-        s"given ${lineMasterConfig.roundWorkerPerDimNum}, but source size is [${roundSources.length}], and sink [${roundSinks.length}]")
-    }
     roundWorkers = {
       val arr = new Array[ActorRef](lineMasterConfig.roundWorkerPerDimNum)
       for (roundNth <- 0 until lineMasterConfig.roundWorkerPerDimNum) {
         val worker = context.actorOf(Props(
           workerClassProvider(),
           workerConfig,
-          roundSources(roundNth),
-          roundSinks(roundNth)),
-          name = s"Worker-round=${roundNth}"
+          source,
+          sink),
+          s"Worker-round=${roundNth}"
         )
         log.info(s"\n----DimensionNode!dim=${assignedDimension}: Worker for round:$roundNth created with ${worker}")
         arr(roundNth) = worker

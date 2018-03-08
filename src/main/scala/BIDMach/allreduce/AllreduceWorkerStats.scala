@@ -118,15 +118,15 @@ class AllreduceDimensionNodeWithStats(
                                        dimensionNodeConfig: DimensionNodeConfig,
                                        lineMasterConfig: LineMasterConfig,
                                        workerConfig: WorkerConfig,
-                                       sources: List[DataSource],
-                                       sinks: List[DataSink]
+                                       source: DataSource,
+                                       sink: DataSink
                                      ) extends
   AllreduceDimensionNode(
     dimensionNodeConfig: DimensionNodeConfig,
     lineMasterConfig: LineMasterConfig,
     workerConfig: WorkerConfig,
-    sources: List[DataSource],
-    sinks: List[DataSink]) with StatsAggregating {
+    source: DataSource,
+    sink: DataSink) with StatsAggregating {
 
   override def workerClassProvider() = {
     classOf[AllreduceWorkerWithStats]

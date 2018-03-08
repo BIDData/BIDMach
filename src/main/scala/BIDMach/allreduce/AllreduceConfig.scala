@@ -38,7 +38,7 @@ case class LineMasterConfig(
   * @param dimNum      Total number of dimension to which node will create corresponding sets of round workers
   * @param reportStats whether the dimension node will receive stats from its round workers
   */
-case class NodeConfig(dimNum: Int, reportStats: Boolean)
+case class NodeConfig(dimNum: Int, reportStats: Boolean, elasticRate : Double)
 
 case class WorkerConfig(
                          statsReportingRoundFrequency: Int = 10,

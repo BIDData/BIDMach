@@ -1,6 +1,8 @@
 package BIDMach.allreduce
 
+import BIDMach.Learner
 import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
+import BIDMach.models.Model
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 
@@ -18,13 +20,20 @@ import scala.concurrent.duration._
 class AllreduceNode(nodeConfig: NodeConfig,
                     lineMasterConfig: LineMasterConfig,
                     workerConfig: WorkerConfig,
-                    dimensionalSources: List[List[DataSource]],
-                    dimensionalSinks: List[List[DataSink]]) extends Actor with akka.actor.ActorLogging {
+                    model : Model, learner: Learner
+                    ) extends Actor with akka.actor.ActorLogging {
+
+  print(model, learner)
+  val binder = new AllreduceBinder(model, nodeConfig.elasticRate)
+  val sink = binder.generateAverageModel()
+  val source = binder.generateDumpModel()
+
 
   val dimNum = nodeConfig.dimNum
 
   var dimensionNodeMap: Array[ActorRef] = Array.empty
 
+  generateTrainer()
   generateDimensionNodes()
 
   override def receive: Receive = {
@@ -40,6 +49,13 @@ class AllreduceNode(nodeConfig: NodeConfig,
     }
   }
 
+  def generateTrainer(): Unit ={
+    context.actorOf(Props(
+      classOf[AllreduceTrainer],
+      learner,
+      model
+    ),"Trainer")
+  }
   def generateDimensionNodes(): Unit = {
     dimensionNodeMap = {
       val arr = new Array[ActorRef](dimNum)
@@ -49,10 +65,8 @@ class AllreduceNode(nodeConfig: NodeConfig,
           DimensionNodeConfig(dim = i),
           lineMasterConfig,
           workerConfig,
-          dimensionalSources(i),
-          dimensionalSinks(i)),
-          name = s"DimensionNode-dim=${i}"
-        )
+          source,
+          sink), s"DimensionNode-dim=${i}")
         println(s"-----Node: DimensionNode dim:$i created with ${dimensionNode}")
         arr(i) = dimensionNode
       }
@@ -67,7 +81,7 @@ object AllreduceNode {
   type DataSource = AllReduceInputRequest => AllReduceInput
 
   def startUp(port: String, nodeConfig: NodeConfig, lineMasterConfig: LineMasterConfig, workerConfig: WorkerConfig,
-              assertCorrectness: Boolean = false, checkpoint: Int = 100) = {
+              model : Model, learner: Learner) = {
 
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
@@ -75,7 +89,7 @@ object AllreduceNode {
 
     val system = ActorSystem("ClusterSystem", config)
 
-
+    /*
     def getSourceSink(dim: Int=0): (DataSource, DataSink) = if (assertCorrectness) {
       getCorrectnessTestSourceSink(workerConfig.metaData.dataSize, checkpoint)
     } else {
@@ -94,15 +108,19 @@ object AllreduceNode {
       }
       (dimSources.toList, dimSinks.toList)
     }
+    */
 
     system.actorOf(Props(classOf[AllreduceNode],
       nodeConfig,
       lineMasterConfig,
       workerConfig,
-      sourceList,
-      sinkList
+      model,
+      learner
     ), name = "Node")
+
   }
+
+
 
   private def getDummySourceSink(sourceDataSize: Int, checkpoint: Int, dim: Int): (DataSource, DataSink) = {
 
@@ -190,7 +208,7 @@ object AllreduceNode {
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
 
-    val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true)
+    val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true, elasticRate = 0.1)
 
     val workerConfig = WorkerConfig(
       statsReportingRoundFrequency = 5,
@@ -205,8 +223,9 @@ object AllreduceNode {
       threshold = threshold,
       metaData = metaData)
 
+    val (model, learner) = AllreduceTrainer.leNetModel()
 
-    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, checkpoint = 10, assertCorrectness = false)
+    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, model, learner)
   }
 }
 
