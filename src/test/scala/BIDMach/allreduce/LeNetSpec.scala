@@ -20,7 +20,7 @@ class LeNetSpec extends WordSpec with Matchers{
   "LeNet" should {
     "train properly" in {
       //Mat.checkMKL(true)
-      //Mat.checkCUDA(true)
+      Mat.checkCUDA(true)
       //System.setProperty("java.library.path", "C:\\Users\\zhang\\Documents\\GitHub\\BIDMach\\lib\\;"+System.getProperty("java.library.path"));
       //System.out.println(System.getProperty("java.library.path"))
       val traindir = "./data/MNIST/"
@@ -57,8 +57,8 @@ class LeNetSpec extends WordSpec with Matchers{
 
       val in = input();
 
-      //val conv1 = conv(in)(w=5,h=5,nch=20,stride=1,pad=0,initv=0.01f,convType=convt);
-      //val pool1 = pool(conv1)(w=2,h=2,stride=2);
+      val conv1 = conv(in)(w=5,h=5,nch=20,stride=1,pad=0,initv=0.01f,convType=convt);
+      val pool1 = pool(conv1)(w=2,h=2,stride=2);
 
       //val conv2 = conv(pool1)(w=5,h=5,nch=20,stride=1,pad=0,convType=convt);
       //val pool2 = pool(conv2)(w=2,h=2,stride=2);

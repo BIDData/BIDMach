@@ -1,33 +1,53 @@
 package BIDMach.allreduce
 
 import BIDMach.Learner
-import BIDMach.datasources.DataSource
-import BIDMach.models.Model
-import BIDMat.{FMat, IMat, Mat}
-import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
-import akka.actor.Actor
+import BIDMat.{FMat}
 
-class AllreduceBinder(model: Model, alpha: Double)  {
-
+/**
+  * This class binds
+  * @param learner the learner we need to bind with
+  * @param alpha the parameter used
+  */
+class AllreduceBinder(learner: Learner, alpha: Double){
+  val model = learner.model
   private def getTotalLength : Int = {
     var ret = 0
-    for (mat <- model.modelmats) {
-      ret += mat.length
+
+    model.modelmats.synchronized {
+      for (mat <- model.modelmats) {
+        val fmat = FMat(mat)
+        ret += fmat.length
+      }
     }
     ret
   }
 
+  /**
+    * Wait until
+    * TODO: Possibly
+    */
+  private def waitUntilFirstRound(): Unit = {
+    var waitInterval = 1
+    while(!learner.synchronized{(learner.ipass > 0  || learner.istep > 0)
+    }){
+      Thread.sleep(waitInterval)
+      waitInterval *=2
+    }
+  }
+
   def generateDumpModel(): AllreduceNode.DataSource = {
     val dumpModel: AllreduceNode.DataSource = r => {
+      //check if the learner has trained for one round
+      println("-- Dumping model --")
+      waitUntilFirstRound()
       val totalLength : Int = getTotalLength
       val ret: Array[Float] = new Array[Float](totalLength)
       model.modelmats.synchronized {
         var current = 0
         for (mat <- model.modelmats) {
           val contents = FMat(mat).contents
-          val offset = current
           for (i <- 0 until mat.length) {
-            ret(current) = contents(offset + i)
+            ret(current) = contents(i)
             current += 1
           }
         }
@@ -46,17 +66,19 @@ class AllreduceBinder(model: Model, alpha: Double)  {
 
   def generateAverageModel(): AllreduceNode.DataSink = {
     val averageModel: AllreduceNode.DataSink = sink => {
+      println("-- Averaging model --")
       val data = sink.data
       val count = sink.count
       var current = 0
+
+
       model.modelmats.synchronized {
         for (mat <- model.modelmats) {
           val contents = FMat(mat).contents
-          val offset : Int = current
           for(i <- 0 until mat.length){
-            val averaged = averageValueOrElse(data(current), count(current))
-            if(averaged.isDefined){
-              contents.update(offset+i, averaged.get * alpha + contents(offset+i) * (1-alpha))
+            val potential_averaged = averageValueOrElse(data(current), count(current))
+            for(averaged <- potential_averaged){
+              contents.update(i, averaged * alpha + contents(i) * (1-alpha))
             }
             current+=1
           }

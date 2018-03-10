@@ -20,14 +20,13 @@ import scala.concurrent.duration._
 class AllreduceNode(nodeConfig: NodeConfig,
                     lineMasterConfig: LineMasterConfig,
                     workerConfig: WorkerConfig,
-                    model : Model, learner: Learner
+                    learner: Learner
                     ) extends Actor with akka.actor.ActorLogging {
 
-  print(model, learner)
-  val binder = new AllreduceBinder(model, nodeConfig.elasticRate)
+  print(learner)
+  val binder = new AllreduceBinder(learner, nodeConfig.elasticRate)
   val sink = binder.generateAverageModel()
   val source = binder.generateDumpModel()
-
 
   val dimNum = nodeConfig.dimNum
 
@@ -52,8 +51,7 @@ class AllreduceNode(nodeConfig: NodeConfig,
   def generateTrainer(): Unit ={
     context.actorOf(Props(
       classOf[AllreduceTrainer],
-      learner,
-      model
+      learner
     ),"Trainer")
   }
   def generateDimensionNodes(): Unit = {
@@ -81,7 +79,7 @@ object AllreduceNode {
   type DataSource = AllReduceInputRequest => AllReduceInput
 
   def startUp(port: String, nodeConfig: NodeConfig, lineMasterConfig: LineMasterConfig, workerConfig: WorkerConfig,
-              model : Model, learner: Learner) = {
+              learner: Learner) = {
 
     val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
@@ -114,7 +112,6 @@ object AllreduceNode {
       nodeConfig,
       lineMasterConfig,
       workerConfig,
-      model,
       learner
     ), name = "Node")
 
@@ -200,7 +197,7 @@ object AllreduceNode {
   def main(args: Array[String]): Unit = {
 
     val dimNum = 2
-    val dataSize = 100
+    val dataSize = 176050 // the data size, should be figured out from model instead
     val maxChunkSize = 4
     val roundWorkerPerDimNum = 4
     val maxRound = 1000
@@ -223,9 +220,9 @@ object AllreduceNode {
       threshold = threshold,
       metaData = metaData)
 
-    val (model, learner) = AllreduceTrainer.leNetModel()
+    val learner = AllreduceTrainer.leNetModel()
 
-    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, model, learner)
+    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, learner)
   }
 }
 
