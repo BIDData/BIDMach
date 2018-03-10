@@ -5,6 +5,13 @@ import org.scalatest.{Matchers, WordSpec}
 class Dynamic2DGridLayoutSpec extends WordSpec with Matchers {
   "Dynamic 2D grid" should {
     var g = new Dynamic2DGridLayout()
+    "Corner Case" in {
+      for(_ <- 0 until 10){
+        g.addNode(0)
+        g.removeNode(0)
+      }
+
+    }
     "Whitebox Addition" in {
       var master_config = g.currentMasterLayout()
       for (i <- 0 until 25) {

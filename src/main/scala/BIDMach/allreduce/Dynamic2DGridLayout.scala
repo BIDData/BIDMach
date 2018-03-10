@@ -97,12 +97,12 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
 
   private def remove(): Unit ={
     assert(_count>0)
-    assert(_filled>0)
     _count -=1
     if(_N==1){
       _node_map.remove(_grid(0)(0).get)
       _grid(0).update(0, Option.empty)
     }else{
+      assert(_filled>0)
       _filled-=1
       val (y,x) = getPos(_filled, _N)
       _node_map.remove(_grid(y)(x).get)
