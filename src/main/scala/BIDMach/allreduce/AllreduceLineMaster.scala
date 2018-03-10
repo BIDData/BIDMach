@@ -49,7 +49,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
       }
 
     case s: StartAllreduceTask =>
-      log.debug(s"\n----LineMaster ${self.path}: Receive PeerNodes from GridMaster with version ${s.lineMasterVersion}.")
+      log.info(s"\n----LineMaster ${self.path}: Receive PeerNodes from GridMaster with version ${s.lineMasterVersion}.")
       if(lineMasterVersion < s.lineMasterVersion){
         isIdle = false
         gridMaster = Some(sender())
@@ -63,7 +63,7 @@ class AllreduceLineMaster(config: LineMasterConfig) extends Actor with akka.acto
         startAllreduce()
       }
     case s : StopAllreduceTask =>
-      log.debug(s"\n----LineMaster ${self.path}: Stop working with version ${s.lineMasterVersion}")
+      log.info(s"\n----LineMaster ${self.path}: Stop working with version ${s.lineMasterVersion}")
       if(lineMasterVersion < s.lineMasterVersion) {
         isIdle = true
         lineMasterVersion = s.lineMasterVersion

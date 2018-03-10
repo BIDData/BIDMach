@@ -49,7 +49,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
         updateAllreduceTask(diff)
       } else {
         if (nodesByIdMap.size >= nodeNum) {
-          println(s"---- all nodes nodes are up, start training")
+          log.info(s"---- all nodes nodes are up, start training")
           for(nodeIdx <- nodesByIdMap.keys){
             startTraining(nodeIdx)
           }
@@ -144,7 +144,7 @@ object AllreduceGridMaster {
   def main(args: Array[String]): Unit = {
     // Override the configuration of the port when specified as program argument
     val port = if (args.isEmpty) "2551" else args(0)
-    val nodeNum = 4
+    val nodeNum = 1
     val masterConfig = GridMasterConfig(nodeNum = nodeNum, nodeResolutionTimeout = 5.seconds)
 
     initGridMaster(port, masterConfig)
