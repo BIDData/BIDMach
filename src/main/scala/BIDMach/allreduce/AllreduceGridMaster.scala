@@ -43,7 +43,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       val oldLayout = gridLayout.currentMasterLayout()
       register(joiningNode)
       if (isInitialized) {
-        startTraining(nodesByIdMap.size - 1) // exactly the node just initialized
+        startTraining(nextNodeId - 1) // exactly the node just initialized, might change logic to instead transfer training from existing node
         val newLayout = gridLayout.currentMasterLayout()
         val diff = Dynamic2DGridLayout.calculate_difference(oldLayout, newLayout)
         updateAllreduceTask(diff)
