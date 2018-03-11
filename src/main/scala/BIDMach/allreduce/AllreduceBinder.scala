@@ -10,9 +10,12 @@ import BIDMat.{FMat}
   */
 class AllreduceBinder(learner: Learner, alpha: Double){
   val model = learner.model
+
+  /**
+    * @return total length for the model
+    */
   private def getTotalLength : Int = {
     var ret = 0
-
     model.modelmats.synchronized {
       for (mat <- model.modelmats) {
         val fmat = FMat(mat)
@@ -23,8 +26,9 @@ class AllreduceBinder(learner: Learner, alpha: Double){
   }
 
   /**
-    * Wait until
-    * TODO: Possibly
+    * Wait until the first round start in order to make sure the model parameter is properly initialized
+    * TODO1: using a signal instead of thread sleep to decrease latency
+    * TODO2: Possibly extend to certain round
     */
   private def waitUntilFirstRound(): Unit = {
     var waitInterval = 1
@@ -70,7 +74,6 @@ class AllreduceBinder(learner: Learner, alpha: Double){
       val data = sink.data
       val count = sink.count
       var current = 0
-
 
       model.modelmats.synchronized {
         for (mat <- model.modelmats) {
