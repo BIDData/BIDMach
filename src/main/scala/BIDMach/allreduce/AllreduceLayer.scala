@@ -3,6 +3,7 @@ package BIDMach.allreduce
 import java.util.concurrent.TimeoutException
 
 import BIDMach.Learner
+import BIDMat.Mat
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.Patterns.after
 
@@ -18,21 +19,23 @@ class AllreduceLayer(actorSystem: ActorSystem,
                      workerConfig: WorkerConfig,
                      lineMasterConfig: LineMasterConfig) {
 
+  def startAfterIter(modelMats: Array[Mat]): Future[ActorRef] = {
+    val binder = new AllreduceBinder(modelMats)
+    val metaDataWithSize = metaData.copy(dataSize = binder.totalLength)
+    val allReduceNode = actorSystem.actorOf(Props(classOf[AllreduceNode],
+      nodeConfig,
+      lineMasterConfig.copy(metaData = metaDataWithSize),
+      workerConfig.copy(metaData = metaDataWithSize),
+      binder
+    ), name = "Node")
+    Future.successful(allReduceNode)
+  }
 
-  def startAfterIter(learner: Learner, iter: Int) = {
+  def startAfterIter(learner: Learner, iter: Int): Future[ActorRef] = {
 
     def createAllReduceNode(): Future[ActorRef] = {
-      if (learner.synchronized(learner.ipass > iter || learner.istep > iter)) {
-        val binder = new AllreduceBinder(learner.model.modelmats)
-        val metaDataWithSize = metaData.copy(dataSize = binder.totalLength)
-        val allReduceNode = actorSystem.actorOf(Props(classOf[AllreduceNode],
-          nodeConfig,
-          lineMasterConfig.copy(metaData = metaDataWithSize),
-          workerConfig.copy(metaData = metaDataWithSize),
-          binder
-        ), name = "Node")
-        println("All reduce node created.")
-        Future.successful(allReduceNode)
+      if (!learner.synchronized(learner.ipass > iter || learner.istep > iter)) {
+        startAfterIter(learner.modelmats)
       } else {
         Future.failed(new TimeoutException("Learner hasn't proceeded"))
       }
