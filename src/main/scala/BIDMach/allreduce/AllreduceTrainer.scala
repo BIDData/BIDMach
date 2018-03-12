@@ -22,7 +22,7 @@ class AllreduceTrainer(learner : Learner) extends Actor with ActorLogging{
 object AllreduceTrainer {
   def leNetModel(): Learner= {
     Mat.checkCUDA(true)
-    val traindir = "./data/MNIST/"
+    val traindir = "/data/MNIST/"
     val train0 = loadIDX(traindir + "train-images-idx3-ubyte.gz").reshapeView(1, 28, 28, 60000);
     val trainlabels0 = loadIDX(traindir + "train-labels-idx1-ubyte.gz").reshapeView(1, 60000);
     val test = loadIDX(traindir + "t10k-images-idx3-ubyte.gz").reshapeView(1, 28, 28, 10000);
