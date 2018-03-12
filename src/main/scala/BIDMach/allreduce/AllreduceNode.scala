@@ -187,10 +187,11 @@ object AllreduceNode {
   def main(args: Array[String]): Unit = {
 
 
-    val learner = AllreduceTrainer.leNetModel()
-    //val learner = new AllreduceDummyLearner()
-    learner.launchTrain
-    
+    //val learner = AllreduceTrainer.leNetModel()
+    //learner.launchTrain
+    val learner = new AllreduceDummyLearner()
+    learner.ipass=1
+
     val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=0").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
       withFallback(ConfigFactory.load())
@@ -223,9 +224,7 @@ object AllreduceNode {
     val allReduceLayer = new AllreduceLayer(system,
       threshold, metaData, nodeConfig, workerConfig, lineMasterConfig)
 
-    val arrMat: Array[Mat] = Array(FMat.ones(29,20), FMat.ones(400,100))
-    val allReduceNode: Future[ActorRef] = allReduceLayer.startAfterIter(arrMat)
-
+    val allReduceNode: Future[ActorRef] = allReduceLayer.startAfterIter(learner, iter=0)
   }
 
 

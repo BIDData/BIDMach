@@ -23,7 +23,6 @@ class AllreduceDummyLearner(learner:Learner, dummy_model:AllreduceDummyModel)
     while(true){
       this.ipass+=1
       this.dummy_model.showSomeWork()
-      Thread.sleep(10000)
     }
 
   }

@@ -34,7 +34,7 @@ class AllreduceLayer(actorSystem: ActorSystem,
   def startAfterIter(learner: Learner, iter: Int): Future[ActorRef] = {
 
     def createAllReduceNode(): Future[ActorRef] = {
-      if (!learner.synchronized(learner.ipass > iter || learner.istep > iter)) {
+      if (learner.synchronized(learner.ipass > iter || learner.istep > iter)) {
         startAfterIter(learner.modelmats)
       } else {
         Future.failed(new TimeoutException("Learner hasn't proceeded"))

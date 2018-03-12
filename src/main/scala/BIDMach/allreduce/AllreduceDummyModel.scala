@@ -19,9 +19,7 @@ class AllreduceDummyModel(val _modelmat: Array[Mat]) extends Model {
   }
   def showSomeWork(){
     println("I'm learning something")
-    for(mat <- _modelmats){
-      val fmat = FMat(mat)
-      fmat ~ fmat + FMat.ones(fmat.dims)
-    }
+    Thread.sleep(1000)
   }
+
 }

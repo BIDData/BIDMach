@@ -49,7 +49,7 @@ class AllreduceBinder(modelMats: Array[Mat]) {
 
   def generateAverageModel(alpha: Double): AllreduceNode.DataSink = {
     val averageModel: AllreduceNode.DataSink = sink => {
-      println("-- Averaging model --")
+      println(s"-- Averaging model of iteration ${sink.iteration}--")
       val data = sink.data
       val count = sink.count
       var current = 0
