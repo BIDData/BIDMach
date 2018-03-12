@@ -22,7 +22,7 @@ case class ThresholdConfig(
                             thComplete: Float)
 
 case class MetaDataConfig(
-                           dataSize: Int,
+                           dataSize: Int = -1,
                            maxChunkSize: Int)
 
 case class LineMasterConfig(

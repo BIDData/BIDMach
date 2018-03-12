@@ -1,12 +1,13 @@
 package BIDMach.allreduce
 
 import BIDMach.Learner
-import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
-import BIDMach.models.Model
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
@@ -14,25 +15,19 @@ import scala.concurrent.duration._
   * The hierarchy has the following paths;
   * for round worker [user/Node/DimensionNode-dim={}/Worker-round={}],
   * and for line master [user/Node/DimensionNode-dim={}/LineMaster]
-  * @param dimensionalSources nested list of data source, where the outermost list element corresponds to each dimension, which also has each source for its round worker
-  * @param dimensionalSinks nested list of data sink, with similar structure as sources
+  *
   */
 class AllreduceNode(nodeConfig: NodeConfig,
                     lineMasterConfig: LineMasterConfig,
                     workerConfig: WorkerConfig,
-                    learner: Learner
-                    ) extends Actor with akka.actor.ActorLogging {
+                    binder: AllreduceBinder
+                   ) extends Actor with akka.actor.ActorLogging {
 
-  print(learner)
-  val binder = new AllreduceBinder(learner, nodeConfig.elasticRate)
-  val sink = binder.generateAverageModel()
+  val sink = binder.generateAverageModel(nodeConfig.elasticRate)
   val source = binder.generateDumpModel()
-
   val dimNum = nodeConfig.dimNum
-
   var dimensionNodeMap: Array[ActorRef] = Array.empty
 
-  generateTrainer()
   generateDimensionNodes()
 
   override def receive: Receive = {
@@ -48,12 +43,6 @@ class AllreduceNode(nodeConfig: NodeConfig,
     }
   }
 
-  def generateTrainer(): Unit ={
-    context.actorOf(Props(
-      classOf[AllreduceTrainer],
-      learner
-    ),"Trainer")
-  }
   def generateDimensionNodes(): Unit = {
     dimensionNodeMap = {
       val arr = new Array[ActorRef](dimNum)
@@ -118,7 +107,6 @@ object AllreduceNode {
   }
 
 
-
   private def getDummySourceSink(sourceDataSize: Int, checkpoint: Int, dim: Int): (DataSource, DataSink) = {
 
     lazy val floats = Array.range(0, sourceDataSize).map(_.toFloat)
@@ -134,8 +122,9 @@ object AllreduceNode {
 
   /**
     * Get source and sink which assert correctness of the reduced data
+    *
     * @param sourceDataSize total data size
-    * @param checkpoint round frequency at which the data should be checked
+    * @param checkpoint     round frequency at which the data should be checked
     */
   private def getCorrectnessTestSourceSink(sourceDataSize: Int, checkpoint: Int) = {
 
@@ -196,14 +185,21 @@ object AllreduceNode {
 
   def main(args: Array[String]): Unit = {
 
+
+    val learner = AllreduceTrainer.leNetModel()
+
+    learner.launchTrain
+
+
+    val system = ActorSystem("ClusterSystem")
+
     val dimNum = 2
-    val dataSize = 176050 // the data size, should be figured out from model instead
     val maxChunkSize = 4
     val roundWorkerPerDimNum = 4
     val maxRound = 1000
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
-    val metaData = MetaDataConfig(dataSize = dataSize, maxChunkSize = maxChunkSize)
+    val metaData = MetaDataConfig(maxChunkSize = maxChunkSize)
 
     val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true, elasticRate = 0.1)
 
@@ -220,9 +216,14 @@ object AllreduceNode {
       threshold = threshold,
       metaData = metaData)
 
-    val learner = AllreduceTrainer.leNetModel()
+    val allReduceLayer = new AllreduceLayer(system,
+      threshold, metaData, nodeConfig, workerConfig, lineMasterConfig)
 
-    AllreduceNode.startUp("0", nodeConfig, lineMasterConfig, workerConfig, learner)
+    val allReduceNode: Future[ActorRef] = allReduceLayer.startAfterIter(learner, iter = 0)
+
   }
+
+
+
 }
 
