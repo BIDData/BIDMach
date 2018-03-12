@@ -50,7 +50,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       } else {
         if (nodesByIdMap.size >= nodeNum) {
           log.info(s"---- all nodes nodes are up, start training")
-          for(nodeIdx <- nodesByIdMap.keys){
+          for (nodeIdx <- nodesByIdMap.keys) {
             startTraining(nodeIdx)
           }
           updateAllreduceTask(gridLayout.currentMasterLayout())
@@ -58,7 +58,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
         }
       }
     case Terminated(a) =>
-      log.info(s"\n----GridMaster: $a is terminated, removing it from the map")
+      log.info(s"\n----GridMaster: $a is terminated, removing it from the grid")
       val oldLayout = gridLayout.currentMasterLayout()
       for ((nodeId, nodeRef) <- nodesByIdMap) {
         if (nodeRef == a) {
@@ -85,7 +85,12 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
     }
   }
 
-  private def startTraining(masterNodeIdx: Int): Unit ={
+  /**
+    * Start the training procedure of specific node
+    *
+    * @param masterNodeIdx the index for the node
+    */
+  private def startTraining(masterNodeIdx: Int): Unit = {
     val result: Try[ActorRef] = Await.ready(context.actorSelection(nodesByIdMap(masterNodeIdx).path / "Trainer")
       .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second).value.get
     if (result.isSuccess) {
@@ -95,27 +100,26 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
     }
   }
 
+  /**
+    * Send to each linemaster about the update via difference from Dynamic 2D Grid
+    *
+    * @param diff difference calculated by Dynamic 2D Grid
+    */
   private def updateAllreduceTask(diff: Dynamic2DGridLayout.MasterLayout): Unit = {
     log.info(s"\n updating Layout: ${diff}")
     lineMasterVersion += 1
-    for ((lineMasterNodeId, assignments) <- diff) {
-      if (nodesByIdMap.contains(lineMasterNodeId)) {
-        for ((iter, dim) <- assignments.productIterator.zipWithIndex) {
-          val assignment = iter.asInstanceOf[Option[Set[Int]]]
-          if (!assignment.isEmpty) {
-            val lineMasterRef = discoverLineMaster(dim, lineMasterNodeId)
-            // in case lineMaster dies ignore that line master
-            if (lineMasterRef.isDefined) {
-              if (assignment.get.isEmpty) {
-                lineMasterRef.get ! StopAllreduceTask(lineMasterVersion)
-              } else {
-                var peerNodeRefs = ArrayBuffer[ActorRef]()
-                for (nodeId <- assignment.get) {
-                  peerNodeRefs += nodesByIdMap(nodeId)
-                }
-                lineMasterRef.get ! StartAllreduceTask(peerNodeRefs, lineMasterVersion)
-              }
+    for ((lineMasterNodeId, assignments) <- diff if nodesByIdMap.contains(lineMasterNodeId)) {
+      for ((iter, dim) <- assignments.productIterator.zipWithIndex) {
+        // here we only deal with it when both assigment and lineMaster exists
+        for (assignment <- iter.asInstanceOf[Option[Set[Int]]]; lineMasterRef <- discoverLineMaster(dim, lineMasterNodeId)) {
+          if (assignment.isEmpty) {
+            lineMasterRef ! StopAllreduceTask(lineMasterVersion)
+          } else {
+            var peerNodeRefs = ArrayBuffer[ActorRef]()
+            for (nodeId <- assignment) {
+              peerNodeRefs += nodesByIdMap(nodeId)
             }
+            lineMasterRef ! StartAllreduceTask(peerNodeRefs, lineMasterVersion)
           }
         }
       }

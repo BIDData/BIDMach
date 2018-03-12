@@ -14,7 +14,7 @@ class AllreduceTrainerSpec extends TestKit(ActorSystem("MySpec")) with ImplicitS
     ),
     name = "trainer"
   )
-  "trainer" must{
+  "trainer" must {
     "train" in{
       trainer ! StartTraining
       expectNoMsg()
