@@ -66,7 +66,7 @@ class AllreduceBinder(learner: Learner, alpha: Double){
 
   def generateAverageModel(): AllreduceNode.DataSink = {
     val averageModel: AllreduceNode.DataSink = sink => {
-      println("-- Averaging model --")
+      println(s"-- Averaging model round ${sink.iteration}--")
       val data = sink.data
       val count = sink.count
       var current = 0
