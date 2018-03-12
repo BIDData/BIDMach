@@ -22,7 +22,7 @@ class AllreduceLayer(actorSystem: ActorSystem,
   def startAfterIter(learner: Learner, iter: Int) = {
 
     def createAllReduceNode(): Future[ActorRef] = {
-      if (!learner.synchronized(learner.ipass > iter || learner.istep > iter)) {
+      if (learner.synchronized(learner.ipass > iter || learner.istep > iter)) {
         val binder = new AllreduceBinder(learner.model.modelmats)
         val metaDataWithSize = metaData.copy(dataSize = binder.totalLength)
         val allReduceNode = actorSystem.actorOf(Props(classOf[AllreduceNode],
@@ -31,9 +31,10 @@ class AllreduceLayer(actorSystem: ActorSystem,
           workerConfig.copy(metaData = metaDataWithSize),
           binder
         ), name = "Node")
+        println("All reduce node created.")
         Future.successful(allReduceNode)
       } else {
-        Future.failed(throw new TimeoutException("Learner hasn't proceeded"))
+        Future.failed(new TimeoutException("Learner hasn't proceeded"))
       }
     }
 
