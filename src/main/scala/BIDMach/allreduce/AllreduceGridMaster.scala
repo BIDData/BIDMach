@@ -43,16 +43,12 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       val oldLayout = gridLayout.currentMasterLayout()
       register(joiningNode)
       if (isInitialized) {
-        startTraining(nextNodeId - 1) // exactly the node just initialized, might change logic to instead transfer training from existing node
         val newLayout = gridLayout.currentMasterLayout()
         val diff = Dynamic2DGridLayout.calculate_difference(oldLayout, newLayout)
         updateAllreduceTask(diff)
       } else {
         if (nodesByIdMap.size >= nodeNum) {
-          log.info(s"---- all nodes nodes are up, start training")
-          for (nodeIdx <- nodesByIdMap.keys) {
-            startTraining(nodeIdx)
-          }
+          log.info(s"---- all nodes nodes are up, start allreduce")
           updateAllreduceTask(gridLayout.currentMasterLayout())
           isInitialized = true
         }
@@ -76,28 +72,20 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
   private def register(node: Member): Unit = {
     if (node.hasRole("Node")) {
       // awaiting here to prevent concurrent futures (from another message) trying to add to node set at the same time
-      val nodeRef: ActorRef = Await.result(context.actorSelection(RootActorPath(node.address) / "user" / "Node").resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second)
-      context watch nodeRef
-      nodesByIdMap(nextNodeId) = nodeRef
-      gridLayout.addNode(nextNodeId)
-      nextNodeId += 1
-      log.info(s"\n----GridMaster: ${nodeRef} is online. Currently ${nodesByIdMap.size} nodes are online")
+      val result: Try[ActorRef] = Await.ready(context.actorSelection(RootActorPath(node.address) / "user" / "Node")
+        .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second).value.get
+      if (result.isSuccess) {
+        val nodeRef = result.get
+        context watch nodeRef
+        nodesByIdMap(nextNodeId) = nodeRef
+        gridLayout.addNode(nextNodeId)
+        nextNodeId += 1
+        log.info(s"\n----GridMaster: ${nodeRef} is online. Currently ${nodesByIdMap.size} nodes are online")
+      }else{
+        log.info(s"\n----GridMaster: Fail to discover Node ${node} Address")
+      }
     }
-  }
-
-  /**
-    * Start the training procedure of specific node
-    *
-    * @param masterNodeIdx the index for the node
-    */
-  private def startTraining(masterNodeIdx: Int): Unit = {
-    val result: Try[ActorRef] = Await.ready(context.actorSelection(nodesByIdMap(masterNodeIdx).path / "Trainer")
-      .resolveOne(nodeResolutionTimeOut), nodeResolutionTimeOut + 1.second).value.get
-    if (result.isSuccess) {
-      result.get ! StartTraining
-    } else {
-      log.info(s"\n----GridMaster: Fail to discover Trainer ${masterNodeIdx} Address")
-    }
+    print("Done with register")
   }
 
   /**

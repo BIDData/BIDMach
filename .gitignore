@@ -21,3 +21,4 @@ data
 
 .DS_store
 project/
+*.txt

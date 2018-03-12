@@ -13,8 +13,8 @@ import BIDMach.updaters.Updater
 class AllreduceDummyLearner(learner:Learner, dummy_model:AllreduceDummyModel)
   extends Learner(learner.datasource,dummy_model,learner.mixins, learner.updater, learner.datasink ,learner.opts) {
 
-  def this(dummy_model: AllreduceDummyModel){
-    this(Net.learner("dummy learner")._1, dummy_model)
+  def this(){
+    this(Net.learner("dummy learner")._1, new AllreduceDummyModel())
   }
 
 

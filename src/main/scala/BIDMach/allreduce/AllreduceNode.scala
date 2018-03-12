@@ -187,11 +187,15 @@ object AllreduceNode {
 
 
     val learner = AllreduceTrainer.leNetModel()
-
+    //val learner = new AllreduceDummyLearner()
     learner.launchTrain
 
+    val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=0").
+      withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
+      withFallback(ConfigFactory.load())
 
-    val system = ActorSystem("ClusterSystem")
+    val system = ActorSystem("ClusterSystem", config)
+
 
     val dimNum = 2
     val maxChunkSize = 4
