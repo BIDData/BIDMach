@@ -1,6 +1,7 @@
 package BIDMach.allreduce
 
 import BIDMach.Learner
+import BIDMat.{FMat, Mat}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
@@ -189,13 +190,12 @@ object AllreduceNode {
     val learner = AllreduceTrainer.leNetModel()
     //val learner = new AllreduceDummyLearner()
     learner.launchTrain
-
+    
     val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=0").
       withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
       withFallback(ConfigFactory.load())
 
     val system = ActorSystem("ClusterSystem", config)
-
 
     val dimNum = 2
     val maxChunkSize = 4
@@ -223,7 +223,8 @@ object AllreduceNode {
     val allReduceLayer = new AllreduceLayer(system,
       threshold, metaData, nodeConfig, workerConfig, lineMasterConfig)
 
-    val allReduceNode: Future[ActorRef] = allReduceLayer.startAfterIter(learner, iter = 0)
+    val arrMat: Array[Mat] = Array(FMat.ones(29,20), FMat.ones(400,100))
+    val allReduceNode: Future[ActorRef] = allReduceLayer.startAfterIter(arrMat)
 
   }
 
