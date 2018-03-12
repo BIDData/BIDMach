@@ -27,8 +27,8 @@ class AllreduceLayer(actorSystem: ActorSystem,
         val metaDataWithSize = metaData.copy(dataSize = binder.totalLength)
         val allReduceNode = actorSystem.actorOf(Props(classOf[AllreduceNode],
           nodeConfig,
-          lineMasterConfig,
-          workerConfig,
+          lineMasterConfig.copy(metaData = metaDataWithSize),
+          workerConfig.copy(metaData = metaDataWithSize),
           binder
         ), name = "Node")
         Future.successful(allReduceNode)
