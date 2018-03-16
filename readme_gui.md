@@ -2,15 +2,15 @@
 git clone https://github.com/BIDData/BIDMach.git
 cd BIDMach
 git checkout gui
+mvn package
 ```
 
-First download the models.tar.gz and data.tar.gz from the google drive.
+First download the models.tar.gz and data.tar.gz from the google drive (https://goo.gl/vqc3rJ)
 
 Extract the models.tar.gz at the BIDMach folder.
 Extract the data.tar.gz to somewhere you like.
 
-
-Before running these scripts, config the `traindir` variable as the right data location. Change `pretrain_model_dir`  and `pretrain_discriminator_dir` if you extract models into different location.
+Before running these scripts, config the `traindir` variable in the scripts as the right data location. Change `pretrain_model_dir`  and `pretrain_discriminator_dir` if you extract models into different location.
 
 DEMO for mnist:
 ```
@@ -29,4 +29,3 @@ If you want to use discriminator (Require pixel value in [0,256)）, run command
 By default, mnist.ssc set `clipping` as false, testcifar_norm.ssc set `clipping` as true.
 
 Change L2 weight and discriminator weight to see the effect.
-
