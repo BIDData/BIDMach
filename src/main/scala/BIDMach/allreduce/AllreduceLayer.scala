@@ -1,54 +1,60 @@
 package BIDMach.allreduce
 
-import java.util.concurrent.TimeoutException
-
 import BIDMach.Learner
+import BIDMach.allreduce.binder.AllreduceBinder
 import BIDMat.Mat
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.pattern.Patterns.after
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import com.typesafe.config.ConfigFactory
 
 
-class AllreduceLayer(actorSystem: ActorSystem,
-                     threshold: ThresholdConfig,
-                     metaData: MetaDataConfig,
+class AllreduceLayer(metaData: MetaDataConfig,
                      nodeConfig: NodeConfig,
                      workerConfig: WorkerConfig,
                      lineMasterConfig: LineMasterConfig) {
 
-  def startAfterIter(modelMats: Array[Mat]): Future[ActorRef] = {
-    val binder = new AllreduceBinder(modelMats)
-    val metaDataWithSize = metaData.copy(dataSize = binder.totalLength)
-    val allReduceNode = actorSystem.actorOf(Props(classOf[AllreduceNode],
+  var started = false
+
+  def start(binder: AllreduceBinder): ActorRef = {
+
+    if (started) {
+      throw new IllegalStateException(s"Actor system has already started, and this node has joined the cluster, and cannot be started again. Consider restarting the actor system")
+    }
+
+    val metaDataWithSize = metaData.copy(dataSize = binder.totalDataSize)
+    val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=0").
+      withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
+      withFallback(ConfigFactory.load())
+
+    val system = ActorSystem("ClusterSystem", config)
+    val nodeRef = system.actorOf(Props(classOf[AllreduceNode],
       nodeConfig,
       lineMasterConfig.copy(metaData = metaDataWithSize),
       workerConfig.copy(metaData = metaDataWithSize),
       binder
     ), name = "Node")
-    Future.successful(allReduceNode)
+
+    started = true
+    nodeRef
   }
 
-  def startAfterIter(learner: Learner, iter: Int): Future[ActorRef] = {
+  def startAfterIter(learner: Learner, iter: Int)(binderProvider: Array[Mat] => AllreduceBinder): ActorRef = {
 
-    def createAllReduceNode(): Future[ActorRef] = {
-      if (learner.synchronized(learner.ipass > iter || learner.istep > iter)) {
-        startAfterIter(learner.modelmats)
+    def createAllReduceNode(): Option[ActorRef] = {
+      if (learner.synchronized(learner.ipass > 0 || learner.istep > iter)) {
+        val allReduceNode = start(binderProvider(learner.modelmats))
+        Some(allReduceNode)
       } else {
-        Future.failed(new TimeoutException("Learner hasn't proceeded"))
+        println(s"Learner is still at #pass ${learner.ipass}, and #step ${learner.istep}. Required #pass > 0, or #step > [$iter] as specified")
+        None
       }
     }
 
-    def createAllReduceNodeWithRetry(): Future[ActorRef] = {
-      createAllReduceNode().recoverWith {
-        case _: TimeoutException => after(2.seconds, actorSystem.scheduler, global, createAllReduceNodeWithRetry())
-        case ex: Exception => throw ex
-      }
+    var allReduceNode: Option[ActorRef] = None
+    while (allReduceNode.isEmpty) {
+      allReduceNode = createAllReduceNode()
+      Thread.sleep(2000L)
     }
-
-    createAllReduceNodeWithRetry()
+    allReduceNode.get
 
   }
 

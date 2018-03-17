@@ -1,6 +1,5 @@
 package BIDMach.allreduce
-
-import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
+import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import akka.actor.{Actor, ActorRef, Props}
 
 /**

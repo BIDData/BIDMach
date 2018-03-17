@@ -1,6 +1,6 @@
 package BIDMach.allreduce
 
-import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
+import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import BIDMach.allreduce.ReceivePipeline.{HandledCompletely, Inner}
 import akka.actor.ActorRef
 
