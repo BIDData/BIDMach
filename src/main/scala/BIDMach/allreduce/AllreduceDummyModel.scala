@@ -5,7 +5,7 @@ import BIDMat.{FMat, Mat}
 
 class AllreduceDummyModel(val _modelmat: Array[Mat]) extends Model {
   def this(){
-    this(Array[Mat](FMat.ones(30,1000000),FMat.ones(1000000,30)))
+    this(Array[Mat](FMat.ones(30,100),FMat.ones(100,30)))
   }
 
 

@@ -107,7 +107,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 nn.launchTrain;
 
-AllreduceNode.start(nn)
+AllreduceNode.startNodeAfterIter(nn, 0)
 
 println("Examine the 'nn' variable to track learning state.\n");
 

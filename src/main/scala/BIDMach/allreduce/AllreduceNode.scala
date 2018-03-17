@@ -2,6 +2,7 @@ package BIDMach.allreduce
 
 import BIDMach.Learner
 import BIDMach.allreduce.binder.{AllreduceBinder, ElasticAverageBinder}
+import BIDMat.Mat
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 
@@ -15,8 +16,6 @@ import scala.concurrent.duration._
   *
   */
 class AllreduceNode(nodeConfig: NodeConfig,
-                    lineMasterConfig: LineMasterConfig,
-                    workerConfig: WorkerConfig,
                     binder: AllreduceBinder
                    ) extends Actor with akka.actor.ActorLogging {
 
@@ -47,8 +46,8 @@ class AllreduceNode(nodeConfig: NodeConfig,
         val dimensionNode = context.actorOf(Props(
           dimensionNodeClassProvider(),
           DimensionNodeConfig(dim = i),
-          lineMasterConfig,
-          workerConfig,
+          nodeConfig.lineMasterConfig,
+          nodeConfig.workerConfig,
           source,
           sink), s"DimensionNode-dim=${i}")
         println(s"-----Node: DimensionNode dim:$i created with ${dimensionNode}")
@@ -59,28 +58,10 @@ class AllreduceNode(nodeConfig: NodeConfig,
   }
 }
 
+
 object AllreduceNode {
 
-  def startUp(port: String, nodeConfig: NodeConfig, lineMasterConfig: LineMasterConfig, workerConfig: WorkerConfig,
-              learner: Learner) = {
-
-    val config = ConfigFactory.parseString(s"\nakka.remote.netty.tcp.port=$port").
-      withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
-      withFallback(ConfigFactory.load())
-
-    val system = ActorSystem("ClusterSystem", config)
-
-    system.actorOf(Props(classOf[AllreduceNode],
-      nodeConfig,
-      lineMasterConfig,
-      workerConfig,
-      learner
-    ), name = "Node")
-
-  }
-
-
-  def getBasicConfigs() = {
+  def getBasicConfigs() : NodeConfig = {
 
     val dimNum = 2
     val maxChunkSize = 20000
@@ -89,8 +70,6 @@ object AllreduceNode {
 
     val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
     val metaData = MetaDataConfig(maxChunkSize = maxChunkSize)
-
-    val nodeConfig = NodeConfig(dimNum = dimNum, reportStats = true, elasticRate = 0.3)
 
     val workerConfig = WorkerConfig(
       statsReportingRoundFrequency = 5,
@@ -102,45 +81,62 @@ object AllreduceNode {
       dim = -1,
       maxRound = maxRound,
       workerResolutionTimeout = 5.seconds,
-      threshold = threshold,
-      metaData = metaData)
+      threshold = threshold)
 
-    (metaData, nodeConfig, workerConfig, lineMasterConfig)
-
+    NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, reportStats = true, elasticRate = 0.3)
   }
 
-  def start(learner: Learner): ActorRef = {
+  def startAllreduceNode(binder: AllreduceBinder, nodeConfig: NodeConfig): ActorRef = {
 
-    val (metaData, nodeConfig, workerConfig, lineMasterConfig) = getBasicConfigs()
+    val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=0").
+      withFallback(ConfigFactory.parseString("akka.cluster.roles = [Node]")).
+      withFallback(ConfigFactory.load())
 
-    val allReduceLayer = new AllreduceLayer(metaData, nodeConfig, workerConfig, lineMasterConfig)
+    val updatedNodeConig = nodeConfig.copy(
+      workerConfig = nodeConfig.workerConfig.copy(
+        metaData = nodeConfig.workerConfig.metaData.copy(
+          dataSize = binder.totalDataSize
+        )
+      )
+    )
 
-    allReduceLayer.startAfterIter(learner, iter = 0) {
-      modelMats => new ElasticAverageBinder(modelMats, nodeConfig.elasticRate)
+    val system = ActorSystem("ClusterSystem", config)
+    val nodeRef = system.actorOf(Props(classOf[AllreduceNode],
+      updatedNodeConig,
+      binder
+    ), name = "Node")
+    nodeRef
+  }
+
+  def startNodeAfterIter(learner: Learner, iter: Int, nodeConfig: NodeConfig, binder: AllreduceBinder): ActorRef = {
+    def createAllReduceNode(): Option[ActorRef] = {
+      if (learner.synchronized(learner.ipass > 0 || learner.istep > iter)) {
+        val allReduceNode = startAllreduceNode(binder, nodeConfig)
+        Some(allReduceNode)
+      } else {
+        println(s"Learner is still at #pass ${learner.ipass}, and #step ${learner.istep}. Required #pass > 0, or #step > [$iter] as specified")
+        None
+      }
     }
-
+    var allReduceNode: Option[ActorRef] = None
+    while (allReduceNode.isEmpty) {
+      allReduceNode = createAllReduceNode()
+      Thread.sleep(2000L)
+    }
+    allReduceNode.get
   }
 
-  def startWithBinder(binder: AllreduceBinder): ActorRef = {
-
-    val (metaData, nodeConfig, workerConfig, lineMasterConfig) = getBasicConfigs()
-
-    val allReduceLayer = new AllreduceLayer(metaData, nodeConfig, workerConfig, lineMasterConfig)
-
-    allReduceLayer.start(binder)
-
-  }
-
-  def getLearner(): Learner = {
-    new AllreduceDummyLearner()
+  def startNodeAfterIter(learner: Learner, iter: Int): Unit ={
+    val nodeConfig = getBasicConfigs()
+    val binder = new ElasticAverageBinder(learner.model.modelmats, nodeConfig.elasticRate)
+    startNodeAfterIter(learner, iter, nodeConfig, binder)
   }
 
   def main(args: Array[String]): Unit = {
-    val learner = getLearner()
+    val learner = new AllreduceDummyLearner()
     learner.launchTrain
-    start(learner)
+    startNodeAfterIter(learner, iter = 0)
   }
-
 
 }
 
