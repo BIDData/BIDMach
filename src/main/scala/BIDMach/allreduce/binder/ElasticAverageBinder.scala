@@ -1,6 +1,7 @@
 package BIDMach.allreduce.binder
 
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
+import BIDMach.models.Model
 import BIDMat.{FMat, Mat}
 
 
@@ -8,15 +9,15 @@ import BIDMat.{FMat, Mat}
 /**
   * Linearize input model mats, and elastic-average update to the same model.
   *
-  * @param modelMats
+  * @param model
   * @param alpha
   */
-class ElasticAverageBinder(modelMats: Array[Mat], alpha: Double) extends AllreduceBinder {
+class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder {
 
-  override val totalDataSize: Int = {
+  override lazy val totalDataSize: Int = {
     var ret = 0
-    modelMats.synchronized {
-      for (mat <- modelMats) {
+    model.modelmats.synchronized {
+      for (mat <- model.modelmats) {
         val fmat = FMat(mat)
         ret += fmat.length
       }
@@ -29,9 +30,9 @@ class ElasticAverageBinder(modelMats: Array[Mat], alpha: Double) extends Allredu
     println(s"--Dumping model data at ${inputRequest.iteration}--")
     val ret: Array[Float] = new Array[Float](totalDataSize)
 
-    modelMats.synchronized {
+    model.modelmats.synchronized {
       var current = 0
-      for (mat <- modelMats) {
+      for (mat <- model.modelmats) {
         val contents = FMat(mat).contents
         var i = 0
         while (i < mat.length) {
@@ -58,8 +59,8 @@ class ElasticAverageBinder(modelMats: Array[Mat], alpha: Double) extends Allredu
     val count = reducedOutput.count
     var current = 0
 
-    modelMats.synchronized {
-      for (mat <- modelMats) {
+    model.modelmats.synchronized {
+      for (mat <- model.modelmats) {
         val contents = FMat(mat).contents
         var i = 0
         while (i < mat.length) {

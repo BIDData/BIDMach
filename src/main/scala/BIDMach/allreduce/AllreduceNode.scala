@@ -126,9 +126,9 @@ object AllreduceNode {
     allReduceNode.get
   }
 
-  def startNodeAfterIter(learner: Learner, iter: Int): Unit ={
+  def startNodeAfterIter(learner: Learner, iter: Int): Unit = {
     val nodeConfig = getBasicConfigs()
-    val binder = new ElasticAverageBinder(learner.model.modelmats, nodeConfig.elasticRate)
+    val binder = new ElasticAverageBinder(learner.model, nodeConfig.elasticRate)
     startNodeAfterIter(learner, iter, nodeConfig, binder)
   }
 
