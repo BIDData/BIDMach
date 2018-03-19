@@ -2,8 +2,7 @@ package BIDMach.allreduce.binder
 
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import BIDMach.models.Model
-import BIDMat.{FMat, Mat}
-
+import BIDMat.FMat
 
 
 /**
@@ -55,9 +54,12 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
 
   override def dataSink: DataSink = reducedOutput => {
     println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
+
     val data = reducedOutput.data
     val count = reducedOutput.count
     var current = 0
+
+    assert(data.length == totalDataSize, "Reduced output should be the same as as model")
 
     model.modelmats.synchronized {
       for (mat <- model.modelmats) {
