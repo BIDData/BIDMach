@@ -24,9 +24,6 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
   var nodesByIdMap = mutable.HashMap[Int, ActorRef]()
   var nextNodeId = 0
 
-  // Grid assignment as line assignment for each selected line master denoted by the node id (key)
-
-
   // Line master version (strictly increasing) for downstream to distinguish new grid assignment
   var lineMasterVersion = -1
 
@@ -39,7 +36,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
   def receive = {
 
     case MemberUp(joiningNode) =>
-      log.info(s"\n----GridMaster: Detect node ${joiningNode.address} up")
+      println(s"\n----GridMaster: Detect node ${joiningNode.address} up")
       val oldLayout = gridLayout.currentMasterLayout()
       register(joiningNode)
       if (isInitialized) {
@@ -80,12 +77,12 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
         nodesByIdMap(nextNodeId) = nodeRef
         gridLayout.addNode(nextNodeId)
         nextNodeId += 1
-        log.info(s"\n----GridMaster: ${nodeRef} is online. Currently ${nodesByIdMap.size} nodes are online")
+        println(s"\n----GridMaster: ${nodeRef} is online. Currently ${nodesByIdMap.size} nodes are online")
       }else{
-        log.info(s"\n----GridMaster: Fail to discover Node ${node} Address")
+        println(s"\n----GridMaster: Fail to discover Node ${node} Address")
       }
     }
-    print("Done with register")
+    println("Done with register")
   }
 
   /**
@@ -107,6 +104,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
             for (nodeId <- assignment) {
               peerNodeRefs += nodesByIdMap(nodeId)
             }
+            println(s"Start all reduce task to $lineMasterRef")
             lineMasterRef ! StartAllreduceTask(peerNodeRefs, lineMasterVersion)
           }
         }

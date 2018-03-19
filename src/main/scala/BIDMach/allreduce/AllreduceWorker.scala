@@ -1,7 +1,8 @@
 package BIDMach.allreduce
 
 
-import BIDMach.allreduce.AllreduceNode.{DataSink, DataSource}
+import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
+import BIDMach.allreduce.binder.{AllReduceInputRequest, AllReduceOutput}
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef}
 

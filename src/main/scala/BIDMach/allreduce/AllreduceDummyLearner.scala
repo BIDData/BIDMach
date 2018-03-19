@@ -1,14 +1,7 @@
 package BIDMach.allreduce
 
-import java.util.concurrent.Future
-
 import BIDMach.Learner
-import BIDMach.datasinks.DataSink
-import BIDMach.datasources.DataSource
-import BIDMach.mixins.Mixin
-import BIDMach.models.Model
 import BIDMach.networks.Net
-import BIDMach.updaters.Updater
 
 class AllreduceDummyLearner(learner:Learner, dummy_model:AllreduceDummyModel)
   extends Learner(learner.datasource,dummy_model,learner.mixins, learner.updater, learner.datasink ,learner.opts) {

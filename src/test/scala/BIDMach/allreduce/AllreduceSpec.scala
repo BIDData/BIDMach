@@ -1,5 +1,6 @@
 package BIDMach.allreduce
 
+import BIDMach.allreduce.binder.{AllReduceInput, AllReduceInputRequest, AllReduceOutput}
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}

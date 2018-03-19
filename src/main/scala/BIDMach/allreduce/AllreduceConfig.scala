@@ -30,15 +30,7 @@ case class LineMasterConfig(
                              dim: Int,
                              maxRound: Int,
                              workerResolutionTimeout: FiniteDuration,
-                             threshold: ThresholdConfig,
-                             metaData: MetaDataConfig)
-
-/**
-  * Node config
-  * @param dimNum      Total number of dimension to which node will create corresponding sets of round workers
-  * @param reportStats whether the dimension node will receive stats from its round workers
-  */
-case class NodeConfig(dimNum: Int, reportStats: Boolean, elasticRate : Double)
+                             threshold: ThresholdConfig)
 
 case class WorkerConfig(
                          statsReportingRoundFrequency: Int = 10,
@@ -46,3 +38,9 @@ case class WorkerConfig(
                          metaData: MetaDataConfig)
 
 case class DimensionNodeConfig(dim: Int)
+
+case class NodeConfig(
+                       workerConfig: WorkerConfig,
+                       lineMasterConfig: LineMasterConfig,
+                       dimNum: Int, reportStats: Boolean, elasticRate: Double
+                     )

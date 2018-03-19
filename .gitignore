@@ -22,3 +22,5 @@ data
 .DS_store
 project/
 *.txt
+log.txt.lck
+*.lck
