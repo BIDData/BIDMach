@@ -1,5 +1,7 @@
 import BIDMach.Learner
-import BIDMach.allreduce.{AllreduceNode, AllreduceTrainer}
+import BIDMach.allreduce.AllreduceNode.{getBasicConfigs, startNodeAfterIter}
+import BIDMach.allreduce.binder.ElasticAverageBinder
+import BIDMach.allreduce.{AllreduceNode}
 import BIDMach.datasources.FileSource
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
@@ -107,7 +109,10 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 nn.launchTrain;
 
-AllreduceNode.startNodeAfterIter(nn, 0)
+// All-reduce
+val nodeConfig = getBasicConfigs().copy(elasticRate = 0.43)
+val binder = new ElasticAverageBinder(nn.model, nodeConfig.elasticRate)
+AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
 
 println("Examine the 'nn' variable to track learning state.\n");
 

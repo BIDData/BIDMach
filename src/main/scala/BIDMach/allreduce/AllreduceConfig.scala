@@ -40,7 +40,7 @@ case class WorkerConfig(
 case class DimensionNodeConfig(dim: Int)
 
 case class NodeConfig(
-                                workerConfig: WorkerConfig,
-                                lineMasterConfig: LineMasterConfig,
-                                dimNum: Int, reportStats: Boolean, elasticRate : Double
+                       workerConfig: WorkerConfig,
+                       lineMasterConfig: LineMasterConfig,
+                       dimNum: Int, reportStats: Boolean, elasticRate: Double
                      )
