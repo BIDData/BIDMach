@@ -29,18 +29,21 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
     println(s"--Dumping model data at ${inputRequest.iteration}--")
     val ret: Array[Float] = new Array[Float](totalDataSize)
 
-    model.modelmats.synchronized {
-      var current = 0
-      for (mat <- model.modelmats) {
-        val contents = FMat(mat).contents
-        var i = 0
-        while (i < mat.length) {
-          ret(current) = contents(i)
-          current += 1
-          i += 1
-        }
+    // backward traversing model mats, assuming forward traversal by the training model
+    // using while instead of for loop due to performance
+    var current = totalDataSize
+    var i = model.modelmats.length - 1
+
+    while (i >= 0) {
+      val mat = model.modelmats(i)
+      mat.synchronized {
+        val contentData = FMat(mat).contents.data
+        current -= contentData.length
+        System.arraycopy(contentData, 0, ret, current, contentData.length)
       }
+      i -= 1
     }
+
     AllReduceInput(ret)
 
   }
@@ -52,29 +55,37 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
     }
   }
 
+
   override def dataSink: DataSink = reducedOutput => {
     println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
 
     val data = reducedOutput.data
     val count = reducedOutput.count
-    var current = 0
 
     assert(data.length == totalDataSize, "Reduced output should be the same as as model")
 
-    model.modelmats.synchronized {
-      for (mat <- model.modelmats) {
+    // backward traversing model mats, assuming forward traversal by the training model
+    // using while instead of for loop due to performance
+    var current = totalDataSize - 1
+    var i = model.modelmats.length - 1
+
+    while (i >= 0) {
+      val mat = model.modelmats(i)
+      mat.synchronized {
         val contents = FMat(mat).contents
-        var i = 0
-        while (i < mat.length) {
-          val potential_averaged = averageValueOrElse(data(current), count(current))
-          for (averaged <- potential_averaged) {
-            contents.update(i, averaged * alpha + contents(i) * (1 - alpha))
+        var j = mat.length - 1
+        while (j >= 0) {
+          averageValueOrElse(data(current), count(current)) match {
+            case Some(averaged) => contents.update(j, averaged * alpha + contents(j) * (1 - alpha))
+            case _ => // No update when reduced data has no content
           }
-          current += 1
-          i += 1
+          j -= 1
+          current -= 1
         }
       }
+      i -= 1
     }
+
   }
 
 }
