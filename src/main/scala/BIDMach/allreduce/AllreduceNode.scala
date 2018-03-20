@@ -2,7 +2,6 @@ package BIDMach.allreduce
 
 import BIDMach.Learner
 import BIDMach.allreduce.binder.{AllreduceBinder, ElasticAverageBinder}
-import BIDMat.Mat
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 
