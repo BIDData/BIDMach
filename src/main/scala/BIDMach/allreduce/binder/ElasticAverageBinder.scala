@@ -75,10 +75,8 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
         val contents = FMat(mat).contents
         var j = mat.length - 1
         while (j >= 0) {
-          averageValueOrElse(data(current), count(current)) match {
-            case Some(averaged) => contents.update(j, averaged * alpha + contents(j) * (1 - alpha))
-            case _ => // No update when reduced data has no content
-          }
+          val averaged =  data(current)/ count(current)
+          contents.update(j, averaged * alpha + contents(j) * (1 - alpha))
           j -= 1
           current -= 1
         }
