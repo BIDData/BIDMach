@@ -36,11 +36,9 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
 
     while (i >= 0) {
       val mat = model.modelmats(i)
-      mat.synchronized {
-        val contentData = FMat(mat).contents.data
-        current -= contentData.length
-        System.arraycopy(contentData, 0, ret, current, contentData.length)
-      }
+      val contentData = FMat(mat).contents.data
+      current -= contentData.length
+      System.arraycopy(contentData, 0, ret, current, contentData.length)
       i -= 1
     }
 
@@ -71,17 +69,15 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
 
     while (i >= 0) {
       val mat = model.modelmats(i)
-      mat.synchronized {
-        val contents = FMat(mat).contents
-        var j = mat.length - 1
-        while (j >= 0) {
-          averageValueOrElse(data(current), count(current)) match {
-            case Some(averaged) => contents.update(j, averaged * alpha + contents(j) * (1 - alpha))
-            case _ => // No update when reduced data has no content
-          }
-          j -= 1
-          current -= 1
+      val contents = FMat(mat).contents
+      var j = mat.length - 1
+      while (j >= 0) {
+        averageValueOrElse(data(current), count(current)) match {
+          case Some(averaged) => contents.update(j, averaged * alpha + contents(j) * (1 - alpha))
+          case _ => // No update when reduced data has no content
         }
+        j -= 1
+        current -= 1
       }
       i -= 1
     }
