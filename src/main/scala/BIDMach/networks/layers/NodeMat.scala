@@ -141,7 +141,7 @@ object NodeMat {
 
     def apply(a:DenseMat[Node]):NodeMat = new NodeMat(a.nrows, a.ncols, a._data) 
     
-    def apply(a:List[Node]) = new NodeMat(1, a.length, a.toArray)
+    def apply(a:Seq[Node]) = new NodeMat(1, a.length, a.toArray)
     
     def elem(x:Node) = {
     	val out = NodeMat(1,1)

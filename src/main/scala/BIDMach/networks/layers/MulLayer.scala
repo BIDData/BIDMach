@@ -64,7 +64,9 @@ trait MulNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
-class MulNode extends Node with MulNodeOpts {
+class MulNode(_ninputs:Int = 2) extends Node with MulNodeOpts {
+  ninputs = _ninputs
+  
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
   def copyTo(opts:MulNode):MulNode = {

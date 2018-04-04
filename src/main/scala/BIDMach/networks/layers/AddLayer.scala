@@ -54,7 +54,9 @@ trait AddNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
-class AddNode extends Node with AddNodeOpts {
+class AddNode(_ninputs:Int = 2) extends Node with AddNodeOpts {
+  ninputs = _ninputs
+
 	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
    def copyTo(opts:AddNode):AddNode = {

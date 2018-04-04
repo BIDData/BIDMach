@@ -57,7 +57,9 @@ trait MaxNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
-class MaxNode extends Node with MaxNodeOpts {
+class MaxNode(_ninputs:Int = 2) extends Node with MaxNodeOpts {
+  ninputs = _ninputs
+
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
   def copyTo(opts:MaxNode):MaxNode = {

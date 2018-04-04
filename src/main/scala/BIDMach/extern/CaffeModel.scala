@@ -224,6 +224,9 @@ object CaffeModel {
           val scaleParam = layer.param.getScaleParam()
           new ScaleNode { hasBias = scaleParam.getBiasTerm() }
         }
+        
+        case "Eltwise" => translateEltwise(layer)
+        
         // TODO: change once we implement all layer types
         case unknownType => throw new NotImplementedError("\"%s\" is not implemented yet" format unknownType)
       }
@@ -551,6 +554,32 @@ object CaffeModel {
         expAvgFactor = bnParam.getMovingAverageFraction()
         batchNormMode = BatchNormLayer.Spatial
       }
+    }
+  }
+  
+  private def translateEltwise(layer:CaffeLayer) = {
+    val eltwiseParam = layer.param.getEltwiseParam()
+    check(eltwiseParam.getOperation() == Caffe.EltwiseParameter.EltwiseOp.SUM || eltwiseParam.getCoeffCount() == 0,
+        layer.param, "Eltwise layer only takes coefficients for summation.")
+    eltwiseParam.getOperation() match {
+      case Caffe.EltwiseParameter.EltwiseOp.SUM => {
+        if (eltwiseParam.getCoeffCount() == 0) {
+          new AddNode(layer.param.getBottomCount())
+        } else {
+          check(eltwiseParam.getCoeffCount() == layer.param.getBottomCount(),
+              layer.param, "Eltwise Layer takes one coefficient per bottom blob.")
+          val coefNodes = for (c <- eltwiseParam.getCoeffList()) yield {
+            new ConstantNode { value = c.floatValue(); cache = true }
+          }
+          val addNode = new AddNode(layer.param.getBottomCount())
+          coefNodes.copyToArray(addNode.inputs)
+          new CompoundNode {
+            grid = NodeMat(coefNodes) \ addNode
+          }
+        }
+      }
+      case Caffe.EltwiseParameter.EltwiseOp.PROD => new MulNode(layer.param.getBottomCount())
+      case Caffe.EltwiseParameter.EltwiseOp.MAX => new MaxNode(layer.param.getBottomCount())
     }
   }
   
