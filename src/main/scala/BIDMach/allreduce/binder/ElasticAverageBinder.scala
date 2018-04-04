@@ -53,7 +53,6 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
     }
   }
 
-
   override def dataSink: DataSink = reducedOutput => {
     println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
 
@@ -64,23 +63,19 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
 
     // backward traversing model mats, assuming forward traversal by the training model
     // using while instead of for loop due to performance
-    var current = totalDataSize - 1
+    var current = totalDataSize
     var i = model.modelmats.length - 1
 
     while (i >= 0) {
       val mat = model.modelmats(i)
-      val contents = FMat(mat).contents
-      var j = mat.length - 1
-      while (j >= 0) {
-        averageValueOrElse(data(current), count(current)) match {
-          case Some(averaged) => contents.update(j, averaged * alpha + contents(j) * (1 - alpha))
-          case _ => // No update when reduced data has no content
-        }
-        j -= 1
-        current -= 1
-      }
+      val contentData = FMat(mat).contents.data
+      current -= contentData.length
+      //suppose averaged data is given
+      System.arraycopy(data, current, contentData, 0, contentData.length)
       i -= 1
     }
+
+    assert(current == 0, "current should be zero after iteration")
 
   }
 
