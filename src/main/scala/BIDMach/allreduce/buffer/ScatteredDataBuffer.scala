@@ -25,16 +25,25 @@ case class ScatteredDataBuffer(dataSize: Int,
     val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
     val chunkSize = chunkEndPos - chunkStartPos
     val reducedArr = new Array[Float](chunkSize)
+
+    val countAtThisChunk = count(chunkId)
+
     for (i <- 0 until peerSize) {
       val tBuf = temporalBuffer(i);
       var j = 0;
       while (j < chunkSize) {
         reducedArr(j) += tBuf(chunkStartPos + j);
+
+        if (i == peerSize - 1) {
+          reducedArr(j) /= countAtThisChunk
+        }
+
         j += 1;
+
       }
     }
     reducedFlag(chunkId) = true
-    (reducedArr, count(chunkId))
+    (reducedArr, countAtThisChunk)
   }
 
   def getUnreducedChunkIds(): List[Int] = {

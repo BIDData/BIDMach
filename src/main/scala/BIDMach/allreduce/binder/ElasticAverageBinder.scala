@@ -75,14 +75,16 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
         val contents = FMat(mat).contents
         var j = mat.length - 1
         while (j >= 0) {
-          val averaged =  data(current)/ count(current)
-          contents.update(j, averaged * alpha + contents(j) * (1 - alpha))
+          contents.update(j, data(current) * alpha + contents(j) * (1 - alpha))
           j -= 1
           current -= 1
         }
       }
       i -= 1
     }
+
+    assert(current == -1, "current should be zero after iteration")
+
 
   }
 

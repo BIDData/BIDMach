@@ -32,8 +32,8 @@ class AssertCorrectnessBinder(dataSize: Int, checkpoint: Int) extends AllreduceB
       var zeroCountNum = 0
       var totalCount = 0
       for (i <- 0 until dataSize) {
+        val meanActual = r.data(i)
         val count = r.count(i)
-        val meanActual = r.data(i) / count
         totalCount += count
         if (count == 0) {
           zeroCountNum += 1
