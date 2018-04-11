@@ -25,8 +25,8 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
 
     "initialize buffers" in {
 
-      buffer.temporalBuffer.length shouldEqual peerSize
-      buffer.temporalBuffer(0).length shouldEqual maxBlockSize
+      buffer.peerBuffer.length shouldEqual peerSize
+      buffer.peerBuffer(0).length shouldEqual maxBlockSize
 
     }
 
