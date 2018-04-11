@@ -48,19 +48,12 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
 
   }
 
-  private def averageValueOrElse(sum: Float, count: Int): Option[Float] = {
-    count match {
-      case 0 => Option.empty
-      case _ => Some(sum / count)
-    }
-  }
-
-
   override def dataSink: DataSink = reducedOutput => {
     println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
 
     val data = reducedOutput.data
-    val count = reducedOutput.count
+    //TODO: now ignoring getting data of zero count - assume all averaged value is valid
+    //the sink here instead of providing count to all elements, can provide index of zero count
 
     assert(data.length == totalDataSize, "Reduced output should be the same as as model")
 
@@ -84,7 +77,6 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
     }
 
     assert(current == -1, "current should be zero after iteration")
-
 
   }
 
