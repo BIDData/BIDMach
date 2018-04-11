@@ -2,10 +2,14 @@ package BIDMach.allreduce.buffer
 
 import java.util
 
+import BIDMach.allreduce.{NoOpReducer, ScatterReducer}
+
+
 case class ScatteredDataBuffer(dataSize: Int,
                                peerSize: Int,
                                reducingThreshold: Float,
-                               maxChunkSize: Int) extends AllReduceBuffer(dataSize, peerSize, maxChunkSize) {
+                               maxChunkSize: Int,
+                               reducer: ScatterReducer) extends AllReduceBuffer(dataSize, peerSize, maxChunkSize) {
 
   val minChunkRequired: Int = (reducingThreshold * peerSize).toInt
 
@@ -29,17 +33,15 @@ case class ScatteredDataBuffer(dataSize: Int,
     val countAtThisChunk = count(chunkId)
 
     for (i <- 0 until peerSize) {
-      val tBuf = temporalBuffer(i);
+      val tBuf = temporalBuffer(i)
       var j = 0;
       while (j < chunkSize) {
-        reducedArr(j) += tBuf(chunkStartPos + j);
-
+        val valueFromPeer = tBuf(chunkStartPos + j)
+        reducedArr(j) = reducer.reduce(reducedArr(j), valueFromPeer)
         if (i == peerSize - 1) {
-          reducedArr(j) /= countAtThisChunk
+          reducedArr(j) = reducer.postProcess(reducedArr(j), countAtThisChunk)
         }
-
         j += 1;
-
       }
     }
     reducedFlag(chunkId) = true
@@ -47,7 +49,7 @@ case class ScatteredDataBuffer(dataSize: Int,
   }
 
   def getUnreducedChunkIds(): List[Int] = {
-    val ids = 0 until(numChunks)
+    val ids = 0 until (numChunks)
     ids.filterNot(reducedFlag(_)).toList
   }
 
@@ -79,6 +81,6 @@ case class ScatteredDataBuffer(dataSize: Int,
 
 object ScatteredDataBuffer {
   def empty = {
-    ScatteredDataBuffer(0, 0, 0f, 0)
+    ScatteredDataBuffer(0, 0, 0f, 0, NoOpReducer)
   }
 }

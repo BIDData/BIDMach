@@ -119,7 +119,8 @@ class AllreduceWorker(config: WorkerConfig,
         dataSize = myBlockSize,
         peerSize = newNumPeers,
         reducingThreshold = thReduce,
-        maxChunkSize = maxChunkSize
+        maxChunkSize = maxChunkSize,
+        reducer = SumReducer
       )
 
       reduceBlockBuf = ReducedDataBuffer(
