@@ -1,5 +1,7 @@
 package BIDMach.allreduce
 
+import BIDMach.allreduce.AllreduceType.AllreduceType
+
 import scala.concurrent.duration._
 
 
@@ -35,7 +37,8 @@ case class LineMasterConfig(
 case class WorkerConfig(
                          statsReportingRoundFrequency: Int = 10,
                          threshold: ThresholdConfig,
-                         metaData: MetaDataConfig)
+                         metaData: MetaDataConfig,
+                         reducer: AllreduceType = AllreduceType.Average)
 
 case class DimensionNodeConfig(dim: Int)
 

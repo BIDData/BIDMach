@@ -34,6 +34,13 @@ class AllreduceWorker(config: WorkerConfig,
   println(s"\n----Worker ${self.path}")
   println(s"\n----Worker ${self.path}: Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}");
 
+  private def reducer: ScatterReducer = {
+    config.reducer match {
+      case AllreduceType.Average => AverageReducer
+      case AllreduceType.Sum => SumReducer
+    }
+  }
+
   def receive = {
 
     case s: StartAllreduce => {
@@ -120,7 +127,7 @@ class AllreduceWorker(config: WorkerConfig,
         peerSize = newNumPeers,
         reducingThreshold = thReduce,
         maxChunkSize = maxChunkSize,
-        reducer = SumReducer
+        reducer = reducer
       )
 
       reduceBlockBuf = ReducedDataBuffer(
