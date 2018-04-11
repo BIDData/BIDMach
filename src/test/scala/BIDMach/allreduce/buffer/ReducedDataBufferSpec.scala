@@ -11,15 +11,13 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
     val maxBlockSize = 5
     val minBlockSize = 5
     val peerSize = 3
-    val maxLag = 4
     val threshold = 0.7f
     val maxChunkSize = 2
 
     val totalDataSize = 15
-    val rowAtTest = 1
 
     val outputBuff = new Array[Float](totalDataSize)
-    val outputCount = new Array[Int](totalDataSize)
+    val emptyBuff = new Array[Float](totalDataSize)
 
     val buffer = ReducedDataBuffer(maxBlockSize, minBlockSize, totalDataSize, peerSize, threshold, maxChunkSize)
 
@@ -32,23 +30,19 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
 
     "have zero counts" in {
 
-      buffer.getWithCounts(outputBuff, outputCount)
+      buffer.getReducedData(outputBuff, emptyBuff)
       outputBuff.sum shouldEqual 0
-      outputCount.sum shouldEqual 0
 
     }
 
     "store first peer first chunk data" in {
+
       val srcId = 0
       val chunkId = 0
       val toStore: Array[Float] = randomFloatArray(maxChunkSize)
       buffer.store(toStore, srcId, chunkId, count = peerSize)
-      buffer.getWithCounts(outputBuff, outputCount)
+      buffer.getReducedData(outputBuff, emptyBuff)
       outputBuff.toList.slice(0, maxChunkSize) shouldEqual toStore.toList
-
-      for (i <- 0 until maxChunkSize) {
-        outputCount(i) shouldEqual peerSize
-      }
 
     }
 
@@ -64,7 +58,7 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
       val toStore: Array[Float] = randomFloatArray(lastChunkSize)
       buffer.store(toStore, srcId, chunkId, count = peerSize)
 
-      buffer.getWithCounts(outputBuff, outputCount)
+      buffer.getReducedData(outputBuff, emptyBuff)
 
       outputBuff.toList.slice(totalDataSize - lastChunkSize, totalDataSize) shouldEqual toStore.toList
 
@@ -93,43 +87,57 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
     }
 
 
-    "get reduced row" in {
+    "get reduced row maintaining missing pieces" in {
       // peer 0 - missing 3rd chunk
       // peer 1 - missing 3rd chunk
       // peer 2 - missing 1st chunk
 
-      buffer.getWithCounts(outputBuff, outputCount)
+      buffer.getReducedData(outputBuff, emptyBuff)
 
       val missingIndex = List(4, 9, 10, 11)
-      for (i <- missingIndex) {
-        outputBuff(i) shouldEqual 0
-      }
-
-
-      // count is zero when data is missing
-      for (i <- missingIndex) {
-        outputCount(i) shouldEqual 0
-      }
-
-      val presentIndex = (0 until totalDataSize).filterNot(missingIndex.contains)
-      for (i <- presentIndex) {
-        outputCount(i) shouldEqual peerSize
+      for (i <- 0 until totalDataSize) {
+        if (missingIndex.contains(i)) outputBuff(i) shouldEqual 0
+        else outputBuff(i) should not equal 0
       }
 
     }
 
-    "be unable to store older round and have buffer cleared after preparation for new round" in {
+    "get reduced row and fill missing with backup" in {
+      // peer 0 - missing 3rd chunk
+      // peer 1 - missing 3rd chunk
+      // peer 2 - missing 1st chunk
+      buffer.getReducedData(outputBuff, emptyBuff)
+      val outputWithZeros = Array.ofDim[Float](totalDataSize)
 
-      val newRoundOfSameMod = rowAtTest + maxLag
+      System.arraycopy(outputBuff, 0, outputWithZeros, 0, totalDataSize)
+
+      val backup = randomFloatArray(totalDataSize)
+
+      buffer.getReducedData(outputBuff, backup)
+
+      val missingIndex = List(4, 9, 10, 11)
+      for (i <- 0 until totalDataSize) {
+        if (missingIndex.contains(i)) outputBuff(i) shouldEqual backup(i)
+        else outputBuff(i) shouldEqual outputWithZeros(i)
+      }
+
+    }
+
+    "reset counts and buffer after preparation for new round" in {
+
 
       buffer.prepareNewRound()
 
-      buffer.getWithCounts(outputBuff, outputCount)
+      buffer.getReducedData(outputBuff, emptyBuff)
 
+      buffer.numChunkReceived shouldEqual 0
+
+      buffer.reachCompletionThreshold() shouldBe false
       outputBuff.toList shouldEqual Array.fill(totalDataSize)(0)
-      outputCount.toList shouldEqual Array.fill(totalDataSize)(0)
 
     }
+
+
 
   }
 
@@ -139,12 +147,10 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
     val maxBlockSize = 6
     val minBlockSize = 4
     val peerSize = 3
-    val maxLag = 4
     val threshold = 1
     val maxChunkSize = 2
 
     val totalDataSize = 16
-    val rowAtTest = 1
 
     val buffer = ReducedDataBuffer(maxBlockSize, minBlockSize, totalDataSize, peerSize, threshold, maxChunkSize)
 
@@ -174,7 +180,7 @@ class ReducedDataBufferSpec extends WordSpec with Matchers {
 
 
   private def randomFloatArray(maxChunkSize: Int) = {
-    Array.range(0, maxChunkSize).toList.map(_ => Random.nextFloat()).toArray
+    Array.range(0, maxChunkSize).toList.map(_ => Math.abs(Random.nextFloat()) + 1).toArray
   }
 
 }

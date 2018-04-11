@@ -46,7 +46,6 @@ class AllReduceWorkerSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSe
       pos should be >= 0
       println(s"output $r with data ${r.data.toList}")
       r.data.toList shouldBe expectedOutput(pos)
-      r.count.toList shouldBe expectedCount(pos)
     }
   }
 
