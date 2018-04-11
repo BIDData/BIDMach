@@ -15,12 +15,18 @@ case class ScatteredDataBuffer(dataSize: Int,
 
   var reducedFlag: Array[Boolean] = new Array[Boolean](numChunks)
 
+  /**
+    * Record how many peers have contributed to a specific chunk.
+    */
+  val countFilled: Array[Int] = Array.ofDim[Int](numChunks)
+
   def count(chunkId: Int): Int = {
     countFilled(chunkId)
   }
 
   override def store(data: Array[Float], srcId: Int, chunkId: Int) = {
     super.store(data, srcId, chunkId)
+    countFilled(chunkId) += 1
   }
 
   def reduce(chunkId: Int): (Array[Float], Int) = {
@@ -33,7 +39,7 @@ case class ScatteredDataBuffer(dataSize: Int,
     val countAtThisChunk = count(chunkId)
 
     for (i <- 0 until peerSize) {
-      val tBuf = temporalBuffer(i)
+      val tBuf = peerBuffer(i)
       var j = 0;
       while (j < chunkSize) {
         val valueFromPeer = tBuf(chunkStartPos + j)
@@ -58,7 +64,7 @@ case class ScatteredDataBuffer(dataSize: Int,
     while (chunkId < numChunks) {
       val chunkStartPos = chunkId * maxChunkSize
       val chunkEndPos = math.min(dataSize, (chunkId + 1) * maxChunkSize)
-      val tBuf = temporalBuffer
+      val tBuf = peerBuffer
       for (peerId <- 0 until peerSize) {
         util.Arrays.fill(
           tBuf(peerId),

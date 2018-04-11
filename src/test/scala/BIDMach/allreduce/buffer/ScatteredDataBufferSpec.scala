@@ -23,8 +23,8 @@ class ScatteredDataBufferSpec extends WordSpec with Matchers {
 
     "initialize buffers with static values" in {
 
-      buffer.temporalBuffer.length shouldEqual peerSize
-      buffer.temporalBuffer(0).length shouldEqual dataSize
+      buffer.peerBuffer.length shouldEqual peerSize
+      buffer.peerBuffer(0).length shouldEqual dataSize
 
       buffer.numChunks shouldEqual 2
     }
