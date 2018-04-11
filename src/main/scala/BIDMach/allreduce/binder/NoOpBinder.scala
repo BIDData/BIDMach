@@ -1,7 +1,7 @@
 package BIDMach.allreduce.binder
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 
-class NoOptBinder(dataSize: Int, printFrequency: Int = 10) extends AllreduceBinder {
+class NoOpBinder(dataSize: Int, printFrequency: Int = 10) extends AllreduceBinder {
 
 
   val random = new scala.util.Random(100)

@@ -25,29 +25,40 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     peerPreReduceDataCount(srcId)(chunkId) = count
   }
 
-  def getWithCounts(dataOutput: Array[Float], countOutput: Array[Int]) = {
+  /**
+    * Get reduced data, and fill the data with specified backup if the reduced data is never received from peer
+    * @param dataOutput data output to write to
+    * @param backUpDataSource data backup to read from
+    */
+  def getReducedData(dataOutput: Array[Float], backUpDataSource: Array[Float]) = {
 
     var transferred = 0
-    var countTransferred = 0
+    var chunkTransferred = 0
 
     for (peerId <- 0 until peerSize) {
+
       val blockFromPeer = peerBuffer(peerId)
       val blockSize = Math.min(totalDataSize - transferred, blockFromPeer.size)
       System.arraycopy(blockFromPeer, 0, dataOutput, transferred, blockSize)
 
+      // possibly overwrite with backup when count is zero
       for (chunkId <- 0 until numChunks) {
-        val countChunkSize = {
-          val countSize = Math.min(maxChunkSize, maxBlockSize - maxChunkSize * chunkId)
-          Math.min(totalDataSize - countTransferred, countSize)
+
+        val chunkSize = Math.min(
+          totalDataSize - chunkTransferred,
+          Math.min(maxChunkSize, maxBlockSize - maxChunkSize * chunkId)
+        )
+
+        if (peerPreReduceDataCount(peerId)(chunkId) == 0) {
+          System.arraycopy(backUpDataSource, chunkTransferred, dataOutput, chunkTransferred, chunkSize)
         }
-        // duplicate count from chunk to element level
-        util.Arrays.fill(countOutput, countTransferred, countTransferred + countChunkSize, peerPreReduceDataCount(peerId)(chunkId))
-        countTransferred += countChunkSize
+
+        chunkTransferred += chunkSize
       }
       transferred += blockSize
     }
 
-    (dataOutput, countOutput)
+    assert(transferred == chunkTransferred)
   }
 
   def prepareNewRound(): Unit = {

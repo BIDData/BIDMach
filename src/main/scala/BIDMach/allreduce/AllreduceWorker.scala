@@ -29,7 +29,6 @@ class AllreduceWorker(config: WorkerConfig,
 
   // Output
   var output: Array[Float] = new Array(dataSize)
-  var outputCount: Array[Int] = new Array(dataSize)
 
   println(s"\n----Worker ${self.path}")
   println(s"\n----Worker ${self.path}: Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}");
@@ -38,6 +37,13 @@ class AllreduceWorker(config: WorkerConfig,
     config.reducer match {
       case AllreduceType.Average => AverageReducer
       case AllreduceType.Sum => SumReducer
+    }
+  }
+
+  private def backUpDataSource: Array[Float] = {
+    config.reducer match {
+      case AllreduceType.Average => data
+      case AllreduceType.Sum => data
     }
   }
 
@@ -201,9 +207,9 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def flush() = {
-    reduceBlockBuf.getWithCounts(output, outputCount)
+    reduceBlockBuf.getReducedData(output, backUpDataSource)
 
-    dataSink(AllReduceOutput(output, outputCount, currentConfig.round))
+    dataSink(AllReduceOutput(output, currentConfig.round))
   }
 
   private def scatter() = {
