@@ -52,8 +52,6 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
     println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
 
     val data = reducedOutput.data
-    //TODO: now ignoring getting data of zero count - assume all averaged value is valid
-    //the sink here instead of providing count to all elements, can provide index of zero count
 
     assert(data.length == totalDataSize, "Reduced output should be the same as as model")
 

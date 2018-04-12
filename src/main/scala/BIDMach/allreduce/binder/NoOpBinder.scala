@@ -5,12 +5,13 @@ class NoOpBinder(dataSize: Int, printFrequency: Int = 10) extends AllreduceBinde
 
 
   val random = new scala.util.Random(100)
-  val totalInputSample = 8
+  val totalInputSample = 4
 
   lazy val randomFloats = {
-    val nestedArray = new Array[Array[Float]](totalInputSample)
+    val nestedArray: Array[Array[Float]] = Array.ofDim(totalInputSample, dataSize)
     for (i <- 0 until totalInputSample) {
-      nestedArray(i) = Array.range(0, dataSize).toList.map(_ => random.nextFloat()).toArray
+      for (j <- 0 until dataSize)
+      nestedArray(i)(j) = random.nextFloat()
     }
     nestedArray
   }
@@ -20,6 +21,7 @@ class NoOpBinder(dataSize: Int, printFrequency: Int = 10) extends AllreduceBinde
     if (inputRequest.iteration % printFrequency == 0) {
       println(s"--NoOptBinder: dump model data at ${inputRequest.iteration}--")
     }
+
     AllReduceInput(randomFloats(inputRequest.iteration % totalInputSample))
   }
 
@@ -27,6 +29,7 @@ class NoOpBinder(dataSize: Int, printFrequency: Int = 10) extends AllreduceBinde
     if (output.iteration % printFrequency == 0) {
       println(s"--NoOptBinder: reduced done data at ${output.iteration}--")
     }
+
   }
 
   override def totalDataSize: Int = dataSize
