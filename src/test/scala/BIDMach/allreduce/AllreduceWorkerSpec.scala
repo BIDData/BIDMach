@@ -8,7 +8,7 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import scala.util.Random
 import scala.concurrent.duration._
 
-class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
+class AllReduceWorkerSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
   override def afterAll {
     TestKit.shutdownActorSystem(system)
@@ -46,7 +46,6 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       pos should be >= 0
       println(s"output $r with data ${r.data.toList}")
       r.data.toList shouldBe expectedOutput(pos)
-      r.count.toList shouldBe expectedCount(pos)
     }
   }
 
@@ -62,7 +61,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
     val workerConfig = WorkerConfig(
       threshold = threshold,
-      metaData = metaData)
+      metaData = metaData,
+      reducer = AllreduceType.Sum)
 
 
     "reduce data over two completions" in {
@@ -122,7 +122,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val workerConfig = WorkerConfig(
         threshold = threshold,
-        metaData = metaData)
+        metaData = metaData,
+        reducer = AllreduceType.Sum)
 
       val worker = createNewWorker(workerConfig, source, sink)
       val workerNum = 4
@@ -176,7 +177,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val workerConfig = WorkerConfig(
         threshold = threshold,
-        metaData = metaData)
+        metaData = metaData,
+        reducer = AllreduceType.Sum)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
       val workerNum = 2
@@ -210,7 +212,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val workerConfig = WorkerConfig(
         threshold = threshold,
-        metaData = metaData)
+        metaData = metaData,
+        reducer = AllreduceType.Sum)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
       var roundConfig = RoundConfig(0, 0, self, workers, idx)
@@ -269,7 +272,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val workerConfig = WorkerConfig(
         threshold = threshold,
-        metaData = metaData)
+        metaData = metaData,
+        reducer = AllreduceType.Sum)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
       var roundConfig = RoundConfig(0, 0, self, workers, idx)
@@ -356,7 +360,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val workerConfig = WorkerConfig(
         threshold = threshold,
-        metaData = metaData)
+        metaData = metaData,
+        reducer = AllreduceType.Sum)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
       var roundConfig = RoundConfig(0, 0, self, workers, idx)
@@ -414,7 +419,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val workerConfig = WorkerConfig(
         threshold = threshold,
-        metaData = metaData)
+        metaData = metaData,
+        reducer = AllreduceType.Sum)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
       var roundConfig = RoundConfig(0, 0, self, workers, idx)
@@ -472,7 +478,8 @@ class AllReduceSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       val workerConfig = WorkerConfig(
         threshold = threshold,
-        metaData = metaData)
+        metaData = metaData,
+        reducer = AllreduceType.Sum)
 
       val worker = createNewWorker(workerConfig, createBasicDataSource(dataSize), sink)
       var roundConfig = RoundConfig(0, 0, self, workers, idx)

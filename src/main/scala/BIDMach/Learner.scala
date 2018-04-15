@@ -183,11 +183,7 @@ class Learner(
           model.dobatchg(mats, ipass, here);
           if (mixins != null) mixins map (_ compute(mats, here));
           while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
-          if (updater != null){
-            updater.model.modelmats.synchronized{
-              updater.update(ipass, here, gprogress)
-            }
-          }
+          if (updater != null) updater.update(ipass, here, gprogress)
         }
         val tmpscores = model.evalbatchg(mats, ipass, here);
         val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
@@ -198,11 +194,7 @@ class Learner(
         model.dobatchg(mats, ipass, here);
         if (mixins != null) mixins map (_ compute(mats, here));
         while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
-        if (updater != null) {
-          updater.model.modelmats.synchronized{
-          updater.update(ipass, here, gprogress)
-          };
-        }
+        if (updater != null) updater.update(ipass, here, gprogress)
       }
       istep += 1
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {

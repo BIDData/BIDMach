@@ -35,10 +35,9 @@ class ElasticAverageBinderSpec extends BIDMachSpec {
 
     val sink = binder.dataSink
 
-    val list = (0 until 10).map(_ * 2.0f)
-    val count = (0 until 10).map(_ => 2)
+    val averagedValue = (0 until 10).map(_.toFloat)
 
-    sink(AllReduceOutput(list.toArray, count.toArray, iteration = 0))
+    sink(AllReduceOutput(averagedValue.toArray, iteration = 0))
 
     model.modelmats.length shouldEqual 2
 
@@ -55,10 +54,9 @@ class ElasticAverageBinderSpec extends BIDMachSpec {
     val sink = binder.dataSink
 
     val list = (0 until 20).map(_ * 2.0f)
-    val count = (0 until 10).map(_ => 2)
 
     intercept[AssertionError] {
-      sink(AllReduceOutput(list.toArray, count.toArray, iteration = 0))
+      sink(AllReduceOutput(list.toArray, iteration = 0))
     }
 
   }
