@@ -2,7 +2,7 @@ package BIDMach.allreduce.binder
 
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import BIDMach.models.Model
-import BIDMat.FMat
+import BIDMat.{FMat, GMat}
 
 
 /**
@@ -11,7 +11,7 @@ import BIDMat.FMat
   * @param model
   * @param alpha
   */
-class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder {
+class ElasticAverageBinder(model: Model, alpha: Float) extends AllreduceBinder {
 
   override lazy val totalDataSize: Int = {
     var ret = 0
@@ -51,9 +51,9 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
   override def dataSink: DataSink = reducedOutput => {
     println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
 
-    val data = reducedOutput.data
+    val reducedData = reducedOutput.data
 
-    assert(data.length == totalDataSize, "Reduced output should be the same as as model")
+    assert(reducedData.length == totalDataSize, "Reduced output should be the same as as model")
 
     // backward traversing model mats, assuming forward traversal by the training model
     // using while instead of for loop due to performance
@@ -63,12 +63,18 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
     while (i >= 0) {
       val mat = model.modelmats(i)
       mat.synchronized {
-        val contents = FMat(mat).contents
+        val modelData = FMat(mat).data
         var j = mat.length - 1
         while (j >= 0) {
-          contents.update(j, data(current) * alpha + contents(j) * (1 - alpha))
+          modelData(j) = reducedData(current) * alpha + modelData(j) * (1 - alpha)
           j -= 1
           current -= 1
+        }
+        mat match {
+          case gmat: GMat =>
+            GMat.CPUtoGPUarraycopy(modelData, 0, gmat.pdata, 0, mat.length, "")
+          case fmat: FMat =>
+            // Already updated in-place fmat array during the elastic averaging
         }
       }
       i -= 1

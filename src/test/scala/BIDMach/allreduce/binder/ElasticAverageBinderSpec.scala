@@ -7,7 +7,7 @@ import BIDMat.{FMat, Mat}
 
 class ElasticAverageBinderSpec extends BIDMachSpec {
 
-  val elasticRate = 0.5
+  val elasticRate = 0.5f
   val model = new ElasticAverageTestModel()
   val binder = new ElasticAverageBinder(model, elasticRate)
 

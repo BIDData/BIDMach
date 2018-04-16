@@ -82,7 +82,7 @@ object AllreduceNode {
       workerResolutionTimeout = 5.seconds,
       threshold = threshold)
 
-    NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, reportStats = true, elasticRate = 0.3)
+    NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, reportStats = true, elasticRate = 0.3f)
   }
 
   def startAllreduceNode(binder: AllreduceBinder, nodeConfig: NodeConfig): ActorRef = {

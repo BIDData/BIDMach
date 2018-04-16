@@ -45,5 +45,5 @@ case class DimensionNodeConfig(dim: Int)
 case class NodeConfig(
                        workerConfig: WorkerConfig,
                        lineMasterConfig: LineMasterConfig,
-                       dimNum: Int, reportStats: Boolean, elasticRate: Double
+                       dimNum: Int, reportStats: Boolean, elasticRate: Float
                      )
