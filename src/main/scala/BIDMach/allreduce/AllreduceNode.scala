@@ -26,6 +26,7 @@ class AllreduceNode(nodeConfig: NodeConfig,
   generateDimensionNodes()
 
   override def receive: Receive = {
+    case StopAllreduceNode => context.stop(self)
     case _ => Unit
   }
 
@@ -125,7 +126,7 @@ object AllreduceNode {
     allReduceNode.get
   }
 
-  def startNodeAfterIter(learner: Learner, iter: Int): Unit = {
+  def startNodeAfterIter(learner: Learner, iter: Int): ActorRef = {
     val nodeConfig = getBasicConfigs()
     val binder = new ElasticAverageBinder(learner.model, nodeConfig.elasticRate)
     startNodeAfterIter(learner, iter, nodeConfig, binder)
@@ -134,7 +135,9 @@ object AllreduceNode {
   def main(args: Array[String]): Unit = {
     val learner = new AllreduceDummyLearner()
     learner.launchTrain
-    startNodeAfterIter(learner, iter = 0)
+    val node = startNodeAfterIter(learner, iter = 0)
+    //use the following message to stop all reduce from working.
+    //node ! StopAllreduceNode
   }
 
 }
