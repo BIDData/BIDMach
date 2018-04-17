@@ -166,6 +166,12 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
   
   // TODO: enable exceptions instead?
   def forwardCUDNN(dotrain:Boolean) = {
+    // Work around rounding error introduced by the float -> double conversion that otherwise
+    // causes the CuDNN functions to return CUDNN_STATUS_BAD_PARAM when epsilon is
+    // CUDNN_BN_MIN_EPSILON
+    val MinEps = JCudnn.CUDNN_BN_MIN_EPSILON
+    val epsilonDouble = if (opts.epsilon == MinEps.asInstanceOf[Float]) MinEps else opts.epsilon
+
     var xDesc:cudnnTensorDescriptor = null;
     var yDesc:cudnnTensorDescriptor = null;
     var scaleBiasMeanVarDesc:cudnnTensorDescriptor = null;
@@ -211,11 +217,11 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
       var err = if (dotrain) {
         cudnnBatchNormalizationForwardTraining(cudnnMainHandle, normMode, BatchNormScaleLayer.One, BatchNormScaleLayer.Zero, 
             xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata, biasGMat.pdata, 
-            opts.expAvgFactor, runningMeansGMat.pdata, runningVariancesGMat.pdata, opts.epsilon, meansGMat.pdata, variancesGMat.pdata);
+            opts.expAvgFactor, runningMeansGMat.pdata, runningVariancesGMat.pdata, epsilonDouble, meansGMat.pdata, variancesGMat.pdata);
       } else {
       	cudnnBatchNormalizationForwardInference(cudnnMainHandle, normMode, BatchNormScaleLayer.One, BatchNormScaleLayer.Zero, 
       	    xDesc, inputGMat.pdata, yDesc, outputGMat.pdata, scaleBiasMeanVarDesc, scaleGMat.pdata,
-      	    biasGMat.pdata, runningMeansGMat.pdata, runningVariancesGMat.pdata, opts.epsilon);        
+      	    biasGMat.pdata, runningMeansGMat.pdata, runningVariancesGMat.pdata, epsilonDouble);        
       }
       cudaStreamSynchronize(cudnnMainStream);
       if (err == 0) {
