@@ -20,31 +20,21 @@ test ~ test - mt;
 
 val (nn,opts) = Net.learner(train,trainlabels);
 
-val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
-
-
-opts.npasses = 2
-
-opts.lrate = 1e-3f 
-opts.texp = 0.3f
-opts.pstep = 0.1f
-opts.hasBias = true;
-opts.tensorFormat = Net.TensorNCHW;
-//opts.autoReset = false;
-
 val model = nn.model.asInstanceOf[Net]
 
 var f:FileReader = null
 var caffeModel:CaffeModel = null
 try {
-  f = new FileReader("lenet_train_test.prototxt")
-  caffeModel = CaffeModel.loadModel(f, model)
+  f = new FileReader("lenet_solver.prototxt")
+  caffeModel = CaffeModel.loadFromSolver(f, opts, model)
 } finally {
   if (f ne null) {
     f.close()
   }
 }
 
+opts.npasses = 2
+//opts.autoReset = false;
 
 
 nn.train;

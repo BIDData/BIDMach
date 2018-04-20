@@ -5,15 +5,19 @@ import BIDMat.MatFunctions._
 import BIDMach._
 import BIDMach.datasources.DataSource
 import BIDMach.datasources.FileSource
+import BIDMach.mixins.L1Regularizer
 import BIDMach.models.GLM
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
+import BIDMach.updaters._
 import scala.collection.JavaConversions._
 import scala.collection.generic.FilterMonadic
 import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.Option
 import scala.util.control.Breaks._
+import scala.util.Try
+import java.io.FileReader
 import java.io.InputStream
 import java.lang.IllegalArgumentException
 import _root_.caffe.Caffe
@@ -108,6 +112,121 @@ class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:
 }
 
 object CaffeModel {
+  def loadFromSolver(solverFile:Readable, opts:Learner.Opts with Grad.Opts, net:Net, means:Mat = null,
+                     l1regopts:L1Regularizer.Opts = null) = {
+    val caffeBuilder = Caffe.SolverParameter.newBuilder()
+    TextFormat.merge(solverFile, caffeBuilder)
+    
+    require(caffeBuilder.hasNet() || caffeBuilder.hasNetParam(), "A solver file must specify a net or inline net param")
+    val caffeModel = if (caffeBuilder.hasNet()) {
+      loadModel(new FileReader(caffeBuilder.getNet()), net, means)
+    } else {
+      val (layers, nodes) = parseProtobuf(caffeBuilder.getNetParam(), Caffe.Phase.TRAIN, net, means)
+      net.opts.nodeset = new NodeSet(nodes.toArray)
+  
+      new CaffeModel(net, caffeBuilder.getNetParam(), layers)
+    }
+    // TODO: implement train_net, test_net, train_net_param, test_net_param
+    
+    require(caffeBuilder.getTestInitialization(), "test_initialization = false is not supported")
+    
+    val maxIter = caffeBuilder.getMaxIter()
+    opts.pstep = caffeBuilder.getDisplay().asInstanceOf[Float] / maxIter
+    // TODO: set opts.npasses from maxIter
+    
+    val baseLr = caffeBuilder.getBaseLr()
+    val gamma = caffeBuilder.getGamma()
+    opts.lrate = baseLr
+    caffeBuilder.getLrPolicy() match {
+      case "fixed" | "" => {}
+      case "step" => {
+        val stepSize = caffeBuilder.getStepsize()
+        opts.lr_policy = 
+          (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(gamma, Math.floor(istep / stepSize))).asInstanceOf[Float]
+      }
+      case "exp" => {
+        opts.lr_policy =
+          (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(gamma, istep)).asInstanceOf[Float]
+      }
+      case "inv" => {
+        val power = caffeBuilder.getPower()
+        opts.lr_policy =
+          (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(1 + gamma * istep, -power)).asInstanceOf[Float]
+      }
+      case "multistep" => {
+        var currentStep = 0
+        val stepValues = caffeBuilder.getStepvalueList()
+        opts.lr_policy = (ipass:Float, istep:Float, prog:Float) => {
+          if (currentStep < stepValues.size() && istep >= stepValues.get(currentStep)) {
+            currentStep += 1
+          }
+          (baseLr * Math.pow(gamma, currentStep)).asInstanceOf[Float]
+        }
+      }
+      case "poly" => {
+        val power = caffeBuilder.getPower()
+        opts.lr_policy =
+          (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(1 - istep/maxIter, power)).asInstanceOf[Float]
+      }
+      case "sigmoid" => {
+        val stepSize = caffeBuilder.getStepsize()
+        opts.lr_policy = (ipass:Float, istep:Float, prog:Float) => {
+          (baseLr * (1 / (1 + Math.exp(-gamma * (istep - stepSize))))).asInstanceOf[Float]
+        }
+      }
+    }
+    
+    caffeBuilder.getRegularizationType() match {
+      case "L1" => {
+        require(l1regopts ne null, "L1 regularization opts must be given to use L1 regularization")
+        l1regopts.reg1weight = caffeBuilder.getWeightDecay()
+      }
+      case "L2" => if (caffeBuilder.hasWeightDecay()) opts.l2reg = caffeBuilder.getWeightDecay()
+    }
+    if (caffeBuilder.hasClipGradients()) opts.max_grad_norm = caffeBuilder.getClipGradients()
+    
+    net.opts.useGPU = (caffeBuilder.getSolverMode() == Caffe.SolverParameter.SolverMode.GPU)
+    
+    opts.texp = null
+    val adaOptsOption = Try(opts.asInstanceOf[ADAGrad.Opts]).toOption
+    caffeBuilder.getType() match {
+      case "SGD" => {
+        opts.vel_decay = caffeBuilder.getMomentum()
+        opts.waitsteps = 0
+        for (adaOpt <- adaOptsOption) {
+          // Don't do AdaGrad etc. stuff
+          adaOpt.vexp = 0f
+        }
+      }
+      case "Nesterov" => {
+        opts.nesterov_vel_decay = caffeBuilder.getMomentum()
+        opts.waitsteps = 0
+        for (adaOpt <- adaOptsOption) {
+          // Don't do AdaGrad etc. stuff
+          adaOpt.vexp = 0f
+        }
+      }
+      case "AdaGrad" => {
+        require(adaOptsOption.nonEmpty, "AdaGrad solver type requires a Learner.Opts of type ADAGrad.Opts")
+        val adaOpt = adaOptsOption.get
+        opts.texp = 0.5f
+        if (caffeBuilder.hasDelta()) adaOpt.epsilon = caffeBuilder.getDelta()
+      }
+      case "RMSProp" => {
+        require(adaOptsOption.nonEmpty, "RMSProp solver type requires a Learner.Opts of type ADAGrad.Opts")
+        val adaOpt = adaOptsOption.get
+        if (caffeBuilder.hasDelta()) adaOpt.epsilon = caffeBuilder.getDelta()
+        adaOpt.gsq_decay = caffeBuilder.getRmsDecay()
+      }
+      case "AdaDelta" => // TODO
+      case "Adam" => // TODO
+    }
+    
+    net.opts.debug = if (caffeBuilder.getDebugInfo()) 1 else 0
+    
+    caffeModel
+  }
+  
   def loadModel(modelFile:Readable, net:Net, means:Mat = null) = {
     val caffeBuilder = Caffe.NetParameter.newBuilder()
     TextFormat.merge(modelFile, caffeBuilder)

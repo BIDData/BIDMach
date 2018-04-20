@@ -54,8 +54,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	stepn.set(1f/(ipass+1));
     	stepn ^ pe;
     } else {
-      te.set(0f);
-      stepn ^ te;
+      one
     }
     if (opts.gsq_decay >= 0){
     	stepn.set(1f - opts.gsq_decay);
@@ -148,9 +147,15 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
 
 object ADAGrad {
   trait Opts extends Grad.Opts {
+    /** Exponent applied to the cumulative sum of squared gradients in AdaGrad-like methods.
+     *  AdaGrad, RMSProp and similar methods use 0.5, Newton's method uses 1. */
     var vexp:FMat = 0.5f;
+    /** Moving average parameter for squared gradients in ADAM and RMSProp.
+     *  If not set, uses 1 / (<em>t</em> + 1), where <em>t</em> is the current timestep. */
     var gsq_decay = -1f;
+    /** Small constant to prevent division by zero */
     var epsilon = 1e-5f;
+    /** Initial value for sum of squares */
     var initsumsq = 1e-5f;
   }
   

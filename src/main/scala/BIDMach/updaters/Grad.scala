@@ -212,17 +212,38 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 
 object Grad {
   trait Opts extends Updater.Opts {
+    /** Learning rate */
   	var lrate:FMat = 1f;
+  	/** Temporal decay rate of learning rate. Effective learning rate is {@code lrate * t^-texp},
+  	 *  where {@code t} is the current iteration number.
+  	 */
     var texp:FMat = 0.5f;
+    /** Temporal decay rate of learning rate per pass. Effective learning rate is {@code lrate * p^-pexp},
+  	 *  where {@code p} is the current pass number through the dataset. Not used unless {@link texp} is null.
+  	 */
     var pexp:FMat = 0f;
+    /** Number of steps to build cumulative sum of squares for before starting to apply gradients */
     var waitsteps = 3;
     var mask:FMat = null;
+    /** Policy for learning rate decay. Should be a function which takes three arguments:
+     *  <ol>
+     *  	<li>{@code ipass}: current pass number through the dataset</li>
+     *  	<li>{@code istep}: current overall iteration number</li>
+     *    <li>{@code progress}: fraction of training process done so far</li>
+     *  </ol>
+     *  The function should return a value which will be used as the learning rate for the iteration.
+     */
     var lr_policy:(Float, Float, Float)=>Float = null;
+    /** Momentum decay rate */
     var vel_decay:FMat = null;
+    /** Nesterov momentum decay rate */
     var nesterov_vel_decay:FMat = null;
+    /** L2-regularization constant */
     var l2reg:FMat = null;
     var langevin = 0f;
+    /** If positive, clip all gradients elementwise by this value */
     var clipByValue = -1f;
+    /** If positive, scale down large gradients so their norm is this value */
     var max_grad_norm = -1f;
   }
   

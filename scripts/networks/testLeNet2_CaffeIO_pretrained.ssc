@@ -15,16 +15,7 @@ val rp = randperm(60000);
 val train = train0(?,?,?,rp);
 val trainlabels = trainlabels0(?,rp);
 
-// TODO: eliminate need to instantiate learner first
 val (nn,opts) = Net.learner(train,trainlabels);
-
-
-opts.npasses = 2
-
-opts.pstep = 0.1f
-opts.hasBias = true;
-opts.tensorFormat = Net.TensorNCHW;
-//opts.autoReset = false;
 
 val model = nn.model.asInstanceOf[Net]
 
@@ -32,10 +23,10 @@ var f1:FileReader = null
 var f2:FileInputStream = null
 var caffeModel:CaffeModel = null
 try {
-  f1 = new FileReader("lenet_train_test.prototxt")
+  f1 = new FileReader("lenet_solver.prototxt")
   f2 = new FileInputStream("lenet_iter_10000.caffemodel")
   
-  caffeModel = CaffeModel.loadModel(f1, model)
+  caffeModel = CaffeModel.loadFromSolver(f1, opts, model)
   caffeModel.loadWeights(f2)
 } finally {
   if (f1 ne null) {
@@ -45,6 +36,9 @@ try {
   	f2.close()
   }
 }
+
+opts.npasses = 2
+//opts.autoReset = false;
 
 val (mm, mopts) = caffeModel.predictor(test, testlabels)
 mopts.autoReset = false;
