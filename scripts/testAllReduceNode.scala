@@ -36,7 +36,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   lr
 }
 
-opts.logfile = "logAlexnet.txt";
+opts.logfile = "logAlexnet_cluster=16_alpha=0_1.txt";
 opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
@@ -113,7 +113,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 nn.launchTrain;
 
 // All-reduce
-val nodeConfig = getBasicConfigs().copy(elasticRate = 0.43)
+val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
 val binder = new ElasticAverageBinder(nn.model, nodeConfig.elasticRate)
 AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
 
