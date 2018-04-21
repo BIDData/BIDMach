@@ -141,7 +141,7 @@ object CaffeModel {
       case "fixed" | "" => {}
       case "step" => {
         val stepSize = caffeBuilder.getStepsize()
-        opts.lr_policy = 
+        opts.lr_policy =
           (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(gamma, Math.floor(istep / stepSize))).asInstanceOf[Float]
       }
       case "exp" => {
@@ -218,8 +218,14 @@ object CaffeModel {
         if (caffeBuilder.hasDelta()) adaOpt.epsilon = caffeBuilder.getDelta()
         adaOpt.gsq_decay = caffeBuilder.getRmsDecay()
       }
-      case "AdaDelta" => // TODO
-      case "Adam" => // TODO
+      case "AdaDelta" => {
+        require(adaOptsOption.nonEmpty, "AdaDelta solver type requires a Learner.Opts of type ADAGrad.Opts")
+        val adaOpt = adaOptsOption.get
+        if (caffeBuilder.hasDelta()) adaOpt.epsilon = caffeBuilder.getDelta()
+        adaOpt.gsq_decay = caffeBuilder.getMomentum()
+        Mat.consoleLogger.warning("AdaDelta: RMS(delta_x) is not currently implemented")
+      }
+      case "Adam" => throw new NotImplementedError("Adam is not implemented yet")
     }
     
     net.opts.debug = if (caffeBuilder.getDebugInfo()) 1 else 0
