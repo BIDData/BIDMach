@@ -1,0 +1,55 @@
+import BIDMach.extern._
+import BIDMach.networks.layers._
+import java.io.FileReader
+import java.io.FileInputStream
+
+val traindir = "../../data/ImageNet/train/";
+//val traindir = "/home/jfc/data/ImageNet/2012/BIDMach/train/";
+val testdir = "../../data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
+
+val (nn, opts) = Net.learner(traindata, trainlabels)
+val net = nn.model.asInstanceOf[Net]
+
+//:silent
+
+val means = ones(3\256\256\256) *@ loadFMat(traindir+"means.fmat.lz4");
+
+var f:FileReader = null
+var f2:FileInputStream = null
+var caffeModel:CaffeModel = null
+try {
+  f = new FileReader("bvlc_alexnet_solver.prototxt")
+  // To obtain caffemodel file: download http://dl.caffe.berkeleyvision.org/bvlc_alexnet.caffemodel,
+  // then run `upgrade_net_proto_binary bvlc_alexnet.caffemodel bvlc_alexnet.new.caffemodel`
+  // then replace bvlc_alexnet.caffemodel with bvlc_alexnet.new.caffemodel
+  f2 = new FileInputStream("bvlc_alexnet.caffemodel")
+
+  caffeModel = CaffeModel.loadFromSolver(f, opts, net, means)
+  caffeModel.loadWeights(f2)
+} finally {
+  if (f ne null) {
+    f.close()
+  }
+  if (f2 ne null) {
+    f2.close()
+  }
+}
+
+opts.logfile = "logAlexnet4y_CaffeIO.txt";
+opts.useCache = false;
+opts.inplace = Net.InPlace;
+
+val (mm, mopts) = caffeModel.predLabels(testdata, testlabels);
+mopts.batchSize= opts.batchSize;
+mopts.autoReset = false;
+mm.predict;
+
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+//:silent
+
+

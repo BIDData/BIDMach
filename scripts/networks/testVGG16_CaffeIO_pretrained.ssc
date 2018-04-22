@@ -1,0 +1,65 @@
+import BIDMach.extern._
+import BIDMach.networks.layers._
+import java.io.FileReader
+import java.io.FileInputStream
+
+val traindir = "../../data/ImageNet/train/";
+//val traindir = "/home/jfc/data/ImageNet/2012/BIDMach/train/";
+val testdir = "../../data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
+
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+val opts = new MyOpts;
+val ds = FileSource(traindata, trainlabels, opts);
+val net = new Net(opts);
+val grad = new Grad(opts);
+val nn = new Learner(ds, net, null, grad, null, opts);
+
+opts.logfile = "logVGG16.txt";
+opts.batchSize= 32;
+opts.npasses = 80;
+opts.tensorFormat = Net.TensorNCHW;
+opts.useCache = false;
+opts.inplace = Net.InPlace;
+
+:silent
+
+val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
+
+var f:FileReader = null
+var f2:FileInputStream = null
+var caffeModel:CaffeModel = null
+try {
+  f = new FileReader("VGG_ILSVRC_16_deploy.prototxt")
+  // To obtain caffemodel file: download http://www.robots.ox.ac.uk/~vgg/software/very_deep/caffe/VGG_ILSVRC_16_layers.caffemodel,
+  // then run `upgrade_net_proto_binary VGG_ILSVRC_16_layers.caffemodel VGG_ILSVRC_16.caffemodel`
+  f2 = new FileInputStream("VGG_ILSVRC_16.caffemodel")
+  
+  caffeModel = CaffeModel.loadModel(f, net, means)
+  caffeModel.loadWeights(f2)
+} finally {
+  if (f ne null) {
+    f.close()
+  }
+}
+
+
+//nn.launchTrain;
+
+//println("Examine the 'nn' variable to track learning state.\n");
+
+nn.train;
+
+val (mm, mopts) = caffeModel.predLabels(testdata, testlabels);
+mopts.batchSize= opts.batchSize;
+mopts.autoReset = false;
+mm.predict;
+
+//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+:silent
+
+
