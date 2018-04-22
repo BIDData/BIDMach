@@ -9,9 +9,9 @@ import BIDMat.{FMat, GMat}
   * Linearize input model mats, and elastic-average update to the same model.
   *
   * @param model
-  * @param alpha
+  * @param alphaFromIter
   */
-class ElasticAverageBinder(model: Model, alpha: Float) extends AllreduceBinder {
+class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float) extends AllreduceBinder {
 
   override lazy val totalDataSize: Int = {
     var ret = 0
@@ -51,6 +51,7 @@ class ElasticAverageBinder(model: Model, alpha: Float) extends AllreduceBinder {
   override def dataSink: DataSink = reducedOutput => {
     println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
 
+
     val reducedData = reducedOutput.data
 
     assert(reducedData.length == totalDataSize, "Reduced output should be the same as as model")
@@ -59,6 +60,7 @@ class ElasticAverageBinder(model: Model, alpha: Float) extends AllreduceBinder {
     // using while instead of for loop due to performance
     var current = totalDataSize - 1
     var i = model.modelmats.length - 1
+    val alpha = alphaFromIter(reducedOutput.iteration)
 
     while (i >= 0) {
       val mat = model.modelmats(i)
