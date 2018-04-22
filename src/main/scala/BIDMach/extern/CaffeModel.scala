@@ -342,6 +342,7 @@ object CaffeModel {
         }
         case "MemoryData" => new InputNode
         case "HDF5Data" => new InputNode
+        case "Input" => new InputNode
 
         case "InnerProduct" => {
           val ipp = layer.param.getInnerProductParam()
