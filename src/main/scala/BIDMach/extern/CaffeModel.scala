@@ -29,7 +29,7 @@ import jcuda.jcudnn.cudnnPoolingMode
 /**
  * Stores a net alongside its Caffe net param.
  */
-class CaffeModel(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[CaffeLayer]) {
+class CaffeModel(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[CaffeLayer], means:Mat) {
   import CaffeModel._
 
   def predictor(data:Mat, labels:Mat) = {
@@ -58,7 +58,7 @@ class CaffeModel(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[Caffe
   
   private def switchLayersToTest(newNet:Net) = {
     // It's assumed that model layers between train and test are the same
-    val (_, testNodes) = parseProtobuf(netParam, Caffe.Phase.TEST, newNet)
+    val (_, testNodes) = parseProtobuf(netParam, Caffe.Phase.TEST, newNet, means)
     newNet.opts.nodeset = new NodeSet(testNodes.toArray)
   }
   
@@ -133,7 +133,7 @@ object CaffeModel {
       val (layers, nodes) = parseProtobuf(caffeBuilder.getNetParam(), Caffe.Phase.TRAIN, net, means)
       net.opts.nodeset = new NodeSet(nodes.toArray)
   
-      new CaffeModel(net, caffeBuilder.getNetParam(), layers)
+      new CaffeModel(net, caffeBuilder.getNetParam(), layers, means)
     }
     // TODO: implement train_net, test_net, train_net_param, test_net_param
     
@@ -254,11 +254,11 @@ object CaffeModel {
     val (layers, nodes) = parseProtobuf(caffeBuilder, Caffe.Phase.TRAIN, net, means)
     net.opts.nodeset = new NodeSet(nodes.toArray)
 
-    new CaffeModel(net, caffeBuilder, layers)
+    new CaffeModel(net, caffeBuilder, layers, means)
   }
 
   /** Does most of the work of populating a net from a Caffe NetParameter */
-  private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net, means:Mat = null) = {
+  private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net, means:Mat) = {
     // Caffe only supports CrossCorrelation convolution
     net.opts.convType = Net.CrossCorrelation
     // The Caffe tensor format is NCHW
