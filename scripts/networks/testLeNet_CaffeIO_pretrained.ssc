@@ -1,0 +1,55 @@
+//:silent
+import BIDMach.extern._
+import BIDMach.networks.layers._
+import java.io.FileReader
+import java.io.FileInputStream
+
+val traindir = "../../data/MNIST/"
+
+val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
+val trainlabels0 = loadIDX(traindir+"train-labels-idx1-ubyte").reshapeView(1,60000);
+val test =         loadIDX(traindir+"t10k-images-idx3-ubyte").reshapeView(1,28,28,10000);
+val testlabels =   loadIDX(traindir+"t10k-labels-idx1-ubyte").reshapeView(1,10000);
+
+val rp = randperm(60000);
+val train = train0(?,?,?,rp);
+val trainlabels = trainlabels0(?,rp);
+
+// TODO: eliminate need to instantiate learner first
+val (nn,opts) = Net.learner(train,trainlabels);
+
+
+opts.npasses = 2
+
+opts.pstep = 0.1f
+opts.hasBias = true;
+opts.tensorFormat = Net.TensorNCHW;
+//opts.autoReset = false;
+
+val model = nn.model.asInstanceOf[Net]
+
+var f1:FileReader = null
+var f2:FileInputStream = null
+var caffeModel:CaffeModel = null
+try {
+  f1 = new FileReader("lenet_train_test_1.prototxt")
+  f2 = new FileInputStream("lenet_1_iter_10000.caffemodel")
+  
+  caffeModel = CaffeModel.loadModel(f1, model)
+  caffeModel.loadWeights(f2)
+} finally {
+  if (f1 ne null) {
+    f1.close()
+  }
+  if (f2 ne null) {
+  	f2.close()
+  }
+}
+
+val (mm, mopts) = caffeModel.predictor(test, testlabels)
+mopts.autoReset = false;
+mm.predict
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+
+//:silent
+
