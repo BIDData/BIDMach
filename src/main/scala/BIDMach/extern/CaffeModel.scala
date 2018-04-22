@@ -123,33 +123,34 @@ object CaffeModel {
    */
   def loadFromSolver(solverFile:Readable, opts:Learner.Opts with Grad.Opts, net:Net, means:Mat = null,
                      l1regopts:L1Regularizer.Opts = null) = {
-    val caffeBuilder = Caffe.SolverParameter.newBuilder()
-    TextFormat.merge(solverFile, caffeBuilder)
+    val solverParam = Caffe.SolverParameter.newBuilder()
+    TextFormat.merge(solverFile, solverParam)
     
-    require(caffeBuilder.hasNet() || caffeBuilder.hasNetParam(), "A solver file must specify a net or inline net param")
-    val caffeModel = if (caffeBuilder.hasNet()) {
-      loadModel(new FileReader(caffeBuilder.getNet()), net, means)
+    require(solverParam.hasNet() || solverParam.hasNetParam(), "A solver file must specify a net or inline net param")
+    val caffeModel = if (solverParam.hasNet()) {
+      loadModel(new FileReader(solverParam.getNet()), net, means)
     } else {
-      val (layers, nodes) = parseProtobuf(caffeBuilder.getNetParam(), Caffe.Phase.TRAIN, net, means)
+      val (layers, nodes) = parseProtobuf(solverParam.getNetParam(), Caffe.Phase.TRAIN, net, means)
       net.opts.nodeset = new NodeSet(nodes.toArray)
   
-      new CaffeModel(net, caffeBuilder.getNetParam(), layers, means)
+      new CaffeModel(net, solverParam.getNetParam(), layers, means)
     }
+
     // TODO: implement train_net, test_net, train_net_param, test_net_param
     
-    require(caffeBuilder.getTestInitialization(), "test_initialization = false is not supported")
+    require(solverParam.getTestInitialization(), "test_initialization = false is not supported")
     
-    val maxIter = caffeBuilder.getMaxIter()
-    opts.pstep = caffeBuilder.getDisplay().asInstanceOf[Float] / maxIter
+    val maxIter = solverParam.getMaxIter()
+    opts.pstep = solverParam.getDisplay().asInstanceOf[Float] / maxIter
     // TODO: set opts.npasses from maxIter
     
-    val baseLr = caffeBuilder.getBaseLr()
-    val gamma = caffeBuilder.getGamma()
+    val baseLr = solverParam.getBaseLr()
+    val gamma = solverParam.getGamma()
     opts.lrate = baseLr
-    caffeBuilder.getLrPolicy() match {
+    solverParam.getLrPolicy() match {
       case "fixed" | "" => {}
       case "step" => {
-        val stepSize = caffeBuilder.getStepsize()
+        val stepSize = solverParam.getStepsize()
         opts.lr_policy =
           (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(gamma, Math.floor(istep / stepSize))).asInstanceOf[Float]
       }
@@ -158,13 +159,13 @@ object CaffeModel {
           (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(gamma, istep)).asInstanceOf[Float]
       }
       case "inv" => {
-        val power = caffeBuilder.getPower()
+        val power = solverParam.getPower()
         opts.lr_policy =
           (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(1 + gamma * istep, -power)).asInstanceOf[Float]
       }
       case "multistep" => {
         var currentStep = 0
-        val stepValues = caffeBuilder.getStepvalueList()
+        val stepValues = solverParam.getStepvalueList()
         opts.lr_policy = (ipass:Float, istep:Float, prog:Float) => {
           if (currentStep < stepValues.size() && istep >= stepValues.get(currentStep)) {
             currentStep += 1
@@ -173,34 +174,34 @@ object CaffeModel {
         }
       }
       case "poly" => {
-        val power = caffeBuilder.getPower()
+        val power = solverParam.getPower()
         opts.lr_policy =
           (ipass:Float, istep:Float, prog:Float) => (baseLr * Math.pow(1 - istep/maxIter, power)).asInstanceOf[Float]
       }
       case "sigmoid" => {
-        val stepSize = caffeBuilder.getStepsize()
+        val stepSize = solverParam.getStepsize()
         opts.lr_policy = (ipass:Float, istep:Float, prog:Float) => {
           (baseLr * (1 / (1 + Math.exp(-gamma * (istep - stepSize))))).asInstanceOf[Float]
         }
       }
     }
     
-    caffeBuilder.getRegularizationType() match {
+    solverParam.getRegularizationType() match {
       case "L1" => {
         require(l1regopts ne null, "L1 regularization opts must be given to use L1 regularization")
-        l1regopts.reg1weight = caffeBuilder.getWeightDecay()
+        l1regopts.reg1weight = solverParam.getWeightDecay()
       }
-      case "L2" => if (caffeBuilder.hasWeightDecay()) opts.l2reg = caffeBuilder.getWeightDecay()
+      case "L2" => if (solverParam.hasWeightDecay()) opts.l2reg = solverParam.getWeightDecay()
     }
-    if (caffeBuilder.hasClipGradients()) opts.max_grad_norm = caffeBuilder.getClipGradients()
+    if (solverParam.hasClipGradients()) opts.max_grad_norm = solverParam.getClipGradients()
     
-    net.opts.useGPU = (caffeBuilder.getSolverMode() == Caffe.SolverParameter.SolverMode.GPU)
+    net.opts.useGPU = (solverParam.getSolverMode() == Caffe.SolverParameter.SolverMode.GPU)
     
     opts.texp = null
     val adaOptsOption = Try(opts.asInstanceOf[ADAGrad.Opts]).toOption
-    caffeBuilder.getType() match {
+    solverParam.getType() match {
       case "SGD" => {
-        opts.vel_decay = caffeBuilder.getMomentum()
+        opts.vel_decay = solverParam.getMomentum()
         opts.waitsteps = 0
         for (adaOpt <- adaOptsOption) {
           // Don't do AdaGrad etc. stuff
@@ -208,7 +209,7 @@ object CaffeModel {
         }
       }
       case "Nesterov" => {
-        opts.nesterov_vel_decay = caffeBuilder.getMomentum()
+        opts.nesterov_vel_decay = solverParam.getMomentum()
         opts.waitsteps = 0
         for (adaOpt <- adaOptsOption) {
           // Don't do AdaGrad etc. stuff
@@ -219,25 +220,25 @@ object CaffeModel {
         require(adaOptsOption.nonEmpty, "AdaGrad solver type requires a Learner.Opts of type ADAGrad.Opts")
         val adaOpt = adaOptsOption.get
         opts.texp = 0.5f
-        if (caffeBuilder.hasDelta()) adaOpt.epsilon = caffeBuilder.getDelta()
+        if (solverParam.hasDelta()) adaOpt.epsilon = solverParam.getDelta()
       }
       case "RMSProp" => {
         require(adaOptsOption.nonEmpty, "RMSProp solver type requires a Learner.Opts of type ADAGrad.Opts")
         val adaOpt = adaOptsOption.get
-        if (caffeBuilder.hasDelta()) adaOpt.epsilon = caffeBuilder.getDelta()
-        adaOpt.gsq_decay = caffeBuilder.getRmsDecay()
+        if (solverParam.hasDelta()) adaOpt.epsilon = solverParam.getDelta()
+        adaOpt.gsq_decay = solverParam.getRmsDecay()
       }
       case "AdaDelta" => {
         require(adaOptsOption.nonEmpty, "AdaDelta solver type requires a Learner.Opts of type ADAGrad.Opts")
         val adaOpt = adaOptsOption.get
-        if (caffeBuilder.hasDelta()) adaOpt.epsilon = caffeBuilder.getDelta()
-        adaOpt.gsq_decay = caffeBuilder.getMomentum()
+        if (solverParam.hasDelta()) adaOpt.epsilon = solverParam.getDelta()
+        adaOpt.gsq_decay = solverParam.getMomentum()
         Mat.consoleLogger.warning("AdaDelta: RMS(delta_x) is not currently implemented")
       }
       case "Adam" => throw new NotImplementedError("Adam is not implemented yet")
     }
     
-    net.opts.debug = if (caffeBuilder.getDebugInfo()) 1 else 0
+    net.opts.debug = if (solverParam.getDebugInfo()) 1 else 0
     
     caffeModel
   }
