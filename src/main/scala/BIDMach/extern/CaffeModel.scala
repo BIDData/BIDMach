@@ -26,10 +26,8 @@ import _root_.caffe.Caffe.PoolingParameter.PoolMethod
 import com.google.protobuf.{CodedInputStream,TextFormat}
 import jcuda.jcudnn.cudnnPoolingMode
 
-class CaffeModel private(net:Net, netParam:Caffe.NetParameterOrBuilder, _layers:Seq[CaffeLayer]) {
+class CaffeModel(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[CaffeLayer]) {
   import CaffeModel._
-  
-  private[extern] val layers = _layers
 
   def predictor(data:Mat, labels:Mat) = {
     val (nn, opts) = Net.predictor(net, data, labels)
@@ -883,7 +881,7 @@ object CaffeModel {
   }
 }
 
-private class CaffeLayer(val param:Caffe.LayerParameter) {
+class CaffeLayer(val param:Caffe.LayerParameter) {
   val inputs = new mutable.ArrayBuffer[CaffeLayer]
   var inodeFirst = -1
   var inodeLast = -1
