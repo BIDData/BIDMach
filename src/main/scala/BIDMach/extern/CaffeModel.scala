@@ -586,7 +586,7 @@ object CaffeModel {
     }
 
     // TODO: avoid duplicating code with ConvLayer here
-    val shape = layerParam.getBlobs(0).getShape().getDimList().map(_.intValue()).toArray
+    val shape = getBlobShape(layerParam.getBlobs(0), 4)
     val filter = FFilter2Ddn(shape(3), shape(2), shape(1), shape(0), stride0, pad0)
     // TODO: is this an abstraction barrier violation
     layerParam.getBlobs(0).getDataList().map(_.floatValue()).copyToArray(filter.data)
@@ -600,8 +600,8 @@ object CaffeModel {
     })
     
     if (hasBias) {
-      val n = layerParam.getBlobs(1).getShape().getDim(0).toInt
-      modelMats += blob2Mat(layerParam.getBlobs(1)).reshapeView(n, 1, 1, 1)
+      val n = getBlobShape(layerParam.getBlobs(1), 1)(0)
+      modelMats += blob2Mat(layerParam.getBlobs(1), 1).reshapeView(n, 1, 1, 1)
     } else {
       modelMats += null
     }
@@ -665,15 +665,16 @@ object CaffeModel {
   private def getInnerProductLayerMats(layerParam:Caffe.LayerParameter) = {
     if (!layerParam.getInnerProductParam().getBiasTerm()) {
       check(layerParam.getBlobsCount() == 1, layerParam, "linear layer without bias needs 1 matrix")
-      Array(blob2MatTranspose(layerParam.getBlobs(0)), null)
+      Array(blob2MatTranspose(layerParam.getBlobs(0), 2), null)
     } else {
       check(layerParam.getBlobsCount() == 2, layerParam, "linear layer without bias needs 2 matrices")
-      check(layerParam.getBlobs(0).getShape().getDim(0) == layerParam.getBlobs(1).getShape().getDim(0),
-            layerParam, "weight and bias dimensions for linear layer don't agree")
+      val weightShape = getBlobShape(layerParam.getBlobs(0), 2)
+      val biasShape = getBlobShape(layerParam.getBlobs(1), 1)
+      check(weightShape(0) == biasShape(0), layerParam, "weight and bias dimensions for linear layer don't agree")
       
-      val outDim = layerParam.getBlobs(0).getShape().getDim(0).intValue()
-      val weightMat = blob2MatTranspose(layerParam.getBlobs(0))
-      val biasMat = blob2MatTranspose(layerParam.getBlobs(1)).reshapeView(outDim, 1)
+      val outDim = biasShape(0)
+      val weightMat = blob2MatTranspose(layerParam.getBlobs(0), 2)
+      val biasMat = blob2MatTranspose(layerParam.getBlobs(1), 1).reshapeView(outDim, 1)
       Array(weightMat, biasMat)
     }
   }
@@ -728,15 +729,15 @@ object CaffeModel {
     check(layerParam.getBlobsCount() == 3, layerParam, "batch norm needs 2 matrices and scale factor")
     check(layerParam.getBlobs(2).getDataCount() > 0, layerParam, "batch norm layer doesn't have a scale factor")
 
-    val c = layerParam.getBlobs(0).getShape().getDim(0).toInt
-    check(c == layerParam.getBlobs(1).getShape().getDim(0).toInt, layerParam, "batch norm matrices aren't the same shape")
+    val c = getBlobShape(layerParam.getBlobs(0), 1)(0)
+    check(c == getBlobShape(layerParam.getBlobs(1), 1)(0), layerParam, "batch norm matrices aren't the same shape")
     val scale = {
       val rawScale = layerParam.getBlobs(2).getData(0)
       if (rawScale == 0) 0f else 1f / rawScale
     }
-    val runningMeans = blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
+    val runningMeans = blob2Mat(layerParam.getBlobs(0), 1).reshapeView(c, 1, 1, 1)
     runningMeans ~ runningMeans * scale
-    val runningVariances = blob2Mat(layerParam.getBlobs(1)).reshapeView(c, 1, 1, 1)
+    val runningVariances = blob2Mat(layerParam.getBlobs(1), 1).reshapeView(c, 1, 1, 1)
     runningVariances ~ runningVariances * scale
     Array(runningMeans, runningVariances)
   }
@@ -750,11 +751,11 @@ object CaffeModel {
       check(layerParam.getBlobsCount() == 1, layerParam, "scale layer without bias needs 1 matrix")
     }
     
-    val c = layerParam.getBlobs(0).getShape().getDim(0).toInt
-    val scaleMat = blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
+    val c = getBlobShape(layerParam.getBlobs(0), 1)(0)
+    val scaleMat = blob2Mat(layerParam.getBlobs(0), 1).reshapeView(c, 1, 1, 1)
     val biasMat = if (hasBias) {
       check(layerParam.getBlobs(1).getShape().getDim(0).toInt == c, layerParam, "scale layer matrices aren't the same shape")
-      blob2Mat(layerParam.getBlobs(0)).reshapeView(c, 1, 1, 1)
+      blob2Mat(layerParam.getBlobs(0), 1).reshapeView(c, 1, 1, 1)
     } else {
       zeros(c \ 1 \ 1 \ 1)
     }
@@ -834,8 +835,8 @@ object CaffeModel {
   }
   
   /** Converts the given blob into a Mat. Does not perform any transposition. */
-  private def blob2Mat(blob:Caffe.BlobProto):Mat = {
-    val dims = blob.getShape().getDimList().map(_.intValue()).toArray
+  private def blob2Mat(blob:Caffe.BlobProto, ndims:Int):Mat = {
+    val dims = getBlobShape(blob, ndims)
     if (blob.getDoubleDataCount() > 0) {
       // TODO: should I bother with GDMat
       new DMat(dims, blob.getDoubleDataList().map(_.doubleValue()).toArray)
@@ -846,11 +847,10 @@ object CaffeModel {
   }
 
   /** Converts the given blob into a Mat, transposing data from row-major order to column-major order. */
-  private def blob2MatTranspose(blob:Caffe.BlobProto):Mat = {
+  private def blob2MatTranspose(blob:Caffe.BlobProto, ndims:Int):Mat = {
     // We convert from row-major to column-major by creating a Mat with reversed dimensions,
     // loading it up with the row-major data, and then performing a deep transpose
-    val dimList = blob.getShape().getDimList()
-    val reverseDims = dimList.map(_.intValue()).reverse.toArray
+    val reverseDims = getBlobShape(blob, ndims).reverse
     if (blob.getDoubleDataCount() > 0) {
       val data = blob.getDoubleDataList().map(_.doubleValue()).toArray
       // TODO: should I bother with GDMat
@@ -859,6 +859,21 @@ object CaffeModel {
       val data = blob.getDataList().map(_.floatValue()).toArray
       // TODO: should I bother with GFMat
       new FMat(reverseDims, data).transpose((reverseDims.length - 1) to 0 by -1)
+    }
+  }
+  
+  private def getBlobShape(blob:Caffe.BlobProto, ndims:Int) = {
+    if (blob.hasShape()) {
+      blob.getShape().getDimList().map(_.intValue()).toArray
+    } else {
+      // Old, deprecated way of specifying blob shape
+      // Apparently the model upgrade tool doesn't convert this over
+      ndims match {
+        case 1 => Array(blob.getWidth())
+        case 2 => Array(blob.getHeight(), blob.getWidth())
+        case 3 => Array(blob.getChannels(), blob.getHeight(), blob.getWidth())
+        case 4 => Array(blob.getNum(), blob.getChannels(), blob.getHeight(), blob.getWidth())
+      }
     }
   }
   
