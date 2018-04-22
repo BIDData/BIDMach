@@ -26,6 +26,9 @@ import _root_.caffe.Caffe.PoolingParameter.PoolMethod
 import com.google.protobuf.{CodedInputStream,TextFormat}
 import jcuda.jcudnn.cudnnPoolingMode
 
+/**
+ * Stores a net alongside its Caffe net param.
+ */
 class CaffeModel(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[CaffeLayer]) {
   import CaffeModel._
 
@@ -59,6 +62,7 @@ class CaffeModel(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[Caffe
     newNet.opts.nodeset = new NodeSet(testNodes.toArray)
   }
   
+  /** Load weights from the given Caffe binary protobuf model into the BIDMach net's modelmats array */
   def loadWeights(weightsFile:InputStream) = {
     val cis = CodedInputStream.newInstance(weightsFile)
     cis.setSizeLimit(1 << 30)
@@ -110,6 +114,13 @@ class CaffeModel(net:Net, netParam:Caffe.NetParameterOrBuilder, layers:Seq[Caffe
 }
 
 object CaffeModel {
+  /** Load a CaffeModel from a solver prototxt.
+   *  @param solverFile the solver file
+   *  @param opts learner and updater opts
+   *  @param net the net to populate
+   *  @param means (optional) a Mat of mean values to subtract from the input data
+   *  @param opts (optional) for an L1 regularizer
+   */
   def loadFromSolver(solverFile:Readable, opts:Learner.Opts with Grad.Opts, net:Net, means:Mat = null,
                      l1regopts:L1Regularizer.Opts = null) = {
     val caffeBuilder = Caffe.SolverParameter.newBuilder()
@@ -231,6 +242,11 @@ object CaffeModel {
     caffeModel
   }
   
+  /** Load a Caffe model from a net prototxt.
+   *  @param modelFile the model file
+   *  @param net the net to populate
+   *  @param means (optional) a Mat of mean values to subtract from the input data
+   */
   def loadModel(modelFile:Readable, net:Net, means:Mat = null) = {
     val caffeBuilder = Caffe.NetParameter.newBuilder()
     TextFormat.merge(modelFile, caffeBuilder)
@@ -241,6 +257,7 @@ object CaffeModel {
     new CaffeModel(net, caffeBuilder, layers)
   }
 
+  /** Does most of the work of populating a net from a Caffe NetParameter */
   private def parseProtobuf(netParam:Caffe.NetParameterOrBuilder, phase:Caffe.Phase, net:Net, means:Mat = null) = {
     // Caffe only supports CrossCorrelation convolution
     net.opts.convType = Net.CrossCorrelation
@@ -881,9 +898,13 @@ object CaffeModel {
   }
 }
 
+/** Stores a Caffe LayerParameter and which BIDMach nodes in the net's nodeset it corresponds to */
 class CaffeLayer(val param:Caffe.LayerParameter) {
+  /** Inputs layers to this CaffeLayer */
   val inputs = new mutable.ArrayBuffer[CaffeLayer]
+  /** Start index of corresponding nodes in the nodeset (inclusive) */
   var inodeFirst = -1
+  /** End index of corresponding nodes in the nodeset (inclusive) */
   var inodeLast = -1
   
   override def toString() = {
