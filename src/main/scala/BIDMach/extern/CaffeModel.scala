@@ -303,6 +303,7 @@ object CaffeModel {
 
       // Translate layer according to its layer type
       val newNodes:Array[Node] = layer.param.getType() match {
+        // Vision layers
         case "Convolution" => translateConvolution(layer, net)
         case "Pooling" => translatePooling(layer)
         case "LRN" => translateLRN(layer)
@@ -329,16 +330,23 @@ object CaffeModel {
           new StackNode(layer.param.getBottomCount())
         }
 
+        // Loss layers
         case "MultinomialLogisticLoss" => {
+          if (layer.param.hasLossParam()) Mat.consoleLogger.warning("LossParameter is not currently supported")
           softmaxOutputNode = new SoftmaxOutputNode { lossType = SoftmaxOutputLayer.CaffeMultinomialLogisticLoss }
           softmaxOutputNode
         }
         case "SoftmaxWithLoss" => {
+          if (layer.param.hasLossParam()) Mat.consoleLogger.warning("LossParameter is not currently supported")
           softmaxOutputNode = new SoftmaxOutputNode
           softmaxOutputNode
         }
-        case "EuclideanLoss" => new GLMNode { links = GLM.linear }
+        case "EuclideanLoss" => {
+          if (layer.param.hasLossParam()) Mat.consoleLogger.warning("LossParameter is not currently supported")
+          new GLMNode { links = GLM.linear }
+        }
         case "HingeLoss" => {
+          if (layer.param.hasLossParam()) Mat.consoleLogger.warning("LossParameter is not currently supported")
           if (layer.param.getHingeLossParam().getNorm() != Caffe.HingeLossParameter.Norm.L1) {
             throw new UnsupportedOperationException("Only L1 loss is supported")
           }
@@ -349,11 +357,16 @@ object CaffeModel {
           Array()
         }
 
-        case "ReLU" => new RectNode
+        // Activations
+        case "ReLU" => {
+          if (layer.param.getReluParam().hasNegativeSlope()) Mat.consoleLogger.warning("Leaky ReLU is not currently supported")
+          new RectNode
+        }
         case "Sigmoid" => new SigmoidNode
         case "TanH" => new TanhNode
         case "BNLL" => new SoftplusNode
 
+        // Data layers
         case "Data" => {
           val dataParam = layer.param.getDataParam()
           
@@ -367,8 +380,11 @@ object CaffeModel {
         case "HDF5Data" => new InputNode
         case "Input" => new InputNode
 
+        // Misc
         case "InnerProduct" => {
           val ipp = layer.param.getInnerProductParam()
+          if (ipp.hasAxis()) throw new NotImplementedError("axis for InnerProduct is not supported")
+          if (ipp.hasTranspose()) throw new NotImplementedError("transpose for InnerProduct is not supported")
           new LinNode {
             outdim = ipp.getNumOutput()
             hasBias = ipp.getBiasTerm()
@@ -376,23 +392,49 @@ object CaffeModel {
           }
         }
         case "Split" => new CopyNode
-        case "Softmax" => new SoftmaxNode
+        case "Softmax" => {
+          if (layer.param.getSoftmaxParam().getAxis() != 1) throw new NotImplementedError("Custom softmax axes are not supported")
+          new SoftmaxNode
+        }
         case "Dropout" => {
           val dropoutParam = layer.param.getDropoutParam()
           new DropoutNode { frac = dropoutParam.getDropoutRatio() }
         }
+        
+        // Unary arithmetic ops
         // TODO: implement base, shift, scale for the following two
-        case "Exp" => new ExpNode
-        case "Log" => new LnNode
+        case "Exp" => {
+          val expParam = layer.param.getExpParam()
+          // We could implement base, shift and scale using AddNode and MulNode, but it might be more efficient to modify
+          // ExpLayer to support these natively if we actually want to implement this.
+          if (expParam.hasBase() || expParam.hasShift() || expParam.hasScale()) {
+            throw new NotImplementedError("base, shift and scale are not currently implemented for Exp layer")
+          }
+          new ExpNode
+        }
+        case "Log" => {
+          val logParam = layer.param.getLogParam()
+          // We could implement base, shift and scale using AddNode and MulNode, but it might be more efficient to modify
+          // LnLayer to support these natively if we actually want to implement this.
+          if (logParam.hasBase() || logParam.hasShift() || logParam.hasScale()) {
+            throw new NotImplementedError("base, shift and scale are not currently implemented for Log layer")
+          }
+          new LnNode
+        }
         case "Scale" => {
+          if (layer.inputs.length > 1) throw new NotImplementedError("Scale layer only supports one input layer")
           val scaleParam = layer.param.getScaleParam()
+          if (scaleParam.hasAxis()) Mat.consoleLogger.warning("Scaling axis are not currently customizable")
+          if (scaleParam.hasFiller() || scaleParam.hasBiasFiller()) {
+            Mat.consoleLogger.warning("Scaling initialization is not currently customizable")
+          }
           new ScaleNode { hasBias = scaleParam.getBiasTerm() }
         }
         
+        // Binary arithmetic ops
         case "Eltwise" => translateEltwise(layer)
-        
-        // TODO: change once we implement all layer types
-        case unknownType => throw new NotImplementedError("\"%s\" is not implemented yet" format unknownType)
+
+        case unknownType => throw new NotImplementedError("\"%s\" is not implemented" format unknownType)
       }
       
       // Set lr scaling and model mat for ModelNodes
@@ -551,6 +593,9 @@ object CaffeModel {
   private def translateConvolution(layer:CaffeLayer, net:Net) = {
     val convParam = layer.param.getConvolutionParam()
     
+    if (convParam.hasGroup()) Mat.consoleLogger.warning("group in ConvolutionParameter is not supported")
+    if (convParam.getAxis() != 1) throw new NotImplementedError("Customizing axis in ConvolutionParameter is not supported")
+    
     val convNode = new ConvNode {
       noutputs = convParam.getNumOutput()
       hasBias = convParam.getBiasTerm()
@@ -634,6 +679,7 @@ object CaffeModel {
   
   private def translatePooling(layer:CaffeLayer) = {
     val poolingParam = layer.param.getPoolingParam()
+    if (poolingParam.getGlobalPooling()) throw new NotImplementedError("Global pooling is not supported")
     new PoolingNode {
       if (poolingParam.hasPadH()) {
         pady = poolingParam.getPadH()
@@ -704,6 +750,8 @@ object CaffeModel {
   
   private def translateBatchNorm(layer:CaffeLayer, scaleParam:Caffe.ScaleParameter) = {
     val bnParam = layer.param.getBatchNormParam()
+    
+    if (bnParam.hasUseGlobalStats()) Mat.consoleLogger.warning("Customization of batch norm use_global_stats is not supported")
     
     if (scaleParam ne null) {
       new BatchNormScaleNode {
@@ -787,6 +835,11 @@ object CaffeModel {
   
   private def addTransformNodes(layerParam:Caffe.LayerParameter, means:Mat, subjectNode:Node) = {
     val transformParam = layerParam.getTransformParam()
+    
+    if (transformParam.hasForceColor() || transformParam.hasForceGray()) {
+      throw new NotImplementedError("Force color and force gray are not currently supported")
+    }
+    
     val newNodeList = new mutable.ListBuffer[Node]
     newNodeList += subjectNode
 
