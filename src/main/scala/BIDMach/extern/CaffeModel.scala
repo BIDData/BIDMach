@@ -17,8 +17,7 @@ import scala.language.implicitConversions
 import scala.Option
 import scala.util.control.Breaks._
 import scala.util.Try
-import java.io.FileReader
-import java.io.InputStream
+import java.io.{FileInputStream,FileReader,InputStream}
 import java.lang.IllegalArgumentException
 import _root_.caffe.Caffe
 import _root_.caffe.Caffe.LRNParameter.NormRegion
@@ -128,12 +127,35 @@ object CaffeModel {
     
     require(solverParam.hasNet() || solverParam.hasNetParam(), "A solver file must specify a net or inline net param")
     val caffeModel = if (solverParam.hasNet()) {
-      loadModel(new FileReader(solverParam.getNet()), net, means)
+      var fr:FileReader = null
+      try {
+        fr = new FileReader(solverParam.getNet())
+        loadModel(fr, net, means)
+      } finally {
+        if (fr ne null) {
+          fr.close()
+        }
+      }
     } else {
       val (layers, nodes) = parseProtobuf(solverParam.getNetParam(), Caffe.Phase.TRAIN, net, means)
       net.opts.nodeset = new NodeSet(nodes.toArray)
   
       new CaffeModel(net, solverParam.getNetParam(), layers, means)
+    }
+    
+    if (solverParam.getWeightsCount() > 0) {
+      if (solverParam.getWeightsCount() > 1) {
+        Mat.consoleLogger.warning("Only one weights file is currently supported")
+      }
+      var fis:FileInputStream = null
+      try {
+        fis = new FileInputStream(solverParam.getWeights(0))
+        caffeModel.loadWeights(fis)
+      } finally {
+        if (fis ne null) {
+          fis.close()
+        }
+      }
     }
 
     // TODO: implement train_net, test_net, train_net_param, test_net_param
