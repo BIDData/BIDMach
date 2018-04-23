@@ -444,7 +444,7 @@ object CaffeModel {
         }
         
         // Binary arithmetic ops
-        case "Eltwise" => translateEltwise(layer)
+        case "Eltwise" => translateEltwise(layer, nodes)
 
         case unknownType => throw new NotImplementedError("\"%s\" is not implemented" format unknownType)
       }
@@ -782,29 +782,30 @@ object CaffeModel {
     }
   }
   
-  private def translateEltwise(layer:CaffeLayer) = {
+  private def translateEltwise(layer:CaffeLayer, nodes:IndexedSeq[Node]):Array[Node] = {
     val eltwiseParam = layer.param.getEltwiseParam()
     check(eltwiseParam.getOperation() == Caffe.EltwiseParameter.EltwiseOp.SUM || eltwiseParam.getCoeffCount() == 0,
         layer.param, "Eltwise layer only takes coefficients for summation.")
     eltwiseParam.getOperation() match {
       case Caffe.EltwiseParameter.EltwiseOp.SUM => {
         if (eltwiseParam.getCoeffCount() == 0) {
-          new AddNode(layer.param.getBottomCount())
+          Array(new AddNode(layer.param.getBottomCount()))
         } else {
           check(eltwiseParam.getCoeffCount() == layer.param.getBottomCount(),
               layer.param, "Eltwise Layer takes one coefficient per bottom blob.")
           val coefNodes = for (c <- eltwiseParam.getCoeffList()) yield {
             new ConstantNode { value = c.floatValue(); cache = true }
           }
-          val addNode = new AddNode(layer.param.getBottomCount())
-          coefNodes.copyToArray(addNode.inputs)
-          new CompoundNode {
-            grid = NodeMat(coefNodes) \ addNode
+          val mulNodes = for ((coefNode, inputLayer) <- coefNodes.zip(layer.inputs)) yield {
+            new MulNode { inputs(0) = nodes(inputLayer.inodeLast); inputs(1) = coefNode }
           }
+          val addNode = new AddNode(layer.param.getBottomCount())
+          mulNodes.copyToArray(addNode.inputs)
+          (coefNodes ++ mulNodes :+ addNode).toArray
         }
       }
-      case Caffe.EltwiseParameter.EltwiseOp.PROD => new MulNode(layer.param.getBottomCount())
-      case Caffe.EltwiseParameter.EltwiseOp.MAX => new MaxNode(layer.param.getBottomCount())
+      case Caffe.EltwiseParameter.EltwiseOp.PROD => Array(new MulNode(layer.param.getBottomCount()))
+      case Caffe.EltwiseParameter.EltwiseOp.MAX => Array(new MaxNode(layer.param.getBottomCount()))
     }
   }
   
