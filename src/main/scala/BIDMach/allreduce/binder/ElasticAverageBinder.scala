@@ -1,5 +1,7 @@
 package BIDMach.allreduce.binder
 
+import java.util.logging.Logger
+
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import BIDMach.models.Model
 import BIDMat.{FMat, GMat}
@@ -11,8 +13,8 @@ import BIDMat.{FMat, GMat}
   * @param model
   * @param alphaFromIter
   */
-class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float) extends AllreduceBinder {
-
+class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Logger) extends AllreduceBinder {
+  var reduceCount = 0
   override lazy val totalDataSize: Int = {
     var ret = 0
     model.modelmats.synchronized {
@@ -26,7 +28,6 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float) extends Al
 
   override def dataSource: DataSource = inputRequest => {
 
-    println(s"--Dumping model data at ${inputRequest.iteration}--")
     val ret: Array[Float] = new Array[Float](totalDataSize)
 
     // backward traversing model mats, assuming forward traversal by the training model
@@ -49,9 +50,10 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float) extends Al
   }
 
   override def dataSink: DataSink = reducedOutput => {
-    println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
-
-
+    reduceCount.synchronized {
+      logger.info(s"allreduce iteration ${reduceCount}")
+      reduceCount += 1
+    }
     val reducedData = reducedOutput.data
 
     assert(reducedData.length == totalDataSize, "Reduced output should be the same as as model")

@@ -9,7 +9,7 @@ class ElasticAverageBinderSpec extends BIDMachSpec {
 
   val elasticRate = 0.5f
   val model = new ElasticAverageTestModel()
-  val binder = new ElasticAverageBinder(model, (iter:Int)=>elasticRate)
+  val binder = new ElasticAverageBinder(model, (iter:Int)=>elasticRate , Mat.consoleLogger)
 
 
   "Elastic binder" should "calculate total data size from model mats" in {

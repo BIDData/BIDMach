@@ -15,6 +15,7 @@ class AllreduceDummyLearner(learner:Learner, dummy_model:AllreduceDummyModel)
     println("dummy model is training!")
     while(true){
       this.ipass+=1
+      myLogger.info("pass=%2d" format ipass)
       this.dummy_model.showSomeWork()
     }
 
