@@ -402,15 +402,27 @@ object CaffeModel {
         }
         
         // Unary arithmetic ops
-        // TODO: implement base, shift, scale for the following two
         case "Exp" => {
           val expParam = layer.param.getExpParam()
-          // We could implement base, shift and scale using AddNode and MulNode, but it might be more efficient to modify
-          // ExpLayer to support these natively if we actually want to implement this.
-          if (expParam.hasBase() || expParam.hasShift() || expParam.hasScale()) {
-            throw new NotImplementedError("base, shift and scale are not currently implemented for Exp layer")
+          // We could implement shift and scale using AddNode and MulNode, but it might be more efficient to modify
+          // ExpLayer/PowerLayer to support these natively if we actually want to implement this.
+          if (expParam.hasShift() || expParam.hasScale()) {
+            throw new NotImplementedError("shift and scale are not currently implemented for Exp layer")
           }
-          new ExpNode
+          
+          if (expParam.hasBase()) {
+            val baseNode = new ConstantNode { value = expParam.getBase(); cache = true }
+            val powNode = new PowerNode {
+              // We need to manually assign input to this node b/c it's not the first node in the array below
+              inputs(0) = nodes(layer.inputs(0).inodeLast)
+              inputs(1) = baseNode
+            }
+            // baseNode will have its input set to the output of the previous node. But whatever, ConstantNodes ignore their
+            // inputs anyway.
+            Array(baseNode, powNode)
+          } else {
+            new ExpNode
+          }
         }
         case "Log" => {
           val logParam = layer.param.getLogParam()
