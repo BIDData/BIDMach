@@ -114,7 +114,7 @@ nn.launchTrain;
 
 // All-reduce
 val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
-val binder = new ElasticAverageBinder(nn.model, nodeConfig.elasticRate)
+val binder = new ElasticAverageBinder(nn.model, (x: Int) => nodeConfig.elasticRate, nn.myLogger)
 AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
 
 println("Examine the 'nn' variable to track learning state.\n");
