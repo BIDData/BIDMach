@@ -28,17 +28,17 @@ val nn = new Learner(ds, net, null, grad, null, opts);
 
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
-  val lr = if (ipass < 20) {
+  val lr = if (ipass < 40) {
     1e-2f
-  } else if (ipass < 40) {
+  } else if (ipass < 80) {
     1e-3f
   } else 1e-4f;
   lr
 }
 
 opts.logfile = "logAlexnet_cluster=16_alpha=0_1.txt";
-opts.batchSize= 128;
-opts.npasses = 80;
+opts.batchSize= 32;
+opts.npasses = 120s;
 //opts.nend = 10;
 opts.lrate = 1e-4f;
 opts.texp = 0f;
