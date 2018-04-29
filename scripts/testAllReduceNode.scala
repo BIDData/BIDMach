@@ -36,8 +36,8 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   lr
 }
 
-opts.logfile = "logAlexnet_cluster=16_alpha=0_3_batch=32.txt";
-opts.batchSize= 32;
+opts.logfile = "logAlexnet_cluster=16_alpha=0_3_batch=128.txt";
+opts.batchSize= 128;
 opts.npasses = 120;
 //opts.nend = 10;
 opts.lrate = 1e-4f;
