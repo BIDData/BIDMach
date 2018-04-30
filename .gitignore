@@ -27,4 +27,6 @@
 !/data/MHTestCorrections
 /logs/
 /project/
+/scripts/networks/*.caffemodel
+!/scripts/networks/lenet_*.caffemodel
 /target/
