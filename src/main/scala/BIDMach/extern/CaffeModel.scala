@@ -926,12 +926,25 @@ object CaffeModel {
   /** Converts the given blob into a Mat. Does not perform any transposition. */
   private def blob2Mat(blob:Caffe.BlobProto, ndims:Int):Mat = {
     val dims = getBlobShape(blob, ndims)
+    // We use while loops instead of map for increased efficiency when loading huge blobs
     if (blob.getDoubleDataCount() > 0) {
+      val data = new Array[Double](dims.reduce(_ * _))
+      var i = 0
+      while (i < data.length) {
+        data(i) = blob.getDoubleData(i)
+        i += 1
+      }
       // TODO: should I bother with GDMat
-      new DMat(dims, blob.getDoubleDataList().map(_.doubleValue()).toArray)
+      new DMat(dims, data)
     } else {
+      val data = new Array[Float](dims.reduce(_ * _))
+      var i = 0
+      while (i < data.length) {
+        data(i) = blob.getData(i)
+        i += 1
+      }
       // TODO: should I bother with GFMat
-      new FMat(dims, blob.getDataList().map(_.floatValue()).toArray)
+      new FMat(dims, data)
     }
   }
 
@@ -940,12 +953,23 @@ object CaffeModel {
     // We convert from row-major to column-major by creating a Mat with reversed dimensions,
     // loading it up with the row-major data, and then performing a deep transpose
     val reverseDims = getBlobShape(blob, ndims).reverse
+    // We use while loops instead of map for increased efficiency when loading huge blobs
     if (blob.getDoubleDataCount() > 0) {
-      val data = blob.getDoubleDataList().map(_.doubleValue()).toArray
+      val data = new Array[Double](reverseDims.reduce(_ * _))
+      var i = 0
+      while (i < data.length) {
+        data(i) = blob.getDoubleData(i)
+        i += 1
+      }
       // TODO: should I bother with GDMat
       new DMat(reverseDims, data).transpose((reverseDims.length - 1) to 0 by -1)
     } else {
-      val data = blob.getDataList().map(_.floatValue()).toArray
+      val data = new Array[Float](reverseDims.reduce(_ * _))
+      var i = 0
+      while (i < data.length) {
+        data(i) = blob.getData(i)
+        i += 1
+      }
       // TODO: should I bother with GFMat
       new FMat(reverseDims, data).transpose((reverseDims.length - 1) to 0 by -1)
     }
