@@ -35,7 +35,7 @@ class L2Regularizer(override val opts:L2Regularizer.Opts = new L2Regularizer.Opt
            val v = if (opts.reg2weight.ncols == 1) - opts.reg2weight else - opts.reg2weight(?,i);
            if (regwt.asInstanceOf[AnyRef] == null) regwt = updatemats(i).zeros(v.dims);
            regwt <-- v
-           updatemats(i) ~ updatemats(i) + (modelmats(i) ∘  v)
+           updatemats(i) ~ updatemats(i) + (modelmats(i) ∘  regwt)
          }
      }
      counter = (counter+1) % opts.mixinInterval
