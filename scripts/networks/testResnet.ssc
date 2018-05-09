@@ -1,7 +1,7 @@
 import BIDMach.networks.layers._
 
-val traindir = "/data/data/ImageNet/train/";
-val testdir = "/data/data/ImageNet/val/";
+val traindir = "../../data/ImageNet/train/";
+val testdir = "../../data/ImageNet/val/";
 val traindata = traindir+"partNCHW%04d.bmat.lz4";
 val trainlabels = traindir+"label%04d.imat.lz4";
 val testdata = testdir+"partNCHW%04d.bmat.lz4";
@@ -43,11 +43,11 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 
 opts.logfile = "logresv1.txt";
 opts.batchSize= 64;
-//opts.nend = 10;
+opts.nend = 240;
 opts.npasses = 100;
 opts.lrate = 1e-1f;
 opts.texp = 0.1f;
-opts.pstep = 0.01f;
+opts.pstep = 0.05f;
 opts.hasBias = false;
 opts.l2reg = 0.0005f;
 opts.hasBias = true;
