@@ -43,7 +43,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 
 opts.logfile = "logresv1.txt";
 opts.batchSize= 64;
-opts.nend = 240;
+opts.nend = 1250;
 opts.npasses = 100;
 opts.lrate = 1e-1f;
 opts.texp = 0.0f;
