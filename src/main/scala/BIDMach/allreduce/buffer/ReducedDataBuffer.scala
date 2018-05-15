@@ -6,9 +6,8 @@ case class ReducedDataBuffer(maxBlockSize: Int,
                              minBlockSize: Int,
                              totalDataSize: Int,
                              peerSize: Int,
-                             maxLag: Int,
                              completionThreshold: Float,
-                             maxChunkSize: Int) extends AllReduceBuffer(maxBlockSize, peerSize, maxLag, maxChunkSize) {
+                             maxChunkSize: Int) extends AllReduceBuffer(maxBlockSize, peerSize, maxChunkSize) {
 
   val minChunkRequired: Int = {
     val minNumChunks = getNumChunk(minBlockSize)
@@ -16,19 +15,19 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     (completionThreshold * totalChunks).toInt
   }
 
-  private val countReduceFilled: Array[Array[Int]] = Array.ofDim[Int](maxLag, peerSize * numChunks)
+  private val countReduceFilled: Array[Int] = Array.ofDim[Int](peerSize * numChunks)
 
-  def store(data: Array[Float], row: Int, srcId: Int, chunkId: Int, count: Int) = {
-    super.store(data, row, srcId, chunkId)
-    countReduceFilled(timeIdx(row))(srcId * numChunks + chunkId) = count
+  def store(data: Array[Float], srcId: Int, chunkId: Int, count: Int) = {
+    super.store(data, srcId, chunkId)
+    countReduceFilled(srcId * numChunks + chunkId) = count
   }
 
-  def getWithCounts(row: Int): (Array[Float], Array[Int]) = {
-    val output = temporalBuffer(timeIdx(row))
-    val countOverPeerChunks = countReduceFilled(timeIdx(row))
+  def getWithCounts(dataOutput: Array[Float], countOutput: Array[Int]) = {
 
-    val dataOutput = Array.fill[Float](totalDataSize)(0.0f)
-    val countOutput = Array.fill[Int](totalDataSize)(0)
+
+    val output = temporalBuffer
+    val countOverPeerChunks = countReduceFilled
+
     var transferred = 0
     var countTransferred = 0
 
@@ -52,15 +51,21 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     (dataOutput, countOutput)
   }
 
-  override def up(): Unit = {
-    super.up()
-    countReduceFilled(timeIdx(maxLag - 1)) = Array.fill(peerSize * numChunks)(0)
+  def prepareNewRound(): Unit = {
+    // clear peer buffers
+    val tmpBuff = temporalBuffer
+    for (i <- 0 until peerSize) {
+      util.Arrays.fill(tmpBuff(i), 0)
+    }
+    // clear two kinds of count
+    util.Arrays.fill(countFilled, 0, numChunks, 0)
+    util.Arrays.fill(countReduceFilled, 0, peerSize * numChunks, 0)
   }
 
-  def reachCompletionThreshold(row: Int): Boolean = {
+  def reachCompletionThreshold(): Boolean = {
     var chunksCompleteReduce = 0
-    for (i <- 0 until countFilled(row).length) {
-      chunksCompleteReduce += countFilled(timeIdx(row))(i);
+    for (i <- 0 until countFilled.length) {
+      chunksCompleteReduce += countFilled(i);
     }
     chunksCompleteReduce == minChunkRequired
   }
@@ -68,6 +73,6 @@ case class ReducedDataBuffer(maxBlockSize: Int,
 
 object ReducedDataBuffer {
   def empty = {
-    ReducedDataBuffer(0, 0, 0, 0, 0, 0f, 1024)
+    ReducedDataBuffer(0, 0, 0, 0, 0f, 0)
   }
 }

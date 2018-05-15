@@ -94,10 +94,10 @@ val out =       softmaxout(fc8)(scoreType=1,lossType=1);
 
 opts.nodeset=Net.getDefaultNodeSet
 }
-
 def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
+
 
 
 nn.launchTrain;
