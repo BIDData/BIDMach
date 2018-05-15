@@ -26,6 +26,7 @@ class AllreduceNode(nodeConfig: NodeConfig,
   generateDimensionNodes()
 
   override def receive: Receive = {
+    case StopAllreduceNode => context.stop(self)
     case _ => Unit
   }
 
@@ -59,8 +60,7 @@ class AllreduceNode(nodeConfig: NodeConfig,
 
 
 object AllreduceNode {
-
-  def getBasicConfigs() : NodeConfig = {
+  def getBasicConfigs(): NodeConfig = {
 
     val dimNum = 2
     val maxChunkSize = 20000
@@ -82,7 +82,7 @@ object AllreduceNode {
       workerResolutionTimeout = 5.seconds,
       threshold = threshold)
 
-    NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, reportStats = true, elasticRate = 0.3)
+    NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, reportStats = true, elasticRate = 0.3f)
   }
 
   def startAllreduceNode(binder: AllreduceBinder, nodeConfig: NodeConfig): ActorRef = {
@@ -117,6 +117,7 @@ object AllreduceNode {
         None
       }
     }
+
     var allReduceNode: Option[ActorRef] = None
     while (allReduceNode.isEmpty) {
       allReduceNode = createAllReduceNode()
@@ -125,16 +126,18 @@ object AllreduceNode {
     allReduceNode.get
   }
 
-  def startNodeAfterIter(learner: Learner, iter: Int): Unit = {
+  def startNodeAfterIter(learner: Learner, iter: Int): ActorRef = {
     val nodeConfig = getBasicConfigs()
-    val binder = new ElasticAverageBinder(learner.model, nodeConfig.elasticRate)
+    val binder = new ElasticAverageBinder(learner.model, (iter: Int) => nodeConfig.elasticRate, learner.myLogger)
     startNodeAfterIter(learner, iter, nodeConfig, binder)
   }
 
   def main(args: Array[String]): Unit = {
     val learner = new AllreduceDummyLearner()
     learner.launchTrain
-    startNodeAfterIter(learner, iter = 0)
+    val node = startNodeAfterIter(learner, iter = 0)
+    //use the following message to stop all reduce from working.
+    //node ! StopAllreduceNode
   }
 
 }

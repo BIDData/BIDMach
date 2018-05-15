@@ -1,18 +1,20 @@
 package BIDMach.allreduce.binder
 
+import java.util.logging.Logger
+
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import BIDMach.models.Model
-import BIDMat.FMat
+import BIDMat.{FMat, GMat}
 
 
 /**
   * Linearize input model mats, and elastic-average update to the same model.
   *
   * @param model
-  * @param alpha
+  * @param alphaFromIter
   */
-class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder {
-
+class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Logger) extends AllreduceBinder {
+  var reduceCount = 0
   override lazy val totalDataSize: Int = {
     var ret = 0
     model.modelmats.synchronized {
@@ -26,7 +28,6 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
 
   override def dataSource: DataSource = inputRequest => {
 
-    println(s"--Dumping model data at ${inputRequest.iteration}--")
     val ret: Array[Float] = new Array[Float](totalDataSize)
 
     // backward traversing model mats, assuming forward traversal by the training model
@@ -49,26 +50,35 @@ class ElasticAverageBinder(model: Model, alpha: Double) extends AllreduceBinder 
   }
 
   override def dataSink: DataSink = reducedOutput => {
-    println(s"-- Averaging model of iteration ${reducedOutput.iteration}--")
+    reduceCount.synchronized {
+      logger.info(s"allreduce iteration ${reduceCount}")
+      reduceCount += 1
+    }
+    val reducedData = reducedOutput.data
 
-    val data = reducedOutput.data
-
-    assert(data.length == totalDataSize, "Reduced output should be the same as as model")
+    assert(reducedData.length == totalDataSize, "Reduced output should be the same as as model")
 
     // backward traversing model mats, assuming forward traversal by the training model
     // using while instead of for loop due to performance
     var current = totalDataSize - 1
     var i = model.modelmats.length - 1
+    val alpha = alphaFromIter(reducedOutput.iteration)
 
     while (i >= 0) {
       val mat = model.modelmats(i)
       mat.synchronized {
-        val contents = FMat(mat).contents
+        val modelData = FMat(mat).data
         var j = mat.length - 1
         while (j >= 0) {
-          contents.update(j, data(current) * alpha + contents(j) * (1 - alpha))
+          modelData(j) = reducedData(current) * alpha + modelData(j) * (1 - alpha)
           j -= 1
           current -= 1
+        }
+        mat match {
+          case gmat: GMat =>
+            GMat.CPUtoGPUarraycopy(modelData, 0, gmat.pdata, 0, mat.length, "")
+          case fmat: FMat =>
+            // Already updated in-place fmat array during the elastic averaging
         }
       }
       i -= 1

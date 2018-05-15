@@ -1,11 +1,12 @@
 import BIDMach.Learner
 import BIDMach.allreduce.AllreduceNode.{getBasicConfigs, startNodeAfterIter}
 import BIDMach.allreduce.binder.ElasticAverageBinder
-import BIDMach.allreduce.{AllreduceNode}
+import BIDMach.allreduce.AllreduceNode
 import BIDMach.datasources.FileSource
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
 import BIDMach.updaters.Grad
+import BIDMat.SciFunctions
 
 val traindir = "./data/ImageNet/train/";
 //val traindir = "/home/jfc/data/ImageNet/2012/BIDMach/train/";
@@ -15,6 +16,8 @@ val trainlabels = traindir+"label%04d.imat.lz4";
 val testdata = testdir+"partNCHW%04d.bmat.lz4";
 val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
+
+SciFunctions.setseed(4)
 
 class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
 val opts = new MyOpts;
@@ -33,7 +36,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   lr
 }
 
-opts.logfile = "logAlexnet.txt";
+opts.logfile = "logAlexnet_cluster=16_alpha=0_1.txt";
 opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
@@ -110,7 +113,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 nn.launchTrain;
 
 // All-reduce
-val nodeConfig = getBasicConfigs().copy(elasticRate = 0.43)
+val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
 val binder = new ElasticAverageBinder(nn.model, nodeConfig.elasticRate)
 AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
 

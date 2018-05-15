@@ -7,9 +7,9 @@ import BIDMat.{FMat, Mat}
 
 class ElasticAverageBinderSpec extends BIDMachSpec {
 
-  val elasticRate = 0.5
+  val elasticRate = 0.5f
   val model = new ElasticAverageTestModel()
-  val binder = new ElasticAverageBinder(model, elasticRate)
+  val binder = new ElasticAverageBinder(model, (iter:Int)=>elasticRate , Mat.consoleLogger)
 
 
   "Elastic binder" should "calculate total data size from model mats" in {

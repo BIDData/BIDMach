@@ -32,3 +32,4 @@ final case class RoundConfig(lineMasterVersion : Int, round: Int, lineMaster : A
 final case class StartAllreduceTask(peerNodes: ArrayBuffer[ActorRef], lineMasterVersion : Int)
 final case class StopAllreduceTask(lineMasterVersion : Int)
 final case class StartTraining()
+final case class StopAllreduceNode()
