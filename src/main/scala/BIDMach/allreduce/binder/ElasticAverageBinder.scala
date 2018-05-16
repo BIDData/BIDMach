@@ -1,5 +1,6 @@
 package BIDMach.allreduce.binder
 
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Logger
 
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
@@ -14,7 +15,11 @@ import BIDMat.{FMat, GMat}
   * @param alphaFromIter
   */
 class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Logger) extends AllreduceBinder {
-  var reduceCount = 0
+
+  // Keeping track of elastic updates
+  var tic = System.currentTimeMillis()
+  val reduceCount = new AtomicInteger()
+
   override lazy val totalDataSize: Int = {
     var ret = 0
     model.modelmats.synchronized {
@@ -49,10 +54,20 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
 
   }
 
+
+
   override def dataSink: DataSink = reducedOutput => {
+
     reduceCount.synchronized {
-      logger.info(s"allreduce iteration ${reduceCount}")
-      reduceCount += 1
+      val currentCount: Int = reduceCount.getAndIncrement()
+      val updateCounts = 10
+      if (currentCount % updateCounts == 0) {
+        val toc = System.currentTimeMillis()
+        if (currentCount > 0) {
+          logger.info(f"elastic_updates/s=${updateCounts/((toc - tic) / 1.0e3)}%2.2f, total_updates=$currentCount")
+        }
+        tic = toc
+      }
     }
     val reducedData = reducedOutput.data
 

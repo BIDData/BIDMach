@@ -97,7 +97,8 @@ trait StatsAggregating extends ReceivePipeline {
       outgoingFloats += stats.outgoingFloats
       incomingFloats += stats.incomingFloats
 
-      val secondElapsed = (System.currentTimeMillis() - tic) / 1.0e3
+      val toc = System.currentTimeMillis()
+      val secondElapsed = (toc - tic) / 1.0e3
 
       if (secondElapsed >= 10) {
 
@@ -109,7 +110,7 @@ trait StatsAggregating extends ReceivePipeline {
         println(s"----$reportOut\n----$reportIn")
         outgoingFloats = 0
         incomingFloats = 0
-        tic = System.currentTimeMillis()
+        tic = toc
       }
 
       HandledCompletely
