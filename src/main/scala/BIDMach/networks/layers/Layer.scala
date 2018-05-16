@@ -190,7 +190,7 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  *
  * Crop and CropMirror Layers:
  - sizes:IMat=irow(3,224,224,0)  Size of the cropped image
- - offsets:IMat=irow(0,-1,-1,-1) Offsets from the input image boundaries. -1 means center the cropped window in this dimension.
+ - offsets:IMat=irow(0,-1,-1,0) Offsets from the input image boundaries. -1 means center the cropped window in this dimension.
  - randoffsets:IMat=null         Magnitude of random offsets in each dimension. 
  * 
  * LinLayer
