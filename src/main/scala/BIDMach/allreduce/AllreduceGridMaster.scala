@@ -66,6 +66,10 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       }
   }
 
+  /**
+    * Register a node and maintain related information
+    * @param node the node to be added
+    */
   private def register(node: Member): Unit = {
     if (node.hasRole("Node")) {
       // awaiting here to prevent concurrent futures (from another message) trying to add to node set at the same time

@@ -6,7 +6,9 @@ import akka.actor.ActorRef
 
 import scala.collection.mutable
 
-
+/**
+  * Code supporting Stats reporting.
+  */
 trait StatsReporting extends ReceivePipeline {
 
   val scatterInCount: mutable.HashMap[Int, Int] = mutable.HashMap[Int, Int]()

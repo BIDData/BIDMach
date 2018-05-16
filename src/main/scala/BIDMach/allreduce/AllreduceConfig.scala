@@ -4,7 +4,10 @@ import BIDMach.allreduce.AllreduceType.AllreduceType
 
 import scala.concurrent.duration._
 
-
+/**
+  * @param nodeNum how many node is in the network
+  * @param nodeResolutionTimeout resolution for node seek process
+  */
 case class GridMasterConfig(
                              nodeNum: Int,
                              nodeResolutionTimeout: FiniteDuration) {
@@ -23,10 +26,23 @@ case class ThresholdConfig(
                             thReduce: Float,
                             thComplete: Float)
 
+/**
+  *  Hyperparameter for the whole process, sharing across machines
+  *
+  * @param dataSize the size of the array to have all reduce operation on
+  * @param maxChunkSize the chunk size to be sent as message during communication. Might be smaller if not split evenly.
+  */
 case class MetaDataConfig(
                            dataSize: Int = -1,
                            maxChunkSize: Int)
 
+/**
+  * @param roundWorkerPerDimNum for one dimension, how many round worker we should have
+  * @param dim ususally 2, extendable
+  * @param maxRound upper limit of the round upon which the all reduce process would stop
+  * @param workerResolutionTimeout timeout used for worker seeking process
+  * @param threshold
+  */
 case class LineMasterConfig(
                              roundWorkerPerDimNum: Int,
                              dim: Int,
@@ -34,12 +50,22 @@ case class LineMasterConfig(
                              workerResolutionTimeout: FiniteDuration,
                              threshold: ThresholdConfig)
 
+/**
+  * Parameters self-explanatory
+  * @param statsReportingRoundFrequency
+  * @param threshold
+  * @param metaData
+  * @param reducer
+  */
 case class WorkerConfig(
                          statsReportingRoundFrequency: Int = 10,
                          threshold: ThresholdConfig,
                          metaData: MetaDataConfig,
                          reducer: AllreduceType = AllreduceType.Average)
 
+/**
+  * @param dim which dimension the node belongs to
+  */
 case class DimensionNodeConfig(dim: Int)
 
 case class NodeConfig(

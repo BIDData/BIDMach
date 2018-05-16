@@ -3,6 +3,11 @@ package BIDMach.allreduce
 import BIDMach.Learner
 import BIDMach.networks.Net
 
+/**
+  * A dummy learner for ease of test. Can be opt or refactored out if necessary
+  * @param learner
+  * @param dummy_model
+  */
 class AllreduceDummyLearner(learner:Learner, dummy_model:AllreduceDummyModel)
   extends Learner(learner.datasource,dummy_model,learner.mixins, learner.updater, learner.datasink ,learner.opts) {
 

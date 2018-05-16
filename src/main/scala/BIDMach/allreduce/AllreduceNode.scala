@@ -85,6 +85,12 @@ object AllreduceNode {
     NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, reportStats = true, elasticRate = 0.3f)
   }
 
+  /**
+    * start the all reduce node with binder and config given
+    * @param binder
+    * @param nodeConfig
+    * @return actor reference of the node required
+    */
   def startAllreduceNode(binder: AllreduceBinder, nodeConfig: NodeConfig): ActorRef = {
 
     val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=0").
@@ -107,6 +113,14 @@ object AllreduceNode {
     nodeRef
   }
 
+  /**
+    * Start the node after learner reach specific round to avoid allreducing null value.
+    * @param learner
+    * @param iter the desired iteration after which to start
+    * @param nodeConfig
+    * @param binder
+    * @return
+    */
   def startNodeAfterIter(learner: Learner, iter: Int, nodeConfig: NodeConfig, binder: AllreduceBinder): ActorRef = {
     def createAllReduceNode(): Option[ActorRef] = {
       if (learner.synchronized(learner.ipass > 0 || learner.istep > iter)) {
@@ -126,6 +140,12 @@ object AllreduceNode {
     allReduceNode.get
   }
 
+  /**
+    *  A simplified version of previous function with default binder.
+    * @param learner
+    * @param iter
+    * @return
+    */
   def startNodeAfterIter(learner: Learner, iter: Int): ActorRef = {
     val nodeConfig = getBasicConfigs()
     val binder = new ElasticAverageBinder(learner.model, (iter: Int) => nodeConfig.elasticRate, learner.myLogger)

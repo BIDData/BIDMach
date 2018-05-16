@@ -13,6 +13,9 @@ final case class ReduceBlock(value: Array[Float], srcId : Int, destId : Int, chu
 
 final case class AllreduceStats(outgoingFloats: Long, incomingFloats: Long)
 
+/**
+  * "comparison override to provide a (line master version, round) pair for a smooth transition when nodes are added or removed
+  */
 final case class RoundConfig(lineMasterVersion : Int, round: Int, lineMaster : ActorRef, peerWorkers: Map[Int, ActorRef], workerId: Int) {
   def < (other : RoundConfig): Boolean = {
   	return if (lineMasterVersion < other.lineMasterVersion || 
@@ -29,7 +32,13 @@ final case class RoundConfig(lineMasterVersion : Int, round: Int, lineMaster : A
   }
 }
 
+/*
+ * Following message used by Line Master
+ */
 final case class StartAllreduceTask(peerNodes: ArrayBuffer[ActorRef], lineMasterVersion : Int)
 final case class StopAllreduceTask(lineMasterVersion : Int)
-final case class StartTraining()
+
+/*
+ * For grid master in case we want to kill the node
+ */
 final case class StopAllreduceNode()

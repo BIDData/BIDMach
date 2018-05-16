@@ -1,6 +1,9 @@
 package BIDMach.allreduce.binder
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 
+/**
+  * Just for experiment. Can be opted out or refactored.
+  */
 class NoOpBinder(dataSize: Int, printFrequency: Int = 10) extends AllreduceBinder {
 
 

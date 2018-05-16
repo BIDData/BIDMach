@@ -4,15 +4,18 @@ import akka.actor.ActorRef
 
 import scala.collection.mutable
 
-
+/**
+  * Dynamic 2D Grid data structure to maintain balanced layout. Run Dynamic2DGridLayoutSpec to check how it works.
+  * @param nodes initialize nodes indexes
+ */
 class Dynamic2DGridLayout(nodes: List[Int]) {
   type MasterLayout = Dynamic2DGridLayout.MasterLayout
-  var _grid = new mutable.ArrayBuffer[mutable.ArrayBuffer[Option[Int]]]()
+  var _grid = new mutable.ArrayBuffer[mutable.ArrayBuffer[Option[Int]]]() // grid recording the nodes layout
   _grid+=mutable.ArrayBuffer.fill(1)(Option.empty)
-  var _count = 0
-  var _filled = 0
-  var _N = 1
-  var _node_map = mutable.HashMap[Int, Tuple2[Int, Int]]()
+  var _count = 0 //how many nodes are in the grid
+  var _filled = 0 //how many locations for are filled. Once fully filled grid would expand
+  var _N = 1 // size of the grid, always N*N except for count = 0 case.
+  var _node_map = mutable.HashMap[Int, Tuple2[Int, Int]]() // node_idx => location in grid
   for (node <- nodes) {
     addNode(node)
   }
@@ -21,6 +24,11 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     this(List.empty)
   }
 
+  /**
+    * @param x the idx specified
+    * @return return all idx current with given x idx.
+    * Same for the getYNodes
+    */
   private def getXNodes(x: Int): Set[Int] = {
     assert(0 <= x && x < _grid(0).length)
     (for (y <- 0 until _grid.length if _grid(y)(x).isDefined) yield _grid(y)(x).get).toSet
@@ -31,6 +39,11 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     (for (x <- 0 until _grid(0).length if _grid(y)(x).isDefined) yield _grid(y)(x).get).toSet
   }
 
+  /**
+    * set master node of given index
+    * @param value the layout to be handled
+    * @param i the idx of row(or column) to handle
+    */
   private def setMasterNode(value: MasterLayout, i: Int): Unit = {
     //exist to help handle n - 1's master properly
     if (i == _N - 1 && _grid.last.last.isEmpty) {
@@ -42,6 +55,12 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     }
   }
 
+  /**
+    * Helper function to decide which next free position to take
+    * @param filled
+    * @param n
+    * @return the next position to take
+    */
   private def getPos(filled: Int, n: Int): Tuple2[Int, Int] = {
     //pattern is (1,2),(2,1),(3,4),(4,3),...(n-1, n-2) -> (n-1,n-1) -> (0,1),(1,0),(2,3),(3,2)...
     val separate_loc = if (n % 2 == 1) n - 1 else n - 2
@@ -95,6 +114,9 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     }
   }
 
+  /**
+    * This always remove the last added node, effectively reverse the process
+    */
   private def remove(): Unit ={
     assert(_count>0)
     _count -=1
@@ -131,6 +153,9 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     }
   }
 
+  /**
+    * @return which position to be removed next
+    */
   private def nextRemove() : Tuple2[Int, Int] ={
     assert(_count > 0)
     if(_N == 1){
@@ -142,6 +167,10 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     }
   }
 
+  /**
+    * Remove specific location using swap and remove()
+    * @param location
+    */
   def removeLocation(location : Tuple2[Int, Int]): Unit ={
     val remove_loc = nextRemove()
     if (remove_loc != location){
@@ -156,11 +185,18 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     remove()
   }
 
+  /**
+    * Remove node by finding its location
+    * @param node node idx to be removed
+    */
   def removeNode(node: Int): Unit ={
     assert(_node_map.contains(node))
     removeLocation(_node_map(node))
   }
 
+  /**
+    * Getter method to get current layout snapshot
+    */
   def currentMasterLayout() : MasterLayout = {
     val ret : MasterLayout = mutable.HashMap[Int, Tuple2[Option[Set[Int]], Option[Set[Int]]]]()
     if (_count ==0){ // special case for count=0
@@ -194,6 +230,13 @@ object Dynamic2DGridLayout{
   type MasterLayout = mutable.HashMap[Int, Tuple2[Option[Set[Int]], Option[Set[Int]]]]
   // Option.empty means "keep unchanged", and Set() means an empty peer list, so we are forced to use option here
   // to distinguish between the two situations
+
+  /**
+    * Given two layout, calculate difference to minimize update
+    * @param old_layout
+    * @param new_layout
+    * @return only difference
+    */
   def calculate_difference(old_layout: MasterLayout, new_layout: MasterLayout) : MasterLayout = {
     var diff : MasterLayout = new_layout.clone()
     for(master_id <- old_layout.keys){

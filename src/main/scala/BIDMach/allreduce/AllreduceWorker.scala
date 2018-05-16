@@ -6,7 +6,12 @@ import BIDMach.allreduce.binder.{AllReduceInputRequest, AllReduceOutput}
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
 import akka.actor.{Actor, ActorRef}
 
-
+/**
+  * The Allreduce worker which performs actual value sharing across different machines
+  * @param config
+  * @param dataSource the data it receives from
+  * @param dataSink the data it would write into
+  */
 class AllreduceWorker(config: WorkerConfig,
                       dataSource: DataSource,
                       dataSink: DataSink) extends Actor with akka.actor.ActorLogging {
@@ -85,6 +90,11 @@ class AllreduceWorker(config: WorkerConfig,
     }
   }
 
+  /**
+    * Check the round config with innate one to see if it is outdated
+    * @param config the round config to be compared with
+    * @return boolean indicating success
+    */
   private def handleRoundConfig(config: RoundConfig): Boolean = {
     if (config < currentConfig) { // outdated msg, discard
       return false
@@ -107,6 +117,9 @@ class AllreduceWorker(config: WorkerConfig,
     completeRound()
   }
 
+  /*
+   * Optimization on whether the buffer should be re-assigned.
+   */
   private def requiresBufferInitialization(newConfig: RoundConfig): Boolean = {
     val newNumPeers = newConfig.peerWorkers.size
     val newScatterBlockSize = getBlockSize(newConfig.workerId, newNumPeers, dataSize)
@@ -197,6 +210,9 @@ class AllreduceWorker(config: WorkerConfig,
     return math.min(blockSize, dataSize - workerId * blockSize)
   }
 
+  /**
+    * Gain data from dataSource
+    */
   private def fetch() = {
     log.debug(s"\nfetch ${currentConfig.round}")
     val input = dataSource(AllReduceInputRequest(currentConfig.round))
@@ -206,6 +222,9 @@ class AllreduceWorker(config: WorkerConfig,
     data = input.data
   }
 
+  /**
+    * Give data to dataSink
+    */
   private def flush() = {
     reduceBlockBuf.getReducedData(output, backUpDataSource)
 
@@ -248,6 +267,12 @@ class AllreduceWorker(config: WorkerConfig,
     broadcast(reducedData, chunkId, reduceCount)
   }
 
+  /**
+    * Broadcast the message
+    * @param data data to be broadcasted
+    * @param chunkId
+    * @param reduceCount count on how many copy is used for this reduce process
+    */
   private def broadcast(data: Array[Float], chunkId: Int, reduceCount: Int) = {
     log.debug(s"\n----Worker ${self.path}: Start broadcasting, chunkId = ${chunkId}")
     val numPeers = currentConfig.peerWorkers.size
