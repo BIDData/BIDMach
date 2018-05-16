@@ -42,10 +42,10 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
 
     while (i >= 0) {
       val mat = model.modelmats(i)
-      mat.synchronized {
-        val contentData = FMat(mat).contents.data
-        current -= contentData.length
-        System.arraycopy(contentData, 0, ret, current, contentData.length)
+      current -= mat.length
+      mat match {
+        case gmat: GMat => GMat.GPUtoCPUarraycopy(gmat.pdata, 0, ret, current, gmat.length, "ElasticAverageBinder dataSource")
+        case fmat: FMat => System.arraycopy(fmat.contents().data, 0, ret, current, fmat.length)
       }
       i -= 1
     }
@@ -91,7 +91,7 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
         }
         mat match {
           case gmat: GMat =>
-            GMat.CPUtoGPUarraycopy(modelData, 0, gmat.pdata, 0, mat.length, "")
+            GMat.CPUtoGPUarraycopy(modelData, 0, gmat.pdata, 0, mat.length, "ElasticAverageBinder dataSink")
           case fmat: FMat =>
             // Already updated in-place fmat array during the elastic averaging
         }
