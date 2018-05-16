@@ -1,0 +1,395 @@
+package BIDMach.updaters;
+ 
+import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GIMat,GDMat,GLMat,GSMat,ND,SMat,SDMat,TMat};
+import BIDMat.MatFunctions._
+import BIDMat.SciFunctions._
+import BIDMach.models._
+import edu.berkeley.bid.CUMACH
+
+class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) extends Updater {
+  
+  var firstStep = 0.0;
+ 
+  var modelmats:Array[Mat] = null;
+  var updatemats:Array[Mat] = null;
+  var momentum:Array[Mat] = null;
+  var randmat:Array[Mat] = null;
+
+  var modelmatsSave:Array[Mat] = null;
+  var momentumSave:Array[Mat] = null;
+
+  var swap:Mat = null;
+  var x:Mat = null;
+  var y:Mat = null;
+  var u:Mat = null;
+  var v:Mat = null;
+  var pbar:Mat = null;
+  var qbar:Mat = null;
+  var c:Mat = null;
+  var tmp:Mat = null;
+  var tmat:Mat = null;
+  var acol:Mat = null;
+  var aelem:Mat = null;
+
+  var stepn:Mat = null;
+  var mask:Mat = null;
+  var te:Mat = null;
+  var pe:Mat = null;
+  var lrate:Mat = null;
+  var mu:Mat = null;
+  var norm_scaling:Mat = null;
+  var tscale:Mat = null;
+
+  def initGrad(model0:Model) = {
+    firstStep = 0;
+    model = model0;
+    modelmats = model.modelmats;
+    updatemats = model.updatemats;
+    mask = opts.mask;
+    val mm = modelmats(0);
+    stepn = mm.zeros(1,1);
+    val nmats = modelmats.length;
+    modelmatsSave = new Array[Mat](nmats);
+    val hasvel_decay = (opts.vel_decay.asInstanceOf[AnyRef] != null || opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null);
+    if (hasvel_decay) {
+      momentum = new Array[Mat](nmats);
+      momentumSave = new Array[Mat](nmats);		
+      for (i <- 0 until nmats) {
+        if (modelmats(i).asInstanceOf[AnyRef] != null) {
+	  momentum(i) = modelmats(i).zeros(modelmats(i).dims);
+        }
+      }
+    }
+    if (opts.langevin > 0) {
+      randmat = new Array[Mat](nmats);
+      for (i <- 0 until nmats) {
+      	if (modelmats(i).asInstanceOf[AnyRef] != null) {
+	  randmat(i) = modelmats(i).zeros(modelmats(i).dims);
+      	}
+      }
+    }
+    if (opts.texp.asInstanceOf[AnyRef] != null) {
+      te = mm.zeros(opts.texp.nrows, opts.texp.ncols);
+    }
+    if (opts.pexp.asInstanceOf[AnyRef] != null) {
+      pe = mm.zeros(opts.pexp.nrows, opts.pexp.ncols);
+    }
+    lrate = mm.zeros(opts.lrate.nrows, 1);
+    mu = mm.zeros(1,1);
+  } 
+  
+  override def init(model0:Model) = initGrad(model0);
+  
+  def clipping() {
+    if (opts.clipByValue>0f) {
+      for (i <- 0 until updatemats.length){
+	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	  min(updatemats(i),opts.clipByValue,updatemats(i));
+	  max(updatemats(i),-opts.clipByValue,updatemats(i));
+	}
+      }
+    }
+    if (opts.max_grad_norm>0f){
+      var tot = 0.0;
+      for (i <- 0 until updatemats.length){
+	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	  tot+=sum(updatemats(i) dot updatemats(i)).dv
+	    }
+      }
+      val scale=opts.max_grad_norm/max(sqrt(tot),opts.max_grad_norm).dv;
+      if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1);
+      norm_scaling(0,0) = scale.toFloat;
+      for (i <- 0 until updatemats.length){
+	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	  updatemats(i)~updatemats(i)*@norm_scaling;
+	}     
+      }
+    }
+  }
+
+  def getLargestMat(mat:Mat, umat:Mat) = {
+    var maxlen = 0;
+    val oldmat = if (mat.asInstanceOf[AnyRef] != null) {
+      mat;
+    } else {
+      for (i <- 0 until updatemats.length) {
+	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	  maxlen = math.max(maxlen, updatemats(i).length);
+	}
+      }
+      umat.zeros(1,maxlen);
+    }
+    oldmat match {
+      case a:GMat => new GMat(umat.dims.data, a.pdata, a.realsize);
+      case a:GIMat => new GIMat(umat.dims.data, a.pdata, a.realsize);
+      case a:GDMat => new GDMat(umat.dims.data, a.pdata, a.realsize);
+      case a:GLMat => new GLMat(umat.dims.data, a.pdata, a.realsize);
+
+      case a:FMat => new FMat(umat.dims.data, a.data);
+      case a:IMat => new IMat(umat.dims.data, a.data);
+      case a:DMat => new DMat(umat.dims.data, a.data);
+      case a:LMat => new LMat(umat.dims.data, a.data);
+    }
+  };
+
+  def getLargestCol(mat:Mat, umat:Mat) = {
+    var maxlen = 0;
+    val oldmat = if (mat.asInstanceOf[AnyRef] != null) {
+      mat;
+    } else {
+      for (i <- 0 until updatemats.length) {
+	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	  maxlen = math.max(maxlen, updatemats(i).nrows);
+	}
+      }
+      umat.zeros(maxlen,1);
+    }
+    val newdims = umat.dims.data.clone();
+    newdims(newdims.length-1) = 1;
+    oldmat match {
+      case a:GMat => new GMat(newdims, a.pdata, a.realsize);
+      case a:GIMat => new GIMat(newdims, a.pdata, a.realsize);
+      case a:GDMat => new GDMat(newdims, a.pdata, a.realsize);
+      case a:GLMat => new GLMat(newdims, a.pdata, a.realsize);
+
+      case a:FMat => new FMat(newdims, a.data);
+      case a:IMat => new IMat(newdims, a.data);
+      case a:DMat => new DMat(newdims, a.data);
+      case a:LMat => new LMat(newdims, a.data);
+    }
+  }
+
+  def swapMats(i:Int) = {
+    if (modelmats(i).asInstanceOf[AnyRef] != null) {
+      swap = getLargestMat(swap, modelmats(i));
+      acol = getLargestCol(acol, modelmats(i));
+
+      if (opts.logswap) Mat.logger.info("before: i=%d, mm=%f, mms=%f" format (i, dotprod(modelmats(i), modelmats(i)), dotprod(modelmatsSave(i), modelmatsSave(i))));
+      swap <-- modelmats(i);
+      modelmats(i) <-- modelmatsSave(i);
+      modelmatsSave(i) <-- swap;
+      if (opts.logswap) Mat.logger.info("after : i=%d, mm=%f, mms=%f" format (i, dotprod(modelmats(i), modelmats(i)), dotprod(modelmatsSave(i), modelmatsSave(i))));
+    }    
+
+    if (momentum(i).asInstanceOf[AnyRef] != null) {
+	if (opts.logswap) Mat.logger.info("before: i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
+      swap <-- momentum(i);
+      momentum(i) <-- momentumSave(i);
+      momentumSave(i) <-- swap;
+      if (opts.logswap) Mat.logger.info("after : i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
+    }
+  };
+
+  def dotprod(a:Mat, b:Mat):Float = {
+    (acol ~ a) dotr b;
+    sum(acol, 1, aelem);
+    aelem.dv.toFloat;
+  };
+
+  def collide(p:Mat, q:Mat, i:Int) = {
+    x = getLargestMat(x, p);
+    y = getLargestMat(y, p);
+    u = getLargestMat(u, p);
+    v = getLargestMat(v, p);
+    tmp = getLargestMat(tmp, p);
+    pbar = getLargestMat(pbar, p);
+    qbar = getLargestMat(qbar, p);
+    c = getLargestMat(c, p);
+    tmat = getLargestMat(tmat, p);
+    acol = getLargestCol(acol, p);
+    val epsilon = 1e-36f;
+    
+    val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
+    val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
+    if (opts.logcollide) {
+      val dp = dotprod(p, q);
+      tmp ~ p *@ p;
+      val meansqp = dotprod(tmp, tmp) / p.length;
+      tmp ~ q *@ q;
+      val meansqq = dotprod(tmp, tmp) / p.length;
+      val meanp = lp * lp;
+      val meanq = lq * lq;
+      val cosp = dp / (p.length * lp * lq + epsilon);
+      Mat.logger.info("before: i=%d, cos(p,q)=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
+    }
+    normrnd(0, lp, x);
+    normrnd(0, lq, y);
+    x ~ x + p;
+    y ~ y + q;
+    
+    u ~ x * math.sqrt(1/(dotprod(x, x)+epsilon)).toFloat;
+    v ~ u * dotprod(y, u);
+    y ~ y - v;
+    val ny1 = dotprod(y, y);
+    v ~ y * math.sqrt(1/(ny1+epsilon)).toFloat;
+    
+    tmp ~ u * dotprod(p, u);
+    pbar ~ v * dotprod(p, v);
+    pbar ~ pbar + tmp;
+
+    tmp ~ u * dotprod(q, u);
+    qbar ~ v * dotprod(q, v);
+    qbar ~ qbar + tmp;
+
+    tmat ~ pbar + qbar;
+    tmp ~ pbar - qbar;
+    val twt = dotprod(tmp, tmat)/(dotprod(tmat, tmat)+epsilon);
+    c ~ tmat * twt;
+    c ~ c - tmp;
+
+    p ~ p + c;
+    q ~ q - c;
+
+    if (opts.logcollide) {
+	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+      val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
+      val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
+      val dp = dotprod(p, q);
+      tmp ~ p *@ p;
+      val meansqp = dotprod(tmp, tmp) / p.length;
+      tmp ~ q *@ q;
+      val meansqq = dotprod(tmp, tmp) / p.length;
+      val meanp = lp * lp;
+      val meanq = lq * lq;
+      val cosp = dp / (p.length * lp * lq + epsilon);
+      Mat.logger.info("after:  i=%d, cos(p,q)=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
+    }
+
+  };
+
+  def attract(p:Mat, q:Mat, afactor:Float, i:Int) = {
+    u = getLargestMat(u, p);
+    acol = getLargestCol(acol, p);
+    val pm = dotprod(p,p);
+    val qm = dotprod(q,q);	
+    u ~ p - q;
+    val um = dotprod(u,u);
+    u ~ u * (0.5f * afactor);
+    p ~ p - u;
+    q ~ q + u;
+    val pm2 = dotprod(p,p);
+    val qm2 = dotprod(q,q);
+    if (opts.logattract) {
+	Mat.logger.info("attract %d pm %g, qm %g, um %g, pm %g, qm %g" format (i, pm, qm, um, pm2, qm2));
+    }	    
+  }
+
+  def checkSwapMats(i:Int) = {
+    if (modelmats(i).asInstanceOf[AnyRef] != null) {
+	if (modelmatsSave(i).asInstanceOf[AnyRef] == null) modelmatsSave(i) = modelmats(i).zeros(modelmats(i).dims);
+      if (momentum(i).asInstanceOf[AnyRef] != null && momentumSave(i).asInstanceOf[AnyRef] == null) momentumSave(i) = momentum(i).zeros(momentum(i).dims);
+    }
+    if (aelem.asInstanceOf[AnyRef] == null) aelem = modelmats(i).zeros(1,1);
+    swapMats(i);
+  }
+
+  override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
+    val start = toc;
+    clipping();
+    val nsteps = if (step == 0) 1.0 else {
+	if (firstStep == 0.0) {
+	  firstStep = step;
+	  1f;
+	} else {
+	  step / firstStep;
+	}
+      }
+    val batchSize = model.gmats(0).ncols;
+    val nmats = updatemats.length;
+    val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps.toFloat, gprogress) else 0;
+    for (i <- 0 until nmats) {
+      if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	val mm = modelmats(i);
+	tscale = if (te.asInstanceOf[AnyRef] != null) {
+	  te <-- opts.texp;
+	  stepn.set(1f/nsteps.toFloat);
+	  stepn ^ te;
+	} else {
+	  pe <-- opts.pexp;
+	  stepn.set(1f/(ipass+1));
+	  stepn ^ pe;
+	}
+	if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
+	  lrate.set(lr0);
+	} else {
+	  if (opts.lrate.ncols > 1) {
+	    lrate <-- opts.lrate(?,i);
+	  } else {
+	    lrate <-- opts.lrate;
+	  }
+	}
+	lrate ~ lrate / batchSize;
+	val lr_scales = model.lr_scales;
+	if (lr_scales.asInstanceOf[AnyRef] != null) {
+	  lrate ~ lrate *@ lr_scales(i);
+	} 
+	if (opts.waitsteps < nsteps) {
+	  val grad = updatemats(i);
+	  if (opts.l2reg.asInstanceOf[AnyRef] != null) {
+	    val i0 = if (opts.l2reg.length > 1) i else 0;
+	    (grad, mm) match {
+	      case (ggrad:GMat, gmm:GMat) => Grad.linComb(ggrad, 1f, gmm, -opts.l2reg(i0) * batchSize, ggrad);
+	      case _ => grad ~ grad - (mm *@ (opts.l2reg(i0) * batchSize));
+	    }
+	  }
+	  if (opts.langevin > 0) {                              // Add Langevin random permutations
+	    normrnd(0, opts.langevin, randmat(i));
+	    grad ~ grad + randmat(i);
+	  }
+	  grad ~ grad *@ (lrate *@ tscale);
+	  if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+	    val i0 = if (opts.vel_decay.length > 1) i else 0;
+	    (grad, momentum(i)) match {
+	      case (ggrad:GMat, gmom:GMat) => Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);
+	      case _ => {
+		mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
+		momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
+		momentum(i) ~ momentum(i) + grad;
+	      }
+	    }
+	    grad <-- momentum(i);
+	  }
+	  if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+	    val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
+	    mu <-- opts.nesterov_vel_decay(i0);                    // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
+	    (grad, momentum(i)) match {
+	      case (ggrad:GMat, gmom:GMat) => {
+		Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);   // p_t = mu * p_t-1 + g
+		Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), ggrad);  // g' = mu p_t + (p_t - mu*p_t-1) = mu *p_t + g
+	      }
+	      case _ => {      
+		momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
+		momentum(i) ~ momentum(i) + grad;                    // Compute new momentum p_t = mu * p_t-1 + g
+		mm ~ mm + grad;                                      // Add 2nd and 4th terms: (p_t - mu p_t-1) = g to the model;
+		grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added.
+	      }
+	    }       	                                  
+	  }
+	  modelmats(i) ~ modelmats(i) + grad;
+	  if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
+	}
+	updatemats(i).clear;
+	if (opts.collideEvery > 0 && (nsteps.toInt % opts.collideEvery) == 0) collide(momentum(i), momentumSave(i), i);
+	if (opts.attractEvery > 0 && (nsteps.toInt % opts.attractEvery) == 0) attract(modelmats(i), modelmatsSave(i), opts.attraction, i);
+      }
+      checkSwapMats(i);
+    }
+    runningtime += toc - start;
+  }
+}
+
+
+object GradCollide {
+  trait Opts extends Grad.Opts {
+    var collideEvery = 2;
+    var attractEvery = 2;
+    var attraction = 0.1f;
+    var logcollide = false;
+    var logattract = false;
+    var logswap = false;
+  }
+  
+  class Options extends Opts {}
+  
+}
+

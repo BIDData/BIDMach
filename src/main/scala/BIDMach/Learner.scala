@@ -87,6 +87,7 @@ class Learner(
     }
     val tmp = myLogger;
     myLogger = Mat.getFileLogger(opts.logfile);
+    Mat.logger = myLogger;
   	val executor = Executors.newFixedThreadPool(nthreads);
   	val runner = new Runnable{
   	  def run() = {

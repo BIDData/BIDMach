@@ -15,7 +15,7 @@ val net = new Net(opts);
 val grad = new Grad(opts);
 val nn = new Learner(ds, net, null, grad, null, opts);
 
-val resdim = 50;
+val resdim = 34;
 val bottleneckThreshold = 40;
 
 val layercounts = (
@@ -33,23 +33,22 @@ val nconv4x = layercounts(imodel, 3);
 val nconv5x = layercounts(imodel, 4);
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
-  val lr = if (ipass < 20) {
-      1e-2f
-  } else if (ipass < 40) {
-      1e-3f
-  } else 1e-4f;
+  val lr = if (ipass < 15) {
+      2e-2f
+  } else if (ipass < 30) {
+      2e-3f
+  } else 2e-4f;
   lr
 }
 
 opts.logfile = "logresv1.txt";
-opts.batchSize= 64;
+opts.batchSize= 128;
 opts.nend = 1250;
-opts.npasses = 100;
+opts.npasses = 60;
 opts.lrate = 1e-1f;
 opts.texp = 0.0f;
 opts.pstep = 0.05f;
-opts.hasBias = false;
-opts.l2reg = 0.0005f;
+opts.l2reg = 0.0001f;
 opts.hasBias = true;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
@@ -61,7 +60,8 @@ opts.inplace = Net.BackwardCaching;
 //opts.inplace = Net.NoInPlace;
 opts.convType = Net.CrossCorrelation;
 
-val bnMode = BatchNormLayer.SPATIAL;
+//val bnMode = BatchNormLayer.SPATIAL;
+val bnMode = BatchNormLayer.PER_ACTIVATION;
 val in_place = opts.inplace
 
 :silent
@@ -72,14 +72,14 @@ import BIDMach.networks.layers.Node._;
 
 // dim is the input and output depth. Image dimensions unchanged.
 def conv3x3Block(in:Node, dim:Int, stride:Int):Node = {
-    val convx_1 =   conv(in)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,hasBias=opts.hasBias,stride = stride);
+    val convx_1 =   conv(in)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias,stride = stride);
     val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
     val relux_1 =   relu(normx_1)(in_place);
 
-    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,hasBias=opts.hasBias);
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias);
     val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
 
-    val shortcut = conv(in)(w=1,h=1,pad=0,nch=dim,initv=1.4142f,hasBias=opts.hasBias,stride=stride)
+    val shortcut = conv(in)(w=1,h=1,pad=0,nch=dim,hasBias=opts.hasBias,stride=stride)
     val bshortcut = batchNormScale(shortcut)(normMode=bnMode,inplace=in_place);
 
     val sum_2 = bshortcut + normx_2
@@ -90,18 +90,18 @@ def conv3x3Block(in:Node, dim:Int, stride:Int):Node = {
 
 // dim is the internal (bottleneck) depth. Input and output should have depth 4x dim. Image dimensions unchanged.
 def convBottleNeckBlock(in:Node, dim:Int, stride:Int, firstBlock:Boolean):Node = {
-    val convx_1 =   conv(in)(w=1,h=1,pad=0,nch=dim,initv=1.4142f,hasBias=opts.hasBias);
+    val convx_1 =   conv(in)(w=1,h=1,pad=0,nch=dim,hasBias=opts.hasBias);
     val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
     val relux_1 =   relu(normx_1)(in_place);
 
-    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,initv=1.4142f,hasBias=opts.hasBias,stride = stride);
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias,stride = stride);
     val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
     val relux_2 =   relu(normx_2)(in_place);
 
-    val convx_3 =   conv(relux_2)(w=1,h=1,pad=0,nch=dim*4,initv=1.4142f,hasBias=opts.hasBias);
+    val convx_3 =   conv(relux_2)(w=1,h=1,pad=0,nch=dim*4,hasBias=opts.hasBias);
     val normx_3 =   batchNormScale(convx_3)(normMode=bnMode,inplace=in_place);
     val shortcut =  if (firstBlock) {
-                        val c = conv(in)(w=1,h=1,pad=0,nch=4*dim,initv=1.4142f,hasBias=opts.hasBias,stride = stride) 
+                        val c = conv(in)(w=1,h=1,pad=0,nch=4*dim,hasBias=opts.hasBias,stride = stride) 
                         batchNormScale(c)(normMode=bnMode,inplace=in_place);
                     }
                     else in;
@@ -129,10 +129,10 @@ val din =       in - meanv;
 //val scalef =    const(row(0.01f));
 //val sdin =      din *@ scalef;
 //val fin =       format(in)();
-val cin =       crop(din)(randoffsets=irow(0,32,32,-1));
-val min =       randmirror(cin)();
+val min =       cropMirror(din)(randoffsets=irow(0,28,28,-1));
+//val min =       randmirror(cin)();
 
-val conv1 =     conv(min)(w=7,h=7,pad=3,stride=2,nch=64,initv=1.4142f,hasBias=opts.hasBias);
+val conv1 =     conv(min)(w=7,h=7,pad=3,stride=2,nch=64,hasBias=opts.hasBias);
 val norm1 =     batchNormScale(conv1)(normMode=bnMode,inplace=in_place);
 val relu1 =     relu(norm1)(in_place);
 val pool1 =     pool(relu1)(h=3,w=3,pad=1,stride=2);
