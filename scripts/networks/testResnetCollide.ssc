@@ -1,3 +1,4 @@
+import BIDMach.updaters.GradCollide
 import BIDMach.networks.layers._
 
 val traindir = "../../data/ImageNet/train/";
@@ -8,11 +9,11 @@ val testdata = testdir+"partNCHW%04d.bmat.lz4";
 val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
 
-class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with GradCollide.Opts;
 val opts = new MyOpts;
 val ds = FileSource(traindata, trainlabels, opts);
 val net = new Net(opts);
-val grad = new Grad(opts);
+val grad = new GradCollide(opts);
 val nn = new Learner(ds, net, null, grad, null, opts);
 
 val resdim = 34;
@@ -34,7 +35,7 @@ val nconv5x = layercounts(imodel, 4);
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 15) {
-      2e-2f
+      4e-2f
   } else if (ipass < 30) {
       2e-3f
   } else 2e-4f;
@@ -42,7 +43,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logresv1.txt";
-opts.batchSize= 128;
+opts.batchSize= 64;
 opts.nend = 1250;
 opts.npasses = 60;
 opts.lrate = 1e-1f;
@@ -52,10 +53,20 @@ opts.l2reg = 0.0001f;
 opts.hasBias = true;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
+opts.attractEvery = 2;
+opts.collideEvery = 2;
+opts.attraction = 0.1f;
+opts.repeat_collide = 2;
+//opts.logcollide=true;
+//opts.logattract=true;
+//opts.logswap=true;
+
+
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
 opts.inplace = Net.BackwardCaching;
 //opts.inplace = Net.InPlace;
+
 //opts.inplace = Net.NoInPlace;
 opts.convType = Net.CrossCorrelation;
 
@@ -85,7 +96,8 @@ def conv3x3Block(in:Node, dim:Int, stride:Int):Node = {
 	in;
     }
 
-    val sum_2 =     shortcut + normx_2;
+    val sum_2 =     shortcut + normx_2
+//    val sum_2 =     in + normx_2;
     val out =       relu(sum_2)(in_place);
     out;
 }
@@ -113,7 +125,7 @@ def convBottleNeckBlock(in:Node, dim:Int, stride:Int, firstBlock:Boolean):Node =
 }
 
 
-def convBlock(in:Node, dim:Int, stride:Int = 1, firstBlock:Boolean = false):Node = {
+def convBlock(in:Node, dim:Int, stride:Int = 0, firstBlock:Boolean = false):Node = {
     if (resdim > bottleneckThreshold) {
 	    convBottleNeckBlock(in, dim, stride, firstBlock) 
     } else {
@@ -171,7 +183,7 @@ opts.nodeset=Net.getDefaultNodeSet
 
 def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
-val sgd = nn.updater.asInstanceOf[Grad];
+val sgd = nn.updater.asInstanceOf[GradCollide];
 
 nn.launchTrain;
 
