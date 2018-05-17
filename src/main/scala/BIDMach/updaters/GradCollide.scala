@@ -216,25 +216,25 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     normrnd(0, lq, y);
     x ~ x + p;
     y ~ y + q;
-    
-    u ~ x * math.sqrt(1/(dotprod(x, x)+epsilon)).toFloat;
-    v ~ u * dotprod(y, u);
+
+    u ~ x * aelem.set(math.sqrt(1/(dotprod(x, x)+epsilon)).toFloat);
+    v ~ u * aelem.set(dotprod(y, u));
     y ~ y - v;
     val ny1 = dotprod(y, y);
-    v ~ y * math.sqrt(1/(ny1+epsilon)).toFloat;
-    
-    tmp ~ u * dotprod(p, u);
-    pbar ~ v * dotprod(p, v);
+    v ~ y * aelem.set(math.sqrt(1/(ny1+epsilon)).toFloat);
+
+    tmp ~ u * aelem.set(dotprod(p, u));
+    pbar ~ v * aelem.set(dotprod(p, v));
     pbar ~ pbar + tmp;
 
-    tmp ~ u * dotprod(q, u);
-    qbar ~ v * dotprod(q, v);
+    tmp ~ u * aelem.set(dotprod(q, u));
+    qbar ~ v * aelem.set(dotprod(q, v));
     qbar ~ qbar + tmp;
 
     tmat ~ pbar + qbar;
     tmp ~ pbar - qbar;
     val twt = dotprod(tmp, tmat)/(dotprod(tmat, tmat)+epsilon);
-    c ~ tmat * twt;
+    c ~ tmat * aelem.set(twt);
     c ~ c - tmp;
 
     p ~ p + c;
