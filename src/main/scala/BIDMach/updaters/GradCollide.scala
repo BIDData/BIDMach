@@ -28,7 +28,6 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   var c:Mat = null;
   var tmp:Mat = null;
   var tmat:Mat = null;
-  var acol:Mat = null;
   var aelem:Mat = null;
 
   var stepn:Mat = null;
@@ -162,7 +161,6 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   def swapMats(i:Int) = {
     if (modelmats(i).asInstanceOf[AnyRef] != null) {
       swap = getLargestMat(swap, modelmats(i));
-      acol = getLargestCol(acol, modelmats(i));
 
       if (opts.logswap) Mat.logger.info("before: i=%d, mm=%f, mms=%f" format (i, dotprod(modelmats(i), modelmats(i)), dotprod(modelmatsSave(i), modelmatsSave(i))));
       swap <-- modelmats(i);
@@ -181,10 +179,11 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   };
 
   def dotprod(a:Mat, b:Mat):Float = {
-    (acol ~ a) dotr b;
-    sum(acol, 1, aelem);
+    aelem ~ a.contents dot b.contents
     aelem.dv.toFloat;
   };
+
+  // This version conserves energy individually for p and q
 
   def collide(p:Mat, q:Mat, i:Int) = {
     x = getLargestMat(x, p);
@@ -196,7 +195,78 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     qbar = getLargestMat(qbar, p);
     c = getLargestMat(c, p);
     tmat = getLargestMat(tmat, p);
-    acol = getLargestCol(acol, p);
+    val epsilon = 1e-36f;
+    
+    val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
+    val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
+    if (opts.logcollide) {
+      val dp = dotprod(p, q);
+      tmp ~ p *@ p;
+      val meansqp = dotprod(tmp, tmp) / p.length;
+      tmp ~ q *@ q;
+      val meansqq = dotprod(tmp, tmp) / p.length;
+      val meanp = lp * lp;
+      val meanq = lq * lq;
+      val cosp = dp / (p.length * lp * lq + epsilon);
+      Mat.logger.info("before: i=%d, cos(p,q)=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
+    }
+    normrnd(0, lp, x);
+    normrnd(0, lq, y);
+    x ~ x + p;
+    y ~ y + q;
+
+    u ~ x * aelem.set(math.sqrt(1/(dotprod(x, x)+epsilon)).toFloat);
+    v ~ u * aelem.set(dotprod(y, u));
+    y ~ y - v;
+    val ny1 = dotprod(y, y);
+    v ~ y * aelem.set(math.sqrt(1/(ny1+epsilon)).toFloat);
+
+    tmp ~ u * aelem.set(dotprod(p, u));
+    pbar ~ v * aelem.set(dotprod(p, v));
+    pbar ~ pbar + tmp;
+
+    tmp ~ u * aelem.set(dotprod(q, u));
+    qbar ~ v * aelem.set(dotprod(q, v));
+    qbar ~ qbar + tmp;
+
+    tmat ~ pbar + qbar;
+    tmp ~ pbar - qbar;
+    val twt = dotprod(tmp, tmat)/(dotprod(tmat, tmat)+epsilon);
+    c ~ tmat * aelem.set(twt);
+    c ~ c - tmp;
+
+    p ~ p + c;
+    q ~ q - c;
+
+    if (opts.logcollide) {
+	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+      val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
+      val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
+      val dp = dotprod(p, q);
+      tmp ~ p *@ p;
+      val meansqp = dotprod(tmp, tmp) / p.length;
+      tmp ~ q *@ q;
+      val meansqq = dotprod(tmp, tmp) / p.length;
+      val meanp = lp * lp;
+      val meanq = lq * lq;
+      val cosp = dp / (p.length * lp * lq + epsilon);
+      Mat.logger.info("after:  i=%d, cos(p,q)=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
+    }
+
+  };
+
+  // This version conserves total energy for p and q
+    
+  def collide1(p:Mat, q:Mat, i:Int) = {
+    x = getLargestMat(x, p);
+    y = getLargestMat(y, p);
+    u = getLargestMat(u, p);
+    v = getLargestMat(v, p);
+    tmp = getLargestMat(tmp, p);
+    pbar = getLargestMat(pbar, p);
+    qbar = getLargestMat(qbar, p);
+    c = getLargestMat(c, p);
+    tmat = getLargestMat(tmat, p);
     val epsilon = 1e-36f;
     
     val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
@@ -259,17 +329,16 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 
   def attract(p:Mat, q:Mat, afactor:Float, i:Int) = {
     u = getLargestMat(u, p);
-    acol = getLargestCol(acol, p);
-    val pm = dotprod(p,p);
-    val qm = dotprod(q,q);	
     u ~ p - q;
-    val um = dotprod(u,u);
-    u ~ u * (0.5f * afactor);
+    val pm = if (opts.logattract) dotprod(p,p) else 0f;
+    val qm = if (opts.logattract) dotprod(q,q) else 0f;
+    val um = if (opts.logattract) dotprod(u,u) else 0f;
+    u ~ u * aelem.set(0.5f * afactor);
     p ~ p - u;
     q ~ q + u;
-    val pm2 = dotprod(p,p);
-    val qm2 = dotprod(q,q);
     if (opts.logattract) {
+	val pm2 = dotprod(p,p);
+	val qm2 = dotprod(q,q);
 	Mat.logger.info("attract %d pm %g, qm %g, um %g, pm %g, qm %g" format (i, pm, qm, um, pm2, qm2));
     }	    
   }
