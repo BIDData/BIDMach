@@ -1,5 +1,5 @@
-import BIDMach.updaters.GradCollide
 import BIDMach.networks.layers._
+import BIDMach.updaters.GradCollide
 
 val traindir = "../../data/ImageNet/train/";
 val testdir = "../../data/ImageNet/val/";
@@ -37,8 +37,9 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 15) {
       4e-2f
   } else if (ipass < 30) {
-      2e-3f
-  } else 2e-4f;
+      4e-3f
+  } else
+      4e-4f;
   lr
 }
 
@@ -53,26 +54,23 @@ opts.l2reg = 0.0001f;
 opts.hasBias = true;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
-opts.attractEvery = 2;
-opts.collideEvery = 2;
-opts.attraction = 0.1f;
-opts.repeat_collide = 2;
-//opts.logcollide=true;
-//opts.logattract=true;
-//opts.logswap=true;
-
-
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
 opts.inplace = Net.BackwardCaching;
 //opts.inplace = Net.InPlace;
-
 //opts.inplace = Net.NoInPlace;
 opts.convType = Net.CrossCorrelation;
-
 val bnMode = BatchNormLayer.SPATIAL;
 //val bnMode = BatchNormLayer.PER_ACTIVATION;
 val in_place = opts.inplace
+
+opts.attractEvery = 2;
+opts.collideEvery = -1;
+opts.attraction = 0.1f;
+opts.hardness = 0.5f;
+//opts.logcollide=true;
+//opts.logattract=true;
+//opts.logswap=true;
 
 :silent
 val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
@@ -96,8 +94,7 @@ def conv3x3Block(in:Node, dim:Int, stride:Int):Node = {
 	in;
     }
 
-    val sum_2 =     shortcut + normx_2
-//    val sum_2 =     in + normx_2;
+    val sum_2 =     shortcut + normx_2;
     val out =       relu(sum_2)(in_place);
     out;
 }
@@ -125,7 +122,7 @@ def convBottleNeckBlock(in:Node, dim:Int, stride:Int, firstBlock:Boolean):Node =
 }
 
 
-def convBlock(in:Node, dim:Int, stride:Int = 0, firstBlock:Boolean = false):Node = {
+def convBlock(in:Node, dim:Int, stride:Int = 1, firstBlock:Boolean = false):Node = {
     if (resdim > bottleneckThreshold) {
 	    convBottleNeckBlock(in, dim, stride, firstBlock) 
     } else {

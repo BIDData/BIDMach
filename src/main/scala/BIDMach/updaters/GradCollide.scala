@@ -162,19 +162,19 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     if (modelmats(i).asInstanceOf[AnyRef] != null) {
       swap = getLargestMat(swap, modelmats(i));
 
-      if (opts.logswap) Mat.logger.info("before: i=%d, mm=%f, mms=%f" format (i, dotprod(modelmats(i), modelmats(i)), dotprod(modelmatsSave(i), modelmatsSave(i))));
+      if (opts.logSwap) Mat.logger.info("before: i=%d, mm=%f, mms=%f" format (i, dotprod(modelmats(i), modelmats(i)), dotprod(modelmatsSave(i), modelmatsSave(i))));
       swap <-- modelmats(i);
       modelmats(i) <-- modelmatsSave(i);
       modelmatsSave(i) <-- swap;
-      if (opts.logswap) Mat.logger.info("after : i=%d, mm=%f, mms=%f" format (i, dotprod(modelmats(i), modelmats(i)), dotprod(modelmatsSave(i), modelmatsSave(i))));
+      if (opts.logSwap) Mat.logger.info("after : i=%d, mm=%f, mms=%f" format (i, dotprod(modelmats(i), modelmats(i)), dotprod(modelmatsSave(i), modelmatsSave(i))));
     }    
 
     if (momentum(i).asInstanceOf[AnyRef] != null) {
-	if (opts.logswap) Mat.logger.info("before: i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
+	if (opts.logSwap) Mat.logger.info("before: i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
       swap <-- momentum(i);
       momentum(i) <-- momentumSave(i);
       momentumSave(i) <-- swap;
-      if (opts.logswap) Mat.logger.info("after : i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
+      if (opts.logSwap) Mat.logger.info("after : i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
     }
   };
 
@@ -199,7 +199,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     
     val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
     val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
-    if (opts.logcollide) {
+    if (opts.logCollide) {
       val dp = dotprod(p, q);
       tmp ~ p *@ p;
       val meansqp = dotprod(tmp, tmp) / p.length;
@@ -238,7 +238,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     p ~ p + c;
     q ~ q - c;
 
-    if (opts.logcollide) {
+    if (opts.logCollide) {
 	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
       val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
       val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
@@ -257,14 +257,14 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 
   // This version conserves total energy for p and q
     
-  def collide(p:Mat, q:Mat, i:Int) = {
+  def collide2(p:Mat, q:Mat, i:Int) = {
     x = getLargestMat(x, p);
     y = getLargestMat(y, p);
     c = getLargestMat(c, p);
     tmp = getLargestMat(tmp, p);
     val epsilon = 1e-36f;
 
-    if (opts.logcollide) {
+    if (opts.logCollide) {
       val meanp = dotprod(p, p) / p.length;
       val meanq = dotprod(q, q) / q.length;
       val dp = dotprod(p, q);
@@ -275,19 +275,17 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
       val cosp = dotprod(p, q) / (p.length * math.sqrt(meanp * meanq).toFloat + epsilon);
       Mat.logger.info("before: i=%d, cos(p,q)=%g, tote=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp+meanq, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
     }
-    for (j <- 0 until opts.repeat_collide) {
-	x ~ p - q;
-	val lx = math.sqrt(dotprod(x, x) / x.length).toFloat;
-	normrnd(0, lx, y);
-	y ~ y + x;
+    x ~ p - q;
+    val lx = math.sqrt(dotprod(x, x) / x.length).toFloat;
+    normrnd(0, lx, y);
+    y ~ y + x;
 	
-	c ~ y * aelem.set((dotprod(x, y)/(dotprod(y, y)+epsilon)).toFloat);
+    c ~ y * aelem.set((dotprod(x, y)/(dotprod(y, y)+epsilon)).toFloat);
 
-	p ~ p - c;
-	q ~ q + c;
-    }
+    p ~ p - c;
+    q ~ q + c;
 
-    if (opts.logcollide) {
+    if (opts.logCollide) {
 	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
       val meanp = dotprod(p, p) / p.length;
       val meanq = dotprod(q, q) / q.length;
@@ -302,16 +300,87 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 
   };
 
+
+  // This version conserves total energy for p and q, allows variable collision "hardness"
+    
+  def collide3(p:Mat, q:Mat, i:Int) = {
+    x = getLargestMat(x, p);
+    y = getLargestMat(y, p);
+    c = getLargestMat(c, p);
+    tmp = getLargestMat(tmp, p);
+    val epsilon = 1e-36f;
+
+    if (opts.logCollide) {
+      val meanp = dotprod(p, p) / p.length;
+      val meanq = dotprod(q, q) / q.length;
+      val dp = dotprod(p, q);
+      tmp ~ p *@ p;
+      val meansqp = dotprod(tmp, tmp) / p.length;
+      tmp ~ q *@ q;
+      val meansqq = dotprod(tmp, tmp) / p.length;
+      val cosp = dotprod(p, q) / (p.length * math.sqrt(meanp * meanq).toFloat + epsilon);
+      val varp = meansqp - meanp * meanp;
+      val varq = meansqq - meanq * meanq;
+      Mat.logger.info("before: i=%d, cos(p,q)=%g, tote=%g, meanp=%g, meanq=%g, totv=%g, varp=%g, varq=%g" format (i, cosp, meanp+meanq, meanp, meanq, meansqp+meansqq, varp, varq));
+    }
+    tmp ~ p - q;
+    c ~ tmp * aelem.set(opts.hardness * 0.5f);
+    x ~ p - c;
+    y ~ q + c;
+    normrnd(0, 1, c);
+    tmp ~ x - y;
+    // Quadratic coefficients for energy conservation
+    val qa = 2 * dotprod(c, c);
+    val qb = 2 * dotprod(c, tmp);
+    val qc = dotprod(x,x) + dotprod(y,y) - dotprod(p,p) - dotprod(q,q);
+    val discr = qb*qb - 4*qa*qc;
+    if (discr >= 0) {
+	// Quadratic is solvable (should be for any hardness in [0,1]) so solve it.
+	val beta = if (Mat.myrand.nextFloat() < 0.5f) {
+	    (-qb + math.sqrt(discr).toFloat)/(2*qa+epsilon);
+	} else {
+	    (-qb - math.sqrt(discr).toFloat)/(2*qa+epsilon);
+	}	    
+	c ~ c * aelem.set(beta);
+	p ~ x + c;
+	q ~ y - c;
+
+	if (opts.logCollide) {
+	    //	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+	    val meanp = dotprod(p, p) / p.length;
+	    val meanq = dotprod(q, q) / q.length;
+	    val dp = dotprod(p, q);
+	    tmp ~ p *@ p;
+	    val meansqp = dotprod(tmp, tmp) / p.length;
+	    tmp ~ q *@ q;
+	    val meansqq = dotprod(tmp, tmp) / p.length;
+	    val cosp = dotprod(p, q) / (p.length * math.sqrt(meanp * meanq).toFloat + epsilon);
+	    val varp = meansqp - meanp * meanp;
+	    val varq = meansqq - meanq * meanq;
+	    Mat.logger.info("after:  i=%d, cos(p,q)=%g, tote=%g, meanp=%g, meanq=%g, totv=%g, varp=%g, varq=%g" format (i, cosp, meanp+meanq, meanp, meanq, meansqp+meansqq, varp, varq));
+	}
+    }
+
+  };
+
+  def collide(p:Mat, q:Mat, i:Int) = {
+      if (opts.hardness > 0) {
+	  collide3(p, q, i);
+      } else {
+	  collide1(p, q, i);
+      }
+  };      
+
   def attract(p:Mat, q:Mat, afactor:Float, i:Int) = {
     u = getLargestMat(u, p);
     u ~ p - q;
-    val pm = if (opts.logattract) dotprod(p,p) else 0f;
-    val qm = if (opts.logattract) dotprod(q,q) else 0f;
-    val um = if (opts.logattract) dotprod(u,u) else 0f;
+    val pm = if (opts.logAttract) dotprod(p,p) else 0f;
+    val qm = if (opts.logAttract) dotprod(q,q) else 0f;
+    val um = if (opts.logAttract) dotprod(u,u) else 0f;
     u ~ u * aelem.set(0.5f * afactor);
     p ~ p - u;
     q ~ q + u;
-    if (opts.logattract) {
+    if (opts.logAttract) {
 	val pm2 = dotprod(p,p);
 	val qm2 = dotprod(q,q);
 	Mat.logger.info("attract %d pm %g, qm %g, um %g, pm %g, qm %g" format (i, pm, qm, um, pm2, qm2));
@@ -319,9 +388,15 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   }
 
   def checkSwapMats(i:Int) = {
-    if (modelmats(i).asInstanceOf[AnyRef] != null) {
-	if (modelmatsSave(i).asInstanceOf[AnyRef] == null) modelmatsSave(i) = modelmats(i).zeros(modelmats(i).dims);
-      if (momentum(i).asInstanceOf[AnyRef] != null && momentumSave(i).asInstanceOf[AnyRef] == null) momentumSave(i) = momentum(i).zeros(momentum(i).dims);
+      if (modelmats(i).asInstanceOf[AnyRef] != null) {
+	  if (modelmatsSave(i).asInstanceOf[AnyRef] == null) {
+	      modelmatsSave(i) = modelmats(i).zeros(modelmats(i).dims);
+	      modelmatsSave(i) <-- modelmats(i);
+	  }
+	  if (momentum(i).asInstanceOf[AnyRef] != null && momentumSave(i).asInstanceOf[AnyRef] == null) {
+	      momentumSave(i) = momentum(i).zeros(momentum(i).dims);
+	      momentumSave(i) <-- momentum(i);
+	  }
     }
     if (aelem.asInstanceOf[AnyRef] == null) aelem = modelmats(i).zeros(1,1);
     swapMats(i);
@@ -416,7 +491,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 	if (opts.collideEvery > 0 && (nsteps.toInt % opts.collideEvery) == 0) collide(momentum(i), momentumSave(i), i);
 	if (opts.attractEvery > 0 && (nsteps.toInt % opts.attractEvery) == 0) attract(modelmats(i), modelmatsSave(i), opts.attraction, i);
       }
-      checkSwapMats(i);
+      if (opts.doSwaps) checkSwapMats(i);
     }
     runningtime += toc - start;
   }
@@ -425,13 +500,14 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 
 object GradCollide {
   trait Opts extends Grad.Opts {
+    var doSwaps = true;
     var collideEvery = 2;
     var attractEvery = 2;
     var attraction = 0.1f;
-    var logcollide = false;
-    var logattract = false;
-    var logswap = false;
-    var repeat_collide = 1;
+    var hardness = 1f;
+    var logCollide = false;
+    var logAttract = false;
+    var logSwap = false;
   }
   
   class Options extends Opts {}
