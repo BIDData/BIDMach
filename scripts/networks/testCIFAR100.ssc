@@ -1,0 +1,69 @@
+:silent
+val datadir = "../../data/CIFAR100/parts/"
+val trainfname = datadir + "trainNCHW%d.fmat.lz4";
+val labelsfname = datadir + "labels%d.imat.lz4";
+val testfname = datadir + "testNCHW%d.fmat.lz4";
+val testlabelsfname = datadir + "testlabels%d.imat.lz4";
+val predsfname = datadir + "preds%d.fmat.lz4";
+
+val (nn,opts) = Net.learner(trainfname,labelsfname);
+
+val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
+
+
+opts.batchSize= 100
+opts.npasses = 10
+opts.lrate = 1e-4f 
+
+opts.vel_decay = 0f
+opts.gsq_decay = 0.99f
+opts.texp = 0.0f
+opts.pstep = 0.1f
+opts.hasBias = true;
+opts.tensorFormat = Net.TensorNCHW;
+opts.autoReset = false;
+opts.debugMem = true;
+
+import BIDMach.networks.layers.Node._;
+
+val in = input();
+val scalef = constant(row(0.01f));
+val inscale = in *@ scalef
+
+val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=0,initv=1f,convType=convt);
+val pool1 = pool(conv1)(w=2,h=2,stride=2);
+//val norm1 = batchNormScale(pool1)();
+val relu1 = relu(pool1)();
+
+val conv2 = conv(relu1)(w=5,h=5,nch=32,stride=1,pad=0,convType=convt);
+val pool2 = pool(conv2)(w=2,h=2,stride=2);
+//val norm2 = batchNormScale(pool2)();
+val relu2 = relu(pool2)();
+
+val conv3 = conv(relu2)(w=5,h=5,nch=32,stride=1,pad=2,convType=convt);
+val pool3 = pool(conv3)(w=3,h=3,stride=2);
+val fc3 =   linear(pool3)(outdim=10,initv=3e-2f);
+val out =   softmaxout(fc3)(scoreType=1); 
+
+val nodes = (in     \ scalef \ inscale on
+             conv1  \ pool1  \ relu1  on
+             conv2  \ pool2  \ relu2  on
+             conv3  \ pool3  \ null   on
+             fc3    \ out    \ null   ).t
+
+
+
+opts.nodemat = nodes;
+val model = nn.model.asInstanceOf[Net];
+nn.train;
+
+val (mm, mopts) =  Net.predictor(model, testfname, testlabelsfname, predsfname);
+mopts.autoReset = false;
+mopts.batchSize = 100;
+val mmodel = mm.model.asInstanceOf[Net];
+mm.predict;
+
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+
+:silent
+
