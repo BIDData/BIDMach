@@ -75,31 +75,34 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
 
     // backward traversing model mats, assuming forward traversal by the training model
     // using while instead of for loop due to performance
-    var current = totalDataSize - 1
+    var current = totalDataSize
     var i = model.modelmats.length - 1
     val alpha = alphaFromIter(reducedOutput.iteration)
 
     while (i >= 0) {
       val mat = model.modelmats(i)
       mat.synchronized {
-        val modelData = FMat(mat).data
-        var j = mat.length - 1
-        while (j >= 0) {
-          modelData(j) = reducedData(current) * alpha + modelData(j) * (1 - alpha)
-          j -= 1
-          current -= 1
-        }
         mat match {
           case gmat: GMat =>
-            GMat.CPUtoGPUarraycopy(modelData, 0, gmat.pdata, 0, mat.length, "ElasticAverageBinder dataSink")
+            val gReduced = GMat.make(gmat.dims)
+            GMat.CPUtoGPUarraycopy(reducedData, current - gmat.length, gReduced.pdata, 0, gmat.length, "ElasticAverageBinder dataSink")
+            gmat ~ gmat * (1 - alpha)
+            gReduced ~ gReduced * alpha
+            gmat ~ gReduced + gmat
+            gReduced.free()
           case fmat: FMat =>
-            // Already updated in-place fmat array during the elastic averaging
+            val fReduced = FMat.make(fmat.dims)
+            System.arraycopy(reducedData, current - fmat.length, fReduced.contents().data, 0, fmat.length)
+            fmat ~ fmat * (1 - alpha)
+            fReduced ~ fReduced * alpha
+            fmat ~ fReduced + fmat
         }
+        current -= mat.length
       }
       i -= 1
     }
 
-    assert(current == -1, "current should be zero after iteration")
+    assert(current == 0, "current should be zero after iteration")
 
   }
 
