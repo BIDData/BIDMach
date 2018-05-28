@@ -1,0 +1,61 @@
+:silent
+val inputdir = "../../data/CIFAR100/";
+val outputdir = "../../data/CIFAR100/parts/";
+val trainfname = "train.bin";
+val testfname = "test.bin";
+val traindname = "train0.fmat.lz4";
+val trainNCHWdname = "trainNCHW0.fmat.lz4";
+val trainlabels = "labels0.imat.lz4";
+val testdname = "test0.fmat.lz4";
+val testNCHWdname = "testNCHW0.fmat.lz4";
+val testlabels = "testlabels0.imat.lz4";
+
+val nparts = 1;
+val nimages = 50000;
+val ntest = 10000;
+val nimgbytes = 3 * 32 * 32;
+
+import java.io._
+
+val buffer = new Array[Byte](nimgbytes);
+val datamat = zeros(3\32\32\nimages);
+val labelfine = izeros(1, nimages);
+val labelcoarse = izeros(1, nimages);
+
+val testdatamat = zeros(3\32\32\ntest);
+val testlabelfine = izeros(1, ntest);
+val testlabelcoarse = izeros(1, ntest);
+
+def getFile(fname:String, datamat:FMat, labelfine:IMat, labelcoarse:IMat, nimages:Int) {
+  val ds = new DataInputStream(new FileInputStream(fname));
+  for (j <- 0 until nimages) {
+    var label = ds.readByte();
+    labelcoarse(j) = label;
+    label = ds.readByte();
+    labelfine(j) = label;
+    ds.readFully(buffer, 0, nimgbytes);
+    var k = 0;
+    while (k < nimgbytes) {
+      datamat.data(k + j * nimgbytes) = buffer(k) & 0xFF;
+      k += 1;
+    }
+  }
+  ds.close();
+}
+
+
+print("\nConverting CIFAR100");
+getFile(inputdir + trainfname, datamat, labelfine, labelcoarse, nimages);
+saveFMat(outputdir+traindname, datamat.fromNCHWtoNHWC);
+saveFMat(outputdir+trainNCHWdname, datamat);
+saveFMat(outputdir+trainlabels, labelfine);
+print(".");
+
+getFile(inputdir + testfname, testdatamat, testlabelfine, testlabelcoarse, ntest);
+saveFMat(outputdir + testdname, testdatamat.fromNCHWtoNHWC);
+saveFMat(outputdir + testNCHWdname, testdatamat);
+saveFMat(outputdir + testlabels, testlabelfine);
+print(".");
+
+println();
+:silent

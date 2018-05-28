@@ -1,6 +1,6 @@
 :silent
-val inputdir = "../data/CIFAR10/";
-val outputdir = "../data/CIFAR10/parts/";
+val inputdir = "../../data/CIFAR10/";
+val outputdir = "../../data/CIFAR10/parts/";
 val trainfname = "data_batch_%d.bin";
 val testfname = "test_batch.bin";
 val traindname = "train%d.fmat.lz4";

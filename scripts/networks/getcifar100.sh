@@ -14,20 +14,20 @@ cd "${BIDMACH_SCRIPTS}"
 BIDMACH_SCRIPTS=`pwd`
 BIDMACH_SCRIPTS="$( echo ${BIDMACH_SCRIPTS} | sed 's+/cygdrive/\([a-z]\)+\1:+' )" 
 
-echo "Loading CIFAR10 data"
+echo "Loading CIFAR100 data"
 
-CIFAR10="${BIDMACH_SCRIPTS}/../../data/CIFAR10"
-mkdir -p ${CIFAR10}/parts
-cd ${CIFAR10}
+CIFAR100="${BIDMACH_SCRIPTS}/../../data/CIFAR100"
+mkdir -p ${CIFAR100}/parts
+cd ${CIFAR100}
 
 if [ ! -e t10k-labels-idx1-ubyte ]; then
-    wget http://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz
-    tar -xf cifar-10-binary.tar.gz 
-    rm -f cifar-10-binary.tar.gz
-    mv cifar-10-batches-bin/* . 
-    rm -rf cifar-10-batches-bin
+    wget http://www.cs.toronto.edu/~kriz/cifar-100-binary.tar.gz
+    tar -xf cifar-100-binary.tar.gz 
+    rm -f cifar-100-binary.tar.gz
+    mv cifar-100-binary/* . 
+    rm -rf cifar-100-binary
 fi
 
-echo "Processing CIFAR10 data"
+echo "Processing CIFAR100 data"
 cd "${BIDMACH_SCRIPTS}"
-../../bidmach processcifar10.ssc
+../../bidmach processcifar100.ssc
