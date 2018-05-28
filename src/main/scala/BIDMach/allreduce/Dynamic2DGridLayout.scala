@@ -1,7 +1,5 @@
 package BIDMach.allreduce
 
-import akka.actor.ActorRef
-
 import scala.collection.mutable
 
 /**
@@ -11,7 +9,7 @@ import scala.collection.mutable
 class Dynamic2DGridLayout(nodes: List[Int]) {
   type MasterLayout = Dynamic2DGridLayout.MasterLayout
   var _grid = new mutable.ArrayBuffer[mutable.ArrayBuffer[Option[Int]]]() // grid recording the nodes layout
-  _grid+=mutable.ArrayBuffer.fill(1)(Option.empty)
+  _grid+=mutable.ArrayBuffer.fill(1)(None)
   var _count = 0 //how many nodes are in the grid
   var _filled = 0 //how many locations for are filled. Once fully filled grid would expand
   var _N = 1 // size of the grid, always N*N except for count = 0 case.
@@ -48,8 +46,8 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     //exist to help handle n - 1's master properly
     if (i == _N - 1 && _grid.last.last.isEmpty) {
       assert(_grid.last(0).isDefined && _grid(0).last.isDefined)
-      value(_grid.last(0).get) = (Some(getYNodes(_N - 1)), Option.empty)
-      value(_grid(0).last.get) = (Option.empty, Some(getXNodes(_N - 1)))
+      value(_grid.last(0).get) = (Some(getYNodes(_N - 1)), None)
+      value(_grid(0).last.get) = (None, Some(getXNodes(_N - 1)))
     } else {
       value(_grid(i)(i).get) = (Some(getYNodes(i)), Some(getXNodes(i)))
     }
@@ -83,15 +81,15 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     if (_N * _N == _count) {
       _filled = 0
       for (i <- 0 until _N) {
-        _grid(i) += Option.empty
+        _grid(i) += None
       }
-      _grid += mutable.ArrayBuffer.fill(_N + 1)(Option.empty)
+      _grid += mutable.ArrayBuffer.fill(_N + 1)(None)
       _N += 1
       for (i <- 0 until _N - 1) {
         _grid(i).update(_grid(i).length-1, _grid(i)(i + 1))
         _grid(_grid.length-1).update(i, _grid(i + 1)(i))
-        _grid(i).update(i + 1, Option.empty)
-        _grid(i + 1).update(i, Option.empty)
+        _grid(i).update(i + 1, None)
+        _grid(i + 1).update(i, None)
         if (_grid(i)(_grid(i).length-1).isDefined) {
           _node_map.update(_grid(i)(_grid(i).length-1).get, (i, _N - 1))
         }
@@ -122,20 +120,20 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
     _count -=1
     if(_N==1){
       _node_map.remove(_grid(0)(0).get)
-      _grid(0).update(0, Option.empty)
+      _grid(0).update(0, None)
     }else{
       assert(_filled>0)
       _filled-=1
       val (y,x) = getPos(_filled, _N)
       _node_map.remove(_grid(y)(x).get)
-      _grid(y).update(x, Option.empty)
+      _grid(y).update(x, None)
       if( _filled == 0){
         // compact afterwards
         for(i <-0 until _N - 1){
           _grid(i).update(i+1, _grid(i)(_grid(i).length-1))
           _grid(i+1).update(i, _grid(_grid.length-1)(i))
-          _grid(i).update(_grid(i).length-1, Option.empty)
-          _grid(_grid.length-1).update(i, Option.empty)
+          _grid(i).update(_grid(i).length-1, None)
+          _grid(_grid.length-1).update(i, None)
           if(_grid(i)(i+1).isDefined){
             _node_map.update(_grid(i)(i+1).get,(i,i+1))
           }
@@ -228,7 +226,7 @@ class Dynamic2DGridLayout(nodes: List[Int]) {
 
 object Dynamic2DGridLayout{
   type MasterLayout = mutable.HashMap[Int, Tuple2[Option[Set[Int]], Option[Set[Int]]]]
-  // Option.empty means "keep unchanged", and Set() means an empty peer list, so we are forced to use option here
+  // None means "keep unchanged", and Set() means an empty peer list, so we are forced to use option here
   // to distinguish between the two situations
 
   /**
@@ -243,21 +241,21 @@ object Dynamic2DGridLayout{
       if(!new_layout.contains(master_id)){
         diff(master_id)=(Some(Set()),Some(Set()))
         if(old_layout(master_id)._1.isEmpty){
-          diff(master_id) = (Option.empty, diff(master_id)._2)
+          diff(master_id) = (None, diff(master_id)._2)
         }
         if(old_layout(master_id)._2.isEmpty){
-          diff(master_id) = (diff(master_id)._1, Option.empty)
+          diff(master_id) = (diff(master_id)._1, None)
         }
       }else{
         // remove master id that does not change
         if(new_layout(master_id)._1 == old_layout(master_id)._1){
-          diff(master_id) = (Option.empty, diff(master_id)._2)
+          diff(master_id) = (None, diff(master_id)._2)
         }
         if(new_layout(master_id)._2 == old_layout(master_id)._2){
-          diff(master_id) = (diff(master_id)._1, Option.empty)
+          diff(master_id) = (diff(master_id)._1, None)
         }
         // clear the entry if both doesn't change.
-        if(diff(master_id)._1 == Option.empty && diff(master_id)._2== Option.empty){
+        if(diff(master_id)._1 == None && diff(master_id)._2== None){
           diff.remove(master_id)
         }
       }

@@ -125,7 +125,7 @@ class AllreduceGridMaster(config: GridMasterConfig) extends Actor with akka.acto
       Some(result.get)
     } else {
       log.info(s"\n----GridMaster: Fail to discover LineMaster ${masterNodeIdx}-${dim} Address")
-      Option.empty
+      None
     }
 
   }
