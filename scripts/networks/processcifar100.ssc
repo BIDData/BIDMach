@@ -48,14 +48,15 @@ print("\nConverting CIFAR100");
 getFile(inputdir + trainfname, datamat, labelfine, labelcoarse, nimages);
 saveFMat(outputdir+traindname, datamat.fromNCHWtoNHWC);
 saveFMat(outputdir+trainNCHWdname, datamat);
-saveFMat(outputdir+trainlabels, labelfine);
+saveIMat(outputdir+trainlabels, labelfine);
 print(".");
 
 getFile(inputdir + testfname, testdatamat, testlabelfine, testlabelcoarse, ntest);
 saveFMat(outputdir + testdname, testdatamat.fromNCHWtoNHWC);
 saveFMat(outputdir + testNCHWdname, testdatamat);
-saveFMat(outputdir + testlabels, testlabelfine);
+saveIMat(outputdir + testlabels, testlabelfine);
 print(".");
 
 println();
 :silent
+System.exit(0)

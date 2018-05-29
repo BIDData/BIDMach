@@ -41,14 +41,15 @@ for (i <- 1 to nparts) {
   getFile(inputdir + trainfname format i, datamat, labelmat);
   saveFMat(outputdir+traindname format (i-1), datamat.fromNCHWtoNHWC);
   saveFMat(outputdir+trainNCHWdname format (i-1), datamat);
-  saveFMat(outputdir+trainlabels format (i-1), labelmat);
+  saveIMat(outputdir+trainlabels format (i-1), labelmat);
   print(".");
 }
 getFile(inputdir + testfname, datamat, labelmat);
 saveFMat(outputdir + testdname, datamat.fromNCHWtoNHWC);
 saveFMat(outputdir + testNCHWdname, datamat);
-saveFMat(outputdir + testlabels, labelmat);
+saveIMat(outputdir + testlabels, labelmat);
 print(".");
 
 println();
 :silent
+System.exit(0)
