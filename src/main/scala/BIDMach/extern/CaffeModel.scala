@@ -691,7 +691,6 @@ object CaffeModel {
   
   private def translatePooling(layer:CaffeLayer) = {
     val poolingParam = layer.param.getPoolingParam()
-    if (poolingParam.getGlobalPooling()) throw new NotImplementedError("Global pooling is not supported")
     new PoolingNode {
       if (poolingParam.hasPadH()) {
         pady = poolingParam.getPadH()
@@ -717,10 +716,13 @@ object CaffeModel {
         stridex = stridey
       }
 
-      poolingMode = poolingParam.getPool() match {
-        case PoolMethod.MAX => cudnnPoolingMode.CUDNN_POOLING_MAX
-        case PoolMethod.AVE => cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
-        case PoolMethod.STOCHASTIC => throw new NotImplementedError("Stochastic pooling is not supported yet")
+      poolingMode = {
+        if (poolingParam.getGlobalPooling()) cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING
+        else poolingParam.getPool() match {
+          case PoolMethod.MAX => cudnnPoolingMode.CUDNN_POOLING_MAX
+          case PoolMethod.AVE => cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
+          case PoolMethod.STOCHASTIC => throw new NotImplementedError("Stochastic pooling is not supported yet")
+        }
       }
     }
   }
