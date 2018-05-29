@@ -92,11 +92,11 @@ def conv3x3Block(in:Node, dim:Int, stride:Int):Node = {
 
 // dim is the internal (bottleneck) depth. Input and output should have depth 4x dim. Image dimensions unchanged.
 def convBottleNeckBlock(in:Node, dim:Int, stride:Int, firstBlock:Boolean):Node = {
-    val convx_1 =   conv(in)(w=1,h=1,pad=0,nch=dim,hasBias=opts.hasBias);
+    val convx_1 =   conv(in)(w=1,h=1,pad=0,nch=dim,hasBias=opts.hasBias,stride = stride);
     val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
     val relux_1 =   relu(normx_1)(in_place);
 
-    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias,stride = stride);
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias);
     val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
     val relux_2 =   relu(normx_2)(in_place);
 
