@@ -19,9 +19,9 @@ import scala.util.control.Breaks._
 import scala.util.Try
 import java.io.{FileInputStream,FileReader,InputStream}
 import java.lang.IllegalArgumentException
-import _root_.caffe.Caffe
-import _root_.caffe.Caffe.LRNParameter.NormRegion
-import _root_.caffe.Caffe.PoolingParameter.PoolMethod
+import caffe.Caffe
+import caffe.Caffe.LRNParameter.NormRegion
+import caffe.Caffe.PoolingParameter.PoolMethod
 import com.google.protobuf.{CodedInputStream,TextFormat}
 import jcuda.jcudnn.cudnnPoolingMode
 
