@@ -1,4 +1,5 @@
 :silent
+
 val datadir = "../../data/CIFAR100/parts/"
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";
 val labelsfname = datadir + "labels%d.imat.lz4";
@@ -6,11 +7,16 @@ val testfname = datadir + "testNCHW%d.fmat.lz4";
 val testlabelsfname = datadir + "testlabels%d.imat.lz4";
 val predsfname = datadir + "preds%d.fmat.lz4";
 
-val (nn,opts) = Net.learner(trainfname,labelsfname);
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+val opts = new MyOpts;
+val ds = FileSource(trainfname, labelsfname, opts);
+val net = new Net(opts);
+val grad = new Grad(opts);
+val nn = new Learner(ds, net, null, grad, null, opts);
 
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
-val lrinit = 1e-3f;
+val lrinit = 1e-2f;
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   if (ipass < 10) {
@@ -27,8 +33,8 @@ opts.batchSize= 100;
 opts.npasses = 20
 opts.lrate = 1e-3f 
 
-opts.vel_decay = 0.0f
-opts.gsq_decay = 0.99f
+opts.vel_decay = 0.9f
+//opts.gsq_decay = 0.99f
 opts.texp = 0.0f
 opts.pstep = 0.1f
 opts.hasBias = true;
@@ -37,6 +43,7 @@ opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.autoReset = false;
 opts.debugMem = true;
+
 
 {
 import BIDMach.networks.layers.Node._;
@@ -68,7 +75,13 @@ opts.nodeset=Net.getDefaultNodeSet
 }
 
 val model = nn.model.asInstanceOf[Net];
+
+def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
+
+val sgd = nn.updater.asInstanceOf[Grad];
+
 nn.train;
+
 
 val (mm, mopts) =  Net.predictor(model, testfname, testlabelsfname, predsfname);
 mopts.autoReset = false;
