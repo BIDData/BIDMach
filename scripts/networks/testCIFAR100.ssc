@@ -1,5 +1,5 @@
 :silent
-val datadir = "../../data/CIFAR10/parts/"
+val datadir = "../../data/CIFAR100/parts/"
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";
 val labelsfname = datadir + "labels%d.imat.lz4";
 val testfname = datadir + "testNCHW%d.fmat.lz4";
@@ -10,16 +10,30 @@ val (nn,opts) = Net.learner(trainfname,labelsfname);
 
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 
+val lrinit = 1e-3f;
 
-opts.batchSize= 100
-opts.npasses = 10
+def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
+  if (ipass < 10) {
+	lrinit;
+  } else if (ipass < 20) {
+	lrinit/10;
+  } else {
+	lrinit/100;
+  }
+}
+
+
+opts.batchSize= 100;
+opts.npasses = 20
 opts.lrate = 1e-3f 
 
-opts.vel_decay = 0f
+opts.vel_decay = 0.0f
 opts.gsq_decay = 0.99f
 opts.texp = 0.0f
 opts.pstep = 0.1f
 opts.hasBias = true;
+opts.l2reg = 0.0005f;
+opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.autoReset = false;
 opts.debugMem = true;
@@ -47,7 +61,7 @@ val relu2 = relu(norm2)();
 
 val conv3 = conv(relu2)(w=5,h=5,nch=32,stride=1,pad=2,convType=convt);
 val pool3 = pool(conv3)(w=3,h=3,stride=2);
-val fc3 =   linear(pool3)(outdim=10,initv=3e-2f);
+val fc3 =   linear(pool3)(outdim=100,initv=3e-2f);
 val out =   softmaxout(fc3)(scoreType=1); 
 
 opts.nodeset=Net.getDefaultNodeSet

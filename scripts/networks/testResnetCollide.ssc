@@ -1,4 +1,5 @@
 import BIDMach.networks.layers._
+import BIDMach.updaters.GradCollide
 
 val traindir = "../../data/ImageNet/train/";
 val testdir = "../../data/ImageNet/val/";
@@ -8,11 +9,11 @@ val testdata = testdir+"partNCHW%04d.bmat.lz4";
 val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
 
-class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with GradCollide.Opts;
 val opts = new MyOpts;
 val ds = FileSource(traindata, trainlabels, opts);
 val net = new Net(opts);
-val grad = new Grad(opts);
+val grad = new GradCollide(opts);
 val nn = new Learner(ds, net, null, grad, null, opts);
 
 val resdim = 34;
@@ -34,15 +35,16 @@ val nconv5x = layercounts(imodel, 4);
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 15) {
-      2e-2f
+      4e-2f
   } else if (ipass < 30) {
-      2e-3f
-  } else 2e-4f;
+      4e-3f
+  } else
+      4e-4f;
   lr
 }
 
 opts.logfile = "logresv1.txt";
-opts.batchSize= 128;
+opts.batchSize= 64;
 opts.nend = 1250;
 opts.npasses = 60;
 opts.lrate = 1e-1f;
@@ -58,10 +60,17 @@ opts.inplace = Net.BackwardCaching;
 //opts.inplace = Net.InPlace;
 //opts.inplace = Net.NoInPlace;
 opts.convType = Net.CrossCorrelation;
-
 val bnMode = BatchNormLayer.SPATIAL;
 //val bnMode = BatchNormLayer.PER_ACTIVATION;
 val in_place = opts.inplace
+
+opts.attractEvery = 2;
+opts.collideEvery = -1;
+opts.attraction = 0.1f;
+opts.hardness = 0.5f;
+//opts.logcollide=true;
+//opts.logattract=true;
+//opts.logswap=true;
 
 :silent
 val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
@@ -171,7 +180,7 @@ opts.nodeset=Net.getDefaultNodeSet
 
 def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
-val sgd = nn.updater.asInstanceOf[Grad];
+val sgd = nn.updater.asInstanceOf[GradCollide];
 
 nn.launchTrain;
 

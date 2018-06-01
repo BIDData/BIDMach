@@ -16,23 +16,25 @@ val net = new Net(opts);
 val grad = new Grad(opts);
 val nn = new Learner(ds, net, null, grad, null, opts);
 
+val lrinit = 1e-2f;
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 20) {
-      1e-2f
+      lrinit
   } else if (ipass < 40) {
-      1e-3f
-  } else 1e-4f;
+      lrinit/10
+  } else
+      lrinit/100
   lr
 }
 
-opts.logfile = "logAlexnet.txt";
+opts.logfile = "logAlexnet_%f.txt" format (lrinit);
 opts.batchSize= 128;
 opts.npasses = 80;
-//opts.nend = 10;
+opts.nend = 1250;
 opts.lrate = 1e-4f;
 opts.texp = 0f;
-opts.pstep = 0.05f
+opts.pstep = 0.01f
 opts.hasBias = true;
 opts.l2reg = 0.0005f;
 opts.vel_decay = 0.9f;
