@@ -45,6 +45,8 @@ class Learner(
   val uopts:Updater.Opts = if (updater != null) updater.opts else null
   var useGPU = false
   var reslist:ListBuffer[FMat] = null;
+  var resTlist:ListBuffer[Float] = null;
+  var restmplist:ListBuffer[Float] = null;
   var samplist:ListBuffer[Float] = null;
   var viz:ListBuffer[Visualization] = null; 
   var lastCheckPoint = 0;
@@ -125,6 +127,8 @@ class Learner(
     debugCPUmemState = Mat.debugCPUmem;
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
+    resTlist = new ListBuffer[Float];
+    restmplist = new ListBuffer[Float];
     samplist = new ListBuffer[Float];
     firstPass(null, doInit);
     updateM(ipass-1)
@@ -191,12 +195,18 @@ class Learner(
         val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
         if (datasink != null) datasink.put;
         reslist.append(scores.newcopy)
+        resTlist.append(restmplist.sum/restmplist.length)
+        restmplist.clear
         samplist.append(here)
       } else {
         model.dobatchg(mats, ipass, here);
         if (mixins != null) mixins map (_ compute(mats, here));
         while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
         if (updater != null) updater.update(ipass, here, gprogress);
+        model match {
+          case m:BIDMach.networks.Net=>restmplist.append(mean(m.score_layers(0).score).dv.toFloat)
+          case _=>
+        }
       }
       if (viz.asInstanceOf[AnyRef] != null) {
           viz.foreach(_.update(model,mats,ipass,here))
