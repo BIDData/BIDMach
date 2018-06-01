@@ -1,4 +1,5 @@
 :silent
+import BIDMach.networks.layers._
 
 val datadir = "../../data/CIFAR100/parts/"
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";

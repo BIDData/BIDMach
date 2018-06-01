@@ -211,6 +211,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
       Mat.logger.info("before: i=%d, cos(p,q)=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
     }
 
+    // First create a random vector and make it orthogonal to p and q. 
     normrnd(0, 1, x);
 
     val pp = dotprod(p, p);
@@ -218,6 +219,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     val pq = dotprod(p, q);
     val rp = dotprod(p, x);
     val rq = dotprod(q, x);
+    val h = opts.hardness;
 
     // solve for coefficients alpha, beta s.t. (r + alpha p + beta q) is orthogonal to p and q.
     val det = pp * qq - pq * pq;
@@ -230,26 +232,27 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     tmp ~ q * aelem.set(beta);
     x ~ x + tmp;
 
+
+    // Now find the vector e which captures the "excess energy" in p and q, i.e.
+    // the component of p or -q which is orthogonal to x=p+q, and the squared magnitude of e (energy).
     val pq2 = pp + 2*pq + qq;
+    val pcoeff = (pq + qq) / (pq2 + epsilon);   // e = pcoeff * p + qcoeff * q;
+    val qcoeff = (pq + pp) / (pq2 + epsilon);
+    val energy = pcoeff * pcoeff * pp + qcoeff * qcoeff * qq - 2 * pcoeff * qcoeff * pq;
 
-    // First find a vector c to reduce the energy of p and q.
-    // This c is the projection of p (or -q) normal to p+q, scaled by hardness. 
-    c ~ p * aelem.set(opts.hardness * (pq + qq) / (pq2 + epsilon));
-    tmp ~ q * aelem.set(- opts.hardness * (pq + pp) / (pq2 + epsilon));
-    c ~ c + tmp;
+    // compute a scaled version of e by hardness
+    c ~ p * aelem.set(pcoeff * h);              
+    tmp ~ q * aelem.set(qcoeff * h);
+    c ~ c - tmp;                        
 
-    // Compute new p and q, and the reduction in energy.
-    p ~ p - c;
-    q ~ q + c;
-    val energy = pp - dotprod(p, p);
-
-    // Scale the random vector to have the same energy. 
+    // Scale the random vector to match the energy diffference
     if (energy > 0) { 
-      c ~ x * aelem.set(math.sqrt(energy / dotprod(x, x)).toFloat);
+      x ~ x * aelem.set(math.sqrt(energy * (2 * h - h * h) / dotprod(x, x)).toFloat);
     } else { 
-      c.set(0);
+      x.set(0);
     }
-    // Add/subtract the random vector.
+    c ~ c + x;
+    // Add/subtract the vector c.
     p ~ p - c;
     q ~ q + c;
 
