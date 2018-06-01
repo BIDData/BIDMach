@@ -19,7 +19,7 @@ DEMO for mnist:
 
 DEMO for CIFAR:
 ```
-./bidmach scripts/viz/testcifar_norm.ssc
+./bidmach scripts/viz/testcifar_vgg.ssc
 ```
 
 After loading the scripts, type `s.launch` to start the MCMC process. Use `s.stop` to stop.
