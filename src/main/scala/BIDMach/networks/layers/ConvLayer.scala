@@ -166,6 +166,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     (bias, output) match {
       case (gbias:GMat, goutput:GMat) => applyBiasGMat(gbias, goutput);
       case (fbias:FMat, foutput:FMat) => applyBiasFMat(fbias, foutput);
+      case _ => throw new RuntimeException("ConvLayer applyBias matrix type not matched");
     }
   }
         
@@ -243,6 +244,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
      (deriv, updateBias) match {
       case (gderiv:GMat, gupdateBias:GMat) => updateBiasGMat(gderiv, gupdateBias);
       case (fderiv:FMat, fupdateBias:FMat) => updateBiasFMat(fderiv, fupdateBias);
+      case _ => throw new RuntimeException("ConvLayer updateBias matrix type not matched");
      } 	
   }
     

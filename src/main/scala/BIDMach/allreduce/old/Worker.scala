@@ -214,6 +214,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
       val nbytes = indexmat match {
         case im:IMat => math.min(limit, im.length)*(2 + 2*sendmat.nrows)*8f
         case im:LMat => math.min(limit, im.length)*(4 + 2*sendmat.nrows)*8f
+        case _ => throw new RuntimeException("allreduce Worker matrix type not matched");
       }
       if (opts.trace > 2) log("Allreduce %5.2f MB took %5.4f secs at %5.2f MB/sec\n" format (
         nbytes/1e6f, t2-t1, nbytes/(t2-t1)/1e6f))
@@ -231,11 +232,13 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
 	    lmat.data, lmat.data, fsendmat.data, fsendmat.length, fsendmat.nrows, round)
           case (imat:IMat, fsendmat:FMat) => machine.configReduce(
 	    imat.data, imat.data, fsendmat.data, fsendmat.length, fsendmat.nrows, round)
+          case _ => throw new RuntimeException("machineAllreduce matrix type not matched");
         }
       } else {
         (indexmat, sendmat) match {
-	  case (lmat:LMat, fsendmat:FMat) => machine.config(lmat.data, lmat.data, round)
+	      case (lmat:LMat, fsendmat:FMat) => machine.config(lmat.data, lmat.data, round)
           case (imat:IMat, fsendmat:FMat) => machine.config(imat.data, imat.data, round)
+          case _ => throw new RuntimeException("machineAllreduce matrix type not matched");
         }
 	val fsendmat = sendmat.asInstanceOf[FMat]
         machine.reduce(fsendmat.data, fsendmat.length, fsendmat.nrows, round)
@@ -378,6 +381,7 @@ class Worker(override val opts:Worker.Opts = new Worker.Options) extends Host {
     		val resp = new ReturnObjectResponse(cmd.round, cmd.dest, obj);
     		sendMaster(resp);
     	}
+            case _ => throw new RuntimeException("Allreduce handle config command type not matched");
     	}
     }
   }

@@ -103,6 +103,7 @@ object RectLayer {
           i += 1;
         }
       }
+      case _ => throw new RuntimeException("RectLayer rectHelper matrix type not matched");
     }
     c;
   }

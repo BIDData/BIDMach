@@ -873,6 +873,7 @@ object LayerFn {
         CPUMACH.applyfwd(af.data, oMat.data, ifn, a.length, Mat.numThreads);
         oMat
       }
+      case _ => throw new RuntimeException("Layer applyfwd matrix type not matched");
     }
   }
 
@@ -892,9 +893,8 @@ object LayerFn {
         CPUMACH.applyderiv(af.data, bf.data, oMat.data, ifn, a.length, Mat.numThreads);
         oMat
       }
+      case _ => throw new RuntimeException("Layer applyderiv matrix type not matched");
     }
   }
 }
  
-
-

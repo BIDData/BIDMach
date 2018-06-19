@@ -270,6 +270,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       case (iwords:IMat, ilb:IMat, iub:IMat) => {
         getnegs(iwords, ilb, iub, Mat.numThreads);
       }
+      case _ => throw new RuntimeException("Word2vec wordMats matrix type not matched");
     }
     
     (words, lb, ub, trandwords, contextwords);
@@ -376,6 +377,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       } else {
         Word2Vec.procPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, lrate, vexp, Mat.numThreads);
       }
+      case _ => throw new RuntimeException("Word2vec procPositives matrix type not matched");
     }
   }
   
@@ -394,6 +396,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       } else {
       	Word2Vec.procNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, lrate, vexp, Mat.numThreads);
       }
+      case _ => throw new RuntimeException("Word2vec procNegatives matrix type not matched");
     }
   }
   
@@ -424,6 +427,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       	Word2Vec.procPosCPUslice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, lrate, vexp, Mat.numThreads, 
           islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
       }
+      case _ => throw new RuntimeException("Word2vec procPositivesSlice matrix type not matched");
     }
   }
   
@@ -457,6 +461,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
     	Word2Vec.procNegCPUslice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, lrate, vexp, Mat.numThreads, 
     			islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode, opts.doHead);
     }
+      case _ => throw new RuntimeException("Word2vec procNegativesSlice matrix type not matched");
     }
   }
     
@@ -478,6 +483,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       } else {
         Word2Vec.evalPosCPU(nrows, nwords, nskip, w.data, lb.data, ub.data, m1.data, m2.data, Mat.numThreads);
       }
+      case _ => throw new RuntimeException("Word2vec evalPositives matrix type not matched");
     }
   }
   
@@ -489,6 +495,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       case (w:IMat, lb:IMat, ub:IMat) => 
         Word2Vec.evalPosCPUslice(nrows, nwords, nskip, w.data, lb.data, ub.data, modelmats, Mat.numThreads,
         		islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode);
+      case _ => throw new RuntimeException("Word2vec evalPositivesSlice matrix type not matched");
     }
   }
   
@@ -510,6 +517,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       } else {
       	Word2Vec.evalNegCPU(nrows, nwords, nwa, nwb, wa.data, wb.data, ma.data, mb.data, Mat.numThreads);
       }
+      case _ => throw new RuntimeException("Word2vec evalNegatives matrix type not matched");
     }
   }
   
@@ -521,6 +529,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
       case (wa:IMat, wb:IMat) => 
       	Word2Vec.evalNegCPUslice(nrows, nwords, nwa, nwb, wa.data, wb.data, modelmats, Mat.numThreads,
       	    islice, opts.nSlices, maxCols, opts.nHeadTerms, opts.dualMode);
+      case _ => throw new RuntimeException("Word2vec evalNegativesSlice matrix type not matched");
     }
   }
   
