@@ -205,7 +205,7 @@ else
 	OBJ="o"
 	OUTFLG="-o "
 	CPPFLAGS="-fPIC -c -O2 -DNDEBUG  -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BIDMACH_ROOT/jni/include -I$CUDA_HOME/include" 
-	CFLAGS="-openmp -fPIC -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BLAS_ROOT/include -I$BLAS_ROOT/include/${ARCHD}${SUBDIR}"
+	CFLAGS="-qopenmp -fPIC -c -O2 -DNDEBUG -I$JAVA_HOME/include -I$JAVA_HOME/include/linux -I$BLAS_ROOT/include -I$BLAS_ROOT/include/${ARCHD}${SUBDIR}"
 	LB="ar rc"    
 	GLD="g++ -shared"
 	LD="icc -shared -static-intel -z noexecstack"
