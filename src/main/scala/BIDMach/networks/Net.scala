@@ -750,15 +750,17 @@ object Net  {
     (nn, opts)
   }
 
-  class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts;
+  class FSAopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts;
+  
+  class FSGopts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
 
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
+  def learner(fn1:String, fn2:String):(Learner, FSAopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
   		                                                                  FileSource.simpleEnum(fn2,1,0)));
 
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FSAopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
 
-  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {
-    val opts = new FDSopts;
+  def learner(fnames:List[(Int)=>String]):(Learner, FSAopts) = {
+    val opts = new FSAopts;
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
@@ -772,14 +774,30 @@ object Net  {
   	    opts)
     (nn, opts)
   }
+  
+  def gradLearner(fnames:List[(Int)=>String]):(Learner, FSGopts) = {
+    val opts = new FSGopts;
+    opts.fnames = fnames
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+    val ds = new FileSource(opts)
+  	val nn = new Learner(
+  			ds,
+  	    new Net(opts),
+  	    null,
+  	    new Grad(opts),
+  	    null,
+  	    opts)
+    (nn, opts)
+  }
 
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
+  def learnerX(fn1:String, fn2:String):(Learner, FSAopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
   		                                                                  FileSource.simpleEnum(fn2,1,0)));
 
-  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0)));
+  def learnerX(fn1:String):(Learner, FSAopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0)));
 
-  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {
-    val opts = new FDSopts
+  def learnerX(fnames:List[(Int)=>String]):(Learner, FSAopts) = {
+    val opts = new FSAopts
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;

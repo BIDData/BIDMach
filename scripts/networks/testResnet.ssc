@@ -171,15 +171,13 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 nn.launchTrain;
 
-val model = nn.model.asInstanceOf[Net]
+def validate = { 
+val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+mopts.batchSize= opts.batchSize;
+mm.predict; 
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+}
 
-
-//val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
-//mopts.batchSize= opts.batchSize;
-//mopts.autoReset = false;
-//mm.predict;
-
-//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 :silent
 
 
