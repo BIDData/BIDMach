@@ -6,9 +6,10 @@ case class ReducedDataBuffer(maxBlockSize: Int,
                              minBlockSize: Int,
                              totalDataSize: Int,
                              peerSize: Int,
-                             maxLag: Int,
                              completionThreshold: Float,
-                             maxChunkSize: Int) extends AllReduceBuffer(maxBlockSize, peerSize, maxLag, maxChunkSize) {
+                             maxChunkSize: Int) extends AllReduceBuffer(maxBlockSize, peerSize, maxChunkSize) {
+
+  var numChunkReceived: Int = 0
 
   val minChunkRequired: Int = {
     val minNumChunks = getNumChunk(minBlockSize)
@@ -16,58 +17,66 @@ case class ReducedDataBuffer(maxBlockSize: Int,
     (completionThreshold * totalChunks).toInt
   }
 
-  private val countReduceFilled: Array[Array[Int]] = Array.ofDim[Int](maxLag, peerSize * numChunks)
+  private val peerPreReduceDataCount: Array[Array[Int]] = Array.ofDim[Int](peerSize, numChunks)
 
-  def store(data: Array[Float], row: Int, srcId: Int, chunkId: Int, count: Int) = {
-    super.store(data, row, srcId, chunkId)
-    countReduceFilled(timeIdx(row))(srcId * numChunks + chunkId) = count
+  def store(data: Array[Float], srcId: Int, chunkId: Int, count: Int) = {
+    super.store(data, srcId, chunkId)
+    numChunkReceived += 1
+    peerPreReduceDataCount(srcId)(chunkId) = count
   }
 
-  def getWithCounts(row: Int): (Array[Float], Array[Int]) = {
-    val output = temporalBuffer(timeIdx(row))
-    val countOverPeerChunks = countReduceFilled(timeIdx(row))
+  /**
+    * Get reduced data, and fill the data with specified backup if the reduced data is never received from peer
+    * @param dataOutput data output to write to
+    * @param backUpDataSource data backup to read from
+    */
+  def getReducedData(dataOutput: Array[Float], backUpDataSource: Array[Float]) = {
 
-    val dataOutput = Array.fill[Float](totalDataSize)(0.0f)
-    val countOutput = Array.fill[Int](totalDataSize)(0)
     var transferred = 0
-    var countTransferred = 0
+    var chunkTransferred = 0
 
-    for (i <- 0 until peerSize) {
-      val blockFromPeer = output(i)
+    for (peerId <- 0 until peerSize) {
+
+      val blockFromPeer = peerBuffer(peerId)
       val blockSize = Math.min(totalDataSize - transferred, blockFromPeer.size)
       System.arraycopy(blockFromPeer, 0, dataOutput, transferred, blockSize)
 
-      for (j <- 0 until numChunks) {
-        val countChunkSize = {
-          val countSize = Math.min(maxChunkSize, maxBlockSize - maxChunkSize * j)
-          Math.min(totalDataSize - countTransferred, countSize)
+      // possibly overwrite with backup when count is zero
+      for (chunkId <- 0 until numChunks) {
+
+        val chunkSize = Math.min(
+          totalDataSize - chunkTransferred,
+          Math.min(maxChunkSize, maxBlockSize - maxChunkSize * chunkId)
+        )
+
+        if (peerPreReduceDataCount(peerId)(chunkId) == 0) {
+          System.arraycopy(backUpDataSource, chunkTransferred, dataOutput, chunkTransferred, chunkSize)
         }
-        // duplicate count from chunk to element level
-        util.Arrays.fill(countOutput, countTransferred, countTransferred + countChunkSize, countOverPeerChunks(i * numChunks + j))
-        countTransferred += countChunkSize
+
+        chunkTransferred += chunkSize
       }
       transferred += blockSize
     }
 
-    (dataOutput, countOutput)
+    assert(transferred == chunkTransferred)
   }
 
-  override def up(): Unit = {
-    super.up()
-    countReduceFilled(timeIdx(maxLag - 1)) = Array.fill(peerSize * numChunks)(0)
-  }
-
-  def reachCompletionThreshold(row: Int): Boolean = {
-    var chunksCompleteReduce = 0
-    for (i <- 0 until countFilled(row).length) {
-      chunksCompleteReduce += countFilled(timeIdx(row))(i);
+  def prepareNewRound(): Unit = {
+    // clear peer data/count buffers
+    for (i <- 0 until peerSize) {
+      util.Arrays.fill(peerBuffer(i), 0)
+      util.Arrays.fill(peerPreReduceDataCount(i), 0)
     }
-    chunksCompleteReduce == minChunkRequired
+    numChunkReceived = 0
+  }
+
+  def reachCompletionThreshold(): Boolean = {
+    numChunkReceived == minChunkRequired
   }
 }
 
 object ReducedDataBuffer {
   def empty = {
-    ReducedDataBuffer(0, 0, 0, 0, 0, 0f, 1024)
+    ReducedDataBuffer(0, 0, 0, 0, 0f, 0)
   }
 }

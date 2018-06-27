@@ -184,7 +184,7 @@ class Learner(
           model.dobatchg(mats, ipass, here);
           if (mixins != null) mixins map (_ compute(mats, here));
           while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
-          if (updater != null) updater.update(ipass, here, gprogress);
+          if (updater != null) updater.update(ipass, here, gprogress)
         }
         val tmpscores = model.evalbatchg(mats, ipass, here);
         val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
@@ -347,6 +347,7 @@ class Learner(
     myLogger.info("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
+      model.clear
       resetGPUs
       Mat.clearCaches
     }
@@ -1102,5 +1103,4 @@ object ParLearner {
     weights(0) = 1;
     models(0).mergeModelFn(models, mm, um, istep, 1f, weights);
   }
-
 }

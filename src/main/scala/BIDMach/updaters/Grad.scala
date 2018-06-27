@@ -132,6 +132,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	  for (i <- 0 until nmats) {
 	    if (updatemats(i).asInstanceOf[AnyRef] != null) {
 	    	val mm = modelmats(i);
+        mm.synchronized {
 	    	tscale = if (te.asInstanceOf[AnyRef] != null) {
 	    		te <-- opts.texp;
 	    		stepn.set(1f/nsteps);
@@ -201,7 +202,8 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	    		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
 	    	}
 	    	updatemats(i).clear;
-	    }
+	     }
+      }
 	  }
 	  runningtime += toc - start;
 	}

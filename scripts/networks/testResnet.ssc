@@ -44,7 +44,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 opts.logfile = "logresv1.txt";
 opts.batchSize= 128;
 opts.nend = 1250;
-opts.npasses = 60;
+opts.npasses = 1;
 opts.lrate = 1e-1f;
 opts.texp = 0.0f;
 opts.pstep = 0.01f;
@@ -127,11 +127,7 @@ var thisnode:Node = null;
 val in =        input();
 val meanv =     const(means);
 val din =       in - meanv;
-//val scalef =    const(row(0.01f));
-//val sdin =      din *@ scalef;
-//val fin =       format(in)();
 val min =       cropMirror(din)(randoffsets=irow(0,28,28,-1));
-//val min =       randmirror(cin)();
 
 val conv1 =     conv(min)(w=7,h=7,pad=3,stride=2,nch=64,hasBias=opts.hasBias);
 val norm1 =     batchNormScale(conv1)(normMode=bnMode,inplace=in_place);
@@ -175,15 +171,13 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 nn.launchTrain;
 
-val model = nn.model.asInstanceOf[Net]
+def validate = { 
+val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+mopts.batchSize= opts.batchSize;
+mm.predict; 
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+}
 
-
-//val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
-//mopts.batchSize= opts.batchSize;
-//mopts.autoReset = false;
-//mm.predict;
-
-//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 :silent
 
 
