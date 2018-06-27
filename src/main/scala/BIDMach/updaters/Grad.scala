@@ -89,6 +89,31 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   	}
   }
   
+    // Make a momentum step only, for Natural gradient
+  
+	override def preupdate(ipass:Int, step:Long, gprogress:Float):Unit = {
+		val start = toc;
+  	val nsteps = if (step == 0) 1f else {
+  		if (firstStep == 0f) {
+  			firstStep = step;
+  			1f;
+  		} else {
+  			step / firstStep;
+  		}
+  	}
+  	val nmats = updatemats.length;
+	  for (i <- 0 until nmats) {
+	    if (momentum(i).asInstanceOf[AnyRef] != null) {
+	    	if (opts.waitsteps < nsteps) {	    	
+	    		modelmats(i) ~ modelmats(i) + momentum(i);
+	    		if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
+	    	}
+	    	if (updatemats(i).asInstanceOf[AnyRef] != null) updatemats(i).clear;
+	    }
+	  }
+	  runningtime += toc - start;
+	}
+  
 	override def update(ipass:Int, step:Long, gprogress:Float):Unit = {
 		val start = toc;
 	  clipping()

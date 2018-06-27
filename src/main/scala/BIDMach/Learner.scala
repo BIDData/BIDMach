@@ -192,10 +192,16 @@ class Learner(
         reslist.append(scores.newcopy)
         samplist.append(here)
       } else {
-        model.dobatchg(mats, ipass, here);
-        if (mixins != null) mixins map (_ compute(mats, here));
-        while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
-        if (updater != null) updater.update(ipass, here, gprogress);
+        if (model.opts.naturalLambda > 0) {
+          model.evalbatchg(mats, ipass, here);
+          if (updater != null) updater.preupdate(ipass, here, gprogress);
+        }
+        for (inatural <- 0 until opts.nNatural) {
+        	model.dobatchg(mats, ipass, here);
+        	if (mixins != null) mixins map (_ compute(mats, here));
+        	while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
+        	if (updater != null) updater.update(ipass, here, gprogress);
+        }
       }
       istep += 1
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
@@ -1003,6 +1009,7 @@ object Learner {
     var checkPointInterval = 0f;
     var pauseAt = -1L;
     var logfile = "log.txt";
+    var nNatural = 1;
   }
   
   class Options extends Opts {}

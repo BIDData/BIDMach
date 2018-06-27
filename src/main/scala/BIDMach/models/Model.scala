@@ -499,6 +499,7 @@ object Model {
 	  var doAllReduce = false;
 	  var logFuncs : Array[(Model,Array[Mat]) => Array[Mat]] = null;
 	  var logDataSink : DataSink = null;
+	  var naturalLambda = 0f
     var trace = 0
   }
 

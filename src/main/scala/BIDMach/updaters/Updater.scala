@@ -23,6 +23,8 @@ abstract class Updater(val opts:Updater.Opts = new Updater.Options) extends Seri
   def updateM(ipass:Int):Unit = {
     model.updatePass(ipass)
   }
+  
+  def preupdate(ipass:Int, step:Long, gprogress:Float):Unit = {}
 }
 
 
