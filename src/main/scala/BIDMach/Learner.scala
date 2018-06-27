@@ -341,6 +341,7 @@ class Learner(
     myLogger.info("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
+      model.clear
       resetGPUs
       Mat.clearCaches
     }
