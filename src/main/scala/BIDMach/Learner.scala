@@ -46,8 +46,6 @@ class Learner(
   val uopts:Updater.Opts = if (updater != null) updater.opts else null
   var useGPU = false
   var reslist:ListBuffer[FMat] = null;
-  var resTlist:ListBuffer[Float] = null;
-  var restmplist:ListBuffer[Float] = null;
   var samplist:ListBuffer[Float] = null;
   var viz:ListBuffer[Visualization] = null; 
   var lastCheckPoint = 0;
@@ -129,8 +127,6 @@ class Learner(
     debugCPUmemState = Mat.debugCPUmem;
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
-    resTlist = new ListBuffer[Float];
-    restmplist = new ListBuffer[Float];
     samplist = new ListBuffer[Float];
     firstPass(null, doInit);
     updateM(ipass-1)
@@ -197,8 +193,6 @@ class Learner(
         val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
         if (datasink != null) datasink.put;
         reslist.append(scores.newcopy)
-        resTlist.append(restmplist.sum/restmplist.length)
-        restmplist.clear
         samplist.append(here)
       } else {
         if (model.opts.naturalLambda > 0) {
