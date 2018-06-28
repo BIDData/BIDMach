@@ -190,7 +190,11 @@ class Learner(
           if (updater != null) updater.update(ipass, here, gprogress);
         }
         val tmpscores = model.evalbatchg(mats, ipass, here);
-        val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
+        val scores = if (model.opts.naturalLambda > 0) {
+          if (tmpscores.ncols > 1) (mean(tmpscores, 2) on variance(tmpscores, 2)) else tmpscores;
+        } else {
+          if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
+        }
         if (datasink != null) datasink.put;
         reslist.append(scores.newcopy)
         samplist.append(here)

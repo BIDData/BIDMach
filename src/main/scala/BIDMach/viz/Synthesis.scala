@@ -16,8 +16,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 **/
 
 class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Synthesis.Options) extends Visualization{
-    val plot = new Plot("Input Synthesis");
-    val plot2 = new Plot("Enlarge Image");    
+    val plot = new ImageArray("Input Synthesis");
+    val plot2 = new ImageArray("Enlarge Image");    
     val zero = irow(0);
 
     var _net: Net = null;

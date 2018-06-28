@@ -11,7 +11,7 @@ import BIDMach.networks.layers._;
 **/
 class FilterViz(val layerId:Int, val bw:Int = 1, val name: String = "") extends Visualization{
     val _name = if (name.length > 0) name else "Conv@" + layerId
-    val plot = new Plot(_name);
+    val plot = new ImageArray(_name);
     var bestImg: Mat = null;
     var bestImgOri: Mat = null;
     var filter_scale = 1f        

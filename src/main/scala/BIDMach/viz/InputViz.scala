@@ -12,7 +12,7 @@ import BIDMach.networks.layers._;
 **/
 
 class InputViz(val name: String = "Input") extends Visualization{
-    val plot = new Plot(name);
+    val plot = new ImageArray(name);
     var deriv: Mat = null;
     var output: Mat = null;
     var guided_bp = true;
