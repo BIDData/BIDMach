@@ -47,7 +47,7 @@ class LogViz(val name: String = "varName") extends Visualization{
         val out = zeros(data(0).nrows, nb - na);
         var i = 0;
         data.foreach(f => {
-          if (i >= na) out(?, i - na) = f;
+          if (i >= na && i < nb) out(?, i - na) = f;
           i += 1;
         })
         out
