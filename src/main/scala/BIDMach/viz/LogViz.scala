@@ -58,8 +58,4 @@ class LogViz(val name: String = "varName") extends Visualization{
       val len = data.synchronized {data.length};
       fromto(math.max(0, len - n0), len);
     }
-        
-      }
-    }
-      
 }
