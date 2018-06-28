@@ -250,11 +250,12 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
       }
       if (opts.naturalLambda > 0) {                                       // Incorporate the natural gradient term
     		val tmp = last_output_mats(j) - dolayers(j).output;
+    		tmp ~ tmp - mean(tmp);
     		tmp ~ tmp *@ opts.naturalLambda;
     		tmp ~ tmp + 1f;
     		max(tmp, 0f, tmp);
     		if (opts.debug > 0) {
-    			println("setderiv %d natgrad %f, %f" format (j, mean(tmp).dv, variance(tmp).dv))
+    			println("setderiv %d natgrad %f" format (j, variance(tmp).dv))
     		}
     		deriv ~ deriv *@ tmp;
     	}
