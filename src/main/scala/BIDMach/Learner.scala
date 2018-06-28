@@ -296,7 +296,7 @@ class Learner(
     plot(mean(b))
   }
 
-  def add_plot(v: Visualization) = {
+  def addViz(v: Visualization) = {
       if (viz.asInstanceOf[AnyRef] == null) viz = new ListBuffer[Visualization]()
       viz+=v
       v
