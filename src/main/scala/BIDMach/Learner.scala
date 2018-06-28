@@ -1072,16 +1072,17 @@ object Learner {
 
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
     if (reslist.length == 0) return zeros(0, 0);
-    val len = reslist.length;
-
-    val out = FMat(reslist(0).nrows, len);
-    var i = 0;
-    while (i < len) {
-      val scoremat = reslist(i)
-      out(?, i) = scoremat(?,0)
-      i += 1
+    reslist.synchronized {
+    	val len = reslist.length;
+    	val out = FMat(reslist(0).nrows, len);
+    	var i = 0;
+    	while (i < len) {
+    		val scoremat = reslist(i)
+    				out(?, i) = scoremat(?,0)
+    				i += 1
+    	}
+    	out
     }
-    out
   }
   
   def printStackTrace(e:Throwable):String = {
