@@ -11,6 +11,7 @@ import BIDMach.datasources._
 import BIDMach.datasinks._
 import BIDMach.mixins._
 import BIDMach.viz._
+
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import java.util.concurrent.ExecutorService;
@@ -200,13 +201,15 @@ class Learner(
         restmplist.clear
         samplist.append(here)
       } else {
-        model.dobatchg(mats, ipass, here);
-        if (mixins != null) mixins map (_ compute(mats, here));
-        while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
-        if (updater != null) updater.update(ipass, here, gprogress);
-        model match {
-          case m:BIDMach.networks.Net=>restmplist.append(mean(m.score_layers(0).score).dv.toFloat)
-          case _=>
+        if (model.opts.naturalLambda > 0) {
+          model.evalbatchg(mats, ipass, here);
+          if (updater != null) updater.preupdate(ipass, here, gprogress);
+        }
+        for (inatural <- 0 until opts.nNatural) {
+        	model.dobatchg(mats, ipass, here);
+        	if (mixins != null) mixins map (_ compute(mats, here));
+        	while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
+        	if (updater != null) updater.update(ipass, here, gprogress);
         }
       }
       if (viz.asInstanceOf[AnyRef] != null) {
@@ -362,6 +365,7 @@ class Learner(
     myLogger.info("Time=%5.4f secs, gflops=%4.2f" format (gf._2, gf._1));
     if (opts.autoReset && useGPU) {
       Learner.toCPU(modelmats)
+      model.clear
       resetGPUs
       Mat.clearCaches
     }
@@ -1024,6 +1028,7 @@ object Learner {
     var checkPointInterval = 0f;
     var pauseAt = -1L;
     var logfile = "log.txt";
+    var nNatural = 1;
   }
   
   class Options extends Opts {}
@@ -1116,5 +1121,4 @@ object ParLearner {
     weights(0) = 1;
     models(0).mergeModelFn(models, mm, um, istep, 1f, weights);
   }
-
 }

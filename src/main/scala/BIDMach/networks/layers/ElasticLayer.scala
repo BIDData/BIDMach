@@ -48,6 +48,7 @@ class ElasticLayer(override val net:Net, override val opts:ElasticNodeOpts = new
 	      case (fromdata:FMat, todata:FMat) => {	    
 	      	System.arraycopy(fromdata.data, 0, todata.data, istart, len);
 	      }
+          case _ => throw new RuntimeException("ElasticLayer initReduceMats matrix type not matched");
 	    }
 	    istart += len;
 	  } 

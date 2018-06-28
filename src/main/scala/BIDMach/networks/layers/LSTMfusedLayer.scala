@@ -35,6 +35,7 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
 	    case (i0:FMat, i1:FMat, i2:FMat, i3:FMat, i4:FMat, out0:FMat, out1:FMat) => {
 	      LSTMfusedLayer.LSTMforward(i0, i1, i2, i3, i4, out0, out1);
 	    }
+        case _ => throw new RuntimeException("LSTMFusedLayer forward matrix type not matched");
 	  }
 	}
   
@@ -48,6 +49,7 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
 	    case (inC:FMat, lin1:FMat, lin2:FMat, lin3:FMat, lin4:FMat, doutC:FMat, doutH:FMat, dinC:FMat, dlin1:FMat, dlin2:FMat, dlin3:FMat, dlin4:FMat) => {
 	      LSTMfusedLayer.LSTMbackward(inC, lin1, lin2, lin3, lin4, doutC, doutH, dinC, dlin1, dlin2, dlin3, dlin4);	      
 	    }
+        case _ => throw new RuntimeException("LSTMFusedLayer backward matrix type not matched");
 	  }
 	  inplaceNoConnectReleaseDeriv();
 	}

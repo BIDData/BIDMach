@@ -1,4 +1,5 @@
 :silent
+import BIDMach.updaters.GradCollide
 import BIDMach.networks.layers._
 
 val datadir = "../../data/CIFAR100/parts/"
@@ -8,11 +9,11 @@ val testfname = datadir + "testNCHW%d.fmat.lz4";
 val testlabelsfname = datadir + "testlabels%d.imat.lz4";
 val predsfname = datadir + "preds%d.fmat.lz4";
 
-class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
+class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with GradCollide.Opts;
 val opts = new MyOpts;
 val ds = FileSource(trainfname, labelsfname, opts);
 val net = new Net(opts);
-val grad = new Grad(opts);
+val grad = new GradCollide(opts);
 val nn = new Learner(ds, net, null, grad, null, opts);
 
 val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
@@ -34,7 +35,7 @@ opts.batchSize= 100;
 opts.npasses = 20
 opts.lrate = 1e-3f 
 
-opts.vel_decay = 0.9f
+opts.vel_decay = 0.95f
 //opts.gsq_decay = 0.99f
 opts.texp = 0.0f
 opts.pstep = 0.1f
@@ -44,6 +45,16 @@ opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.autoReset = false;
 opts.debugMem = true;
+
+opts.attractEvery = 4;
+opts.attraction = 0.1f;
+opts.collideEvery = 4;
+opts.hardness = 0.5f;
+//opts.logCollide=true;
+//opts.logAttract=true;
+//opts.logSwap=true;
+//opts.doSwaps = false;
+opts.logfile = "logCIFAR100collide%3.2f_Attract%3.2f_lr%3.2f.txt" format (opts.hardness, opts.attraction, lrinit);
 
 
 {
@@ -79,7 +90,7 @@ val model = nn.model.asInstanceOf[Net];
 
 def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
-val sgd = nn.updater.asInstanceOf[Grad];
+val sgd = nn.updater.asInstanceOf[GradCollide];
 
 nn.train;
 

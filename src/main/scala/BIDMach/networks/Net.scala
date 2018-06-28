@@ -33,6 +33,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var og_nodes:Array[Node] = null;
   var input_layers:Array[Layer] = null;
   var output_layers:Array[Layer] = null;
+  var last_output_mats:Array[Mat] = null;
   var score_layers:Array[Layer] = null;
   var og_layers:Array[Layer] = null;
   var targmap:Mat = null;
@@ -247,6 +248,16 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
       } else {
         deriv <-- (ones(deriv.nrows, todo) \ zeros(deriv.nrows, deriv.ncols - todo));
       }
+      if (opts.naturalLambda > 0) {                                       // Incorporate the natural gradient term
+    		val tmp = last_output_mats(j) - dolayers(j).output;
+    		tmp ~ tmp *@ opts.naturalLambda;
+    		tmp ~ tmp + 1f;
+    		max(tmp, 0f, tmp);
+    		if (opts.debug > 0) {
+    			println("setderiv %d natgrad %f, %f" format (j, mean(tmp).dv, variance(tmp).dv))
+    		}
+    		deriv ~ deriv *@ tmp;
+    	}
     	j += 1;
     }    
   }
@@ -305,6 +316,21 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		if (og_layers.asInstanceOf[AnyRef] != null) {
   			for (i <- 0 until og_layers.length) {
   				ogmats(i) = og_layers(i).output;
+  			}
+  		}
+  		if (opts.naturalLambda > 0) {                    // Save output for natural gradient update
+  			val dolayers = if (output_layers.length > 0) output_layers else Array(layers(layers.length-1));
+  		  if (last_output_mats.asInstanceOf[AnyRef] == null) {
+  		    last_output_mats = new Array[Mat](dolayers.length);
+  		    for (i <- 0 until dolayers.length) {
+  		    	last_output_mats(i) = dolayers(i).output.zeros(dolayers(i).output.dims);
+  		    }
+  		  }
+  			for (i <- 0 until output_layers.length) {
+  				last_output_mats(i) <-- dolayers(i).output;
+  				if (opts.debug > 0) {
+  					println("evalbatch save output data %d %f" format (i, sum(sum(last_output_mats(i))).dv));
+  				}
   			}
   		}
   		predicting = tmppred;
@@ -749,15 +775,17 @@ object Net  {
     (nn, opts)
   }
 
-  class FDSopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts;
+  class FSAopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts;
+  
+  class FSGopts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
 
-  def learner(fn1:String, fn2:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
+  def learner(fn1:String, fn2:String):(Learner, FSAopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
   		                                                                  FileSource.simpleEnum(fn2,1,0)));
 
-  def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
+  def learner(fn1:String):(Learner, FSAopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
 
-  def learner(fnames:List[(Int)=>String]):(Learner, FDSopts) = {
-    val opts = new FDSopts;
+  def learner(fnames:List[(Int)=>String]):(Learner, FSAopts) = {
+    val opts = new FSAopts;
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;
@@ -771,14 +799,30 @@ object Net  {
   	    opts)
     (nn, opts)
   }
+  
+  def gradLearner(fnames:List[(Int)=>String]):(Learner, FSGopts) = {
+    val opts = new FSGopts;
+    opts.fnames = fnames
+    opts.batchSize = 100000;
+    opts.eltsPerSample = 500;
+    val ds = new FileSource(opts)
+  	val nn = new Learner(
+  			ds,
+  	    new Net(opts),
+  	    null,
+  	    new Grad(opts),
+  	    null,
+  	    opts)
+    (nn, opts)
+  }
 
-  def learnerX(fn1:String, fn2:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
+  def learnerX(fn1:String, fn2:String):(Learner, FSAopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
   		                                                                  FileSource.simpleEnum(fn2,1,0)));
 
-  def learnerX(fn1:String):(Learner, FDSopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0)));
+  def learnerX(fn1:String):(Learner, FSAopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0)));
 
-  def learnerX(fnames:List[(Int)=>String]):(Learner, FDSopts) = {
-    val opts = new FDSopts
+  def learnerX(fnames:List[(Int)=>String]):(Learner, FSAopts) = {
+    val opts = new FSAopts
     opts.fnames = fnames
     opts.batchSize = 100000;
     opts.eltsPerSample = 500;

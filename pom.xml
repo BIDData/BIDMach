@@ -6,7 +6,7 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>2.0.17-cuda8.0beta</version>
+  <version>2.0.19-cuda8.0beta</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
@@ -238,6 +238,12 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.typesafe.akka</groupId>
+      <artifactId>akka-testkit_2.11</artifactId>
+      <version>2.5.4</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
       <version>3.1.0</version>
@@ -258,7 +264,7 @@
       <plugin>
         <groupId>net.alchim31.maven</groupId>
         <artifactId>scala-maven-plugin</artifactId>
-        <version>3.2.1</version>
+        <version>3.3.1</version>
         <executions>
           <execution>
             <goals>
@@ -275,7 +281,6 @@
           <args>
             <arg>-feature</arg>
             <arg>-deprecation</arg>
-            <arg>-target:jvm-1.7</arg>
           </args>
           <recompileMode>incremental</recompileMode>
         </configuration>
@@ -285,8 +290,8 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.5.1</version>
         <configuration>
-          <source>1.7</source>
-          <target>1.7</target>
+          <source>1.8</source>
+          <target>1.8</target>
         </configuration>
       </plugin>
       <plugin>

@@ -376,6 +376,7 @@ object ADAGrad {
     		    fvexp.data, vexp.length, ftexp.data, texp.length,	istep, 1, eps, biasv, 0);
     	}
     }
+      case _ => throw new RuntimeException("ADAGrad PairMultUpdate matrix type not matched");
     }
   }
   
@@ -411,6 +412,7 @@ object ADAGrad {
     			multUpdateHelperT(fa, sb, fmm, fssq, fmask, flrate, fvexp, ftexp, istep, addgrad, eps, 0, 1);
     		}
       }
+      case _ => throw new RuntimeException("ADAGrad hashMultUpdate matrix type not matched");
     }    
   }
   

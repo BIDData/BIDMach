@@ -96,24 +96,24 @@ val out =       softmaxout(fc8)(scoreType=1,lossType=1);
 
 opts.nodeset=Net.getDefaultNodeSet
 }
-
 def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
+
 
 
 nn.launchTrain;
 
 println("Examine the 'nn' variable to track learning state.\n");
 
-//nn.train;
 
-//val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
-//mopts.batchSize= opts.batchSize;
-//mopts.autoReset = false;
-//mm.predict;
+def validate = { 
+val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+mopts.batchSize= opts.batchSize;
+mm.predict; 
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+}
 
-//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 :silent
 
 

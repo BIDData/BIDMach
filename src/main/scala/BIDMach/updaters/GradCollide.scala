@@ -187,6 +187,94 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 
   def collide1(p:Mat, q:Mat, i:Int) = {
     x = getLargestMat(x, p);
+    tmp = getLargestMat(tmp, p);
+    c = getLargestMat(c, p);
+//    y = getLargestMat(y, p);
+//    u = getLargestMat(u, p);
+//    v = getLargestMat(v, p);
+//    pbar = getLargestMat(pbar, p);
+//    qbar = getLargestMat(qbar, p);
+//    tmat = getLargestMat(tmat, p);
+    val epsilon = 1e-36f;
+    
+    if (opts.logCollide) {
+      val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
+      val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
+      val dp = dotprod(p, q);
+      tmp ~ p *@ p;
+      val meansqp = dotprod(tmp, tmp) / p.length;
+      tmp ~ q *@ q;
+      val meansqq = dotprod(tmp, tmp) / p.length;
+      val meanp = lp * lp;
+      val meanq = lq * lq;
+      val cosp = dp / (p.length * lp * lq + epsilon);
+      Mat.logger.info("before: i=%d, cos(p,q)=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
+    }
+
+    // First create a random vector and make it orthogonal to p and q. 
+    normrnd(0, 1, x);
+
+    val pp = dotprod(p, p);
+    val qq = dotprod(q, q);
+    val pq = dotprod(p, q);
+    val rp = dotprod(p, x);
+    val rq = dotprod(q, x);
+    val h = opts.hardness;
+
+    // solve for coefficients alpha, beta s.t. (r + alpha p + beta q) is orthogonal to p and q.
+    val det = pp * qq - pq * pq;
+    val alpha = (pq * rq - qq * rp) / (det + epsilon);
+    val beta = (pq * rp - pp * rq) / (det + epsilon);
+
+    tmp ~ p * aelem.set(alpha);
+    x ~ x + tmp;
+
+    tmp ~ q * aelem.set(beta);
+    x ~ x + tmp;
+
+
+    // Now find the vector e which captures the "excess energy" in p and q, i.e.
+    // the component of p or -q which is orthogonal to x=p+q, and the squared magnitude of e (energy).
+    val pq2 = pp + 2*pq + qq;
+    val pcoeff = (pq + qq) / (pq2 + epsilon);   // e = pcoeff * p + qcoeff * q;
+    val qcoeff = (pq + pp) / (pq2 + epsilon);
+    val energy = pcoeff * pcoeff * pp + qcoeff * qcoeff * qq - 2 * pcoeff * qcoeff * pq;
+
+    // compute a scaled version of e by hardness
+    c ~ p * aelem.set(pcoeff * h);              
+    tmp ~ q * aelem.set(qcoeff * h);
+    c ~ c - tmp;                        
+
+    // Scale the random vector to match the energy diffference
+    if (energy > 0) { 
+      x ~ x * aelem.set(math.sqrt(energy * (2 * h - h * h) / dotprod(x, x)).toFloat);
+    } else { 
+      x.set(0);
+    }
+    c ~ c + x;
+    // Add/subtract the vector c.
+    p ~ p - c;
+    q ~ q + c;
+
+    if (opts.logCollide) {
+	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+      val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
+      val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
+      val dp = dotprod(p, q);
+      tmp ~ p *@ p;
+      val meansqp = dotprod(tmp, tmp) / p.length;
+      tmp ~ q *@ q;
+      val meansqq = dotprod(tmp, tmp) / p.length;
+      val meanp = lp * lp;
+      val meanq = lq * lq;
+      val cosp = dp / (p.length * lp * lq + epsilon);
+      Mat.logger.info("after:  i=%d, cos(p,q)=%g, meanp=%g, meanq=%g, varp=%g, varq=%g" format (i, cosp, meanp, meanq, meansqp - meanp * meanp, meansqq - meanq * meanq));
+    }
+
+  };
+
+  def collide1x(p:Mat, q:Mat, i:Int) = {
+    x = getLargestMat(x, p);
     y = getLargestMat(y, p);
     u = getLargestMat(u, p);
     v = getLargestMat(v, p);
@@ -212,7 +300,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     }
     normrnd(0, lp, x);
     normrnd(0, lq, y);
-    x ~ x + p;
+/*    x ~ x + p;
     y ~ y + q;
 
     u ~ x * aelem.set(math.sqrt(1/(dotprod(x, x)+epsilon)).toFloat);
@@ -227,7 +315,11 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 
     tmp ~ u * aelem.set(dotprod(q, u));
     qbar ~ v * aelem.set(dotprod(q, v));
-    qbar ~ qbar + tmp;
+    qbar ~ qbar + tmp; */
+
+    pbar ~ x + p;
+    qbar ~ y + q;
+
 
     tmat ~ pbar + qbar;
     tmp ~ pbar - qbar;
@@ -364,10 +456,10 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   };
 
   def collide(p:Mat, q:Mat, i:Int) = {
-      if (opts.hardness > 0) {
-	  collide3(p, q, i);
-      } else {
+      if (opts.perParticleMomentum) {
 	  collide1(p, q, i);
+      } else {
+	  collide3(p, q, i);
       }
   };      
 
@@ -505,6 +597,7 @@ object GradCollide {
     var attractEvery = 2;
     var attraction = 0.1f;
     var hardness = 1f;
+    var perParticleMomentum = true;
     var logCollide = false;
     var logAttract = false;
     var logSwap = false;

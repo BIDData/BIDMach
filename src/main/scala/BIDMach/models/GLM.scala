@@ -419,6 +419,7 @@ object GLM {
         meanHelper(feta, fout, ilinks, 0, feta.ncols)
         out
       }
+      case _ => throw new RuntimeException("GLM preds matrix type not matched");
     }
   }
   
@@ -442,6 +443,7 @@ object GLM {
         meanHelper(feta, fout, ilinks, 0, feta.ncols)
         fout
       }
+      case _ => throw new RuntimeException("GLM preds matrix type not matched");
     }
   }
   
@@ -474,6 +476,7 @@ object GLM {
             }
             out
       }
+      case _ => throw new RuntimeException("GLM llfun matrix type not matched");
     }
   }
   
@@ -503,6 +506,7 @@ object GLM {
       	}
       	fout;
       }
+      case _ => throw new RuntimeException("GLM derivs matrix type not matched");
     }
   }
    
@@ -535,6 +539,7 @@ object GLM {
       	}
       	fout;
       }
+      case _ => throw new RuntimeException("GLM derivs matrix type not matched");
     }
   }
    
@@ -550,6 +555,7 @@ object GLM {
   def hashMult(a:Mat, b:Mat, bound1:Int, bound2:Int):Mat = {
   	(a, b) match {
   	  case (ga:GMat, gb:GSMat) => hashMult(ga, gb, bound1, bound2)
+      case _ => throw new RuntimeException("GLM hashMult matrix type not matched");
   	}
   }
 
@@ -566,6 +572,7 @@ object GLM {
   def hashMultT(a:Mat, b:Mat, nfeats:Int, bound1:Int, bound2:Int):Mat = {
   	(a, b) match {
   	  case (ga:GMat, gb:GSMat) => hashMultT(ga, gb, nfeats, bound1, bound2)
+      case _ => throw new RuntimeException("GLM hashMultT matrix type not matched");
   	}
   }
 
@@ -581,6 +588,7 @@ object GLM {
   def hashCross(a:Mat, b:Mat, c:Mat):Mat = {
   	(a, b, c) match {
   	  case (ga:GMat, gb:GSMat, gc:GSMat) => hashCross(ga, gb, gc)
+      case _ => throw new RuntimeException("GLM hashCross matrix type not matched");
   	}
   }
   
@@ -596,6 +604,7 @@ object GLM {
   def hashCrossT(a:Mat, b:Mat, c:Mat, nfeats:Int):Mat = {
   	(a, b, c) match {
   	  case (ga:GMat, gb:GSMat, gc:GSMat) => hashCrossT(ga, gb, gc, nfeats)
+      case _ => throw new RuntimeException("GLM hashCrossT matrix type not matched");
   	}
   }
   
@@ -788,11 +797,11 @@ object GLM {
   	  	pairMult(nr, ncols, k, fa, 0, 0, sb, x, 0, fc, y, 0);
   	  }
   	}
+      case _ => throw new RuntimeException("GLM pairMult matrix type not matched");
   	}
    	c;
   }
   
-
   
   def mkGLMModel(fopts:Model.Opts) = {
   	new GLM(fopts.asInstanceOf[GLM.Opts])
