@@ -31,12 +31,35 @@ class LogViz(val name: String = "varName") extends Visualization{
         
     override def doUpdate(model:Model, mats:Array[Mat], ipass:Int, pos:Long) = {  
       data.synchronized  {
-    	  data += collect(model, mats, ipass, pos);
+    	  data += FMat(collect(model, mats, ipass, pos));
       }
     }
     
     def snapshot = {
       Learner.scores2FMat(data);
+    }
+    
+    def fromto(n0:Int, n1:Int) = {
+      data.synchronized {
+        val len = data.length;
+        val na = math.min(n0, len);
+        val nb = math.min(n1, len);
+        val out = zeros(data(0).nrows, nb - na);
+        var i = 0;
+        data.foreach(f => {
+          if (i >= na) out(?, i - na) = f;
+          i += 1;
+        })
+        out
+      }
+    }
+    
+    def lastn(n0:Int) = {
+      val len = data.synchronized {data.length};
+      fromto(math.max(0, len - n0), len);
+    }
+        
+      }
     }
       
 }
