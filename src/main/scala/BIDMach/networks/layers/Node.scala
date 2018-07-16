@@ -648,7 +648,14 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
-  def variable(dims0:IMat) = new VariableNode{dims = dims0;}
+  def variable(dims:IMat)(name:String="", initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f, lr_scale:Float=1f) = {
+    val mname = name;
+    val initf = initfn;
+    val initv0 = initv;
+    val lrs = lr_scale;
+  	val dims0 = dims;
+  	new VariableNode{modelName = mname; initfn = initf; initv = initv0; lr_scale=lrs; dims = dims0}; 
+  }
   
   implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n);
 
