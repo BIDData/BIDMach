@@ -648,6 +648,8 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
+  def variable(dims0:IMat) = new VariableNode{dims = dims0;}
+  
   implicit def NodeToNodeMat(n:Node):NodeMat = NodeMat.elem(n);
 
 }

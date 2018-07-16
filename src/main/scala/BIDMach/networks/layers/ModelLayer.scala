@@ -44,42 +44,6 @@ class ModelLayer(override val net:Net, override val opts:ModelNodeOpts = new Mod
 			net.imodel - nmats;
 		};
   }
-  
-  def initModelMat(dims:IMat):Mat = {
-		  if (lr_scales.asInstanceOf[AnyRef] != null) {
-			  lr_scales(imodel) = opts.lr_scale;
-		  }
-		  zeros(dims)
-  }
-
-  override def forward = {
-		  val start = toc;
-		  if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-			  modelmats(imodel) = convertMat(initModelMat(opts.dims));
-			  updatemats(imodel) = modelmats(imodel).zeros(opts.dims);
-			  opts.initfn(modelmats(imodel), opts.initv);
-		  }
-		  val mm = modelmats(imodel);
-		  createOutput(mm.dims);
-		  inplaceNoConnectGetOutput(true);
-
-		  output <-- modelmats(imodel+1);
-		  forwardtime += toc - start;
-  }
-
-  override def backward = {
-    val start = toc;
-    inplaceNoConnectGetInputDerivs();
-    
-    val mm = modelmats(imodel);
-
-    val um = updatemats(imodel);
-    deriv.madd(inputData, um, false, true);
-
-    inplaceNoConnectReleaseDeriv();
-    backwardtime += toc - start;
-  }
-
 }
 
 trait ModelNodeOpts extends NodeOpts {
@@ -89,7 +53,6 @@ trait ModelNodeOpts extends NodeOpts {
   var bias_scale = 1f;
   var initfn:(Mat,Float)=>Mat = Net.xavier;
   var initv:Float = 1f;
-  var dims:IMat = irow(1,1)
   
   def copyOpts(opts:ModelNodeOpts):ModelNodeOpts = {
     super.copyOpts(opts);
@@ -99,7 +62,6 @@ trait ModelNodeOpts extends NodeOpts {
     opts.bias_scale = bias_scale;
     opts.initfn = initfn;
     opts.initv = initv;
-    opts.dims = dims;
     opts;
   }
 }

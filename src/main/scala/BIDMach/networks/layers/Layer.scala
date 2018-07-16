@@ -831,6 +831,10 @@ object Layer {
   
   def tanh(a:LayerTerm) = new TanhLayer(null){inputs(0) = a};
   
+  def variable(dims0:IMat)(net:Net = null) = {
+    new VariableLayer(net, new VariableNode{dims = dims0;})
+  }
+  
 }
 
 
