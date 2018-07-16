@@ -67,7 +67,7 @@ class ModelLayer(override val net:Net, override val opts:ModelNodeOpts = new Mod
 		  forwardtime += toc - start;
   }
 
-  override def backward(ipass:Int, pos:Long) = {
+  override def backward = {
     val start = toc;
     inplaceNoConnectGetInputDerivs();
     
