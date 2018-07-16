@@ -55,6 +55,14 @@ class VariableLayer(override val net:Net, override val opts:VariableNodeOpts = n
     inplaceNoConnectReleaseDeriv();
     backwardtime += toc - start;
   }
+  
+  override def clear = {
+  		clearMats;
+  }
+
+  override def toString = {
+    "var@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
 
 }
 
