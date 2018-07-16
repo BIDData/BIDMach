@@ -624,7 +624,7 @@ object Node {
 
   def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
   
-  def softmaxout(a:NodeTerm)(scoreType:Int=0, lossType:Int=0) =  {
+  def softmaxout(a:NodeTerm)(scoreType:Int=1, lossType:Int=1) =  {
     val scoreTyp = scoreType;
     val lossTyp = lossType;
     new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; lossType = lossTyp}
