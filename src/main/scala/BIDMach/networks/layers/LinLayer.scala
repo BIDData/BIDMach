@@ -158,8 +158,6 @@ trait LinNodeOpts extends ModelNodeOpts {
   var outdim = 0;
   var tmatShape:(Int, Int) => (Array[Int], Array[Int], Array[Int], Array[Int]) = null;
   var withInteractions = false;
-  var initfn:(Mat,Float)=>Mat = Net.xavier;
-  var initv:Float = 1f;
   var initbiasfn:(Mat,Float)=>Mat = Net.constant;
   var initbiasv:Float = 0f;
   var ngroups = 0;

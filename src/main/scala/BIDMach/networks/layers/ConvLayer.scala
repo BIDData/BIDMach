@@ -333,8 +333,6 @@ trait ConvNodeOpts extends ModelNodeOpts {
   var stride:IMat = null
   var dilation:IMat = null //was dilation:List[Integer] = Arrays.asList(1)
   var convType:Int = Net.UseNetConvType;
-  var initfn:(Mat,Float)=>Mat = Net.xavier;
-  var initv:Float = 1f;
   var initbiasfn:(Mat,Float)=>Mat = Net.constant;
   var initbiasv:Float = 0f;
 

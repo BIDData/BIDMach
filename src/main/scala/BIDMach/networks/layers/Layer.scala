@@ -536,6 +536,12 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
   def *@   (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
     
   def ∘    (a:LayerTerm) = {val n=this; new MulLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def *    (a:LayerTerm) = {val n=this; new MatMulLayer(null){inputs(0)=n; inputs(1)=a;}};
+  
+  def ^*   (a:LayerTerm) = {val n=this; new MatMulLayer(null){inputs(0)=n; inputs(1)=a; opts.transA=true;}};
+  
+  def *^   (a:LayerTerm) = {val n=this; new MatMulLayer(null){inputs(0)=n; inputs(1)=a; opts.transB=true;}};
     
   def /    (a:LayerTerm) = {val n=this; new DivLayer(null){inputs(0)=n; inputs(1)=a;}};
   
