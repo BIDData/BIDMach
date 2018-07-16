@@ -79,4 +79,22 @@ class VariableNode extends Node with VariableNodeOpts {
   override def clone:VariableNode = {
     copyTo(new VariableNode).asInstanceOf[VariableNode];
   }
+  
+  override def toString = {
+    "var@"+Integer.toHexString(hashCode % 0x10000).toString
+  }
+
+  override def create(net:Net):VariableLayer = {
+  	VariableLayer(net, this);
+  }
 }
+
+
+object VariableLayer {
+
+  def apply(net:Net) = new VariableLayer(net, new VariableNode);
+
+  def apply(net:Net, opts:VariableNodeOpts):VariableLayer = new VariableLayer(net, opts);
+
+}
+
