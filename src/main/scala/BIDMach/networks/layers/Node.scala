@@ -607,6 +607,12 @@ object Node {
     new RectNode{inputs(0) = a; inplace = inplac};
   }
   
+  def reshape(a:NodeTerm)(dims:IMat=null,addBatchDim:Boolean=false) = {
+  	val dims0 = dims;
+  	val addbatch = addBatchDim;
+    new ReshapeNode{inputs(0) = a; dims = dims0; addBatchDim = addbatch};
+  }
+  
   def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
       lr_scale:Float=1f, bias_scale:Float=1f) = {
   	val hb = hasBias;

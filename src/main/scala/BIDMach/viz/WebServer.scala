@@ -58,6 +58,7 @@ class WebServer(val port:Int = 8888, val callback: String=>Any = println(_)) {
                               val reply = callback(text)
                               senders.foreach(_ ! reply)
                           }
+                          case _ =>  {}
       })
 
       val outgoingMessages: Source[Message, _] =

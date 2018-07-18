@@ -802,7 +802,12 @@ object Layer {
     val inplac = inplace;
     new RectLayer(null, new RectNode{inplace=inplac;}){inputs(0) = a};
   }
-  
+
+  def reshape(a:LayerTerm)(dims:IMat=null,addBatchDim:Boolean=false) = {
+    val dims0 = dims;
+    val addbatch = addBatchDim;
+    new ReshapeLayer(null, new ReshapeNode{dims=dims0; addBatchDim = addbatch}){inputs(0) = a};
+  }
   def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
   
   def sign(a:LayerTerm) = new SignLayer(null){inputs(0) = a;};
