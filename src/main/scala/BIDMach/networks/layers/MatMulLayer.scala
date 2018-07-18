@@ -58,7 +58,7 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
     }
     if (inputDerivs(1).asInstanceOf[AnyRef] != null) {
     	if (! opts.transB) {
-    		inputDatas(0).blockmadd(deriv, inputDerivs(1), nblocks, opts.transA, false)
+    		inputDatas(0).blockmadd(deriv, inputDerivs(1), nblocks, ! opts.transA, false)
     	} else {
     	  deriv.blockmadd(inputDatas(0), inputDerivs(1), nblocks, true, opts.transA)
     	}
