@@ -19,7 +19,7 @@ import BIDMach.networks._
  */
 
 
-class VariableLayer(override val net:Net, override val opts:VariableNodeOpts = new VariableNode) extends ModelLayer(net, opts, 2) {
+class VariableLayer(override val net:Net, override val opts:VariableNodeOpts = new VariableNode) extends ModelLayer(net, opts, 1) {
   
   def initModelMat(dims:IMat):Mat = {
 		  if (lr_scales.asInstanceOf[AnyRef] != null) {
