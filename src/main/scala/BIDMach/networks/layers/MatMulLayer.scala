@@ -26,11 +26,13 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
 
 	override def forward = {
     val start = toc;
+    val nrows = if (opts.transA) inputData.dims(1) else inputData.dims(0);
+    val ncols = if (opts.transB) inputDatas(1).dims(0) else inputDatas(1).dims(1);
     val nblocks = if (inputData.dims.length <= 2) {
-    	createOutput(inputData.nrows \ inputDatas(1).dims(1));
+    	createOutput(nrows \ ncols);
     	1
     } else {
-    	createOutput(inputData.nrows \ inputDatas(1).dims(1) \ inputData.dims(2->inputData.dims.length));
+    	createOutput(nrows \ ncols \ inputData.dims(2->inputData.dims.length));
     	inputData.dims.data.slice(2, inputData.dims.length).reduce(_*_)
     }
     inplaceNoConnectGetOutput();
