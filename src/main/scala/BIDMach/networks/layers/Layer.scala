@@ -383,7 +383,11 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   			BIDMat.SciFunctions.sum(a);
   		}
   	} else {
+  	  if (b.ncols == 1 && a.ncols > 1) {
+  	    BIDMat.SciFunctions.sum(a, 2)
+  	  } else {
   		a;
+  	  }
   	}
   }
   
