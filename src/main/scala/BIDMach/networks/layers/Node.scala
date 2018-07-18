@@ -607,7 +607,7 @@ object Node {
     new RectNode{inputs(0) = a; inplace = inplac};
   }
   
-  def reshape(a:NodeTerm)(dims:IMat=null,addBatchDim:Boolean=false) = {
+  def reshape(a:NodeTerm)(dims:IMat=null,addBatchDim:Boolean=true) = {
   	val dims0 = dims;
   	val addbatch = addBatchDim;
     new ReshapeNode{inputs(0) = a; dims = dims0; addBatchDim = addbatch};

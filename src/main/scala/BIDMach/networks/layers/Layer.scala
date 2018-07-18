@@ -803,7 +803,7 @@ object Layer {
     new RectLayer(null, new RectNode{inplace=inplac;}){inputs(0) = a};
   }
 
-  def reshape(a:LayerTerm)(dims:IMat=null,addBatchDim:Boolean=false) = {
+  def reshape(a:LayerTerm)(dims:IMat=null,addBatchDim:Boolean=true) = {
     val dims0 = dims;
     val addbatch = addBatchDim;
     new ReshapeLayer(null, new ReshapeNode{dims=dims0; addBatchDim = addbatch}){inputs(0) = a};
