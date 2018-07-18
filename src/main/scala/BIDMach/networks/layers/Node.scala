@@ -654,6 +654,11 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
+  def transpose(a:NodeTerm)(perm:IMat=null) = {
+  	val perm0 = perm;
+    new TransposeNode{inputs(0) = a; perm = perm0;};
+  }
+  
   def variable(dims:IMat)(name:String="", initfn:(Mat,Float)=>Mat = Net.constant, initv:Float = 0f, lr_scale:Float=1f) = {
     val mname = name;
     val initf = initfn;

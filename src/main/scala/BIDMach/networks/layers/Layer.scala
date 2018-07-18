@@ -812,6 +812,7 @@ object Layer {
     val addbatch = addBatchDim;
     new ReshapeLayer(null, new ReshapeNode{dims=dims0; addBatchDim = addbatch}){inputs(0) = a};
   }
+  
   def sigmoid(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
   
   def sign(a:LayerTerm) = new SignLayer(null){inputs(0) = a;};
@@ -839,6 +840,11 @@ object Layer {
   def sum(a:LayerTerm) = new SumLayer(null){inputs(0) = a};
   
   def tanh(a:LayerTerm) = new TanhLayer(null){inputs(0) = a};
+  
+  def transpose(a:LayerTerm)(perm:IMat=null) = {
+    val perm0 = perm;
+    new TransposeLayer(null, new TransposeNode{perm=perm0}){inputs(0) = a};
+  }
 
   def variable(dims:IMat)(name:String="", initfn:(Mat,Float)=>Mat = Net.constant, initv:Float = 0f, lr_scale:Float=1f, net:Net = null) = {
 		  val mname = name;
