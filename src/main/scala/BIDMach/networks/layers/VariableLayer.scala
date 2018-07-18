@@ -35,24 +35,19 @@ class VariableLayer(override val net:Net, override val opts:VariableNodeOpts = n
 			  updatemats(imodel) = modelmats(imodel).zeros(opts.dims);
 			  opts.initfn(modelmats(imodel), opts.initv);
 		  }
-		  val mm = modelmats(imodel);
-		  createOutput(mm.dims);
+		  
+		  output = modelmats(imodel);
 		  inplaceNoConnectGetOutput(true);
 
-		  output <-- modelmats(imodel+1);
 		  forwardtime += toc - start;
   }
 
   override def backward = {
     val start = toc;
-    inplaceNoConnectGetInputDerivs();
     
-    val mm = modelmats(imodel);
-
     val um = updatemats(imodel);
-    deriv.madd(inputData, um, false, true);
+    um ~ um + deriv;
 
-    inplaceNoConnectReleaseDeriv();
     backwardtime += toc - start;
   }
   
