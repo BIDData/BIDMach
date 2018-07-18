@@ -840,7 +840,7 @@ object Layer {
   
   def tanh(a:LayerTerm) = new TanhLayer(null){inputs(0) = a};
 
-  def variable(dims:IMat)(name:String="", initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f, lr_scale:Float=1f, net:Net = null) = {
+  def variable(dims:IMat)(name:String="", initfn:(Mat,Float)=>Mat = Net.constant, initv:Float = 0f, lr_scale:Float=1f, net:Net = null) = {
 		  val mname = name;
 		  val initf = initfn;
 		  val initv0 = initv;

@@ -654,7 +654,7 @@ object Node {
   
   def tanh(a:NodeTerm) = new TanhNode{inputs(0) = a};
   
-  def variable(dims:IMat)(name:String="", initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f, lr_scale:Float=1f) = {
+  def variable(dims:IMat)(name:String="", initfn:(Mat,Float)=>Mat = Net.constant, initv:Float = 0f, lr_scale:Float=1f) = {
     val mname = name;
     val initf = initfn;
     val initv0 = initv;
