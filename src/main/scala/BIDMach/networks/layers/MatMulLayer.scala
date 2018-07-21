@@ -26,18 +26,28 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
 
 	override def forward = {
     val start = toc;
-    val nrows = if (opts.transA) inputData.dims(1) else inputData.dims(0);
-    val ncols = if (opts.transB) inputDatas(1).dims(0) else inputDatas(1).dims(1);
+    val coli = if (opts.skipDim1) 2 else 1;
+    val nrows = if (opts.transA) inputData.dims(coli) else inputData.dims(0);
+    val ncols = if (opts.transB) inputDatas(1).dims(0) else inputDatas(1).dims(coli);
     val nblocks = if (inputData.dims.length <= 2) {
     	createOutput(nrows \ ncols);
     	1
     } else {
-    	createOutput(nrows \ ncols \ inputData.dims(2->inputData.dims.length));
-    	inputData.dims.data.slice(2, inputData.dims.length).reduce(_*_)
+      if (!opts.skipDim1) {
+    	  createOutput(nrows \ ncols \ inputData.dims(2->inputData.dims.length));
+    	  inputData.dims.data.slice(2, inputData.dims.length).reduce(_*_)
+      } else {
+        createOutput(nrows \ inputData.dims(1) \ ncols \ inputData.dims(3->inputData.dims.length));
+        inputData.dims(1)
+      }
     }
     inplaceNoConnectGetOutput();
 	        
-    inputData.blockmult(inputDatas(1), output, nblocks, opts.transA, opts.transB)
+    if (!opts.skipDim1) {
+    	inputData.blockmult(inputDatas(1), output, nblocks, opts.transA, opts.transB)
+    } else {
+      inputData.blockmult2(inputDatas(1), output, nblocks, opts.transA, opts.transB)    
+    }
 	
 	  forwardtime += toc - start;
 	}
@@ -45,25 +55,45 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
 	override def backward = {
     val start = toc;
     inplaceNoConnectGetInputDerivs();
-    val nblocks = if (inputData.dims.length <= 2) {
-    	1
+     val nblocks = if (inputData.dims.length <= 2) {
+      1
     } else {
-    	inputData.dims.data.slice(2, inputData.dims.length).reduce(_*_)
+      if (!opts.skipDim1) {
+        inputData.dims.data.slice(2, inputData.dims.length).reduce(_*_)
+      } else {
+        inputData.dims(1)
+      }
     }
     
     if (inputDerivs(0).asInstanceOf[AnyRef] != null) {
-      if (! opts.transA) {
-    	  deriv.blockmadd(inputDatas(1), inputDerivs(0), nblocks, false, ! opts.transB)      
+      if (!opts.skipDim1) {
+    	  if (! opts.transA) {
+    		  deriv.blockmadd(inputDatas(1), inputDerivs(0), nblocks, false, ! opts.transB)      
+    	  } else {
+    		  inputDatas(1).blockmadd(deriv, inputDerivs(0), nblocks, opts.transB, true)
+    	  }
       } else {
-        inputDatas(1).blockmadd(deriv, inputDerivs(0), nblocks, opts.transB, true)
+        if (! opts.transA) {
+          deriv.blockmadd2(inputDatas(1), inputDerivs(0), nblocks, false, ! opts.transB)      
+        } else {
+          inputDatas(1).blockmadd2(deriv, inputDerivs(0), nblocks, opts.transB, true)
+        }        
       }
     }
     if (inputDerivs(1).asInstanceOf[AnyRef] != null) {
-    	if (! opts.transB) {
-    		inputDatas(0).blockmadd(deriv, inputDerivs(1), nblocks, ! opts.transA, false)
-    	} else {
-    	  deriv.blockmadd(inputDatas(0), inputDerivs(1), nblocks, true, opts.transA)
-    	}
+    	if (!opts.skipDim1) {
+    		if (! opts.transB) {
+    			inputData.blockmadd(deriv, inputDerivs(1), nblocks, ! opts.transA, false)
+    		} else {
+    			deriv.blockmadd(inputData, inputDerivs(1), nblocks, true, opts.transA)
+    		}
+      } else {
+        if (! opts.transB) {
+          inputData.blockmadd2(deriv, inputDerivs(1), nblocks, ! opts.transA, false)
+        } else {
+          deriv.blockmadd2(inputData, inputDerivs(1), nblocks, true, opts.transA)
+        }      
+      }
     }
     
     inplaceNoConnectReleaseDeriv()
@@ -78,6 +108,7 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
 trait MatMulNodeOpts extends NodeOpts {  
   var transA = false
   var transB = false
+  var skipDim1 = false
 }
 
 class MatMulNode extends Node with MatMulNodeOpts {

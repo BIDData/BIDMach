@@ -313,6 +313,12 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
   
   def ^*   (a:NodeTerm) = {val n=this; new MatMulNode{inputs(0)=n; inputs(1)=a; transA = true;}};
   
+  def *-*   (a:NodeTerm) = {val n=this; new MatMulNode{inputs(0)=n; inputs(1)=a;}};
+  
+  def *-*^   (a:NodeTerm) = {val n=this; new MatMulNode{inputs(0)=n; inputs(1)=a; transB = true;}};
+  
+  def ^*-*   (a:NodeTerm) = {val n=this; new MatMulNode{inputs(0)=n; inputs(1)=a; transA = true;}};
+  
   def /    (a:NodeTerm) = {val n=this; new DivNode{inputs(0)=n; inputs(1)=a;}};
   
   def dot  (a:NodeTerm) = {val n=this; new DotNode{inputs(0)=n; inputs(1)=a;}};

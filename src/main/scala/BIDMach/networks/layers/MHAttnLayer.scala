@@ -75,36 +75,50 @@ class MultiHeadAttnNode extends CompoundNode with MultiHeadAttnNodeOpts {
 	  	  
 	  def constructGraph0 = {
     	import BIDMach.networks.layers.Node._
-    	val indims = irow(nfeats, nbatch, nwords, nheads);
-    	val outdims = irow(nfeats * nheads, nbatch, nwords);
+    	val indims = irow(nfeats, nheads, nbatch, nwords);
+    	val dims1 = irow(nfeats, nheads, nbatch * nwords);
+    	val dims2 = irow(nfeats, nheads * nbatch, nwords);
+    	val dims3 = irow(nwords, nheads * nbatch * nwords);
+    	val dims4 = irow(nwords, nheads * nbatch, nwords);
+    	val dims5 = irow(nfeats * nheads, nbatch * nwords);
+      
+      val proj1dims = irow(nfeats, nheads, nfeats);
+      val proj2dims = irow(nfeats * nheads, nfeats * nheads);
+        
     		
-    	val in_v = copy;
-    	val in_k = copy; 
-    	val in_q = copy;
+    	val v1   = copy;
+    	val k1   = copy; 
+    	val q1   = copy;
     	val c1   = constant(row(1f/ math.sqrt(dimk).toFloat));
-    	
-    	val v_split = reshape(in_v)(indims);
-    	val k_split = reshape(in_k)(indims);
-    	val q_split = reshape(in_q)(indims);
+      
+      val mv   = variable(proj1dims)();
+      val mk   = variable(proj1dims)();
+      val mq   = variable(proj1dims)();
+      val mout = variable(proj2dims)();
 
-    	val v_int  = linear(v_split)(prefix+"MultiHeadAttn_v_internal",   outdim=dimmodel, hasBias=hasBias);
-    	val k_int  = linear(k_split)(prefix+"MultiHeadAttn_k_internal",   outdim=dimmodel, hasBias=hasBias);   
-    	val q_int  = linear(q_split)(prefix+"MultiHeadAttn_q_internal",   outdim=dimmodel, hasBias=hasBias);
-    	
-    	val prod1  = q_int * k_int;
-    	val prod1a = prod1 *@ c1;
-    	val sm     = softmax(prod1a);
-    	val sdp    = sm * v_split
-    	
-    	val merged = reshape(sdp)(outdims)
-    	
+    	val pv   = mv *-* v1
+      val pk   = mk *-* k1
+      val pq   = mq *-* q1
+      
+      val v2   = reshape(pv)(dims2);
+      val k2   = reshape(pk)(dims2);
+      val q2   = reshape(pq)(dims2);
+    	val prods  = k2 ^*-* q2;
+      
+      val scaled = prods *@ c1;        // nwords, nheads * nbatch, nwords
+      val sc2    = reshape(scaled)(dims3)
+    	val sm     = softmax(sc2);       // softmax over first dimension (keys)      
+      val sm2    = reshape(sm)(dims4)
+      
+    	val sdp    = k2 *-* sm;
+      val shaped = reshape(sdp)(dims5);
+    	val mapped = mout * sdp;
+    	val out    = reshape(mapped)(dims1)
 
-    	val out    = merged
-
-    	grid =  (in_v   on
-               in_k   on
-               in_q   on
-               c1   );
+    	grid =  (v1   \   mv   \    pv    \   v2    \  scaled  \     sdp   on
+               k1   \   mk   \    pk    \   k2    \     sc2  \  shaped   on
+               q1   \   mq   \    pq    \   q2    \      sm  \  mapped   on
+               c1   \  mout  \   null   \  prods  \     sm2  \     out   );
     	
     	val lopts = grid.data;
     	lopts.map((x:Node) => if (x != null) x.parent = this);
