@@ -14,7 +14,9 @@ fi
 BIDMACH_ROOT=`dirname "$BIDMACH_ROOT"`
 pushd "${BIDMACH_ROOT}"  > /dev/null
 BIDMACH_ROOT=`pwd -P`
-BIDMACH_ROOT="$( echo ${BIDMACH_ROOT} | sed 's+/cygdrive/\(.\)+\1:+' )"
+BIDMACH_ROOT0="$( echo ${BIDMACH_ROOT} | sed 's+^/cygdrive/\(.\)+\1:+' )"
+BIDMACH_ROOT="$( echo ${BIDMACH_ROOT0} | sed 's+^/mnt/\(.\)+\1:+' )"
+
 LIBDIR="${BIDMACH_ROOT}/lib"
 
 LOGGING_CONF="${BIDMACH_ROOT}/conf/logging.conf"
@@ -59,17 +61,14 @@ cd lib
 BIDMACH_JARS=`echo *.jar`
 BIDMACH_LIBS="${BIDMACH_ROOT}/target/BIDMach-${BIDMAT_VERSION}.jar"
 for lib in ${BIDMACH_JARS}; do
-    if [[ "$lib" != IScala* && "$lib" != scala* ]]; then
-	BIDMACH_LIBS="${BIDMACH_LIBS};${LIBDIR}/${lib}"
-    fi
+    BIDMACH_LIBS="${BIDMACH_LIBS};${LIBDIR}/${lib}"
 done
 
 popd > /dev/null
 
-TOOL_LIBS="${BIDMACH_ROOT}/conf;${JAVA_HOME}/lib/tools.jar;${LIBDIR}/IScala-1.0.0.jar"
+TOOL_LIBS="${BIDMACH_ROOT}/conf;${JAVA_HOME}/lib/tools.jar"
 
-ALL_LIBS="${TOOL_LIBS};\
-${BIDMACH_LIBS}"
+ALL_LIBS="${TOOL_LIBS};${BIDMACH_LIBS}"
 
 if [ "$OSS" = "windows" ]; then
     if [ ! "${CUDA_PATH}" = "" ]; then
@@ -94,11 +93,21 @@ fi
 if [ "$1" = "notebook" ]; then
     shift 1
     if [ ! -z "$@" ]; then
-        KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\", \"$@\"]"
+	ARGSTR=", \"$@\""
     else
-        KERNEL_CMD="[\"java\", \"-cp\", \"${ALL_LIBS}\", \"${MEMSIZE}\", \"-Xms128M\", \"-Dfile.encoding=UTF-8\", \"org.refptr.iscala.IScala\", \"--profile\", \"{connection_file}\", \"--parent\"]"
+	ARGSTR=""
     fi
+    KERNEL_CMD="[\"java\", \"-noverify\", \"-Xms128M\", \"${MEMSIZE}\", \"-Dfile.encoding=UTF-8\", 
+                 \"-jar\", \"${BIDMACH_ROOT0}/launcher.jar\", \"launch\", 
+                 \"-r\", \"sonatype:releases\", \"-r\", \"sonatype:snapshots\", 
+                 \"-r\", \"http://dl.bintray.com/biddata/BIDData\", \"-i\", \"ammonite\",
+                 \"-I\", \"ammonite:org.jupyter-scala:ammonite-runtime_2.11.11:0.8.3-1\",
+                 \"-I\", \"ammonite:org.jupyter-scala:scala-api_2.11.11:0.4.2\",
+                 \"-I\", \"ammonite:BIDMach:BIDMach:${BIDMACH_VERSION}\",
+                 \"org.jupyter-scala:scala-cli_2.11.11:0.4.2\", \"-M\", \"jupyter.scala.JupyterScala\",  \"--\", 
+                 \"--id\", \"scala\", \"--name\", \"Scala\", \"--connection-file\", \"{connection_file}\"${ARGSR}]"
     ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${TOOL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  ${1}
+    echo ${ALL_LIBS}
+    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  ${1}
 fi
