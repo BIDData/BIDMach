@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="2.0.23-cuda8.0"
+VERSION="2.0.24-cuda8.0"
 DEVVERSION="dev-cuda8.0"
 
 OS=`uname -a`

@@ -38,13 +38,17 @@ if [[ "$OSS" == Darwin* ]] ; then
 	    ARCH="x86_64"
     fi
     OSS="apple"
+    JUPYTER_DIR="~/Library/Jupyter"
 elif [[ "$OSS" == Linux* ]] ; then
     OSS="linux"
+    JUPYTER_DIR="${HOME}/.local/share/jupyter"
 elif [[ "$OSS" == CYGWIN* ]] ; then
     if [[ "$OSS" == *WOW* ]] ; then
         ARCH="x86_64"
     fi
-	OSS="windows"
+    OSS="windows"
+    JUPYTER_DIR=`echo $APPDATA | sed 's_\\\\_/_g' | sed 's_^\([A-Z]\):_/cygdrive/\1_'`
+    JUPYTER_DIR="${JUPYTER_DIR}/jupyter"
 else
     echo "OS not supported" $OSS
     exit 1
@@ -80,34 +84,30 @@ else
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
 fi
 
-userargs=""
-if [ "$2" != "" ]; then
-    userargs="-Duser.arg0=$2"
-    j=1;
-    for i in ${*:3}; do
-	userargs="$userargs -Duser.arg$j=$i"
-	j=$((j+1))
-    done
-fi
 
 if [ "$1" = "notebook" ]; then
     shift 1
-    if [ ! -z "$@" ]; then
-	ARGSTR=", \"$@\""
-    else
-	ARGSTR=""
-    fi
-    KERNEL_CMD="[\"java\", \"-noverify\", \"-Xms128M\", \"${MEMSIZE}\", \"-Dfile.encoding=UTF-8\", 
-                 \"-jar\", \"${BIDMACH_ROOT0}/launcher.jar\", \"launch\", 
-                 \"-r\", \"sonatype:releases\", \"-r\", \"sonatype:snapshots\", 
-                 \"-r\", \"http://dl.bintray.com/biddata/BIDData\", \"-i\", \"ammonite\",
-                 \"-I\", \"ammonite:org.jupyter-scala:ammonite-runtime_2.11.11:0.8.3-1\",
-                 \"-I\", \"ammonite:org.jupyter-scala:scala-api_2.11.11:0.4.2\",
-                 \"-I\", \"ammonite:BIDMach:BIDMach:${BIDMACH_VERSION}\",
-                 \"org.jupyter-scala:scala-cli_2.11.11:0.4.2\", \"-M\", \"jupyter.scala.JupyterScala\",  \"--\", 
-                 \"--id\", \"scala\", \"--name\", \"Scala\", \"--connection-file\", \"{connection_file}\"${ARGSR}]"
-    ipython notebook --profile=scala --KernelManager.kernel_cmd="$KERNEL_CMD"
+    kernelargs=""
+    for i in $@; do
+	kernelargs="$kernelargs, \"$i\""
+    done
+    KERNEL_CMD="[\"java\", \"-Xms128M\", \"${MEMSIZE}\", \"-Dfile.encoding=UTF-8\", \"-cp\", \"${ALL_LIBS}\",
+                 \"-Dcoursier.mainJar=jupyter.scala.JupyterScala\", \"jupyter.scala.JupyterScala\", 
+                 \"--id\", \"bidmach\", \"--name\", \"BIDMach\", \"--connection-file\", \"{connection_file}\"${kernelargs}]"
+    KERNEL_JSON="{\"language\" : \"bidmach\", \"display_name\" : \"BIDMach\", \"argv\" : ${KERNEL_CMD} }"
+    mkdir -p "${JUPYTER_DIR}/kernels/bidmach"
+    echo "${KERNEL_JSON}" > ${JUPYTER_DIR}/kernels/bidmach/kernel.json
+    cp ${BIDMACH_ROOT}/logo-64x64.png ${JUPYTER_DIR}/kernels/bidmach
+    jupyter notebook --KernelManager.kernel_cmd="$KERNEL_CMD"
 else
-    echo ${ALL_LIBS}
+    userargs=""
+    if [ "$2" != "" ]; then
+	userargs="-Duser.arg0=$2"
+	j=1;
+	for i in ${*:3}; do
+	    userargs="$userargs -Duser.arg$j=$i"
+	    j=$((j+1))
+	done
+    fi
     ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.scala  ${1}
 fi
