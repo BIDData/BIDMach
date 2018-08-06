@@ -87,18 +87,14 @@ fi
 
 if [ "$1" = "notebook" ]; then
     shift 1
-    kernelargs=""
-    for i in $@; do
-	kernelargs="$kernelargs, \"$i\""
-    done
     KERNEL_CMD="[\"java\", \"-Xms128M\", \"${MEMSIZE}\", \"-Dfile.encoding=UTF-8\", \"-cp\", \"${ALL_LIBS}\",
                  \"-Dcoursier.mainJar=jupyter.scala.JupyterScala\", \"jupyter.scala.JupyterScala\", 
-                 \"--id\", \"bidmach\", \"--name\", \"BIDMach\", \"--connection-file\", \"{connection_file}\"${kernelargs}]"
+                 \"--id\", \"bidmach\", \"--name\", \"BIDMach\", \"--connection-file\", \"{connection_file}\"]"
     KERNEL_JSON="{\"language\" : \"bidmach\", \"display_name\" : \"BIDMach\", \"argv\" : ${KERNEL_CMD} }"
     mkdir -p "${JUPYTER_DIR}/kernels/bidmach"
     echo "${KERNEL_JSON}" > ${JUPYTER_DIR}/kernels/bidmach/kernel.json
     cp ${BIDMACH_ROOT}/logo-64x64.png ${JUPYTER_DIR}/kernels/bidmach
-    jupyter notebook --KernelManager.kernel_cmd="$KERNEL_CMD"
+    jupyter notebook --KernelManager.kernel_cmd="${KERNEL_CMD}" $@
 else
     userargs=""
     if [ "$2" != "" ]; then
