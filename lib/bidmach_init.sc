@@ -14,4 +14,4 @@ import BIDMach.causal.{IPTW}
 
 Mat.checkMKL(false)
 Mat.checkCUDA
-
+implicit val publish = new NonNotebook
