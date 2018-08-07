@@ -40,7 +40,12 @@ if [[ "$OSS" == Darwin* ]] ; then
     OSS="apple"
     JUPYTER_DIR="${HOME}/Library/Jupyter"
 elif [[ "$OSS" == Linux* ]] ; then
-    OSS="linux"
+    WSL=`cat /proc/version | grep 'Microsoft'`
+    if [ ! "$WSL" = "" ]; then
+	OSS="WSL"
+    else
+	OSS="linux"
+    fi
     JUPYTER_DIR="${HOME}/.local/share/jupyter"
 elif [[ "$OSS" == CYGWIN* ]] ; then
     if [[ "$OSS" == *WOW* ]] ; then
