@@ -1,6 +1,5 @@
 package BIDMach.viz
-/**
-**/
+
 
 import BIDMat.{BMat,Mat,SBMat,CMat,DMat,FMat,FFilter,IMat,HMat,GDMat,GFilter,GLMat,GMat,GIMat,GSDMat,GSMat,LMat,SMat,SDMat,TMat,Image}
 import BIDMat.MatFunctions._
@@ -18,6 +17,7 @@ import java.awt._;
 import java.awt.image.BufferedImage
 import ptolemy.plot._
 import BIDMat.{Plotting,MyPlot,Image}
+import jupyter.api.Publish
 
 
 
@@ -27,6 +27,8 @@ class ImageArray(name: String = "plot") {
     var img: Image = null;
     val controlPanel: JPanel = new JPanel();
     val frame: JFrame = new JFrame;
+
+    implicit val publish = new NonNotebook;
     
     def init(data: FMat) {
         img = Image(data);

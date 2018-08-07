@@ -62,7 +62,8 @@ fi
 if [ "$OSS" = "windows" ]; then
     if [ ! "${JAVA_HOME}" = "" ]; then
         JAVA_HOME=`${BIDMACH_ROOT}/shortpath.bat "${JAVA_HOME}"`
-	    export JAVA_HOME=`echo ${JAVA_HOME} | sed 's_\\\\_/_g'`/bin
+        JAVA_HOME=`echo ${JAVA_HOME} | tr -d '\r'`
+        export JAVA_HOME=`echo ${JAVA_HOME} | sed 's_\\\\_/_g'`/bin
     fi
 fi
 

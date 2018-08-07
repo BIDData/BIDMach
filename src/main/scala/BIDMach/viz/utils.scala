@@ -10,7 +10,7 @@ import BIDMach.networks.layers._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.collection.mutable.HashMap
-
+import jupyter.api.Publish
 
 object utils {
     def getLayerInfo(layer:Layer): HashMap[String,Any] =
@@ -94,7 +94,7 @@ object utils {
           FMat(cpu(data_))
   }
     
-  def show(data : Mat, tensorFormat: Int = 1) = {      
+  def show(data : Mat, tensorFormat: Int = 1)(implicit publish:Publish) = {      
       val out = packImages(data, tensorFormat)
       val img = Image(out);
       img.show;
