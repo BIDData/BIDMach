@@ -54,6 +54,7 @@ elif [[ "$OSS" == CYGWIN* ]] ; then
     OSS="windows"
     JUPYTER_DIR=`echo $APPDATA | sed 's_\\\\_/_g' | sed 's_^\([A-Z]\):_/cygdrive/\1_'`
     JUPYTER_DIR="${JUPYTER_DIR}/jupyter"
+    export TERM="cygwin"     # this should work for most cygwin setups. Try removing if it doesnt.
 else
     echo "OS not supported" $OSS
     exit 1
