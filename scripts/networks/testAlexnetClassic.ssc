@@ -35,8 +35,6 @@ opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
 val inplace = true;
 
-:silent
-
 val means = loadFMat(traindir+"means.fmat.lz4");
 
 {
@@ -109,6 +107,5 @@ opts.nodeset =  Net.getDefaultNodeSet
 //mm.predict;
 
 //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-:silent
 
 

@@ -111,5 +111,9 @@ else
 	    j=$((j+1))
 	done
     fi
-    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.sc  ${1}
+    runscript=""
+    if [ "$1" != "" ]; then
+	runscript="-i ${1}"
+    fi
+    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.sc $runscript
 fi

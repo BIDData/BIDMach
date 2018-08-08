@@ -1,5 +1,3 @@
-:silent
-
 val mdir = "../data/criteo/parts/"
 
 val (nn,opts) = Net.learner(mdir+"trainsorted%02d.smat.lz4",mdir+"trainlabel%02d.fmat.lz4");
@@ -34,8 +32,6 @@ val preds=FMat(mm.preds(0))
 
 val ll = DMat(ln(preds *@ testlabels + (1-preds) *@ (1-testlabels)))
 val rc = roc(preds, testlabels, 1-testlabels, 1000);
-
-:silent
 
 (mean(ll), mean(rc))
 

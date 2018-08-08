@@ -1,4 +1,3 @@
-:silent
 val traindir = "../../data/MNIST/"
 
 val train0 =       loadIDX(traindir+"train-images-idx3-ubyte").reshapeView(1,28,28,60000);
@@ -73,6 +72,5 @@ val net = mm.model.asInstanceOf[Net];
 mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-:silent
 
 

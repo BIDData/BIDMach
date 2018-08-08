@@ -72,7 +72,6 @@ opts.hardness = 0.5f;
 //opts.logattract=true;
 //opts.logswap=true;
 
-:silent
 val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 
 {
@@ -193,6 +192,5 @@ val model = nn.model.asInstanceOf[Net]
 //mm.predict;
 
 //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-:silent
 
 

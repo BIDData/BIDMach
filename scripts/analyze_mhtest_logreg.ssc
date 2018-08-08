@@ -1,4 +1,3 @@
-:silent
 
 /**
  * This script is to be run *after* `./bidmach scrpts/test_mh.ssc`, i.e. the
@@ -77,5 +76,4 @@ data(3,?) = FMat(ll_test).t
 saveAs("mhtest_analysis/results.mat", 
        samples, "samples", 
        data, "data")
-:silent
 sys.exit

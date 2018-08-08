@@ -1,4 +1,3 @@
-:silent
 import BIDMat.TMat
 
 val mdir = "../data/criteo/parts/"
@@ -74,7 +73,5 @@ val preds=FMat(mm.preds(0))
 
 val ll = DMat(ln(preds *@ testlabels + (1-preds) *@ (1-testlabels)))
 val rc = roc(preds, testlabels, 1-testlabels, 1000);
-
-:silent
 
 (mean(ll), mean(rc))

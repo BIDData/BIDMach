@@ -1,4 +1,3 @@
-:silent
 import BIDMach.updaters.GradCollide
 import BIDMach.networks.layers._
 
@@ -103,5 +102,4 @@ mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 
-:silent
 

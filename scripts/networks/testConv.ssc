@@ -1,4 +1,3 @@
-:silent
 val traindir = "../../data/ImageNet/train/";
 val testdir = "../../data/ImageNet/test/";
 
@@ -74,6 +73,4 @@ nn.train;
 val (mm, mopts) =  Net.predictor(model,testdir+"parts%04d.fmat.lz4",testdir+"preds%04d.fmat.lz4");
 mm.predict;
 
-
-:silent
 

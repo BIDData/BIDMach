@@ -1,4 +1,3 @@
-:silent
 import BIDMat.TMat
 
 val mdir = "/code/BIDMach/data/criteo/parts/"
@@ -82,8 +81,6 @@ for(i<-0 until 65){
     }
 }
 pw.close()
-:silent
-
 
 /*val preds=FMat(mm.preds(0))
 

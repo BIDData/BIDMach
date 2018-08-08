@@ -1,4 +1,3 @@
-:silent
 val datadir = "../../data/CIFAR10/parts/"
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";
 val labelsfname = datadir + "labels%d.imat.lz4";
@@ -63,6 +62,4 @@ val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-
-:silent
 

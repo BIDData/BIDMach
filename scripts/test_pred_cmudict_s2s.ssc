@@ -5,10 +5,8 @@ val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
 val modeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/bidmach_model_10pass/"
 val preddir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/pred/"
 
-:silent
 var src = loadMat(datadir+"valid.src_grapheme.shuf.smat.lz4")
 var dst = loadMat(datadir+"valid.dst_phoneme.shuf.smat.lz4")
-:silent
 
 // val model = SeqToSeq.load(modeldir+"model256_te0.3_00/")
 val model = new SeqToSeq

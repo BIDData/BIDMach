@@ -1,5 +1,3 @@
-:silent
-
 /**
  * This will process MNIST so that we pick two binary classes. This is suitable
  * for preparing the data for logistic regression, for instance. It will save
@@ -83,4 +81,3 @@ saveFMat("MNIST_Xtrain_"+class1+"_"+class2+"_shuf.fmat.lz4", X_train_shuf)
 saveFMat("MNIST_Xtest_"+class1+"_"+class2+"_shuf.fmat.lz4", X_test_shuf)
 saveIMat("MNIST_Ytrain_"+class1+"_"+class2+"_shuf.imat.lz4", Y_train_shuf)
 saveIMat("MNIST_Ytest_"+class1+"_"+class2+"_shuf.imat.lz4", Y_test_shuf)
-:silent

@@ -1,5 +1,3 @@
-:silent
-
 class xopts extends Learner.Options with MatSource.Opts with RandomForest.Opts with Batch.Opts
 val opts = new xopts
 
@@ -64,7 +62,6 @@ mm.predict
 val rr=zeros(nn.results.ncols/opts.depth, opts.depth);
 rr(?) = nn.results(0,?).t
 val diffs = DMat(preds - testcats);
-:silent
 val scores = mean(rr)
 val MSE = (diffs dotr diffs) / diffs.length;
 

@@ -3,10 +3,8 @@ import BIDMach.networks.SeqToSeq
 val datadir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/smat_data/"
 val modeldir = "/mnt/BIDMach/data/phonetisaurus-cmudict-split/bidmach_model_10pass/"
 
-:silent
 val src = loadMat(datadir+"train.src_grapheme.shuf.smat.lz4")
 val dst = loadMat(datadir+"train.dst_phoneme.shuf.smat.lz4")
-:silent
 
 val (nn, opts) = SeqToSeq.learner(src, dst)
 val net = nn.model.asInstanceOf[BIDMach.networks.SeqToSeq]

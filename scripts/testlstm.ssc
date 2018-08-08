@@ -1,4 +1,3 @@
-:silent
 import BIDMach.networks.LSTMnextWord
 
 val dir="d:/data/twitter/featurized3/"
@@ -46,7 +45,6 @@ val dl2 = d2.internal_layers
 val in = ll(0).output.asInstanceOf[GSMat];
 val rin = IMat(new GIMat(1, in.nc, in.ir, in.nc));
 val dict = Dict(loadSBMat(dir+"../alldict.gz"));
-:silent
 
 val lres = nn.results.ncols
 mean(nn.results(?,(lres-11)->(lres-1)),2)

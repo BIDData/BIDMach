@@ -1,4 +1,3 @@
-:silent
 import BIDMach.networks.Net
 
 val dir="/mnt/BIDMach/data/rcv1/"
@@ -45,6 +44,5 @@ val pc = FMat(mm.preds(0))
 
 val rc = roc2(pc, tc, 1-tc, 1000)
 val counts = sum(tc,2);
-:silent
 println("auc6 = %5.4f, auc weighted mean = %5.4f" format (mean(rc)(6), (mean(rc) * counts / sum(counts)).dv));
 

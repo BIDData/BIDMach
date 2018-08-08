@@ -1,4 +1,3 @@
-:silent
 val inputdir = "../../data/CIFAR100/";
 val outputdir = "../../data/CIFAR100/parts/";
 val trainfname = "train.bin";
@@ -58,5 +57,4 @@ saveIMat(outputdir + testlabels, testlabelfine);
 print(".");
 
 println();
-:silent
 System.exit(0)

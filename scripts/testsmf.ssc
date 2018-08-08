@@ -1,5 +1,4 @@
 import BIDMach.models.SMF
-//:silent
 val dir="../data/netflix/"
 
 //val a0=loadSMat(dir+"train.smat.lz4")
@@ -87,4 +86,3 @@ rmse
 val rmse = testme
 
 println("rmse = %f" format rmse);
-//:silent

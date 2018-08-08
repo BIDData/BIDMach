@@ -1,4 +1,3 @@
-:silent
 val dir="../data/netflix/"
 
 val exists = (new java.io.File(dir+"newtrain.smat.lz4")).exists
@@ -72,5 +71,3 @@ max(pa.contents,1,pa.contents)
 val diff = ta.contents - pa.contents
 val rmse = sqrt((diff ^* diff) / diff.length)
 println("RMSE = %f" format rmse.v);
-
-:silent

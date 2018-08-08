@@ -1,5 +1,3 @@
-:silent
-
 val tt = "train";
 
 val traindir = "../../data/ImageNet/train/";
@@ -33,5 +31,3 @@ println("");
 msum ~ msum / nimgs.toDouble;
 val means = FMat(msum);
 saveFMat(traindir+"/means.fmat.lz4", means);
-
-:silent

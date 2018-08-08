@@ -1,4 +1,3 @@
-:silent
 // Repartition and remap the data files to fixed size for a FileDS
 
 val size = 10000000; // target size in words
@@ -73,5 +72,4 @@ repartition(dir2 +"news.en.heldout-%05d-of-00050_sentence.imat.gz",
             map1,
             0, 49, size);
 
-:silent
 sys.exit
