@@ -2,7 +2,7 @@ val dir = "../data/uci/";
 
 val (nn,opts)=LDA.learner(dir + "pubmed_parts/part%02d.smat.lz4", 256);
 
-opts.batchSize = 10000;
+opts.batchSize = 50000;
 opts.nend = 9;
 opts.eltsPerSample = 400;
 opts.npasses = 3;
