@@ -5,7 +5,7 @@ import java.util.logging.Logger
 
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import BIDMach.models.Model
-import BIDMat.{FMat, GMat}
+import BIDMat.{FMat, GMat, Mat}
 
 
 /**
@@ -17,16 +17,15 @@ import BIDMat.{FMat, GMat}
 class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Logger) extends AllreduceBinder {
 
   // Keeping track of elastic updates
-  var tic = System.currentTimeMillis()
+  var tick = System.currentTimeMillis()
   val reduceCount = new AtomicInteger()
+  
+  var aelem: Mat = null
 
   override lazy val totalDataSize: Int = {
     var ret = 0
     model.modelmats.synchronized {
-      for (mat <- model.modelmats) {
-        val fmat = FMat(mat)
-        ret += fmat.length
-      }
+      for (mat <- model.modelmats) ret += mat.length
     }
     ret
   }
@@ -62,42 +61,43 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
       val currentCount: Int = reduceCount.getAndIncrement()
       val updateCounts = 10
       if (currentCount % updateCounts == 0) {
-        val toc = System.currentTimeMillis()
+        val tock = System.currentTimeMillis()
         if (currentCount > 0) {
-          logger.info(f"elastic_updates/s=${updateCounts/((toc - tic) / 1.0e3)}%2.2f, total_updates=$currentCount")
+          logger.info(f"elastic_updates/s=${updateCounts/((tock - tick) / 1.0e3)}%2.2f, total_updates=$currentCount")
         }
-        tic = toc
+        tick = tock
       }
     }
     val reducedData = reducedOutput.data
 
-    assert(reducedData.length == totalDataSize, "Reduced output should be the same as as model")
+    assert(reducedData.length == totalDataSize, "Reduced output should be the same as model")
 
     // backward traversing model mats, assuming forward traversal by the training model
     // using while instead of for loop due to performance
     var current = totalDataSize
     var i = model.modelmats.length - 1
     val alpha = alphaFromIter(reducedOutput.iteration)
+    if (aelem eq null) aelem = model.modelmats(0).zeros(1, 1)
 
     while (i >= 0) {
       val mat = model.modelmats(i)
+      current -= mat.length
       mat.synchronized {
         mat match {
           case gmat: GMat =>
             val gReduced = GMat.make(gmat.dims)
-            GMat.CPUtoGPUarraycopy(reducedData, current - gmat.length, gReduced.pdata, 0, gmat.length, "ElasticAverageBinder dataSink")
-            gmat ~ gmat * (1 - alpha)
-            gReduced ~ gReduced * alpha
+            GMat.CPUtoGPUarraycopy(reducedData, current, gReduced.pdata, 0, gmat.length, "ElasticAverageBinder dataSink")
+            gmat ~ gmat * aelem.set(1 - alpha)
+            gReduced ~ gReduced * aelem.set(alpha)
             gmat ~ gReduced + gmat
             gReduced.free()
           case fmat: FMat =>
             val fReduced = FMat.make(fmat.dims)
-            System.arraycopy(reducedData, current - fmat.length, fReduced.contents().data, 0, fmat.length)
-            fmat ~ fmat * (1 - alpha)
-            fReduced ~ fReduced * alpha
+            System.arraycopy(reducedData, current, fReduced.contents().data, 0, fmat.length)
+            fmat ~ fmat * aelem.set(1 - alpha)
+            fReduced ~ fReduced * aelem.set(alpha)
             fmat ~ fReduced + fmat
         }
-        current -= mat.length
       }
       i -= 1
     }
