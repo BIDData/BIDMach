@@ -28,7 +28,7 @@ class ImageArray(name: String = "plot") {
     val controlPanel: JPanel = new JPanel();
     val frame: JFrame = new JFrame;
 
-    implicit val publish = new NonNotebook;
+    implicit val publish = new Mat.NonNotebook;
     
     def init(data: FMat) {
         img = Image(data);

@@ -78,7 +78,6 @@ done
 popd > /dev/null
 
 TOOL_LIBS="${BIDMACH_ROOT}/conf;${JAVA_HOME}/lib/tools.jar"
-
 ALL_LIBS="${TOOL_LIBS};${BIDMACH_LIBS}"
 
 if [ "$OSS" = "windows" ]; then
@@ -116,5 +115,6 @@ else
     if [ "$1" != "" ]; then
 	runscript="-i ${1}"
     fi
-    ${BIDMACH_ROOT}/scripts/scala/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${ALL_LIBS}" -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.sc $runscript
+    ${BIDMACH_ROOT}/command/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${TOOL_LIBS}" \
+		   -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.sc $runscript
 fi

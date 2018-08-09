@@ -1,4 +1,5 @@
-import BIDMat.{BMat,CMat,CSMat,DMat,Dict,FMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,HMat,IDict,Image,IMat,LMat,Mat,Quaternion,SMat,SBMat,SDMat,TMat}
+import BIDMat.{BMat,CMat,CSMat,DMat,Dict,FMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,HMat,IDict,Image,IMat,LMat,Mat}
+import BIDMat.{Quaternion,SMat,SBMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMat.Solvers._
@@ -11,7 +12,8 @@ import BIDMach.datasinks.{DataSink,MatSink}
 import BIDMach.mixins.{CosineSim,Perplexity,Top,L1Regularizer,L2Regularizer}
 import BIDMach.updaters.{ADAGrad,Batch,BatchNorm,Grad,IncMult,IncNorm,Telescoping,Updater}
 import BIDMach.causal.{IPTW}
+import BIDMat.Mat.console_publish
 
 Mat.checkMKL(false)
-Mat.checkCUDA
-implicit val publish = new NonNotebook
+Mat.checkCUDA(true)
+
