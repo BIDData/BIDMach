@@ -46,7 +46,6 @@ opts.convType = Net.CrossCorrelation;
 
 val ResDim = 50
 
-:silent
 val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 
 var f:FileReader = null
@@ -72,6 +71,5 @@ mopts.autoReset = false;
 mm.predict;
 
 //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-:silent
 
 

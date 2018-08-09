@@ -1,4 +1,3 @@
-//:silent
 import BIDMach.extern._
 import BIDMach.networks.layers._
 import java.io.FileReader
@@ -45,6 +44,4 @@ val mmodel = mm.model.asInstanceOf[Net];
 mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-
-//:silent
 

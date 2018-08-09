@@ -15,8 +15,6 @@ val testpreds = testdir+"pred%04d.fmat.lz4";
 val (nn, opts) = Net.learner(traindata, trainlabels)
 val net = nn.model.asInstanceOf[Net]
 
-//:silent
-
 val means = ones(3\256\256\256) *@ loadFMat(traindir+"means.fmat.lz4");
 
 var f:FileReader = null
@@ -50,6 +48,5 @@ mopts.autoReset = false;
 mm.predict;
 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-//:silent
 
 

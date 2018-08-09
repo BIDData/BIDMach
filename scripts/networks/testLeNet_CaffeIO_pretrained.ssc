@@ -1,4 +1,3 @@
-//:silent
 import BIDMach.extern._
 import BIDMach.networks.layers._
 import java.io.FileReader
@@ -50,6 +49,4 @@ val (mm, mopts) = caffeModel.predictor(test, testlabels)
 mopts.autoReset = false;
 mm.predict
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-
-//:silent
 
