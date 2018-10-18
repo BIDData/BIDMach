@@ -27,7 +27,7 @@ else
 fi
 export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8 ${LOG_OPTS} ${JAVA_OPTS}" # Set as much memory as possible
 
-BIDMAT_VERSION=`echo lib/BIDMat-*-cpu-*.jar | sed 's/.*BIDMat-//' | sed 's/-cpu.*\.jar//'`
+BIDMAT_VERSION=`echo lib/BIDMat-natives-*-cpu-*.jar | sed 's/.*BIDMat-natives-//' | sed 's/-cpu.*\.jar//'`
 
 OSS=`uname -a`
 if [ "$ARCH" = "" ]; then

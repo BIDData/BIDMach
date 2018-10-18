@@ -6,7 +6,7 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>2.0.26-cuda8.0</version>
+  <version>2.0.27-cuda8.0</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
@@ -16,18 +16,18 @@
   </properties>
   <repositories>
     <repository>
-      <id>central</id>
-      <name>Maven Repository Switchboard</name>
-      <layout>default</layout>
-      <url>http://repo1.maven.org/maven2</url>
+      <id>bintray-biddata-BIDData</id>
+      <name>bintray</name>
+      <url>http://dl.bintray.com/biddata/BIDData</url>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
     </repository>
     <repository>
-      <id>bintray-biddata-BIDData</id>
-      <name>bintray</name>
-      <url>http://dl.bintray.com/biddata/BIDData</url>
+      <id>central</id>
+      <name>Maven Repository Switchboard</name>
+      <layout>default</layout>
+      <url>http://repo1.maven.org/maven2</url>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
@@ -94,138 +94,20 @@
         <osarch>linux-aarch64</osarch>
       </properties>
     </profile>
-    <profile>
-      <id>gpu</id>
-      <activation>
-        <property>
-          <name>gpu</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>3.0.2</version>
-            <executions>
-              <execution>
-                <id>build_cuda_native_jar</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <classesDirectory>src/main/resources</classesDirectory>
-                  <classifier>gpu-${osarch}</classifier>
-                  <includes>
-                    <include>lib/*bidmachcuda*</include>
-                  </includes>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>cpu</id>
-      <activation>
-        <property>
-          <name>cpu</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>3.0.2</version>
-            <executions>
-              <execution>
-                <id>build_cpu_native_jar</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <classesDirectory>src/main/resources</classesDirectory>
-                  <classifier>cpu-${osarch}</classifier>
-                  <includes>
-                    <include>lib/*bidmachcpu*</include>
-                    <include>lib/*iomp5*</include>
-                    <include>cbin/*</include>
-                  </includes>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>dependcpu</id>
-      <activation>
-        <property>
-          <name>!cpu</name>
-        </property>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>${project.groupId}</groupId>
-          <artifactId>${project.artifactId}</artifactId>
-          <version>${project.version}</version>
-          <classifier>cpu-${osarch}</classifier>
-        </dependency>
-      </dependencies>
-      <build>
-	<plugins>
-	  <plugin>
-	    <groupId>org.apache.maven.plugins</groupId>
-	    <artifactId>maven-dependency-plugin</artifactId>
-	    <version>2.10</version>
-	    <executions>
-	      <execution>
-		<id>unpack-resources</id>
-		<phase>package</phase>
-		<goals>
-		  <goal>unpack</goal>
-		</goals>
-		<configuration>
-		  <artifactItems>
-		    <artifactItem>
-		      <groupId>BIDMach</groupId>
-		      <artifactId>BIDMach</artifactId>
-		      <classifier>cpu-${osarch}</classifier>
-		      <version>${project.version}</version>
-		      <includes>**/*.exe</includes>
-		      <outputDirectory>${project.basedir}</outputDirectory>
-		    </artifactItem>
-		  </artifactItems>
-		</configuration>
-	      </execution>
-	    </executions>
-	  </plugin>
-	</plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>dependgpu</id>
-      <activation>
-        <property>
-          <name>!gpu</name>
-        </property>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>${project.groupId}</groupId>
-          <artifactId>${project.artifactId}</artifactId>
-          <version>${project.version}</version>
-          <classifier>gpu-${osarch}</classifier>
-        </dependency>
-      </dependencies>
-    </profile>
   </profiles>
   <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>BIDMach-natives</artifactId>
+      <version>${project.version}</version>
+      <classifier>cpu-${osarch}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>BIDMach-natives</artifactId>
+      <version>${project.version}</version>
+      <classifier>gpu-${osarch}</classifier>
+    </dependency>
     <dependency>
       <groupId>BIDMat</groupId>
       <artifactId>BIDMat</artifactId>
@@ -321,6 +203,25 @@
               <overWriteIfNewer>true</overWriteIfNewer>
             </configuration>
           </execution>
+	  <execution>
+	    <id>unpack-resources</id>
+	    <phase>package</phase>
+	    <goals>
+	      <goal>unpack</goal>
+	    </goals>
+	    <configuration>
+	      <artifactItems>
+		<artifactItem>
+		  <groupId>BIDMach</groupId>
+		  <artifactId>BIDMach-natives</artifactId>
+		  <classifier>cpu-${osarch}</classifier>
+		  <version>${project.version}</version>
+		  <includes>**/*.exe</includes>
+		  <outputDirectory>${project.basedir}</outputDirectory>
+		</artifactItem>
+	      </artifactItems>
+	    </configuration>
+	  </execution>
         </executions>
       </plugin>
       <plugin>
