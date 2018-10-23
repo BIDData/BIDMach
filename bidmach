@@ -113,8 +113,8 @@ else
     fi
     runscript=""
     if [ "$1" != "" ]; then
-	runscript="-i ${1}"
+	runscript="-I ${1}"
     fi
     ${BIDMACH_ROOT}/command/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${TOOL_LIBS}" \
-		   -cp "${ALL_LIBS}" -Yrepl-sync -i ${LIBDIR}/bidmach_init.sc $runscript
+		   -cp "${ALL_LIBS}" -Yrepl-sync -I ${LIBDIR}/bidmach_init.sc $runscript
 fi
