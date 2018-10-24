@@ -6,7 +6,7 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach-natives</artifactId>
   <packaging>jar</packaging>
-  <version>2.0.27-cuda8.0</version>
+  <version>2.0.28-cuda8.0</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
@@ -98,7 +98,7 @@
       <id>gpu</id>
       <activation>
         <property>
-          <name>gpu</name>
+          <name>!cpu</name>
         </property>
       </activation>
       <build>
@@ -131,7 +131,7 @@
       <id>cpu</id>
       <activation>
         <property>
-          <name>cpu</name>
+          <name>!gpu</name>
         </property>
       </activation>
       <build>
