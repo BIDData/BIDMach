@@ -1,4 +1,3 @@
-:silent
 
 // This script needs to be run from <BIDMACH_DIR>/scripts
 
@@ -15,4 +14,3 @@ useGPU = false
 println("\n<<<<<<< Testing without MKL >>>>>>>")
 Mat.useMKL = false
 :load workout_slave.ssc
-:silent
