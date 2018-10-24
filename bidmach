@@ -90,7 +90,6 @@ else
     ALL_LIBS=`echo "${ALL_LIBS}" | sed 's/;/:/g'`
 fi
 
-
 if [ "$1" = "notebook" ]; then
     shift 1
     KERNEL_CMD="[\"java\", \"-Xms128M\", \"${MEMSIZE}\", \"-Dfile.encoding=UTF-8\", \"-cp\", \"${ALL_LIBS}\",
@@ -115,6 +114,6 @@ else
     if [ "$1" != "" ]; then
 	runscript="-I ${1}"
     fi
-    ${BIDMACH_ROOT}/command/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${TOOL_LIBS}" \
+    ${BIDMACH_ROOT}/command/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${ALL_LIBS}" \
 		   -cp "${ALL_LIBS}" -Yrepl-sync -I ${LIBDIR}/bidmach_init.sc $runscript
 fi

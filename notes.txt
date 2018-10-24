@@ -1,0 +1,4 @@
+
+In theory -toolcp should only contain the tool classes, but native code errors result if it doesnt contain all libs.
+
+    ${BIDMACH_ROOT}/command/scala -Dscala.repl.maxprintstring=8000 ${userargs} -nobootcp -toolcp "${ALL_LIBS}" \
