@@ -2,7 +2,7 @@
 
 import jcuda.jcudnn._
 
-val datadir = "/data/data/CIFAR10/parts/"
+val datadir = "/data/mcmc/data/CIFAR10/parts/"
 val pretrain_model_dir = "models/cifar_new/"
 val pretrain_discriminator_dir = "models/cifar_discri2/"
 

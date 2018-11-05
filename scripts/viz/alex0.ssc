@@ -9,7 +9,7 @@ import BIDMach.networks.layers._
 
 val pretrained_model_dir = "models/alex32p/"
 
-val traindir = "/data/data/ImageNet/train/";
+val traindir = "/code/BIDMach/data/ImageNet/train/";
 val testdir = "/code/BIDMach/data/ImageNet/val/";
 val traindata = traindir+"partNCHW%04d.bmat.lz4";
 val trainlabels = traindir+"label%04d.imat.lz4";
