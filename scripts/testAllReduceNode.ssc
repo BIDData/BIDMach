@@ -109,7 +109,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 
 
-nn.train;
+nn.launchTrain
 
 // All-reduce
 val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
