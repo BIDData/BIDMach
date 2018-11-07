@@ -298,6 +298,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 	  input.close;
 	  opts.copyFrom(newopts);
     }
+    refresh = false;
   }
 
   def bind(ds:DataSource):Unit = {
