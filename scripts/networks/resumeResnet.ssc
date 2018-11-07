@@ -1,0 +1,65 @@
+import BIDMach.networks.layers._
+
+val traindir = "../../data/ImageNet/train/";
+val testdir = "../../data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
+
+val (nn, opts) = Net.gradLearner(traindata, trainlabels);
+val net = nn.model.asInstanceOf[Net]
+
+def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
+  val lr = if (ipass < 15) {
+      2e-2f
+  } else if (ipass < 30) {
+      2e-3f
+  } else 2e-4f;
+  lr
+}
+
+opts.checkPointFile = "../../models/resnet%03d/"
+
+// Find the last checkpoint file
+var lasti = -1;
+var foundany = false;
+var foundall = false;
+val limit = 10000
+while (!foundall && lasti < limit) { 
+  lasti += 1;
+  val f = new java.io.File(opts.checkPointFile format lasti);
+  if (f.exists()) { 
+    foundany = true;
+  } else { 
+    if (foundany) { 
+      foundall = true;
+    }
+  }
+}
+
+lasti -= 1;
+
+net.load(opts.checkPointFile format lasti);
+net.refresh=false;
+opts.nextCheckPoint = lasti+1;
+//opts.lr_policy = lr_update _;
+
+
+def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
+
+val sgd = nn.updater.asInstanceOf[Grad];
+
+// nn.train
+
+
+// def validate = { 
+// val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+// mopts.batchSize= opts.batchSize;
+// mm.predict; 
+// println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+// }
+
+
+
