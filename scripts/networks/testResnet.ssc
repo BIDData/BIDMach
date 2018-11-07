@@ -8,12 +8,7 @@ val testdata = testdir+"partNCHW%04d.bmat.lz4";
 val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
 
-class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
-val opts = new MyOpts;
-val ds = FileSource(traindata, trainlabels, opts);
-val net = new Net(opts);
-val grad = new Grad(opts);
-val nn = new Learner(ds, net, null, grad, null, opts);
+val (nn, opts) = new Net.gradLearner(traindata, trainlabels);
 
 val resdim = 34;
 val bottleneckThreshold = 40;

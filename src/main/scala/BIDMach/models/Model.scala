@@ -216,7 +216,13 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
 
   def saveMetaData(fname:String) = {}
 
+  def deleteMetaData(fname:String) = {}
+
   def loadMetaData(fname:String) = {}
+
+  def guardOptions():AnyRef = null
+
+  def unguardOptions(guard:AnyRef) = { }
 
   /**
    * Save the model to a given path. This is normally a directory (which is created if needed).
@@ -229,6 +235,7 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     val parentdir = metadataname.getParentFile();
     if (parentdir != null) parentdir.mkdirs();
     val pw = new PrintWriter(metadataname);
+    val guard = guardOptions();
     pw.print(JSON.toJSON(opts, true));
     pw.close;
     val out  = new FileOutputStream(fname+"options.ser")
@@ -240,10 +247,26 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       saveMat(fname+"modelmat%02d.lz4" format i, cpu(mat));
     }
     saveMetaData(fname);
+    unguardOptions(guard);
   }
 
-  def load(fname:String) = {
-	  import java.io._
+  def delete(fname:String) = {
+    import java.io._
+    val metadataname = new File(fname+"options.json");
+    val serialname = new File(fname+"options.ser")
+    val parentdir = metadataname.getParentFile();
+    metadataname.delete();
+    serialname.delete();
+    for (i <- 0 until modelmats.length) {
+      val matfile = new File(fname+"modelmat%02d.lz4" format i);
+      matfile.delete();
+    }
+    deleteMetaData(fname);
+    parentdir.delete();
+  }
+
+  def load(fname:String, useJson:Boolean=false) = {
+	import java.io._
     import BIDMat.JSON
     if (modelmats != null && modelmats.length > 0) {
     	for (i <- 0 until modelmats.length) {
@@ -258,20 +281,23 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
       }
       setmodelmats(mlist.toArray);
     }
-	  if (new File(fname+"options.ser").exists) {
-	  	val in = new FileInputStream(fname+"options.ser");
-	  	val input = new ObjectInputStream(in);
-	  	val newopts = input.readObject.asInstanceOf[Model.Opts];
-	  	input.close;
-	  	/*    val fr = new BufferedReader(new FileReader(fname+"options.json"));
-    val strbuf = new StringBuffer;
-    var line:String = null;
-    while ({line = fr.readLine(); line != null}) {
-      strbuf.append(line).append("\n");
+    if (useJson) { 
+	  val fr = new BufferedReader(new FileReader(fname+"options.json"));
+      val strbuf = new StringBuffer;
+      var line:String = null;
+      while ({line = fr.readLine(); line != null}) {
+        strbuf.append(line).append("\n");
+      }
+      fr.close();
+      val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts];
+	  opts.copyFrom(newopts);
+    } else { 
+	  val in = new FileInputStream(fname+"options.ser");
+	  val input = new ObjectInputStream(in);
+	  val newopts = input.readObject.asInstanceOf[Model.Opts];
+	  input.close;
+	  opts.copyFrom(newopts);
     }
-    val newopts = JSON.fromJSON(strbuf.toString).asInstanceOf[Model.Opts]; */
-	  	opts.copyFrom(newopts);
-	  }
   }
 
   def bind(ds:DataSource):Unit = {

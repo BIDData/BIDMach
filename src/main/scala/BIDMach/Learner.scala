@@ -48,7 +48,7 @@ class Learner(
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
   var viz:ListBuffer[Visualization] = null; 
-  var lastCheckPoint = 0;
+  var nextCheckPoint = opts.nextCheckPoint;
   @volatile var done = false;
   @volatile var paused = false;
   @volatile var pauseAt = -1L;
@@ -222,9 +222,13 @@ class Learner(
           bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
         lasti = reslist.length;
       }
-      if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
-        model.save(opts.checkPointFile format lastCheckPoint);
-        lastCheckPoint += 1;
+      if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + nextCheckPoint)) {
+        model.save(opts.checkPointFile format nextCheckPoint);
+        val oldCheckPoint = nextCheckPoint - opts.keepCheckPoints;
+        nextCheckPoint += 1;
+        if (opts.keepCheckPoints > 0 && oldCheckPoint >= 0) {
+            model.delete(opts.checkPointFile format oldCheckPoint);
+        }
       }
     }
     ipass += 1
@@ -235,7 +239,7 @@ class Learner(
   }
 
   def wrapUp(ipass:Int) {
-    if (opts.checkPointFile != null) model.save(opts.checkPointFile format lastCheckPoint)
+    if (opts.checkPointFile != null) model.save(opts.checkPointFile format nextCheckPoint)
     model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
@@ -403,7 +407,7 @@ class ParLearner(
   var useGPU = false;
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
-  var lastCheckPoint = 0;
+  var nextCheckPoint = 0;
   @volatile var done = false;
   @volatile var paused = false;
   @volatile var ipass = 0;
@@ -1020,6 +1024,8 @@ object Learner {
     var cumScore = 0;
     var checkPointFile:String = null;
     var checkPointInterval = 0f;
+    var keepCheckPoints = 2;
+    var nextCheckPoint = 0;
     var pauseAt = -1L;
     var logfile = "log.txt";
     var nNatural = 1;

@@ -6,10 +6,12 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>2.0.28-cuda8.0</version>
+  <version>2.1.0-cuda8.0</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
+    <nativeVersion>2.1.0-cuda8.0</nativeVersion>
+    <bidmatVersion>2.1.0-cuda8.0</bidmatVersion>
     <scalaVersion>2.11.11</scalaVersion>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <skipTests>true</skipTests>
@@ -99,19 +101,19 @@
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>BIDMach-natives</artifactId>
-      <version>${project.version}</version>
+      <version>${nativeVersion}</version>
       <classifier>cpu-${osarch}</classifier>
     </dependency>
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>BIDMach-natives</artifactId>
-      <version>${project.version}</version>
+      <version>${nativeVersion}</version>
       <classifier>gpu-${osarch}</classifier>
     </dependency>
     <dependency>
       <groupId>BIDMat</groupId>
       <artifactId>BIDMat</artifactId>
-      <version>${project.version}</version>
+      <version>${bidmatVersion}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
