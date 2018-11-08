@@ -27,7 +27,7 @@ else
 fi
 export JAVA_OPTS="${MEMSIZE} -Xms128M -Dfile.encoding=UTF-8 ${LOG_OPTS} ${JAVA_OPTS}" # Set as much memory as possible
 
-BIDMAT_VERSION=`echo lib/BIDMat-natives-*-cpu-*.jar | sed 's/.*BIDMat-natives-//' | sed 's/-cpu.*\.jar//'`
+BIDMACH_VERSION=`echo target/BIDMach-*.jar | sed 's/.*BIDMach-//' | sed 's/\.jar//'`
 
 OSS=`uname -a`
 if [ "$ARCH" = "" ]; then
@@ -70,7 +70,7 @@ fi
 
 cd lib
 BIDMACH_JARS=`echo *.jar`
-BIDMACH_LIBS="${BIDMACH_ROOT}/target/BIDMach-${BIDMAT_VERSION}.jar"
+BIDMACH_LIBS="${BIDMACH_ROOT}/target/BIDMach-${BIDMACH_VERSION}.jar"
 for lib in ${BIDMACH_JARS}; do
     BIDMACH_LIBS="${BIDMACH_LIBS};${LIBDIR}/${lib}"
 done
