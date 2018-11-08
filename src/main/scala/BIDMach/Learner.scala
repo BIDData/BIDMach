@@ -48,7 +48,7 @@ class Learner(
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
   var viz:ListBuffer[Visualization] = null; 
-  var nextCheckPoint = opts.nextCheckPoint;
+  var nextCheckPoint = 0;
   @volatile var done = false;
   @volatile var paused = false;
   @volatile var pauseAt = -1L;
@@ -81,6 +81,7 @@ class Learner(
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
     useGPU = model.useGPU;
+    nextCheckPoint = opts.nextCheckPoint;
   }
   
   def launch(fn:()=>Unit) = {
@@ -394,13 +395,13 @@ class Learner(
       }
     }
     lasti -= 1;
-    opts.nextCheckPoint = lasti+1;
     val toload = if (checkPointNumber >= 0) { 
       checkPointNumber
     } else { 
       lasti;
     }
     model.load(opts.checkPointFile format toload);
+    opts.nextCheckPoint = lasti+1;
   }
 
   def datamats = datasource.asInstanceOf[MatSource].mats;
