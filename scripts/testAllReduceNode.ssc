@@ -1,3 +1,4 @@
+:silent
 import BIDMach.Learner
 import BIDMach.allreduce.AllreduceNode.{getBasicConfigs, startNodeAfterIter}
 import BIDMach.allreduce.binder.ElasticAverageBinder
@@ -108,7 +109,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 
 
-nn.launchTrain;
+nn.launchTrain
 
 // All-reduce
 val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
