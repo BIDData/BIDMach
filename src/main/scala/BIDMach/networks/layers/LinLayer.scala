@@ -63,10 +63,12 @@ class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode
 	opts.initfn(modelmats(imodel), opts.initv*math.sqrt(ngroups).toFloat);
       }
       updatemats(imodel) = convertMat(modelmats(imodel).copy);
-      if (opts.hasBias && modelmats(imodel).asInstanceOf[AnyRef] == null) {
-	modelmats(imodel+1) = convertMat(zeros(outdim, 1));
+      if (opts.hasBias) { 
+	if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
+	  modelmats(imodel+1) = convertMat(zeros(outdim, 1));
+	  opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);	
+	}
 	updatemats(imodel+1) = convertMat(zeros(outdim, 1));		 
-	opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);	
       }
       initialized = true;
     }

@@ -83,11 +83,13 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     val outDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
     val biasDim = irow(outDim(0), 1, 1, 1);
     	
-    if (opts.hasBias && modelmats(imodel+1).asInstanceOf[AnyRef] == null) {
-      modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
-      opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
+    if (opts.hasBias) { 
+      if (modelmats(imodel+1).asInstanceOf[AnyRef] == null) {
+	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
+	opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
+      }
+      updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
     }
-    updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
     bwdFilterWS = modelmats(0).zeros(filter_h\filter_w\1\channel_out);
     
     if (lr_scales.asInstanceOf[AnyRef] != null) {
@@ -105,7 +107,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     
     bias_mat = modelmats(imodel+1).asInstanceOf[FMat];
     update_bias_mat = updatemats(imodel+1).asInstanceOf[FMat];
-    if (update_bias_mat.asInstanceOf[AnyRef] != null) update_bias_mat.clear;
+    if (opts.hasBias && update_bias_mat.asInstanceOf[AnyRef] != null) update_bias_mat.clear;
   }
 
   override def forward = {
