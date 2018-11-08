@@ -60,7 +60,6 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
     val hasInitData = modelmats(imodel).asInstanceOf[AnyRef] != null;
     filter = modelmats(imodel).asInstanceOf[FMat];
-    ffilter = modelmats(imodel).asInstanceOf[Filter];   	
     modelmats(imodel) = modelmats(imodel) match { 
       case mm:GMat => { 
         val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,mm);
@@ -72,6 +71,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
         FFilter.FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,filter);
       }
     }
+    ffilter = modelmats(imodel).asInstanceOf[Filter];   	
     ffilter match {
       case aa:GFilter => aa.convType = opts.convType;
       case _ => {}
