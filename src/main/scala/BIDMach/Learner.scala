@@ -223,7 +223,7 @@ class Learner(
           bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
         lasti = reslist.length;
       }
-      if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + nextCheckPoint)) {
+      if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + nextCheckPoint - opts.nextCheckPoint)) {
         model.save(opts.checkPointFile format nextCheckPoint);
         val oldCheckPoint = nextCheckPoint - opts.keepCheckPoints;
         nextCheckPoint += 1;
@@ -375,7 +375,7 @@ class Learner(
   }
 
   /**
-   * Load a specified checkPoint, or the last one if no arg given
+   * Load a specified checkPoint number, or the last one if no arg given.
    */
 
   def loadCheckPoint(checkPointNumber:Int= -1) = {
@@ -400,8 +400,12 @@ class Learner(
     } else { 
       lasti;
     }
-    model.load(opts.checkPointFile format toload);
-    opts.nextCheckPoint = lasti+1;
+    if (foundany) { 
+      model.load(opts.checkPointFile format toload);
+      opts.nextCheckPoint = lasti+1;
+    } else { 
+      myLogger.warning("loadCheckPoint: didnt find any checkpoint files");
+    }
   }
 
   def datamats = datasource.asInstanceOf[MatSource].mats;
