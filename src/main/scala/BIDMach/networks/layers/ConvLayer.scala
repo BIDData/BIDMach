@@ -59,18 +59,15 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     val channel_out = opts.noutputs; // actually # of filters;
 
     val hasInitData = modelmats(imodel).asInstanceOf[AnyRef] != null;
-    filter = modelmats(imodel).asInstanceOf[FMat];
-    modelmats(imodel) = modelmats(imodel) match { 
-      case mm:GMat => { 
-        val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,mm);
-        x.setTensorFormat(Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat));
-        x.convType = Net.getCUDNNconvType(opts.convType, net.opts.convType);
-        x;
-      }
-      case _ => { 
-        FFilter.FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,filter);
-      }
+    modelmats(imodel) = if (net.opts.useGPU && Mat.hasCUDA > 0) { 
+      val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,modelmats(imodel).asInstanceOf[GMat]);
+      x.setTensorFormat(Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat));
+      x.convType = Net.getCUDNNconvType(opts.convType, net.opts.convType);
+      x;
+    } else { 
+      FFilter.FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,modelmats(imodel).asInstanceOf[FMat]);
     }
+    filter = modelmats(imodel).asInstanceOf[FMat];
     ffilter = modelmats(imodel).asInstanceOf[Filter];   	
     ffilter match {
       case aa:GFilter => aa.convType = opts.convType;
@@ -85,8 +82,8 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     	
     if (opts.hasBias) { 
       if (modelmats(imodel+1).asInstanceOf[AnyRef] == null) {
-	modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
-	opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
+	    modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
+	    opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
       }
       updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
     }

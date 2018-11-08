@@ -42,24 +42,23 @@ while (!foundall && lasti < limit) {
 lasti -= 1;
 
 net.load(opts.checkPointFile format lasti);
-net.refresh=false;
 opts.nextCheckPoint = lasti+1;
 opts.lr_policy = lr_update _;
-
+opts.logfile = "logresv1a.txt";
 
 def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-nn.train
+nn.launchTrain
 
 
-// def validate = { 
-// val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
-// mopts.batchSize= opts.batchSize;
-// mm.predict; 
-// println("Accuracy = %f" format mean(mm.results(0,?),2).v);
-// }
+def validate = { 
+  val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+  mopts.batchSize= opts.batchSize;
+  mm.predict; 
+  println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+}
 
 
 

@@ -39,7 +39,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 
 opts.logfile = "logresv1.txt";
 opts.checkPointFile = "../../models/resnet%03d/"
-opts.checkPointInterval = 0.25f;
+opts.checkPointInterval = 0.5f;
 opts.batchSize= 128;
 opts.nend = 1250;
 opts.npasses = 50;
@@ -166,7 +166,7 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-nn.train
+nn.launchTrain
 
 
 def validate = { 
@@ -175,6 +175,5 @@ mopts.batchSize= opts.batchSize;
 mm.predict; 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 }
-
 
 

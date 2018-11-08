@@ -373,14 +373,42 @@ class Learner(
     results
   }
 
+  /**
+   * Load a specified checkPoint, or the last one if no arg given
+   */
+
+  def loadCheckPoint(checkPointNumber:Int= -1) = {
+    var lasti = -1;
+    var foundany = false;
+    var foundall = false;
+    val limit = 100000;
+    while (!foundall && lasti < limit) { 
+      lasti += 1;
+      val f = new java.io.File(opts.checkPointFile format lasti);
+      if (f.exists()) { 
+        foundany = true;
+      } else { 
+        if (foundany) { 
+          foundall = true;
+        }
+      }
+    }
+    lasti -= 1;
+    opts.nextCheckPoint = lasti+1;
+    val toload = if (checkPointNumber >= 0) { 
+      checkPointNumber
+    } else { 
+      lasti;
+    }
+    model.load(opts.checkPointFile format toload);
+  }
+
   def datamats = datasource.asInstanceOf[MatSource].mats;
   def modelmats = model.modelmats;
   def datamat = datasource.asInstanceOf[MatSource].mats(0);
   def modelmat = model.modelmats(0);
   def preds = datasink.asInstanceOf[MatSink].mats
 }
-
-
 /**
  * Parallel Learner with a single datasource.
  */

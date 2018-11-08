@@ -61,9 +61,9 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     	modelmats(imodel+1) = modelmats(imodel).zeros(bdims);
     	modelmats(imodel+2) = modelmats(imodel).zeros(bdims);
     	modelmats(imodel+3) = modelmats(imodel).zeros(bdims);
-    	updatemats(imodel) = modelmats(imodel).zeros(bdims);
-    	updatemats(imodel+1) = modelmats(imodel).zeros(bdims);
     }
+    updatemats(imodel) = modelmats(imodel).zeros(bdims);
+    updatemats(imodel+1) = modelmats(imodel).zeros(bdims);
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
     	lr_scales(imodel+1) = opts.bias_scale;
