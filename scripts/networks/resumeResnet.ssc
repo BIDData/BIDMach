@@ -44,14 +44,14 @@ lasti -= 1;
 net.load(opts.checkPointFile format lasti);
 net.refresh=false;
 opts.nextCheckPoint = lasti+1;
-//opts.lr_policy = lr_update _;
+opts.lr_policy = lr_update _;
 
 
 def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-// nn.train
+nn.train
 
 
 // def validate = { 

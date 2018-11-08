@@ -58,42 +58,42 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     val nstride = opts.stride(0); // 1;
     val channel_out = opts.noutputs; // actually # of filters;
 
-    
-    if (modelmats(imodel).asInstanceOf[AnyRef] == null) {
-    	modelmats(imodel) = if (net.opts.useGPU && Mat.hasCUDA > 0 && Mat.hasCUDNN) {
-    		val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad); 
-    		x.setTensorFormat(Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat));
-    		x.convType = Net.getCUDNNconvType(opts.convType, net.opts.convType);
-    		x;
-    	} else {
-    		FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad);
-    	}
-    	filter = modelmats(imodel).asInstanceOf[FMat];
-    	ffilter = modelmats(imodel).asInstanceOf[Filter];   	
-    	ffilter match {
-    	  case aa:GFilter => aa.convType = opts.convType;
-    	  case _ => {}
-    	}
-    	updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
-    	
-    	opts.initfn(filter, opts.initv);
-    	
-    	val outDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
-    	
-    	if (opts.hasBias) {
-    		val biasDim = irow(outDim(0), 1, 1, 1);
-    		modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
-    		updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
-    		opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
-    	}
-    	bwdFilterWS = modelmats(0).zeros(filter_h\filter_w\1\channel_out);
+    val hasInitData = modelmats(imodel).asInstanceOf[AnyRef] != null;
+    filter = modelmats(imodel).asInstanceOf[FMat];
+    ffilter = modelmats(imodel).asInstanceOf[Filter];   	
+    modelmats(imodel) = modelmats(imodel) match { 
+      case mm:GMat => { 
+        val x = GFilter.GFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,mm);
+        x.setTensorFormat(Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat));
+        x.convType = Net.getCUDNNconvType(opts.convType, net.opts.convType);
+        x;
+      }
+      case _ => { 
+        FFilter.FFilter2Ddn(filter_h,filter_w,channel_in,channel_out,nstride,npad,filter);
+      }
     }
+    ffilter match {
+      case aa:GFilter => aa.convType = opts.convType;
+      case _ => {}
+    }
+    updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
+    	
+    if (!hasInitData) opts.initfn(filter, opts.initv);
+    	
+    val outDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
+    val biasDim = irow(outDim(0), 1, 1, 1);
+    	
+    if (opts.hasBias && modelmats(imodel+1).asInstanceOf[AnyRef] == null) {
+      modelmats(imodel+1) = modelmats(imodel).zeros(biasDim);
+      opts.initbiasfn(modelmats(imodel+1), opts.initbiasv);
+    }
+    updatemats(imodel+1) = modelmats(imodel).zeros(biasDim); 		    	
+    bwdFilterWS = modelmats(0).zeros(filter_h\filter_w\1\channel_out);
+    
     if (lr_scales.asInstanceOf[AnyRef] != null) {
     	lr_scales(imodel) = opts.lr_scale;
     	lr_scales(imodel+1) = opts.bias_scale;
     }
-    filter = modelmats(imodel).asInstanceOf[FMat];
-    ffilter = modelmats(imodel).asInstanceOf[Filter];
     if (output.asInstanceOf[AnyRef] == null) { 
     	val outputBatchDim = Filter.getOutputDims(inputData.dims, ffilter.inDims, ffilter.outDims, ffilter.stride, ffilter.pad, ffilter.outPad);
     	output = filter.zeros(outputBatchDim);
