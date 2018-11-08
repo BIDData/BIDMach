@@ -8,7 +8,7 @@ val testdata = testdir+"partNCHW%04d.bmat.lz4";
 val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
 
-val (nn, opts) = new Net.gradLearner(traindata, trainlabels);
+val (nn, opts) = Net.gradLearner(traindata, trainlabels);
 val net = nn.model.asInstanceOf[Net]
 
 val resdim = 34;
