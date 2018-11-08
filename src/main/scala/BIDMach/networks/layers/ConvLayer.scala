@@ -49,7 +49,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
   }
 
   def initModelMats = {
-  	initHandles();
+    initHandles();
     inputDim = inputData.dims;
     val channel_in = inputDim(0);
     val filter_h = opts.kernel(0); // 3;0
