@@ -223,7 +223,7 @@ class Learner(
           bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
         lasti = reslist.length;
       }
-      if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + nextCheckPoint - opts.nextCheckPoint)) {
+      if (opts.checkPointFile != null && ipass + dsp > opts.checkPointInterval * (1 + nextCheckPoint - opts.nextCheckPoint)) {
         model.save(opts.checkPointFile format nextCheckPoint);
         val oldCheckPoint = nextCheckPoint - opts.keepCheckPoints;
         nextCheckPoint += 1;
