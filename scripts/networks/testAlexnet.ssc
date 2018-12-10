@@ -9,12 +9,10 @@ val testdata = testdir+"partNCHW%04d.bmat.lz4";
 val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
 
-class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
-val opts = new MyOpts;
-val ds = FileSource(traindata, trainlabels, opts);
-val net = new Net(opts);
-val grad = new Grad(opts);
-val nn = new Learner(ds, net, null, grad, null, opts);
+val (nn, opts) = Net.gradLearner(traindata, trainlabels);
+val net = nn.model.asInstanceOf[Net]
+val ds = nn.datasource.asInstanceOf[FileSource];
+val grad = nn.updater.asInstanceOf[Grad]
 
 val lrinit = 1e-2f;
 
@@ -29,6 +27,9 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet_%f.txt" format (lrinit);
+opts.checkPointFile = "../../models/alexnet%03d/"
+opts.checkPointInterval = 5f;
+opts.keepCheckPoints= -1;
 opts.batchSize= 128;
 opts.npasses = 80;
 opts.nend = 1250;
@@ -36,7 +37,7 @@ opts.lrate = 1e-4f;
 opts.texp = 0f;
 opts.pstep = 0.01f
 opts.hasBias = true;
-opts.l2reg = 0.0005f;
+opts.l2reg = 0.00005f;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
