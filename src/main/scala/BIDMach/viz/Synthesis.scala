@@ -13,7 +13,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 /***
     Use activation maximization to synthesis images based on a particular neuron.
-**/
+*/
 
 class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Synthesis.Options) extends Visualization{
     val plot = new ImageArray("Input Synthesis");
@@ -376,7 +376,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                 batch(0)(?,?,?,0->(batchSize/2)) = cpu(data(?,?,?,0->(batchSize/2)))
                 batch(1)(?,0->(batchSize/2)) = 0;                
                 D.layers(0).deriv.clear;
-                D.dobatchg(batch,here,0);*/
+                D.dobatchg(batch,here,0); */
                 if (opts.trainDis) {
                     val batchSize = ds.opts.batchSize;
                     here += batchSize;
@@ -420,7 +420,7 @@ class Synthesis(val modelname: String = "cifar",val opts:Synthesis.Opts = new Sy
                 val gloss = mean(D.output_layers(0).output(1,?)).dv.toFloat;
                 val gscore = mean(D.output_layers(0).score).dv.toFloat
                 gscores+=gscore;
-                updater.update(0,here,0);*/                
+                updater.update(0,here,0); */                
             }
         }        
     }
@@ -558,7 +558,7 @@ object Synthesis {
                          conv2  \ pool2  \ relu2  on
                          conv3  \ pool3  \ null   on
                          fc3    \ out    \ null   ).t
-            opts.nodemat = nodes;*/
+            opts.nodemat = nodes; */
             opts.nodeset=Net.getDefaultNodeSet
         }        
         ds.init
@@ -624,7 +624,7 @@ object Synthesis {
                          fc3    \ relu3   \ null   \ null    on
                          drop6    \ null   \ null    \ null    on
                      fc5    \ out     \ null   \ null).t
-            opts.nodemat = nodes;*/
+            opts.nodemat = nodes; */
             opts.nodeset=Net.getDefaultNodeSet
         }        
         ds.init
