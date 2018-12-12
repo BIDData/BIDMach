@@ -30,20 +30,23 @@ val nconv5x = layercounts(imodel, 4);
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 15) {
-      2e-2f
+      1e-1f
   } else if (ipass < 30) {
-      2e-3f
-  } else 2e-4f;
+      1e-2f
+  } else 1e-3f;
   lr
 }
 
 opts.logfile = "logresv1.txt";
+opts.checkPointFile = "../../models/resnet%03d/"
+opts.checkPointInterval = 5f;
+opts.keepCheckPoints = -1;
 opts.batchSize= 128;
 opts.nend = 1250;
 opts.npasses = 50;
 opts.lrate = 1e-1f;
 opts.texp = 0.0f;
-opts.pstep = 0.01f;
+opts.pstep = 0.05f;
 opts.l2reg = 0.0001f;
 opts.hasBias = true;
 opts.vel_decay = 0.9f;
@@ -164,7 +167,8 @@ def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
 
 val sgd = nn.updater.asInstanceOf[Grad];
 
-nn.launchTrain;
+nn.launchTrain
+
 
 def validate = { 
 val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
@@ -172,6 +176,5 @@ mopts.batchSize= opts.batchSize;
 mm.predict; 
 println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 }
-
 
 
