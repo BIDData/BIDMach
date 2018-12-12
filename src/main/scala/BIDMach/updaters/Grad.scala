@@ -161,8 +161,8 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 	    		if (opts.l2reg.asInstanceOf[AnyRef] != null) {
 	    			val i0 = if (opts.l2reg.length > 1) i else 0;
 	    			(grad, mm) match {
-	    			  case (ggrad:GMat, gmm:GMat) => Grad.linComb(ggrad, 1f, gmm, -opts.l2reg(i0), ggrad);
-	    			  case _ => grad ~ grad - (mm *@ opts.l2reg(i0));
+	    			  case (ggrad:GMat, gmm:GMat) => Grad.linComb(ggrad, 1f, gmm, -(opts.l2reg(i0)*batchSize), ggrad);
+	    			  case _ => grad ~ grad - (mm *@ (opts.l2reg(i0)*batchSize));
 	    			}
 	    		}
 	    		if (opts.langevin > 0) {                              // Add Langevin random permutations
