@@ -86,6 +86,7 @@ trait BatchNormNodeOpts extends ModelNodeOpts {
 	var expAvgFactor:Float = 1f;
   var epsilon:Float = 1e-4f;
   var batchNormMode = BatchNormLayer.SPATIAL;
+  weight_decay_scale = 0f;
   
   def copyOpts(opts:BatchNormNodeOpts):BatchNormNodeOpts = {
       super.copyOpts(opts);

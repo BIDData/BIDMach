@@ -72,7 +72,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     		val um = updatemats(i);
     		if (opts.l2reg.asInstanceOf[AnyRef] != null) {
     			val i0 = if (opts.l2reg.length > 1) i else 0;
-    			um ~ um - (mm *@ opts.l2reg(i0));
+    			um ~ um - (mm *@ (opts.l2reg(i0) * model.l2reg_scales(i)));
     		}
     		if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
     			lrate.set(lr0);
