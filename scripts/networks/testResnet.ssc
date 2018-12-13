@@ -28,12 +28,14 @@ val nconv3x = layercounts(imodel, 2);
 val nconv4x = layercounts(imodel, 3);
 val nconv5x = layercounts(imodel, 4);
 
+val lrinit = 1e-1f;
+
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 15) {
-      1e-1f
+      lrinit
   } else if (ipass < 30) {
-      1e-2f
-  } else 1e-3f;
+      lrinit/10
+  } else lrinit/100
   lr
 }
 
