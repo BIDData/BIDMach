@@ -23,6 +23,8 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
   
   var _lr_scales:FMat = null;
 
+  var _l2reg_scales:FMat = null;
+
   var parent_model:Model = null;
   
   var elastic_tmp:Mat = null;
@@ -49,9 +51,20 @@ abstract class Model(val opts:Model.Opts = new Model.Options) extends Serializab
     }
   }
 
+  def l2reg_scales:FMat = {
+    if (_modelmats != null) {
+      _l2reg_scales
+    } else if (parent_model != null) {
+      parent_model._l2reg_scales
+    } else {
+      null
+    }
+  }
+
   def setmodelmats(a:Array[Mat]) = {
     _modelmats = a;
     _lr_scales = ones(1, _modelmats.length);
+    _l2reg_scales = ones(1, _modelmats.length);
   }
 
   var updatemats:Array[Mat] = null;

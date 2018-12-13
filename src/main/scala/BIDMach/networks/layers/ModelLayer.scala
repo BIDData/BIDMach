@@ -51,6 +51,7 @@ trait ModelNodeOpts extends NodeOpts {
   var imodel = 0;
   var lr_scale = 1f;
   var bias_scale = 1f;
+  var weight_decay_scale = 1f;
   var initfn:(Mat,Float)=>Mat = Net.xavier;
   var initv:Float = 1f;
   
@@ -60,6 +61,7 @@ trait ModelNodeOpts extends NodeOpts {
     opts.imodel = imodel;
     opts.lr_scale = lr_scale;
     opts.bias_scale = bias_scale;
+    opts.weight_decay_scale = weight_decay_scale;
     opts.initfn = initfn;
     opts.initv = initv;
     opts;

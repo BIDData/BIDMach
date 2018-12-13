@@ -68,6 +68,10 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
     	lr_scales(imodel) = opts.lr_scale;
     	lr_scales(imodel+1) = opts.bias_scale;
     }
+    net.l2reg_scales(imodel) = opts.weight_decay_scale;
+    net.l2reg_scales(imodel+1) = opts.weight_decay_scale;
+    net.l2reg_scales(imodel+2) = opts.weight_decay_scale;
+    net.l2reg_scales(imodel+3) = opts.weight_decay_scale;
     scale = modelmats(imodel);
     bias = modelmats(imodel+1);
     runningMeans = modelmats(imodel+2);
@@ -318,10 +322,11 @@ class BatchNormScaleLayer(override val net:Net, override val opts:BatchNormScale
 }
 
 trait BatchNormScaleNodeOpts extends ModelNodeOpts {
-	var hasBias:Boolean = true;
+  var hasBias:Boolean = true;
   var expAvgFactor:Float = 1.0f;                  
   var epsilon:Float = 1e-4f;
   var batchNormMode:Int = BatchNormLayer.SPATIAL;
+  weight_decay_scale = 0f;
 
   def copyOpts(opts:BatchNormScaleNodeOpts):BatchNormScaleNodeOpts = {
 		super.copyOpts(opts);
