@@ -34,12 +34,7 @@ def lr_update(ipass0:Float, istep:Float, frac:Float):Float = {
 opts.lr_policy = lr_update _;
 opts.logfile = "logresv1b.txt";
 
-def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
-
-val sgd = nn.updater.asInstanceOf[Grad];
-
 nn.launchTrain
-
 
 def validate = { 
   val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);

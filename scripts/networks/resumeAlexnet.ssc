@@ -17,7 +17,7 @@ opts.checkPointFile = "../../models/alexnet%03d/"
 nn.loadCheckPoint();
 
 // Enter the number of epochs completed already
-val doneEpochs = 50;
+val doneEpochs = 0;
 val lrinit = 1e-2f;
 
 def lr_update(ipass0:Float, istep:Float, frac:Float):Float = {
