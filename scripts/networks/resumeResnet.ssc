@@ -33,6 +33,7 @@ def lr_update(ipass0:Float, istep:Float, frac:Float):Float = {
 
 opts.lr_policy = lr_update _;
 opts.logfile = "logresv1b.txt";
+opts.npasses = opts.npasses - doneEpochs;
 
 nn.launchTrain
 

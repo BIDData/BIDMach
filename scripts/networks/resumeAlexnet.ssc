@@ -32,6 +32,7 @@ def lr_update(ipass0:Float, istep:Float, frac:Float):Float = {
 
 opts.logfile = "logAlexnet_%fb.txt" format (lrinit);
 opts.lr_policy = lr_update _;
+opts.npasses = opts.npasses - doneEpochs;
 
 nn.launchTrain;
 
