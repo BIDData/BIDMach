@@ -378,7 +378,7 @@ class Learner(
    * Load a specified checkPoint number, or the last one if no arg given.
    */
 
-  def loadCheckPoint(checkPointNumber:Int= -1) = {
+  def loadCheckPoint(checkPointNumber:Int= -1, useJson:Boolean=false) = {
     var lasti = -1;
     var foundany = false;
     var foundall = false;
@@ -401,7 +401,7 @@ class Learner(
       lasti;
     }
     if (foundany) { 
-      model.load(opts.checkPointFile format toload);
+      model.load(opts.checkPointFile format toload, useJson);
       opts.nextCheckPoint = lasti+1;
     } else { 
       myLogger.warning("loadCheckPoint: didnt find any checkpoint files");
