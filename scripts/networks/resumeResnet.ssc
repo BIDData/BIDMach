@@ -25,7 +25,7 @@ def lr_update(ipass0:Float, istep:Float, frac:Float):Float = {
   val ipass = ipass0 + doneEpochs;
   val lr = if (ipass < 15) {
     lrinit
-  } else if (ipass < 30) {
+  } else if (ipass < 20) {
     lrinit/10
   } else lrinit/100
   lr

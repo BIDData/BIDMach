@@ -33,7 +33,7 @@ val lrinit = 1e-1f;
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 15) {
       lrinit
-  } else if (ipass < 30) {
+  } else if (ipass < 20) {
       lrinit/10
   } else lrinit/100
   lr
@@ -45,11 +45,11 @@ opts.checkPointInterval = 5f;
 opts.keepCheckPoints = -1;
 opts.batchSize= 128;
 opts.nend = 1250;
-opts.npasses = 50;
+opts.npasses = 25;
 opts.lrate = 1e-1f;
 opts.texp = 0.0f;
 opts.pstep = 0.05f;
-opts.l2reg = 0.0002f;
+opts.l2reg = 0.00005f;
 opts.hasBias = true;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
