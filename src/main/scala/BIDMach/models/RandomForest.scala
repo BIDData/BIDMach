@@ -1160,7 +1160,7 @@ def minImpurityx(keys:LMat, cnts:IMat, outv:IMat, outf:IMat, outn:IMat, outg:FMa
     saveFMat(fname+"ctrees.fmat.lz4", ctrees);
   }
 
-  override def load(fname:String) = {
+  override def load(fname:String, useJson:Boolean=false) = {
     itrees = loadIMat(fname+"itrees.imat.lz4");
     ftrees = loadIMat(fname+"ftrees.imat.lz4");
     vtrees = loadIMat(fname+"vtrees.imat.lz4");

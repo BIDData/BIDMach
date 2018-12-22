@@ -1,0 +1,50 @@
+import BIDMach.networks.layers._
+
+val traindir = "../../data/ImageNet/train/";
+//val traindir = "/home/jfc/data/ImageNet/2012/BIDMach/train/";
+val testdir = "../../data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
+
+val (nn, opts) = Net.gradLearner(traindata, trainlabels);
+val net = nn.model.asInstanceOf[Net]
+
+// Load the most recent checkpoint matching the checkpoint filename template
+opts.checkPointFile = "../../models/alexnet%03d/"
+nn.loadCheckPoint();
+
+// Enter the number of epochs completed already
+val doneEpochs = 0;
+val lrinit = 1e-2f;
+
+def lr_update(ipass0:Float, istep:Float, frac:Float):Float = {
+  val ipass = ipass0 + doneEpochs;
+  val lr = if (ipass < 20) {
+      lrinit
+  } else if (ipass < 40) {
+      lrinit/10
+  } else lrinit/100
+  lr
+}
+
+opts.logfile = "logAlexnet_%fb.txt" format (lrinit);
+opts.lr_policy = lr_update _;
+opts.npasses = opts.npasses - doneEpochs;
+
+nn.launchTrain;
+
+println("Examine the 'nn' variable to track learning state.\n");
+
+
+def validate = { 
+val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+mopts.batchSize= opts.batchSize;
+mm.predict; 
+println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+}
+
+
+

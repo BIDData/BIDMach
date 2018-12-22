@@ -1,3 +1,4 @@
+
 package BIDMach.networks.layers
 
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat,TMat}
@@ -100,6 +101,7 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
 trait ScaleNodeOpts extends ModelNodeOpts {
 	var hasBias:Boolean = true;
   var batchNormMode = BatchNormLayer.Spatial;
+  weight_decay_scale = 0f;
    
   def copyOpts(opts:ScaleNodeOpts):ScaleNodeOpts = {
   		super.copyOpts(opts);

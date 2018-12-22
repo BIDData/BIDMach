@@ -1,3 +1,4 @@
+:silent
 import BIDMach.Learner
 import BIDMach.allreduce.AllreduceNode.{getBasicConfigs, startNodeAfterIter}
 import BIDMach.allreduce.binder.ElasticAverageBinder
@@ -19,12 +20,10 @@ val testpreds = testdir+"pred%04d.fmat.lz4";
 
 SciFunctions.setseed(4)
 
-class MyOpts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
-val opts = new MyOpts;
-val ds = FileSource(traindata, trainlabels, opts);
-val net = new Net(opts);
-val grad = new Grad(opts);
-val nn = new Learner(ds, net, null, grad, null, opts);
+val (nn, opts) = Net.gradLearner(traindata, trainlabels);
+val net = nn.model.asInstanceOf[Net]
+val ds = nn.datasource.asInstanceOf[FileSource];
+val grad = nn.updater.asInstanceOf[Grad]
 
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
@@ -37,6 +36,8 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 }
 
 opts.logfile = "logAlexnet_cluster=16_alpha=0_1.txt";
+opts.checkPointFile = "../../models/alexnet%03d/"
+opts.checkPointInterval = 0.5f;
 opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
@@ -108,7 +109,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 
 
-nn.launchTrain;
+nn.launchTrain
 
 // All-reduce
 val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
@@ -127,6 +128,8 @@ println("Examine the 'nn' variable to track learning state.\n");
 //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 
 
-
+while(true){
+Thread.sleep(10000);
+}
 
 

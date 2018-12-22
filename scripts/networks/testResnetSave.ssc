@@ -28,14 +28,12 @@ val nconv3x = layercounts(imodel, 2);
 val nconv4x = layercounts(imodel, 3);
 val nconv5x = layercounts(imodel, 4);
 
-val lrinit = 1e-1f;
-
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 15) {
-      lrinit
-  } else if (ipass < 20) {
-      lrinit/10
-  } else lrinit/100
+      1e-1f
+  } else if (ipass < 30) {
+      1e-2f
+  } else 1e-3f;
   lr
 }
 
@@ -45,11 +43,11 @@ opts.checkPointInterval = 5f;
 opts.keepCheckPoints = -1;
 opts.batchSize= 128;
 opts.nend = 1250;
-opts.npasses = 25;
+opts.npasses = 50;
 opts.lrate = 1e-1f;
 opts.texp = 0.0f;
 opts.pstep = 0.05f;
-opts.l2reg = 0.00005f;
+opts.l2reg = 0.0001f;
 opts.hasBias = true;
 opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
@@ -60,8 +58,8 @@ opts.inplace = Net.BackwardCaching;
 //opts.inplace = Net.NoInPlace;
 opts.convType = Net.CrossCorrelation;
 
-val bnMode = BatchNormLayer.Spatial;
-//val bnMode = BatchNormLayer.PerActivation;
+val bnMode = BatchNormLayer.SPATIAL;
+//val bnMode = BatchNormLayer.PER_ACTIVATION;
 val in_place = opts.inplace
 
 val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");

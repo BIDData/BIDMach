@@ -122,17 +122,20 @@ __device__ const doptype dllfns[] = {
   dll_maxp,
   dll_svm};
 
-
-void setsizes(int N, dim3 *gridp, int *nthreadsp) {
+void setsizes(long long N, dim3 *gridp, int *nthreadsp) {
   int nblocks = 1;
-  int nthreads = 1;
-  while (nblocks * nthreads < N) {
+  int nthreads = 32;
+  int threads_per_block = 1024;
+//  int version;
+//  version = getDeviceVersion();
+//  if (version == 320) threads_per_block = 512;
+  while (1L * nblocks * nthreads < N) {
     if (nblocks < 16) {
       nblocks = 2*nblocks;
-    } else if (nthreads < 1024) {
+    } else if (nthreads < threads_per_block) {
       nthreads = 2*nthreads;
     } else {
-      nblocks = 2*nblocks;
+        nblocks = 2*nblocks;
     }
   }
   gridp->y = 1 + (nblocks-1)/65536;
@@ -141,13 +144,17 @@ void setsizes(int N, dim3 *gridp, int *nthreadsp) {
   *nthreadsp = nthreads;
 }
 
-void setsizesLean(int N, dim3 *gridp, int *nthreadsp) {
+void setsizesLean(long long N, dim3 *gridp, int *nthreadsp) {
   int nblocks = 1;
-  int nthreads = 1;
-  while (nblocks * nthreads < N) {
+  int nthreads = 32;
+  int threads_per_block = 1024;
+//  int version;
+//  version = getDeviceVersion();
+//  if (version == 320) threads_per_block = 512;
+  while (1L * nblocks * nthreads < N) {
     if (nblocks < 16) {
       nblocks = 2*nblocks;
-    } else if (nthreads < 1024) {
+    } else if (nthreads < threads_per_block) {
       nthreads = 2*nthreads;
     } else {
       nblocks = max(nblocks, 1 + (int)((N-1)/nthreads));

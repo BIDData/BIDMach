@@ -27,6 +27,8 @@ opts.hasBias = true;
 //opts.lookahead = 0;
 opts.autoReset = false;
 opts.tensorFormat = Net.TensorNCHW;
+opts.checkPointFile="../../models/lenet_mnist%03d/";
+opts.checkPointInterval=0.5f;
 
 import BIDMach.networks.layers.Node._;
 

@@ -131,5 +131,4 @@ public final class CUMACH {
     
     public static native int linComb(Pointer x, float wx, Pointer y, float wy, Pointer z, int len);
 
-
 }

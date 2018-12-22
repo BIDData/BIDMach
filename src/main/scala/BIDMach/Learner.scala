@@ -48,7 +48,7 @@ class Learner(
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
   var viz:ListBuffer[Visualization] = null; 
-  var lastCheckPoint = 0;
+  var nextCheckPoint = 0;
   @volatile var done = false;
   @volatile var paused = false;
   @volatile var pauseAt = -1L;
@@ -81,6 +81,7 @@ class Learner(
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
     useGPU = model.useGPU;
+    nextCheckPoint = opts.nextCheckPoint;
   }
   
   def launch(fn:()=>Unit) = {
@@ -222,9 +223,13 @@ class Learner(
           bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
         lasti = reslist.length;
       }
-      if (opts.checkPointFile != null && toc > 3600 * opts.checkPointInterval * (1 + lastCheckPoint)) {
-        model.save(opts.checkPointFile format lastCheckPoint);
-        lastCheckPoint += 1;
+      if (opts.checkPointFile != null && ipass + dsp > opts.checkPointInterval * (1 + nextCheckPoint - opts.nextCheckPoint)) {
+        model.save(opts.checkPointFile format nextCheckPoint);
+        val oldCheckPoint = nextCheckPoint - opts.keepCheckPoints;
+        nextCheckPoint += 1;
+        if (opts.keepCheckPoints > 0 && oldCheckPoint >= 0) {
+            model.delete(opts.checkPointFile format oldCheckPoint);
+        }
       }
     }
     ipass += 1
@@ -235,7 +240,7 @@ class Learner(
   }
 
   def wrapUp(ipass:Int) {
-    if (opts.checkPointFile != null) model.save(opts.checkPointFile format lastCheckPoint)
+    if (opts.checkPointFile != null) model.save(opts.checkPointFile format nextCheckPoint)
     model.wrapUp(ipass);
     val gf = gflop;
     Mat.useCache = cacheState;
@@ -369,14 +374,46 @@ class Learner(
     results
   }
 
+  /**
+   * Load a specified checkPoint number, or the last one if no arg given.
+   */
+
+  def loadCheckPoint(checkPointNumber:Int= -1, useJson:Boolean=false) = {
+    var lasti = -1;
+    var foundany = false;
+    var foundall = false;
+    val limit = 100000;
+    while (!foundall && lasti < limit) { 
+      lasti += 1;
+      val f = new java.io.File(opts.checkPointFile format lasti);
+      if (f.exists()) { 
+        foundany = true;
+      } else { 
+        if (foundany) { 
+          foundall = true;
+        }
+      }
+    }
+    lasti -= 1;
+    val toload = if (checkPointNumber >= 0) { 
+      checkPointNumber
+    } else { 
+      lasti;
+    }
+    if (foundany) { 
+      model.load(opts.checkPointFile format toload, useJson);
+      opts.nextCheckPoint = lasti+1;
+    } else { 
+      myLogger.warning("loadCheckPoint: didnt find any checkpoint files");
+    }
+  }
+
   def datamats = datasource.asInstanceOf[MatSource].mats;
   def modelmats = model.modelmats;
   def datamat = datasource.asInstanceOf[MatSource].mats(0);
   def modelmat = model.modelmats(0);
   def preds = datasink.asInstanceOf[MatSink].mats
 }
-
-
 /**
  * Parallel Learner with a single datasource.
  */
@@ -403,7 +440,7 @@ class ParLearner(
   var useGPU = false;
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
-  var lastCheckPoint = 0;
+  var nextCheckPoint = 0;
   @volatile var done = false;
   @volatile var paused = false;
   @volatile var ipass = 0;
@@ -1020,6 +1057,8 @@ object Learner {
     var cumScore = 0;
     var checkPointFile:String = null;
     var checkPointInterval = 0f;
+    var keepCheckPoints = 2;
+    var nextCheckPoint = 0;
     var pauseAt = -1L;
     var logfile = "log.txt";
     var nNatural = 1;

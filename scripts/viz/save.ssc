@@ -22,10 +22,10 @@ def savenn(nn:Learner,fname:String) {
       val mat = net.modelmats(i);
       saveMat(fname+"/modelmat%02d.lz4" format i, cpu(mat));
     }
-    val tc = row(nn.resTlist.map(_.v).toArray)
-    val vc = row( nn.reslist.map(_.v).toArray)
-    saveMat(fname+"/training_curve.lz4", tc);
-    saveMat(fname+"/validation_curve.lz4", tc);
+    //val tc = row(nn.resTlist.map(_.v).toArray)
+    //val vc = row( nn.reslist.map(_.v).toArray)
+    //saveMat(fname+"/training_curve.lz4", tc);
+    //saveMat(fname+"/validation_curve.lz4", tc);
 }
 
 def loadnn(nn:Learner,fname:String,print:Boolean = true) {
@@ -34,24 +34,24 @@ def loadnn(nn:Learner,fname:String,print:Boolean = true) {
         val data = loadMat(fname+"/modelmat%02d.lz4" format i);
         net.modelmats(i)<--data
     }
-    if (print){
-        val tc = loadMat(fname+"/training_curve.lz4");
-        val vc = loadMat(fname+"/validation_curve.lz4");
-        plot(tc)
-        plot(vc)
-    }
+    //if (print){
+    //    val tc = loadMat(fname+"/training_curve.lz4");
+    //    val vc = loadMat(fname+"/validation_curve.lz4");
+    //    plot(tc)
+    //    plot(vc)
+    //}
 }
 
 def savecurve(nn:Learner) {
-    val tc = row(nn.resTlist.map(_.v).toArray)
-    val vc = row( nn.reslist.map(_.v).toArray)
-    saveMat("training_curve.lz4", tc);
-    saveMat("validation_curve.lz4", vc);
+    //val tc = row(nn.resTlist.map(_.v).toArray)
+    //val vc = row( nn.reslist.map(_.v).toArray)
+    //saveMat("training_curve.lz4", tc);
+    //saveMat("validation_curve.lz4", vc);
 }
 
 def plotcurve(interval: Int = 1) {
-    val tc = loadFMat("training_curve.lz4");
-    val vc = loadFMat("validation_curve.lz4");
-    plot(row(tc.data.grouped(interval).map(x=>x.sum/x.length).toArray))
-    plot(row(vc.data.grouped(interval).map(x=>x.sum/x.length).toArray))
+    //val tc = loadFMat("training_curve.lz4");
+    //val vc = loadFMat("validation_curve.lz4");
+    //plot(row(tc.data.grouped(interval).map(x=>x.sum/x.length).toArray))
+    //plot(row(vc.data.grouped(interval).map(x=>x.sum/x.length).toArray))
 }

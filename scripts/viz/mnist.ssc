@@ -8,7 +8,7 @@ Download those models from https://drive.google.com/file/d/1gXxbzZ7MNPPkcxDIpUDr
 Modified traindir to locate the path to MNIST dataset
 */
 
-val traindir = "/data/data/MNIST/"
+val traindir = "/data/mcmc/data/MNIST/"
 val pretrain_model_dir = "models/mnist/"
 val pretrain_discriminator_dir = "models/mnist_discri/"
 

@@ -6,7 +6,7 @@ import jcuda.jcudnn._
 val pretrain_model_dir = "models/cifar_vgg/"
 val pretrain_discriminator_dir = "models/cifar_discri2/"
 
-val datadir = "/data/data/CIFAR10/parts/"
+val datadir = "/data/mcmc/data/CIFAR10/parts/"
 val trainfname = datadir + "trainNCHW%d.fmat.lz4";
 val labelsfname = datadir + "labels%d.imat.lz4";
 val testfname = datadir + "testNCHW%d.fmat.lz4";

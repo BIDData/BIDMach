@@ -10,7 +10,7 @@
 #define MAXXGRID 65535
 #endif
 
-void setsizes(int N, dim3 *gridp, int *nthreadsp);
+void setsizes(long long N, dim3 *gridp, int *nthreadsp);
 
 __forceinline__ __device__ int solve1(int j) {
   float v = sqrtf((float)j);

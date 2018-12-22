@@ -115,6 +115,9 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		}
   	}
   	createInOutScoreLayers(nodes);
+  	for (i <- 0 until opts.nodeset.nnodes) {
+  		nodes(i).myLayer = null;
+  	}
   }   
   
   def createLayersFromNodeMat = {
@@ -151,6 +154,14 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		}
   	}
   	createInOutScoreLayers(nodes);
+  	for (i <- 0 until ncols) {
+  		for (j <- 0 until nrows) {
+  			val node = opts.nodemat(j, i);
+  			if (node.asInstanceOf[AnyRef] != null) {
+  				node.myLayer = null
+            }
+        }
+    }
   }
   
   def createInOutScoreLayers(nodes:Array[Node]) = {
@@ -342,12 +353,43 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   	}
   }
 
+  override def guardOptions():AnyRef = { 
+    val guard = new Array[AnyRef](1);
+//    guard(0) = opts.nodemat;
+//    guard(1) = opts.nodeset;
+//    opts.nodemat = null;
+//    opts.nodeset = null;
+    opts match { 
+      case gopts:Grad.Opts => { 
+        guard(0) = gopts.lr_policy;
+        gopts.lr_policy = null;
+      }
+      case _ => { }
+    }
+    guard;
+  }
+
+  override def unguardOptions(guard0:AnyRef) = { 
+    val guard = guard0.asInstanceOf[Array[AnyRef]];
+//    opts.nodemat = guard(0).asInstanceOf[NodeMat];
+//    opts.nodeset = guard(1).asInstanceOf[NodeSet];
+    opts match { 
+      case gopts:Grad.Opts => gopts.lr_policy = guard(0).asInstanceOf[(Float, Float, Float)=>Float];
+      case _ => { }
+    }
+  }
+
   override def saveMetaData(fname:String) = {
     import java.io._
     val str = BIDMat.JSON.toJSON(modelMap, true);
     val writer = new PrintWriter(new File(fname + "metadata.json"));
     writer.print(str);
     writer.close;
+  }
+
+  override def deleteMetaData(fname:String) = {
+    val mdname = new java.io.File(fname + "metadata.json");
+    mdname.delete();
   }
 
   override def loadMetaData(fname:String) = {
@@ -815,6 +857,10 @@ object Net  {
   	    null,
   	    opts)
     (nn, opts)
+  }
+
+  def gradLearner(fn1:String, fn2:String):(Learner, FSGopts) = { 
+    gradLearner(List(FileSource.simpleEnum(fn1,1,0),FileSource.simpleEnum(fn2,1,0)));
   }
 
   def learnerX(fn1:String, fn2:String):(Learner, FSAopts) = learnerX(List(FileSource.simpleEnum(fn1,1,0),
