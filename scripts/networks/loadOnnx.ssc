@@ -9,7 +9,7 @@ import BIDMach.networks.layers._
 import jcuda.jcudnn._
 import jcuda.jcudnn.JCudnn._
 
-val modelFile = "/code/onnx/models/resnet50/resnet50/model.onnx";
+val modelFile = "/code/onnx/models/squeezenet/squeezenet/model.onnx";
 
 class ModelMap { 
   var nmodels = 0;
@@ -208,6 +208,18 @@ def createSumNode(node:NodeProto, outputMap:HashMap[String,Node]) = {
   newnode
 }
 
+def createConcatNode(node:NodeProto, outputMap:HashMap[String,Node]) = { 
+  var axis = 1
+  for (attrib <- node.getAttributeList) { 
+    attrib.getName match { 
+      case "axis" => axis = attrib.getI
+    }
+  }
+  val newnode = new StackNode{inputs(0) = null;};
+  outputMap(node.getOutput(0)) = newnode
+  newnode
+}
+
 def createSoftmaxNode(node:NodeProto, outputMap:HashMap[String,Node], outputName:String) = { 
   val newnode = if (outputName.matches(node.getOutput(0))) { 
     val scoreTyp = 1
@@ -313,6 +325,7 @@ for (node <- nodeProtos) {
     case "MaxPool" => createMaxPoolNode(node, outputMap);
     case "AveragePool" => createAveragePoolNode(node, outputMap);
     case "Sum" => createSumNode(node, outputMap);
+    case "Concat" => createConcatNode(node, outputMap);
     case "Reshape" => createReshapeNode(node, outputMap, weightsMap);
     case "Gemm" => createGemmNode(node, outputMap, inputMap, modelMap);
     case "Softmax" => createSoftmaxNode(node, outputMap, graph.getOutput(0).getName);
@@ -340,6 +353,7 @@ for (node <- nodeProtos) {
     case "MaxPool" => linkToInputs(node, outputMap, 1);
     case "AveragePool" => linkToInputs(node, outputMap, 1);
     case "Sum" => linkToInputs(node, outputMap, node.getInputCount);
+    case "Concat" => linkToInputs(node, outputMap, node.getInputCount);
     case "Reshape" => linkToInputs(node, outputMap, 1);
     case "Gemm" => linkToInputs(node, outputMap, 1);
     case "Softmax" => linkToInputs(node, outputMap, 1);
