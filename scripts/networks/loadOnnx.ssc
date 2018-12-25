@@ -188,7 +188,7 @@ def createBatchNormScaleNode(node:NodeProto, outputMap:HashMap[String,Node], mod
 
 
 def createReshapeNode(node:NodeProto, outputMap:HashMap[String,Node], weightsMap:HashMap[String,Mat]) = { 
-  val shapeSpec=IMat(weightsMap(node.getInput(1)))
+  val shapeSpec=reverse(IMat(weightsMap(node.getInput(1))).t)
 //  val dims = shapeSpec.getType.getTensorType.getShape
   val newnode = new ReshapeNode{inputs(0)=null; dims=shapeSpec}
   outputMap(node.getOutput(0)) = newnode
@@ -212,7 +212,7 @@ def createSoftmaxNode(node:NodeProto, outputMap:HashMap[String,Node], outputName
   val newnode = if (outputName.matches(node.getOutput(0))) { 
     val scoreTyp = 1
     val lossTyp = 1
-    new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; lossType = lossTyp}
+    new SoftmaxOutputNode{inputs(0) = null; scoreType=scoreTyp; lossType = lossTyp}
   } else { 
     new SoftmaxNode{inputs(0) = null;};
   }
@@ -233,11 +233,12 @@ val outputMap = new HashMap[String,Node];
 val inputMap = new HashMap[String,ValueInfoProto];
 
 // A NodeSet to contain the translated graph
-val nodes = new NodeSet(nodeProtos.size+1);
+val nodes = new NodeSet(nodeProtos.size+2);
 
 // The input layer for the network
 nodes(0) = new InputNode;
-outputMap(inputs.get(0).getName) = nodes(0);
+nodes(1) = new CropNode{inputs(0)=nodes(0);}
+outputMap(inputs.get(0).getName) = nodes(1);
 
 // Create input map
 for (b <- inputs) { 
@@ -303,7 +304,7 @@ val matBuffer = ArrayBuffer.empty[Mat]
 println("Constructing outputMap")
 
 // Create all the nodes in the graph
-var i = 1;
+var i = 2;
 for (node <- nodeProtos) { 
   val newnode = node.getOpType match { 
     case "Conv" => createConvNode(node, outputMap, inputMap, modelMap);
@@ -374,6 +375,9 @@ net0.setmodelmats(modelmats)
 opts.nodeset=nodes
 
 val (mm, mopts) =  Net.predLabels(net0, testdata, testlabels);
+mopts.tensorFormat = Net.TensorNCHW;
+mopts.inplace = Net.BackwardCaching;
+mopts.convType = Net.CrossCorrelation;
 mopts.batchSize= 64
 mm.predict; 
 
