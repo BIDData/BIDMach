@@ -19,39 +19,39 @@ import BIDMach.networks._
 class ReshapeLayer(override val net:Net, override val opts:ReshapeNodeOpts = new ReshapeNode) extends Layer(net, opts) {
 
   override def forward = {
-		  val start = toc;
-		  if (output.asInstanceOf[AnyRef] == null) {
-			  val io = inputData;
-			  val newdims = if (opts.addBatchDim) {
-			     if (io.nrows != opts.dims.data.reduce(_*_)) {
-					  throw new RuntimeException("ReshapeLayer input and output dims not compatible")
-				  }
-				  opts.dims \ io.ncols;
-			  } else {
-				  if (io.length != opts.dims.data.reduce(_*_)) {
-					  throw new RuntimeException("ReshapeLayer input and output dims not compatible")
-				  }
-				  opts.dims;
-			  }
-			  output = io match {
-			  case s:IMat => io.izeros(newdims)
-			  case m:Mat => io.zeros(newdims)
-			  }
-		  }
-		  output <-- inputData.reshapeView(output.dims);
-		  inplaceNoConnectSetupDerivs();
-      
-		  forwardtime += toc - start;
+    val start = toc;
+    if (output.asInstanceOf[AnyRef] == null) {
+      val io = inputData;
+      val newdims = if (opts.addBatchDim) {
+	if (io.nrows != opts.dims.data.reduce(_*_)) {
+	  throw new RuntimeException("ReshapeLayer input and output dims not compatible")
+	}
+	opts.dims \ io.ncols;
+      } else {
+	if (io.length != opts.dims.data.reduce(_*_)) {
+	  throw new RuntimeException("ReshapeLayer input and output dims not compatible")
+	}
+	opts.dims;
+      }
+      output = io match {
+	case s:IMat => io.izeros(newdims)
+	case m:Mat => io.zeros(newdims)
+      }
+    }
+    output <-- inputData.reshapeView(output.dims);
+    inplaceNoConnectSetupDerivs();
+    
+    forwardtime += toc - start;
   }
 
   override def backward = {
-		  val start = toc;
-		  inplaceNoConnectGetInputDerivs();
-		  
-		  if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv.reshapeView(inputDeriv.dims)
-		  
-		  inplaceNoConnectReleaseDeriv();
-		  backwardtime += toc - start;
+    val start = toc;
+    inplaceNoConnectGetInputDerivs();
+    
+    if (inputDeriv.asInstanceOf[AnyRef] != null) inputDeriv ~ inputDeriv + deriv.reshapeView(inputDeriv.dims)
+    
+    inplaceNoConnectReleaseDeriv();
+    backwardtime += toc - start;
   }
 
   override def toString = {
