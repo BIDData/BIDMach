@@ -97,7 +97,7 @@ trait BatchNormNodeOpts extends ModelNodeOpts {
   }
 }
 
-class BatchNormNode extends Node with BatchNormNodeOpts {
+class BatchNormNode extends ModelNode with BatchNormNodeOpts {
   
   def copyTo(opts:BatchNormNode):BatchNormNode = {
     this.asInstanceOf[Node].copyTo(opts);

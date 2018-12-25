@@ -71,7 +71,7 @@ trait VariableNodeOpts extends ModelNodeOpts {
   }
 }
     
-class VariableNode extends Node with VariableNodeOpts {
+class VariableNode extends ModelNode with VariableNodeOpts {
   
   def copyTo(opts:VariableNode):VariableNode = {
     this.asInstanceOf[Node].copyTo(opts);
