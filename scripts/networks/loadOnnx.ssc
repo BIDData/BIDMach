@@ -361,7 +361,7 @@ val matBuffer = ArrayBuffer.empty[Mat]
 println("Constructing outputMap")
 
 // A NodeSet to contain the translated graph
-val nodes = new NodeSet(nodeProtos.size+6);
+val nodes = new NodeSet(nodeProtos.size+4);
 
 val means = ones(3\256\256\batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 
@@ -369,16 +369,14 @@ val means = ones(3\256\256\batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 nodes(0) = new InputNode;
 nodes(1) = new ConstantNode{value=means};
 nodes(2) = new SubNode{inputs(0)=nodes(0); inputs(1)=nodes(1)};
-nodes(3) = new ConstantNode{value=row(1f)};
-nodes(4) = new MulNode{inputs(0)=nodes(2); inputs(1)=nodes(3)};
-nodes(5) = new CropNode{inputs(0)=nodes(4);}
+nodes(3) = new CropNode{inputs(0)=nodes(2);}
 
 // How to find the data input tensor:
 val dataname = (inputs.map(_.getName).toSet -- weights.map(_.getName).toSet).head
-outputMap(dataname) = nodes(5);
+outputMap(dataname) = nodes(3);
 
 // Create all the nodes in the graph
-var i = 6;
+var i = 4;
 for (node <- nodeProtos) { 
   val newnode = node.getOpType match { 
     case "Conv" => createConvNode(node, outputMap, inputMap, modelMap);
@@ -440,6 +438,16 @@ for (w <- weights) {
     modelmats(modelMap.mmap(wname)) = if (modelMap.tmap(wname)) data.t else data
   }
 }
+// Caffe2 uses BGR image order so we need to flip the first conv weight matrix.
+val perm = irow(2,1,0);
+def fromRGBtoBGR(a:Mat):Mat = {
+    val dd = a.dims
+    val aa = a.reshapeView(dd(1),dd(2),dd(0),dd(3));
+    val bb = aa(?,?,perm,?)
+    bb.reshapeView(dd);
+}
+
+modelmats(0) = fromRGBtoBGR(modelmats(0))
 
 println("Starting Predictor")
 
