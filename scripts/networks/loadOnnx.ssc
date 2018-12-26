@@ -9,7 +9,18 @@ import BIDMach.networks.layers._
 import jcuda.jcudnn._
 import jcuda.jcudnn.JCudnn._
 
-val modelFile = "/code/onnx/models/squeezenet/squeezenet/model.onnx";
+//val modelname = "bvlc_reference_caffenet"
+val modelname = "squeezenet"
+val modelFile = "/code/onnx/models/"+modelname+"/"+modelname+"/model.onnx";
+val batchSize = 64;
+
+val traindir = "../../data/ImageNet/train/";
+val testdir = "../../data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
 
 class ModelMap { 
   var nmodels = 0;
@@ -67,14 +78,14 @@ def createConvNode(node:NodeProto, outputMap:HashMap[String,Node], inputMap:Hash
   val initbiasv0:Float = 0f
   val lrs:Float=1f
   val bs:Float=1f
-  val ct:Int=cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
-
+  val ct=Net.UseNetConvType
+  
   val weightSpec=inputMap(node.getInput(1));
   val wdims = weightSpec.getType.getTensorType.getShape
   val odim = wdims.getDim(0).getDimValue.toInt
 
   val newnode = new ConvNode{inputs(0)=null; modelName=mname; kernel=kernel_shape; noutputs=odim; stride=strides; pad=pads; hasBias=hb; 
-    initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0; convType=ct; lr_scale=lrs; bias_scale=bs;}
+	  initfn = initf; initv = initv0; initbiasfn = initbiasf; initbiasv = initbiasv0;}
   outputMap(node.getOutput(0)) = newnode
   modelMap.addModel2(node.getInput(1), if (node.getInputCount > 2) node.getInput(2) else null);
   newnode
@@ -128,6 +139,23 @@ def createMaxPoolNode(node:NodeProto, outputMap:HashMap[String,Node]) = {
   newnode
 }
 
+def createLRNNode(node:NodeProto, outputMap:HashMap[String,Node]) = { 
+  var alpha0 = 0.00001f
+  var beta0 = 0.75f
+  var bias = 1.0f
+  var size = 1
+  for (attrib <- node.getAttributeList) { 
+    attrib.getName match { 
+      case "alpha" => alpha0 = attrib.getF
+      case "beta" => beta0 = attrib.getF
+      case "bias" => bias = attrib.getF
+      case "size" => size = attrib.getI.toInt
+    }
+  }
+  val newnode = new LRNacrossNode{inputs(0)=null; dim=size; alpha=alpha0; beta=beta0; k=bias}
+  outputMap(node.getOutput(0)) = newnode
+  newnode
+}
 
 def createAveragePoolNode(node:NodeProto, outputMap:HashMap[String,Node]) = { 
   val pads = izeros(1, 4)
@@ -333,18 +361,24 @@ val matBuffer = ArrayBuffer.empty[Mat]
 println("Constructing outputMap")
 
 // A NodeSet to contain the translated graph
-val nodes = new NodeSet(nodeProtos.size+2);
+val nodes = new NodeSet(nodeProtos.size+6);
 
-// The input layer for the network
+val means = ones(3\256\256\batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
+
+// The input layers for the network
 nodes(0) = new InputNode;
-nodes(1) = new CropNode{inputs(0)=nodes(0);}
+nodes(1) = new ConstantNode{value=means};
+nodes(2) = new SubNode{inputs(0)=nodes(0); inputs(1)=nodes(1)};
+nodes(3) = new ConstantNode{value=row(1f)};
+nodes(4) = new MulNode{inputs(0)=nodes(2); inputs(1)=nodes(3)};
+nodes(5) = new CropNode{inputs(0)=nodes(4);}
 
 // How to find the data input tensor:
 val dataname = (inputs.map(_.getName).toSet -- weights.map(_.getName).toSet).head
-outputMap(dataname) = nodes(1);
+outputMap(dataname) = nodes(5);
 
 // Create all the nodes in the graph
-var i = 2;
+var i = 6;
 for (node <- nodeProtos) { 
   val newnode = node.getOpType match { 
     case "Conv" => createConvNode(node, outputMap, inputMap, modelMap);
@@ -356,6 +390,7 @@ for (node <- nodeProtos) {
     case "Sum" => createSumNode(node, outputMap);
     case "Concat" => createConcatNode(node, outputMap);
     case "Dropout" => createDropoutNode(node, outputMap);
+    case "LRN" => createLRNNode(node, outputMap);
     case "Reshape" => createReshapeNode(node, outputMap, weightsMap);
     case "Gemm" => createGemmNode(node, outputMap, inputMap, modelMap);
     case "Softmax" => createSoftmaxNode(node, outputMap, graph.getOutput(0).getName);
@@ -386,6 +421,7 @@ for (node <- nodeProtos) {
     case "Sum" => linkToInputs(node, outputMap, node.getInputCount);
     case "Concat" => linkToInputs(node, outputMap, node.getInputCount);
     case "Dropout" => linkToInputs(node, outputMap, 1);
+    case "LRN" => linkToInputs(node, outputMap, 1);	
     case "Reshape" => linkToInputs(node, outputMap, 1);
     case "Gemm" => linkToInputs(node, outputMap, 1);
     case "Softmax" => linkToInputs(node, outputMap, 1);
@@ -407,14 +443,6 @@ for (w <- weights) {
 
 println("Starting Predictor")
 
-val traindir = "../../data/ImageNet/train/";
-val testdir = "../../data/ImageNet/val/";
-val traindata = traindir+"partNCHW%04d.bmat.lz4";
-val trainlabels = traindir+"label%04d.imat.lz4";
-val testdata = testdir+"partNCHW%04d.bmat.lz4";
-val testlabels = testdir+"label%04d.imat.lz4";
-val testpreds = testdir+"pred%04d.fmat.lz4";
-
 val opts = new Net.FilePredOptions
 val net0 = new Net(opts)
 net0.setmodelmats(modelmats)
@@ -423,10 +451,13 @@ opts.nodeset=nodes
 val (mm, mopts) =  Net.predLabels(net0, testdata, testlabels);
 mopts.tensorFormat = Net.TensorNCHW;
 mopts.inplace = Net.BackwardCaching;
+mopts.inplace = Net.NoInPlace
 mopts.convType = Net.CrossCorrelation;
-mopts.batchSize= 64
+//mopts.convType = Net.Convolution;
+mopts.batchSize= batchSize
 mopts.autoReset = false
-
+mopts.hasBias = true
+    
 val net = mm.model.asInstanceOf[Net];
 mm.predict; 
 

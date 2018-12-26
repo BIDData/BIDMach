@@ -69,10 +69,6 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     }
     filter = modelmats(imodel).asInstanceOf[FMat];
     ffilter = modelmats(imodel).asInstanceOf[Filter];   	
-    ffilter match {
-      case aa:GFilter => aa.convType = opts.convType;
-      case _ => {}
-    }
     updatemats(imodel) = ffilter.copy.asInstanceOf[FMat];
     	
     if (!hasInitData) opts.initfn(filter, opts.initv);
