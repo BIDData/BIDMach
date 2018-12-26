@@ -18,6 +18,8 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
 
   var cudnnMainHandle:cudnnHandle = null;
   var cudnnMainStream:cudaStream_t = null;
+  var h = 0;
+  var w = 0;
   
   def initHandles() = { 
     cudnnMainHandle = new cudnnHandle;
@@ -32,8 +34,10 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   def initModelMats = {   
   	initHandles();
     val outdims = inputData.dims.copy;
-    val outh = (outdims(2) + 2*opts.pad - opts.h)/opts.stride + 1;
-    val outw = (outdims(1) + 2*opts.pad - opts.w)/opts.stride + 1;
+    h = if (opts.h > 0) opts.h else outdims(2);
+    w = if (opts.w > 0) opts.w else outdims(1);
+    val outh = (outdims(2) + 2*opts.pad - h)/opts.stride + 1;
+    val outw = (outdims(1) + 2*opts.pad - w)/opts.stride + 1;
     outdims(2) = outh;
     outdims(1) = outw;
     createOutput(outdims);
@@ -87,12 +91,12 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   		while (iimg < nbatch) {
   			var x = 0;
   			while (x < outw) {
-  				var ixmin = math.max(0, x * stridex - (opts.w-1)/2);
-  				var ixmax = math.min(x * stridex + opts.w/2, inw-1);
+  				var ixmin = math.max(0, x * stridex - (w-1)/2);
+  				var ixmax = math.min(x * stridex + w/2, inw-1);
   				var y = 0;
   				while (y < outh) {
-  					var iymin = math.max(0, y * stridey - (opts.h-1)/2);
-  					var iymax = math.min(y * stridey + opts.h/2, inh-1);
+  					var iymin = math.max(0, y * stridey - (h-1)/2);
+  					var iymax = math.min(y * stridey + h/2, inh-1);
   					var outi = nch * (x + outw * (y + outh * iimg));
 
   					var firststep = true;
@@ -149,12 +153,12 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
   		while (iimg < nbatch) {
   			var x = 0;
   			while (x < outw) {
-  				var ixmin = math.max(0, x * stridex - (opts.w-1)/2);
-  				var ixmax = math.min(x * stridex + opts.w/2, inw-1);
+  				var ixmin = math.max(0, x * stridex - (w-1)/2);
+  				var ixmax = math.min(x * stridex + w/2, inw-1);
   				var y = 0;
   				while (y < outh) {
-  					var iymin = math.max(0, y * stridey - (opts.h-1)/2);
-  					var iymax = math.min(y * stridey + opts.h/2, inh-1);
+  					var iymin = math.max(0, y * stridey - (h-1)/2);
+  					var iymax = math.min(y * stridey + h/2, inh-1);
   					var outi = nch * (x + outw * (y + outh * iimg));
 
   					var ix = ixmin;
@@ -193,8 +197,6 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
     val inputGMat = inputData.asInstanceOf[GMat];
     val outputGMat = output.asInstanceOf[GMat];
     
-    val h = opts.h;
-    val w = opts.w;
     val pady = opts.pad;
     val padx = opts.pad;
     val stridey = opts.stride;
@@ -247,8 +249,6 @@ class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new
     val derivGMat = deriv.asInstanceOf[GMat];
     val inputDerivGMat = inputDeriv.asInstanceOf[GMat];
     
-    val h = opts.h;
-    val w = opts.w;
     val pady = opts.pad;
     val padx = opts.pad;
     val stridey = opts.stride;

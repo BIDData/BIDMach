@@ -157,6 +157,19 @@ def createAveragePoolNode(node:NodeProto, outputMap:HashMap[String,Node]) = {
   newnode
 }
 
+def createGlobalAveragePoolNode(node:NodeProto, outputMap:HashMap[String,Node]) = { 
+  val newnode = new PoolingNode{inputs(0)=null; h= -1; w= -1; stride=1; pad=0;
+				                poolingMode=cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING}
+  outputMap(node.getOutput(0)) = newnode
+  newnode
+}
+
+def createGlobalMaxPoolNode(node:NodeProto, outputMap:HashMap[String,Node]) = { 
+  val newnode = new PoolingNode{inputs(0)=null; h= -1; w= -1; stride=1; pad=0;}
+  outputMap(node.getOutput(0)) = newnode
+  newnode
+}
+
 def createBatchNormScaleNode(node:NodeProto, outputMap:HashMap[String,Node], modelMap:ModelMap) = { 
   var epsilon = 1e-5f
   var momentum = 0.9f;
@@ -212,10 +225,22 @@ def createConcatNode(node:NodeProto, outputMap:HashMap[String,Node]) = {
   var axis = 1
   for (attrib <- node.getAttributeList) { 
     attrib.getName match { 
-      case "axis" => axis = attrib.getI
+      case "axis" => axis = attrib.getI.toInt
     }
   }
   val newnode = new StackNode{inputs(0) = null;};
+  outputMap(node.getOutput(0)) = newnode
+  newnode
+}
+
+def createDropoutNode(node:NodeProto, outputMap:HashMap[String,Node]) = { 
+  var ratio = 0.5f
+  for (attrib <- node.getAttributeList) { 
+    attrib.getName match { 
+      case "ratio" => ratio = attrib.getF
+    }
+  }
+  val newnode = new DropoutNode{inputs(0) = null; frac=ratio};
   outputMap(node.getOutput(0)) = newnode
   newnode
 }
@@ -243,14 +268,6 @@ val inputs = graph.getInputList
 
 val outputMap = new HashMap[String,Node];
 val inputMap = new HashMap[String,ValueInfoProto];
-
-// A NodeSet to contain the translated graph
-val nodes = new NodeSet(nodeProtos.size+2);
-
-// The input layer for the network
-nodes(0) = new InputNode;
-nodes(1) = new CropNode{inputs(0)=nodes(0);}
-outputMap(inputs.get(0).getName) = nodes(1);
 
 // Create input map
 for (b <- inputs) { 
@@ -315,6 +332,17 @@ val matBuffer = ArrayBuffer.empty[Mat]
 
 println("Constructing outputMap")
 
+// A NodeSet to contain the translated graph
+val nodes = new NodeSet(nodeProtos.size+2);
+
+// The input layer for the network
+nodes(0) = new InputNode;
+nodes(1) = new CropNode{inputs(0)=nodes(0);}
+
+// How to find the data input tensor:
+val dataname = (inputs.map(_.getName).toSet -- weights.map(_.getName).toSet).head
+outputMap(dataname) = nodes(1);
+
 // Create all the nodes in the graph
 var i = 2;
 for (node <- nodeProtos) { 
@@ -324,8 +352,10 @@ for (node <- nodeProtos) {
     case "Relu" => createReluNode(node, outputMap);
     case "MaxPool" => createMaxPoolNode(node, outputMap);
     case "AveragePool" => createAveragePoolNode(node, outputMap);
+    case "GlobalAveragePool" => createGlobalAveragePoolNode(node, outputMap);
     case "Sum" => createSumNode(node, outputMap);
     case "Concat" => createConcatNode(node, outputMap);
+    case "Dropout" => createDropoutNode(node, outputMap);
     case "Reshape" => createReshapeNode(node, outputMap, weightsMap);
     case "Gemm" => createGemmNode(node, outputMap, inputMap, modelMap);
     case "Softmax" => createSoftmaxNode(node, outputMap, graph.getOutput(0).getName);
@@ -352,8 +382,10 @@ for (node <- nodeProtos) {
     case "Relu" => linkToInputs(node, outputMap, 1);
     case "MaxPool" => linkToInputs(node, outputMap, 1);
     case "AveragePool" => linkToInputs(node, outputMap, 1);
+    case "GlobalAveragePool" => linkToInputs(node, outputMap, 1);
     case "Sum" => linkToInputs(node, outputMap, node.getInputCount);
     case "Concat" => linkToInputs(node, outputMap, node.getInputCount);
+    case "Dropout" => linkToInputs(node, outputMap, 1);
     case "Reshape" => linkToInputs(node, outputMap, 1);
     case "Gemm" => linkToInputs(node, outputMap, 1);
     case "Softmax" => linkToInputs(node, outputMap, 1);
@@ -393,6 +425,9 @@ mopts.tensorFormat = Net.TensorNCHW;
 mopts.inplace = Net.BackwardCaching;
 mopts.convType = Net.CrossCorrelation;
 mopts.batchSize= 64
+mopts.autoReset = false
+
+val net = mm.model.asInstanceOf[Net];
 mm.predict; 
 
 

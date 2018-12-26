@@ -31,7 +31,7 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
   }
   
   def computeProbs() {
-	  probs = inputData - maxi(inputData);  // ensures sum(exps) is between 1 and nfeats
+	  probs = inputData.reshapeView(inputData.nrows, inputData.ncols) - maxi(inputData);  // ensures sum(exps) is between 1 and nfeats
 	  exp(probs, probs); 
 	  probs ~ probs / sum(probs); 
   }
@@ -70,12 +70,12 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
 		      case SoftmaxOutputLayer.TargetProbs => {
 		        val probinds = probs(inds) ∘ deriv;
 		      	val oderiv = probs ∘ probinds;
-		      	inputDeriv ~ inputDeriv - oderiv;
+		      	inputDeriv ~ inputDeriv - oderiv.reshapeView(inputDeriv.dims)
 		      	inputDeriv(inds) = inputDeriv(inds) + probinds; 		      
 		      }
 		      case SoftmaxOutputLayer.CrossEntropyLoss => {
 		        probs ~ probs ∘ deriv;
-		      	inputDeriv ~ inputDeriv - probs;
+		      	inputDeriv ~ inputDeriv - probs.reshapeView(inputDeriv.dims);
 		      	inputDeriv(inds) = inputDeriv(inds) + deriv;
 		      }
 		    }

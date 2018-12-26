@@ -214,13 +214,13 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
   
   def applyBiasGMat(bias:GMat, output:GMat) = {
   	val dims = output.dims;
-  	val bdims = bias.dims;
+  	val blen = bias.length;
   	var dataType = cudnnDataType.CUDNN_DATA_FLOAT;
   	val tformat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
   	
   	val adesc = new cudnnTensorDescriptor;
   	cudnnCreateTensorDescriptor(adesc);
-  	val astatus = cudnnSetTensor4dDescriptor(adesc, tformat, dataType, bdims(3), bdims(0), bdims(2), bdims(1));
+  	val astatus = cudnnSetTensor4dDescriptor(adesc, tformat, dataType, 1, blen, 1, 1);
   	if (astatus > 0) throw new RuntimeException("Error %d creating A tensor for forward bias computation" format astatus);
 
   	val bdesc = new cudnnTensorDescriptor;
@@ -293,7 +293,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
   
   def updateBiasGMat(deriv:GMat, updateBias:GMat) = {   
   	val dims = deriv.dims;
-  	val bdims = updateBias.dims;
+  	val blen = updateBias.length
   	var dataType = cudnnDataType.CUDNN_DATA_FLOAT;
   	val tformat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
   	
@@ -304,7 +304,7 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
 
   	val bdesc = new cudnnTensorDescriptor;
   	cudnnCreateTensorDescriptor(bdesc);
-  	val bstatus = cudnnSetTensor4dDescriptor(bdesc, tformat, dataType, bdims(3), bdims(0), bdims(2), bdims(1));
+  	val bstatus = cudnnSetTensor4dDescriptor(bdesc, tformat, dataType, 1, blen, 1, 1);
   	if (bstatus > 0) throw new RuntimeException("Error %d creating B tensor for backward bias computation" format bstatus);
 	  
   	var err = cudnnConvolutionBackwardBias(cudnnMainHandle, GFilter.ONE, adesc, deriv.pdata, GFilter.ONE, bdesc, updateBias.pdata);
