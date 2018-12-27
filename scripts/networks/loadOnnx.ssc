@@ -35,6 +35,7 @@ dataLink(dataname) = 3;
 println("Reading Model")
 val onnx = new Onnx
 val (nodes, modelmats) = onnx.readModel(modelFile, frontEnd, dataLink)
+modelmats(0) = Onnx.fromRGBtoBGR(modelmats(0))
 
 println("Starting Predictor")
 
