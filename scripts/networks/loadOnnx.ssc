@@ -1,5 +1,7 @@
 import BIDMach.networks.layers._
 import BIDMach.io.Onnx
+import scala.collection.mutable.HashMap
+
 
 //val modelname = "bvlc_reference_caffenet"
 val modelname = "squeezenet"
