@@ -1,36 +1,36 @@
 package BIDMach.io
 
-import onnx.Onnx.{ModelProto,GraphProto,NodeProto,ValueInfoProto,TensorProto}
-import java.io._
-import java.nio.ByteBuffer
-import scala.collection.JavaConversions._
-import scala.collection.mutable.{HashMap,ArrayBuffer}
 import BIDMat.{BMat,Mat,SBMat,CMat,CSMat,DMat,FMat,FFilter,GMat,GFilter,GDMat,GIMat,GLMat,GSMat,GSDMat,HMat,IMat,JSON,LMat,SMat,SDMat,TMat}
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.networks.Net
 import BIDMach.networks.layers._
-import jcuda.jcudnn._
-import jcuda.jcudnn.JCudnn._
+import onnx.Onnx.{ModelProto,GraphProto,NodeProto,ValueInfoProto,TensorProto}
+import java.io._
+import java.nio.ByteBuffer
+import scala.collection.JavaConversions._
+import scala.collection.mutable.{HashMap,ArrayBuffer}
+import jcuda.jcudnn.cudnnPoolingMode
 
 class Onnx { 
 
   var nmodels = 0;
 
-  var mmap:HashMap[String,Int] = null;
-  var tmap:HashMap[String,Boolean] = null;
   var builder:ModelProto.Builder = null
-  var outputMap:HashMap[String,Node] = null
-  var inputMap:HashMap[String,ValueInfoProto] = null
   var graph:GraphProto = null
   var nodeProtos:java.util.List[NodeProto] = null;
   var inputs:java.util.List[ValueInfoProto] = null;
   var weights:java.util.List[TensorProto] = null;
+  var outputMap:HashMap[String,Node] = null
+  var inputMap:HashMap[String,ValueInfoProto] = null
   var weightsMap:HashMap[String,Mat] = null;
   var nodes:NodeSet = null;
   var modelmats:Array[Mat] = null;
+  var mmap:HashMap[String,Int] = null;
+  var tmap:HashMap[String,Boolean] = null;
 
-  def readModel(modelFile:String, frontEnd:NodeSet=null, dataLinks:HashMap[String,Int]=null) = { 
+  def readModel(modelFile:String, frontEnd:NodeSet=null, dataLinks:HashMap[String,Node]=null,
+		formatNCHW:Boolean=true, rowMajor:Boolean=true) = { 
     nmodels = 0;
     mmap = new HashMap[String,Int];
     tmap = new HashMap[String,Boolean];
@@ -49,7 +49,7 @@ class Onnx {
     // Create input map
     for (b <- inputs) { inputMap(b.getName) = b; }
     
-    getInitializerData;
+    getInitializerData(formatNCHW, rowMajor);
 
     createNodes(frontEnd, dataLinks);
 
@@ -314,7 +314,7 @@ class Onnx {
     newnode
   }
 
-  def getInitializerData { 
+  def getInitializerData(formatNCHW:Boolean, rowMajor:Boolean) { 
     for (w <- weights) { 
       val dims0 = w.getDimsList.map(_.toInt).toArray
       val dims = dims0.size match { 
@@ -331,7 +331,17 @@ class Onnx {
 	  val m = FMat.make(dims);
 	  val fb = bbw.asFloatBuffer
 	  for (i <- 0 until m.length) m(i) = fb.get(i);
-	  m
+	  if (dims.size == 4) { 
+	    if (!formatNCHW) { 
+	      m.fromNHWCtoNCHW
+	    } else { 
+	      m
+	    }
+	  } else if (dims.size == 2 && !rowMajor) { 
+	    m.reshapeView(m.ncols, m.nrows).t 
+	  } else { 
+	    m
+	  }
 	}
 	case 2 => { 
 	  val m = BMat.make(dims);
@@ -366,12 +376,12 @@ class Onnx {
     }
   }
   
-  def createNodes(frontEnd:NodeSet, dataLinks:HashMap[String,Int]) { 
+  def createNodes(frontEnd:NodeSet, dataLinks:HashMap[String,Node]) { 
     val nfront = if (frontEnd.asInstanceOf[AnyRef] == null) 0 else frontEnd.size
     nodes = new NodeSet(nodeProtos.size + nfront);
     if (nfront > 0) { 
       for (i <- 0 until nfront) nodes(i) = frontEnd(i);
-      for ((k,v) <- dataLinks) outputMap(k) = nodes(v);
+      for ((k,v) <- dataLinks) outputMap(k) = v;
     }
     var i = nfront
     for (node <- nodeProtos) { 
@@ -434,7 +444,6 @@ class Onnx {
       }
     }
   }
-
 }
 
 object Onnx { 
