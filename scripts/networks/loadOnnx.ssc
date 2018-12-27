@@ -17,15 +17,15 @@ val testlabels = testdir+"label%04d.imat.lz4";
 val testpreds = testdir+"pred%04d.fmat.lz4";
 
 
-val frontend = new NodeSet(4);
+val frontEnd = new NodeSet(4);
 
 val means = ones(3\256\256\batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
 
 // The input layers for the network
-frontend(0) = new InputNode;
-frontend(1) = new ConstantNode{value=means};
-frontend(2) = new SubNode{inputs(0)=frontend(0); inputs(1)=frontend(1)};
-frontend(3) = new CropNode{inputs(0)=frontend(2);}
+frontEnd(0) = new InputNode;
+frontEnd(1) = new ConstantNode{value=means};
+frontEnd(2) = new SubNode{inputs(0)=frontEnd(0); inputs(1)=frontEnd(1)};
+frontEnd(3) = new CropNode{inputs(0)=frontEnd(2);}
 
 // How to find the data input tensor:
 val dataLink = new HashMap[String,Int];
