@@ -435,7 +435,10 @@ class Onnx {
     }
   }
 
-  val perm = irow(2,1,0);
+}
+
+object Onnx { 
+  private val perm = irow(2,1,0);
   def fromRGBtoBGR(a:Mat):Mat = {
     val dd = a.dims
     val aa = a.reshapeView(dd(1),dd(2),dd(0),dd(3));
@@ -443,5 +446,3 @@ class Onnx {
     bb.reshapeView(dd);
   }
 }
-
-
