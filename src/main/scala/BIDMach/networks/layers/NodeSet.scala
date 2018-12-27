@@ -10,6 +10,10 @@ class NodeSet(val nnodes:Int, val nodes:Array[Node]) extends Serializable {
   
   def update(i:Int, lopts:Node) = {nodes(i) = lopts; this}
   
+  def size = nnodes;
+
+  def length = nnodes;
+  
   override def clone = copyTo(new NodeSet(nnodes));
   
   def copyTo(lopts:NodeSet):NodeSet = {
