@@ -225,8 +225,8 @@ class Learner(
       istep += 1
       if ((dsp > lastp + opts.pstep && reslist.length > lasti) || ! datasource.hasNext) {
         val gf = gflop
-        lastp = dsp - (dsp % opts.pstep)
-        myLogger.info(("%5.2f%%, train=%6.5f, val=%6.5f, sec=%2.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
+        lastp = if (datasource.hasNext) (dsp - (dsp % opts.pstep)) else 1f
+        myLogger.info(("%6.2f%%, train=%6.5f, val=%6.5f, sec=%2.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
           100f*lastp,
           Learner.scoreSummary(trainlist, lastti, trainlist.length, opts.cumScore),
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
@@ -362,7 +362,7 @@ class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep);
-        myLogger.info(("%5.2f%%, score=%6.5f, sec=%3.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
+        myLogger.info(("%6.2f%%, score=%6.5f, sec=%3.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
         		100f*lastp,
         		Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
         		gf._2,
