@@ -213,7 +213,7 @@ class Learner(
         	if (mixins != null) mixins map (_ compute(mats, here));
         	while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
         	if (updater != null) updater.update(ipass, here, gprogress);
-        }
+        } 
         val tmpscores = model.evalbatchg(mats, ipass, here);
         val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
         trainlist.append(scores.newcopy)
@@ -226,14 +226,14 @@ class Learner(
       if ((dsp > lastp + opts.pstep && reslist.length > lasti) || ! datasource.hasNext) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        myLogger.info(("%5.2f%%, train=%6.5f, val=%6.5f, secs=%3f, samps/s=%4f, gf=%4f, MB/s=%3.1f" format (
+        myLogger.info(("%5.2f%%, train=%6.5f, val=%6.5f, sec=%2.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
           100f*lastp,
           Learner.scoreSummary(trainlist, lastti, trainlist.length, opts.cumScore),
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._2,
           nsamps/gf._2,
           gf._1,
-          bytes/gf._2*1e-6)) + (if (useGPU) {", GM=%3.3f" format GPUmem._1} else ""));
+          bytes/gf._2*1e-6)) + (if (useGPU) {", GMem=%4.4f" format GPUmem._1} else ""));
         lasti = reslist.length;
         lastti = trainlist.length;
       }
@@ -362,13 +362,13 @@ class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep);
-        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%3.2f" format (
+        myLogger.info(("%5.2f%%, score=%6.5f, sec=%3.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
         		100f*lastp,
         		Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
         		gf._2,
         		nsamps/gf._2,
         		gf._1,
-        		bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
+        		bytes/gf._2*1e-6)) + (if (useGPU) {", GMem=%3.4f" format GPUmem._1} else ""));
         lasti = reslist.length;
       }
     }
