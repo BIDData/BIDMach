@@ -47,6 +47,8 @@ class Learner(
   var useGPU = false
   var reslist:ListBuffer[FMat] = null;
   var samplist:ListBuffer[Float] = null;
+  var trainlist:ListBuffer[FMat] = null;
+  var trainsamplist:ListBuffer[Float] = null;
   var viz:ListBuffer[Visualization] = null; 
   var nextCheckPoint = 0;
   @volatile var done = false;
@@ -56,6 +58,7 @@ class Learner(
   @volatile var istep = 0;
   var here = 0L;
   var lasti = 0;
+  var lastti = 0;
   var bytes = 0L;
   var nsamps = 0L;
   var cacheState = false;
@@ -129,6 +132,8 @@ class Learner(
     if (updater != null) updater.clear;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
+    trainlist = new ListBuffer[FMat];
+    trainsamplist = new ListBuffer[Float];
     firstPass(null, doInit);
     updateM(ipass-1)
     while (ipass < opts.npasses && ! done) {
@@ -148,6 +153,7 @@ class Learner(
     ipass = 0;
     here = 0L;
     lasti = 0;
+    lastti = 0;
     bytes = 0L;
     nsamps = 0L;
     if (updater != null) updater.clear;
@@ -157,6 +163,8 @@ class Learner(
     Mat.useGPUcache = opts.useGPUcache;
     reslist = new ListBuffer[FMat];
     samplist = new ListBuffer[Float];
+    trainlist = new ListBuffer[FMat];    
+    trainsamplist = new ListBuffer[Float];
     flip;
     nextPass(iter);
   }
@@ -206,22 +214,28 @@ class Learner(
         	while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
         	if (updater != null) updater.update(ipass, here, gprogress);
         }
+        val tmpscores = model.evalbatchg(mats, ipass, here);
+        val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
+        trainlist.append(scores.newcopy)
+        trainsamplist.append(here)
       }
       if (viz.asInstanceOf[AnyRef] != null) {
           viz.foreach(_.update(model,mats,ipass,here))
       }        
       istep += 1
-      if (dsp > lastp + opts.pstep && reslist.length > lasti) {
+      if ((dsp > lastp + opts.pstep && reslist.length > lasti) || ! datasource.hasNext) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep)
-        myLogger.info(("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%3.2f" format (
+        myLogger.info(("%5.2f%%, train=%6.5f, val=%6.5f, secs=%3f, samps/s=%4f, gf=%4f, MB/s=%3.1f" format (
           100f*lastp,
+          Learner.scoreSummary(trainlist, lastti, trainlist.length, opts.cumScore),
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
           gf._2,
           nsamps/gf._2,
           gf._1,
-          bytes/gf._2*1e-6)) + (if (useGPU) {", GPUmem=%3.6f" format GPUmem._1} else ""));
+          bytes/gf._2*1e-6)) + (if (useGPU) {", GM=%3.3f" format GPUmem._1} else ""));
         lasti = reslist.length;
+        lastti = trainlist.length;
       }
       if (opts.checkPointFile != null && ipass + dsp > opts.checkPointInterval * (1 + nextCheckPoint - opts.nextCheckPoint)) {
         model.save(opts.checkPointFile format nextCheckPoint);
