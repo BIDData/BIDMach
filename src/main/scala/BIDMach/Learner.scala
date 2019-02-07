@@ -214,10 +214,12 @@ class Learner(
         	while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
         	if (updater != null) updater.update(ipass, here, gprogress);
         } 
-        val tmpscores = model.evalbatchg(mats, ipass, here);
-        val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
-        trainlist.append(scores.newcopy)
-        trainsamplist.append(here)
+        if ((istep - 1) % opts.evalStep == 1) { 
+          val tmpscores = model.evalbatchg(mats, ipass, here);
+          val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
+          trainlist.append(scores.newcopy)
+          trainsamplist.append(here)
+        }
       }
       if (viz.asInstanceOf[AnyRef] != null) {
           viz.foreach(_.update(model,mats,ipass,here))
