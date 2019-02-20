@@ -1,0 +1,197 @@
+import BIDMach.allreduce.AllreduceNode
+import BIDMach.allreduce.AllreduceNode.getBasicConfigs
+import BIDMach.allreduce.binder.ElasticAverageBinder
+import BIDMach.networks.layers._
+
+val traindir = "./data/ImageNet/train/";
+val testdir = "./data/ImageNet/val/";
+val traindata = traindir+"partNCHW%04d.bmat.lz4";
+val trainlabels = traindir+"label%04d.imat.lz4";
+val testdata = testdir+"partNCHW%04d.bmat.lz4";
+val testlabels = testdir+"label%04d.imat.lz4";
+val testpreds = testdir+"pred%04d.fmat.lz4";
+
+val (nn, opts) = Net.gradLearner(traindata, trainlabels);
+val net = nn.model.asInstanceOf[Net]
+
+val resdim = 34;
+val bottleneckThreshold = 40;
+
+val layercounts = (
+  18   \  2 \  2 \  2 \  2 on
+    34   \  3 \  4 \  6 \  3 on
+    50   \  3 \  4 \  6 \  3 on
+    101  \  3 \  4 \ 23 \  3 on
+    152  \  3 \  8 \ 36 \  3);
+
+val imodel = find(layercounts(?,0) == resdim).v;
+
+val nconv2x = layercounts(imodel, 1);
+val nconv3x = layercounts(imodel, 2);
+val nconv4x = layercounts(imodel, 3);
+val nconv5x = layercounts(imodel, 4);
+
+def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
+  val lr = if (ipass < 15) {
+    2e-2f
+  } else if (ipass < 30) {
+    2e-3f
+  } else 2e-4f;
+  lr
+}
+
+opts.logfile = "logresv1_cluster=4.txt";
+opts.checkPointFile = "models/resnet%03d/"
+opts.checkPointInterval = 0.5f;
+opts.batchSize= 128;
+opts.nend = 1250;
+opts.npasses = 50;
+opts.lrate = 1e-1f;
+opts.texp = 0.0f;
+opts.pstep = 0.01f;
+opts.l2reg = 0.0001f;
+opts.hasBias = true;
+opts.vel_decay = 0.9f;
+opts.lr_policy = lr_update _;
+opts.tensorFormat = Net.TensorNCHW;
+opts.useCache = false;
+opts.inplace = Net.BackwardCaching;
+//opts.inplace = Net.InPlace;
+//opts.inplace = Net.NoInPlace;
+opts.convType = Net.CrossCorrelation;
+
+val bnMode = BatchNormLayer.SPATIAL;
+//val bnMode = BatchNormLayer.PER_ACTIVATION;
+val in_place = opts.inplace
+
+val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
+
+{
+  import BIDMach.networks.layers.Node._;
+
+  // dim is the input and output depth. Image dimensions unchanged.
+  def conv3x3Block(in:Node, dim:Int, stride:Int):Node = {
+    val convx_1 =   conv(in)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias,stride = stride);
+    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
+    val relux_1 =   relu(normx_1)(in_place);
+
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias);
+    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
+
+    val shortcut = if (stride > 1) {
+      val convx_3 = conv(in)(w=1,h=1,pad=0,nch=dim,hasBias=opts.hasBias,stride=stride);
+      batchNormScale(convx_3)(normMode=bnMode,inplace=in_place);
+    } else {
+      in;
+    }
+
+    val sum_2 =     shortcut + normx_2;
+    val out =       relu(sum_2)(in_place);
+    out;
+  }
+
+  // dim is the internal (bottleneck) depth. Input and output should have depth 4x dim. Image dimensions unchanged.
+  def convBottleNeckBlock(in:Node, dim:Int, stride:Int, firstBlock:Boolean):Node = {
+    val convx_1 =   conv(in)(w=1,h=1,pad=0,nch=dim,hasBias=opts.hasBias);
+    val normx_1 =   batchNormScale(convx_1)(normMode=bnMode,inplace=in_place);
+    val relux_1 =   relu(normx_1)(in_place);
+
+    val convx_2 =   conv(relux_1)(w=3,h=3,pad=1,nch=dim,hasBias=opts.hasBias,stride = stride);
+    val normx_2 =   batchNormScale(convx_2)(normMode=bnMode,inplace=in_place);
+    val relux_2 =   relu(normx_2)(in_place);
+
+    val convx_3 =   conv(relux_2)(w=1,h=1,pad=0,nch=dim*4,hasBias=opts.hasBias);
+    val normx_3 =   batchNormScale(convx_3)(normMode=bnMode,inplace=in_place);
+    val shortcut =  if (firstBlock) {
+      val c = conv(in)(w=1,h=1,pad=0,nch=4*dim,hasBias=opts.hasBias,stride = stride)
+      batchNormScale(c)(normMode=bnMode,inplace=in_place);
+    }
+    else in;
+    val sum_3 =     shortcut + normx_3;
+    val out =       relu(sum_3)(in_place);
+    out;
+  }
+
+
+  def convBlock(in:Node, dim:Int, stride:Int = 1, firstBlock:Boolean = false):Node = {
+    if (resdim > bottleneckThreshold) {
+      convBottleNeckBlock(in, dim, stride, firstBlock)
+    } else {
+      conv3x3Block(in, dim, stride);
+    }
+  }
+
+  Net.initDefaultNodeSet;
+  var thisnode:Node = null;
+
+  val in =        input();
+  val meanv =     const(means);
+  val din =       in - meanv;
+  val min =       cropMirror(din)(randoffsets=irow(0,28,28,-1));
+
+  val conv1 =     conv(min)(w=7,h=7,pad=3,stride=2,nch=64,hasBias=opts.hasBias);
+  val norm1 =     batchNormScale(conv1)(normMode=bnMode,inplace=in_place);
+  val relu1 =     relu(norm1)(in_place);
+  val pool1 =     pool(relu1)(h=3,w=3,pad=1,stride=2);
+
+  thisnode =      convBlock(pool1, 64, 1, true);
+
+  for (i <- 0 until (nconv2x-1)) {
+    thisnode =  convBlock(thisnode, 64);
+  }
+
+  thisnode =      convBlock(thisnode, 128, 2, true);
+
+  for (i <- 0 until (nconv3x-1)) {
+    thisnode =  convBlock(thisnode, 128);
+  }
+
+  thisnode =      convBlock(thisnode, 256, 2, true);
+
+  for (i <- 0 until (nconv4x-1)) {
+    thisnode =  convBlock(thisnode, 256);
+  }
+
+  thisnode =      convBlock(thisnode, 512, 2, true);
+
+  for (i <- 0 until (nconv5x-1)) {
+    thisnode =  convBlock(thisnode, 512);
+  }
+
+  val pool5 =     pool(thisnode)(h=7,w=7,stride = 7,poolingMode=jcuda.jcudnn.cudnnPoolingMode.CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING);
+  val fc5  =      linear(pool5)(outdim=1000);
+  val out =       softmaxout(fc5)(scoreType=1,lossType=1);
+
+  opts.nodeset=Net.getDefaultNodeSet
+}
+
+def loss = {net.layers(net.layers.length-1).asInstanceOf[SoftmaxOutputLayer]};
+
+val sgd = nn.updater.asInstanceOf[Grad];
+
+nn.launchTrain
+
+
+
+// All-reduce
+val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
+val binder = new ElasticAverageBinder(nn.model, _ => nodeConfig.elasticRate, nn.myLogger)
+AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
+
+println("Examine the 'nn' variable to track learning state.\n");
+
+//nn.train;
+
+//val (mm, mopts) =  Net.predLabels(net, testdata, testlabels);
+//mopts.batchSize= opts.batchSize;
+//mopts.autoReset = false;
+//mm.predict;
+
+//println("Accuracy = %f" format mean(mm.results(0,?),2).v);
+
+
+while(true){
+  Thread.sleep(10000);
+}
+
+
