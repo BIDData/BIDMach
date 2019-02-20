@@ -37,7 +37,7 @@ def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
 
 opts.logfile = "logAlexnet_cluster=4_alpha=0_1.txt";
 opts.checkPointFile = "../models/alexnet%03d/"
-opts.checkPointInterval = 0.5f;
+opts.checkPointInterval = 5f;
 opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
