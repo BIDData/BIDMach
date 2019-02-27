@@ -242,6 +242,15 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   		}
   	}
   }
+
+  /* Initialize the gradients of the last layer to poisson values per-column, simulating
+   * a bootstrap sample.
+   */
+
+  def poissonBlock(nr:Int, nc:Int, p:Float) = { 
+//    ones(nr, 1) * FMat(poissrnd(p, 1, nc));
+    ones(nr, 1) * trunc(3*rand(1, nc));
+  }
   
   /** 
    *  Set the derivative of the output layer to 1's. Assumes we are maximizing likelihood. 
@@ -255,9 +264,17 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
     while (j < dolayers.length) {
     	val deriv = dolayers(j).deriv;
       if (todo == 0 || todo == deriv.ncols) {
-      	deriv.set(1);
+        if (opts.bootstrap > 0) { 
+          deriv <-- poissonBlock(deriv.nrows, deriv.ncols, opts.bootstrap);
+        } else { 
+      	  deriv.set(1);
+        }
       } else {
-        deriv <-- (ones(deriv.nrows, todo) \ zeros(deriv.nrows, deriv.ncols - todo));
+        if (opts.bootstrap > 0) { 
+          deriv <-- (poissonBlock(deriv.nrows, todo, opts.bootstrap) \ zeros(deriv.nrows, deriv.ncols - todo));
+        } else { 
+          (ones(deriv.nrows, todo) \ zeros(deriv.nrows, deriv.ncols - todo));
+        }
       }
       if (opts.naturalLambda > 0) {                                       // Incorporate the natural gradient term
     		val tmp = last_output_mats(j) - dolayers(j).output;
@@ -513,6 +530,7 @@ object Net  {
     var convType = CrossCorrelation;
     var inplace = NoInPlace;
     var compute_input_gradient = false;
+    var bootstrap = 0f;
   }
    
   final val UseNetFormat = 0;
