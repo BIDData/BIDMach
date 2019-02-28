@@ -39,19 +39,9 @@ case class ScatteredDataBuffer(dataSize: Int,
     val countAtThisChunk = count(chunkId)
 
     for (i <- 0 until peerSize) {
-      val tBuf = peerBuffer(i)
-/*      var j = 0;
-      while (j < chunkSize) {
-        val valueFromPeer = tBuf(chunkStartPos + j)
-        reducedArr(j) = reducer.reduce(reducedArr(j), valueFromPeer)
-        if (i == peerSize - 1) {
-          reducedArr(j) = reducer.postProcess(reducedArr(j), countAtThisChunk)
-        }
-        j += 1;
-      }*/
-      reducer.reduceVec(tBuf, chunkStartPos, reducedArr, 0, reducedArr, 0, chunkSize);
+      reducer.reduceVec(peerBuffer(i), chunkStartPos, reducedArr, chunkSize);
       if (i == peerSize - 1) {
-        reducer.postProcessVec(reducedArr, 0, countAtThisChunk, reducedArr, 0, chunkSize);
+        reducer.postProcessVec(reducedArr, countAtThisChunk, chunkSize);
       }
     }
     reducedFlag(chunkId) = true
