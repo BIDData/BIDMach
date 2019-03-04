@@ -311,7 +311,7 @@ class LRNacrossNode extends Node with LRNacrossNodeOpts {
 	}
 
 
-  
+@SerialVersionUID(100L)
 object LRNacrossNode {   
   
   def apply() = {
@@ -326,6 +326,7 @@ object LRNacrossNode {
   }
 }
 
+@SerialVersionUID(100L)
 object LRNacrossLayer {    
   
   def apply(net:Net) = new LRNacrossLayer(net, new LRNacrossNode);
