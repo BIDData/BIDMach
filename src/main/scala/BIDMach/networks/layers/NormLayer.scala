@@ -20,6 +20,7 @@ import BIDMach.networks._
  * is different from the optsified value (targetNorm).
  */
 
+@SerialVersionUID(100L)
 class NormLayer(override val net:Net, override val opts:NormNodeOpts = new NormNode) extends Layer(net, opts) {
 	var sconst:Mat = null;
 
@@ -70,6 +71,7 @@ trait NormNodeOpts extends NodeOpts {
     }
 }
 
+@SerialVersionUID(100L)
 class NormNode extends Node with NormNodeOpts {  
     
 	def copyTo(opts:NormNode):NormNode = {
@@ -87,6 +89,7 @@ class NormNode extends Node with NormNodeOpts {
 	}
 }
   
+@SerialVersionUID(100L)
 object NormLayer {  
   
   def apply(net:Net) = new NormLayer(net, new NormNode);

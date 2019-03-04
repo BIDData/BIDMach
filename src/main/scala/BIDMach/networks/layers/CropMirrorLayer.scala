@@ -22,6 +22,7 @@ import java.util.Random;
  * Does not pass derivatives
  */
 
+@SerialVersionUID(100L)
 class CropMirrorLayer(override val net:Net, override val opts:CropMirrorNodeOpts = new CropMirrorNode) extends Layer(net, opts) {
   var blockInds:Array[IMat] = null;
   var baseInds:Array[IMat] = null;
@@ -154,6 +155,7 @@ class CropMirrorLayer(override val net:Net, override val opts:CropMirrorNodeOpts
 trait CropMirrorNodeOpts extends CropNodeOpts {
 }
 
+@SerialVersionUID(100L)
 class CropMirrorNode extends Node with CropMirrorNodeOpts {
   def copyTo(opts:CropMirrorNode):CropMirrorNode = {
     this.asInstanceOf[Node].copyTo(opts);
@@ -170,6 +172,7 @@ class CropMirrorNode extends Node with CropMirrorNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object CropMirrorLayer {  
   
   def apply(net:Net) = new CropMirrorLayer(net, new CropMirrorNode);

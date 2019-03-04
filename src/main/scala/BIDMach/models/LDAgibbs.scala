@@ -45,6 +45,7 @@ import BIDMach._
  * 
  */
 
+@SerialVersionUID(100L)
 class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends FactorModel(opts) {
  
     var mm:Mat = null;
@@ -125,6 +126,7 @@ class LDAgibbs(override val opts:LDAgibbs.Opts = new LDAgibbs.Options) extends F
   }
 }
 
+@SerialVersionUID(100L)
 object LDAgibbs  {
   import edu.berkeley.bid.CUMACH
   import jcuda.runtime.JCuda._

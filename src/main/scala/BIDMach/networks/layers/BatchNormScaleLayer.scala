@@ -355,6 +355,7 @@ class BatchNormScaleNode extends ModelNode with BatchNormScaleNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object BatchNormScaleLayer {
   
   val ONE = Pointer.to(Array(1.0f));

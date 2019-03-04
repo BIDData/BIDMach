@@ -41,6 +41,7 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  * 
  */
 
+@SerialVersionUID(100L)
 class LayerActor(val layer:Layer) extends Actor {
   import LayerActor._
   layer.myActor = self;
@@ -137,6 +138,7 @@ class LayerActor(val layer:Layer) extends Actor {
   }
 }
 
+@SerialVersionUID(100L)
 object LayerActor {
   case object GetOutputs;
   case object IsOutput;

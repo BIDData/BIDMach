@@ -20,6 +20,7 @@ import BIDMach.networks._
  * and the output will be updated, unless opts.cache is true. 
  */
 
+@SerialVersionUID(100L)
 class ConstantLayer(override val net:Net, override val opts:ConstantNodeOpts = new ConstantNode) extends Layer(net, opts) {
   
   override def forward = {
@@ -43,6 +44,7 @@ trait ConstantNodeOpts extends NodeOpts {
   var cache:Boolean = false;
 }
 
+@SerialVersionUID(100L)
 class ConstantNode extends Node with ConstantNodeOpts {
 
   def copyTo(opts:ConstantNode):ConstantNode = {
@@ -64,7 +66,7 @@ class ConstantNode extends Node with ConstantNodeOpts {
 }
 
 
-  
+@SerialVersionUID(100L)  
 object ConstantLayer {
   
   def apply(net:Net) = new ConstantLayer(net, new ConstantNode);

@@ -5,6 +5,7 @@ import BIDMat.SciFunctions._
 import BIDMach.models._
 
 // Minimize the pairwise cosine of all model vectors
+@SerialVersionUID(100L)
 class CosineSim(override val opts:CosineSim.Opts = new CosineSim.Options) extends Mixin(opts) { 
    def compute(mats:Array[Mat], step:Float) = {
      for (i <- 0 until opts.cosnmats) {
@@ -39,6 +40,7 @@ class CosineSim(override val opts:CosineSim.Opts = new CosineSim.Options) extend
 }
 
 // Minimize the within-cluster perplexity
+@SerialVersionUID(100L)
 class Perplexity(override val opts:Perplexity.Opts = new Perplexity.Options) extends Mixin(opts) { 
    def compute(mats:Array[Mat], step:Float) = {
      for (i <- 0 until opts.perpnmats) {
@@ -78,6 +80,7 @@ class Perplexity(override val opts:Perplexity.Opts = new Perplexity.Options) ext
 }
 
 // Minimize the non-top weights
+@SerialVersionUID(100L)
 class Top(override val opts:Top.Opts = new Top.Options) extends Mixin(opts) { 
    def compute(mats:Array[Mat], step:Float) = {
      for (i <- 0 until opts.topnmats) {
@@ -113,7 +116,7 @@ object CosineSim {
         var cosorthog:Boolean = true
         var cosnmats:Int = 1
     }
-    
+    @SerialVersionUID(100L)
     class Options extends Opts {}
 }
 

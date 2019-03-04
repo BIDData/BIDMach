@@ -9,6 +9,8 @@ import BIDMach.models._
  * Incrementally update two moving averages using updatemats(0) and updatemats(1), and compute the model
  * as their ratio. 
  */
+
+@SerialVersionUID(100L)
 class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Updater(opts) {
   
   var firstStep = 0f
@@ -76,6 +78,7 @@ class IncNorm(override val opts:IncNorm.Opts = new IncNorm.Options) extends Upda
   }
 }
 
+@SerialVersionUID(100L)
 object IncNorm {
   trait Opts extends Updater.Opts {
     var warmup = 0L 

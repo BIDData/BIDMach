@@ -16,6 +16,7 @@ import scala.collection.mutable.HashMap;
  * LRN within channel unit
  */
 
+@SerialVersionUID(100L)
 class LRNwithinLayer(override val net:Net, override val opts:LRNwithinNode = new LRNwithinNode) extends CompoundLayer(net, opts) {
   
 	override def clear = {
@@ -44,6 +45,7 @@ trait LRNwithinNodeOpts extends CompoundNodeOpts {
     }
 }
 
+@SerialVersionUID(100L)
 class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {	
   
   	var xalpha:Mat = null;
@@ -120,7 +122,7 @@ class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {
 	}
 
 
-  
+@SerialVersionUID(100L)  
 object LRNwithinNode {   
   
   def apply() = {
@@ -137,6 +139,7 @@ object LRNwithinNode {
   }
 }
 
+@SerialVersionUID(100L)
 object LRNwithinLayer {    
   
   def apply(net:Net) = new LRNwithinLayer(net, new LRNwithinNode);

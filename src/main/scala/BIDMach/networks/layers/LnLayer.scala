@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Natural Log layer. 
  */
 
+@SerialVersionUID(100L)
 class LnLayer(override val net:Net, override val opts:LnNodeOpts = new LnNode) extends Layer(net, opts) {
 
 	override def forward = {
@@ -48,6 +49,7 @@ class LnLayer(override val net:Net, override val opts:LnNodeOpts = new LnNode) e
 trait LnNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class LnNode extends Node with LnNodeOpts {
 
 	override def clone:LnNode = {copyTo(new LnNode).asInstanceOf[LnNode];}
@@ -59,6 +61,7 @@ class LnNode extends Node with LnNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object LnLayer {  
   
   def apply(net:Net) = new LnLayer(net, new LnNode);

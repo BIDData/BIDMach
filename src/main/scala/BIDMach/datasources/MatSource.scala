@@ -4,7 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
 
-
+@SerialVersionUID(100L)
 class MatSource(var mats:Array[Mat], override val opts:MatSource.Opts = new MatSource.Options) extends DataSource(opts) {
   var sizeMargin = 0f
   var here = 0
@@ -78,6 +78,7 @@ class MatSource(var mats:Array[Mat], override val opts:MatSource.Opts = new MatS
 
 }
 
+@SerialVersionUID(100L)
 object MatSource {
     trait Opts extends DataSource.Opts {
   }

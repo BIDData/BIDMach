@@ -15,7 +15,7 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 
-
+@SerialVersionUID(100L)
 class TransposeLayer(override val net:Net, override val opts:TransposeNodeOpts = new TransposeNode) extends Layer(net, opts) {
 
   override def forward = {
@@ -57,6 +57,7 @@ trait TransposeNodeOpts extends NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class TransposeNode extends Node with TransposeNodeOpts {
   
 	def copyTo(opts:TransposeNode):TransposeNode = {
@@ -74,6 +75,7 @@ class TransposeNode extends Node with TransposeNodeOpts {
 	}
 }
 
+@SerialVersionUID(100L)
 object TransposeLayer {
 
   def apply(net:Net) = new TransposeLayer(net, new TransposeNode);

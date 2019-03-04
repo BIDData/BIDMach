@@ -19,6 +19,7 @@ import BIDMach.networks._
  * 
  */
 
+@SerialVersionUID(100L)
 class SelectLayer(override val net:Net, override val opts:SelectNodeOpts = new SelectNode) extends Layer(net, opts) {
   var colindx:IMat = null;
   var fullindx:IMat = null;
@@ -69,6 +70,7 @@ class SelectLayer(override val net:Net, override val opts:SelectNodeOpts = new S
 trait SelectNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class SelectNode extends Node with SelectNodeOpts {
 	override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
 
@@ -81,6 +83,7 @@ class SelectNode extends Node with SelectNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SelectLayer {  
   
   def apply(net:Net) = new SelectLayer(net, new SelectNode);

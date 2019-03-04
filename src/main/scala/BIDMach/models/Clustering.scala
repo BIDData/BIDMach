@@ -72,6 +72,7 @@ abstract class ClusteringModel(override val opts:ClusteringModel.Opts) extends M
   }
 }
 
+@SerialVersionUID(100L)
 object ClusteringModel {
   trait Opts extends Model.Opts {
   }

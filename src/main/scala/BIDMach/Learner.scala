@@ -1056,7 +1056,7 @@ class ParLearnerxF(
   }
 }
 
-
+@SerialVersionUID(100L)
 object Learner {
 
   trait Opts extends BIDMat.Opts {
@@ -1146,6 +1146,7 @@ object Learner {
   }
 }
 
+@SerialVersionUID(100L)
 object ParLearner {
 
   trait Opts extends

@@ -24,6 +24,7 @@ import java.util.HashMap;
  *
  */
 
+@SerialVersionUID(100L)
 class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
   var layers:Array[Layer] = null;
   var layermat:LayerMat = null;
@@ -510,6 +511,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
 
 }
 
+@SerialVersionUID(100L)
 object Net  {
   trait Opts extends Model.Opts {
     var links:IMat = null;
@@ -546,6 +548,7 @@ object Net  {
   final val InPlace = 2;
   final val BackwardCaching = 3;
   
+  @SerialVersionUID(100L)
   class Options extends Opts {}
 
   var defaultNodeList:List[Node] = null;
@@ -802,6 +805,7 @@ object Net  {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
 
+  @SerialVersionUID(100L)
   class LearnOptions extends Learner.Options with Net.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, targ:Mat) = {
@@ -836,8 +840,10 @@ object Net  {
     (nn, opts)
   }
 
+  @SerialVersionUID(100L)
   class FSAopts extends Learner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts;
   
+  @SerialVersionUID(100L)
   class FSGopts extends Learner.Options with Net.Opts with FileSource.Opts with Grad.Opts;
 
   def learner(fn1:String, fn2:String):(Learner, FSAopts) = learner(List(FileSource.simpleEnum(fn1,1,0),
@@ -903,6 +909,7 @@ object Net  {
   }
 
 
+  @SerialVersionUID(100L)
   class PredOptions extends Learner.Options with Net.Opts with MatSource.Opts with MatSink.Opts;
 
   def predictor(model0:Model, data0:Mat, labels0:Mat):(Learner, PredOptions) = {
@@ -938,6 +945,7 @@ object Net  {
     (nn, opts)
   }
 
+  @SerialVersionUID(100L)
   class FilePredOptions extends Learner.Options with Net.Opts with FileSource.Opts with FileSink.Opts;
 
   def predictor(model0:Model, infn:String, outfn:String):(Learner, FilePredOptions) = {
@@ -990,6 +998,7 @@ def predictor(model0:Model, infiles:List[(Int)=>String], outfiles:List[(Int)=>St
     (nn, opts)
   }
 
+  @SerialVersionUID(100L)
   class LearnParOptions extends ParLearner.Options with Net.Opts with FileSource.Opts with ADAGrad.Opts 
 
   def learnPar(fn1:String, fn2:String):(ParLearnerF, LearnParOptions) = {

@@ -17,6 +17,7 @@ import BIDMach.networks._
  * Designed to map linear integer feature arrays to sparse matrices. Doesnt deal with derivatives.
  */
 
+@SerialVersionUID(100L)
 class OnehotLayer(override val net:Net, override val opts:OnehotNodeOpts = new OnehotNode) extends Layer(net, opts) {
 
   override def forward = {
@@ -40,6 +41,7 @@ trait OnehotNodeOpts extends NodeOpts {
   var full:Boolean = false
 }
 
+@SerialVersionUID(100L)
 class OnehotNode extends Node with OnehotNodeOpts {
 
 	override def clone:OnehotNode = {copyTo(new OnehotNode).asInstanceOf[OnehotNode];}
@@ -51,6 +53,7 @@ class OnehotNode extends Node with OnehotNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object OnehotLayer {
 
   def apply(net:Net) = new OnehotLayer(net, new OnehotNode);

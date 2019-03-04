@@ -20,6 +20,7 @@ import BIDMach.networks._
  * 
  */
 
+@SerialVersionUID(100L)
 class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNodeOpts = new SoftmaxOutputNode) extends Layer(net, opts) with OutputLayer { 
   var coloffsets:IMat = null;
   var probs:Mat = null;
@@ -119,6 +120,7 @@ trait SoftmaxOutputNodeOpts extends NodeOpts {
 	}
 }
 
+@SerialVersionUID(100L)
 class SoftmaxOutputNode extends Node with OutputNode with SoftmaxOutputNodeOpts {
   
   def copyTo(opts:SoftmaxOutputNode):SoftmaxOutputNode = {

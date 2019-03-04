@@ -21,7 +21,7 @@ import BIDMach.networks._
  * If using named model layers, the model layer name is augmented with "_i" for matrices >= 1. 
  */
 
-
+@SerialVersionUID(100L)
 class ModelLayer(override val net:Net, override val opts:ModelNodeOpts = new ModelNode, val nmats:Int = 1) extends Layer(net, opts) {
 	var imodel = 0;
   
@@ -67,7 +67,8 @@ trait ModelNodeOpts extends NodeOpts {
     opts;
   }
 }
-    
+
+@SerialVersionUID(100L)    
 class ModelNode extends Node with ModelNodeOpts {
   
   def copyTo(opts:ModelNode):ModelNode = {

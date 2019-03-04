@@ -15,6 +15,7 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 
+@SerialVersionUID(100L)
 class CompoundLayer(override val net:Net, override val opts:CompoundNode = new CompoundNode) extends ModelLayer(net, opts) {
 	 
   override def setInput(i:Int, v:LayerTerm):CompoundLayer = {               // Assumes the inputs are the first k layers in internal_layers
@@ -129,6 +130,7 @@ trait CompoundNodeOpts extends ModelNodeOpts {
   var prefix = "";
 }
 
+@SerialVersionUID(100L)
 class CompoundNode extends ModelNode with CompoundNodeOpts {
 	var grid:NodeMat = null;
 //  var lopts:Array[Node] = null;

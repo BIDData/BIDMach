@@ -21,6 +21,7 @@ import scala.collection.mutable.HashMap;
  * LRN across channel unit
  */
 
+@SerialVersionUID(100L)
 class LRNacrossLayer(override val net:Net, override val opts:LRNacrossNode = new LRNacrossNode) extends Layer(net, opts) {
   
 	val data_type = cudnnDataType.CUDNN_DATA_FLOAT;
@@ -292,6 +293,7 @@ trait LRNacrossNodeOpts extends NodeOpts {
     }
 }
 
+@SerialVersionUID(100L)
 class LRNacrossNode extends Node with LRNacrossNodeOpts {	
 	 
 	  override def clone:LRNacrossNode = {

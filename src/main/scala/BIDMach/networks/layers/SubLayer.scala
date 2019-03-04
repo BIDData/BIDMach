@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Computes the element-wise difference of input layers. The first argument is added to the output, others are subtracted.
  */
 
+@SerialVersionUID(100L)
 class SubLayer(override val net:Net, override val opts:SubNodeOpts = new SubNode) extends Layer(net, opts) { 
   
   override val _inputs = new Array[LayerTerm](opts.ninputs);
@@ -55,6 +56,7 @@ trait SubNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
+@SerialVersionUID(100L)
 class SubNode extends Node with SubNodeOpts {
 	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
@@ -73,6 +75,7 @@ class SubNode extends Node with SubNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SubLayer { 
   
   def apply(net:Net) = new SubLayer(net, new SubNode);

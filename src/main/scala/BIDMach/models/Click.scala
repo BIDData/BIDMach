@@ -45,6 +45,7 @@ import BIDMach._
  * }}}
  */
 
+@SerialVersionUID(100L)
 class Click(override val opts:Click.Opts = new Click.Options) extends FactorModel(opts) {
 
   var mm:Mat = null
@@ -162,6 +163,7 @@ class Click(override val opts:Click.Opts = new Click.Options) extends FactorMode
   def evalfun(data:Mat, user:Mat, ipass:Int, pos:Long):FMat = {zeros(1,1)}
 }
 
+@SerialVersionUID(100L)
 object Click  {
   trait Opts extends FactorModel.Opts {
     var LDAeps = 1e-9

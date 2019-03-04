@@ -11,7 +11,7 @@ import BIDMat.SciFunctions._
 import BIDMach.models._
 import BIDMach.networks._
 
-
+@SerialVersionUID(100L)
 class PoolingLayer(override val net:Net, override val opts:PoolingNodeOpts = new PoolingNode) extends Layer(net, opts) {
    
   val data_type = cudnnDataType.CUDNN_DATA_FLOAT;
@@ -328,6 +328,7 @@ trait PoolingNodeOpts extends NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class PoolingNode extends Node with PoolingNodeOpts {
   
 	def copyTo(opts:PoolingNode):PoolingNode = {
@@ -344,6 +345,7 @@ class PoolingNode extends Node with PoolingNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object PoolingLayer {
   
   val ONE = Pointer.to(Array(1.0f));

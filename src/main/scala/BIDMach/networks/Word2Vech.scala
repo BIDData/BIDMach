@@ -41,6 +41,7 @@ import scala.concurrent.duration.Duration
  * The code has the ability to build models larger than a single Java array, and bigger than a single node can store. 
  */
 
+@SerialVersionUID(100L)
 class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extends Model(opts) {
   
   // Hierarchical softmax tree data.
@@ -226,6 +227,7 @@ class Word2Vech(override val opts:Word2Vech.Opts = new Word2Vech.Options) extend
   }
 }
 
+@SerialVersionUID(100L)
 object Word2Vech  {
   trait Opts extends Model.Opts {
     var nskip = 5; 
@@ -343,6 +345,7 @@ object Word2Vech  {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
+@SerialVersionUID(100L)
   class LearnOptions extends Learner.Options with Word2Vech.Opts with MatSource.Opts with ADAGrad.Opts;
   
   def learner(mat0:Mat, targ:Mat) = {
@@ -358,6 +361,7 @@ object Word2Vech  {
     (nn, opts)
   }
   
+@SerialVersionUID(100L)
   class FDSopts extends Learner.Options with Word2Vech.Opts with FileSource.Opts with ADAGrad.Opts
   
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
@@ -423,6 +427,7 @@ object Word2Vech  {
     (nn, opts)
   }
   
+@SerialVersionUID(100L)
   class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FileSource.Opts with ADAGrad.Opts;
   
   def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0)))}

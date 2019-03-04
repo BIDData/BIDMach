@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Sign layer. 
  */
 
+@SerialVersionUID(100L)
 class SignLayer(override val net:Net, override val opts:SignNodeOpts = new SignNode) extends Layer(net, opts) {
 
 	override def forward = {
@@ -45,6 +46,7 @@ class SignLayer(override val net:Net, override val opts:SignNodeOpts = new SignN
 trait SignNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class SignNode extends Node with SignNodeOpts {
 
 	override def clone:SignNode = {copyTo(new SignNode).asInstanceOf[SignNode];}
@@ -56,6 +58,7 @@ class SignNode extends Node with SignNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SignLayer {  
   
   def apply(net:Net) = new SignLayer(net, new SignNode);

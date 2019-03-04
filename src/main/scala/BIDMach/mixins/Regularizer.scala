@@ -4,6 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
+@SerialVersionUID(100L)
 class L1Regularizer(override val opts:L1Regularizer.Opts = new L1Regularizer.Options) extends Mixin(opts) { 
    var regwt:Mat = null;
    def compute(mats:Array[Mat], step:Float) = {
@@ -27,6 +28,7 @@ class L1Regularizer(override val opts:L1Regularizer.Opts = new L1Regularizer.Opt
    }
 }
 
+@SerialVersionUID(100L)
 class L2Regularizer(override val opts:L2Regularizer.Opts = new L2Regularizer.Options) extends Mixin(opts) { 
    var regwt:Mat = null;
    def compute(mats:Array[Mat], step:Float) = {
@@ -57,6 +59,7 @@ object L1Regularizer {
 		var r1nmats:Int = 1
 	}
 	
+@SerialVersionUID(100L)
 	class Options extends Opts {}
 }
 
@@ -65,7 +68,7 @@ object L2Regularizer {
         var reg2weight:FMat = 1e-7f
         var r2nmats:Int = 1
     }
-    
+@SerialVersionUID(100L)    
     class Options extends Opts {}
 }
 

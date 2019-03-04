@@ -13,6 +13,8 @@ import BIDMach._
 /*
  * LSTM next Word prediction model, which comprises a rectangular grid of LSTM compound layers.
  */
+
+@SerialVersionUID(100L)
 class NextWord(override val opts:NextWord.Opts = new NextWord.Options) extends Net(opts) {
   
   var shiftedInds:IMat = null;
@@ -127,6 +129,7 @@ object NextWord {
     var bylevel = true;
   }
   
+  @SerialVersionUID(100L)
   class Options extends Opts {}
   
    def mkNetModel(fopts:Model.Opts) = {
@@ -141,6 +144,7 @@ object NextWord {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
+@SerialVersionUID(100L)
   class LearnOptions extends Learner.Options with NextWord.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat) = {
@@ -169,6 +173,7 @@ object NextWord {
     (nn, opts)
   }
   
+@SerialVersionUID(100L)
   class FDSopts extends Learner.Options with NextWord.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));

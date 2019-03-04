@@ -10,6 +10,7 @@ import jcuda.runtime.JCuda._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
+@SerialVersionUID(100L)
 class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad {
   
 	var sumSq:Array[Mat] = null;
@@ -145,7 +146,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
   }
 }
 
-
+@SerialVersionUID(100L)
 object ADAGrad {
   trait Opts extends Grad.Opts {
     var vexp:FMat = 0.5f;

@@ -25,6 +25,7 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
  * 
  */
 
+@SerialVersionUID(100L)
 class NetActor(val net:Net) extends Actor {
   import LayerActor._
   
@@ -96,6 +97,7 @@ class NetActor(val net:Net) extends Actor {
   }
 }
 
+@SerialVersionUID(100L)
 object NetActor {
   def props(net: Net): Props = Props(new NetActor(net));
 }

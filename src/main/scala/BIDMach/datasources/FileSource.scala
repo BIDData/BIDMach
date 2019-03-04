@@ -20,6 +20,7 @@ import java.io._
  * or the next file if no read is in progress. 
  */
 
+@SerialVersionUID(100L)
 class FileSource(override val opts:FileSource.Opts = new FileSource.Options) extends DataSource(opts) {
   var sizeMargin = 0f;
   var blockSize = 0;
@@ -327,6 +328,7 @@ class FileSource(override val opts:FileSource.Opts = new FileSource.Options) ext
   }
 }
 
+@SerialVersionUID(100L)
 object FileSource {
 
   def apply(opts:FileSource.Opts, nthreads:Int):FileSource = {

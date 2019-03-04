@@ -17,6 +17,7 @@ import edu.berkeley.bid.CUMACH;
  * LSTM unit 
  */
 
+@SerialVersionUID(100L)
 class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts = new LSTMfusedNode) extends Layer(net, opts) {
 	override val _inputs = new Array[LayerTerm](5);
 	override val _outputs = new Array[Mat](2);
@@ -64,11 +65,13 @@ trait LSTMfusedNodeOpts extends NodeOpts {
     }
 }
 
+@SerialVersionUID(100L)
 class LSTMfusedNode extends Node with LSTMfusedNodeOpts {	
   
 	  override val inputs:Array[NodeTerm] = Array(null, null, null, null, null);
 }
 
+@SerialVersionUID(100L)
 object LSTMfusedLayer {  
   
   def apply(net:Net) = new LSTMfusedLayer(net, new LSTMfusedNode);

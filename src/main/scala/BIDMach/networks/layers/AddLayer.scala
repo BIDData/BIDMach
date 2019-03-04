@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Computes the element-wise sum of input layers. 
  */
 
+@SerialVersionUID(100L)
 class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode) extends Layer(net, opts) { 
   
   override val _inputs = new Array[LayerTerm](opts.ninputs);
@@ -54,6 +55,7 @@ trait AddNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
+@SerialVersionUID(100L)
 class AddNode extends Node with AddNodeOpts {
 	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
@@ -72,6 +74,7 @@ class AddNode extends Node with AddNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object AddLayer { 
   
   def apply(net:Net) = new AddLayer(net, new AddNode);
