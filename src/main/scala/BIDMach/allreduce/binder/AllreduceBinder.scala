@@ -19,6 +19,7 @@ object AllreduceBinder {
 
   type DataSink = AllReduceOutput => Unit
   type DataSource = AllReduceInputRequest => AllReduceInput
+  var updateCounts = 100
 
 }
 

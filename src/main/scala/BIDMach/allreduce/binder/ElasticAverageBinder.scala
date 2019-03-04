@@ -60,7 +60,7 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
 
     reduceCount.synchronized {
       val currentCount: Int = reduceCount.getAndIncrement()
-      val updateCounts = 10
+      val updateCounts = AllreduceBinder.updateCounts
       if (currentCount % updateCounts == 0) {
         val toc = System.currentTimeMillis()
         if (currentCount > 0) {
