@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Softmax layer. Output = exp(input) / sum(exp(input))
  */
 
+@SerialVersionUID(100L)
 class SoftmaxLayer(override val net:Net, override val opts:SoftmaxNodeOpts = new SoftmaxNode) extends Layer(net, opts) {
   var one:Mat = null;
 
@@ -62,6 +63,7 @@ trait SoftmaxNodeOpts extends NodeOpts {
 
 }
 
+@SerialVersionUID(100L)
 class SoftmaxNode extends Node with SoftmaxNodeOpts {
 
 	override def clone:SoftmaxNode = {copyTo(new SoftmaxNode).asInstanceOf[SoftmaxNode];};
@@ -73,6 +75,7 @@ class SoftmaxNode extends Node with SoftmaxNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SoftmaxLayer {
 
   def apply(net:Net) = new SoftmaxLayer(net, new SoftmaxNode);

@@ -24,6 +24,7 @@ import BIDMach._
  * }}}
  */
 
+@SerialVersionUID(100L)
 class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends ClusteringModel(opts) {
 
 //  var mm:Mat = null
@@ -132,6 +133,7 @@ class KMeans(override val opts:KMeans.Opts = new KMeans.Options) extends Cluster
   }
 }
 
+@SerialVersionUID(100L)
 object KMeans  {
   trait Opts extends ClusteringModel.Opts {
   }

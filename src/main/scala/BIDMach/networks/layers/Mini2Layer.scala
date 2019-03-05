@@ -65,6 +65,7 @@ class Mini2Node extends Node with Mini2NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object Mini2Layer {  
   
   def apply(net:Net) = new Mini2Layer(net, new Mini2Node);

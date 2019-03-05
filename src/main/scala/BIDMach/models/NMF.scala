@@ -41,6 +41,7 @@ import BIDMach._
  * nn.datamat            // get the other factor
  * }}}
  */
+@SerialVersionUID(100L)
 class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   
   var mm:Mat = null
@@ -124,6 +125,7 @@ class NMF(opts:NMF.Opts = new NMF.Options) extends FactorModel(opts) {
   }
 }
 
+@SerialVersionUID(100L)
 object NMF  {
   trait Opts extends FactorModel.Opts {
     var NMFeps = 1e-12

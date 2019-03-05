@@ -18,6 +18,7 @@ import BIDMach.networks._
  * Computes the product of its input layers. 
  */
 
+@SerialVersionUID(100L)
 class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode) extends Layer(net, opts) {  
   
 	override val _inputs = new Array[LayerTerm](opts.ninputs);
@@ -64,6 +65,7 @@ trait MulNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
+@SerialVersionUID(100L)
 class MulNode extends Node with MulNodeOpts {
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
@@ -82,6 +84,7 @@ class MulNode extends Node with MulNodeOpts {
   }
 }
   
+@SerialVersionUID(100L)
 object MulLayer {  
   
   def apply(net:Net) = new MulLayer(net, new MulNode);

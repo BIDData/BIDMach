@@ -14,6 +14,8 @@ import BIDMach._
 /*
  * LSTM next Word predictseq model, which comprises a rectangular grid of LSTM compound layers.
  */
+
+@SerialVersionUID(100L)
 class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends Net(opts) {
   
   var PADrow:Mat = null;
@@ -276,6 +278,7 @@ class SeqToSeq(override val opts:SeqToSeq.Opts = new SeqToSeq.Options) extends N
   }
 }
 
+@SerialVersionUID(100L)
 object SeqToSeq {
   trait Opts extends Net.Opts {
     var inwidth = 1;     // Max src sentence length
@@ -300,6 +303,7 @@ object SeqToSeq {
     
   }
   
+@SerialVersionUID(100L)
   class Options extends Opts {}
   
    def mkNetModel(fopts:Model.Opts) = {
@@ -314,6 +318,7 @@ object SeqToSeq {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
+@SerialVersionUID(100L)
   class LearnOptions extends Learner.Options with SeqToSeq.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
 
   def learner(mat0:Mat, mat1:Mat, regularize:Boolean = false) = {
@@ -342,6 +347,7 @@ object SeqToSeq {
     (nn, opts)
   }
   
+@SerialVersionUID(100L)
   class FDSopts extends Learner.Options with SeqToSeq.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
    
   def learner(fn1:String, fn2:String, regularize:Boolean, adagrad:Boolean):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0), FileSource.simpleEnum(fn2,1,0)), regularize, adagrad);
@@ -386,6 +392,7 @@ object SeqToSeq {
     (nn, opts)
   }
   
+@SerialVersionUID(100L)
   class FEopts extends Learner.Options with SeqToSeq.Opts with FileSource.Opts with FileSink.Opts
   
   def embed(model:SeqToSeq, ifname:String, ofname:String):(Learner, FEopts) = {   
@@ -431,6 +438,7 @@ object SeqToSeq {
     (nn, opts)
   }
 
+@SerialVersionUID(100L)
   class MatPredOpts extends Learner.Options with SeqToSeq.Opts with MatSource.Opts with MatSink.Opts
 
   def embed(model:SeqToSeq, src:Mat):(Learner, MatPredOpts) = {

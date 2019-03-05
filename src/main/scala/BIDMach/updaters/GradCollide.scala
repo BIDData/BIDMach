@@ -6,6 +6,7 @@ import BIDMat.SciFunctions._
 import BIDMach.models._
 import edu.berkeley.bid.CUMACH
 
+@SerialVersionUID(100L)
 class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) extends Updater {
   
   var firstStep = 0.0;
@@ -589,7 +590,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   }
 }
 
-
+@SerialVersionUID(100L)
 object GradCollide {
   trait Opts extends Grad.Opts {
     var doSwaps = true;

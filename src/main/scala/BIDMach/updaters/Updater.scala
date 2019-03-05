@@ -27,7 +27,7 @@ abstract class Updater(val opts:Updater.Opts = new Updater.Options) extends Seri
   def preupdate(ipass:Int, step:Long, gprogress:Float):Unit = {}
 }
 
-
+@SerialVersionUID(100L)
 object Updater {
   trait Opts extends BIDMat.Opts {  
   }

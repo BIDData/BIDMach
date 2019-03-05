@@ -50,6 +50,7 @@ import BIDMach._
  * }}}
  */
 
+@SerialVersionUID(100L)
 class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
   val linkArray = GLM.linkArray
@@ -226,7 +227,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
   
 }
 
-
+@SerialVersionUID(100L)
 object GLM {
   trait Opts extends RegressionModel.Opts {
     var links:IMat = null;

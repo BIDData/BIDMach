@@ -21,7 +21,7 @@ import java.util.HashMap
 import BIDMach.networks._
 import java.util.Arrays
 
-
+@SerialVersionUID(100L)
 class ElasticLayer(override val net:Net, override val opts:ElasticNodeOpts = new ElasticNode ) extends Layer(net, opts) {
 
   var reducedmats:Array[Mat] = null;
@@ -102,6 +102,7 @@ trait ElasticNodeOpts extends ModelNodeOpts {
 
 }
 
+@SerialVersionUID(100L)
 class ElasticNode extends Node with ElasticNodeOpts {
 
   def copyTo(opts:ElasticNode):ElasticNode = {
@@ -125,6 +126,7 @@ class ElasticNode extends Node with ElasticNodeOpts {
 
 }
 
+@SerialVersionUID(100L)
 object ElasticLayer {
   
   def apply(net:Net) = new ElasticLayer(net, new ElasticNode);

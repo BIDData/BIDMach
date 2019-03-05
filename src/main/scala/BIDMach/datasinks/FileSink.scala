@@ -5,6 +5,7 @@ import BIDMat.SciFunctions._
 import BIDMach.datasources._
 import scala.collection.mutable.ListBuffer
 
+@SerialVersionUID(100L)
 class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends MatSink(opts) { 
   var ifile = 0;
   var colsdone = 0;
@@ -47,6 +48,7 @@ class FileSink(override val opts:FileSink.Opts = new FileSink.Options) extends M
   }
 }
 
+@SerialVersionUID(100L)
 object FileSink {
   trait Opts extends MatSink.Opts {
   	var ofnames:List[(Int)=>String] = null;

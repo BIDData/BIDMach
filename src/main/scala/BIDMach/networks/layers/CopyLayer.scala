@@ -15,7 +15,7 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 
-
+@SerialVersionUID(100L)
 class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyNode) extends Layer(net, opts) {
 
   override def forward = {
@@ -52,6 +52,7 @@ class CopyLayer(override val net:Net, override val opts:CopyNodeOpts = new CopyN
 trait CopyNodeOpts extends NodeOpts {
 }
 
+@SerialVersionUID(100L)
 class CopyNode extends Node with CopyNodeOpts {
 
     override def clone:CopyNode = {copyTo(new CopyNode).asInstanceOf[CopyNode];};
@@ -63,6 +64,7 @@ class CopyNode extends Node with CopyNodeOpts {
     }
 }
 
+@SerialVersionUID(100L)
 object CopyLayer {
 
   def apply(net:Net) = new CopyLayer(net, new CopyNode);

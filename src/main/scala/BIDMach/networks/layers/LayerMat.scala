@@ -6,6 +6,7 @@ import BIDMat.IMat
 import BIDMat.DenseMat
 import scala.collection.mutable.HashMap
 
+@SerialVersionUID(100L)
 case class LayerMat(override val nrows:Int, override val ncols:Int, override val _data:Array[Layer]) extends DenseMat[Layer](nrows, ncols, _data) {	
 	
 	override def t:LayerMat = LayerMat(gt(null))
@@ -167,6 +168,7 @@ case class LayerMat(override val nrows:Int, override val ncols:Int, override val
 	}
 }
 
+@SerialVersionUID(100L)
 object LayerMat {
   
     def apply(nr:Int, nc:Int):LayerMat = new LayerMat(nr, nc, new Array[Layer](nr*nc))

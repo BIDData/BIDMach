@@ -46,6 +46,7 @@ import BIDMach._
 *
 */
 
+@SerialVersionUID(100L)
 class LDAgibbsv(override val opts:LDAgibbsv.Opts = new LDAgibbsv.Options) extends FactorModel(opts) {
  
   var mm:Mat = null
@@ -119,6 +120,7 @@ um ~ um + opts.beta
   }
 }
 
+@SerialVersionUID(100L)
 object LDAgibbsv {
   import edu.berkeley.bid.CUMACH
   import jcuda.runtime.JCuda._

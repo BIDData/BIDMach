@@ -17,6 +17,7 @@ import BIDMach.networks._
  * Sum layer. 
  */
 
+@SerialVersionUID(100L)
 class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode) extends Layer(net, opts) {
 	var vmap:Mat = null;
 
@@ -54,6 +55,7 @@ class SumLayer(override val net:Net, override val opts:SumNodeOpts = new SumNode
 trait SumNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class SumNode extends Node with SumNodeOpts {
 
 	override def clone:SumNode = {copyTo(new SumNode).asInstanceOf[SumNode];}
@@ -65,6 +67,7 @@ class SumNode extends Node with SumNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SumLayer {  
   
   def apply(net:Net) = new SumLayer(net, new SumNode);

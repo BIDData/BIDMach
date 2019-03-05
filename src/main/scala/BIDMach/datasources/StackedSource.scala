@@ -4,6 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
 
+@SerialVersionUID(100L)
 class StackedDS(val s1:DataSource, val s2:DataSource, 
     override val opts:DataSource.Opts = new DataSource.Options) extends DataSource(opts) {
 

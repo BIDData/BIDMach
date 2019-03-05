@@ -6,6 +6,7 @@ import BIDMat.SciFunctions._
 import BIDMach.models._
 import edu.berkeley.bid.CUMACH
 
+@SerialVersionUID(100L)
 class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
   
   var firstStep = 0f
@@ -212,6 +213,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
 }
 
 
+@SerialVersionUID(100L)
 object Grad {
   trait Opts extends Updater.Opts {
   	var lrate:FMat = 1f;

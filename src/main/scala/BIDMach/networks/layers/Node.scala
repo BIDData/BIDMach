@@ -261,6 +261,7 @@ trait NodeOpts extends BIDMat.Opts {
   }
 }
 
+@SerialVersionUID(100L)
 class Node extends NodeTerm(null, 0) with NodeOpts {
 	val inputs:Array[NodeTerm] = Array(null);
   var myLayer:Layer = null;
@@ -294,7 +295,7 @@ class Node extends NodeTerm(null, 0) with NodeOpts {
 
 trait OutputNode {}
 
-
+@SerialVersionUID(100L)
 class NodeTerm(val _node:Node, val term:Int) extends Serializable {  
   
   def node = _node;

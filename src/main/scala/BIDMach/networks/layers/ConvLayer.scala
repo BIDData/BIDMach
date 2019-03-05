@@ -21,7 +21,7 @@ import java.util.HashMap
 import BIDMach.networks._
 import java.util.Arrays
 
-
+@SerialVersionUID(100L)
 class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvNode ) extends ModelLayer(net, opts, 2) {
     var filter:FMat = null; 
     var ffilter:Filter = null;
@@ -349,6 +349,7 @@ trait ConvNodeOpts extends ModelNodeOpts {
 
 }
 
+@SerialVersionUID(100L)
 class ConvNode extends ModelNode with ConvNodeOpts {
 
   def copyTo(opts:ConvNode):ConvNode = {
@@ -372,6 +373,7 @@ class ConvNode extends ModelNode with ConvNodeOpts {
 
 }
 
+@SerialVersionUID(100L)
 object ConvLayer {
   
   def apply(net:Net) = new ConvLayer(net, new ConvNode);

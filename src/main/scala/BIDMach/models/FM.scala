@@ -62,6 +62,7 @@ import BIDMach._
  * 
  */
 
+@SerialVersionUID(100L)
 class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opts) {
   
   var mylinks:Mat = null;
@@ -262,6 +263,7 @@ class FM(override val opts:FM.Opts = new FM.Options) extends RegressionModel(opt
 
 }
 
+@SerialVersionUID(100L)
 object FM {
   trait Opts extends GLM.Opts {
     var strictFM = false;

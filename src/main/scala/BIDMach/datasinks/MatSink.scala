@@ -4,7 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import scala.collection.mutable.ListBuffer
 
-
+@SerialVersionUID(100L)
 class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends DataSink(opts) { 
   var blocks = new ListBuffer[Array[Mat]]();
   var mats:Array[Mat] = null;
@@ -53,6 +53,7 @@ class MatSink(override val opts:MatSink.Opts = new MatSink.Options) extends Data
   }
 }
 
+@SerialVersionUID(100L)
 object MatSink {
   trait Opts extends DataSink.Opts {
     var nmats = 1;

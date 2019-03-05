@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Sigmoid layer.  
  */
 
+@SerialVersionUID(100L)
 class SigmoidLayer(override val net:Net, override val opts:SigmoidNodeOpts = new SigmoidNode) extends Layer(net, opts) {
 
   override def forward = {
@@ -49,6 +50,7 @@ class SigmoidLayer(override val net:Net, override val opts:SigmoidNodeOpts = new
 trait SigmoidNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class SigmoidNode extends Node with SigmoidNodeOpts {
 
 	override def clone:SigmoidNode = {copyTo(new SigmoidNode).asInstanceOf[SigmoidNode];}
@@ -60,6 +62,7 @@ class SigmoidNode extends Node with SigmoidNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SigmoidLayer {  
   
   def apply(net:Net) = new SigmoidLayer(net, new SigmoidNode);

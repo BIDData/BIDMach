@@ -21,6 +21,7 @@ import BIDMach._
  *
  */
 
+@SerialVersionUID(100L)
 class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
  
   var Q:Mat = null;                                        // (Left) Singular vectors
@@ -155,6 +156,7 @@ class SVD(opts:SVD.Opts = new SVD.Options) extends Model(opts) {
   }
 }
 
+@SerialVersionUID(100L)
 object SVD  {
   trait Opts extends Model.Opts {
     var miniBatchPasses = 1;

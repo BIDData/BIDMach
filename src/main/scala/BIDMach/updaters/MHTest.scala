@@ -45,6 +45,8 @@ import edu.berkeley.bid.CUMACH
  * a generic parameter `K` for a constant that we multiply to the scores. For
  * instance, K could be our estimate of N/T.
  */
+
+@SerialVersionUID(100L)
 class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater {
 
   var n2ld:DMat = null                 // X_c values for pre-selected \sigma.
@@ -321,7 +323,7 @@ class MHTest(override val opts:MHTest.Opts = new MHTest.Options) extends Updater
   
 }
 
-
+@SerialVersionUID(100L)
 object MHTest {
 
   trait Opts extends Updater.Opts {

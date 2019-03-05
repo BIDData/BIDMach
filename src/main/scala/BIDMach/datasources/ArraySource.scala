@@ -7,6 +7,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContextExecutor
 import java.io._
 
+@SerialVersionUID(100L)
 class ArraySource(override val opts:ArraySource.Opts = new ArraySource.Options) extends IteratorSource(opts) {
   @transient var dataArray:Array[_ <: AnyRef] = null
 
@@ -47,6 +48,7 @@ class ArraySource(override val opts:ArraySource.Opts = new ArraySource.Options) 
   }
 }
 
+@SerialVersionUID(100L)
 object ArraySource {
   def apply(opts:ArraySource.Opts):ArraySource = {
     new ArraySource(opts);
@@ -56,5 +58,6 @@ object ArraySource {
     @transient var dataArray:Array[_ <: AnyRef] = null
   }
 
+  @SerialVersionUID(100L)
   class Options extends Opts {}
 }

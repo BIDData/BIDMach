@@ -43,6 +43,7 @@ import BIDMach._
  * }}}
  */
 
+@SerialVersionUID(100L)
 class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts) {
 
   var mm:Mat = null
@@ -132,6 +133,7 @@ class LDA(override val opts:LDA.Opts = new LDA.Options) extends FactorModel(opts
   }
 }
 
+@SerialVersionUID(100L)
 object LDA  {
   trait Opts extends FactorModel.Opts {
     var LDAeps = 1e-9

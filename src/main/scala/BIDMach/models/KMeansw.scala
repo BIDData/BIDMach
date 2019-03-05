@@ -32,6 +32,7 @@ import BIDMach.models._
  * }}}
  */
 
+@SerialVersionUID(100L)
 class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Model(opts) {
 
   var mm:Mat = null
@@ -120,6 +121,7 @@ class KMeansw(override val opts:KMeansw.Opts = new KMeansw.Options) extends Mode
   }
 }
 
+@SerialVersionUID(100L)
 object KMeansw  {
   trait Opts extends ClusteringModel.Opts {
     var wsize = 1e-4f

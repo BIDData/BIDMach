@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Exponential layer. 
  */
 
+@SerialVersionUID(100L)
 class ExpLayer(override val net:Net, override val opts:ExpNodeOpts = new ExpNode) extends Layer(net, opts) {
 
 	override def forward = {
@@ -49,6 +50,7 @@ class ExpLayer(override val net:Net, override val opts:ExpNodeOpts = new ExpNode
 trait ExpNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class ExpNode extends Node with ExpNodeOpts {
 
 	override def clone:ExpNode = {copyTo(new ExpNode).asInstanceOf[ExpNode];}
@@ -60,6 +62,7 @@ class ExpNode extends Node with ExpNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object ExpLayer {  
   
   def apply(net:Net) = new ExpLayer(net, new ExpNode);

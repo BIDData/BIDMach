@@ -22,6 +22,7 @@ import java.util.Random;
  * Does not pass derivatives
  */
 
+@SerialVersionUID(100L)
 class CropLayer(override val net:Net, override val opts:CropNodeOpts = new CropNode) extends Layer(net, opts) {
   var blockInds:Array[IMat] = null;
   var baseInds:Array[IMat] = null;
@@ -155,6 +156,7 @@ trait CropNodeOpts extends NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class CropNode extends Node with CropNodeOpts {
   def copyTo(opts:CropNode):CropNode = {
     this.asInstanceOf[Node].copyTo(opts);
@@ -171,6 +173,7 @@ class CropNode extends Node with CropNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object CropLayer {  
   
   def apply(net:Net) = new CropLayer(net, new CropNode);

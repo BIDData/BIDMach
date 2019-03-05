@@ -20,6 +20,7 @@ import BIDMach.networks._
  * The matrix multiply is repeated over the other dimensions. 
  */
 
+@SerialVersionUID(100L)
 class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new MatMulNode) extends Layer(net, opts) {  
   
 	override val _inputs = new Array[LayerTerm](2);
@@ -111,6 +112,7 @@ trait MatMulNodeOpts extends NodeOpts {
   var skipDim1 = false
 }
 
+@SerialVersionUID(100L)
 class MatMulNode extends Node with MatMulNodeOpts {
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
   
@@ -130,6 +132,7 @@ class MatMulNode extends Node with MatMulNodeOpts {
   }
 }
   
+@SerialVersionUID(100L)
 object MatMulLayer {  
   
   def apply(net:Net) = new MatMulLayer(net, new MatMulNode);

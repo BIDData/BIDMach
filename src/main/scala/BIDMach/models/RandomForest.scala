@@ -71,7 +71,7 @@ import scala.concurrent.ExecutionContextExecutor
  */
 
 
-
+@SerialVersionUID(100L)
 class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Options) extends Model(opts) {
 
   val ITree = 0; val INode = 1; val JFeat = 2; val IFeat = 3; val IVFeat = 4; val ICat = 5
@@ -1312,12 +1312,14 @@ class SVTree(val n:Int) extends Serializable {
   }
 }
 
+@SerialVersionUID(100L)
 object SVec {
   def apply(n:Int):SVec = {
     new SVec(lzeros(1,n), izeros(1,n))
   }
 }
 
+@SerialVersionUID(100L)
 object RandomForest {
 
   trait imptyType {

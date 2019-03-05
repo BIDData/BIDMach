@@ -12,6 +12,7 @@ import java.io._
  *  We assume the iterator returns pairs from a Sequencefile of (StringWritable, MatIO)
  */
 
+@SerialVersionUID(100L)
 class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.Options) extends DataSource(opts) {
   var sizeMargin = 0f;
   var blockSize = 0;
@@ -166,7 +167,7 @@ class IteratorSource(override val opts:IteratorSource.Opts = new IteratorSource.
   }
 }
 
-
+@SerialVersionUID(100L)
 object IteratorSource {
 
   def apply(opts:IteratorSource.Opts):IteratorSource = {

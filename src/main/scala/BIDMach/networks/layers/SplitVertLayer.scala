@@ -14,6 +14,7 @@ import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
 
+@SerialVersionUID(100L)
 class SplitVertLayer(override val net:Net, override val opts:SplitVertNodeOpts = new SplitVertNode) extends Layer(net, opts) {
   override val _outputs = new Array[Mat](opts.nparts);
   override val _derivs = new Array[Mat](opts.nparts);
@@ -115,6 +116,7 @@ trait SplitVertNodeOpts extends NodeOpts {
   var nparts = 1
 }
 
+@SerialVersionUID(100L)
 class SplitVertNode extends Node with SplitVertNodeOpts {
 
 	override def clone:SplitVertNode = {copyTo(new SplitVertNode).asInstanceOf[SplitVertNode];}
@@ -126,6 +128,7 @@ class SplitVertNode extends Node with SplitVertNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SplitVertLayer {  
   
   def apply(net:Net) = new SplitVertLayer(net, new SplitVertNode);

@@ -14,7 +14,7 @@ import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
 
-
+@SerialVersionUID(100L)
 class MaxIndexLayer(override val net:Net, override val opts:MaxIndexNodeOpts = new MaxIndexNode) extends Layer(net, opts) {
 
   override def forward = {
@@ -36,6 +36,7 @@ class MaxIndexLayer(override val net:Net, override val opts:MaxIndexNodeOpts = n
 trait MaxIndexNodeOpts extends NodeOpts {
 }
 
+@SerialVersionUID(100L)
 class MaxIndexNode extends Node with MaxIndexNodeOpts {
 
   override def clone:MaxIndexNode = {copyTo(new MaxIndexNode).asInstanceOf[MaxIndexNode];}
@@ -47,6 +48,7 @@ class MaxIndexNode extends Node with MaxIndexNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object MaxIndexLayer {
 
   def apply(net:Net) = new MaxIndexLayer(net, new MaxIndexNode);

@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Maxi2 layer. 
  */
 
+@SerialVersionUID(100L)
 class Maxi2Layer(override val net:Net, override val opts:Maxi2NodeOpts = new Maxi2Node) extends Layer(net, opts) {
 
   override val _outputs = new Array[Mat](2);
@@ -54,6 +55,7 @@ class Maxi2Layer(override val net:Net, override val opts:Maxi2NodeOpts = new Max
 trait Maxi2NodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class Maxi2Node extends Node with Maxi2NodeOpts {
 
 	override def clone:Maxi2Node = {copyTo(new Maxi2Node).asInstanceOf[Maxi2Node];}
@@ -65,6 +67,7 @@ class Maxi2Node extends Node with Maxi2NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object Maxi2Layer {  
   
   def apply(net:Net) = new Maxi2Layer(net, new Maxi2Node);

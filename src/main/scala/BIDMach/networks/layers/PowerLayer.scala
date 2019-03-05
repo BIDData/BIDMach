@@ -17,6 +17,7 @@ import BIDMach.networks._
  * Power layer. 
  */
 
+@SerialVersionUID(100L)
 class PowerLayer(override val net:Net, override val opts:PowerNodeOpts = new PowerNode) extends Layer(net, opts) {
 
   override val _inputs = new Array[LayerTerm](2);
@@ -59,6 +60,7 @@ class PowerLayer(override val net:Net, override val opts:PowerNodeOpts = new Pow
 trait PowerNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class PowerNode extends Node with PowerNodeOpts {
 	override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
 
@@ -71,6 +73,7 @@ class PowerNode extends Node with PowerNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object PowerLayer {  
   
   def apply(net:Net) = new PowerLayer(net, new PowerNode);

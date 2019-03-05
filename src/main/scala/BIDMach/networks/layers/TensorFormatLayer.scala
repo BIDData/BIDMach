@@ -20,6 +20,7 @@ import BIDMach.networks._
  * Assumes the input type is known. If conversion is set to "auto" will convert from the input type to the net type. 
  */
 
+@SerialVersionUID(100L)
 class TensorFormatLayer(override val net:Net, override val opts:TensorFormatNodeOpts = new TensorFormatNode) extends Layer(net, opts) {
 
 	override def forward = {
@@ -79,6 +80,7 @@ trait TensorFormatNodeOpts extends NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class TensorFormatNode extends Node with TensorFormatNodeOpts {
   def copyTo(opts:TensorFormatNode):TensorFormatNode = {
     this.asInstanceOf[Node].copyTo(opts);
@@ -95,6 +97,7 @@ class TensorFormatNode extends Node with TensorFormatNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object TensorFormatLayer {  
   final val AUTO = 0;
   final val NHWCtoNCHW = 1;

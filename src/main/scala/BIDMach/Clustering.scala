@@ -3,7 +3,7 @@ import BIDMat.{Mat,SBMat,CMat,DMat,FMat,GFunctions,IMat,HMat,GMat,GIMat,GSMat,SM
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 
-
+@SerialVersionUID(100L)
 class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) { 
   var a:FMat = null
   var nfeats = 0
@@ -201,6 +201,7 @@ class PAMmodel(val opts:PAMmodel.Options = new PAMmodel.Options) {
   
 }
 
+@SerialVersionUID(100L)
 object PAMmodel { 
   class Options { 
     var ncenters = 1000

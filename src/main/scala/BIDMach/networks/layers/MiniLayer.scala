@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Mini layer. 
  */
 
+@SerialVersionUID(100L)
 class MiniLayer(override val net:Net, override val opts:MiniNodeOpts = new MiniNode) extends Layer(net, opts) {
 
 	override def forward = {
@@ -50,6 +51,7 @@ class MiniLayer(override val net:Net, override val opts:MiniNodeOpts = new MiniN
 trait MiniNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class MiniNode extends Node with MiniNodeOpts {
 
 	override def clone:MiniNode = {copyTo(new MiniNode).asInstanceOf[MiniNode];}
@@ -61,6 +63,7 @@ class MiniNode extends Node with MiniNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object MiniLayer {  
   
   def apply(net:Net) = new MiniLayer(net, new MiniNode);

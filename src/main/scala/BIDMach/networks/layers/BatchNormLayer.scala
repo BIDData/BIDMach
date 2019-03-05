@@ -10,7 +10,7 @@ import BIDMat.SciFunctions._
 import BIDMach.models._
 import BIDMach.networks._
 
-
+@SerialVersionUID(100L)
 class BatchNormLayer(override val net:Net, override val opts:BatchNormNodeOpts = new BatchNormNode) extends Layer(net, opts) {
    
   var means:Mat = null
@@ -97,6 +97,7 @@ trait BatchNormNodeOpts extends ModelNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class BatchNormNode extends ModelNode with BatchNormNodeOpts {
   
   def copyTo(opts:BatchNormNode):BatchNormNode = {
@@ -113,6 +114,7 @@ class BatchNormNode extends ModelNode with BatchNormNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object BatchNormLayer {
   final val SPATIAL = 1;
   final val PER_ACTIVATION = 2;

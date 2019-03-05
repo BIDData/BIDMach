@@ -20,6 +20,7 @@ import BIDMach.networks._
  *  
  */
 
+@SerialVersionUID(100L)
 class EfnLayer(override val net:Net, override val opts:EfnNodeOpts = new EfnNode) extends Layer(net, opts) {
   var finput:FMat = null;
   var foutput:FMat = null;
@@ -87,6 +88,7 @@ trait EfnNodeOpts extends NodeOpts {
   var bwdfn:(Float,Float,Float)=> Float = null;
 }
 
+@SerialVersionUID(100L)
 class EfnNode extends Node with EfnNodeOpts {
   	def copyTo(opts:EfnNode):EfnNode = {
 			super.copyTo(opts);
@@ -104,6 +106,7 @@ class EfnNode extends Node with EfnNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object EfnLayer {  
   
   def apply(net:Net) = new EfnLayer(net, new EfnNode);

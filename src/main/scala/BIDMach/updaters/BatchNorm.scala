@@ -5,7 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
-
+@SerialVersionUID(100L)
 class BatchNorm(override val opts:BatchNorm.Opts = new BatchNorm.Options) extends Updater {
   var accumulators:Array[Mat] = null
   
@@ -40,6 +40,7 @@ class BatchNorm(override val opts:BatchNorm.Opts = new BatchNorm.Options) extend
   }
 }
 
+@SerialVersionUID(100L)
 object BatchNorm {
   trait Opts extends Updater.Opts {
   }

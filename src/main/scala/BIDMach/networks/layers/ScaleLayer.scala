@@ -22,6 +22,7 @@ import BIDMach.networks._
  * Includes a model matrix that contains the linear map. 
  */
 
+@SerialVersionUID(100L)
 class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new ScaleNode) extends ModelLayer(net, opts, 2) {
   
 	var scaleMat:Mat = null;
@@ -111,6 +112,7 @@ trait ScaleNodeOpts extends ModelNodeOpts {
   }
 }
     
+@SerialVersionUID(100L)
 class ScaleNode extends ModelNode with ScaleNodeOpts {
   def copyTo(opts:ScaleNode):ScaleNode = {
     this.asInstanceOf[Node].copyTo(opts);
@@ -131,6 +133,7 @@ class ScaleNode extends ModelNode with ScaleNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object ScaleLayer {  
 
   def apply(net:Net) = new ScaleLayer(net, new ScaleNode);
