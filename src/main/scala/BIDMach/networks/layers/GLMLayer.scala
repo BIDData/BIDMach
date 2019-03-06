@@ -21,6 +21,7 @@ import BIDMach.networks._
  * Commonly used as an output layer so includes a score method.
  */
 
+@SerialVersionUID(100L)
 class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode) extends Layer(net, opts) with OutputLayer {
 	var ilinks:Mat = null;
 	var totflops = 0L;
@@ -69,6 +70,7 @@ trait GLMNodeOpts extends NodeOpts {
 	var links:IMat = null;
 }
  
+@SerialVersionUID(100L)
 class GLMNode extends Node with OutputNode with GLMNodeOpts {  
 	def copyTo(opts:GLMNode) = {
 		super.copyTo(opts);
@@ -85,6 +87,7 @@ class GLMNode extends Node with OutputNode with GLMNodeOpts {
   }
 }
   
+@SerialVersionUID(100L)
 object GLMLayer {
   
   def apply(net:Net) = new GLMLayer(net, new GLMNode);

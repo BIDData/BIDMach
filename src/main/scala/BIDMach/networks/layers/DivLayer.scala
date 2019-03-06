@@ -18,6 +18,7 @@ import BIDMach.networks._
  * Computes the quotien of its input layers. 
  */
 
+@SerialVersionUID(100L)
 class DivLayer(override val net:Net, override val opts:DivNodeOpts = new DivNode) extends Layer(net, opts) {  
   
 	override val _inputs = new Array[LayerTerm](2);
@@ -50,6 +51,7 @@ class DivLayer(override val net:Net, override val opts:DivNodeOpts = new DivNode
 trait DivNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class DivNode extends Node with DivNodeOpts {
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
   
@@ -67,6 +69,7 @@ class DivNode extends Node with DivNodeOpts {
   }
 }
   
+@SerialVersionUID(100L)
 object DivLayer {  
   
   def apply(net:Net) = new DivLayer(net, new DivNode);

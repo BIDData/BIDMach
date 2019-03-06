@@ -47,6 +47,8 @@ import java.lang.Math;
  * For additional references, see Aapo Hyvärinen's other papers, and visit:
  *   http://research.ics.aalto.fi/ica/fastica/
  */
+
+@SerialVersionUID(100L)
 class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts) {
   
   // Some temp variables. The most important one is mm, which is our W = A^{-1}.
@@ -257,7 +259,7 @@ class ICA(override val opts:ICA.Opts = new ICA.Options) extends FactorModel(opts
   }
 }
 
-
+@SerialVersionUID(100L)
 object ICA {
 
   trait Opts extends FactorModel.Opts {

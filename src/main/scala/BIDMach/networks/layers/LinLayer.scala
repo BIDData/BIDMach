@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Includes a model matrix that contains the linear map.
  */
 
+@SerialVersionUID(100L)
 class LinLayer(override val net:Net, override val opts:LinNodeOpts = new LinNode) extends ModelLayer(net, opts, 2) {
   var vexp:Mat = null;
   var texp:Mat = null;
@@ -186,6 +187,7 @@ trait LinNodeOpts extends ModelNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class LinNode extends ModelNode with LinNodeOpts {
   def copyTo(opts:LinNode):LinNode = {
     this.asInstanceOf[Node].copyTo(opts);
@@ -206,6 +208,7 @@ class LinNode extends ModelNode with LinNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object LinLayer {
 
   def apply(net:Net) = new LinLayer(net, new LinNode);

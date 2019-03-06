@@ -14,6 +14,7 @@ import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
 
+@SerialVersionUID(100L)
 class StackLayer(override val net:Net, override val opts:StackNodeOpts = new StackNode) extends Layer(net, opts) {
   override val _inputs = new Array[LayerTerm](opts.ninputs);
 
@@ -124,6 +125,7 @@ trait StackNodeOpts extends NodeOpts {
   var ninputs = 2;
 }
 
+@SerialVersionUID(100L)
 class StackNode extends Node with StackNodeOpts {
 	override val inputs = new Array[NodeTerm](ninputs);
 
@@ -136,6 +138,7 @@ class StackNode extends Node with StackNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object StackLayer {  
   
   def apply(net:Net) = new StackLayer(net, new StackNode);

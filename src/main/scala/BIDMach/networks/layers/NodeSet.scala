@@ -1,5 +1,6 @@
 package BIDMach.networks.layers
 
+@SerialVersionUID(100L)
 class NodeSet(val nnodes:Int, val nodes:Array[Node]) extends Serializable {
   
   def this(nnodes:Int) = this(nnodes, new Array[Node](nnodes));

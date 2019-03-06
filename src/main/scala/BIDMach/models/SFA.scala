@@ -45,6 +45,7 @@ import BIDMach.Learner
  * }}}
  */
 
+@SerialVersionUID(100L)
 class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts) {
 
   var mm:Mat = null;
@@ -247,6 +248,7 @@ class SFA(override val opts:SFA.Opts = new SFA.Options) extends FactorModel(opts
   }
 }
 
+@SerialVersionUID(100L)
 object SFA  {
   trait Opts extends FactorModel.Opts {
   	var ueps = 1e-10f

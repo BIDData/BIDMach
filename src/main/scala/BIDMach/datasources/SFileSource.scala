@@ -16,6 +16,7 @@ import java.io._
  * fcounts is an IMat specifying the numbers of rows to use for each input block. 
  */
 
+@SerialVersionUID(100L)
 class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) extends FileSource(opts) {
   
   var inptrs:IMat = null
@@ -188,6 +189,7 @@ class SFileSource(override val opts:SFileSource.Opts = new SFileSource.Options) 
 
 }
 
+@SerialVersionUID(100L)
 object SFileSource {
   trait Opts extends FileSource.Opts {
   	var fcounts:IMat = null

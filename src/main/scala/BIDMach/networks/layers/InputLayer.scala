@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Input layer is currently just a placeholder.
  */
 
+@SerialVersionUID(100L)
 class InputLayer(override val net:Net, override val opts:InputNodeOpts = new InputNode) extends Layer(net, opts) {
     override def toString = {
     "input@"+Integer.toHexString(hashCode % 0x10000).toString
@@ -27,6 +28,7 @@ class InputLayer(override val net:Net, override val opts:InputNodeOpts = new Inp
 
 trait InputNodeOpts extends NodeOpts {}
 
+@SerialVersionUID(100L)
 class InputNode extends Node with InputNodeOpts {
   def copyTo(opts:InputNode):InputNode = {
     super.copyTo(opts);
@@ -45,7 +47,7 @@ class InputNode extends Node with InputNodeOpts {
 }
 
 
-  
+@SerialVersionUID(100L)
 object InputLayer {
   
   def apply(net:Net) = new InputLayer(net, new InputNode);

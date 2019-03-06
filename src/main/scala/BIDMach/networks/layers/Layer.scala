@@ -530,6 +530,7 @@ class Layer(val net:Net, val opts:NodeOpts = new Node) extends LayerTerm(null, 0
   }
 }
 
+@SerialVersionUID(100L)
 class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
   def layer = _layer;
   
@@ -562,6 +563,7 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
   def apply(a:LayerTerm) = {val n=this; new SelectLayer(null){inputs(0)=n; inputs(1)=a;}};
 }
 
+@SerialVersionUID(100L)
 object Layer {
   
   def abs(a:LayerTerm) = new AbsLayer(null){inputs(0) = a;};

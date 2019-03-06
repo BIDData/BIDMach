@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Softplus layer.  
  */
 
+@SerialVersionUID(100L)
 class SoftplusLayer(override val net:Net, override val opts:SoftplusNodeOpts = new SoftplusNode) extends Layer(net, opts) {
   var totflops = 0L;
 
@@ -49,6 +50,7 @@ class SoftplusLayer(override val net:Net, override val opts:SoftplusNodeOpts = n
 trait SoftplusNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class SoftplusNode extends Node with SoftplusNodeOpts {
 
 	override def clone:SoftplusNode = {copyTo(new SoftplusNode).asInstanceOf[SoftplusNode];}
@@ -60,6 +62,7 @@ class SoftplusNode extends Node with SoftplusNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SoftplusLayer {  
   
   def apply(net:Net) = new SoftplusLayer(net, new SoftplusNode);

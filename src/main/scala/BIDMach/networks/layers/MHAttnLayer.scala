@@ -16,6 +16,7 @@ import scala.collection.mutable.HashMap;
  * 
  */
 
+@SerialVersionUID(100L)
 class MultiHeadAttnLayer(override val net:Net, override val opts:MultiHeadAttnNode = new MultiHeadAttnNode) extends CompoundLayer(net, opts) {
 	override val _inputs = new Array[LayerTerm](3);
 	override val _outputs = new Array[Mat](2);
@@ -48,6 +49,7 @@ trait MultiHeadAttnNodeOpts extends CompoundNodeOpts {
     }
 }
 
+@SerialVersionUID(100L)
 class MultiHeadAttnNode extends CompoundNode with MultiHeadAttnNodeOpts {	
   
 	  override val inputs:Array[NodeTerm] = Array(null, null, null);
@@ -161,6 +163,7 @@ object MultiHeadAttnNode {
   }
 }
 
+@SerialVersionUID(100L)
 object MultiHeadAttnLayer {    
   
   def apply(net:Net) = new MultiHeadAttnLayer(net, new MultiHeadAttnNode);

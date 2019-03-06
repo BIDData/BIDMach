@@ -18,6 +18,7 @@ import BIDMach.networks._
  * Computes the max of its input layers. 
  */
 
+@SerialVersionUID(100L)
 class MaxLayer(override val net:Net, override val opts:MaxNodeOpts = new MaxNode) extends Layer(net, opts) {  
   
 	override val _inputs = new Array[LayerTerm](opts.ninputs);
@@ -57,6 +58,7 @@ trait MaxNodeOpts extends NodeOpts {
 	var ninputs = 2;
 }
 
+@SerialVersionUID(100L)
 class MaxNode extends Node with MaxNodeOpts {
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
@@ -74,6 +76,7 @@ class MaxNode extends Node with MaxNodeOpts {
   }
 }
   
+@SerialVersionUID(100L)
 object MaxLayer {  
   
   def apply(net:Net) = new MaxLayer(net, new MaxNode);

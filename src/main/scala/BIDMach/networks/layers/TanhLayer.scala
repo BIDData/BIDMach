@@ -18,6 +18,7 @@ import BIDMach.networks._
  * Tanh layer. 
  */
 
+@SerialVersionUID(100L)
 class TanhLayer(override val net:Net, override val opts:TanhNodeOpts = new TanhNode) extends Layer(net, opts) {    
 
 	override def forward = {
@@ -47,6 +48,7 @@ class TanhLayer(override val net:Net, override val opts:TanhNodeOpts = new TanhN
 trait TanhNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class TanhNode extends Node with TanhNodeOpts {
 
 	override def clone:TanhNode = {copyTo(new TanhNode).asInstanceOf[TanhNode];}
@@ -58,6 +60,7 @@ class TanhNode extends Node with TanhNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object TanhLayer {  
   
   def apply(net:Net) = new TanhLayer(net, new TanhNode);

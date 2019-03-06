@@ -51,6 +51,7 @@ import scala.concurrent.duration.Duration
  - iSlice(0) which model slice are we processing on this node?
  */
 
+@SerialVersionUID(100L)
 class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends Model(opts) {
   
   var firstPos = -1L;
@@ -568,6 +569,7 @@ class Word2Vec(override val opts:Word2Vec.Opts = new Word2Vec.Options) extends M
 
 }
 
+@SerialVersionUID(100L)
 object Word2Vec  {
   trait Opts extends Model.Opts {
     var aopts:ADAGrad.Opts = null;
@@ -1213,6 +1215,8 @@ object Word2Vec  {
     Array(new L1Regularizer(nopts.asInstanceOf[L1Regularizer.Opts]))
   }
     
+
+@SerialVersionUID(100L)
   class LearnOptions extends Learner.Options with Word2Vec.Opts with MatSource.Opts with ADAGrad.Opts with L1Regularizer.Opts;
   
   def learner(mat0:Mat, targ:Mat) = {
@@ -1228,6 +1232,7 @@ object Word2Vec  {
     (nn, opts)
   }
   
+@SerialVersionUID(100L)
   class FDSopts extends Learner.Options with Word2Vec.Opts with FileSource.Opts with ADAGrad.Opts with L1Regularizer.Opts
   
   def learner(fn1:String):(Learner, FDSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)));
@@ -1301,6 +1306,7 @@ object Word2Vec  {
     (nn, opts)
   }
   
+@SerialVersionUID(100L)
   class LearnParOptions extends ParLearner.Options with Word2Vec.Opts with FileSource.Opts with ADAGrad.Opts;
   
   def learnPar(fn1:String):(ParLearnerF, LearnParOptions) = {learnPar(List(FileSource.simpleEnum(fn1,1,0)))}

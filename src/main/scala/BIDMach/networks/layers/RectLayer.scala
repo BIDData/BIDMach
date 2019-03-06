@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Rectifying Linear Unit layer.
  */
 
+@SerialVersionUID(100L)
 class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectNode) extends Layer(net, opts) {
 
   override def forward = {
@@ -54,6 +55,7 @@ class RectLayer(override val net:Net, override val opts:RectNodeOpts = new RectN
 trait RectNodeOpts extends NodeOpts {
 }
     
+@SerialVersionUID(100L)
 class RectNode extends Node with RectNodeOpts {
   def copyTo(opts:RectNode):RectNode = {
     super.copyTo(opts);
@@ -73,6 +75,7 @@ class RectNode extends Node with RectNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object RectLayer {  
   
   def apply(net:Net) = new RectLayer(net, new RectNode);

@@ -23,7 +23,7 @@ abstract class DataSource(val opts:DataSource.Opts = new DataSource.Options) ext
   var fullmats:Array[Mat] = null
 }
 
-
+@SerialVersionUID(100L)
 object DataSource {
   trait Opts extends BIDMat.Opts {
     var batchSize = 10000

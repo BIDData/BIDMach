@@ -18,7 +18,7 @@ import BIDMach.networks._
  * Variable layer. 
  */
 
-
+@SerialVersionUID(100L)
 class VariableLayer(override val net:Net, override val opts:VariableNodeOpts = new VariableNode) extends ModelLayer(net, opts, 2) {
   
   def initModelMat(dims:IMat):Mat = {
@@ -71,6 +71,7 @@ trait VariableNodeOpts extends ModelNodeOpts {
   }
 }
     
+@SerialVersionUID(100L)
 class VariableNode extends ModelNode with VariableNodeOpts {
   
   def copyTo(opts:VariableNode):VariableNode = {
@@ -92,7 +93,7 @@ class VariableNode extends ModelNode with VariableNodeOpts {
   }
 }
 
-
+@SerialVersionUID(100L)
 object VariableLayer {
 
   def apply(net:Net) = new VariableLayer(net, new VariableNode);

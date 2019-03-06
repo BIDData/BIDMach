@@ -15,7 +15,7 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 
-
+@SerialVersionUID(100L)
 class Fn2Layer(override val net:Net, override val opts:Fn2NodeOpts = new Fn2Node) extends Layer(net, opts) {
 
 	override val _inputs = new Array[LayerTerm](2);
@@ -57,6 +57,7 @@ trait Fn2NodeOpts extends NodeOpts {
   var bwdfn2:(Mat,Mat,Mat,Mat)=> Mat = null;
 }
 
+@SerialVersionUID(100L)
 class Fn2Node extends Node with Fn2NodeOpts {
   	def copyTo(opts:Fn2Node):Fn2Node = {
 			super.copyTo(opts);
@@ -75,6 +76,7 @@ class Fn2Node extends Node with Fn2NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object Fn2Layer {  
   
   def apply(net:Net) = new Fn2Layer(net, new Fn2Node);

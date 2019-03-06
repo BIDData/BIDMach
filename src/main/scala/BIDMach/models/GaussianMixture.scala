@@ -18,6 +18,8 @@ import BIDMach._
  * 
  * Written by Daniel Seita (May 2016).
  */
+
+@SerialVersionUID(100L)
 class GaussianMixture(override val opts:GaussianMixture.Opts = new GaussianMixture.Options) extends Model(opts) {
 
     var theta:Mat = null // References modelmats(0), i.e., the 2-D \theta vector we are interested in.
@@ -65,7 +67,7 @@ class GaussianMixture(override val opts:GaussianMixture.Opts = new GaussianMixtu
     }
 }
 
-
+@SerialVersionUID(100L)
 object GaussianMixture {
     trait Opts extends Model.Opts {}
         

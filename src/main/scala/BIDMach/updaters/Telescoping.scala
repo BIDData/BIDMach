@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
+@SerialVersionUID(100L)
 class Telescoping(override val opts:Telescoping.Opts = new Telescoping.Options) extends Updater {
 	var accumulators:Array[Mat] = null
   var firstStep = 0L
@@ -48,6 +49,7 @@ class Telescoping(override val opts:Telescoping.Opts = new Telescoping.Options) 
   }
 }
 
+@SerialVersionUID(100L)
 object Telescoping {
   trait Opts extends Updater.Opts {
     val factor = 1.5f

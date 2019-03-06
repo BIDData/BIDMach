@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
+@SerialVersionUID(100L)
 class CG(override val opts:CG.Opts = new CG.Options) extends Updater(opts) {
 	var res:Mat = null
 	var Ap:Mat = null
@@ -54,6 +55,7 @@ trait CGUpdateable {
   def setpm(pm:Mat)
 }
 
+@SerialVersionUID(100L)
 object CG {
   trait Opts extends Updater.Opts {
   	var meps = 1e-12f

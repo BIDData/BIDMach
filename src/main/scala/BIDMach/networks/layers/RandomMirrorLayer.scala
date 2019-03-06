@@ -20,6 +20,7 @@ import BIDMach.networks._
  * Does not pass derivatives.
  */
 
+@SerialVersionUID(100L)
 class RandomMirrorLayer(override val net:Net, override val opts:RandomMirrorNodeOpts = new RandomMirrorNode) extends Layer(net, opts) {
   var mirrorInds:IMat = null;
   var randomSelector:Mat = null;
@@ -80,6 +81,7 @@ trait RandomMirrorNodeOpts extends NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class RandomMirrorNode extends Node with RandomMirrorNodeOpts {
   def copyTo(opts:RandomMirrorNode):RandomMirrorNode = {
     this.asInstanceOf[Node].copyTo(opts);
@@ -96,6 +98,7 @@ class RandomMirrorNode extends Node with RandomMirrorNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object RandomMirrorLayer {  
   
   def apply(net:Net) = new RandomMirrorLayer(net, new RandomMirrorNode);

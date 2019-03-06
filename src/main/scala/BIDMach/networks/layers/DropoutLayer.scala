@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Assumes that "randmat" is not changed between forward and backward passes. 
  */
 
+@SerialVersionUID(100L)
 class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new DropoutNode) extends Layer(net, opts) {  
 	var randmat:Mat = null;
 
@@ -69,7 +70,7 @@ trait DropoutNodeOpts extends NodeOpts {
     var frac = 1f;
 }
     
-    
+@SerialVersionUID(100L)    
 class DropoutNode extends Node with DropoutNodeOpts { 
 	def copyTo(opts:DropoutNode):DropoutNode = {
 			super.copyTo(opts);
@@ -86,6 +87,7 @@ class DropoutNode extends Node with DropoutNodeOpts {
 	}
 }
   
+@SerialVersionUID(100L)
 object DropoutLayer { 
   
   def apply(net:Net) = new DropoutLayer(net, new DropoutNode);

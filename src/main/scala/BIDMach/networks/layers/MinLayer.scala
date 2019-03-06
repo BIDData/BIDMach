@@ -18,6 +18,7 @@ import BIDMach.networks._
  * Computes the min of its input layers. 
  */
 
+@SerialVersionUID(100L)
 class MinLayer(override val net:Net, override val opts:MinNodeOpts = new MinNode) extends Layer(net, opts) {  
   
 	override val _inputs = new Array[LayerTerm](opts.ninputs);
@@ -59,6 +60,7 @@ trait MinNodeOpts extends NodeOpts {
   var ninputs = 2;
 }
 
+@SerialVersionUID(100L)
 class MinNode extends Node with MinNodeOpts {
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
@@ -76,6 +78,7 @@ class MinNode extends Node with MinNodeOpts {
   }
 }
   
+@SerialVersionUID(100L)
 object MinLayer {  
   
   def apply(net:Net) = new MinLayer(net, new MinNode);

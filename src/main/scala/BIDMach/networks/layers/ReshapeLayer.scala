@@ -15,7 +15,7 @@ import java.util.HashMap;
 import BIDMach.networks._
 
 
-
+@SerialVersionUID(100L)
 class ReshapeLayer(override val net:Net, override val opts:ReshapeNodeOpts = new ReshapeNode) extends Layer(net, opts) {
 
   override def forward = {
@@ -71,6 +71,7 @@ trait ReshapeNodeOpts extends NodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 class ReshapeNode extends Node with ReshapeNodeOpts {
   
 	def copyTo(opts:ReshapeNode):ReshapeNode = {
@@ -88,6 +89,7 @@ class ReshapeNode extends Node with ReshapeNodeOpts {
 	}
 }
 
+@SerialVersionUID(100L)
 object ReshapeLayer {
 
   def apply(net:Net) = new ReshapeLayer(net, new ReshapeNode);

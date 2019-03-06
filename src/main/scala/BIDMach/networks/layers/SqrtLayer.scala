@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Sqrt layer. 
  */
 
+@SerialVersionUID(100L)
 class SqrtLayer(override val net:Net, override val opts:SqrtNodeOpts = new SqrtNode) extends Layer(net, opts) {
   
   var half:Mat = null;
@@ -52,6 +53,7 @@ class SqrtLayer(override val net:Net, override val opts:SqrtNodeOpts = new SqrtN
 trait SqrtNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class SqrtNode extends Node with SqrtNodeOpts {
 
 	override def clone:SqrtNode = {copyTo(new SqrtNode).asInstanceOf[SqrtNode];}
@@ -63,6 +65,7 @@ class SqrtNode extends Node with SqrtNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object SqrtLayer {  
   
   def apply(net:Net) = new SqrtLayer(net, new SqrtNode);

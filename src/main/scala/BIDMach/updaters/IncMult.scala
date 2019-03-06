@@ -5,6 +5,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import BIDMach.models._
 
+@SerialVersionUID(100L)
 class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Updater {
   
   var firstStep = 0f
@@ -44,7 +45,7 @@ class IncMult(override val opts:IncMult.Opts = new IncMult.Options) extends Upda
   }
 }
 
-
+@SerialVersionUID(100L)
 object IncMult {
   trait Opts extends Updater.Opts {
     var warmup = 0L 

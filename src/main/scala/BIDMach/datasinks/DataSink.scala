@@ -18,7 +18,7 @@ abstract class DataSink(val opts:DataSink.Opts = new DataSink.Options) extends S
   var omats:Array[Mat] = null
 }
 
-
+@SerialVersionUID(100L)
 object DataSink {
   trait Opts extends BIDMat.Opts {
   } 

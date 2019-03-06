@@ -18,7 +18,7 @@ import BIDMach.networks._
 /**
  * Absolute Value layer. 
  */
-
+@SerialVersionUID(100L)
 class AbsLayer(override val net:Net, override val opts:AbsNodeOpts = new AbsNode) extends Layer(net, opts) {
 
 	override def forward = {
@@ -49,6 +49,7 @@ class AbsLayer(override val net:Net, override val opts:AbsNodeOpts = new AbsNode
 trait AbsNodeOpts extends NodeOpts {  
 }
 
+@SerialVersionUID(100L)
 class AbsNode extends Node with AbsNodeOpts {
 
 	override def clone:AbsNode = {copyTo(new AbsNode).asInstanceOf[AbsNode];}
@@ -60,6 +61,7 @@ class AbsNode extends Node with AbsNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object AbsLayer {  
   
   def apply(net:Net) = new AbsLayer(net, new AbsNode);

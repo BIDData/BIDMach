@@ -4,6 +4,7 @@ import BIDMat.IMat
 import BIDMat.DenseMat
 import scala.collection.mutable.HashMap;
 
+@SerialVersionUID(100L)
 case class NodeMat(override val nrows:Int, override val ncols:Int, override val _data:Array[Node]) extends DenseMat[Node](nrows, ncols, _data) {	
   
   var nodeMap:HashMap[Node,Int] = null;
@@ -135,6 +136,7 @@ case class NodeMat(override val nrows:Int, override val ncols:Int, override val 
 	def on (b: Node) = vertcat(NodeMat.elem(b))
 }
 
+@SerialVersionUID(100L)
 object NodeMat {
   
     def apply(nr:Int, nc:Int):NodeMat = new NodeMat(nr, nc, new Array[Node](nr*nc))

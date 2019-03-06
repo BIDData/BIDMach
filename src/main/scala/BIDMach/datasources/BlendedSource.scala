@@ -4,6 +4,7 @@ import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
 import java.io._
 
+@SerialVersionUID(100L)
 class BlendedSource(val s1:DataSource, val s2:DataSource, 
     override val opts:BlendedSource.Opts = new BlendedSource.Options) extends DataSource(opts) {
 
@@ -124,7 +125,7 @@ class BlendedSource(val s1:DataSource, val s2:DataSource,
   }
 }
 
-
+@SerialVersionUID(100L)
 object BlendedSource {
   trait Opts extends DataSource.Opts {
   	var bBlock = 1000

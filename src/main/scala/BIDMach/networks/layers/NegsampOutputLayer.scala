@@ -14,7 +14,7 @@ import scala.util.hashing.MurmurHash3;
 import java.util.HashMap;
 import BIDMach.networks._
 
-
+@SerialVersionUID(100L)
 class NegsampOutputLayer(override val net:Net, override val opts:NegsampOutputNodeOpts = new NegsampOutputNode) extends ModelLayer(net, opts) with OutputLayer { 
   var vexp:Mat = null;
   var texp:Mat = null;
@@ -187,6 +187,7 @@ trait NegsampOutputNodeOpts extends ModelNodeOpts with OutputNode {
 	}
 }
 
+@SerialVersionUID(100L)
 class NegsampOutputNode extends ModelNode with NegsampOutputNodeOpts {
   
   def copyTo(opts:NegsampOutputNode):NegsampOutputNode = {
@@ -204,6 +205,7 @@ class NegsampOutputNode extends ModelNode with NegsampOutputNodeOpts {
   }
 }
   
+@SerialVersionUID(100L)
 object NegsampOutputLayer {
   
   def apply(net:Net) = new NegsampOutputLayer(net, new NegsampOutputNode);

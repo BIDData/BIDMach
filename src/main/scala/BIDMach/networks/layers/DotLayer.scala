@@ -19,6 +19,7 @@ import BIDMach.networks._
  * Computes the column-wise dot products of two input layers.
  */
 
+@SerialVersionUID(100L)
 class DotLayer(override val net:Net, override val opts:DotNodeOpts = new DotNode) extends Layer(net, opts) { 
   
   override val _inputs = new Array[LayerTerm](2);
@@ -53,6 +54,7 @@ trait DotNodeOpts extends NodeOpts {
 
 }
 
+@SerialVersionUID(100L)
 class DotNode extends Node with DotNodeOpts {
 	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
   
@@ -70,6 +72,7 @@ class DotNode extends Node with DotNodeOpts {
   }
 }
 
+@SerialVersionUID(100L)
 object DotLayer { 
   
   def apply(net:Net) = new DotLayer(net, new DotNode);
