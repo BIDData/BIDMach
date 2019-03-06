@@ -90,7 +90,7 @@ class GLM(opts:GLM.Opts) extends RegressionModel(opts) {
     } else {
       modelmats(0).nrows;
     }
-    val sdat = (sum(data0,2).t + 0.5f).asInstanceOf[FMat]
+    val sdat = cpu(sum(data0,2).t + 0.5f)
     sp = sdat / sum(sdat)
     println("corpus perplexity=%f" format (math.exp(-(sp ddot ln(sp)))))
     
@@ -262,6 +262,23 @@ object GLM {
   		- diff * diff;
   	}
 
+  	def dlink(in:Double) = {
+  		in
+  	}
+
+  	def dmean(in:Double) = {
+  		in
+  	}
+
+  	def dderivlink(in:Double, targ:Double) = {
+  		targ - in;
+  	}
+
+  	def dlikelihood(pred:Double, targ:Double) = {
+  		val diff = targ - pred;
+  		- diff * diff;
+  	}
+
   	override val linkfn = link _;
 
   	override val derivfn = derivlink _;
@@ -269,6 +286,14 @@ object GLM {
   	override val meanfn = mean _;
 
   	override val likelihoodfn = likelihood _;
+
+  	override val dlinkfn = dlink _;
+
+  	override val dderivfn = dderivlink _;
+
+  	override val dmeanfn = dmean _;
+
+  	override val dlikelihoodfn = dlikelihood _;
 
   	val fnflops = 2;
   }
@@ -296,6 +321,28 @@ object GLM {
   		math.log(targ * pred + (1.0f - targ) * (1.0f - pred) + 1e-20).toFloat
   	}
 
+  	def dlink(in:Double) = {
+  		math.log(in / (1.0 - in));
+  	}
+
+  	def dmean(in:Double) = {
+  		if (in > 0) {
+  			val tmp = math.exp(-in);
+  			(1.0 / (1.0 + tmp));
+  		} else {
+  			val tmp = math.exp(in);
+  			(tmp / (1.0 + tmp))
+  		}
+  	}
+
+  	def dderivlink(in:Double, targ:Double) = {
+  		targ - in;
+  	}
+
+  	def dlikelihood(pred:Double, targ:Double) = {
+  		math.log(targ * pred + (1.0 - targ) * (1.0 - pred) + 1e-20)
+  	}
+
   	override val linkfn = link _;
 
   	override val derivfn = derivlink _;
@@ -303,6 +350,14 @@ object GLM {
   	override val meanfn = mean _;
 
   	override val likelihoodfn = likelihood _;
+
+  	override val dlinkfn = dlink _;
+
+  	override val dderivfn = dderivlink _;
+
+  	override val dmeanfn = dmean _;
+
+  	override val dlikelihoodfn = dlikelihood _;
 
   	val fnflops = 20;
   }
@@ -331,6 +386,28 @@ object GLM {
   		targ * pred + (1.0f - targ) * (1.0f - pred) -1.0f;
   	}
 
+  	def dlink(in:Double) = {
+  		math.log(in / (1.0 - in));
+  	}
+
+  	def dmean(in:Double) = {
+  		if (in > 0) {
+  			val tmp = math.exp(-in);
+  			(1.0 / (1.0 + tmp));
+  		} else {
+  			val tmp = math.exp(in);
+  			(tmp / (1.0 + tmp));
+  		}
+  	}
+
+  	def dderivlink(p:Double, targ:Double) = {
+  		(2.0 * targ - 1.0) * p * (1.0 - p);
+  	}
+
+  	def dlikelihood(pred:Double, targ:Double) = {
+  		targ * pred + (1.0 - targ) * (1.0 - pred) -1.0;
+  	}
+
   	override val linkfn = link _;
 
   	override val derivfn = derivlink _;
@@ -338,6 +415,14 @@ object GLM {
   	override val meanfn = mean _;
 
   	override val likelihoodfn = likelihood _;
+
+  	override val dlinkfn = dlink _;
+
+  	override val dderivfn = dderivlink _;
+
+  	override val dmeanfn = dmean _;
+
+  	override val dlikelihoodfn = dlikelihood _;
 
   	val fnflops = 20;
   }
@@ -361,6 +446,24 @@ object GLM {
   		scala.math.min(0f, ttarg * pred - 1f);
   	}
 
+  	def dlink(in:Double) = {
+  		in
+  	}
+
+  	def dmean(in:Double) = {
+  		in
+  	}
+
+  	def dderivlink(pred:Double, targ:Double) = {
+  		val ttarg = 2 * targ - 1;
+  		if (pred * ttarg < 1f) ttarg else 0f;
+  	}
+
+  	def dlikelihood(pred:Double, targ:Double) = {
+  		val ttarg = 2 * targ - 1;
+  		scala.math.min(0.0, ttarg * pred - 1);
+  	}
+
   	override val linkfn = link _;
 
   	override val derivfn = derivlink _;
@@ -368,6 +471,14 @@ object GLM {
   	override val meanfn = mean _;
 
   	override val likelihoodfn = likelihood _;
+
+  	override val dlinkfn = dlink _;
+
+  	override val dderivfn = dderivlink _;
+
+  	override val dmeanfn = dmean _;
+
+  	override val dlikelihoodfn = dlikelihood _;
 
   	val fnflops = 2;
   }
@@ -382,6 +493,10 @@ object GLM {
   	val derivfn:((Float,Float) => Float)
   	val meanfn:(Float => Float)
   	val likelihoodfn:((Float,Float) => Float)
+  	val dlinkfn:(Double => Double)
+  	val dderivfn:((Double,Double) => Double)
+  	val dmeanfn:(Double => Double)
+  	val dlikelihoodfn:((Double,Double) => Double)
   	val fnflops:Int
   }
   
@@ -395,6 +510,19 @@ object GLM {
       var j = 0
       while (j < feta.nrows) { 
         val fun = GLM.linkArray(ilinks(j)).meanfn
+        fout.data(j + i * fout.nrows) = fun(feta.data(j + i * feta.nrows))
+        j += 1 
+      }
+      i += 1
+    }     
+  }
+
+  def dmeanHelper(feta:DMat, fout:DMat, ilinks:IMat, istart:Int, iend:Int) {
+    var i = istart
+    while (i < iend) {
+      var j = 0
+      while (j < feta.nrows) { 
+        val fun = GLM.linkArray(ilinks(j)).dmeanfn
         fout.data(j + i * fout.nrows) = fun(feta.data(j + i * feta.nrows))
         j += 1 
       }
@@ -419,6 +547,11 @@ object GLM {
         meanHelper(feta, fout, ilinks, 0, feta.ncols)
         out
       }
+      case (feta:DMat, ilinks:IMat, fout:DMat) => {
+        Mat.nflops += totflops * feta.ncols
+        dmeanHelper(feta, fout, ilinks, 0, feta.ncols)
+        out
+      }
       case _ => throw new RuntimeException("GLM preds matrix type not matched");
     }
   }
@@ -441,6 +574,12 @@ object GLM {
         val fout = FMat.newOrCheckFMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
         Mat.nflops += totflops * feta.ncols
         meanHelper(feta, fout, ilinks, 0, feta.ncols)
+        fout
+      }
+      case (feta:DMat, ilinks:IMat) => {
+        val fout = DMat.newOrCheckDMat(eta.nrows, eta.ncols, null, eta.GUID, links.GUID, "GLM.preds".##)
+        Mat.nflops += totflops * feta.ncols
+        dmeanHelper(feta, fout, ilinks, 0, feta.ncols)
         fout
       }
       case _ => throw new RuntimeException("GLM preds matrix type not matched");
@@ -469,6 +608,21 @@ object GLM {
                 var j = 0
                 while (j < ftarg.nrows) {
                     val fun = GLM.linkArray(ilinks(j)).likelihoodfn
+                    out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
+                    j += 1
+                }
+                i += 1
+            }
+            out
+      }
+      case (fpred:DMat, ftarg:DMat, ilinks:IMat) => {
+        Mat.nflops += 10L * ftarg.length
+            var i = 0
+            val out = (ftarg + 5f)
+            while (i < ftarg.ncols) {
+                var j = 0
+                while (j < ftarg.nrows) {
+                    val fun = GLM.linkArray(ilinks(j)).dlikelihoodfn
                     out.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows))
                     j += 1
                 }
@@ -506,6 +660,20 @@ object GLM {
       	}
       	fout;
       }
+      case (fpred:DMat, ftarg:DMat, fout:DMat, ilinks:IMat) => {
+      	Mat.nflops += 10L * ftarg.length;
+      	var i = 0;
+      	while (i < ftarg.ncols) {
+      		var j = 0;
+      		while (j < ftarg.nrows) {
+      			val fun = GLM.linkArray(ilinks(j)).dderivfn;
+      			fout.data(j + i * out.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+      			j += 1;
+      		}
+      		i += 1;
+      	}
+      	fout;
+      }
       case _ => throw new RuntimeException("GLM derivs matrix type not matched");
     }
   }
@@ -532,6 +700,21 @@ object GLM {
       		var j = 0
       				while (j < ftarg.nrows) {
       					val fun = GLM.linkArray(ilinks(j)).derivfn;
+      					fout.data(j + i * fout.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
+      					j += 1;
+      				}
+      		i += 1;
+      	}
+      	fout;
+      }
+      case (fpred:DMat, ftarg:DMat, ilinks:IMat) => {
+      	val fout = DMat.newOrCheckDMat(pred.nrows, pred.ncols, null, pred.GUID, targ.GUID, links.GUID, "GLM.derivs".##)
+        Mat.nflops += 10L * ftarg.length;
+      	var i = 0;
+      	while (i < ftarg.ncols) {
+      		var j = 0
+      				while (j < ftarg.nrows) {
+      					val fun = GLM.linkArray(ilinks(j)).dderivfn;
       					fout.data(j + i * fout.nrows) = fun(fpred.data(j + i * ftarg.nrows),  ftarg.data(j + i * ftarg.nrows));
       					j += 1;
       				}
