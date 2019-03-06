@@ -606,6 +606,20 @@ object Model {
       		f
       	}
       }
+      case f:DMat =>
+      if (useGPU) {
+      	if (useDouble) {
+      		GDMat(f);
+      	} else {
+      		GMat(FMat(f));
+      	}
+      } else {
+      	if (useDouble) {
+      		f;
+      	} else {
+      		DMat(f);
+      	}
+      }
       case i:IMat =>
       if (useGPU) {
         GIMat(i);

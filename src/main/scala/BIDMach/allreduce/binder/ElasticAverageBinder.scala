@@ -22,11 +22,8 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
 
   override lazy val totalDataSize: Int = {
     var ret = 0
-    model.modelmats.synchronized {
-      for (mat <- model.modelmats) {
-        val fmat = FMat(mat)
-        ret += fmat.length
-      }
+    for (mat <- model.modelmats) {
+      ret += mat.length
     }
     ret
   }
@@ -42,14 +39,15 @@ class ElasticAverageBinder(model: Model, alphaFromIter: Int => Float, logger: Lo
 
     while (i >= 0) {
       val mat = model.modelmats(i)
-      current -= mat.length
-      mat match {
-        case gmat: GMat => GMat.GPUtoCPUarraycopy(gmat.pdata, 0, ret, current, gmat.length, "ElasticAverageBinder dataSource")
-        case fmat: FMat => System.arraycopy(fmat.contents().data, 0, ret, current, fmat.length)
+      mat.synchronized {
+        current -= mat.length
+        mat match {
+          case gmat: GMat => GMat.GPUtoCPUarraycopy(gmat.pdata, 0, ret, current, gmat.length, "ElasticAverageBinder dataSource");
+          case fmat: FMat => System.arraycopy(fmat.contents().data, 0, ret, current, fmat.length);
+        }
+        i -= 1
       }
-      i -= 1
     }
-
     AllReduceInput(ret)
 
   }
