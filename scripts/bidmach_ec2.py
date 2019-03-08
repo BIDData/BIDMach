@@ -1214,7 +1214,7 @@ def real_main():
     elif action == "login":
         (master_nodes, slave_nodes) = get_existing_cluster(conn, opts, cluster_name)
         if opts.node is not None:
-            slave = slave_nodes[opts.slaves]
+            slave = slave_nodes[opts.node]
             if not slave.public_dns_name and not opts.private_ips:
                 print("Slave has no public DNS name.  Maybe you meant to specify --private-ips?")
             else:
