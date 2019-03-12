@@ -172,6 +172,9 @@ def parse_args():
         "-s", "--slaves", type="int", default=1,
         help="Number of slaves to launch (default: %default)")
     parser.add_option(
+        "-n", "--node", type="int", 
+        help="Number of slave to login to")
+    parser.add_option(
         "-w", "--wait", type="int",
         help="DEPRECATED (no longer necessary) - Seconds to wait for nodes to start")
     parser.add_option(
@@ -962,7 +965,7 @@ def ssh_args(opts):
 
 
 def ssh_command(opts):
-    return ['ssh'] + ssh_args(opts)
+    return ['ssh'] + ['-Y'] + ssh_args(opts)
 
 
 # Run a command on a host through ssh, retrying up to five times
@@ -1210,16 +1213,30 @@ def real_main():
 
     elif action == "login":
         (master_nodes, slave_nodes) = get_existing_cluster(conn, opts, cluster_name)
-        if not master_nodes[0].public_dns_name and not opts.private_ips:
-            print("Master has no public DNS name.  Maybe you meant to specify --private-ips?")
+        if opts.node is not None:
+            slave = slave_nodes[opts.node]
+            if not slave.public_dns_name and not opts.private_ips:
+                print("Slave has no public DNS name.  Maybe you meant to specify --private-ips?")
+            else:
+                slave = get_dns_name(slave, opts.private_ips)
+                print("Logging into slave " + slave + "...")
+                proxy_opt = []
+                if opts.proxy_port is not None:
+                    proxy_opt = ['-D', opts.proxy_port]
+                subprocess.check_call(
+                    ssh_command(opts) + proxy_opt + ['-t', '-t', "%s@%s" % (opts.user, slave)])
+
         else:
-            master = get_dns_name(master_nodes[0], opts.private_ips)
-            print("Logging into master " + master + "...")
-            proxy_opt = []
-            if opts.proxy_port is not None:
-                proxy_opt = ['-D', opts.proxy_port]
-            subprocess.check_call(
-                ssh_command(opts) + proxy_opt + ['-t', '-t', "%s@%s" % (opts.user, master)])
+            if not master_nodes[0].public_dns_name and not opts.private_ips:
+                print("Master has no public DNS name.  Maybe you meant to specify --private-ips?")
+            else:
+                master = get_dns_name(master_nodes[0], opts.private_ips)
+                print("Logging into master " + master + "...")
+                proxy_opt = []
+                if opts.proxy_port is not None:
+                    proxy_opt = ['-D', opts.proxy_port]
+                subprocess.check_call(
+                    ssh_command(opts) + proxy_opt + ['-t', '-t', "%s@%s" % (opts.user, master)])
 
     elif action == "reboot-slaves":
         response = raw_input(

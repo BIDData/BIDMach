@@ -39,6 +39,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   var mu:Mat = null;
   var norm_scaling:Mat = null;
   var tscale:Mat = null;
+  var clip_count = 0L;
 
   def initGrad(model0:Model) = {
     firstStep = 0;
@@ -79,33 +80,54 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   } 
   
   override def init(model0:Model) = initGrad(model0);
-  
+
   def clipping() {
-    if (opts.clipByValue>0f) {
-      for (i <- 0 until updatemats.length){
-	if (updatemats(i).asInstanceOf[AnyRef] != null) {
-	  min(updatemats(i),opts.clipByValue,updatemats(i));
-	  max(updatemats(i),-opts.clipByValue,updatemats(i));
-	}
+  	if (opts.clipByValue>0f) {
+  		for (i <- 0 until updatemats.length){
+  			if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  				min(updatemats(i),opts.clipByValue,updatemats(i));
+  				max(updatemats(i),-opts.clipByValue,updatemats(i));
+  			}
+  		}
+  	}
+  	if (opts.clip_grad_norm>0f){
+  	  if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1);
+  	  for (i <- 0 until updatemats.length){
+  		if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  		  val tot=sum(updatemats(i) dot updatemats(i)).dv
+          val len= updatemats(i).length;
+          val scale = math.sqrt(tot/len);
+          if (scale > opts.clip_grad_norm) { 
+            clip_count += 1;
+            norm_scaling(0,0) = (opts.clip_grad_norm/scale).toFloat;
+  			updatemats(i)~updatemats(i)*@norm_scaling;
+  		  }     
+  	    }
       }
     }
-    if (opts.max_grad_norm>0f){
-      var tot = 0.0;
-      for (i <- 0 until updatemats.length){
-	if (updatemats(i).asInstanceOf[AnyRef] != null) {
-	  tot+=sum(updatemats(i) dot updatemats(i)).dv
-	    }
-      }
-      val scale=opts.max_grad_norm/max(sqrt(tot),opts.max_grad_norm).dv;
+  	if (opts.clip_grad_global_norm>0f){
       if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1);
-      norm_scaling(0,0) = scale.toFloat;
-      for (i <- 0 until updatemats.length){
-	if (updatemats(i).asInstanceOf[AnyRef] != null) {
-	  updatemats(i)~updatemats(i)*@norm_scaling;
-	}     
+  	  var tot = 0.0;
+      var len = 0.0;
+  	  for (i <- 0 until updatemats.length){
+  		if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  		  tot+=sum(updatemats(i) dot updatemats(i)).dv
+          len += updatemats(i).length;
+  		}
+  	  }
+      val scale = math.sqrt(tot/len);
+  	  if (scale > opts.clip_grad_norm) { 
+        clip_count += 1;
+        norm_scaling(0,0) = (opts.clip_grad_norm/scale).toFloat;
+  	    for (i <- 0 until updatemats.length){
+  		  if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  			updatemats(i)~updatemats(i)*@norm_scaling;
+  		  }     
+  	    }
       }
-    }
+  	}
   }
+  
 
   def getLargestMat(mat:Mat, umat:Mat) = {
     var maxlen = 0;

@@ -25,23 +25,24 @@ val net = nn.model.asInstanceOf[Net]
 val ds = nn.datasource.asInstanceOf[FileSource];
 val grad = nn.updater.asInstanceOf[Grad]
 
+val alpha = 0.2f
+val lrinit = 2e-2f
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
-  val lr = if (ipass < 20) {
-    2e-2f
+  if (ipass < 20) {
+    lrinit
   } else if (ipass < 40) {
-    2e-3f
-  } else 2e-4f;
-  lr
-}
+    lrinit/10
+  } else
+    lrinit/100
+}   
 
-opts.logfile = "logAlexnet_cluster=4_alpha=0_1.txt";
+opts.logfile = "logAlexnet_cluster4_lr_%4.3f_alpha_%2.1f.txt" format (lrinit,alpha);
 opts.checkPointFile = "../models/alexnet%03d/"
-opts.checkPointInterval = 5f;
+opts.checkPointInterval = 10f;
 opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
-opts.lrate = 1e-4f;
 opts.texp = 0f;
 opts.pstep = 0.05f
 opts.hasBias = true;
@@ -112,7 +113,7 @@ val sgd = nn.updater.asInstanceOf[Grad];
 nn.launchTrain
 
 // All-reduce
-val nodeConfig = getBasicConfigs().copy(elasticRate = 0.1f)
+val nodeConfig = getBasicConfigs().copy(elasticRate = alpha)
 val binder = new ElasticAverageBinder(nn.model, _ => nodeConfig.elasticRate, nn.myLogger)
 AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
 
@@ -127,9 +128,5 @@ println("Examine the 'nn' variable to track learning state.\n");
 
 //println("Accuracy = %f" format mean(mm.results(0,?),2).v);
 
-
-while(true){
-Thread.sleep(10000);
-}
 
 
