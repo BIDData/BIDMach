@@ -25,21 +25,26 @@ val net = nn.model.asInstanceOf[Net]
 val ds = nn.datasource.asInstanceOf[FileSource];
 val grad = nn.updater.asInstanceOf[Grad]
 
-val alpha = 0.2f
+val alpha = 0.3f
 val lrinit = 2e-2f
 
+val epochsecs = 2000f
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
-  if (ipass < 20) {
+  if (toc < 20*epochsecs) { 
     lrinit
-  } else if (ipass < 40) {
+  } else if (toc < 40*epochsecs) { 
     lrinit/10
-  } else
+  } else if (toc < 60*epochsecs) { 
     lrinit/100
+  } else { 
+    lrinit/1000
+  }
 }   
 
 opts.logfile = "logAlexnet_cluster4_lr_%4.3f_alpha_%2.1f.txt" format (lrinit,alpha);
 opts.checkPointFile = "../models/alexnet%03d/"
 opts.checkPointInterval = 10f;
+opts.keepCheckPoints = 2
 opts.batchSize= 128;
 opts.npasses = 80;
 //opts.nend = 10;
@@ -112,9 +117,33 @@ val sgd = nn.updater.asInstanceOf[Grad];
 
 nn.launchTrain
 
-// All-reduce
-val nodeConfig = getBasicConfigs().copy(elasticRate = alpha)
+// All-reduce config
+import BIDMach.allreduce.{ThresholdConfig,MetaDataConfig,WorkerConfig,LineMasterConfig,NodeConfig}
+
+val dimNum = 2
+val maxChunkSize = 20000
+val roundWorkerPerDimNum = 3
+val maxRound = 1000000
+
+val threshold = ThresholdConfig(thAllreduce = 1f, thReduce = 1f, thComplete = 1f)
+val metaData = MetaDataConfig(maxChunkSize = maxChunkSize)
+
+val workerConfig = WorkerConfig(
+  statsReportingRoundFrequency = 5,
+  threshold = threshold,
+  metaData = metaData)
+
+val lineMasterConfig = LineMasterConfig(
+  roundWorkerPerDimNum = roundWorkerPerDimNum,
+  dim = -1,
+  maxRound = maxRound,
+  workerResolutionTimeout = 10.seconds,
+  threshold = threshold)
+
+val nodeConfig = NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, reportStats = true, elasticRate = alpha)
+
 val binder = new ElasticAverageBinder(nn.model, _ => nodeConfig.elasticRate, nn.myLogger)
+
 AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
 
 println("Examine the 'nn' variable to track learning state.\n");
