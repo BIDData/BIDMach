@@ -119,6 +119,7 @@ nn.launchTrain
 
 // All-reduce config
 import BIDMach.allreduce.{ThresholdConfig,MetaDataConfig,WorkerConfig,LineMasterConfig,NodeConfig}
+import scala.concurrent.duration._
 
 val dimNum = 2
 val maxChunkSize = 200000
