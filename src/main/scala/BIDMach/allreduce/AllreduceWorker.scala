@@ -1,6 +1,8 @@
 package BIDMach.allreduce
 
-
+import scala.collection.mutable.ArrayBuffer
+import BIDMat.SciFunctions._
+import BIDMat.MatFunctions._
 import BIDMach.allreduce.binder.AllreduceBinder.{DataSink, DataSource}
 import BIDMach.allreduce.binder.{AllReduceInputRequest, AllReduceOutput}
 import BIDMach.allreduce.buffer.{ReducedDataBuffer, ScatteredDataBuffer}
@@ -230,7 +232,9 @@ class AllreduceWorker(config: WorkerConfig,
   private def flush() = {
     reduceBlockBuf.getReducedData(output, backUpDataSource)
 
-    unshuffle(output, unshuffledOutput, dataSize);
+    val rp = new RandPerm(currentConfig.round);
+    output.copyToArray(unshuffledOutput);
+    rp.irandmove(unshuffledOutput, getChunkSizes());
 
     dataSink(AllReduceOutput(unshuffledOutput, currentConfig.round))
   }
@@ -255,8 +259,28 @@ class AllreduceWorker(config: WorkerConfig,
     }
   }
 
+  private def getChunkSizes() = { 
+    val numPeers = currentConfig.peerWorkers.size
+    val sizes = ArrayBuffer[Int]();
+    for (peerId <- 0 until numPeers) {
+      val idx = (peerId + currentConfig.workerId) % numPeers
+      val worker = currentConfig.peerWorkers(idx)
+      //Partition the dataBlock if it is too big
+      val peerBlockStart = idx * getBlockSize(0, numPeers, dataSize)
+      val peerBlockSize = getBlockSize(idx, numPeers, dataSize)
+      val peerNumChunks = math.ceil(1f * peerBlockSize / maxChunkSize).toInt
+      for (i <- 0 until peerNumChunks) {
+        val chunkStart = math.min(i * maxChunkSize, peerBlockSize - 1);
+	sizes += chunkStart;
+      }
+    }
+    irow(sizes.toArray);
+  }
+
   private def scatter() = {
-    shuffle(data, shuffledData, dataSize);
+    val rp = new RandPerm(currentConfig.round);
+    data.copyToArray(shuffledData);
+    rp.randmove(shuffledData, getChunkSizes());
     val numPeers = currentConfig.peerWorkers.size
     log.debug(s"scatter: numPeers = ${numPeers}")
     for (peerId <- 0 until numPeers) {

@@ -33,199 +33,85 @@ class RandPerm(seed:Int) {
     mat;
   }
 
-  def permcols1(data1:FMat, rr:FMat, len:Int) = { 
-    val nr = rr.nrows;
-    val nc = rr.ncols;
-    var i = 0;
-    while (i < nc) { 
-      var j = 0;
-      val joff = i * nr;
-      val nrr = if (i < nc-1) nr else nr - (data1.length - len);
-      while (j < (nrr - 1)) { 
-	    val indx = joff + math.min(nrr - 1, j + (rr.data(j+joff) * (nrr - j)).toInt);
-	    val tmpv = data1.data(j + joff);
-	    data1.data(j + joff) = data1.data(indx);
-	    data1.data(indx) = tmpv;
-	    j += 1;
+
+  def randmove(mat:Array[Float], ranges:IMat) = { 
+    val aranges = ranges \ mat.length;
+    val ir = ranges.copy
+    val or = ranges.copy
+    var nr = ranges.length;
+    val ncols = math.min(1+mat.length/nr, 1000);
+    val rr = zeros(nr, ncols);
+    var icol = ncols;
+    while (nr > 0) { 
+      if (icol >= ncols) { 
+	rand(rr);
+	icol = 0;
       }
-      i += 1;
-    }
-  }
-
-  def ipermcols1(data1:FMat, rr:FMat, len:Int) = { 
-    val nr = rr.nrows;
-    val nc = rr.ncols;
-    var i = nc - 1
-    while (i >= 0) { 
-      val joff = i * nr;
-      val nrr = if (i < nc-1) nr else nr - (data1.length - len);
-      var j = nrr - 2;
-      while (j >= 0) { 
-	    val indx = joff + math.min(nrr - 1, j + (rr.data(j+joff) * (nrr - j)).toInt);
-	    val tmpv = data1.data(j + joff);
-	    data1.data(j + joff) = data1.data(indx);
-	    data1.data(indx) = tmpv;
-	    j -= 1;
+      // Shuffle
+      var i = 0;
+      while (i < nr - 1) { 
+	val rv = rr.data(icol * rr.nrows + i);
+	val indx = math.min(nr - 1, (rv * (nr - i)).toInt);
+	val vv = mat(or.data(i));
+	mat(or.data(i)) = mat(or.data(indx));
+	mat(or.data(indx)) = vv;
+	i += 1;
       }
-      i -= 1;
-    }
-  }
-
-  def permcols2(data1:FMat, rr:FMat, len:Int) = { 
-    val nr = rr.nrows;
-    val nc = rr.ncols;
-    var i = 0;
-    while (i < nc) { 
-      var j = 0;
-      val joff = i * nr;
-      val nrr = if (i < nc - (data1.length - len)) nr else (nr - 1);
-      while (j < (nrr - 1)) { 
-	    val indx = joff + math.min(nrr - 1, j + (rr.data(j+joff) * (nrr - j)).toInt);
-	    val tmpv = data1.data(j + joff);
-	    data1.data(j + joff) = data1.data(indx);
-	    data1.data(indx) = tmpv;
-	    j += 1;
+      icol += 1;
+      nr = 0;
+      i = 0;
+      while (i < ir.length) { 
+	ir.data(i) = ir.data(i) + 1;
+	if (ir.data(i) < aranges(i+1)) {
+	  or.data(nr) = ir.data(i)
+	  nr += 1;
+	} 
+	i += 1;
       }
-      i += 1;
     }
+    mat;
   }
 
-  def ipermcols2(data1:FMat, rr:FMat, len:Int) = { 
-    val nr = rr.nrows;
-    val nc = rr.ncols;
-    var i = nc - 1;
-    while (i >= 0) { 
-      val joff = i * nr;
-      val nrr = if (i < nc - (data1.length - len)) nr else (nr - 1);
-      var j = nrr - 2;
-      while (j >= 0) { 
-	    val indx = joff + math.min(nrr - 1, j + (rr.data(j+joff) * (nrr - j)).toInt);
-	    val tmpv = data1.data(j + joff);
-	    data1.data(j + joff) = data1.data(indx);
-	    data1.data(indx) = tmpv;
-	    j -= 1;
+  def irandmove(mat:Array[Float], ranges:IMat) = { 
+    val aranges = ranges \ mat.length;
+    val ir = ranges.copy
+    val or = ranges.copy
+    var nr = ranges.length;
+    val ncols = math.min(1+mat.length/nr, 1000);
+    val rr = zeros(nr, ncols);
+    var icol = ncols;
+    while (nr > 0) { 
+      if (icol >= ncols) { 
+	rand(rr);
+	icol = 0;
       }
-      i -= 1;
-    }
-  }
-
-  def randperm(mat:FMat) = { 
-    tic
-    val dd = math.ceil(math.sqrt(mat.length)).toInt;
-    val data1 = zeros(dd, dd);
-    val rand1 = zeros(dd, dd);
-    val rand2 = zeros(dd, dd);
-    val out = zeros(mat.nrows, mat.ncols);
-    val t0 = toc;
-    rand(rand1);
-    rand(rand2);
-    val t1 = toc;
-    var i = 0;
-    while (i < mat.length) { 
-      data1.data(i) = mat.data(i);
-      i += 1;
-    }
-    val t2 = toc;
-    permcols1(data1, rand1, mat.length)
-    val t3 = toc;
-    val datat = data1.t;
-    val t4 = toc;
-    permcols2(datat, rand2, mat.length)
-    val t5 = toc;
-
-    i = 0;
-	var iout = 0;
-    while (i < dd) { 
-      val nr = if (i < dd - (data1.length - mat.length)) dd else (dd - 1);
-      var j = 0;
-      while (j < nr) { 
-	    out.data(iout) = datat.data(j + i * dd);
-        iout += 1;
-        j += 1;
+      // UnShuffle
+      var i = nr - 2;
+      while (i >= 0) { 
+	val rv = rr.data(icol * rr.nrows + i);
+	val indx = math.min(nr - 1, (rv * (nr - i)).toInt);
+	val vv = mat(or.data(i));
+	mat(or.data(i)) = mat(or.data(indx));
+	mat(or.data(indx)) = vv;
+	i -= 1;
       }
-      i += 1;
-    }
-    val t6 = toc;
-    (out, row(t0, t1-t0, t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t6));
-  }
-
-  def irandperm(mat:FMat) = { 
-    tic
-    val dd = math.ceil(math.sqrt(mat.length)).toInt;
-    val data1 = zeros(dd, dd);
-    val rand1 = zeros(dd, dd);
-    val rand2 = zeros(dd, dd);
-    val out = zeros(mat.nrows, mat.ncols);
-    val t0 = toc;
-    rand(rand1);
-    rand(rand2);
-    val t1 = toc;
-    var i = 0;
-	var iin = 0;
-    while (i < dd) { 
-      val nr = if (i < dd - (data1.length - mat.length)) dd else (dd - 1);
-      var j = 0;
-      while (j < nr) { 
-        data1.data(j + i * dd) = mat.data(iin);
-        iin += 1;
-        j += 1;
+      icol += 1;
+      nr = 0;
+      i = 0;
+      while (i < ir.length) { 
+	ir.data(i) = ir.data(i) + 1;
+	if (ir.data(i) < aranges(i+1)) {
+	  or.data(nr) = ir.data(i)
+	  nr += 1;
+	} 
+	i += 1;
       }
-      i += 1;
     }
-
-    val t2 = toc;
-    ipermcols2(data1, rand2, mat.length)
-    val t3 = toc;
-    val datat = data1.t;
-    val t4 = toc;
-    ipermcols1(datat, rand1, mat.length)
-    val t5 = toc;
-    i = 0;
-    while (i < mat.length) { 
-      out.data(i) = datat.data(i);
-      i += 1;
-    }
-
-    val t6 = toc;
-    (out, row(t0, t1-t0, t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t6));
+    mat
   }
 
-  def randperm2(mat:FMat) = { 
-    tic
-    val out = zeros(mat.nrows, mat.ncols);
-    val rand1 = zeros(mat.length, 1);
-    val t0 = toc;
-    rand(rand1);
-    val t1 = toc;
-    var i = 0;
-    while (i < mat.length) { 
-      out.data(i) = mat.data(i);
-      i += 1;
-    }
-    val t2 = toc;
-    permcols1(out, rand1, mat.length)
-    val t3 = toc;
-    (out, row(t0, t1-t0, t2-t1, t3-t2, t3));
-  }
-
-  def irandperm2(mat:FMat) = { 
-    tic
-    val out = zeros(mat.nrows, mat.ncols);
-    val rand1 = zeros(mat.length, 1);
-    val t0 = toc;
-    rand(rand1);
-    val t1 = toc;
-    var i = 0;
-    while (i < mat.length) { 
-      out.data(i) = mat.data(i);
-      i += 1;
-    }
-    val t2 = toc;
-    ipermcols1(out, rand1, mat.length)
-    val t3 = toc;
-    (out, row(t0, t1-t0, t2-t1, t3-t2, t3));
-  }
 }
+
 
 object RandPerm { 
 }
