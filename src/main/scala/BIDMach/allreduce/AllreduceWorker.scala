@@ -29,7 +29,7 @@ class AllreduceWorker(config: WorkerConfig,
 
   // Data
   var data: Array[Float] = new Array(dataSize)
-  var shuffledData: Array[Float] = new Array(dataSize)
+//  var shuffledData: Array[Float] = new Array(dataSize)
 
   // Buffer
   var scatterBlockBuf: ScatteredDataBuffer = ScatteredDataBuffer.empty // store scattered data received
@@ -37,7 +37,7 @@ class AllreduceWorker(config: WorkerConfig,
 
   // Output
   var output: Array[Float] = new Array(dataSize)
-  var unshuffledOutput: Array[Float] = new Array(dataSize)
+//  var unshuffledOutput: Array[Float] = new Array(dataSize)
 
   println(s"\n----Worker ${self.path}")
   println(s"\n----Worker ${self.path}: Thresholds: thReduce = ${thReduce}, thComplete = ${thComplete}");
@@ -232,31 +232,12 @@ class AllreduceWorker(config: WorkerConfig,
   private def flush() = {
     reduceBlockBuf.getReducedData(output, backUpDataSource)
 
-    val rp = new RandPerm(currentConfig.round);
+/*    val rp = new RandPerm(currentConfig.round);
     output.copyToArray(unshuffledOutput);
     rp.irandmove(unshuffledOutput, getChunkSizes());
-
     dataSink(AllReduceOutput(unshuffledOutput, currentConfig.round))
-  }
-
-  def shuffle(data:Array[Float], shuffledData:Array[Float], size:Int) = { 
-    val rand = new scala.util.Random(currentConfig.round);
-    val perm = rand.shuffle(0 to (size-1));
-    var i = 0;
-    while (i < size) { 
-      shuffledData(i) = data(perm(i));
-      i += 1;
-    }
-  }
-
-  def unshuffle(output:Array[Float], unshuffledOutput:Array[Float], size:Int) = { 
-    val rand = new scala.util.Random(currentConfig.round);
-    val perm = rand.shuffle(0 to (size-1));
-    var i = 0;
-    while (i < size) { 
-      unshuffledOutput(perm(i)) = output(i);
-      i += 1;
-    }
+*/
+    dataSink(AllReduceOutput(output, currentConfig.round))
   }
 
   private def getChunkSizes() = { 
@@ -278,9 +259,10 @@ class AllreduceWorker(config: WorkerConfig,
   }
 
   private def scatter() = {
-    val rp = new RandPerm(currentConfig.round);
+/*    val rp = new RandPerm(currentConfig.round);
     data.copyToArray(shuffledData);
     rp.randmove(shuffledData, getChunkSizes());
+ */
     val numPeers = currentConfig.peerWorkers.size
     log.debug(s"scatter: numPeers = ${numPeers}")
     for (peerId <- 0 until numPeers) {
@@ -298,7 +280,7 @@ class AllreduceWorker(config: WorkerConfig,
         val chunkSize = chunkEnd - chunkStart + 1
         val chunk: Array[Float] = new Array(chunkSize)
 
-        System.arraycopy(shuffledData, peerBlockStart + chunkStart, chunk, 0, chunkSize);
+        System.arraycopy(data, peerBlockStart + chunkStart, chunk, 0, chunkSize);
         log.debug(s"\n----Worker ${self.path}: send msg from ${currentConfig.workerId} to ${idx}, chunkId: ${i}")
         val scatterConfig = currentConfig.copy(workerId = idx)
         val scatterMsg = ScatterBlock(chunk, currentConfig.workerId, idx, i, scatterConfig)
