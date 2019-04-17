@@ -141,7 +141,7 @@ akka {
       "akka.tcp://ClusterSystem@%s:2552"]
   }
   extensions = ["com.romix.akka.serialization.kryo.KryoSerializationExtension$"]
-  loglevel = DEBUG
+  loglevel = "DEBUG"
   loggers = ["akka.event.jul.JavaLogger"]
   logging-filter = "akka.event.jul.JavaLoggingFilter"
 }
