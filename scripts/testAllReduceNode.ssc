@@ -122,7 +122,7 @@ import BIDMach.allreduce.{ThresholdConfig,MetaDataConfig,WorkerConfig,LineMaster
 import scala.concurrent.duration._
 
 val dimNum = 2
-val maxChunkSize = 200000
+val maxChunkSize = 1000000
 val roundWorkerPerDimNum = 3
 val maxRound = 1000000
 
@@ -146,7 +146,7 @@ val nodeConfig = NodeConfig(workerConfig, lineMasterConfig, dimNum = dimNum, rep
 
 val binder = new ElasticAverageBinder(nn.model, _ => nodeConfig.elasticRate, nn.myLogger)
 
-AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
+val reduceNode = AllreduceNode.startNodeAfterIter(nn, iter = 0, nodeConfig, binder)
 
 println("Examine the 'nn' variable to track learning state.\n");
 
