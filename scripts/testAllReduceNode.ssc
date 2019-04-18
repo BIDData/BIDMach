@@ -132,7 +132,7 @@ val metaData = MetaDataConfig(maxChunkSize = maxChunkSize)
 val workerConfig = WorkerConfig(
   statsReportingRoundFrequency = 5,
   threshold = threshold,
-  doShuffle = false,
+  doShuffle = true,
   metaData = metaData)
 
 val lineMasterConfig = LineMasterConfig(
