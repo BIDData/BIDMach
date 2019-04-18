@@ -235,10 +235,7 @@ class AllreduceWorker(config: WorkerConfig,
     val rp = new RandPerm(currentConfig.round);
 //    output.copyToArray(unshuffledOutput);
 
-
-
-//    rp.irandmove(output, getChunkSizes());
-
+    rp.irandmove(output, getChunkSizes());
 
 //    dataSink(AllReduceOutput(unshuffledOutput, currentConfig.round))
     dataSink(AllReduceOutput(output, currentConfig.round))
@@ -266,7 +263,7 @@ class AllreduceWorker(config: WorkerConfig,
     val rp = new RandPerm(currentConfig.round);
 //    data.copyToArray(shuffledData);
 
-//    rp.randmove(data, getChunkSizes());
+    rp.randmove(data, getChunkSizes());
 
     val numPeers = currentConfig.peerWorkers.size
     log.debug(s"scatter: numPeers = ${numPeers}")
