@@ -61,7 +61,8 @@ case class WorkerConfig(
                          statsReportingRoundFrequency: Int = 10,
                          threshold: ThresholdConfig,
                          metaData: MetaDataConfig,
-                         reducer: AllreduceType = AllreduceType.Average)
+                         reducer: AllreduceType = AllreduceType.Average,
+                         doShuffle: Boolean = true)
 
 /**
   * @param dim which dimension the node belongs to

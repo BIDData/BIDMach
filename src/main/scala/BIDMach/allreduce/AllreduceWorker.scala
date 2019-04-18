@@ -26,6 +26,7 @@ class AllreduceWorker(config: WorkerConfig,
 
   var currentConfig: RoundConfig = RoundConfig(-1, -1, self, Map[Int, ActorRef](), -1)
   var isCurrentRoundCompleted = true
+  var doShuffle = config.doShuffle
 
   // Data
   var data: Array[Float] = new Array(dataSize)
@@ -235,7 +236,9 @@ class AllreduceWorker(config: WorkerConfig,
     val rp = new RandPerm(currentConfig.round);
 //    output.copyToArray(unshuffledOutput);
 
-    rp.irandmove(output, getChunkSizes());
+    if (doShuffle) { 
+      rp.irandmove(output, getChunkSizes());
+    }
 
 //    dataSink(AllReduceOutput(unshuffledOutput, currentConfig.round))
     dataSink(AllReduceOutput(output, currentConfig.round))
@@ -263,7 +266,9 @@ class AllreduceWorker(config: WorkerConfig,
     val rp = new RandPerm(currentConfig.round);
 //    data.copyToArray(shuffledData);
 
-    rp.randmove(data, getChunkSizes());
+    if (doShuffle) { 
+      rp.randmove(data, getChunkSizes());
+    }
 
     val numPeers = currentConfig.peerWorkers.size
     log.debug(s"scatter: numPeers = ${numPeers}")
