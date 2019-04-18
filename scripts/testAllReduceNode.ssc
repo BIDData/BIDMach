@@ -122,7 +122,7 @@ import BIDMach.allreduce.{ThresholdConfig,MetaDataConfig,WorkerConfig,LineMaster
 import scala.concurrent.duration._
 
 val dimNum = 2
-val maxChunkSize = 1000000
+val maxChunkSize = 4000000
 val roundWorkerPerDimNum = 3
 val maxRound = 1000000
 

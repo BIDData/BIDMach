@@ -130,14 +130,14 @@ akka {
   }
   remote {
     log-remote-lifecycle-events = off
-    maximum-payload-bytes = 5000000 bytes
+    maximum-payload-bytes = 20000000 bytes
     netty.tcp {
       hostname = "%s"
       port = 0
-      message-frame-size = 5000000b
-      send-buffer-size = 5000000b
-      receive-buffer-size = 5000000b
-      maximum-frame-size = 5000000b
+      message-frame-size = 20000000b
+      send-buffer-size = 20000000b
+      receive-buffer-size = 20000000b
+      maximum-frame-size = 20000000b
     }
   }
   cluster {
