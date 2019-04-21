@@ -39,8 +39,9 @@ class RandPerm(seed:Int) {
     val ir = ranges.copy
     val or = ranges.copy
     var nr = ranges.length;
-    val ncols = math.min(1+mat.length/nr, 1000);
+    val ncols = math.min(1+mat.length/nr, 123451);
     val rr = zeros(nr, ncols);
+//    rand(rr);
     var icol = ncols;
     while (nr > 0) { 
       if (icol >= ncols) { 
@@ -77,8 +78,9 @@ class RandPerm(seed:Int) {
     val ir = ranges.copy
     val or = ranges.copy
     var nr = ranges.length;
-    val ncols = math.min(1+mat.length/nr, 1000);
+    val ncols = math.min(1+mat.length/nr, 123451);
     val rr = zeros(nr, ncols);
+//    rand(rr);
     var icol = ncols;
     while (nr > 0) { 
       if (icol >= ncols) { 
@@ -112,6 +114,3 @@ class RandPerm(seed:Int) {
 
 }
 
-
-object RandPerm { 
-}

@@ -171,7 +171,7 @@ def parse_args():
         prog="launch_cluster",
         version="1.00",
         usage="%prog [options] <action> <cluster_name>\n\n"
-        + "<action> can be: launch, destroy, login, stop, start, get-master, reboot-slaves")
+        + "<action> can be: launch, destroy, login, stop, start, get-master, get-slaves, reboot-slaves")
 
     parser.add_option(
         "-s", "--slaves", type="int", default=1,
@@ -1263,6 +1263,14 @@ def real_main():
             print("Master has no public DNS name.  Maybe you meant to specify --private-ips?")
         else:
             print(get_dns_name(master_nodes[0], opts.private_ips))
+
+    elif action == "get-slaves":
+        (master_nodes, slave_nodes) = get_existing_cluster(conn, opts, cluster_name)
+        for inst in slave_nodes:
+            if not inst.public_dns_name and not opts.private_ips:
+                print("Slave %s has no public DNS name.  Maybe you meant to specify --private-ips?" % inst)
+            else:
+                print(get_dns_name(inst, opts.private_ips))
 
     elif action == "stop":
         response = raw_input(
