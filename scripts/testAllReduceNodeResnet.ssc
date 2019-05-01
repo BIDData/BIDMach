@@ -35,7 +35,7 @@ val nconv4x = layercounts(imodel, 3);
 val nconv5x = layercounts(imodel, 4);
 
 val epochsecs = 2000f
-val lrinit = 4e-1f;
+val lrinit = 2e-1f;
 val alpha = 0.2f;
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
@@ -54,12 +54,12 @@ opts.logfile = "logresv1_cluster16_lr_%4.3f_alpha_%2.1f.txt" format (lrinit,alph
 opts.checkPointFile = "models/resnet%03d/"
 opts.checkPointInterval = 10f;
 opts.keepCheckPoints = 2
-opts.batchSize= 32;
+opts.batchSize= 64;
 opts.npasses = 80;
 opts.pstep = 0.05f;
 opts.l2reg = 0.0001f;
 opts.hasBias = true;
-opts.vel_decay = 0.0f;
+opts.vel_decay = 0.9f;
 opts.lr_policy = lr_update _;
 opts.tensorFormat = Net.TensorNCHW;
 opts.useCache = false;
