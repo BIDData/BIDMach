@@ -669,6 +669,11 @@ object Layer {
   
   def input() = new InputLayer(null);
 
+  def layerNorm(a:LayerTerm)(inplace:Int = Net.UseNetPlacing, net:Net=null) = {
+    val inp = inplace;
+    new LayerNormLayer(net, new LayerNormNode{inplace=inp}){inputs(0)=a;}
+  }
+
   def layerNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, hasBias:Boolean = true, 
       lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing, net:Net=null) = {
     val hb = hasBias;

@@ -450,6 +450,11 @@ object Node {
   
   def input() = new InputNode;
 
+  def layerNorm(a:NodeTerm)(inplace:Int = Net.UseNetPlacing) = {
+    val inp = inplace;
+    new LayerNormNode{inputs(0)=a; inplace=inp}    
+  }
+
   def layerNormScale(a:NodeTerm)(name:String="", avgFactor:Float=0.1f, hasBias:Boolean = true,
       lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing) = {
   	val hb = hasBias;

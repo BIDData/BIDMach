@@ -20,6 +20,7 @@ class LayerNormScaleLayer(override val net:Net, override val opts:LayerNormScale
   var variances:Mat = null;
   var runningMeans:Mat = null;
   var runningVariances:Mat = null;
+
   var sdevs:Mat = null;
   
   var scale:Mat = null;
@@ -64,8 +65,6 @@ class LayerNormScaleLayer(override val net:Net, override val opts:LayerNormScale
     }
     net.l2reg_scales(imodel) = opts.weight_decay_scale;
     net.l2reg_scales(imodel+1) = opts.weight_decay_scale;
-    net.l2reg_scales(imodel+2) = opts.weight_decay_scale;
-    net.l2reg_scales(imodel+3) = opts.weight_decay_scale;
     scale = modelmats(imodel);
     bias = modelmats(imodel+1);
     runningMeans = modelmats(imodel+2);
@@ -113,15 +112,8 @@ class LayerNormScaleLayer(override val net:Net, override val opts:LayerNormScale
     // Do LayerNorm
     means = inputData.mean(batchDim);
     variances = inputData.variance(batchDim) + opts.epsilon;
-    if (opts.expAvgFactor == 1.0f) {
-    	sdevs = sqrt(variances);
-      output ~ inputData - means;
-    } else {
-      runningMeans ~ (runningMeans *@ (1f - opts.expAvgFactor)) + (means *@ opts.expAvgFactor);
-      runningVariances ~ (runningVariances *@ (1f - opts.expAvgFactor)) + (variances *@ opts.expAvgFactor);
-      sdevs = sqrt(runningVariances);
-      output ~ inputData - runningMeans;
-    }
+    sdevs = sqrt(variances);
+    output ~ inputData - means;
     output ~ output / sdevs;                       // Works even if output = input;
     
     // Now do scale and bias:    
@@ -129,37 +121,12 @@ class LayerNormScaleLayer(override val net:Net, override val opts:LayerNormScale
     output ~ output + bias;
   }
   
-  // Backward formula is (deriv - mean(deriv,2))/sdevs - (in - mean(in,2))^2 *@ deriv /std^3 - (in - mean(in,2))^2 * deriv / std^3
-  // Compute it as ((1 - ((in -mean(in))^2/var)) *@ deriv - mean(deriv,2) - ((in -mean(in))^2/var) dotr deriv)/sdevs to save tmp storage
-  
   def backwardGeneric = {
-  		// Do scale and bias first
-  		updateScale ~ updateScale + (inputData dotr deriv);    
-  		if (opts.hasBias) updateBias ~ updateBias + deriv.sum(batchDim);
-  		deriv ~ scale *@ deriv;
-  		
-  		if (opts.expAvgFactor == 1.0) {
-  			if (debugMe) {
-  				// Now do LayerNorm
-  				val diff = inputData - means;
-  				val normedvar = diff *@ diff / variances;
-  				val terms = (1f - normedvar) *@ deriv - (deriv.mean(batchDim) + (normedvar dotr deriv));
-  				inputDeriv ~ inputDeriv + (terms / sdevs);
-  			} else {
-  				// Now do LayerNorm, minimize tmp storage
-  				val tmp = inputData - means;
-  				tmp ~ tmp *@ tmp;
-  				tmp ~ tmp / variances;                     // Normalized per-element variance (normedvar)
-  				val lastTerm = tmp dotr deriv;
-  				tmp ~ 1f - tmp;
-  				tmp ~ tmp *@ deriv;
-  				tmp ~ tmp - (lastTerm + deriv.mean(batchDim));
-  				tmp ~ tmp / sdevs;
-  				inputDeriv ~ inputDeriv + tmp;
-  			}  
-  		} else {
-  		  inputDeriv ~ inputDeriv + (deriv / sdevs);
-  		}
+    // Do scale and bias first
+    updateScale ~ updateScale + (inputData dotr deriv);    
+    if (opts.hasBias) updateBias ~ updateBias + deriv.sum(batchDim);
+    deriv ~ scale *@ deriv;
+    inputDeriv ~ inputDeriv + (deriv / sdevs);
   }
   
   // TODO: enable exceptions instead?
