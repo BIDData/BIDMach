@@ -582,7 +582,7 @@ object Layer {
     new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; 
     hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}){inputs(0)=a;}
   }
-  
+
   def constant(v:Mat)(net:Net=null):ConstantLayer = {
     new ConstantLayer(net, new ConstantNode{value = v;})
   }
@@ -668,6 +668,17 @@ object Layer {
   def input(a:LayerTerm) = new InputLayer(null){inputs(0) = a;};
   
   def input() = new InputLayer(null);
+
+  def layerNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, hasBias:Boolean = true, 
+      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing, net:Net=null) = {
+    val hb = hasBias;
+  	val mname = name;
+  	val lrs = lr_scale;
+  	val bs = bias_scale;
+  	val inp = inplace;
+    new LayerNormScaleLayer(net, new LayerNormScaleNode{modelName = mname; expAvgFactor=avgFactor;
+    hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}){inputs(0)=a;}
+  }
   
   def linear(a:LayerTerm)(name:String="", outdim:Int=0, hasBias:Boolean=true, aopts:ADAGrad.Opts=null,
       initfn:(Mat,Float)=>Mat = Net.xavier, initv:Float = 1f,
