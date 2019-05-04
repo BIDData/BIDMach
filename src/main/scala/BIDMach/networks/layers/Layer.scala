@@ -568,18 +568,20 @@ object Layer {
   
   def abs(a:LayerTerm) = new AbsLayer(null){inputs(0) = a;};
   
-  def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL) = {
-    new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode}){inputs(0)=a;}
+  def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, epsilon:Float=1e-4f) = {
+    val eps = epsilon;
+    new BatchNormLayer(null, new BatchNormNode{expAvgFactor=avgFactor; batchNormMode=normMode; epsilon=eps}){inputs(0)=a}
   }
   
-  def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, 
-      lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing, net:Net=null) = {
+  def batchNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, epsilon:Float=1e-4f,
+                                  hasBias:Boolean = true, lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing, net:Net=null) = {
     val hb = hasBias;
   	val mname = name;
   	val lrs = lr_scale;
   	val bs = bias_scale;
   	val inp = inplace;
-    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; 
+    val eps = epsilon;
+    new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; epsilon=eps;
     hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}){inputs(0)=a;}
   }
 
@@ -669,19 +671,20 @@ object Layer {
   
   def input() = new InputLayer(null);
 
-  def layerNorm(a:LayerTerm)(inplace:Int = Net.UseNetPlacing, net:Net=null) = {
-    val inp = inplace;
-    new LayerNormLayer(net, new LayerNormNode{inplace=inp}){inputs(0)=a;}
+  def layerNorm(a:LayerTerm)(epsilon:Float=1e-4f, net:Net=null) = {
+    val eps = epsilon;
+    new LayerNormLayer(net, new LayerNormNode{epsilon=eps}){inputs(0)=a;}
   }
 
-  def layerNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, hasBias:Boolean = true, 
+  def layerNormScale(a:LayerTerm)(name:String="", avgFactor:Float=0.1f, hasBias:Boolean = true, epsilon:Float=1e-4f,
       lr_scale:Float=1f, bias_scale:Float=1f, inplace:Int = Net.UseNetPlacing, net:Net=null) = {
     val hb = hasBias;
   	val mname = name;
   	val lrs = lr_scale;
   	val bs = bias_scale;
   	val inp = inplace;
-    new LayerNormScaleLayer(net, new LayerNormScaleNode{modelName = mname; expAvgFactor=avgFactor;
+    val eps = epsilon;
+    new LayerNormScaleLayer(net, new LayerNormScaleNode{modelName = mname; expAvgFactor=avgFactor; epsilon=eps;
     hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}){inputs(0)=a;}
   }
   

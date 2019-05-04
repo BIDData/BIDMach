@@ -18,11 +18,15 @@ class LayerNormLayer(override val net:Net, override val opts:LayerNormNodeOpts =
   var variances:Mat = null;
   var sdevs:Mat = null;
   var batchDim:IMat = null;
+  var batchDim1:IMat = null;
   
   var debugMe = false;
 
   def initModelMats = {
     batchDim = irow(0->(inputData.dims.length-1));
+    if (prod(inputData.dims(0->(inputData.dims.length-1))).v > 1024) { 
+      batchDim1 = irow(0->(inputData.dims.length-2));
+    }
   }
 
   override def forward = {
@@ -49,15 +53,25 @@ class LayerNormLayer(override val net:Net, override val opts:LayerNormNodeOpts =
     
   def forwardGeneric = {
     // Do LayerNorm
-    means = mean(inputData)
-    variances = variance(inputData) + opts.epsilon;
+    if (batchDim1.asInstanceOf[AnyRef] != null) { 
+      val means1 = inputData.mean(batchDim1);
+      means = means1.mean(batchDim);
+      val variances1 = inputData.variance(batchDim1);
+      variances = variances1.mean(batchDim) + opts.epsilon;
+    } else { 
+      means = inputData.mean(batchDim);
+      variances = inputData.variance(batchDim) + opts.epsilon;
+    }
     sdevs = sqrt(variances);
     output ~ inputData - means;
     output ~ output / sdevs;                       // Works even if output = input;
   }
   
   def backwardGeneric = {
-    inputDeriv ~ inputDeriv + (deriv / sdevs);
+    if (inputDeriv.asInstanceOf[AnyRef] != null ) { 
+      deriv ~ deriv / sdevs;
+      inputDeriv ~ inputDeriv + deriv;
+    }
   }
   
   override def clear = {
@@ -79,7 +93,6 @@ trait LayerNormNodeOpts extends NodeOpts {
   def copyOpts(opts:LayerNormNodeOpts):LayerNormNodeOpts = {
 		super.copyOpts(opts);
 		opts.epsilon = epsilon;
-		opts.inplace = inplace;
 		opts;
   }
 }
