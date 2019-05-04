@@ -24,7 +24,7 @@ class LayerNormLayer(override val net:Net, override val opts:LayerNormNodeOpts =
 
   def initModelMats = {
     batchDim = irow(0->(inputData.dims.length-1));
-    if (prod(inputData.dims(0->(inputData.dims.length-1))).v > 1024) { 
+    if (prod(inputData.dims(0->(inputData.dims.length-2))).v > 128 && prod(inputData.dims(0->(inputData.dims.length-2))).v > 1024) { 
       batchDim1 = irow(0->(inputData.dims.length-2));
     }
   }
