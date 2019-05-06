@@ -655,6 +655,11 @@ bias_scale=bs; inplace=inp}
   def σ(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
 
   def softmax(a:NodeTerm) = new SoftmaxNode{inputs(0) = a};
+
+  def softmaxx(a:NodeTerm)(inds:IMat = irow(0)) = { 
+    val inds0 = inds;
+    new SoftmaxxNode{inputs(0) = a; inds=inds0};
+  }
   
   def softmaxout(a:NodeTerm)(scoreType:Int=1, lossType:Int=1) =  {
     val scoreTyp = scoreType;

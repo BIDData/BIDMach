@@ -790,6 +790,7 @@ object Layer {
   def norm(a:LayerTerm)(opts:NormNodeOpts) = new NormLayer(null){inputs(0) = a;}
   
   def oneHot(a:LayerTerm) = new OnehotLayer(null){inputs(0) = a};
+
   
   def pool(a:LayerTerm)(h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
       poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
@@ -841,6 +842,11 @@ object Layer {
   def σ(a:LayerTerm) = new SigmoidLayer(null){inputs(0) = a};
 
   def softmax(a:LayerTerm) = new SoftmaxLayer(null){inputs(0) = a};
+
+  def softmaxx(a:LayerTerm)(inds:IMat = irow(0)) = { 
+    val inds0 = inds;
+    new SoftmaxxLayer(null, new SoftmaxxNode{inds=inds0}){inputs(0) = a;}
+  }
   
   def softmaxout(a:LayerTerm)(scoreType:Int=1, lossType:Int = 1, net:Net=null) =  {
     val scoreTyp = scoreType;

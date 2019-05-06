@@ -118,40 +118,39 @@ class LSTMNode extends CompoundNode with LSTMNodeOpts {
 	  // LSTM with 4 linear layers, with h and i stacked as inputs
     
     def constructGraph1 = {
-    	import BIDMach.networks.layers.Node._
-    	val odim = dim;
-    		
-    	val in_h = copy;
-    	val in_c = copy; 
-    	val in_i = copy;
-    	val h_over_i = in_h over in_i;
+      import BIDMach.networks.layers.Node._
+      val odim = dim;
+      
+      val in_h = copy;
+      val in_c = copy; 
+      val in_i = copy;
+      val h_over_i = in_h over in_i;
 
-    	val lin1 = linear(h_over_i)(prefix+"LSTM_in_gate",     outdim=odim, hasBias=hasBias);
-    	val lin2 = linear(h_over_i)(prefix+"LSTM_out_gate",    outdim=odim, hasBias=hasBias);   
-    	val lin3 = linear(h_over_i)(prefix+"LSTM_forget_gate", outdim=odim, hasBias=hasBias);
-    	val lin4 = linear(h_over_i)(prefix+"LSTM_tanh_gate",   outdim=odim, hasBias=hasBias);
-    	
-    	val in_gate = σ(lin1);
-    	val out_gate = σ(lin2);
-    	val forget_gate = σ(lin3);
-    	val in_sat = tanh(lin4);
-    	
-    	val in_prod = in_gate ∘ in_sat;
-    	val f_prod = forget_gate ∘ in_c;
-    	val out_c = in_prod + f_prod;
-    	
-    	val out_tanh = tanh(out_c);
-    	val out_h = out_gate ∘ out_tanh;
+      val lin1 = linear(h_over_i)(prefix+"LSTM_in_gate",     outdim=odim, hasBias=hasBias);
+      val lin2 = linear(h_over_i)(prefix+"LSTM_out_gate",    outdim=odim, hasBias=hasBias);   
+      val lin3 = linear(h_over_i)(prefix+"LSTM_forget_gate", outdim=odim, hasBias=hasBias);
+      val lin4 = linear(h_over_i)(prefix+"LSTM_tanh_gate",   outdim=odim, hasBias=hasBias);
+      
+      val in_gate = σ(lin1);
+      val out_gate = σ(lin2);
+      val forget_gate = σ(lin3);
+      val in_sat = tanh(lin4);
+      
+      val in_prod = in_gate ∘ in_sat;
+      val f_prod = forget_gate ∘ in_c;
+      val out_c = in_prod + f_prod;
+      
+      val out_tanh = tanh(out_c);
+      val out_h = out_gate ∘ out_tanh;
 
-    	grid = in_h      \   lin1   \  in_gate      \  in_prod  \  out_tanh  on
+      grid = in_h      \   lin1   \  in_gate      \  in_prod  \  out_tanh  on
              in_c      \   lin2   \  out_gate     \  f_prod   \  out_h     on
              in_i      \   lin3   \  forget_gate  \  out_c    \  null      on
              h_over_i  \   lin4   \  in_sat       \  null     \  null;
     	
-    	val lopts = grid.data;
-    	lopts.map((x:Node) => if (x != null) x.parent = this);
-    	outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));
-    	
+      val lopts = grid.data;
+      lopts.map((x:Node) => if (x != null) x.parent = this);
+      outputNumbers = Array(lopts.indexOf(out_h), lopts.indexOf(out_c));
     }
     
     // LSTM with 1 linear layer, with h and i stacked as inputs, and all 4 output stacked
