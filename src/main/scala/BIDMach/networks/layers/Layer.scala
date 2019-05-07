@@ -559,6 +559,10 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
   def pow  (a:LayerTerm) = {val n=this; new PowerLayer(null){inputs(0)=n; inputs(1)=a;}};
         
   def over (a:LayerTerm) = {val n=this; new StackLayer(null){inputs(0)=n; inputs(1)=a;}};
+
+  def \ (a:LayerTerm) = {val n=this; new HcatLayer(null){inputs(0)=n; inputs(1)=a;}};
+
+  def hcat (a:LayerTerm) = {val n=this; new HcatLayer(null){inputs(0)=n; inputs(1)=a;}};
   
   def apply(a:LayerTerm) = {val n=this; new SelectLayer(null){inputs(0)=n; inputs(1)=a;}};
 }
@@ -583,6 +587,12 @@ object Layer {
     val eps = epsilon;
     new BatchNormScaleLayer(net, new BatchNormScaleNode{modelName = mname; expAvgFactor=avgFactor; batchNormMode=normMode; epsilon=eps;
     hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}){inputs(0)=a;}
+  }
+
+  def colslice(n:LayerTerm)(a:Int, b:Int) = { 
+    val a0 = a;
+    val b0 = b;
+    new ColsliceLayer(null, new ColsliceNode{a=a0; b=b0;}){inputs(0)=n;}
   }
 
   def constant(v:Mat)(net:Net=null):ConstantLayer = {

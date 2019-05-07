@@ -122,14 +122,21 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 
 
 trait StackNodeOpts extends NodeOpts {  
-  var ninputs = 2;
+  var ninputs = 2;  
+
+  def copyOpts(opts:StackNodeOpts):StackNodeOpts = {
+	super.copyOpts(opts);
+	opts.ninputs = ninputs;
+	opts;
+  }
+
 }
 
 @SerialVersionUID(100L)
 class StackNode extends Node with StackNodeOpts {
-	override val inputs = new Array[NodeTerm](ninputs);
+  override val inputs = new Array[NodeTerm](ninputs);
 
-	override def clone:StackNode = {copyTo(new StackNode).asInstanceOf[StackNode];}
+  override def clone:StackNode = {copyTo(new StackNode).asInstanceOf[StackNode];}
 
   override def create(net:Net):StackLayer = {StackLayer(net, this);}
   

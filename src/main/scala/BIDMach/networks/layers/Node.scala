@@ -331,6 +331,10 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
   def pow  (a:NodeTerm) = {val n=this; new PowerNode{inputs(0)=n; inputs(1)=a;}};
         
   def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
+
+  def \ (a:NodeTerm) = {val n=this; new HcatNode{inputs(0)=n; inputs(1)=a;}};
+
+  def hcat (a:NodeTerm) = {val n=this; new HcatNode{inputs(0)=n; inputs(1)=a;}};
   
   def apply(a:NodeTerm) = {val n=this; new SelectNode{inputs(0)=n; inputs(1)=a;}};
 }
@@ -359,6 +363,12 @@ object Node {
     val eps = epsilon;
     new BatchNormScaleNode{inputs(0)=a; modelName=mname; expAvgFactor=avgFactor; batchNormMode=normMode; epsilon=eps;
                            hasBias=hb; lr_scale=lrs; bias_scale=bs; inplace=inp}    
+  }
+
+  def colslice(n:NodeTerm)(a:Int, b:Int) = { 
+    val a0 = a;
+    val b0 = b;
+    new ColsliceNode{inputs(0) = n; a=a0; b=b0;}
   }
  
   def constant(v:Mat) = {
