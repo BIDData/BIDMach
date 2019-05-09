@@ -16,11 +16,16 @@ import BIDMach._
  */
 
 @SerialVersionUID(100L)
-class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Options) extends Net(opts) {
+class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Options) extends Model(opts) {
   
   var table:Array[Mat] = null;
   var dtable:Array[Mat] = null;
-  
+  var batchSize:Int = 0;
+
+
+  override def init() = {
+  }  
+
   def createTables(opts:TransformerLT.Opts) { 
     table = new Array[Mat](opts.depth);
     dtable = new Array[Mat](opts.depth);
@@ -30,12 +35,10 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     }
   }
 
+  def createTxNet(seqlength:Int) = {
+    val net = new Net();
+    val nopts = net.opts;
 
-  /**
-   * TODO: Modify 
-   */
-
-  def constructTxNode(seqlength:Int) = {
     import BIDMach.networks.layers.Node._
     val innerdim = opts.indim;
     val dim =      opts.dim;
@@ -101,34 +104,29 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val norm2 =       layerNorm(relu1)();
     val sum2 =        sum1 + norm2;
     
-    val grid =     in_qkv       \ this_in      \ last_in      \ cmask        \ smask        on
-                   proj_q_this  \ proj_k_this  \ proj_v_this  \ proj_k_last  \ proj_v_last  on
-                   rqueries     \ rkeys_this   \ rvals_this   \ rkeys_last   \ rvals_last   on
-                   queries      \ keys_this    \ vals_this    \ keys_last    \ vals_last    on
-                   keys         \ vals         \ prod         \ mprod        \ oprod        on
-                   weights      \ wvals        \ pvals        \ rpvals       \ mhattn       on
-                   norm1        \ sum1         \ ffwd1        \ relu1        \ norm2        on 
-                   sum2         \ null         \ null         \ null         \ null;
+    nopts.nodemat = in_qkv       \ this_in      \ last_in      \ cmask        \ smask        on
+                    proj_q_this  \ proj_k_this  \ proj_v_this  \ proj_k_last  \ proj_v_last  on
+                    rqueries     \ rkeys_this   \ rvals_this   \ rkeys_last   \ rvals_last   on
+                    queries      \ keys_this    \ vals_this    \ keys_last    \ vals_last    on
+                    keys         \ vals         \ prod         \ mprod        \ oprod        on
+                    weights      \ wvals        \ pvals        \ rpvals       \ mhattn       on
+                    norm1        \ sum1         \ ffwd1        \ relu1        \ norm2        on 
+                    sum2         \ null         \ null         \ null         \ null;
+ 
+    net.output_nodes = Array(sum2);
+    net.createLayers;
+    net
   }
 
-  override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) { 
-  }
-
-  override def assignTargets(gmats:Array[Mat], ipass:Int, pos:Long) {
-  } 
-  
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
-      assignInputs(gmats, ipass, pos);
-      assignTargets(gmats, ipass, pos);
     }
   }
   
   override def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (batchSize == gmats(0).ncols) { 
-      assignInputs(gmats, ipass, pos);
     }
     zeros(1, 1);
   }
@@ -136,16 +134,17 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
 @SerialVersionUID(100L)
 object TransformerLT {
-  trait Opts extends Net.Opts {
+  trait Opts extends Model.Opts {
     var seqlength = 16384;
     dim = 512;
-    var degree = 128;
     var indim = 512;
+    var degree = 128;
     var nheads = 8;
     var depth = 32;
     var stride = 4;
     var firststrided = 10;
     var nstrided = 6;
+    var hasBias = true;
   }
   
 @SerialVersionUID(100L)
