@@ -57,7 +57,7 @@ trait AddNodeOpts extends NodeOpts {
 
 @SerialVersionUID(100L)
 class AddNode extends Node with AddNodeOpts {
-	 override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
+  override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
    def copyTo(opts:AddNode):AddNode = {
       super.copyTo(opts);

@@ -25,8 +25,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     table = new Array[Mat](opts.depth);
     dtable = new Array[Mat](opts.depth);
     for (i <- 0 until opts.depth) { 
-      table(i) = convertMat(zeros(opts.dim, opts.seqlength));
-      dtable(i) = convertMat(zeros(opts.dim, opts.seqlength));
+      table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
+      dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
     }
   }
 
@@ -35,64 +35,80 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
    * TODO: Modify 
    */
 
-  def constructNet(nqueries:Int, nvals:Int) = {
+  def constructTxNode(seqlength:Int) = {
     import BIDMach.networks.layers.Node._
     val innerdim = opts.indim;
     val dim =      opts.dim;
-    val headdims = irow(opts.dim/opts.nheads, opts.nheads, nqueries);
-    val headdims2 = irow(opts.dim/opts.nheads, opts.nheads, nvals);
-    val headperm = irow(0,2,1);
+    val degree =   opts.degree;
+    val basedims = irow(opts.dim, seqlength);
+    val headdims = irow(opts.dim/opts.nheads, opts.nheads, degree, seqlength/degree);
+    val headperm = irow(0,2,1,3);
+    val invheadperm = headperm;
+    val headperm2 = irow(2,0,1,3);
     val hasBias  = opts.hasBias;
 
-    val cmask0 =   zeros(nvals, nqueries);
-    val col = icol(0->nqueries);
-    for (i <- 0 until nqueries) { 
-      cmask0(i + col, i) = 1;
+    val cmask0 =   zeros((degree*2) \ degree \ opts.nheads \ (seqlength/degree));
+    val col = icol(0->degree);
+    for (i <- 0 until seqlength/degree) { 
+      for (j <- 0 until opts.nheads) { 
+        for (k <- 0 until degree) { 
+          cmask0(k + 1 + col, k, j, i) = 1f;
+        }
+      }
     }
-    val smask0 =   (1f - cmask0) *@ -100f;
+    val smask0 =   (1f - cmask0) *@ -1000f;
+
+    val in_qkv =      input;
+    val this_in =     colslice(in_qkv)(degree, seqlength+degree);
+    val last_in =     colslice(in_qkv)(0, seqlength);
+    val cmask =       constant(cmask0);
+    val smask =       constant(smask0);
+
+    val proj_q_this = linear(this_in)(outdim=innerdim, hasBias=hasBias);
+    val proj_k_this = linear(this_in)(outdim=innerdim, hasBias=hasBias);
+    val proj_v_this = linear(this_in)(outdim=innerdim, hasBias=hasBias);   
+    val proj_k_last = linear(last_in)(outdim=innerdim, hasBias=hasBias);
+    val proj_v_last = linear(last_in)(outdim=innerdim, hasBias=hasBias);   
+
+    val rqueries =    reshape(proj_q_this)(headdims,false);
+    val rkeys_this =  reshape(proj_k_this)(headdims,false);
+    val rvals_this =  reshape(proj_v_this)(headdims,false);
+    val rkeys_last =  reshape(proj_k_last)(headdims,false);
+    val rvals_last =  reshape(proj_v_last)(headdims,false);
+
+    val queries =     transpose(rqueries)(headperm);
+    val keys_this =   transpose(rkeys_this)(headperm2);
+    val vals_this =   transpose(rvals_this)(headperm2);
+    val keys_last =   transpose(rkeys_last)(headperm2);
+    val vals_last =   transpose(rvals_last)(headperm2);
+
+    val keys =        keys_last over keys_this;
+    val vals =        vals_last over vals_this;
+    val prod =        keys * queries;
+    val mprod =       prod *@ cmask;
+    val oprod =       prod + smask;
+
+    val weights =     softmaxx(oprod)();
+    val wvals =       vals ^* weights;
+    val pvals =       transpose(wvals)(invheadperm);
+    val rpvals =      reshape(pvals)(basedims,false);
+    val mhattn =      linear(rpvals)(outdim=dim, hasBias=hasBias);
+
+    val norm1 =       layerNorm(mhattn)();
+    val sum1 =        norm1 + this_in;
+    val ffwd1 =       linear(sum1)(outdim=dim, hasBias=hasBias);
+    val relu1 =       relu(ffwd1)();
+    val norm2 =       layerNorm(relu1)();
+    val sum2 =        sum1 + norm2;
     
-    val in_q =     input;
-    val in_k =     input;
-    val in_v =     input;
-
-    val cmask =    constant(cmask0);
-    val smask =    constant(smask0);
-
-    val proj_q =   linear(in_q)(outdim=innerdim, hasBias=hasBias);
-    val proj_k =   linear(in_k)(outdim=innerdim, hasBias=hasBias);
-    val proj_v =   linear(in_v)(outdim=innerdim, hasBias=hasBias);   
-
-    val rqueries = reshape(proj_q)(headdims,false);
-    val rkeys =    reshape(proj_k)(headdims2,false);
-    val rvalues =  reshape(proj_v)(headdims2,false);
-
-    val queries =  transpose(rqueries)(headperm);
-    val keys =     transpose(rkeys)(headperm);
-    val values =   transpose(rvalues)(headperm);
-
-    val prod =     keys ^* queries;
-    val mprod =    prod *@ cmask;
-    val oprod =    prod + smask;
-    val weights =  softmaxx(oprod)();
-    val wvals =    values * weights;
-
-    val pvals =    transpose(wvals)(headperm);
-    val mhattn =   linear(pvals)(outdim=dim, hasBias=hasBias);
-    val sum1 =     mhattn + in_q;
-    val norm1 =    layerNorm(sum1)();
-
-    val ffwd1 =    linear(wvals)(outdim=dim, hasBias=hasBias);
-    val relu1 =    relu(ffwd1)();
-    val sum2 =     relu1 + norm1;
-    val norm2 =    layerNorm(sum2)();
-    
-    val grid =     in_q       \ in_v      \ in_k      \ cmask    on
-                   smask      \ proj_q    \ proj_k    \ proj_v   on
-                   rqueries   \ rkeys     \ rvalues   \ null     on
-                   queries    \ keys      \ values    \ prod     on
-                   mprod      \ oprod     \ weights   \ wvals    on
-                   pvals      \ mhattn    \ sum1      \ norm1    on
-                   ffwd1      \ relu1     \ sum2      \ norm2;
+    val grid =     in_qkv       \ this_in      \ last_in      \ cmask        \ smask        on
+                   proj_q_this  \ proj_k_this  \ proj_v_this  \ proj_k_last  \ proj_v_last  on
+                   rqueries     \ rkeys_this   \ rvals_this   \ rkeys_last   \ rvals_last   on
+                   queries      \ keys_this    \ vals_this    \ keys_last    \ vals_last    on
+                   keys         \ vals         \ prod         \ mprod        \ oprod        on
+                   weights      \ wvals        \ pvals        \ rpvals       \ mhattn       on
+                   norm1        \ sum1         \ ffwd1        \ relu1        \ norm2        on 
+                   sum2         \ null         \ null         \ null         \ null;
   }
 
   override def assignInputs(gmats:Array[Mat], ipass:Int, pos:Long) { 
