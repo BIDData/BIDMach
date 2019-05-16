@@ -332,7 +332,7 @@ class NodeTerm(val _node:Node, val term:Int) extends Serializable {
         
   def over (a:NodeTerm) = {val n=this; new StackNode{inputs(0)=n; inputs(1)=a;}};
 
-  def \ (a:NodeTerm) = {val n=this; new HcatNode{inputs(0)=n; inputs(1)=a;}};
+  def \\ (a:NodeTerm) = {val n=this; new HcatNode{inputs(0)=n; inputs(1)=a;}};
 
   def hcat (a:NodeTerm) = {val n=this; new HcatNode{inputs(0)=n; inputs(1)=a;}};
   

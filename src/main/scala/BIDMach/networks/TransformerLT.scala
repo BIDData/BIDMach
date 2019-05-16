@@ -21,18 +21,38 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var table:Array[Mat] = null;
   var dtable:Array[Mat] = null;
   var batchSize:Int = 0;
-
+  var txNets:Array[Net] = null;
+  val kmodels = 5
 
   override def init() = {
   }  
 
-  def createTables(opts:TransformerLT.Opts) { 
+  def createTables() { 
     table = new Array[Mat](opts.depth);
     dtable = new Array[Mat](opts.depth);
+    setmodelmats(new Array[Mat](opts.depth * kmodels * 2));
+    updatemats = new Array[Mat](opts.depth * kmodels * 2);
     for (i <- 0 until opts.depth) { 
       table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
       dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
+      for (j <- 0 until kmodels) { 
+        modelmats(2 * (j + kmodels * i)) = convertMat(zeros(opts.dim,opts.dim));
+      }
     }
+
+  }
+
+
+  def attach(net:Net, level:Int = 0) { 
+    net.layers(0).output = table(level);
+    net.layers(0).deriv = dtable(level);
+    net.layers(5).asInstanceOf[ModelLayer].imodel = level * kmodels;
+    net.layers(6).asInstanceOf[ModelLayer].imodel = level * kmodels + 2;
+    net.layers(7).asInstanceOf[ModelLayer].imodel = level * kmodels + 4;
+    net.layers(8).asInstanceOf[ModelLayer].imodel = level * kmodels + 2;
+    net.layers(9).asInstanceOf[ModelLayer].imodel = level * kmodels + 4;
+    net.layers(29).asInstanceOf[ModelLayer].imodel = level * kmodels + 6;
+    net.layers(32).asInstanceOf[ModelLayer].imodel = level * kmodels + 8;
   }
 
   def createTxNet(seqlength:Int) = {
@@ -104,7 +124,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val norm2 =       layerNorm(relu1)();
     val sum2 =        sum1 + norm2;
     
-    nopts.nodemat = in_qkv       \ this_in      \ last_in      \ cmask        \ smask        on
+    val nodes     = in_qkv       \ this_in      \ last_in      \ cmask        \ smask        on
                     proj_q_this  \ proj_k_this  \ proj_v_this  \ proj_k_last  \ proj_v_last  on
                     rqueries     \ rkeys_this   \ rvals_this   \ rkeys_last   \ rvals_last   on
                     queries      \ keys_this    \ vals_this    \ keys_last    \ vals_last    on
@@ -112,10 +132,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
                     weights      \ wvals        \ pvals        \ rpvals       \ mhattn       on
                     norm1        \ sum1         \ ffwd1        \ relu1        \ norm2        on 
                     sum2         \ null         \ null         \ null         \ null;
+
+    nopts.nodemat = nodes.t;
  
     net.output_nodes = Array(sum2);
     net.createLayers;
-    net
+    net;
   }
 
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
@@ -165,6 +187,28 @@ object TransformerLT {
   	    opts)
     (nn, opts)
   }
+
+  def testsetup(len:Int = 16384):TransformerLT = { 
+    val opts = new Options;
+    opts.seqlength = len;
+    opts.depth = 2;
+    val trans = new TransformerLT(opts);
+    trans.createTables();
+    val net = trans.createTxNet(len);
+    net.setmodelmats(trans.modelmats);
+    net.updatemats = trans.updatemats;
+    trans.attach(net, 0);
+    trans.txNets = Array(net);
+    trans;
+  }
+
+  def testfwd(trans:TransformerLT, n:Int) = { 
+    for (i <- 0 until n) { 
+      trans.txNets(0).forward
+    }
+  }
+  
+  
   
   def load(fname:String):TransformerLT = {
   	val mm = new TransformerLT;
