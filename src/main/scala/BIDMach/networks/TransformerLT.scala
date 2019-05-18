@@ -188,13 +188,11 @@ object TransformerLT {
     (nn, opts)
   }
 
-  def testsetup(len:Int = 16384):TransformerLT = { 
-    val opts = new Options;
-    opts.seqlength = len;
+  def testsetup(opts:Opts = new Options):TransformerLT = { 
     opts.depth = 2;
     val trans = new TransformerLT(opts);
     trans.createTables();
-    val net = trans.createTxNet(len);
+    val net = trans.createTxNet(opts.seqlength);
     net.setmodelmats(trans.modelmats);
     net.updatemats = trans.updatemats;
     trans.attach(net, 0);

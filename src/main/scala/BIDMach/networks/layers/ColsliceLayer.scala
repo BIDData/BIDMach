@@ -20,7 +20,7 @@ class ColsliceLayer(override val net:Net, override val opts:ColsliceNodeOpts = n
   override def forward = {
 	val start = toc;
 	if (output.asInstanceOf[AnyRef] == null) {
-      val odims = inputData(0).dims.copy;
+      val odims = inputData.dims.copy;
       odims(odims.length-1) = opts.b - opts.a;
 	  output = inputData.zeros(odims);
 	}
