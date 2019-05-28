@@ -62,7 +62,13 @@ class MulLayer(override val net:Net, override val opts:MulNodeOpts = new MulNode
 }
 
 trait MulNodeOpts extends NodeOpts {  
-	var ninputs = 2;
+  var ninputs = 2;
+
+  def copyOpts(opts:MulNodeOpts):MulNodeOpts = {
+      super.copyOpts(opts);
+      opts.ninputs = ninputs;
+      opts;
+  }
 }
 
 @SerialVersionUID(100L)
@@ -71,7 +77,7 @@ class MulNode extends Node with MulNodeOpts {
   
   def copyTo(opts:MulNode):MulNode = {
       super.copyTo(opts);
-      opts.ninputs = ninputs;
+      copyOpts(opts);
       opts;
   }
 

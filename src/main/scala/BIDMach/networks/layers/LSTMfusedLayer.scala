@@ -58,12 +58,8 @@ class LSTMfusedLayer(override val net:Net, override val opts:LSTMfusedNodeOpts =
 }
 
 trait LSTMfusedNodeOpts extends NodeOpts {
-    
-   def copyOpts(opts:LSTMfusedNodeOpts):LSTMfusedNodeOpts = {
-  		super.copyOpts(opts);
-  		opts;
-    }
-}
+}    
+
 
 @SerialVersionUID(100L)
 class LSTMfusedNode extends Node with LSTMfusedNodeOpts {	

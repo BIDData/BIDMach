@@ -53,7 +53,13 @@ class SubLayer(override val net:Net, override val opts:SubNodeOpts = new SubNode
 }
 
 trait SubNodeOpts extends NodeOpts {
-	var ninputs = 2;
+  var ninputs = 2;
+
+  def copyOpts(opts:SubNodeOpts):SubNodeOpts = {
+    super.copyOpts(opts);
+    opts.ninputs = ninputs;
+    opts;
+  }
 }
 
 @SerialVersionUID(100L)
@@ -62,7 +68,7 @@ class SubNode extends Node with SubNodeOpts {
   
    def copyTo(opts:SubNode):SubNode = {
       super.copyTo(opts);
-      opts.ninputs = ninputs;
+      copyOpts(opts);
       opts;
   }
 

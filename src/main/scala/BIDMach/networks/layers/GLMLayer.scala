@@ -68,19 +68,25 @@ class GLMLayer(override val net:Net, override val opts:GLMNodeOpts = new GLMNode
 
 trait GLMNodeOpts extends NodeOpts { 
 	var links:IMat = null;
+
+	def copyOpts(opts:GLMNodeOpts):GLMNodeOpts = {
+	  super.copyOpts(opts);
+	  opts.links = links;
+      opts
+    }
 }
  
 @SerialVersionUID(100L)
 class GLMNode extends Node with OutputNode with GLMNodeOpts {  
-	def copyTo(opts:GLMNode) = {
-		super.copyTo(opts);
-		opts.links = links;
-		opts;
-	}
+  def copyTo(opts:GLMNode) = {
+	super.copyTo(opts);
+	copyOpts(opts);
+	opts;
+  }
 
-	override def clone:GLMNode = {copyTo(new GLMNode);}   
+  override def clone:GLMNode = {copyTo(new GLMNode);}   
 
-	override def create(net:Net):GLMLayer = {GLMLayer(net, this);}
+  override def create(net:Net):GLMLayer = {GLMLayer(net, this);}
   
   override def toString = {
     "glm@"+Integer.toHexString(hashCode % 0x10000).toString

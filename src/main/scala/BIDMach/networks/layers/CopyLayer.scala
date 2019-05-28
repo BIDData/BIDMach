@@ -54,6 +54,12 @@ trait CopyNodeOpts extends NodeOpts {
 
 @SerialVersionUID(100L)
 class CopyNode extends Node with CopyNodeOpts {
+  
+  def copyTo(opts:CopyNode):CopyNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
 
     override def clone:CopyNode = {copyTo(new CopyNode).asInstanceOf[CopyNode];};
 

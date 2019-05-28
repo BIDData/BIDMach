@@ -284,18 +284,24 @@ trait LRNacrossNodeOpts extends NodeOpts {
     var k = 2f;
     
    def copyOpts(opts:LRNacrossNodeOpts):LRNacrossNodeOpts = {
-  		super.copyOpts(opts);
-  		opts.dim = dim;
-  		opts.alpha = alpha;
-  		opts.beta = beta;
-  		opts.k = k;
-  		opts;
-    }
+  	 super.copyOpts(opts);
+  	 opts.dim = dim;
+  	 opts.alpha = alpha;
+  	 opts.beta = beta;
+  	 opts.k = k;
+  	 opts;
+   }
 }
 
 @SerialVersionUID(100L)
 class LRNacrossNode extends Node with LRNacrossNodeOpts {	
-	 
+	
+  def copyTo(opts:LRNacrossNode):LRNacrossNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
+ 
 	  override def clone:LRNacrossNode = {
 		  copyTo(new LRNacrossNode).asInstanceOf[LRNacrossNode];
 	  }

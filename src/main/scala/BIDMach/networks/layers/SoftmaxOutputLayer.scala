@@ -112,11 +112,11 @@ trait SoftmaxOutputNodeOpts extends NodeOpts {
 	var eps = 1e-6f;
 		
 	def copyOpts(opts:SoftmaxOutputNodeOpts):SoftmaxOutputNodeOpts = {
-			super.copyOpts(opts);
-			opts.scoreType = scoreType;
-			opts.lossType = lossType;
-			opts.eps = eps;
-			opts;
+	  super.copyOpts(opts);
+	  opts.scoreType = scoreType;
+	  opts.lossType = lossType;
+	  opts.eps = eps;
+	  opts;
 	}
 }
 

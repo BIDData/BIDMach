@@ -30,13 +30,13 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 	  ndims = inputData.dims.length;
 	  ocols = 0;
 	  for (i <- 0 until opts.ninputs) {
-		val thiscol = inputDatas(i).dims(0);
+		val thiscol = inputDatas(i).dims(opts.idim);
 		colranges(i) = inputData.izeros(1,thiscol).asInstanceOf[IMat];
 		colranges(i) <-- irow(ocols -> (ocols + thiscol));
 		ocols += thiscol;
 	  }
 	  val odims = inputData.dims.copy;
-	  odims(0) = ocols;
+	  odims(opts.idim) = ocols;
 	  output = inputData.zeros(odims);
 	}
 	inplaceNoConnectGetOutput();
@@ -60,12 +60,36 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  }
 		}
 	  } else {
-		ndims match {
-		  case 2 => output(colranges(i), ?) = inputDatas(i);
-		  case 3 => output(colranges(i), ?, ?) = inputDatas(i);
-		  case 4 => output(colranges(i), ?, ?, ?) = inputDatas(i);
-		  case 5 => output(colranges(i), ?, ?, ?, ?) = inputDatas(i);
-		}
+        if (opts.idim == 0) { 
+		  ndims match {
+		    case 2 => output(colranges(i), ?) = inputDatas(i);
+		    case 3 => output(colranges(i), ?, ?) = inputDatas(i);
+		    case 4 => output(colranges(i), ?, ?, ?) = inputDatas(i);
+		    case 5 => output(colranges(i), ?, ?, ?, ?) = inputDatas(i);
+		  }
+        } else if (opts.idim == 1) { 
+		  ndims match {
+		    case 2 => output(?, colranges(i)) = inputDatas(i);
+		    case 3 => output(?, colranges(i), ?) = inputDatas(i);
+		    case 4 => output(?, colranges(i), ?, ?) = inputDatas(i);
+		    case 5 => output(?, colranges(i), ?, ?, ?) = inputDatas(i);
+          }
+        } else if (opts.idim == 2) { 
+		  ndims match {
+		    case 3 => output(?, ?, colranges(i)) = inputDatas(i);
+		    case 4 => output(?, ?, colranges(i), ?) = inputDatas(i);
+		    case 5 => output(?, ?, colranges(i), ?, ?) = inputDatas(i);
+          }
+        } else if (opts.idim == 3) { 
+		  ndims match {
+		    case 4 => output(?, ?, ?, colranges(i)) = inputDatas(i);
+		    case 5 => output(?, ?, ?, colranges(i), ?) = inputDatas(i);
+          }
+        } else if (opts.idim == 4) { 
+		  ndims match {
+		    case 5 => output(?, ?, ?, ?, colranges(i)) = inputDatas(i);
+          }
+        }
 	  }
 	}
 	
@@ -96,12 +120,36 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 		  	}
 		  }
 		} else {
-		  ndims match {
-		  	case 2 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?);
-		  	case 3 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?, ?);
-		  	case 4 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?, ?, ?);
-		  	case 5 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?, ?, ?, ?);
-		  }
+          if (opts.idim == 0) { 
+		    ndims match {
+		  	  case 2 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?);
+		  	  case 3 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?, ?);
+		  	  case 4 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?, ?, ?);
+		  	  case 5 => inputDerivs(i) ~ inputDerivs(i) + deriv(colranges(i), ?, ?, ?, ?);
+            }
+		  } else if (opts.idim == 1) { 
+		    ndims match {
+		  	  case 2 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, colranges(i));
+		  	  case 3 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, colranges(i), ?);
+		  	  case 4 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, colranges(i), ?, ?);
+		  	  case 5 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, colranges(i), ?, ?, ?);
+            }
+		  } else if (opts.idim == 2) { 
+		    ndims match { 
+		  	  case 3 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, ?, colranges(i));
+		  	  case 4 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, ?, colranges(i), ?);
+		  	  case 5 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, ?, colranges(i), ?, ?);
+            }
+		  } else if (opts.idim == 3) { 
+		    ndims match {
+		  	  case 4 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, ?, ?, colranges(i));
+		  	  case 5 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, ?, ?, colranges(i), ?);
+            }
+		  } else if (opts.idim == 4) { 
+		    ndims match {
+		  	  case 5 => inputDerivs(i) ~ inputDerivs(i) + deriv(?, ?, ?, ?, colranges(i));
+            }
+          }
 		}
 	  }
 	}  
@@ -123,10 +171,12 @@ class StackLayer(override val net:Net, override val opts:StackNodeOpts = new Sta
 
 trait StackNodeOpts extends NodeOpts {  
   var ninputs = 2;  
+  var idim = 0;
 
   def copyOpts(opts:StackNodeOpts):StackNodeOpts = {
 	super.copyOpts(opts);
 	opts.ninputs = ninputs;
+	opts.idim = idim;
 	opts;
   }
 
@@ -135,6 +185,13 @@ trait StackNodeOpts extends NodeOpts {
 @SerialVersionUID(100L)
 class StackNode extends Node with StackNodeOpts {
   override val inputs = new Array[NodeTerm](ninputs);
+
+  def copyTo(opts:StackNode):StackNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
+
 
   override def clone:StackNode = {copyTo(new StackNode).asInstanceOf[StackNode];}
 

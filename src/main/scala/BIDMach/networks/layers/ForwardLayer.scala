@@ -41,7 +41,7 @@ trait ForwardNodeOpts extends NodeOpts {
 @SerialVersionUID(100L)
 class ForwardNode extends Node with ForwardNodeOpts {
 
-	override def clone:ForwardNode = {copyTo(new ForwardNode).asInstanceOf[ForwardNode];}
+  override def clone:ForwardNode = {copyTo(new ForwardNode).asInstanceOf[ForwardNode];}
 
   override def create(net:Net):ForwardLayer = {ForwardLayer(net, this);}
   

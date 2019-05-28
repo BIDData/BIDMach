@@ -48,9 +48,16 @@ trait LRNwithinNodeOpts extends CompoundNodeOpts {
 @SerialVersionUID(100L)
 class LRNwithinNode extends CompoundNode with LRNwithinNodeOpts {	
   
-  	var xalpha:Mat = null;
-    var xbeta:Mat = null;
-    var xone:Mat = null;
+  var xalpha:Mat = null;
+  var xbeta:Mat = null;
+  var xone:Mat = null;
+
+  def copyTo(opts:LRNwithinNode):LRNwithinNode = {
+    this.asInstanceOf[Node].copyTo(opts);
+    copyOpts(opts);
+    opts
+  }
+
     
     def initMats(a:Mat) = {
   	    xalpha = a.zeros(iones(1,a.dims.length));

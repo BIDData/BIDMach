@@ -68,14 +68,21 @@ class DropoutLayer(override val net:Net, override val opts:DropoutNodeOpts = new
 
 trait DropoutNodeOpts extends NodeOpts {
     var frac = 1f;
+
+  def copyOpts(opts:DropoutNodeOpts):DropoutNodeOpts = {
+	super.copyOpts(opts);
+	opts.frac = frac;
+	opts;
+  }
+
 }
     
 @SerialVersionUID(100L)    
 class DropoutNode extends Node with DropoutNodeOpts { 
 	def copyTo(opts:DropoutNode):DropoutNode = {
-			super.copyTo(opts);
-			opts.frac = frac;
-			opts;
+	  super.copyTo(opts);
+      copyOpts(opts);
+	  opts;
 	}
 
 	override def clone:DropoutNode = {copyTo(new DropoutNode);}

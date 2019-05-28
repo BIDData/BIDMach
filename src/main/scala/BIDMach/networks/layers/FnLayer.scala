@@ -49,18 +49,24 @@ class FnLayer(override val net:Net, override val opts:FnNodeOpts = new FnNode) e
 trait FnNodeOpts extends NodeOpts { 
   var fwdfn:(Mat)=> Mat = null;
   var bwdfn:(Mat,Mat,Mat)=> Mat = null;
+
+  def copyOpts(opts:FnNodeOpts):FnNodeOpts = {
+	super.copyOpts(opts);
+	opts.fwdfn = fwdfn;
+	opts.bwdfn = bwdfn;
+    opts;
+  }
 }
 
 @SerialVersionUID(100L)
 class FnNode extends Node with FnNodeOpts {
-  	def copyTo(opts:FnNode):FnNode = {
-			super.copyTo(opts);
-			opts.fwdfn = fwdfn;
-			opts.bwdfn = bwdfn;
-			opts;
-	}
+  def copyTo(opts:FnNode):FnNode = {
+	super.copyTo(opts);
+    copyOpts(opts);
+	opts;
+  }
 
-	override def clone:FnNode = {copyTo(new FnNode).asInstanceOf[FnNode];}
+  override def clone:FnNode = {copyTo(new FnNode).asInstanceOf[FnNode];}
 
   override def create(net:Net):FnLayer = {FnLayer(net, this);}
   

@@ -54,7 +54,7 @@ trait MaxiNodeOpts extends NodeOpts {
 @SerialVersionUID(100L)
 class MaxiNode extends Node with MaxiNodeOpts {
 
-	override def clone:MaxiNode = {copyTo(new MaxiNode).asInstanceOf[MaxiNode];}
+  override def clone:MaxiNode = {copyTo(new MaxiNode).asInstanceOf[MaxiNode];}
 
   override def create(net:Net):MaxiLayer = {MaxiLayer(net, this);}
   

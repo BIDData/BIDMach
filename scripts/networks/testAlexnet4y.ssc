@@ -48,9 +48,9 @@ val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION
 Net.initDefaultNodeSet;
 
 val in =        input();
-val meanv =     const(means);
+val meanv =     const(means)();
 val din =       in - meanv;
-val scalef =    const(row(0.01f));
+val scalef =    const(row(0.01f))();
 //val sdin =      din *@ scalef;
 //val fin =       format(in)();
 val cin =       crop(din)(randoffsets=irow(0,32,32,-1));

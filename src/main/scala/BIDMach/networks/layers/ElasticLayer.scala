@@ -95,9 +95,9 @@ trait ElasticNodeOpts extends ModelNodeOpts {
   var elastic_weight = 0f
 
   def copyOpts(opts:ElasticNodeOpts):ElasticNodeOpts = {
-  		super.copyOpts(opts);
-  		opts.elastic_weight = elastic_weight;
-  		opts;
+  	super.copyOpts(opts);
+  	opts.elastic_weight = elastic_weight;
+  	opts;
   }
 
 }

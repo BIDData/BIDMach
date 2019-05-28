@@ -42,6 +42,14 @@ class ConstantLayer(override val net:Net, override val opts:ConstantNodeOpts = n
 trait ConstantNodeOpts extends NodeOpts {
   var value:Mat = null;
   var cache:Boolean = false;
+
+  def copyOpts(opts:ConstantNodeOpts):ConstantNodeOpts = {
+	super.copyOpts(opts);
+	opts.value = value;
+	opts.cache = cache;
+	opts;
+  }
+
 }
 
 @SerialVersionUID(100L)
@@ -49,8 +57,7 @@ class ConstantNode extends Node with ConstantNodeOpts {
 
   def copyTo(opts:ConstantNode):ConstantNode = {
     super.copyTo(opts);
-    opts.value = value;
-    opts.cache = cache;
+    copyOpts(opts);
     opts;
   }
     

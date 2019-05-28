@@ -125,7 +125,7 @@ Net.initDefaultNodeSet;
 var thisnode:Node = null;
 
 val in =        input();
-val meanv =     const(means);
+val meanv =     const(means)();
 val din =       in - meanv;
 val min =       cropMirror(din)(randoffsets=irow(0,28,28,-1));
 

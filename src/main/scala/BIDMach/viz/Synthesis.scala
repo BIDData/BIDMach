@@ -535,7 +535,7 @@ object Synthesis {
             val convt = jcuda.jcudnn.cudnnConvolutionMode.CUDNN_CROSS_CORRELATION;
             Net.initDefaultNodeSet;
             val in = input;
-            val scalef = constant(row(0.01f));
+            val scalef = constant(row(0.01f))(true);
             val inscale = in *@ scalef
 
             val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=0,initv=1f,convType=convt);
@@ -665,9 +665,9 @@ object Synthesis {
 
             val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4");
             val in =        input;
-            val meanv =     const(means);
+            val meanv =     const(means)(true);
             val din =       in - meanv;
-            val scalef =    const(row(0.01f));
+            val scalef =    const(row(0.01f))(true);
             val cin =       cropMirror(din)(sizes=irow(3,227,227,0), randoffsets=irow(0,28,28,-1));
 
             val conv1 =     conv(cin)(w=11,h=11,nch=96,stride=4,initfn=Net.gaussian,initv=0.01f,initbiasv=0f);

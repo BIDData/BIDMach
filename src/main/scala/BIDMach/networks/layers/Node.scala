@@ -257,7 +257,7 @@ trait NodeOpts extends BIDMat.Opts {
     opts.name = name;
     opts.tensorFormat = tensorFormat
     opts.inplace = inplace;
-		opts;
+	opts;
   }
 }
 
@@ -370,13 +370,19 @@ object Node {
     val b0 = b;
     new ColsliceNode{inputs(0) = n; a=a0; b=b0;}
   }
+
+  def colperm(a:NodeTerm, b:NodeTerm) = { 
+    new ColpermNode{inputs(0) = a; inputs(1) = b;}
+  }
  
-  def constant(v:Mat) = {
-    new ConstantNode{value = v;}
+  def constant(v:Mat)(cache:Boolean=false) = {
+    val cache0 = cache;
+    new ConstantNode{value = v;cache=cache0}
   }
   
-  def const(v:Mat) = {
-    new ConstantNode{value = v;}
+  def const(v:Mat)(cache:Boolean=false) = {
+    val cache0 = cache;
+    new ConstantNode{value = v;cache=cache0}
   }
     
   def conv(a:NodeTerm)(name:String="", w:Int, h:Int, nch:Int, stride:IMat = irow(1), pad:IMat = irow(1), hasBias:Boolean = true, 
@@ -685,10 +691,11 @@ bias_scale=bs; inplace=inp}
   
   def sqrt(a:NodeTerm) = new SqrtNode{inputs(0) = a;};
   
-  def stack(a:Array[_ <: NodeTerm]) = {
-    val n = new StackNode{override val inputs = new Array[NodeTerm](a.length); ninputs = a.length};
-    Array.copy(a, 0, n.inputs, 0, a.length);
-	  n
+  def stack(a:NodeTerm*)(idim:Int = 0) = {
+    val idim0 = idim;
+    val n = new StackNode{override val inputs = new Array[NodeTerm](a.length); ninputs = a.length; idim=idim0};
+    Array.copy(a.toArray, 0, n.inputs, 0, a.length);
+	n
   }
   
   def sum(a:NodeTerm) = new SumNode{inputs(0) = a;}

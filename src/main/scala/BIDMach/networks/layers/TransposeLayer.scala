@@ -51,9 +51,9 @@ trait TransposeNodeOpts extends NodeOpts {
   var perm:IMat = null;                  // Permutation matrix
 
   def copyOpts(opts:TransposeNodeOpts):TransposeNodeOpts = {
-		super.copyOpts(opts);
-		opts.perm = perm;           
-		opts;
+	super.copyOpts(opts);
+	opts.perm = perm;           
+	opts;
   }
 }
 
@@ -61,9 +61,9 @@ trait TransposeNodeOpts extends NodeOpts {
 class TransposeNode extends Node with TransposeNodeOpts {
   
 	def copyTo(opts:TransposeNode):TransposeNode = {
-			this.asInstanceOf[Node].copyTo(opts);
-			copyOpts(opts);
-			opts
+	  this.asInstanceOf[Node].copyTo(opts);
+	  copyOpts(opts);
+	  opts
 	}
 
 	override def clone:TransposeNode = {copyTo(new TransposeNode).asInstanceOf[TransposeNode];}

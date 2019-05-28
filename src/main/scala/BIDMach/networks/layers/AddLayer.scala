@@ -28,22 +28,22 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
       val start = toc;
       inplaceNoConnectGetOutput();
       
-			output ~ inputData + inputDatas(1);
-			(2 until inputlength).map((i:Int) => output ~ output + inputDatas(i));
+	  output ~ inputData + inputDatas(1);
+	  (2 until inputlength).map((i:Int) => output ~ output + inputDatas(i));
 
-			forwardtime += toc - start;
+	  forwardtime += toc - start;
 	}
 
 	override def backward = {
       val start = toc;
       inplaceNoConnectGetInputDerivs();
       
-			(0 until inputlength).map((i:Int) => {
-				if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + squash(deriv, inputDerivs(i));
-			});
-			
-			inplaceNoConnectReleaseDeriv()
-			backwardtime += toc - start;
+	  (0 until inputlength).map((i:Int) => {
+		if (inputDerivs(i).asInstanceOf[AnyRef] != null) inputDerivs(i) ~ inputDerivs(i) + squash(deriv, inputDerivs(i));
+	  });
+	  
+	  inplaceNoConnectReleaseDeriv()
+	  backwardtime += toc - start;
 	}
   
   override def toString = {
@@ -52,22 +52,29 @@ class AddLayer(override val net:Net, override val opts:AddNodeOpts = new AddNode
 }
 
 trait AddNodeOpts extends NodeOpts {
-	var ninputs = 2;
+  var ninputs = 2;
+  
+  def copyOpts(opts:AddNodeOpts):AddNodeOpts = {
+    super.copyOpts(opts);
+    opts.ninputs = ninputs;
+    opts;
+  }
 }
 
 @SerialVersionUID(100L)
 class AddNode extends Node with AddNodeOpts {
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](ninputs);
   
-   def copyTo(opts:AddNode):AddNode = {
-      super.copyTo(opts);
-      opts.ninputs = ninputs;
-      opts;
+  def copyTo(opts:AddNode):AddNode = {
+    super.copyTo(opts);
+    copyOpts(opts);
+    opts;
   }
 
-	override def clone:AddNode = {copyTo(new AddNode).asInstanceOf[AddNode];}
 
-	override def create(net:Net):AddLayer = {AddLayer(net, this);}
+  override def clone:AddNode = {copyTo(new AddNode).asInstanceOf[AddNode];}
+
+  override def create(net:Net):AddLayer = {AddLayer(net, this);}
   
   override def toString = {
    "add@"+("%04x" format (hashCode % 0x10000));

@@ -83,7 +83,13 @@ trait HcatNodeOpts extends NodeOpts {
 class HcatNode extends Node with HcatNodeOpts {
   override val inputs = new Array[NodeTerm](ninputs);
   
-  override def clone:HcatNode = {copyTo(new HcatNode).asInstanceOf[HcatNode];}
+  def copyTo(opts:HcatNode):HcatNode = {
+	super.copyTo(opts);
+	copyOpts(opts);
+	opts;
+  }
+
+  override def clone:HcatNode = {copyTo(new HcatNode);}
 
   override def create(net:Net):HcatLayer = {HcatLayer(net, this);}
   

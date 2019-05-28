@@ -25,8 +25,12 @@ class LayerNormLayer(override val net:Net, override val opts:LayerNormNodeOpts =
   def initModelMats = {
     batchDim = irow(0->(inputData.dims.length-1));
     val d = inputData.dims
-    if (d.length > 2 && prod(d(0->(d.length-2))).v > 128) { 
-      batchDim1 = irow(0->(inputData.dims.length-2));
+    if (d.length > 2) { 
+      if (d(0) > 128) { 
+        batchDim1 = irow(0);
+      } else if (d.length > 3 && prod(d(0->(d.length-2))).v > 128) { 
+        batchDim1 = irow(0->(inputData.dims.length-2));
+      }
     }
   }
 
@@ -84,7 +88,7 @@ class LayerNormLayer(override val net:Net, override val opts:LayerNormNodeOpts =
   }
 
   override def toString = {
-    "ln@" + Integer.toHexString(hashCode() % 0x10000)
+    "lnorm@" + Integer.toHexString(hashCode() % 0x10000)
   }
 }
 
@@ -92,9 +96,9 @@ trait LayerNormNodeOpts extends NodeOpts {
   var epsilon:Float = 1e-4f;
 
   def copyOpts(opts:LayerNormNodeOpts):LayerNormNodeOpts = {
-		super.copyOpts(opts);
-		opts.epsilon = epsilon;
-		opts;
+	super.copyOpts(opts);
+	opts.epsilon = epsilon;
+	opts;
   }
 }
 
@@ -110,7 +114,7 @@ class LayerNormNode extends Node with LayerNormNodeOpts {
   override def create(net:Net) = LayerNormLayer(net, this)
   
   override def toString = {
-    "ln@" + Integer.toHexString(hashCode() % 0x10000)
+    "lnorm@" + Integer.toHexString(hashCode() % 0x10000)
   }
 }
 

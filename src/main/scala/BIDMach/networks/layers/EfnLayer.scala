@@ -86,15 +86,21 @@ class EfnLayer(override val net:Net, override val opts:EfnNodeOpts = new EfnNode
 trait EfnNodeOpts extends NodeOpts { 
   var fwdfn:(Float)=> Float = null;
   var bwdfn:(Float,Float,Float)=> Float = null;
+
+  def copyOpts(opts:EfnNodeOpts):EfnNodeOpts = {
+	super.copyOpts(opts);
+	opts.fwdfn = fwdfn;
+	opts.bwdfn = bwdfn;
+    opts
+  }
 }
 
 @SerialVersionUID(100L)
 class EfnNode extends Node with EfnNodeOpts {
   	def copyTo(opts:EfnNode):EfnNode = {
-			super.copyTo(opts);
-			opts.fwdfn = fwdfn;
-			opts.bwdfn = bwdfn;
-			opts;
+	  super.copyTo(opts);
+      copyOpts(opts);
+	  opts;
 	}
 
 	override def clone:EfnNode = {copyTo(new EfnNode).asInstanceOf[EfnNode];}

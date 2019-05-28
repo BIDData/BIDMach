@@ -52,7 +52,7 @@ trait AbsNodeOpts extends NodeOpts {
 @SerialVersionUID(100L)
 class AbsNode extends Node with AbsNodeOpts {
 
-	override def clone:AbsNode = {copyTo(new AbsNode).asInstanceOf[AbsNode];}
+  override def clone:AbsNode = {copyTo(new AbsNode).asInstanceOf[AbsNode];}
 
   override def create(net:Net):AbsLayer = {AbsLayer(net, this);}
   

@@ -595,6 +595,10 @@ object Layer {
     new ColsliceLayer(null, new ColsliceNode{a=a0; b=b0;}){inputs(0)=n;}
   }
 
+  def colperm(a:LayerTerm, b:LayerTerm) = { 
+    new ColpermLayer(null, new ColpermNode()){inputs(0)=a; inputs(1)=b}
+  }
+
   def constant(v:Mat)(net:Net=null):ConstantLayer = {
     new ConstantLayer(net, new ConstantNode{value = v;})
   }

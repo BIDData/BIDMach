@@ -55,19 +55,25 @@ trait Fn2NodeOpts extends NodeOpts {
   var fwdfn:(Mat,Mat)=> Mat = null;
   var bwdfn1:(Mat,Mat,Mat,Mat)=> Mat = null;
   var bwdfn2:(Mat,Mat,Mat,Mat)=> Mat = null;
+
+  def copyOpts(opts:Fn2NodeOpts):Fn2NodeOpts = {
+	super.copyOpts(opts);
+	opts.fwdfn = fwdfn;
+	opts.bwdfn1 = bwdfn1;
+	opts.bwdfn2 = bwdfn2;
+    opts
+  }
 }
 
 @SerialVersionUID(100L)
 class Fn2Node extends Node with Fn2NodeOpts {
-  	def copyTo(opts:Fn2Node):Fn2Node = {
-			super.copyTo(opts);
-			opts.fwdfn = fwdfn;
-			opts.bwdfn1 = bwdfn1;
-			opts.bwdfn2 = bwdfn2;
-			opts;
-	}
+  def copyTo(opts:Fn2Node):Fn2Node = {
+	super.copyTo(opts);
+    copyOpts(opts);
+	opts;
+  }
 
-	override def clone:Fn2Node = {copyTo(new Fn2Node).asInstanceOf[Fn2Node];}
+  override def clone:Fn2Node = {copyTo(new Fn2Node).asInstanceOf[Fn2Node];}
 
   override def create(net:Net):Fn2Layer = {Fn2Layer(net, this);}
   

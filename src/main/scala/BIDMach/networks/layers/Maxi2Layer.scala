@@ -58,7 +58,7 @@ trait Maxi2NodeOpts extends NodeOpts {
 @SerialVersionUID(100L)
 class Maxi2Node extends Node with Maxi2NodeOpts {
 
-	override def clone:Maxi2Node = {copyTo(new Maxi2Node).asInstanceOf[Maxi2Node];}
+  override def clone:Maxi2Node = {copyTo(new Maxi2Node).asInstanceOf[Maxi2Node];}
 
   override def create(net:Net):Maxi2Layer = {Maxi2Layer(net, this);}
   

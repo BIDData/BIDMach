@@ -52,8 +52,14 @@ trait MultiHeadAttnNodeOpts extends CompoundNodeOpts {
 @SerialVersionUID(100L)
 class MultiHeadAttnNode extends CompoundNode with MultiHeadAttnNodeOpts {	
   
-	  override val inputs:Array[NodeTerm] = Array(null, null, null);
+  override val inputs:Array[NodeTerm] = Array(null, null, null);
 //    override val inputTerminals:Array[Int] = Array(0,0,0);
+
+  def copyTo(opts:MultiHeadAttnNode):MultiHeadAttnNode = {
+    super.copyTo(opts);
+    copyOpts(opts);
+    opts;
+  }
 	  
     def v = apply(0);
     
@@ -91,7 +97,7 @@ class MultiHeadAttnNode extends CompoundNode with MultiHeadAttnNodeOpts {
     	val v1   = copy;
     	val k1   = copy; 
     	val q1   = copy;
-    	val c1   = constant(row(1f/ math.sqrt(dimk).toFloat));
+    	val c1   = constant(row(1f/ math.sqrt(dimk).toFloat))(true);
       
       val mv   = variable(proj1dims)();
       val mk   = variable(proj1dims)();

@@ -133,7 +133,7 @@ val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4"
   var thisnode:Node = null;
 
   val in =        input();
-  val meanv =     const(means);
+  val meanv =     const(means)();
   val din =       in - meanv;
   val min =       cropMirror(din)(randoffsets=irow(0,28,28,-1));
 

@@ -70,6 +70,13 @@ trait ColsliceNodeOpts extends NodeOpts {
 
 @SerialVersionUID(100L)
 class ColsliceNode extends Node with ColsliceNodeOpts {
+
+  def copyTo(opts:ColsliceNode):ColsliceNode = {
+    super.copyTo(opts);
+    copyOpts(opts);
+    opts;
+  }
+
   
   override def clone:ColsliceNode = {copyTo(new ColsliceNode).asInstanceOf[ColsliceNode];}
 

@@ -30,9 +30,9 @@ import BIDMach.networks.layers.Node._;
 Net.initDefaultNodeSet;
 
 val in = input();
-val meanv = const(means);
+val meanv = const(means)();
 val din =   in - meanv;
-val scalef = constant(row(0.01f));
+val scalef = constant(row(0.01f))();
 val inscale = din *@ scalef
 
 val conv1 = conv(inscale)(w=5,h=5,nch=32,stride=1,pad=2,initv=1f,convType=convt);

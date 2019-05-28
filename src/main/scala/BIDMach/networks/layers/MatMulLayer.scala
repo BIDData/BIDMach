@@ -110,6 +110,13 @@ trait MatMulNodeOpts extends NodeOpts {
   var transA = false
   var transB = false
   var skipDim1 = false
+
+  def copyOpts(opts:MatMulNodeOpts):MatMulNodeOpts = {
+      super.copyOpts(opts);
+      opts.transA = transA
+      opts.transB = transB
+      opts;
+  }
 }
 
 @SerialVersionUID(100L)
@@ -117,10 +124,9 @@ class MatMulNode extends Node with MatMulNodeOpts {
   override val inputs:Array[NodeTerm] = new Array[NodeTerm](2);
   
   def copyTo(opts:MatMulNode):MatMulNode = {
-      super.copyTo(opts);
-      opts.transA = transA
-      opts.transB = transB
-      opts;
+    super.copyTo(opts);
+    copyOpts(opts);
+    opts;
   }
 
 	override def clone:MatMulNode = {copyTo(new MatMulNode).asInstanceOf[MatMulNode];}

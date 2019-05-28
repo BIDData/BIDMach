@@ -53,7 +53,7 @@ trait ExpNodeOpts extends NodeOpts {
 @SerialVersionUID(100L)
 class ExpNode extends Node with ExpNodeOpts {
 
-	override def clone:ExpNode = {copyTo(new ExpNode).asInstanceOf[ExpNode];}
+  override def clone:ExpNode = {copyTo(new ExpNode).asInstanceOf[ExpNode];}
 
   override def create(net:Net):ExpLayer = {ExpLayer(net, this);}
   

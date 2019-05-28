@@ -68,9 +68,9 @@ val means = ones(3\256\256\opts.batchSize) *@ loadFMat(traindir+"means.fmat.lz4"
   Net.initDefaultNodeSet;
 
   val in =        input();
-  val meanv =     const(means);
+  val meanv =     const(means)();
   val din =       in - meanv;
-  val scalef =    const(row(0.01f));
+  val scalef =    const(row(0.01f))();
   //val sdin =      din *@ scalef;
   //val fin =       format(in)();
   val cin =       cropMirror(din)(sizes=irow(3,227,227,0), randoffsets=irow(0,28,28,-1));
