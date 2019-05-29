@@ -48,10 +48,10 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     setmodelmats(new Array[Mat](opts.depth * kmodels * 2));
     updatemats = new Array[Mat](opts.depth * kmodels * 2);
     for (i <- 0 until opts.depth) { 
-      table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
-      dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
+      table(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
+      dtable(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
       for (j <- 0 until kmodels) { 
-        modelmats(2 * (j + kmodels * i)) = convertMat(zeros(opts.dim,opts.dim));
+        modelmats(2 * (j + kmodels * i)) = convertMat(mkdiag(ones(opts.dim,1)));
       }
     }
 
@@ -61,6 +61,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   def attach(net:Net, level:Int = 0) { 
     net.layers(0).output = table(level);
     net.layers(0).deriv = dtable(level);
+//    net.layers(net.layers.length-1).deriv = dtable(level+1).colslice(0,opts.seqlength)
     net.layers(5).asInstanceOf[ModelLayer].imodel = level * kmodels;
     net.layers(6).asInstanceOf[ModelLayer].imodel = level * kmodels + 2;
     net.layers(7).asInstanceOf[ModelLayer].imodel = level * kmodels + 4;
@@ -240,6 +241,14 @@ object TransformerLT {
   def testfwd(trans:TransformerLT, n:Int) = { 
     for (i <- 0 until n) { 
       trans.txNets(0).forward
+    }
+  }
+
+  def testbwd(trans:TransformerLT, n:Int) = { 
+    for (i <- 0 until n) { 
+      trans.txNets(0).forward
+      trans.txNets(0).setderiv();
+      trans.txNets(0).backward()
     }
   }
   

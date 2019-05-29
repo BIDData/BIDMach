@@ -11,7 +11,7 @@
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
     <nativeVersion>2.1.1-cuda8.0</nativeVersion>
-    <bidmatVersion>2.1.4-cuda8.0</bidmatVersion>
+    <bidmatVersion>2.1.5-cuda8.0</bidmatVersion>
     <scalaVersion>2.11.11</scalaVersion>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <skipTests>true</skipTests>

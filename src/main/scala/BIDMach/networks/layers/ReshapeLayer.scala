@@ -18,27 +18,30 @@ import BIDMach.networks._
 @SerialVersionUID(100L)
 class ReshapeLayer(override val net:Net, override val opts:ReshapeNodeOpts = new ReshapeNode) extends Layer(net, opts) {
 
+  var newdims:IMat = null;
+
   override def forward = {
     val start = toc;
     if (output.asInstanceOf[AnyRef] == null) {
       val io = inputData;
-      val newdims = if (opts.addBatchDim) {
-	if (io.nrows != opts.dims.data.reduce(_*_)) {
-	  throw new RuntimeException("ReshapeLayer input and output dims not compatible")
-	}
-	opts.dims \ io.ncols;
+      newdims = if (opts.addBatchDim) {
+	    if (io.nrows != opts.dims.data.reduce(_*_)) {
+	      throw new RuntimeException("ReshapeLayer input and output dims not compatible")
+	    }
+	    opts.dims \ io.ncols;
       } else {
-	if (io.length != opts.dims.data.reduce(_*_)) {
-	  throw new RuntimeException("ReshapeLayer input and output dims not compatible")
-	}
-	opts.dims;
+	    if (io.length != opts.dims.data.reduce(_*_)) {
+	      throw new RuntimeException("ReshapeLayer input and output dims not compatible")
+	    }
+	    opts.dims;
       }
-      output = io match {
-	case s:IMat => io.izeros(newdims)
-	case m:Mat => io.zeros(newdims)
-      }
+//      output = io match {
+//	    case s:IMat => io.izeros(newdims)
+//	    case m:Mat => io.zeros(newdims)
+//      }
     }
-    output <-- inputData.reshapeView(output.dims);
+//    output <-- inputData.reshapeView(output.dims);
+    output = inputData.reshapeView(newdims);
     inplaceNoConnectSetupDerivs();
     
     forwardtime += toc - start;

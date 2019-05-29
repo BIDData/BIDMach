@@ -24,35 +24,35 @@ class SoftmaxxLayer(override val net:Net, override val opts:SoftmaxxNodeOpts = n
   var one:Mat = null;
 
   override def forward = {
-			val start = toc;
-			if (one.asInstanceOf[AnyRef] == null) one = inputData.ones(1,1);
-			inplaceNoConnectGetOutput();
-			
-			output ~ inputData - inputData.maxi(opts.inds)
-			exp(output, output);  // ensures sum(exps) is between 1 and nfeats
-			output ~ output / output.sum(opts.inds);
-		
-			forwardtime += toc - start;
-	}
+	val start = toc;
+	if (one.asInstanceOf[AnyRef] == null) one = inputData.ones(1,1);
+	inplaceNoConnectGetOutput();
+	
+	output ~ inputData - inputData.maxi(opts.inds)
+	exp(output, output);  // ensures sum(exps) is between 1 and nfeats
+	output ~ output / output.sum(opts.inds);
+	
+	forwardtime += toc - start;
+  }
 
-	override def backward = {
-			val start = toc;
-			inplaceNoConnectGetInputDerivs();
-			
-			if (inputDeriv.asInstanceOf[AnyRef] != null) {
-				val exps = exp(inputData - inputData.maxi(opts.inds));
-				val smax = exps / exps.sum(opts.inds);
-				inputDeriv ~ inputDeriv + ((smax ∘ deriv) - (smax ∘ (smax ∙ deriv)));
-			}
-			
-			inplaceNoConnectReleaseDeriv();
-			backwardtime += toc - start;
+  override def backward = {
+	val start = toc;
+	inplaceNoConnectGetInputDerivs();
+	
+	if (inputDeriv.asInstanceOf[AnyRef] != null) {
+	  val exps = exp(inputData - inputData.maxi(opts.inds));
+	  val smax = exps / exps.sum(opts.inds);
+	  inputDeriv ~ inputDeriv + ((smax ∘ deriv) - (smax ∘ (smax ∙ deriv)));
 	}
 	
-	override def clear = {
-	  clearMats;
-	  one = null;
-	}
+	inplaceNoConnectReleaseDeriv();
+	backwardtime += toc - start;
+  }
+  
+  override def clear = {
+	clearMats;
+	one = null;
+  }
 
   override def toString = {
     "softmaxx@"+Integer.toHexString(hashCode % 0x10000).toString
