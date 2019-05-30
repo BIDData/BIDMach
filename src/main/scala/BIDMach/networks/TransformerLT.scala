@@ -20,15 +20,18 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   
   var table:Array[Mat] = null;
   var dtable:Array[Mat] = null;
-  var batchSize:Int = 0;
   var txNets:Array[Net] = null;
   var frontEnd:Net = null;
   var backEnd:Net = null;
+  var lastScores:FMat = null;
+  
   val kmodels = 5
   var cacheState = false;
   var cacheGPUstate = false;
   var useCache = false;
   var useGPUCache = true;
+  var seqptr = 0;
+  var batchSize = -1;
 
   override def init() = {
 	useGPU = opts.useGPU && Mat.hasCUDA > 0;
@@ -62,6 +65,61 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     Mat.useGPUcache = cacheGPUstate;
   }
 
+  def assignInputsAndTargets(gmats:Array[Mat], ipass:Int, pos:Long) = {
+    val src = gmats(0);
+    if (opts.seqlength % batchSize != 0) { 
+      throw new RuntimeException("TransformerLT sequence length must be a multiple of batch size");
+    }
+    src ~ src - ((src >= opts.nvocab) ∘ (src - opts.OOVsym)) // Map OOV words to the OOV symbol
+    val target = backEnd.output_layers(0).target;
+    val inmat = table(0);
+    target(0, seqptr->(seqptr+batchSize)) = src
+    if (seqptr + batchSize < opts.seqlength) { 
+      inmat(0, (seqptr + opts.degree + 1)->(seqptr + opts.degree + 1 + batchSize)) = src;
+    } else { 
+      inmat(0, (seqptr + opts.degree + 1)->(seqptr + opts.degree + batchSize)) = src(0, 0->(batchSize-1));
+    }
+    seqptr += batchSize;
+  }
+  
+  def wrapInput() { 
+    val target = backEnd.output_layers(0).target;
+    val inmat = table(0);
+    inmat(0, 0->(opts.degree+1)) = target(0, (opts.seqlength - opts.degree - 1)->opts.seqlength);
+  }
+
+  override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
+    if (batchSize < 0) batchSize = gmats(0).ncols;
+    if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
+      assignInputsAndTargets(gmats, ipass, pos);
+      if (seqptr >= opts.seqlength) { 
+        forward();
+        backward();
+        wrapInput();
+        seqptr = 0;
+      }
+    }
+  }
+
+  override def evalbatch(gmats:Array[Mat], ipass:Int, pos:Long):FMat = {
+    if (batchSize < 0) batchSize = gmats(0).ncols;
+    if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
+      assignInputsAndTargets(gmats, ipass, pos);
+      if (lastScores.asInstanceOf[AnyRef] == null) lastScores = zeros(backEnd.score_layers.length, batchSize);
+      if (seqptr == 0) { 
+        forward(true);
+        lastScores = zeros(backEnd.score_layers.length, batchSize);
+  		for (i <- 0 until backEnd.score_layers.length) {
+  		  lastScores(i,?) = backEnd.score_layers(i).score;
+  		}
+      }
+      lastScores
+    } else { 
+      zeros(backEnd.score_layers.length, 1);
+    }
+  }
+
+
   def createTables() { 
     table = new Array[Mat](opts.depth+1);
     dtable = new Array[Mat](opts.depth+1);
@@ -77,13 +135,13 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
         updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
       }
     }
-    modelmats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.vocab));
+    modelmats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
-    modelmats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.vocab));
+    modelmats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.dim, 1));
-    updatemats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.vocab));
+    updatemats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
     updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
-    updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.vocab));
+    updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.nvocab));
     updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.dim, 1));
     table(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
     dtable(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
@@ -110,18 +168,29 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.layers(39).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 8;
   }
 
-  def forward(net:Net) { 
+  def forward(predicting:Boolean=false) { 
+    var tmppred = frontEnd.predicting;
+    frontEnd.predicting = predicting;
     frontEnd.forward;
+    frontEnd.predicting = tmppred;
+    val net = txNets(0);
     for (level <- 0 until opts.depth) { 
       attach(net, level);
+      val tmppred = net.predicting;
+      net.predicting = predicting;
       net.forward;
+      net.predicting = tmppred;
       table(level+1).colslice(opts.seqlength, opts.seqlength+opts.degree, table(level+1), 0);
       net.layers(net.layers.length-1).output.colslice(0, opts.seqlength, table(level+1), opts.degree);
     }
+    tmppred = backEnd.predicting;
+    backEnd.predicting = predicting;
     backEnd.forward;
+    backEnd.predicting = tmppred;
   }
 
-  def backward(net:Net) { 
+  def backward() { 
+    val net = txNets(0);
     backEnd.backward();
     for (level <- (opts.depth -1) to 0 by -1) { 
       attach(net, level);
@@ -143,7 +212,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     import BIDMach.networks.layers.Node._
 
     val in =        input;
-    val smat =      oneHot(in)(opts.vocab);
+    val smat =      oneHot(in)(opts.nvocab);
     val out =       linear(smat)(outdim=dim, hasBias=hasBias);
 
     nopts.nodemat = in \ smat \ out;
@@ -164,7 +233,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     import BIDMach.networks.layers.Node._
 
     val in =        input;
-    val prod =      linear(in)(outdim=opts.vocab, hasBias=false);
+    val prod =      linear(in)(outdim=opts.nvocab, hasBias=false);
     val out =       softmaxout(prod)(scoreType=1, lossType=1);
 
     nopts.nodemat = in \ prod \ out;
@@ -280,19 +349,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.createLayers;
     net;
   }
-
-  override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
-    if (batchSize < 0) batchSize = gmats(0).ncols;
-    if (batchSize == gmats(0).ncols) {                                    // discard odd-sized minibatches
-    }
-  }
-  
-  override def evalbatch(mats:Array[Mat], ipass:Int, pos:Long):FMat = {  
-    if (batchSize < 0) batchSize = gmats(0).ncols;
-    if (batchSize == gmats(0).ncols) { 
-    }
-    zeros(1, 1);
-  }
 }
 
 @SerialVersionUID(100L)
@@ -307,8 +363,11 @@ object TransformerLT {
     var stride = 4;
     var firststrided = 10;
     var nstrided = 6;
-    var vocab = 32768;
+    var nvocab = 32768;
     var hasBias = true;
+    var PADsym = 1;      // Padding symbol
+    var OOVsym = 2;      // OOV symbol
+    var STARTsym = 0;    // Start symbol
   }
   
 @SerialVersionUID(100L)
@@ -317,7 +376,11 @@ object TransformerLT {
 @SerialVersionUID(100L)
   class LearnOptions extends Learner.Options with TransformerLT.Opts with MatSource.Opts with Grad.Opts
 
-  def learner(mat0:Mat, mat1:Mat, regularize:Boolean = false) = {
+@SerialVersionUID(100L)
+  class FSopts extends Learner.Options with TransformerLT.Opts with FileSource.Opts with Grad.Opts
+
+
+  def learner(mat0:Mat, mat1:Mat) = {
     val opts = new LearnOptions;
     opts.batchSize = 128;
   	val nn = new Learner(
@@ -329,6 +392,21 @@ object TransformerLT {
   	    opts)
     (nn, opts)
   }
+
+  def learner(fnames:List[(Int)=>String]) = {
+    val opts = new FSopts;
+    opts.fnames = fnames
+  	val nn = new Learner(
+  	    new FileSource(opts),
+  	    new TransformerLT(opts), 
+        null,
+  	    new Grad(opts), 
+  	    null,
+  	    opts)
+    (nn, opts)
+  }
+
+  def learner(fn1:String):(Learner, FSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)))
 
   def testsetup(opts:Opts = new Options):TransformerLT = { 
     val trans = new TransformerLT(opts);
@@ -352,8 +430,8 @@ object TransformerLT {
 
   def testbackward(trans:TransformerLT, n:Int) = { 
     for (i <- 0 until n) { 
-      trans.forward(trans.txNets(0));
-      trans.backward(trans.txNets(0));
+      trans.forward();
+      trans.backward();
     }
   }
   
