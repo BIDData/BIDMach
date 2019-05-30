@@ -22,6 +22,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var dtable:Array[Mat] = null;
   var batchSize:Int = 0;
   var txNets:Array[Net] = null;
+  var frontEnd:Net = null;
+  var backEnd:Net = null;
   val kmodels = 5
   var cacheState = false;
   var cacheGPUstate = false;
@@ -35,6 +37,24 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     Mat.useCache = useCache;
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = useGPUCache;
+
+    createTables();
+
+    frontEnd = createFrontEnd();
+    frontEnd.setmodelmats(modelmats);
+    frontEnd.updatemats = updatemats;
+
+    backEnd = createBackEnd();
+    backEnd.setmodelmats(modelmats);
+    backEnd.updatemats = updatemats;
+
+    attachEnds();
+
+    val net = createTxNet(opts.seqlength);
+    net.setmodelmats(modelmats);
+    net.updatemats = updatemats;
+    txNets = Array(net);
+
   }  
   
   def wrapUp() = { 
@@ -43,33 +63,117 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   }
 
   def createTables() { 
-    table = new Array[Mat](opts.depth);
-    dtable = new Array[Mat](opts.depth);
-    setmodelmats(new Array[Mat](opts.depth * kmodels * 2));
-    updatemats = new Array[Mat](opts.depth * kmodels * 2);
+    table = new Array[Mat](opts.depth+1);
+    dtable = new Array[Mat](opts.depth+1);
+    setmodelmats(new Array[Mat](opts.depth * kmodels * 2 + 4));
+    updatemats = new Array[Mat](opts.depth * kmodels * 2 + 4);
     for (i <- 0 until opts.depth) { 
       table(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
       dtable(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
       for (j <- 0 until kmodels) { 
-        modelmats(2 * (j + kmodels * i)) = convertMat(mkdiag(ones(opts.dim,1)));
+        modelmats(2 * (j + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
+        modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+        updatemats(2 * (j + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
+        updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
       }
     }
-
+    modelmats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.vocab));
+    modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
+    modelmats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.vocab));
+    modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.dim, 1));
+    updatemats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.vocab));
+    updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
+    updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.vocab));
+    updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.dim, 1));
+    table(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
+    dtable(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
   }
 
+  def attachEnds() { 
+    frontEnd.layers(2).output = table(0);
+    frontEnd.layers(2).deriv = dtable(0);
+    frontEnd.layers(2).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2;
+    backEnd.layers(0).output = table(opts.depth);
+    backEnd.layers(0).deriv = dtable(opts.depth);
+    backEnd.layers(1).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2 + 2;
+  }
 
   def attach(net:Net, level:Int = 0) { 
     net.layers(0).output = table(level);
     net.layers(0).deriv = dtable(level);
-//    net.layers(net.layers.length-1).deriv = dtable(level+1).colslice(0,opts.seqlength)
-    net.layers(5).asInstanceOf[ModelLayer].imodel = level * kmodels;
-    net.layers(6).asInstanceOf[ModelLayer].imodel = level * kmodels + 2;
-    net.layers(7).asInstanceOf[ModelLayer].imodel = level * kmodels + 4;
-    net.layers(8).asInstanceOf[ModelLayer].imodel = level * kmodels + 2;
-    net.layers(9).asInstanceOf[ModelLayer].imodel = level * kmodels + 4;
-    net.layers(36).asInstanceOf[ModelLayer].imodel = level * kmodels + 6;
-    net.layers(39).asInstanceOf[ModelLayer].imodel = level * kmodels + 8;
+    net.layers(5).asInstanceOf[ModelLayer].imodel = level * kmodels * 2;
+    net.layers(6).asInstanceOf[ModelLayer].imodel = level * kmodels * 2  + 2;
+    net.layers(7).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
+    net.layers(8).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
+    net.layers(9).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
+    net.layers(36).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 6;
+    net.layers(39).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 8;
   }
+
+  def forward(net:Net) { 
+    frontEnd.forward;
+    for (level <- 0 until opts.depth) { 
+      attach(net, level);
+      net.forward;
+      table(level+1).colslice(opts.seqlength, opts.seqlength+opts.degree, table(level+1), 0);
+      net.layers(net.layers.length-1).output.colslice(0, opts.seqlength, table(level+1), opts.degree);
+    }
+    backEnd.forward;
+  }
+
+  def backward(net:Net) { 
+    backEnd.backward();
+    for (level <- (opts.depth -1) to 0 by -1) { 
+      attach(net, level);
+      dtable(level+1).colslice(opts.degree, opts.seqlength+opts.degree, net.layers(net.layers.length-1).deriv, 0)
+      net.forward;
+      net.backward();
+    }
+    frontEnd.backward();
+  }
+
+  def createFrontEnd() = {
+    val net = new Net();
+    val nopts = net.opts;
+    nopts.useGPU = useGPU;
+    net.useGPU = useGPU;
+    val dim =       opts.dim;
+    val hasBias =   opts.hasBias;
+
+    import BIDMach.networks.layers.Node._
+
+    val in =        input;
+    val smat =      oneHot(in)(opts.vocab);
+    val out =       linear(smat)(outdim=dim, hasBias=hasBias);
+
+    nopts.nodemat = in \ smat \ out;
+ 
+    net.output_nodes = Array(out);
+    net.createLayers;
+    net;
+  }
+
+  def createBackEnd() = {
+    val net = new Net();
+    val nopts = net.opts;
+    nopts.useGPU = useGPU;
+    net.useGPU = useGPU;
+    val dim =       opts.dim;
+    val hasBias =   opts.hasBias;
+
+    import BIDMach.networks.layers.Node._
+
+    val in =        input;
+    val prod =      linear(in)(outdim=opts.vocab, hasBias=false);
+    val out =       softmaxout(prod)(scoreType=1, lossType=1);
+
+    nopts.nodemat = in \ prod \ out;
+ 
+    net.output_nodes = Array(out);
+    net.createLayers;
+    net;
+  }
+
 
   def createTxNet(seqlength:Int) = {
     val net = new Net();
@@ -203,6 +307,7 @@ object TransformerLT {
     var stride = 4;
     var firststrided = 10;
     var nstrided = 6;
+    var vocab = 32768;
     var hasBias = true;
   }
   
@@ -226,15 +331,8 @@ object TransformerLT {
   }
 
   def testsetup(opts:Opts = new Options):TransformerLT = { 
-    opts.depth = 2;
     val trans = new TransformerLT(opts);
     trans.init();
-    trans.createTables();
-    val net = trans.createTxNet(opts.seqlength);
-    net.setmodelmats(trans.modelmats);
-    net.updatemats = trans.updatemats;
-    trans.attach(net, 0);
-    trans.txNets = Array(net);
     trans;
   }
 
@@ -249,6 +347,13 @@ object TransformerLT {
       trans.txNets(0).forward
       trans.txNets(0).setderiv();
       trans.txNets(0).backward()
+    }
+  }
+
+  def testbackward(trans:TransformerLT, n:Int) = { 
+    for (i <- 0 until n) { 
+      trans.forward(trans.txNets(0));
+      trans.backward(trans.txNets(0));
     }
   }
   

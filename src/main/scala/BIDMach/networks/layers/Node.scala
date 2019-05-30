@@ -618,7 +618,7 @@ bias_scale=bs; inplace=inp}
     n
   }
   
-  def oneHot(a:NodeTerm) = new OnehotNode{inputs(0) = a};
+  def oneHot(a:NodeTerm)(n:Int = 0) = new OnehotNode{inputs(0) = a; length=n};
   
   def pool(a:NodeTerm)(h:Int=1, w:Int=1, stride:Int=1, pad:Int=0, 
       poolingMode:Int=cudnnPoolingMode.CUDNN_POOLING_MAX, 
