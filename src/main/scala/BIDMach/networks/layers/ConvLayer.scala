@@ -109,9 +109,10 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     if (inputDim.asInstanceOf[AnyRef] == null) initModelMats;
     inplaceNoConnectSetupDerivs(true);
     
-    val workspace = if (Net.getPlacing(opts.inplace, net.opts.inplace) == Net.InPlace) deriv else null;   
-    ffilter.convolve(inputData, output, true, workspace);
-    if (Net.getPlacing(opts.inplace, net.opts.inplace) == Net.InPlace) deriv.clear;
+//    val workspace = if (Net.getPlacing(opts.inplace, net.opts.inplace) == Net.InPlace) deriv else null;   
+//    ffilter.convolve(inputData, output, true, workspace);
+//    if (Net.getPlacing(opts.inplace, net.opts.inplace) == Net.InPlace) deriv.clear;
+    ffilter.convolve(inputData, output, true, null);
 
     if (opts.hasBias) {
       applyBias(bias_mat, output);
@@ -131,8 +132,9 @@ class ConvLayer(override val net:Net, override val opts:ConvNodeOpts = new ConvN
     backwardfiltertime += toc - start;
     
     if (inputDeriv.asInstanceOf[AnyRef] != null) {  
-    	val workspace = if (Net.getPlacing(opts.inplace, net.opts.inplace) == Net.InPlace) output else null;
-      ffilter.convolveT(deriv, inputDeriv, false, workspace);
+//      val workspace = if (Net.getPlacing(opts.inplace, net.opts.inplace) == Net.InPlace) output else null;
+//      ffilter.convolveT(deriv, inputDeriv, false, workspace);
+      ffilter.convolveT(deriv, inputDeriv, false, null);
     } 
     backwarddatatime += toc - start;
     

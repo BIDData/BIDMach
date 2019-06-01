@@ -17,7 +17,7 @@ def main():
         todostr = 'rsync -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" -avz ubuntu@%s:/code/BIDMach/logs/log.0.0.txt %s/' % (s, slave_dir)
         print(todostr)
         subprocess.check_call(todostr, shell=True)
-        todostr = 'rsync -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" -avz ubuntu@%s:/code/BIDMach/scripts/logAlexnet* %s/' % (s, slave_dir)
+        todostr = 'rsync -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" -avz ubuntu@%s:/code/BIDMach/scripts/logres* %s/' % (s, slave_dir)
         print(todostr)
         subprocess.check_call(todostr, shell=True)
 
