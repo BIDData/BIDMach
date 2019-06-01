@@ -6,12 +6,12 @@
   <groupId>BIDMach</groupId>
   <artifactId>BIDMach</artifactId>
   <packaging>jar</packaging>
-  <version>2.1.9-cuda9.2</version>
+  <version>2.1.10-cuda9.2</version>
   <name>BIDMach</name>
   <description>BIDMach is an optimized machine learning library in Scala</description>
   <properties>
     <nativeVersion>2.1.2-cuda9.2</nativeVersion>
-    <bidmatVersion>2.1.5-cuda9.2</bidmatVersion>
+    <bidmatVersion>2.1.6-cuda9.2</bidmatVersion>
     <scalaVersion>2.11.11</scalaVersion>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <skipTests>true</skipTests>
