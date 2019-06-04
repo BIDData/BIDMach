@@ -142,25 +142,26 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       table(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
       dtable(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
       for (j <- 0 until 3) { 
-        modelmats(2 * (j + kmodels * i)) = convertMat(zeros(opts.indim, opts.dim));
+        modelmats(2 * (j + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.indim, opts.dim));
         modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
         updatemats(2 * (j + kmodels * i)) = convertMat(zeros(opts.indim, opts.dim));
         updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
       }
-      modelmats(2 * (3 + kmodels * i)) = convertMat(zeros(opts.dim, opts.indim));
+      modelmats(2 * (3 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.indim).toFloat, opts.dim, opts.indim));
       modelmats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
       updatemats(2 * (3 + kmodels * i)) = convertMat(zeros(opts.dim, opts.indim));
       updatemats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
 
-      modelmats(2 * (4 + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
+      modelmats(2 * (4 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.dim));
       modelmats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
       updatemats(2 * (4 + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
       updatemats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
     }
-    modelmats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
+    modelmats(2 * kmodels * opts.depth) = convertMat(normrnd(0, 1, opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
-    modelmats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
+    modelmats(2 * kmodels * opts.depth + 2) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.nvocab, opts.dim));
     modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
+
     updatemats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
     updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
     updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
