@@ -274,16 +274,17 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.useGPU = useGPU;
 
     import BIDMach.networks.layers.Node._
-    val innerdim = opts.indim;
+    val indim = opts.indim;
     val dim =      opts.dim;
     val degree =   opts.degree;
-    val basedims = irow(opts.dim, seqlength);
-    val headdims = irow(opts.dim/opts.nheads, opts.nheads, degree, seqlength/degree);
-    val headdims2 = irow(opts.dim/opts.nheads, opts.nheads, degree*2, seqlength/degree);
-    val headdims_2d = irow(opts.dim/opts.nheads, opts.nheads * seqlength);
-    val headdims2_2d = irow(opts.dim/opts.nheads, opts.nheads * seqlength * 2);
-    val headdimsx = irow(opts.dim/opts.nheads, degree, opts.nheads, seqlength/degree);
-    val headdimsx2 = irow(opts.dim/opts.nheads, degree*2, opts.nheads, seqlength/degree);
+    val basedims = irow(dim, seqlength);
+    val basedimsi = irow(indim, seqlength);
+    val headdims = irow(indim/opts.nheads, opts.nheads, degree, seqlength/degree);
+    val headdims2 = irow(indim/opts.nheads, opts.nheads, degree*2, seqlength/degree);
+    val headdims_2d = irow(indim/opts.nheads, opts.nheads * seqlength);
+    val headdims2_2d = irow(indim/opts.nheads, opts.nheads * seqlength * 2);
+    val headdimsx = irow(indim/opts.nheads, degree, opts.nheads, seqlength/degree);
+    val headdimsx2 = irow(indim/opts.nheads, degree*2, opts.nheads, seqlength/degree);
     val headinds__ = irow(0->(opts.nheads * seqlength)).reshapeView(opts.nheads, degree, seqlength/degree);
     val headinds_ = headinds__.transpose(1\0\2).reshapeView(1,opts.nheads*seqlength);
     val headinds2__ = irow(0->(opts.nheads * seqlength * 2)).reshapeView(opts.nheads, degree*2, seqlength/degree);
@@ -310,11 +311,11 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val headinds =    constant(headinds_)(true);
     val headinds2 =   constant(headinds2_)(true);
 
-    val proj_q_this = linear(this_in)(outdim=innerdim, hasBias=hasBias); // layers 5-9
-    val proj_k_this = linear(this_in)(outdim=innerdim, hasBias=hasBias);
-    val proj_v_this = linear(this_in)(outdim=innerdim, hasBias=hasBias);   
-    val proj_k_last = linear(last_in)(outdim=innerdim, hasBias=hasBias);
-    val proj_v_last = linear(last_in)(outdim=innerdim, hasBias=hasBias);   
+    val proj_q_this = linear(this_in)(outdim=indim, hasBias=hasBias); // layers 5-9
+    val proj_k_this = linear(this_in)(outdim=indim, hasBias=hasBias);
+    val proj_v_this = linear(this_in)(outdim=indim, hasBias=hasBias);   
+    val proj_k_last = linear(last_in)(outdim=indim, hasBias=hasBias);
+    val proj_v_last = linear(last_in)(outdim=indim, hasBias=hasBias);   
 
     val queries_2d =  reshape(proj_q_this)(headdims_2d,false);
     val keys_this =   reshape(proj_k_this)(headdims,false);
@@ -346,7 +347,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val invheadinds = constant(invheadinds_)(true);
     val pvals_2d =    colperm(wvals_2d, invheadinds);
 
-    val pvals =       reshape(pvals_2d)(basedims,false);
+    val pvals =       reshape(pvals_2d)(basedimsi,false);
     val mhattn =      linear(pvals)(outdim=dim, hasBias=hasBias); // layer 36
     val norm1 =       layerNorm(mhattn)();
     val sum1 =        norm1 + this_in;
