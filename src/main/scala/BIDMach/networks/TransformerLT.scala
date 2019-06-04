@@ -40,6 +40,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     Mat.useCache = useCache;
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = useGPUCache;
+    seqptr = 0;
 
     createTables();
 
@@ -63,29 +64,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   def wrapUp() = { 
     Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
-  }
-
-  def assignInputsAndTargets(gmats:Array[Mat], ipass:Int, pos:Long) = {
-    val src = gmats(0);
-    if (opts.seqlength % batchSize != 0) { 
-      throw new RuntimeException("TransformerLT sequence length must be a multiple of batch size");
-    }
-    src ~ src - ((src >= opts.nvocab) ∘ (src - opts.OOVsym)) // Map OOV words to the OOV symbol
-    val target = backEnd.output_layers(0).target;
-    val inmat = table(0);
-    target(0, seqptr->(seqptr+batchSize)) = src
-    if (seqptr + batchSize < opts.seqlength) { 
-      inmat(0, (seqptr + opts.degree + 1)->(seqptr + opts.degree + 1 + batchSize)) = src;
-    } else { 
-      inmat(0, (seqptr + opts.degree + 1)->(seqptr + opts.degree + batchSize)) = src(0, 0->(batchSize-1));
-    }
-    seqptr += batchSize;
-  }
-  
-  def wrapInput() { 
-    val target = backEnd.output_layers(0).target;
-    val inmat = table(0);
-    inmat(0, 0->(opts.degree+1)) = target(0, (opts.seqlength - opts.degree - 1)->opts.seqlength);
   }
 
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
@@ -119,6 +97,41 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     }
   }
 
+  def assignInputsAndTargets(gmats:Array[Mat], ipass:Int, pos:Long) = {
+    val src = gmats(0);
+    if (opts.seqlength % batchSize != 0) { 
+      throw new RuntimeException("TransformerLT sequence length must be a multiple of batch size");
+    }
+    src ~ src - ((src >= opts.nvocab) ∘ (src - opts.OOVsym)) // Map OOV words to the OOV symbol
+
+    val inlayer = frontEnd.layers(0)
+    if (inlayer.output.asInstanceOf[AnyRef] == null) inlayer.output = convertMat(izeros(1, opts.seqlength+opts.degree))
+    val inmat = inlayer.output
+    if (seqptr + batchSize < opts.seqlength) { 
+      src.colslice(0, batchSize, inmat, seqptr + opts.degree + 1);
+    } else { 
+      src.colslice(0, batchSize - 1, inmat, seqptr + opts.degree + 1);
+    }
+
+    val backin = backEnd.layers(0)
+    if (backin.output.asInstanceOf[AnyRef] == null) { 
+      backin.output = convertMat(zeros(opts.dim, opts.seqlength))
+      backin.deriv = convertMat(zeros(opts.dim, opts.seqlength))
+    }
+
+    val backout = backEnd.output_layers(0)
+    if (backout.target.asInstanceOf[AnyRef] == null) backout.target = convertMat(izeros(1, opts.seqlength))
+    val target = backout.target;
+    src.colslice(0, batchSize, target, seqptr);
+
+    seqptr += batchSize;
+  }
+  
+  def wrapInput() { 
+    val target = backEnd.output_layers(0).target;
+    val inmat = frontEnd.layers(0).output
+    target.colslice(opts.seqlength - opts.degree - 1, opts.seqlength, inmat, 0);
+  }
 
   def createTables() { 
     table = new Array[Mat](opts.depth+1);
@@ -128,21 +141,30 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     for (i <- 0 until opts.depth) { 
       table(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
       dtable(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
-      for (j <- 0 until kmodels) { 
-        modelmats(2 * (j + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
-        modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
-        updatemats(2 * (j + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
-        updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+      for (j <- 0 until 3) { 
+        modelmats(2 * (j + kmodels * i)) = convertMat(zeros(opts.indim, opts.dim));
+        modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
+        updatemats(2 * (j + kmodels * i)) = convertMat(zeros(opts.indim, opts.dim));
+        updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
       }
+      modelmats(2 * (3 + kmodels * i)) = convertMat(zeros(opts.dim, opts.indim));
+      modelmats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+      updatemats(2 * (3 + kmodels * i)) = convertMat(zeros(opts.dim, opts.indim));
+      updatemats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+
+      modelmats(2 * (4 + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
+      modelmats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+      updatemats(2 * (4 + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
+      updatemats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
     }
     modelmats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
-    modelmats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.nvocab));
-    modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.dim, 1));
+    modelmats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
+    modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
     updatemats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
     updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
-    updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.dim, opts.nvocab));
-    updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.dim, 1));
+    updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
+    updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
     table(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
     dtable(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
   }
@@ -151,8 +173,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     frontEnd.layers(2).output = table(0);
     frontEnd.layers(2).deriv = dtable(0);
     frontEnd.layers(2).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2;
-    backEnd.layers(0).output = table(opts.depth);
-    backEnd.layers(0).deriv = dtable(opts.depth);
     backEnd.layers(1).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2 + 2;
   }
 
@@ -184,6 +204,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       net.layers(net.layers.length-1).output.colslice(0, opts.seqlength, table(level+1), opts.degree);
     }
     tmppred = backEnd.predicting;
+    table(opts.depth).colslice(opts.degree, opts.seqlength+opts.degree, backEnd.layers(0).output, 0);
     backEnd.predicting = predicting;
     backEnd.forward;
     backEnd.predicting = tmppred;
@@ -192,6 +213,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   def backward() { 
     val net = txNets(0);
     backEnd.backward();
+    backEnd.layers(0).deriv.colslice(0, opts.seqlength, dtable(opts.depth), opts.degree);
     for (level <- (opts.depth -1) to 0 by -1) { 
       attach(net, level);
       dtable(level+1).colslice(opts.degree, opts.seqlength+opts.degree, net.layers(net.layers.length-1).deriv, 0)
