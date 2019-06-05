@@ -30,12 +30,12 @@ import java.util.logging.Level;
 
 @SerialVersionUID(100L)
 class Learner(
-    val datasource:DataSource,
-    val model:Model,
-    val mixins:Array[Mixin],
-    val updater:Updater,
-    val datasink:DataSink,
-    val opts:Learner.Opts = new Learner.Options) extends Serializable {
+  val datasource:DataSource,
+  val model:Model,
+  val mixins:Array[Mixin],
+  val updater:Updater,
+  val datasink:DataSink,
+  val opts:Learner.Opts = new Learner.Options) extends Serializable {
 
   var myLogger = Mat.consoleLogger;
   var fut:Future[_] = null;
@@ -99,12 +99,12 @@ class Learner(
   	val runner = new Runnable{
   	  def run() = {
   	    try {
-  	    	fn();
+  	      fn();
   	    } catch {
   	      case e:Throwable => myLogger.severe("Learner thread failed: %s" format Learner.printStackTrace(e));
   	    }
-    	  myLogger = tmp;
-    	}
+    	myLogger = tmp;
+      }
   	}
   	fut = executor.submit(runner);
   	fut;
@@ -209,10 +209,10 @@ class Learner(
           if (updater != null) updater.preupdate(ipass, here, gprogress);
         }
         for (inatural <- 0 until opts.nNatural) {
-        	model.dobatchg(mats, ipass, here);
-        	if (mixins != null) mixins map (_ compute(mats, here));
-        	while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
-        	if (updater != null) updater.update(ipass, here, gprogress);
+          model.dobatchg(mats, ipass, here);
+          if (mixins != null) mixins map (_ compute(mats, here));
+          while (paused || (pauseAt > 0 && pauseAt <= istep)) Thread.sleep(1000);
+          if (updater != null) updater.update(ipass, here, gprogress);
         } 
         if ((istep - 1) % opts.evalStep == 1) { 
           val tmpscores = model.evalbatchg(mats, ipass, here);
@@ -222,13 +222,13 @@ class Learner(
         }
       }
       if (viz.asInstanceOf[AnyRef] != null) {
-          viz.foreach(_.update(model,mats,ipass,here))
+        viz.foreach(_.update(model,mats,ipass,here))
       }        
       istep += 1
       if ((dsp > lastp + opts.pstep && reslist.length > lasti) || ! datasource.hasNext) {
         val gf = gflop
         lastp = if (datasource.hasNext) (dsp - (dsp % opts.pstep)) else 1f
-        myLogger.info(("%6.2f%%, train=%6.5f, val=%6.5f, sec=%2.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
+        myLogger.info(("%6.2f%%, train=%6.5f, val=%6.5f, sec=%2.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.2f" format (
           100f*lastp,
           Learner.scoreSummary(trainlist, lastti, trainlist.length, opts.cumScore),
           Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
@@ -244,7 +244,7 @@ class Learner(
         val oldCheckPoint = nextCheckPoint - opts.keepCheckPoints;
         nextCheckPoint += 1;
         if (opts.keepCheckPoints > 0 && oldCheckPoint >= 0) {
-            model.delete(opts.checkPointFile format oldCheckPoint);
+          model.delete(opts.checkPointFile format oldCheckPoint);
         }
       }
     }
@@ -314,9 +314,9 @@ class Learner(
   }
 
   def addViz(v: Visualization) = {
-      if (viz.asInstanceOf[AnyRef] == null) viz = new ListBuffer[Visualization]()
-      viz+=v
-      v
+    if (viz.asInstanceOf[AnyRef] == null) viz = new ListBuffer[Visualization]()
+    viz+=v
+    v
   }
 
   def predict() = {
@@ -364,13 +364,13 @@ class Learner(
       if (dsp > lastp + opts.pstep && reslist.length > lasti) {
         val gf = gflop
         lastp = dsp - (dsp % opts.pstep);
-        myLogger.info(("%6.2f%%, score=%6.5f, sec=%3.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.1f" format (
-        		100f*lastp,
-        		Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
-        		gf._2,
-        		nsamps/gf._2,
-        		gf._1,
-        		bytes/gf._2*1e-6)) + (if (useGPU) {", GMem=%3.4f" format GPUmem._1} else ""));
+        myLogger.info(("%6.2f%%, score=%6.5f, sec=%3.0f, sam/s=%2.0f, gf=%2.1f, MB/s=%3.2f" format (
+          100f*lastp,
+          Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore),
+          gf._2,
+          nsamps/gf._2,
+          gf._1,
+          bytes/gf._2*1e-6)) + (if (useGPU) {", GMem=%3.4f" format GPUmem._1} else ""));
         lasti = reslist.length;
       }
     }
@@ -431,24 +431,24 @@ class Learner(
   def preds = datasink.asInstanceOf[MatSink].mats
 }
 /**
- * Parallel Learner with a single datasource.
- */
+* Parallel Learner with a single datasource.
+*/
 
 class ParLearner(
-    val datasource:DataSource,
-    val mkModelFn:(Int)=>Model,
-    val mkMixinsFn:(Int)=>Array[Mixin],
-    val mkUpdaterFn:(Int)=>Updater,
-    val datasink:DataSink,
-    val opts:ParLearner.Opts = new ParLearner.Options) extends Serializable {
+  val datasource:DataSource,
+  val mkModelFn:(Int)=>Model,
+  val mkMixinsFn:(Int)=>Array[Mixin],
+  val mkUpdaterFn:(Int)=>Updater,
+  val datasink:DataSink,
+  val opts:ParLearner.Opts = new ParLearner.Options) extends Serializable {
 
   var models:Array[Model] = null;
   var mixins:Array[Array[Mixin]] = null;
   var updaters:Array[Updater] = null;
-	var myLogger = Mat.consoleLogger;
+  var myLogger = Mat.consoleLogger;
   var fut:Future[_] = null;
-	var workers:Array[Future[_]] = null;
-	var executor:ExecutorService = null;
+  var workers:Array[Future[_]] = null;
+  var executor:ExecutorService = null;
   var um:Array[Mat] = null;
   var mm:Array[Mat] = null;
   var results:FMat = null;
@@ -487,23 +487,23 @@ class ParLearner(
     if (mkMixinsFn.asInstanceOf[AnyRef] != null) mixins = new Array[Array[Mixin]](nthreads)
     if (mkUpdaterFn.asInstanceOf[AnyRef] != null) updaters = new Array[Updater](nthreads);
     for (i <- 0 until nthreads) {
-    	cmats(i) = new Array[Mat](datasource.omats.length);
-    	if (i < Mat.hasCUDA) setGPU(i);
-    	models(i) = mkModelFn(i);
-    	for (j <- 0 until mats.length) {
-    		cmats(i)(j) = safeCopy(mats(j), i);
-    	}
-    	models(i).bind(datasource);
-    	models(i).mats = cmats(i);
-    	models(i).init;
-    	if (mixins.asInstanceOf[AnyRef] != null) {
-    	  mixins(i) = mkMixinsFn(i);
-    	  mixins(i) map (_ init(models(i)));
-    	}
-    	if (updaters.asInstanceOf[AnyRef] != null) {
-    		updaters(i) = mkUpdaterFn(i);
-    	  updaters(i).init(models(i));
-    	}
+      cmats(i) = new Array[Mat](datasource.omats.length);
+      if (i < Mat.hasCUDA) setGPU(i);
+      models(i) = mkModelFn(i);
+      for (j <- 0 until mats.length) {
+    	cmats(i)(j) = safeCopy(mats(j), i);
+      }
+      models(i).bind(datasource);
+      models(i).mats = cmats(i);
+      models(i).init;
+      if (mixins.asInstanceOf[AnyRef] != null) {
+    	mixins(i) = mkMixinsFn(i);
+    	mixins(i) map (_ init(models(i)));
+      }
+      if (updaters.asInstanceOf[AnyRef] != null) {
+    	updaters(i) = mkUpdaterFn(i);
+    	updaters(i).init(models(i));
+      }
     }
     useGPU = models(0).opts.useGPU;
     datasource.reset;
@@ -517,9 +517,9 @@ class ParLearner(
     um = new Array[Mat](mml)
     mm = new Array[Mat](mml)
     for (i <- 0 until mml) {
-    	val mm0 = models(0).modelmats(i)
-    	mm(i) = zeros(mm0.dims)
-    	um(i) = zeros(mm0.dims)
+      val mm0 = models(0).modelmats(i)
+      mm(i) = zeros(mm0.dims)
+      um(i) = zeros(mm0.dims)
     }
     dones = iones(1, nthreads)
     ParLearner.syncmodels(models, mm, um, 0, useGPU)
@@ -536,12 +536,12 @@ class ParLearner(
   	val runner = new Runnable{
   	  def run() = {
   	    try {
-  	    	fn();
+  	      fn();
   	    } catch {
   	      case e:Throwable => myLogger.severe("Learner thread failed: %s" format Learner.printStackTrace(e));
   	    }
-    	  myLogger = tmp;
-    	}
+    	myLogger = tmp;
+      }
   	}
   	fut = executor.submit(runner);
   	fut;
@@ -565,11 +565,11 @@ class ParLearner(
     Mat.useGPUcache = opts.useGPUcache;
     Mat.useCache = opts.useCache
     val thisGPU = if (useGPU) getGPU else 0
-	  if (useGPU) {
-	    for (i <- 0 until nthreads) {
-//	      if (i != thisGPU) connect(i)
-	    }
+	if (useGPU) {
+	  for (i <- 0 until nthreads) {
+        //	      if (i != thisGPU) connect(i)
 	  }
+	}
     ipass = 0
     istep = 0
     here = 0L
@@ -578,8 +578,8 @@ class ParLearner(
     reslist = new ListBuffer[FMat]
     samplist = new ListBuffer[Float]
     for (i <- 0 until nthreads) {
-    	if (useGPU && i < Mat.hasCUDA) setGPU(i)
-    	if (updaters != null && updaters(i) != null) updaters(i).clear
+      if (useGPU && i < Mat.hasCUDA) setGPU(i)
+      if (updaters != null && updaters(i) != null) updaters(i).clear
     }
     setGPU(thisGPU)
     var lastp = 0f
@@ -589,40 +589,40 @@ class ParLearner(
     class LearnThread(val ithread:Int) extends Runnable {
       def run() = {
         if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
-    		while (!done) {
-    			while (dones(ithread) == 1) Thread.sleep(1)
-    			try {
-    				if ((istep/nthreads) % opts.evalStep == 0 || !datasource.hasNext ) {
-    					if (opts.updateAll) {
-    						models(ithread).dobatchg(cmats(ithread), ipass, here)
-    						if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here));
-    						while (paused || (opts.pauseAt > 0 && opts.pauseAt <= istep)) Thread.sleep(1000);
-    						if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress);
-    					}
-    					val tmpscores = models(ithread).evalbatchg(cmats(ithread), ipass, here);
-    					val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
-    					reslist.synchronized { reslist.append(scores.newcopy) }
-    					samplist.synchronized { samplist.append(here) }
-    				} else {
-    					models(ithread).dobatchg(cmats(ithread), ipass, here)
-    					if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here));
-    					while (paused || (opts.pauseAt > 0 && opts.pauseAt <= istep)) Thread.sleep(1000);
-    					if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress);
-    				}
-    			} catch {
-    			case e:Throwable => {
-    				myLogger.severe("Caught exception in thread %d %s\n" format (ithread, e.toString));
-    				val se = e.getStackTrace();
-    				for (i <- 0 until 8) {
-    					myLogger.severe("thread %d, %s" format (ithread, se(i).toString));
-    				}
-
-    				myLogger.severe("Restarted: Keep on truckin...")
-    			}
-    			}
-    			dones(ithread) = 1
+    	while (!done) {
+    	  while (dones(ithread) == 1) Thread.sleep(1)
+    	  try {
+    		if ((istep/nthreads) % opts.evalStep == 0 || !datasource.hasNext ) {
+    		  if (opts.updateAll) {
+    			models(ithread).dobatchg(cmats(ithread), ipass, here)
+    			if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here));
+    			while (paused || (opts.pauseAt > 0 && opts.pauseAt <= istep)) Thread.sleep(1000);
+    			if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress);
+    		  }
+    		  val tmpscores = models(ithread).evalbatchg(cmats(ithread), ipass, here);
+    		  val scores = if (tmpscores.ncols > 1) mean(tmpscores, 2) else tmpscores;
+    		  reslist.synchronized { reslist.append(scores.newcopy) }
+    		  samplist.synchronized { samplist.append(here) }
+    		} else {
+    		  models(ithread).dobatchg(cmats(ithread), ipass, here)
+    		  if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(cmats(ithread), here));
+    		  while (paused || (opts.pauseAt > 0 && opts.pauseAt <= istep)) Thread.sleep(1000);
+    		  if (updaters != null && updaters(ithread) != null) updaters(ithread).update(ipass, here, gprogress);
     		}
+    	  } catch {
+    		case e:Throwable => {
+    		  myLogger.severe("Caught exception in thread %d %s\n" format (ithread, e.toString));
+    		  val se = e.getStackTrace();
+    		  for (i <- 0 until 8) {
+    			myLogger.severe("thread %d, %s" format (ithread, se(i).toString));
+    		  }
+
+    		  myLogger.severe("Restarted: Keep on truckin...")
+    		}
+    	  }
+    	  dones(ithread) = 1
     	}
+      }
     }
     
     for (i <- 0 until nthreads) {
@@ -630,52 +630,52 @@ class ParLearner(
     }
 
     while (ipass < opts.npasses) {
-    	datasource.reset
+      datasource.reset
       istep = 0
       lastp = 0f
       myLogger.info("pass=%2d" format ipass)
-    	while (datasource.hasNext) {
-    		for (ithread <- 0 until nthreads) {
-    			if (datasource.hasNext) {
-    				val mats = datasource.next;
-    				nsamps += mats(0).ncols;
-				progress = datasource.progress
-				gprogress = (ipass + progress)/opts.npasses
-    				for (j <- 0 until mats.length) {
-    				  cmats(ithread)(j) = safeCopy(mats(j), ithread)
-    				}
-    				if (ithread == 0) here += datasource.opts.batchSize
-    				dones(ithread) = 0;
-    				bytes += mats.map(Learner.numBytes _).reduce(_+_);
-    			}
+      while (datasource.hasNext) {
+    	for (ithread <- 0 until nthreads) {
+    	  if (datasource.hasNext) {
+    		val mats = datasource.next;
+    		nsamps += mats(0).ncols;
+			progress = datasource.progress
+			gprogress = (ipass + progress)/opts.npasses
+    		for (j <- 0 until mats.length) {
+    		  cmats(ithread)(j) = safeCopy(mats(j), ithread)
     		}
+    		if (ithread == 0) here += datasource.opts.batchSize
+    		dones(ithread) = 0;
+    		bytes += mats.map(Learner.numBytes _).reduce(_+_);
+    	  }
+    	}
       	while (mini(dones).v == 0) Thread.sleep(1)
       	Thread.sleep(opts.coolit)
       	istep += nthreads
       	if ((istep/nthreads) % opts.syncStep == 0) ParLearner.syncmodels(models, mm, um, istep/opts.syncStep, useGPU, opts.elastic_weight)
       	if (datasource.progress > lastp + opts.pstep) {
-      		while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
-      		val gf = BIDMat.MatFunctions.gflop;
-      		if (reslist.length > lasti) {
-      			val perfStr = ("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
-      					100f*lastp,
-      					reslist.synchronized {
-      						Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore);
-      					},
-      					gf._2,
-      					nsamps/gf._2,
-      					gf._1,
-      					bytes/gf._2*1e-6));
-      		  val gpuStr = if (useGPU) {
-      		    (0 until math.min(nthreads, Mat.hasCUDA)).map((i)=>{
-      		      setGPU(i);
-      		      if (i==0) (", GPUmem=%3.2f" format GPUmem._1) else (", %3.2f" format GPUmem._1)
-      		    }).reduce(_+_);
-      		  } else "";
-      		  myLogger.info(perfStr + gpuStr);
-      			if (useGPU) setGPU(thisGPU);
-      		}
-      		lasti = reslist.length
+      	  while (datasource.progress > lastp + opts.pstep) lastp += opts.pstep
+      	  val gf = BIDMat.MatFunctions.gflop;
+      	  if (reslist.length > lasti) {
+      		val perfStr = ("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%3.2f" format (
+      		  100f*lastp,
+      		  reslist.synchronized {
+      			Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore);
+      		  },
+      		  gf._2,
+      		  nsamps/gf._2,
+      		  gf._1,
+      		  bytes/gf._2*1e-6));
+      		val gpuStr = if (useGPU) {
+      		  (0 until math.min(nthreads, Mat.hasCUDA)).map((i)=>{
+      		    setGPU(i);
+      		    if (i==0) (", GPUmem=%3.2f" format GPUmem._1) else (", %3.2f" format GPUmem._1)
+      		  }).reduce(_+_);
+      		} else "";
+      		myLogger.info(perfStr + gpuStr);
+      		if (useGPU) setGPU(thisGPU);
+      	  }
+      	  lasti = reslist.length
       	}
       }
       for (i <- 0 until nthreads) {
@@ -694,9 +694,9 @@ class ParLearner(
     val gf = gflop
     Mat.useCache = cacheState
     if (useGPU) {
-    	for (i <- 0 until nthreads) {
- //   		if (i != thisGPU) disconnect(i);
-    	}
+      for (i <- 0 until nthreads) {
+        //   		if (i != thisGPU) disconnect(i);
+      }
     }
     if (opts.autoReset && useGPU) {
       for (i <- 0 until nthreads) {
@@ -706,19 +706,19 @@ class ParLearner(
       resetGPUs
     }
     val perfStr = ("%5.2f%%, score=%6.5f, secs=%3.1f, samps/s=%4.1f, gf=%4.1f, MB/s=%4.1f" format (
-    		           100f*lastp,
-    		           reslist.synchronized {
-    		          	 Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore)
-    		           },
-    		           gf._2,
-    		           nsamps/gf._2,
-    		           gf._1,
-    		           bytes/gf._2*1e-6));
+      100f*lastp,
+      reslist.synchronized {
+    	Learner.scoreSummary(reslist, lasti, reslist.length, opts.cumScore)
+      },
+      gf._2,
+      nsamps/gf._2,
+      gf._1,
+      bytes/gf._2*1e-6));
     val gpuStr = if (useGPU) {
-    	             (0 until math.min(nthreads, Mat.hasCUDA)).map((i)=>{
-    	            	 setGPU(i);
-    	            	 if (i==0) (", GPUmem=%3.2f" format GPUmem._1) else (", %3.2f" format GPUmem._1)
-    	             }).reduce(_+_);
+      (0 until math.min(nthreads, Mat.hasCUDA)).map((i)=>{
+    	setGPU(i);
+    	if (i==0) (", GPUmem=%3.2f" format GPUmem._1) else (", %3.2f" format GPUmem._1)
+      }).reduce(_+_);
     } else "";
     setGPU(thisGPU);
     myLogger.info(perfStr + gpuStr);
@@ -785,30 +785,30 @@ class ParLearner(
 }
 
 /**
- * Parallel Learner with simplified Function arguments
- */
+* Parallel Learner with simplified Function arguments
+*/
 class ParLearnerF(
-    datasource:DataSource,
-    mkModelFn:()=>Model,
-    mkMixinsFn:()=>Array[Mixin],
-    mkUpdaterFn:()=>Updater,
-    datasink:DataSink,
-    opts:ParLearner.Opts = new ParLearner.Options) extends 
-    ParLearner(datasource, (i:Int)=>mkModelFn(), (i:Int)=>mkMixinsFn(), (i:Int)=>mkUpdaterFn(), datasink, opts) {}
+  datasource:DataSource,
+  mkModelFn:()=>Model,
+  mkMixinsFn:()=>Array[Mixin],
+  mkUpdaterFn:()=>Updater,
+  datasink:DataSink,
+  opts:ParLearner.Opts = new ParLearner.Options) extends 
+ParLearner(datasource, (i:Int)=>mkModelFn(), (i:Int)=>mkMixinsFn(), (i:Int)=>mkUpdaterFn(), datasink, opts) {}
 
 
 /**
- * Parallel Learner class with multiple datasources, models, mixins, and updaters.
- * i.e. several independent Learners whose models are synchronized periodically.
- */
+* Parallel Learner class with multiple datasources, models, mixins, and updaters.
+* i.e. several independent Learners whose models are synchronized periodically.
+*/
 
 class ParLearnerx(
-    val datasources:Array[DataSource],
-    val models:Array[Model],
-    val mixins:Array[Array[Mixin]],
-    val updaters:Array[Updater],
-    val datasinks:Array[DataSink],
-		val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
+  val datasources:Array[DataSource],
+  val models:Array[Model],
+  val mixins:Array[Array[Mixin]],
+  val updaters:Array[Updater],
+  val datasinks:Array[DataSink],
+  val opts:ParLearner.Options = new ParLearner.Options) extends Serializable {
 
   var um:Array[Mat] = null
   var mm:Array[Mat] = null
@@ -818,12 +818,12 @@ class ParLearnerx(
   def init = {
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
   	for (i <- 0 until opts.nthreads) {
-  		if (i < Mat.hasCUDA) setGPU(i)
-  		datasources(i).init
-  		models(i).bind(datasources(i))
-  		models(i).init
-  		if (mixins != null) mixins(i) map(_ init(models(i)))
-  		updaters(i).init(models(i))
+  	  if (i < Mat.hasCUDA) setGPU(i)
+  	  datasources(i).init
+  	  models(i).bind(datasources(i))
+  	  models(i).init
+  	  if (mixins != null) mixins(i) map(_ init(models(i)))
+  	  updaters(i).init(models(i))
   	}
   	useGPU = models(0).useGPU
   	if (Mat.hasCUDA > 0) setGPU(thisGPU)
@@ -831,9 +831,9 @@ class ParLearnerx(
     um = new Array[Mat](mml)
     mm = new Array[Mat](mml)
     for (i <- 0 until mml) {
-    	val mm0 = models(0).modelmats(i)
-    	mm(i) = zeros(mm0.nrows, mm0.ncols)
-    	um(i) = zeros(mm0.nrows, mm0.ncols)
+      val mm0 = models(0).modelmats(i)
+      mm(i) = zeros(mm0.nrows, mm0.ncols)
+      um(i) = zeros(mm0.nrows, mm0.ncols)
     }
   	ParLearner.initmodels(models, mm, um, 0, useGPU)
   }
@@ -844,139 +844,139 @@ class ParLearnerx(
   }
 
   def retrain() = {
-	  flip
-	  var cacheState = Mat.useCache;
+	flip
+	var cacheState = Mat.useCache;
     Mat.useCache = opts.useCache;
     var cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = opts.useCache;
-	  val thisGPU = if (useGPU) getGPU else 0
-	  if (useGPU) {
-	    for (i <- 0 until opts.nthreads) {
-	      if (i != thisGPU) connect(i)
-	    }
+	val thisGPU = if (useGPU) getGPU else 0
+	if (useGPU) {
+	  for (i <- 0 until opts.nthreads) {
+	    if (i != thisGPU) connect(i)
 	  }
+	}
 
-	  @volatile var done = izeros(opts.nthreads, 1)
-	  var ipass = 0
-	  var istep0 = 0L
-	  var ilast0 = 0L
-	  var bytes = 0L
-	  val reslist = new ListBuffer[FMat]
-	  val samplist = new ListBuffer[Float]
-	  var lastp = 0f
-	  var lasti = 0
+	@volatile var done = izeros(opts.nthreads, 1)
+	var ipass = 0
+	var istep0 = 0L
+	var ilast0 = 0L
+	var bytes = 0L
+	val reslist = new ListBuffer[FMat]
+	val samplist = new ListBuffer[Float]
+	var lastp = 0f
+	var lasti = 0
     var gprogress = 0f
-	  done.clear
-	  (0 until opts.nthreads).par.foreach((ithread:Int) => {
-	  		if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
-	  		var here = 0L
-	  		updaters(ithread).clear
-	  		while (done(ithread) < opts.npasses) {
-	  			var istep = 0
-	  			while (datasources(ithread).hasNext) {
-	  				val mats = datasources(ithread).next
-	  				here += datasources(ithread).opts.batchSize
-	  				bytes += mats.map(Learner.numBytes _).reduce(_+_);
-            gprogress = (dsProgress + ipass)/opts.npasses
-	  				models(0).synchronized {
-	  					istep += 1
-	  					istep0 += 1
-	  				}
-	  				try {
-	  					if (istep % opts.evalStep == 0) {
-	  						val scores = models(ithread).synchronized {models(ithread).evalbatchg(mats, ipass, here)}
-	  						reslist.synchronized { reslist.append(scores) }
-	  						samplist.synchronized { samplist.append(here) }
-	  					} else {
-	  						models(ithread).synchronized {
-	  							models(ithread).dobatchg(mats, ipass, here)
-	  							if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(mats, here))
-	  							updaters(ithread).update(ipass, here, gprogress)
-	  						}
-	  					}
-	  				} catch {
-	  				case e:Exception => {
-	  					print("Caught exception in thread %d %s\nTrying restart..." format (ithread, e.toString))
-	  					restart(ithread)
-	  					println("Keep on truckin...")
-	  				}
-	  				}
-	  				if (useGPU) Thread.sleep(opts.coolit)
-	  				if (datasources(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, datasources(ithread).opts.putBack)
-//	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
-	  			}
-	  			models(ithread).synchronized { updaters(ithread).updateM(ipass) }
-	  			done(ithread) += 1
-	  			while (done(ithread) > ipass) Thread.sleep(1)
-	  		}
-	  	});
-
-	  println("pass=%2d" format ipass)
-	  while (ipass < opts.npasses) {
-	  	while (mini(done).v == ipass) {
-	  		if (istep0 >= ilast0 + opts.syncStep) {
-	  			ParLearner.syncmodels(models, mm, um, istep0/opts.syncStep, useGPU)
-	  			ilast0 += opts.syncStep
-	  		}
-	  		if (dsProgress > lastp + opts.pstep) {
-	  			while (dsProgress > lastp + opts.pstep) lastp += opts.pstep
-	  			val gf = gflop
-	  			if (reslist.length > lasti) {
-	  				print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
-	  						100f*lastp,
-	  						reslist.synchronized {
-	  							Learner.scoreSummary(reslist, lasti, reslist.length)
-	  						},
-	  						gf._1,
-	  						gf._2,
-	  						bytes*1e-9,
-	  						bytes/gf._2*1e-6))
-	  						if (useGPU) {
-	  							for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
-	  								setGPU(i)
-	  								if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
-	  							}
-	  							setGPU(thisGPU)
-	  						}
-	  				println
-	  			}
-	  			lasti = reslist.length
+	done.clear
+	(0 until opts.nthreads).par.foreach((ithread:Int) => {
+	  if (useGPU && ithread < Mat.hasCUDA) setGPU(ithread)
+	  var here = 0L
+	  updaters(ithread).clear
+	  while (done(ithread) < opts.npasses) {
+	  	var istep = 0
+	  	while (datasources(ithread).hasNext) {
+	  	  val mats = datasources(ithread).next
+	  	  here += datasources(ithread).opts.batchSize
+	  	  bytes += mats.map(Learner.numBytes _).reduce(_+_);
+          gprogress = (dsProgress + ipass)/opts.npasses
+	  	  models(0).synchronized {
+	  		istep += 1
+	  		istep0 += 1
+	  	  }
+	  	  try {
+	  		if (istep % opts.evalStep == 0) {
+	  		  val scores = models(ithread).synchronized {models(ithread).evalbatchg(mats, ipass, here)}
+	  		  reslist.synchronized { reslist.append(scores) }
+	  		  samplist.synchronized { samplist.append(here) }
 	  		} else {
-	  		  Thread.sleep(1)
+	  		  models(ithread).synchronized {
+	  			models(ithread).dobatchg(mats, ipass, here)
+	  			if (mixins != null && mixins(ithread) != null) mixins(ithread) map (_ compute(mats, here))
+	  			updaters(ithread).update(ipass, here, gprogress)
+	  		  }
 	  		}
+	  	  } catch {
+	  		case e:Exception => {
+	  		  print("Caught exception in thread %d %s\nTrying restart..." format (ithread, e.toString))
+	  		  restart(ithread)
+	  		  println("Keep on truckin...")
+	  		}
+	  	  }
+	  	  if (useGPU) Thread.sleep(opts.coolit)
+	  	  if (datasources(ithread).opts.putBack >= 0) datasources(ithread).putBack(mats, datasources(ithread).opts.putBack)
+          //	  				if (istep % (opts.syncStep/opts.nthreads) == 0) syncmodel(models, ithread)
 	  	}
-	  	lastp = 0f
-	  	if (ipass < opts.npasses) {
-	  	  for (i <- 0 until opts.nthreads) datasources(i).reset
-	  	  println("pass=%2d" format ipass+1)
+	  	models(ithread).synchronized { updaters(ithread).updateM(ipass) }
+	  	done(ithread) += 1
+	  	while (done(ithread) > ipass) Thread.sleep(1)
+	  }
+	});
+
+	println("pass=%2d" format ipass)
+	while (ipass < opts.npasses) {
+	  while (mini(done).v == ipass) {
+	  	if (istep0 >= ilast0 + opts.syncStep) {
+	  	  ParLearner.syncmodels(models, mm, um, istep0/opts.syncStep, useGPU)
+	  	  ilast0 += opts.syncStep
 	  	}
-	  	if (opts.resFile != null) {
+	  	if (dsProgress > lastp + opts.pstep) {
+	  	  while (dsProgress > lastp + opts.pstep) lastp += opts.pstep
+	  	  val gf = gflop
+	  	  if (reslist.length > lasti) {
+	  		print("%5.2f%%, ll=%6.5f, gf=%5.3f, secs=%3.1f, GB=%4.2f, MB/s=%5.2f" format (
+	  		  100f*lastp,
+	  		  reslist.synchronized {
+	  			Learner.scoreSummary(reslist, lasti, reslist.length)
+	  		  },
+	  		  gf._1,
+	  		  gf._2,
+	  		  bytes*1e-9,
+	  		  bytes/gf._2*1e-6))
+	  		if (useGPU) {
+	  		  for (i <- 0 until math.min(opts.nthreads, Mat.hasCUDA)) {
+	  			setGPU(i)
+	  			if (i==0) print(", GPUmem=%3.2f" format GPUmem._1) else print(", %3.2f" format GPUmem._1)
+	  		  }
+	  		  setGPU(thisGPU)
+	  		}
+	  		println
+	  	  }
+	  	  lasti = reslist.length
+	  	} else {
+	  	  Thread.sleep(1)
+	  	}
+	  }
+	  lastp = 0f
+	  if (ipass < opts.npasses) {
+	  	for (i <- 0 until opts.nthreads) datasources(i).reset
+	  	println("pass=%2d" format ipass+1)
+	  }
+	  if (opts.resFile != null) {
       	saveAs(opts.resFile, Learner.scores2FMat(reslist) on row(samplist.toList), "results")
       }
-	  	ipass += 1
-	  }
-	  val gf = gflop;
-	  Mat.useCache = cacheState;
+	  ipass += 1
+	}
+	val gf = gflop;
+	Mat.useCache = cacheState;
     Mat.useGPUcache = cacheGPUstate;
-	  println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
-	  if (opts.autoReset && useGPU) {
-	    Learner.toCPU(modelmats)
-	    resetGPUs
-	  }
-	  for (ithread <- 0 until opts.nthreads) datasources(ithread).close
-	  results = Learner.scores2FMat(reslist) on row(samplist.toList)
+	println("Time=%5.4f secs, gflops=%4.2f, MB/s=%5.2f, GB=%5.2f" format (gf._2, gf._1, bytes/gf._2*1e-6, bytes*1e-9))
+	if (opts.autoReset && useGPU) {
+	  Learner.toCPU(modelmats)
+	  resetGPUs
+	}
+	for (ithread <- 0 until opts.nthreads) datasources(ithread).close
+	results = Learner.scores2FMat(reslist) on row(samplist.toList)
   }
 
   def syncmodel(models:Array[Model], ithread:Int) = {
-	  mm.synchronized {
-	    for (i <- 0 until models(ithread).modelmats.length) {
-	    	um(i) <-- models(ithread).modelmats(i)
-	    	um(i) ~ um(i) *@ (1f/opts.nthreads)
-	    	mm(i) ~ mm(i) *@ (1 - 1f/opts.nthreads)
-	    	mm(i) ~ mm(i) + um(i)
-	    	models(ithread).modelmats(i) <-- mm(i)
-	    }
+	mm.synchronized {
+	  for (i <- 0 until models(ithread).modelmats.length) {
+	    um(i) <-- models(ithread).modelmats(i)
+	    um(i) ~ um(i) *@ (1f/opts.nthreads)
+	    mm(i) ~ mm(i) *@ (1 - 1f/opts.nthreads)
+	    mm(i) ~ mm(i) + um(i)
+	    models(ithread).modelmats(i) <-- mm(i)
 	  }
+	}
   }
 
   def restart(ithread:Int) = {
@@ -987,7 +987,7 @@ class ParLearnerx(
     models(ithread).bind(datasources(ithread))
     models(ithread).init
     for (i <- 0 until models(ithread).modelmats.length) {
-    	models(ithread).modelmats(i) <-- mm(i)
+      models(ithread).modelmats(i) <-- mm(i)
     }
     updaters(ithread).init(models(ithread))
   }
@@ -1006,22 +1006,22 @@ class ParLearnerx(
 }
 
 /**
- * Parallel multi-datasource Learner that takes function arguments.
- * This allows classes to be initialized later, when the learner is setup.
- */
+* Parallel multi-datasource Learner that takes function arguments.
+* This allows classes to be initialized later, when the learner is setup.
+*/
 
 class ParLearnerxF(
-    dopts:DataSource.Opts,
-		ddfun:(DataSource.Opts, Int)=>DataSource,
-		mopts:Model.Opts,
-		mkmodel:(Model.Opts)=>Model,
-		ropts:Mixin.Opts,
-		mkreg:(Mixin.Opts)=>Array[Mixin],
-		uopts:Updater.Opts,
-		mkupdater:(Updater.Opts)=>Updater,
-		sopts:DataSink.Opts,
-		ssfun:(DataSink.Opts, Int)=>DataSink,
-		val lopts:ParLearner.Options = new ParLearner.Options) extends Serializable {
+  dopts:DataSource.Opts,
+  ddfun:(DataSource.Opts, Int)=>DataSource,
+  mopts:Model.Opts,
+  mkmodel:(Model.Opts)=>Model,
+  ropts:Mixin.Opts,
+  mkreg:(Mixin.Opts)=>Array[Mixin],
+  uopts:Updater.Opts,
+  mkupdater:(Updater.Opts)=>Updater,
+  sopts:DataSink.Opts,
+  ssfun:(DataSink.Opts, Int)=>DataSink,
+  val lopts:ParLearner.Options = new ParLearner.Options) extends Serializable {
 
   var dds:Array[DataSource] = null;
   var sss:Array[DataSink] = null
@@ -1039,10 +1039,10 @@ class ParLearnerxF(
     val thisGPU = if (Mat.hasCUDA > 0) getGPU else 0
     for (i <- 0 until lopts.nthreads) {
       if (mopts.useGPU && i < Mat.hasCUDA) setGPU(i)
-    	dds(i) = ddfun(dopts, i)
-    	models(i) = mkmodel(mopts)
-    	if (mkreg != null) mixins(i) = mkreg(ropts)
-    	updaters(i) = mkupdater(uopts)
+      dds(i) = ddfun(dopts, i)
+      models(i) = mkmodel(mopts)
+      if (mkreg != null) mixins(i) = mkreg(ropts)
+      updaters(i) = mkupdater(uopts)
     }
     if (0 < Mat.hasCUDA) setGPU(thisGPU)
     learner = new ParLearnerx(dds, models, mixins, updaters, sss, lopts)
@@ -1124,15 +1124,15 @@ object Learner {
   def scores2FMat(reslist:ListBuffer[FMat]):FMat = {
     if (reslist.length == 0) return zeros(0, 0);
     reslist.synchronized {
-    	val len = reslist.length;
-    	val out = FMat(reslist(0).nrows, len);
-    	var i = 0;
-    	while (i < len) {
-    		val scoremat = reslist(i)
-    				out(?, i) = scoremat(?,0)
-    				i += 1
-    	}
-    	out
+      val len = reslist.length;
+      val out = FMat(reslist(0).nrows, len);
+      var i = 0;
+      while (i < len) {
+    	val scoremat = reslist(i)
+    	out(?, i) = scoremat(?,0)
+    	i += 1
+      }
+      out
     }
   }
   

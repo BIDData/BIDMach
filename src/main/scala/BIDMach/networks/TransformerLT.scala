@@ -140,7 +140,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     updatemats = new Array[Mat](opts.depth * kmodels * 2 + 4);
     for (i <- 0 until opts.depth) { 
       table(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
-      dtable(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
+      dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
       for (j <- 0 until 3) { 
         modelmats(2 * (j + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.indim, opts.dim));
         modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
@@ -167,7 +167,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
     updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
     table(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
-    dtable(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
+    dtable(opts.depth) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
   }
 
   def attachEnds() { 
@@ -181,7 +181,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.layers(0).output = table(level);
     net.layers(0).deriv = dtable(level);
     net.layers(5).asInstanceOf[ModelLayer].imodel = level * kmodels * 2;
-    net.layers(6).asInstanceOf[ModelLayer].imodel = level * kmodels * 2  + 2;
+    net.layers(6).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
     net.layers(7).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
     net.layers(8).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
     net.layers(9).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
@@ -213,12 +213,13 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
   def backward() { 
     val net = txNets(0);
+    backEnd.layers(2).deriv.set(1f);
     backEnd.backward();
     backEnd.layers(0).deriv.colslice(0, opts.seqlength, dtable(opts.depth), opts.degree);
     for (level <- (opts.depth -1) to 0 by -1) { 
       attach(net, level);
-      dtable(level+1).colslice(opts.degree, opts.seqlength+opts.degree, net.layers(net.layers.length-1).deriv, 0)
       net.forward;
+      dtable(level+1).colslice(opts.degree, opts.seqlength+opts.degree, net.layers(net.layers.length-1).deriv, 0)
       net.backward();
     }
     frontEnd.backward();
@@ -257,7 +258,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
     val in =        input;
     val prod =      linear(in)(outdim=opts.nvocab, hasBias=false);
-    val out =       softmaxout(prod)(scoreType=1, lossType=1);
+    val out =       softmaxout(prod)(scoreType=opts.scoreType, lossType=1);
 
     nopts.nodemat = in \ prod \ out;
  
@@ -389,6 +390,7 @@ object TransformerLT {
     var nstrided = 6;
     var nvocab = 32768;
     var hasBias = true;
+    var scoreType = SoftmaxOutputLayer.CrossEntropyScore
     var PADsym = 1;      // Padding symbol
     var OOVsym = 2;      // OOV symbol
     var STARTsym = 0;    // Start symbol
@@ -398,67 +400,44 @@ object TransformerLT {
   class Options extends Opts {}
   
 @SerialVersionUID(100L)
-  class LearnOptions extends Learner.Options with TransformerLT.Opts with MatSource.Opts with Grad.Opts
+  class LearnOptions extends Learner.Options with TransformerLT.Opts with MatSource.Opts with ADAGrad.Opts
 
 @SerialVersionUID(100L)
-  class FSopts extends Learner.Options with TransformerLT.Opts with FileSource.Opts with Grad.Opts
+  class FSopts extends Learner.Options with TransformerLT.Opts with FileSource.Opts with ADAGrad.Opts
 
 
-  def learner(mat0:Mat, mat1:Mat) = {
+  def learner(mat0:Mat, useADAGrad:Boolean) = {
     val opts = new LearnOptions;
     opts.batchSize = 128;
   	val nn = new Learner(
-  	    new MatSource(Array(mat0, mat1), opts), 
+  	    new MatSource(Array(mat0), opts), 
   	    new TransformerLT(opts), 
         null,
-  	    new Grad(opts), 
+  	    if (useADAGrad) { new ADAGrad(opts) } else { new Grad(opts) }, 
   	    null,
   	    opts)
     (nn, opts)
   }
 
-  def learner(fnames:List[(Int)=>String]) = {
+  def learner(mat0:Mat):(Learner, LearnOptions) = learner(mat0, true);
+
+  def learner(fnames:List[(Int)=>String], useADAGrad:Boolean) = {
     val opts = new FSopts;
     opts.fnames = fnames
   	val nn = new Learner(
   	    new FileSource(opts),
   	    new TransformerLT(opts), 
         null,
-  	    new Grad(opts), 
+  	    if (useADAGrad) { new ADAGrad(opts) } else { new Grad(opts) }, 
   	    null,
   	    opts)
     (nn, opts)
   }
 
-  def learner(fn1:String):(Learner, FSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)))
+  def learner(fn1:String, useADAGrad:Boolean):(Learner, FSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)), useADAGrad)
 
-  def testsetup(opts:Opts = new Options):TransformerLT = { 
-    val trans = new TransformerLT(opts);
-    trans.init();
-    trans;
-  }
+  def learner(fn1:String):(Learner, FSopts) = learner(List(FileSource.simpleEnum(fn1,1,0)), true)
 
-  def testfwd(trans:TransformerLT, n:Int) = { 
-    for (i <- 0 until n) { 
-      trans.txNets(0).forward
-    }
-  }
-
-  def testbwd(trans:TransformerLT, n:Int) = { 
-    for (i <- 0 until n) { 
-      trans.txNets(0).forward
-      trans.txNets(0).setderiv();
-      trans.txNets(0).backward()
-    }
-  }
-
-  def testbackward(trans:TransformerLT, n:Int) = { 
-    for (i <- 0 until n) { 
-      trans.forward();
-      trans.backward();
-    }
-  }
-  
   
   
   def load(fname:String):TransformerLT = {

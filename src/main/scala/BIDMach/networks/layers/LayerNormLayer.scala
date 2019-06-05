@@ -62,11 +62,13 @@ class LayerNormLayer(override val net:Net, override val opts:LayerNormNodeOpts =
       val means1 = inputData.mean(batchDim1);
       means = means1.mean(batchDim);
       val variances1 = inputData.variance(batchDim1);
-      variances = variances1.mean(batchDim) + opts.epsilon;
+      variances = variances1.mean(batchDim);
     } else { 
       means = inputData.mean(batchDim);
-      variances = inputData.variance(batchDim) + opts.epsilon;
+      variances = inputData.variance(batchDim);
     }
+    abs(variances, variances);
+    variances ~ variances + opts.epsilon;
     sdevs = sqrt(variances);
     output ~ inputData - means;
     output ~ output / sdevs;                       // Works even if output = input;
