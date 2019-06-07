@@ -84,9 +84,10 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
       assignInputsAndTargets(gmats, ipass, pos);
       if (lastScores.asInstanceOf[AnyRef] == null) lastScores = zeros(backEnd.score_layers.length, batchSize);
-      if (seqptr == 0) { 
+      if (seqptr >= opts.seqlength) { 
         forward(true);
-        lastScores = zeros(backEnd.score_layers.length, batchSize);
+        wrapInput();
+        seqptr = 0;
   		for (i <- 0 until backEnd.score_layers.length) {
   		  lastScores(i,?) = backEnd.score_layers(i).score;
   		}
@@ -297,14 +298,15 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
     val cmask_ =   zeros((degree*2) \ degree \ opts.nheads \ (seqlength/degree));
     val col = icol(0->degree);
+    val v = 1/math.sqrt(indim/opts.nheads).toFloat;
     for (i <- 0 until seqlength/degree) { 
       for (j <- 0 until opts.nheads) { 
         for (k <- 0 until degree) { 
-          cmask_(k + 1 + col, k, j, i) = 1f;
+          cmask_(k + 1 + col, k, j, i) = v
         }
       }
     }
-    val smask_ =   (1f - cmask_) *@ -1000f;
+    val smask_ =   (1f - cmask_) *@ -1e37f;
 
     val in_qkv =      input;
     val this_in =     colslice(in_qkv)(degree, seqlength+degree);

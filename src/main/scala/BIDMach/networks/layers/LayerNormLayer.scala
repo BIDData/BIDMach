@@ -62,7 +62,7 @@ class LayerNormLayer(override val net:Net, override val opts:LayerNormNodeOpts =
       val means1 = inputData.mean(batchDim1);
       means = means1.mean(batchDim);
       val squares1 = (inputData *@ inputData).mean(batchDim1);
-	  val squares = squares.mean(batchDim);
+	  val squares = squares1.mean(batchDim);
       variances = squares - means *@ means;
     } else { 
       means = inputData.mean(batchDim);

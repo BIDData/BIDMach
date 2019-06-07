@@ -42,7 +42,8 @@ class SoftmaxxLayer(override val net:Net, override val opts:SoftmaxxNodeOpts = n
 	if (inputDeriv.asInstanceOf[AnyRef] != null) {
 	  val exps = exp(inputData - inputData.maxi(opts.inds));
 	  val smax = exps / exps.sum(opts.inds);
-	  inputDeriv ~ inputDeriv + ((smax ∘ deriv) - (smax ∘ (smax ∙ deriv)));
+      val sderiv = smax ∘ deriv
+	  inputDeriv ~ inputDeriv + (sderiv - (smax ∘ sderiv.sum(opts.inds)));
 	}
 	
 	inplaceNoConnectReleaseDeriv();
