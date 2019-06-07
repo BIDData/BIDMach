@@ -23,40 +23,40 @@ import BIDMach.networks._
 @SerialVersionUID(100L)
 class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new MatMulNode) extends Layer(net, opts) {  
   
-	override val _inputs = new Array[LayerTerm](2);
+  override val _inputs = new Array[LayerTerm](2);
 
-	override def forward = {
+  override def forward = {
     val start = toc;
     val coli = if (opts.skipDim1) 2 else 1;
     val nrows = if (opts.transA) inputData.dims(coli) else inputData.dims(0);
     val ncols = if (opts.transB) inputDatas(1).dims(0) else inputDatas(1).dims(coli);
     val nblocks = if (inputData.dims.length <= 2) {
-    	createOutput(nrows \ ncols);
-    	1
+      createOutput(nrows \ ncols);
+      1
     } else {
       if (!opts.skipDim1) {
-    	  createOutput(nrows \ ncols \ inputData.dims(2->inputData.dims.length));
-    	  inputData.dims.data.slice(2, inputData.dims.length).reduce(_*_)
+    	createOutput(nrows \ ncols \ inputData.dims(2->inputData.dims.length));
+    	inputData.dims.data.slice(2, inputData.dims.length).reduce(_*_)
       } else {
         createOutput(nrows \ inputData.dims(1) \ ncols \ inputData.dims(3->inputData.dims.length));
         inputData.dims(1)
       }
     }
     inplaceNoConnectGetOutput();
-	        
+	
     if (!opts.skipDim1) {
-    	inputData.blockmult(inputDatas(1), output, nblocks, opts.transA, opts.transB)
+      inputData.blockmult(inputDatas(1), output, nblocks, opts.transA, opts.transB)
     } else {
       inputData.blockmult2(inputDatas(1), output, nblocks, opts.transA, opts.transB)    
     }
 	
-	  forwardtime += toc - start;
-	}
+	forwardtime += toc - start;
+  }
 
-	override def backward = {
+  override def backward = {
     val start = toc;
     inplaceNoConnectGetInputDerivs();
-     val nblocks = if (inputData.dims.length <= 2) {
+    val nblocks = if (inputData.dims.length <= 2) {
       1
     } else {
       if (!opts.skipDim1) {
@@ -68,11 +68,11 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
     
     if (inputDerivs(0).asInstanceOf[AnyRef] != null) {
       if (!opts.skipDim1) {
-    	  if (! opts.transA) {
-    		  deriv.blockmadd(inputDatas(1), inputDerivs(0), nblocks, false, ! opts.transB)      
-    	  } else {
-    		  inputDatas(1).blockmadd(deriv, inputDerivs(0), nblocks, opts.transB, true)
-    	  }
+    	if (! opts.transA) {
+    	  deriv.blockmadd(inputDatas(1), inputDerivs(0), nblocks, false, ! opts.transB)      
+    	} else {
+    	  inputDatas(1).blockmadd(deriv, inputDerivs(0), nblocks, opts.transB, true)
+    	}
       } else {
         if (! opts.transA) {
           deriv.blockmadd2(inputDatas(1), inputDerivs(0), nblocks, false, ! opts.transB)      
@@ -82,12 +82,12 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
       }
     }
     if (inputDerivs(1).asInstanceOf[AnyRef] != null) {
-    	if (!opts.skipDim1) {
-    		if (! opts.transB) {
-    			inputData.blockmadd(deriv, inputDerivs(1), nblocks, ! opts.transA, false)
-    		} else {
-    			deriv.blockmadd(inputData, inputDerivs(1), nblocks, true, opts.transA)
-    		}
+      if (!opts.skipDim1) {
+    	if (! opts.transB) {
+    	  inputData.blockmadd(deriv, inputDerivs(1), nblocks, ! opts.transA, false)
+    	} else {
+    	  deriv.blockmadd(inputData, inputDerivs(1), nblocks, true, opts.transA)
+    	}
       } else {
         if (! opts.transB) {
           inputData.blockmadd2(deriv, inputDerivs(1), nblocks, ! opts.transA, false)
@@ -99,7 +99,7 @@ class MatMulLayer(override val net:Net, override val opts:MatMulNodeOpts = new M
     
     inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
-	}
+  }
   
   override def toString = {
     "matmul@"+Integer.toHexString(hashCode % 0x10000).toString
@@ -112,10 +112,10 @@ trait MatMulNodeOpts extends NodeOpts {
   var skipDim1 = false
 
   def copyOpts(opts:MatMulNodeOpts):MatMulNodeOpts = {
-      super.copyOpts(opts);
-      opts.transA = transA
-      opts.transB = transB
-      opts;
+    super.copyOpts(opts);
+    opts.transA = transA
+    opts.transB = transB
+    opts;
   }
 }
 
@@ -129,15 +129,15 @@ class MatMulNode extends Node with MatMulNodeOpts {
     opts;
   }
 
-	override def clone:MatMulNode = {copyTo(new MatMulNode).asInstanceOf[MatMulNode];}
+  override def clone:MatMulNode = {copyTo(new MatMulNode).asInstanceOf[MatMulNode];}
 
-	override def create(net:Net):MatMulLayer = {MatMulLayer(net, this);}
+  override def create(net:Net):MatMulLayer = {MatMulLayer(net, this);}
   
   override def toString = {
     "matmul@"+Integer.toHexString(hashCode % 0x10000).toString
   }
 }
-  
+
 @SerialVersionUID(100L)
 object MatMulLayer {  
   
