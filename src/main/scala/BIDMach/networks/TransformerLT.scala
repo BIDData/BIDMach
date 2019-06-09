@@ -114,6 +114,11 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       src.colslice(0, batchSize - 1, inmat, seqptr + opts.degree + 1);
     }
 
+    val poslayer = frontEnd.layers(1).asInstanceOf[ConstantLayer]
+    if (poslayer.opts.value.asInstanceOf[AnyRef] == null) poslayer.opts.value = zeros(opts.dim, opts.seqlength+opts.degree);
+    val posmat = poslayer.opts.value.asInstanceOf[FMat];
+    posEncoding(pos, posmat);
+
     val backin = backEnd.layers(0)
     if (backin.output.asInstanceOf[AnyRef] == null) { 
       backin.output = convertMat(zeros(opts.dim, opts.seqlength))
@@ -172,9 +177,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   }
 
   def attachEnds() { 
-    frontEnd.layers(2).output = table(0);
-    frontEnd.layers(2).deriv = dtable(0);
-    frontEnd.layers(2).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2;
+    frontEnd.layers(4).output = table(0);
+    frontEnd.layers(4).deriv = dtable(0);
+    frontEnd.layers(3).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2;
     backEnd.layers(1).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2 + 2;
   }
 
@@ -187,7 +192,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.layers(8).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
     net.layers(9).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
     net.layers(36).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 6;
-    net.layers(39).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 8;
+    net.layers(40).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 8;
   }
 
   def forward(predicting:Boolean=false) { 
@@ -237,10 +242,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     import BIDMach.networks.layers.Node._
 
     val in =        input;
+    val posenc =    constant(null)(false);
     val smat =      oneHot(in)(opts.nvocab);
-    val out =       linear(smat)(outdim=dim, hasBias=hasBias);
+    val embed =     linear(smat)(outdim=dim, hasBias=hasBias);
+    val out =       embed + posenc;
 
-    nopts.nodemat = in \ smat \ out;
+    nopts.nodemat = in \ posenc \ smat \ embed \ out;
  
     net.output_nodes = Array(out);
     net.createLayers;
@@ -302,11 +309,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     for (i <- 0 until seqlength/degree) { 
       for (j <- 0 until opts.nheads) { 
         for (k <- 0 until degree) { 
-          cmask_(k + 1 + col, k, j, i) = v
+          cmask_(k + 1 + col, k, j, i) = 1f
         }
       }
     }
     val smask_ =   (1f - cmask_) *@ -1e37f;
+    cmask_ ~ cmask_ * v;
 
     val in_qkv =      input;
     val this_in =     colslice(in_qkv)(degree, seqlength+degree);
@@ -338,7 +346,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val keysx =       reshape(keysx_2d)(headdimsx2,false);
     val valsx =       reshape(valsx_2d)(headdimsx2,false);
 
-    val prod =        keysx ^* queriesx;
+    val prod =        keysx ^* queriesx;   // layer 25
     val cmask =       constant(cmask_)(true);
     val smask =       constant(smask_)(true);
     val mprod =       prod *@ cmask;
@@ -352,12 +360,14 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
     val pvals =       reshape(pvals_2d)(basedimsi,false);
     val mhattn =      linear(pvals)(outdim=dim, hasBias=hasBias); // layer 36
-    val norm1 =       layerNorm(mhattn)();
+    val drop1 =       dropout(mhattn)(0.9f)
+    val norm1 =       layerNorm(drop1)();
     val sum1 =        norm1 + this_in;
-    val ffwd1 =       linear(sum1)(outdim=dim, hasBias=hasBias);  // layer 39
 
+    val ffwd1 =       linear(sum1)(outdim=dim, hasBias=hasBias);  // layer 40
     val relu1 =       relu(ffwd1)();
-    val norm2 =       layerNorm(relu1)();
+    val drop2 =       dropout(relu1)(0.9f)
+    val norm2 =       layerNorm(drop2)();
     val sum2 =        sum1 + norm2;
     
     val nodes     = in_qkv       \ this_in      \ last_in      \ headinds     \ headinds2    on
@@ -367,14 +377,25 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
                     keysx_2d     \ valsx_2d     \ queriesx     \ keysx        \ valsx        on
                     prod         \ cmask        \ smask        \ mprod        \ oprod        on
                     weights      \ wvals        \ wvals_2d     \ invheadinds  \ pvals_2d     on
-                    pvals        \ mhattn       \ norm1        \ sum1         \ ffwd1        on
-                    relu1        \ norm2        \ sum2         \ null         \ null;
+                    pvals        \ mhattn       \ drop1        \ norm1        \ sum1         on
+                    ffwd1        \ relu1        \ drop2        \ norm2        \ sum2         
 
     nopts.nodemat = nodes.t;
  
     net.output_nodes = Array(sum2);
     net.createLayers;
     net;
+  }
+  
+  def posEncoding(startpos:Long, mat:FMat) = { 
+    val d = mat.nrows;
+    val n = mat.ncols;
+    val pos = row(startpos.toInt->(startpos.toInt + n));
+    for (i <- 0 until d/2) { 
+      val rate = math.pow(10000, i*2/d).toFloat
+      mat(i*2, ?) = sin(pos * rate);
+      mat(i*2+1, ?) = cos(pos * rate);
+    }
   }
 }
 
