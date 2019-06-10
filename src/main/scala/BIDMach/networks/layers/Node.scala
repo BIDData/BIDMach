@@ -677,10 +677,11 @@ bias_scale=bs; inplace=inp}
     new SoftmaxxNode{inputs(0) = a; inds=inds0};
   }
   
-  def softmaxout(a:NodeTerm)(scoreType:Int=1, lossType:Int=1) =  {
+  def softmaxout(a:NodeTerm)(scoreType:Int=1, lossType:Int=1, eps:Float=1e-6f) =  {
     val scoreTyp = scoreType;
     val lossTyp = lossType;
-    new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; lossType = lossTyp}
+    val eps0 = eps;
+    new SoftmaxOutputNode{inputs(0) = a; scoreType=scoreTyp; lossType = lossTyp; eps=eps0}
   }
   
   def softplus(a:NodeTerm) = new SoftplusNode{inputs(0) = a};

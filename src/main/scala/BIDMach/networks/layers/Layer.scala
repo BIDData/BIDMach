@@ -862,10 +862,11 @@ object Layer {
     new SoftmaxxLayer(null, new SoftmaxxNode{inds=inds0}){inputs(0) = a;}
   }
   
-  def softmaxout(a:LayerTerm)(scoreType:Int=1, lossType:Int = 1, net:Net=null) =  {
+  def softmaxout(a:LayerTerm)(scoreType:Int=1, lossType:Int = 1, eps:Float=1e16f, net:Net=null) =  {
     val scoreTyp = scoreType;
     val lossTyp = lossType;
-    new SoftmaxOutputLayer(net, new SoftmaxOutputNode{scoreType=scoreTyp; lossType=lossTyp}){inputs(0) = a}
+    val eps0 = eps;
+    new SoftmaxOutputLayer(net, new SoftmaxOutputNode{scoreType=scoreTyp; lossType=lossTyp; eps=eps0}){inputs(0) = a}
   }
   
   def softplus(a:LayerTerm) = new SoftplusLayer(null){inputs(0) = a};

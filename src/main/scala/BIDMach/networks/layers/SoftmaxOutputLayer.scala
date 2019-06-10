@@ -91,7 +91,8 @@ class SoftmaxOutputLayer(override val net:Net, override val opts:SoftmaxOutputNo
     if (opts.scoreType == SoftmaxOutputLayer.AccuracyScore) {
       FMat(probs(inds) == maxi(probs));
     } else {
-      FMat(ln(probs(inds)));
+      if (eps.asInstanceOf[AnyRef] == null) eps = convertMat(row(opts.eps));
+      FMat(ln(probs(inds)+eps));
     }
   }
   
