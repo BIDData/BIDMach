@@ -11,6 +11,13 @@ class ElasticAverageBinderSpec extends BIDMachSpec {
   val model = new ElasticAverageTestModel()
   val binder = new ElasticAverageBinder(model, (iter:Int)=>elasticRate , Mat.consoleLogger)
 
+  def checkSimilar(a:FMat, b:FMat, eps:Float) = {
+  	a.dims.length should equal (b.dims.length) ;
+  	a.dims.data should equal (b.dims.data);
+  	assert_approx_eq(a.data, b.data, eps);
+  }
+  
+  def checkSimilar(a:FMat, b:FMat):Unit = checkSimilar(a, b, 1e-4f);
 
   "Elastic binder" should "calculate total data size from model mats" in {
 
