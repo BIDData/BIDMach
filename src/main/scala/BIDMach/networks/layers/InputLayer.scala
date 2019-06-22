@@ -24,6 +24,15 @@ class InputLayer(override val net:Net, override val opts:InputNodeOpts = new Inp
     override def toString = {
     "input@"+Integer.toHexString(hashCode % 0x10000).toString
   }
+
+  override def forward = {
+	val start = toc;
+	if (deriv.asInstanceOf[AnyRef] != null) {
+      deriv.clear;
+    }
+	forwardtime += toc - start;
+  }
+
 }
 
 trait InputNodeOpts extends NodeOpts {}

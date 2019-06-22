@@ -145,7 +145,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     setmodelmats(new Array[Mat](opts.depth * kmodels * 2 + 4));
     updatemats = new Array[Mat](opts.depth * kmodels * 2 + 4);
     for (i <- 0 until opts.depth) { 
-      table(i) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
+      table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
       dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
       for (j <- 0 until 3) { 
         modelmats(2 * (j + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.indim, opts.dim));
