@@ -117,7 +117,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val poslayer = frontEnd.layers(1).asInstanceOf[ConstantLayer]
     if (poslayer.opts.value.asInstanceOf[AnyRef] == null) poslayer.opts.value = zeros(opts.dim, opts.seqlength+opts.degree);
     val posmat = poslayer.opts.value.asInstanceOf[FMat];
-    posEncoding(pos, posmat);
+    TransformerLT.posEncoding(pos, posmat);
 
     val backin = backEnd.layers(0)
     if (backin.output.asInstanceOf[AnyRef] == null) { 
@@ -386,17 +386,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.createLayers;
     net;
   }
-  
-  def posEncoding(startpos:Long, mat:FMat) = { 
-    val d = mat.nrows;
-    val n = mat.ncols;
-    val pos = row(startpos.toInt->(startpos.toInt + n));
-    for (i <- 0 until d/2) { 
-      val rate = math.pow(10000, -i*2.0/d).toFloat
-      mat(i*2, ?) = sin(pos * rate);
-      mat(i*2+1, ?) = cos(pos * rate);
-    }
-  }
 }
 
 @SerialVersionUID(100L)
@@ -419,6 +408,19 @@ object TransformerLT {
     var STARTsym = 0;    // Start symbol
     var dropout = 0.9f;
   }
+
+  def posEncoding(startpos:Long, mat:FMat, maxr:Float=10000) = { 
+    val d = mat.nrows;
+    val n = mat.ncols;
+    val pos = row(startpos.toInt->(startpos.toInt + n));
+    for (i <- 0 until d/2) { 
+      val rate = math.pow(maxr, -i*2.0/d).toFloat
+      mat(i*2, ?) = sin(pos * rate);
+      mat(i*2+1, ?) = cos(pos * rate);
+    }
+    mat
+  }
+
   
 @SerialVersionUID(100L)
   class Options extends Opts {}
