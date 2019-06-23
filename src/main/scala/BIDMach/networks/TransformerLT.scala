@@ -172,7 +172,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
     updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
     updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
-    table(opts.depth) = convertMat(rand(opts.dim, opts.seqlength + opts.degree));
+    table(opts.depth) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
     dtable(opts.depth) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
   }
 
@@ -360,13 +360,13 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
     val pvals =       reshape(pvals_2d)(basedimsi,false);
     val mhattn =      linear(pvals)(outdim=dim, hasBias=hasBias); // layer 36
-    val drop1 =       dropout(mhattn)(0.9f)
+    val drop1 =       dropout(mhattn)(opts.dropout)
     val norm1 =       layerNorm(drop1)();
     val sum1 =        norm1 + this_in;
 
     val ffwd1 =       linear(sum1)(outdim=dim, hasBias=hasBias);  // layer 40
     val relu1 =       relu(ffwd1)();
-    val drop2 =       dropout(relu1)(0.9f)
+    val drop2 =       dropout(relu1)(opts.dropout)
     val norm2 =       layerNorm(drop2)();
     val sum2 =        sum1 + norm2;
     
@@ -392,7 +392,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val n = mat.ncols;
     val pos = row(startpos.toInt->(startpos.toInt + n));
     for (i <- 0 until d/2) { 
-      val rate = math.pow(10000, i*2/d).toFloat
+      val rate = math.pow(10000, -i*2.0/d).toFloat
       mat(i*2, ?) = sin(pos * rate);
       mat(i*2+1, ?) = cos(pos * rate);
     }
@@ -417,6 +417,7 @@ object TransformerLT {
     var PADsym = 1;      // Padding symbol
     var OOVsym = 2;      // OOV symbol
     var STARTsym = 0;    // Start symbol
+    var dropout = 0.9f;
   }
   
 @SerialVersionUID(100L)
