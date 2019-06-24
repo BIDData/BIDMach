@@ -48,6 +48,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     seqptr = 0;
 
     createTables();
+    createModelmats();
 
     frontEnd = createFrontEnd();
     frontEnd.setmodelmats(modelmats);
@@ -63,7 +64,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.setmodelmats(modelmats);
     net.updatemats = updatemats;
     txNets = Array(net);
-
   }  
   
   def wrapUp() = { 
@@ -150,48 +150,60 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   def createTables() { 
     table = new Array[Mat](opts.depth+1);
     dtable = new Array[Mat](opts.depth+1);
+    for (i <- 0 to opts.depth) { 
+      table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
+      dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
+    }
+  }
+
+  def createModelmats() { 
     setmodelmats(new Array[Mat](opts.depth * kmodels * 2 + 4));
     updatemats = new Array[Mat](opts.depth * kmodels * 2 + 4);
     for (i <- 0 until opts.depth) { 
-      table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
-      dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
-      for (j <- 0 until 3) {     // Query, Key, Value embedding matrices
-        modelmats(2 * (j + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.indim, opts.dim));
-        modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
-        updatemats(2 * (j + kmodels * i)) = convertMat(zeros(opts.indim, opts.dim));
-        updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
+
+      // Query, Key, Value embedding model matrices
+      for (j <- 0 until 3) {     
+        val m0 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.indim, opts.dim));
+        modelmats(2 * (j + kmodels * i)) = m0;
+        modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(m0.nrows, 1));             // Bias vector
+        updatemats(2 * (j + kmodels * i)) = convertMat(zeros(m0.dims))                     // Matches model dims
+        updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(m0.nrows, 1));            // Bias update vector
       }
+
       // MHattn linear map matrices
-      modelmats(2 * (3 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.indim).toFloat, opts.dim, opts.indim));
-      modelmats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
-      updatemats(2 * (3 + kmodels * i)) = convertMat(zeros(opts.dim, opts.indim));
-      updatemats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+      val m1 = convertMat(normrnd(0, 1/math.sqrt(opts.indim).toFloat, opts.dim, opts.indim));
+      modelmats(2 * (3 + kmodels * i)) = m1
+      modelmats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(m1.nrows, 1));
+      updatemats(2 * (3 + kmodels * i)) = convertMat(zeros(m1.dims));
+      updatemats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(m1.nrows, 1));
 
       // First feedforward net matrices
-      modelmats(2 * (4 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.outdim, opts.dim));
-      modelmats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.outdim, 1));
-      updatemats(2 * (4 + kmodels * i)) = convertMat(zeros(opts.outdim, opts.dim));
-      updatemats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.outdim, 1));
+      val m2 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.outdim, opts.dim));
+      modelmats(2 * (4 + kmodels * i)) = m2;
+      modelmats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(m2.nrows, 1));
+      updatemats(2 * (4 + kmodels * i)) = convertMat(zeros(m2.dims));
+      updatemats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(m2.nrows, 1));
 
       // Second feedforward net matrices
-      modelmats(2 * (5 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.outdim));
-      modelmats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
-      updatemats(2 * (5 + kmodels * i)) = convertMat(zeros(opts.dim, opts.outdim));
-      updatemats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+      val m3 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.outdim));
+      modelmats(2 * (5 + kmodels * i)) = m3;
+      modelmats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
+      updatemats(2 * (5 + kmodels * i)) = convertMat(zeros(m3.dims))
+      updatemats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
     }
     // Front-end model matrices
-    modelmats(2 * kmodels * opts.depth) = convertMat(normrnd(0, 1, opts.dim, opts.nvocab));
-    modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
-    updatemats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
-    updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
+    val m4 = convertMat(normrnd(0, 1, opts.dim, opts.nvocab));
+    modelmats(2 * kmodels * opts.depth) = m4;
+    modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(m4.nrows, 1));
+    updatemats(2 * kmodels * opts.depth) = convertMat(zeros(m4.dims));
+    updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(m4.nrows, 1));
 
     // Back-end model matrices
-    modelmats(2 * kmodels * opts.depth + 2) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.nvocab, opts.dim));
-    modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
-    updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
-    updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
-    table(opts.depth) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
-    dtable(opts.depth) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
+    val m5 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.nvocab, opts.dim));
+    modelmats(2 * kmodels * opts.depth + 2) = m5;
+    modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(m5.nrows, 1));
+    updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(m5.dims));
+    updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(m5.nrows, 1));
   }
 
   def attachEnds() { 
@@ -428,7 +440,7 @@ object TransformerLT {
     var firststrided = 10;
     var nstrided = 6;
     var nvocab = 32768;
-    var hasBias = true;
+    var hasBias = false;
     var scoreType = SoftmaxOutputLayer.CrossEntropyScore
     var PADsym = 1;      // Padding symbol
     var OOVsym = 2;      // OOV symbol
