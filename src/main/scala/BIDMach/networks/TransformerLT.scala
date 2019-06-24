@@ -25,13 +25,18 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var backEnd:Net = null;
   var lastScores:FMat = null;
   
-  val kmodels = 5
+  val kmodels = 6
   var cacheState = false;
   var cacheGPUstate = false;
   var useCache = false;
   var useGPUCache = true;
   var seqptr = 0;
   var batchSize = -1;
+
+  var linear0_nodenum = 0
+  var linear5_nodenum = 0
+  var linear6_nodenum = 0
+  var linear7_nodenum = 0
 
   override def init() = {
 	useGPU = opts.useGPU && Mat.hasCUDA > 0;
@@ -118,6 +123,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     if (poslayer.opts.value.asInstanceOf[AnyRef] == null) poslayer.opts.value = zeros(opts.dim, opts.seqlength+opts.degree);
     val posmat = poslayer.opts.value.asInstanceOf[FMat];
     if (!opts.useRelPos) { 
+//      TransformerLT.posEncoding(pos, posmat, scale=1f/math.sqrt(opts.dim).toFloat);
       TransformerLT.posEncoding(pos, posmat);
     }
 
@@ -149,29 +155,39 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     for (i <- 0 until opts.depth) { 
       table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
       dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
-      for (j <- 0 until 3) { 
+      for (j <- 0 until 3) {     // Query, Key, Value embedding matrices
         modelmats(2 * (j + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.indim, opts.dim));
         modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
         updatemats(2 * (j + kmodels * i)) = convertMat(zeros(opts.indim, opts.dim));
         updatemats(2 * (j + kmodels * i) + 1) = convertMat(zeros(opts.indim, 1));
       }
+      // MHattn linear map matrices
       modelmats(2 * (3 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.indim).toFloat, opts.dim, opts.indim));
       modelmats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
       updatemats(2 * (3 + kmodels * i)) = convertMat(zeros(opts.dim, opts.indim));
       updatemats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
 
-      modelmats(2 * (4 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.dim));
-      modelmats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
-      updatemats(2 * (4 + kmodels * i)) = convertMat(zeros(opts.dim, opts.dim));
-      updatemats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+      // First feedforward net matrices
+      modelmats(2 * (4 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.outdim, opts.dim));
+      modelmats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.outdim, 1));
+      updatemats(2 * (4 + kmodels * i)) = convertMat(zeros(opts.outdim, opts.dim));
+      updatemats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(opts.outdim, 1));
+
+      // Second feedforward net matrices
+      modelmats(2 * (5 + kmodels * i)) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.outdim));
+      modelmats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
+      updatemats(2 * (5 + kmodels * i)) = convertMat(zeros(opts.dim, opts.outdim));
+      updatemats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(opts.dim, 1));
     }
+    // Front-end model matrices
     modelmats(2 * kmodels * opts.depth) = convertMat(normrnd(0, 1, opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
-    modelmats(2 * kmodels * opts.depth + 2) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.nvocab, opts.dim));
-    modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
-
     updatemats(2 * kmodels * opts.depth) = convertMat(zeros(opts.dim, opts.nvocab));
     updatemats(2 * kmodels * opts.depth + 1) = convertMat(zeros(opts.dim, 1));
+
+    // Back-end model matrices
+    modelmats(2 * kmodels * opts.depth + 2) = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.nvocab, opts.dim));
+    modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
     updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(opts.nvocab, opts.dim));
     updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(opts.nvocab, 1));
     table(opts.depth) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
@@ -188,13 +204,14 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   def attach(net:Net, level:Int = 0) { 
     net.layers(0).output = table(level);
     net.layers(0).deriv = dtable(level);
-    net.layers(5).asInstanceOf[ModelLayer].imodel = level * kmodels * 2;
-    net.layers(6).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
-    net.layers(7).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
-    net.layers(8).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
-    net.layers(9).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
-    net.layers(36).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 6;
-    net.layers(40).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 8;
+    net.layers(linear0_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2;
+    net.layers(linear0_nodenum+1).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
+    net.layers(linear0_nodenum+2).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
+    net.layers(linear0_nodenum+3).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
+    net.layers(linear0_nodenum+4).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
+    net.layers(linear5_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 6;
+    net.layers(linear6_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 8;
+    net.layers(linear7_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 10;
   }
 
   def forward(predicting:Boolean=false) { 
@@ -310,12 +327,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     for (i <- 0 until seqlength/degree) { 
       for (j <- 0 until opts.nheads) { 
         for (k <- 0 until degree) { 
-          cmask_(k + col, k, j, i) = 1f
+          cmask_(k + col + 1, k, j, i) = 1f
         }
       }
     }
     val smask_ =  (1f - cmask_) *@ -1e37f;
-    if (opts.useRelPos) smask_ ~ smask_ + TransformerLT.getRelPos(cmask_);
+    if (opts.useRelPos) smask_ ~ smask_ + TransformerLT.getRelPos(cmask_, headScale=0.5f);
     val v = 1/math.sqrt(indim/opts.nheads).toFloat;
     cmask_ ~ cmask_ * v;
 
@@ -325,6 +342,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val headinds =    constant(headinds_)(true);
     val headinds2 =   constant(headinds2_)(true);
 
+    linear0_nodenum = 5;
     val proj_q_this = linear(this_in)(outdim=indim, hasBias=hasBias); // layers 5-9
     val proj_k_this = linear(this_in)(outdim=indim, hasBias=hasBias);
     val proj_v_this = linear(this_in)(outdim=indim, hasBias=hasBias);   
@@ -364,14 +382,19 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val pvals =       reshape(pvals_2d)(basedimsi,false);
     val mhattn =      linear(pvals)(outdim=dim, hasBias=hasBias); // layer 36
     val drop1 =       dropout(mhattn)(opts.dropout)
-    val norm1 =       layerNorm(drop1)();
-    val sum1 =        norm1 + this_in;
+    val sum1 =        drop1 + this_in;
+    val norm1 =       layerNorm(sum1)();
+    linear5_nodenum = 36;
 
-    val ffwd1 =       linear(sum1)(outdim=dim, hasBias=hasBias);  // layer 40
+    val ffwd1 =       linear(norm1)(outdim=opts.outdim, hasBias=true);  // layer 40
     val relu1 =       relu(ffwd1)();
-    val drop2 =       dropout(relu1)(opts.dropout)
-    val norm2 =       layerNorm(drop2)();
-    val sum2 =        sum1 + norm2;
+    val ffwd2 =       linear(relu1)(outdim=dim, hasBias=true);  // layer 42
+    val drop2 =       dropout(ffwd2)(opts.dropout)
+    val sum2 =        norm1 + drop2;
+    linear6_nodenum = 40;
+    linear7_nodenum = 42;
+
+    val norm2 =       layerNorm(sum2)();
     
     val nodes     = in_qkv       \ this_in      \ last_in      \ headinds     \ headinds2    on
                     proj_q_this  \ proj_k_this  \ proj_v_this  \ proj_k_last  \ proj_v_last  on
@@ -380,9 +403,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
                     keysx_2d     \ valsx_2d     \ queriesx     \ keysx        \ valsx        on
                     prod         \ cmask        \ smask        \ mprod        \ oprod        on
                     weights      \ wvals        \ wvals_2d     \ invheadinds  \ pvals_2d     on
-                    pvals        \ mhattn       \ drop1        \ norm1        \ sum1         on
-                    ffwd1        \ relu1        \ drop2        \ norm2        \ sum2         
-
+                    pvals        \ mhattn       \ drop1        \ sum1         \ norm1        on
+                    ffwd1        \ relu1        \ ffwd2        \ drop2        \ sum2         on
+                    norm2        \ null         \ null         \ null         \ null
     nopts.nodemat = nodes.t;
  
     net.output_nodes = Array(sum2);
@@ -397,6 +420,7 @@ object TransformerLT {
     var seqlength = 16384;
     dim = 512;
     var indim = 512;
+    var outdim = 2048;
     var degree = 128;
     var nheads = 8;
     var depth = 32;
@@ -410,34 +434,36 @@ object TransformerLT {
     var OOVsym = 2;      // OOV symbol
     var STARTsym = 0;    // Start symbol
     var dropout = 0.9f;
-    var useRelPos = true;
+    var useRelPos = false;
   }
 
 
-  def posEncoding(startpos:Long, mat:FMat, maxr:Float=10000) = { 
+  def posEncoding(startpos:Long, mat:FMat, maxr:Float=10000, scale:Float=1f) = { 
     val d = mat.nrows;
     val n = mat.ncols;
     val pos = row(startpos.toInt->(startpos.toInt + n));
     for (i <- 0 until d/2) { 
       val rate = math.pow(maxr, -i*2.0/d).toFloat
-      mat(i*2, ?) = sin(pos * rate);
-      mat(i*2+1, ?) = cos(pos * rate);
+      mat(i*2, ?) = sin(pos * rate) * scale;
+      mat(i*2+1, ?) = cos(pos * rate) * scale;
     }
     mat
   }
 
-  def getRelPos(cmask:FMat, exponent:Float=0.883f):FMat = { 
+  def getRelPos(cmask:FMat, exponent:Float=0.883f, headScale:Float=0):FMat = { 
     val cd = cmask.dims;
     val mat = zeros(cd);
-    val nr = cd(0);
-    val nc = cd(1);
-    val na = cd(2);
-    val nb = cd(3);
-    for (ii <- 0 until nb) { 
-      for (jj <- 0 until na) { 
-        for (i <- 0 until nc) { 
-          for (j <- 0 until nr) { 
-            if (cmask(j, i, jj, ii) != 0) mat(j, i, jj, ii) = math.pow(j-i+1, exponent-1).toFloat;
+    val degree = cd(1);
+    val nheads = cd(2);
+    val len = cd(3);
+    for (ii <- 0 until len) { 
+      for (jj <- 0 until nheads) { 
+        for (i <- 0 until degree) { 
+          for (j <- 0 until degree*2) { 
+            val dt = degree - j + i;
+            if (cmask(j, i, jj, ii) != 0) {
+              mat(j, i, jj, ii) = math.pow(1 + dt, (exponent-1) * (1 + headScale*jj)).toFloat;
+            }
           }
         }
       }
