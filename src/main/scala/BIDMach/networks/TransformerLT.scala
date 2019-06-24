@@ -117,7 +117,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val poslayer = frontEnd.layers(1).asInstanceOf[ConstantLayer]
     if (poslayer.opts.value.asInstanceOf[AnyRef] == null) poslayer.opts.value = zeros(opts.dim, opts.seqlength+opts.degree);
     val posmat = poslayer.opts.value.asInstanceOf[FMat];
-    TransformerLT.posEncoding(pos, posmat);
+    if (!opts.useRelPos) { 
+      TransformerLT.posEncoding(pos, posmat);
+    }
 
     val backin = backEnd.layers(0)
     if (backin.output.asInstanceOf[AnyRef] == null) { 
@@ -303,17 +305,18 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val headperm2 = irow(2,0,1,3);
     val hasBias  = opts.hasBias;
 
-    val cmask_ =   zeros((degree*2) \ degree \ opts.nheads \ (seqlength/degree));
+    val cmask_ =  zeros((degree*2) \ degree \ opts.nheads \ (seqlength/degree));
     val col = icol(0->degree);
-    val v = 1/math.sqrt(indim/opts.nheads).toFloat;
     for (i <- 0 until seqlength/degree) { 
       for (j <- 0 until opts.nheads) { 
         for (k <- 0 until degree) { 
-          cmask_(k + 1 + col, k, j, i) = 1f
+          cmask_(k + col, k, j, i) = 1f
         }
       }
     }
-    val smask_ =   (1f - cmask_) *@ -1e37f;
+    val smask_ =  (1f - cmask_) *@ -1e37f;
+    if (opts.useRelPos) smask_ ~ smask_ + TransformerLT.getRelPos(cmask_);
+    val v = 1/math.sqrt(indim/opts.nheads).toFloat;
     cmask_ ~ cmask_ * v;
 
     val in_qkv =      input;
@@ -407,7 +410,9 @@ object TransformerLT {
     var OOVsym = 2;      // OOV symbol
     var STARTsym = 0;    // Start symbol
     var dropout = 0.9f;
+    var useRelPos = true;
   }
+
 
   def posEncoding(startpos:Long, mat:FMat, maxr:Float=10000) = { 
     val d = mat.nrows;
@@ -417,6 +422,25 @@ object TransformerLT {
       val rate = math.pow(maxr, -i*2.0/d).toFloat
       mat(i*2, ?) = sin(pos * rate);
       mat(i*2+1, ?) = cos(pos * rate);
+    }
+    mat
+  }
+
+  def getRelPos(cmask:FMat, exponent:Float=0.883f):FMat = { 
+    val cd = cmask.dims;
+    val mat = zeros(cd);
+    val nr = cd(0);
+    val nc = cd(1);
+    val na = cd(2);
+    val nb = cd(3);
+    for (ii <- 0 until nb) { 
+      for (jj <- 0 until na) { 
+        for (i <- 0 until nc) { 
+          for (j <- 0 until nr) { 
+            if (cmask(j, i, jj, ii) != 0) mat(j, i, jj, ii) = math.pow(j-i+1, exponent-1).toFloat;
+          }
+        }
+      }
     }
     mat
   }
