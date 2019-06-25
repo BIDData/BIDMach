@@ -37,6 +37,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var linear5_nodenum = 0
   var linear6_nodenum = 0
   var linear7_nodenum = 0
+  var step = 0L
 
   override def init() = {
 	useGPU = opts.useGPU && Mat.hasCUDA > 0;
@@ -80,6 +81,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
         backward();
         wrapInput();
         seqptr = 0;
+        step += 1;
       }
     }
   }
@@ -93,6 +95,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
         forward(true);
         wrapInput();
         seqptr = 0;
+        step += 1;
   		for (i <- 0 until backEnd.score_layers.length) {
   		  lastScores(i,?) = backEnd.score_layers(i).score;
   		}
@@ -236,6 +239,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       attach(net, level);
       val tmppred = net.predicting;
       net.predicting = predicting;
+      setseed((5434*level+2354*step).toInt);    // Needed for dropout to be consistent
       net.forward;
       net.predicting = tmppred;
       table(level+1).colslice(opts.seqlength, opts.seqlength+opts.degree, table(level+1), 0);
@@ -255,6 +259,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     backEnd.layers(0).deriv.colslice(0, opts.seqlength, dtable(opts.depth), opts.degree);
     for (level <- (opts.depth -1) to 0 by -1) { 
       attach(net, level);
+      setseed((5434*level+2354*step).toInt);
       net.forward;
       dtable(level+1).colslice(opts.degree, opts.seqlength+opts.degree, net.layers(net.layers.length-1).deriv, 0)
       net.backward();
