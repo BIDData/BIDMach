@@ -8,11 +8,11 @@ val fname = ddir + "train/part%04d.imat.lz4"
 val (nn, opts) = TransformerLT.learner(fname);
 
 opts.lrate = 2e-4f
-opts.seqlength = 1024*2
+opts.seqlength = 1024
 opts.batchSize = opts.seqlength
 opts.npasses = 40
 opts.degree = 64
-opts.depth = 2
+opts.depth = 4
 opts.nheads = 8
 opts.dim = 512
 opts.indim = opts.dim
