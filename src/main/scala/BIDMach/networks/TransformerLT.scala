@@ -195,7 +195,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       updatemats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
     }
     // Front-end model matrices
-    val m4 = convertMat(normrnd(0, 1, opts.dim, opts.nvocab));
+    val m4 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth) = m4;
     modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(m4.nrows, 1));
     updatemats(2 * kmodels * opts.depth) = convertMat(zeros(m4.dims));
