@@ -99,9 +99,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
         wrapInput();
         seqptr = 0;
         step += 1;
-  		for (i <- 0 until backEnd.score_layers.length) {
-  		  lastScores(i,?) = backEnd.score_layers(i).score;
-  		}
+  	for (i <- 0 until backEnd.score_layers.length) {
+  	  lastScores(i,?) = backEnd.score_layers(i).score;
+  	}
       }
       lastScores
     } else { 
@@ -254,7 +254,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
   def backward() { 
     val net = txNets(0);
-    backEnd.layers(backend.layers.length-1).deriv.set(1f);
+    backEnd.layers(backEnd.layers.length-1).deriv.set(1f);
     backEnd.backward();
     backEnd.layers(0).deriv.colslice(0, opts.seqlength, dtable(opts.depth), opts.degree);
     for (level <- (opts.depth -1) to 0 by -1) { 
