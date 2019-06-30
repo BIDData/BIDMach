@@ -1,5 +1,5 @@
 package BIDMach.updaters;
- 
+
 import BIDMat.{Mat,SBMat,CMat,DMat,FMat,IMat,LMat,HMat,GMat,GIMat,GDMat,GLMat,GSMat,ND,SMat,SDMat,TMat};
 import BIDMat.MatFunctions._
 import BIDMat.SciFunctions._
@@ -10,7 +10,7 @@ import edu.berkeley.bid.CUMACH
 class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) extends Updater {
   
   var firstStep = 0.0;
- 
+  
   var modelmats:Array[Mat] = null;
   var updatemats:Array[Mat] = null;
   var momentum:Array[Mat] = null;
@@ -82,50 +82,50 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   override def init(model0:Model) = initGrad(model0);
 
   def clipping() {
-  	if (opts.clipByValue>0f) {
-  		for (i <- 0 until updatemats.length){
-  			if (updatemats(i).asInstanceOf[AnyRef] != null) {
-  				min(updatemats(i),opts.clipByValue,updatemats(i));
-  				max(updatemats(i),-opts.clipByValue,updatemats(i));
-  			}
-  		}
+    if (opts.clip_by_value>0f) {
+      for (i <- 0 until updatemats.length){
+  	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  	  min(updatemats(i),opts.clip_by_value,updatemats(i));
+  	  max(updatemats(i),-opts.clip_by_value,updatemats(i));
   	}
-  	if (opts.clip_grad_norm>0f){
-  	  if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1);
-  	  for (i <- 0 until updatemats.length){
-  		if (updatemats(i).asInstanceOf[AnyRef] != null) {
-  		  val tot=sum(updatemats(i) dot updatemats(i)).dv
+      }
+    }
+    if (opts.clip_grad_norm>0f){
+      if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1);
+      for (i <- 0 until updatemats.length){
+  	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  	  val tot=sum(updatemats(i) dot updatemats(i)).dv
           val len= updatemats(i).length;
           val scale = math.sqrt(tot/len);
           if (scale > opts.clip_grad_norm) { 
             clip_count += 1;
             norm_scaling(0,0) = (opts.clip_grad_norm/scale).toFloat;
-  			updatemats(i)~updatemats(i)*@norm_scaling;
-  		  }     
-  	    }
+  	    updatemats(i)~updatemats(i)*@norm_scaling;
+  	  }     
+  	}
       }
     }
-  	if (opts.clip_grad_global_norm>0f){
+    if (opts.clip_grad_global_norm>0f){
       if (norm_scaling==null) norm_scaling = updatemats(0).zeros(1,1);
-  	  var tot = 0.0;
+      var tot = 0.0;
       var len = 0.0;
-  	  for (i <- 0 until updatemats.length){
-  		if (updatemats(i).asInstanceOf[AnyRef] != null) {
-  		  tot+=sum(updatemats(i) dot updatemats(i)).dv
+      for (i <- 0 until updatemats.length){
+  	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  	  tot+=sum(updatemats(i) dot updatemats(i)).dv
           len += updatemats(i).length;
-  		}
-  	  }
+  	}
+      }
       val scale = math.sqrt(tot/len);
-  	  if (scale > opts.clip_grad_norm) { 
+      if (scale > opts.clip_grad_norm) { 
         clip_count += 1;
         norm_scaling(0,0) = (opts.clip_grad_norm/scale).toFloat;
-  	    for (i <- 0 until updatemats.length){
-  		  if (updatemats(i).asInstanceOf[AnyRef] != null) {
-  			updatemats(i)~updatemats(i)*@norm_scaling;
-  		  }     
-  	    }
-      }
+  	for (i <- 0 until updatemats.length){
+  	  if (updatemats(i).asInstanceOf[AnyRef] != null) {
+  	    updatemats(i)~updatemats(i)*@norm_scaling;
+  	  }     
   	}
+      }
+    }
   }
   
 
@@ -193,7 +193,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     }    
 
     if (momentum(i).asInstanceOf[AnyRef] != null) {
-	if (opts.logSwap) Mat.logger.info("before: i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
+      if (opts.logSwap) Mat.logger.info("before: i=%d, mo=%f, mos=%f" format (i, dotprod(momentum(i), momentum(i)), dotprod(momentumSave(i), momentumSave(i))));
       swap <-- momentum(i);
       momentum(i) <-- momentumSave(i);
       momentumSave(i) <-- swap;
@@ -212,12 +212,12 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     x = getLargestMat(x, p);
     tmp = getLargestMat(tmp, p);
     c = getLargestMat(c, p);
-//    y = getLargestMat(y, p);
-//    u = getLargestMat(u, p);
-//    v = getLargestMat(v, p);
-//    pbar = getLargestMat(pbar, p);
-//    qbar = getLargestMat(qbar, p);
-//    tmat = getLargestMat(tmat, p);
+    //    y = getLargestMat(y, p);
+    //    u = getLargestMat(u, p);
+    //    v = getLargestMat(v, p);
+    //    pbar = getLargestMat(pbar, p);
+    //    qbar = getLargestMat(qbar, p);
+    //    tmat = getLargestMat(tmat, p);
     val epsilon = 1e-36f;
     
     if (opts.logCollide) {
@@ -280,7 +280,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     q ~ q + c;
 
     if (opts.logCollide) {
-	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+      //	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
       val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
       val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
       val dp = dotprod(p, q);
@@ -323,7 +323,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     }
     normrnd(0, lp, x);
     normrnd(0, lq, y);
-/*    x ~ x + p;
+    /*    x ~ x + p;
     y ~ y + q;
 
     u ~ x * aelem.set(math.sqrt(1/(dotprod(x, x)+epsilon)).toFloat);
@@ -354,7 +354,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     q ~ q - c;
 
     if (opts.logCollide) {
-	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+      //	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
       val lp = math.sqrt(dotprod(p, p) / p.length).toFloat;
       val lq = math.sqrt(dotprod(q, q) / q.length).toFloat;
       val dp = dotprod(p, q);
@@ -371,7 +371,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
   };
 
   // This version conserves total energy for p and q
-    
+  
   def collide2(p:Mat, q:Mat, i:Int) = {
     x = getLargestMat(x, p);
     y = getLargestMat(y, p);
@@ -394,14 +394,14 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     val lx = math.sqrt(dotprod(x, x) / x.length).toFloat;
     normrnd(0, lx, y);
     y ~ y + x;
-	
+    
     c ~ y * aelem.set((dotprod(x, y)/(dotprod(y, y)+epsilon)).toFloat);
 
     p ~ p - c;
     q ~ q + c;
 
     if (opts.logCollide) {
-	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+      //	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
       val meanp = dotprod(p, p) / p.length;
       val meanq = dotprod(q, q) / q.length;
       val dp = dotprod(p, q);
@@ -417,7 +417,7 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
 
 
   // This version conserves total energy for p and q, allows variable collision "hardness"
-    
+  
   def collide3(p:Mat, q:Mat, i:Int) = {
     x = getLargestMat(x, p);
     y = getLargestMat(y, p);
@@ -450,40 +450,40 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     val qc = dotprod(x,x) + dotprod(y,y) - dotprod(p,p) - dotprod(q,q);
     val discr = qb*qb - 4*qa*qc;
     if (discr >= 0) {
-	// Quadratic is solvable (should be for any hardness in [0,1]) so solve it.
-	val beta = if (Mat.myrand.nextFloat() < 0.5f) {
-	    (-qb + math.sqrt(discr).toFloat)/(2*qa+epsilon);
-	} else {
-	    (-qb - math.sqrt(discr).toFloat)/(2*qa+epsilon);
-	}	    
-	c ~ c * aelem.set(beta);
-	p ~ x + c;
-	q ~ y - c;
+      // Quadratic is solvable (should be for any hardness in [0,1]) so solve it.
+      val beta = if (Mat.myrand.nextFloat() < 0.5f) {
+	(-qb + math.sqrt(discr).toFloat)/(2*qa+epsilon);
+      } else {
+	(-qb - math.sqrt(discr).toFloat)/(2*qa+epsilon);
+      }	    
+      c ~ c * aelem.set(beta);
+      p ~ x + c;
+      q ~ y - c;
 
-	if (opts.logCollide) {
-	    //	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
-	    val meanp = dotprod(p, p) / p.length;
-	    val meanq = dotprod(q, q) / q.length;
-	    val dp = dotprod(p, q);
-	    tmp ~ p *@ p;
-	    val meansqp = dotprod(tmp, tmp) / p.length;
-	    tmp ~ q *@ q;
-	    val meansqq = dotprod(tmp, tmp) / p.length;
-	    val cosp = dotprod(p, q) / (p.length * math.sqrt(meanp * meanq).toFloat + epsilon);
-	    val varp = meansqp - meanp * meanp;
-	    val varq = meansqq - meanq * meanq;
-	    Mat.logger.info("after:  i=%d, cos(p,q)=%g, tote=%g, meanp=%g, meanq=%g, totv=%g, varp=%g, varq=%g" format (i, cosp, meanp+meanq, meanp, meanq, meansqp+meansqq, varp, varq));
-	}
+      if (opts.logCollide) {
+	//	Mat.logger.info("after: nx=%g, ny1=%g, ny2=%g, nu=%g, nv=%g, nc=%g" format (dotprod(x,x),ny1,dotprod(y,y),dotprod(u,u), dotprod(v,v), dotprod(c,c)));
+	val meanp = dotprod(p, p) / p.length;
+	val meanq = dotprod(q, q) / q.length;
+	val dp = dotprod(p, q);
+	tmp ~ p *@ p;
+	val meansqp = dotprod(tmp, tmp) / p.length;
+	tmp ~ q *@ q;
+	val meansqq = dotprod(tmp, tmp) / p.length;
+	val cosp = dotprod(p, q) / (p.length * math.sqrt(meanp * meanq).toFloat + epsilon);
+	val varp = meansqp - meanp * meanp;
+	val varq = meansqq - meanq * meanq;
+	Mat.logger.info("after:  i=%d, cos(p,q)=%g, tote=%g, meanp=%g, meanq=%g, totv=%g, varp=%g, varq=%g" format (i, cosp, meanp+meanq, meanp, meanq, meansqp+meansqq, varp, varq));
+      }
     }
 
   };
 
   def collide(p:Mat, q:Mat, i:Int) = {
-      if (opts.perParticleMomentum) {
-	  collide1(p, q, i);
-      } else {
-	  collide3(p, q, i);
-      }
+    if (opts.perParticleMomentum) {
+      collide1(p, q, i);
+    } else {
+      collide3(p, q, i);
+    }
   };      
 
   def attract(p:Mat, q:Mat, afactor:Float, i:Int) = {
@@ -496,22 +496,22 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     p ~ p - u;
     q ~ q + u;
     if (opts.logAttract) {
-	val pm2 = dotprod(p,p);
-	val qm2 = dotprod(q,q);
-	Mat.logger.info("attract %d pm %g, qm %g, um %g, pm %g, qm %g" format (i, pm, qm, um, pm2, qm2));
+      val pm2 = dotprod(p,p);
+      val qm2 = dotprod(q,q);
+      Mat.logger.info("attract %d pm %g, qm %g, um %g, pm %g, qm %g" format (i, pm, qm, um, pm2, qm2));
     }	    
   }
 
   def checkSwapMats(i:Int) = {
-      if (modelmats(i).asInstanceOf[AnyRef] != null) {
-	  if (modelmatsSave(i).asInstanceOf[AnyRef] == null) {
-	      modelmatsSave(i) = modelmats(i).zeros(modelmats(i).dims);
-	      modelmatsSave(i) <-- modelmats(i);
-	  }
-	  if (momentum(i).asInstanceOf[AnyRef] != null && momentumSave(i).asInstanceOf[AnyRef] == null) {
-	      momentumSave(i) = momentum(i).zeros(momentum(i).dims);
-	      momentumSave(i) <-- momentum(i);
-	  }
+    if (modelmats(i).asInstanceOf[AnyRef] != null) {
+      if (modelmatsSave(i).asInstanceOf[AnyRef] == null) {
+	modelmatsSave(i) = modelmats(i).zeros(modelmats(i).dims);
+	modelmatsSave(i) <-- modelmats(i);
+      }
+      if (momentum(i).asInstanceOf[AnyRef] != null && momentumSave(i).asInstanceOf[AnyRef] == null) {
+	momentumSave(i) = momentum(i).zeros(momentum(i).dims);
+	momentumSave(i) <-- momentum(i);
+      }
     }
     if (aelem.asInstanceOf[AnyRef] == null) aelem = modelmats(i).zeros(1,1);
     swapMats(i);
@@ -521,13 +521,13 @@ class GradCollide(override val opts:GradCollide.Opts = new GradCollide.Options) 
     val start = toc;
     clipping();
     val nsteps = if (step == 0) 1.0 else {
-	if (firstStep == 0.0) {
-	  firstStep = step;
-	  1f;
-	} else {
-	  step / firstStep;
-	}
+      if (firstStep == 0.0) {
+	firstStep = step;
+	1f;
+      } else {
+	step / firstStep;
       }
+    }
     val batchSize = model.gmats(0).ncols;
     val nmats = updatemats.length;
     val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps.toFloat, gprogress) else 0;
