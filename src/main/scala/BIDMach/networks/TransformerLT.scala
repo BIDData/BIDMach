@@ -24,6 +24,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var frontEnd:Net = null;
   var backEnd:Net = null;
   var lastScores:FMat = null;
+  var posMat:FMat = null;
   
   val kmodels = 6
   var cacheState = false;
@@ -37,11 +38,13 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var linear5_nodenum = 0
   var linear6_nodenum = 0
   var linear7_nodenum = 0
+  var be_model_nodenum = 0;
+  var fe_model_nodenum = 0;
   var step = 0L
 
   override def init() = {
-	useGPU = opts.useGPU && Mat.hasCUDA > 0;
-	useDouble = opts.useDouble;
+    useGPU = opts.useGPU && Mat.hasCUDA > 0;
+    useDouble = opts.useDouble;
     cacheState = Mat.useCache;
     Mat.useCache = useCache;
     cacheGPUstate = Mat.useGPUcache;
@@ -122,14 +125,10 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       src.colslice(0, batchSize - 1, inmat, seqptr + opts.degree + 1);
     }
 
-    val poslayer = frontEnd.layers(1).asInstanceOf[ConstantLayer]
-    if (poslayer.opts.value.asInstanceOf[AnyRef] == null) poslayer.opts.value = zeros(opts.dim, opts.seqlength+opts.degree);
-    val posmat = poslayer.opts.value.asInstanceOf[FMat];
     if (!opts.useRelPos) { 
-//      TransformerLT.posEncoding(pos, posmat, scale=1f/math.sqrt(opts.dim).toFloat);
-      TransformerLT.posEncoding(pos, posmat);
+      TransformerLT.posEncoding(pos, posMat, scale=1f/math.sqrt(opts.dim).toFloat);
+//      TransformerLT.posEncoding(pos, posMat);
     }
-
     val backin = backEnd.layers(0)
     if (backin.output.asInstanceOf[AnyRef] == null) { 
       backin.output = convertMat(zeros(opts.dim, opts.seqlength))
@@ -157,6 +156,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
       dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
     }
+    posMat = zeros(opts.dim, opts.seqlength + opts.degree);
   }
 
   def createModelmats() { 
@@ -195,7 +195,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       updatemats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
     }
     // Front-end model matrices
-    val m4 = convertMat(normrnd(0, 1, opts.dim, opts.nvocab));
+    val m4 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth) = m4;
     modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(m4.nrows, 1));
     updatemats(2 * kmodels * opts.depth) = convertMat(zeros(m4.dims));
@@ -210,10 +210,10 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   }
 
   def attachEnds() { 
-    frontEnd.layers(4).output = table(0);
-    frontEnd.layers(4).deriv = dtable(0);
-    frontEnd.layers(3).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2;
-    backEnd.layers(1).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2 + 2;
+    frontEnd.layers(frontEnd.layers.length-1).output = table(0);
+    frontEnd.layers(frontEnd.layers.length-1).deriv = dtable(0);
+    frontEnd.layers(fe_model_nodenum).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2;
+    backEnd.layers(be_model_nodenum).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2 + 2;
   }
 
   def attach(net:Net, level:Int = 0) { 
@@ -254,7 +254,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
   def backward() { 
     val net = txNets(0);
-    backEnd.layers(2).deriv.set(1f);
+    backEnd.layers(backend.layers.length-1).deriv.set(1f);
     backEnd.backward();
     backEnd.layers(0).deriv.colslice(0, opts.seqlength, dtable(opts.depth), opts.degree);
     for (level <- (opts.depth -1) to 0 by -1) { 
@@ -276,16 +276,17 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val hasBias =   opts.hasBias;
 
     import BIDMach.networks.layers.Node._
+    Net.initDefaultNodeSet;
 
-    val in =        input;
-    val posenc =    constant(null)(false);
-    val smat =      oneHot(in)(opts.nvocab);
-    val embed =     linear(smat)(outdim=dim, hasBias=hasBias);
-    val out =       embed + posenc;
+    val in =           input;
+    val smat =         oneHot(in)(opts.nvocab);
+    fe_model_nodenum = Net.getDefaultNodeNum
+    val embed =        linear(smat)(outdim=dim, hasBias=hasBias);
+//    val posenc =       constant(posMat)(false);
+//    val out =          embed + posenc;
 
-    nopts.nodemat = in \ posenc \ smat \ embed \ out;
+    nopts.nodeset =    Net.getDefaultNodeSet
  
-    net.output_nodes = Array(out);
     net.createLayers;
     net;
   }
@@ -299,14 +300,15 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val hasBias =   opts.hasBias;
 
     import BIDMach.networks.layers.Node._
+    Net.initDefaultNodeSet;
 
-    val in =        input;
-    val prod =      linear(in)(outdim=opts.nvocab, hasBias=false);
-    val out =       softmaxout(prod)(scoreType=opts.scoreType, lossType=1);
+    val in =           input;
+    be_model_nodenum = Net.getDefaultNodeNum
+    val prod =         linear(in)(outdim=opts.nvocab, hasBias=false);
+    val out =          softmaxout(prod)(scoreType=opts.scoreType, lossType=1);
 
-    nopts.nodemat = in \ prod \ out;
+    nopts.nodeset =    Net.getDefaultNodeSet;
  
-    net.output_nodes = Array(out);
     net.createLayers;
     net;
   }
@@ -353,79 +355,83 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val v = 1/math.sqrt(indim/opts.nheads).toFloat;
     cmask_ ~ cmask_ * v;
 
-    val in_qkv =      input;
-    val this_in =     colslice(in_qkv)(degree, seqlength+degree);
-    val last_in =     colslice(in_qkv)(0, seqlength);
-    val headinds =    constant(headinds_)(true);
-    val headinds2 =   constant(headinds2_)(true);
+    Net.initDefaultNodeSet;
 
-    linear0_nodenum = 5;
-    val proj_q_this = linear(this_in)(outdim=indim, hasBias=hasBias); // layers 5-9
+    // Split the input into current and previous degree blocks (to be stacked later). Apply posencoding
+    // but not to the residual link this_in
+    val in_qkv =      input;
+    val this_in_nopos=colslice(in_qkv)(degree, seqlength+degree);
+//    val last_in =     colslice(in_qkv)(0, seqlength);
+    val posenc =      constant(posMat)(false);
+    val in_qkv_pos =  in_qkv + posenc
+    val this_in =     colslice(in_qkv_pos)(degree, seqlength+degree);
+    val last_in =     colslice(in_qkv_pos)(0, seqlength);
+
+    // Query/Key/Value embedding
+    linear0_nodenum = Net.getDefaultNodeNum
+    val proj_q_this = linear(this_in)(outdim=indim, hasBias=hasBias);
     val proj_k_this = linear(this_in)(outdim=indim, hasBias=hasBias);
     val proj_v_this = linear(this_in)(outdim=indim, hasBias=hasBias);   
     val proj_k_last = linear(last_in)(outdim=indim, hasBias=hasBias);
     val proj_v_last = linear(last_in)(outdim=indim, hasBias=hasBias);   
 
+    // Reshape queries and keys. Keys and Vals are reshaped differently so they can be stacked to 2*degree height
     val queries_2d =  reshape(proj_q_this)(headdims_2d,false);
     val keys_this =   reshape(proj_k_this)(headdims,false);
     val vals_this =   reshape(proj_v_this)(headdims,false);
     val keys_last =   reshape(proj_k_last)(headdims,false);
     val vals_last =   reshape(proj_v_last)(headdims,false);
 
+    // Now stack keys and values.
     val keys =        stack(keys_last, keys_this)(2);
     val vals =        stack(vals_last, vals_this)(2);
     val keys_2d =     reshape(keys)(headdims2_2d,false);
     val vals_2d =     reshape(vals)(headdims2_2d,false);
-    val queriesx_2d = colperm(queries_2d, headinds);
 
-    val keysx_2d =    colperm(keys_2d, headinds2); // layer 20
+    // Now transpose from (dim/nheads, nheads, degree, n) to (dim/nheads, degree, nheads, n) using colperm
+    val headinds =    constant(headinds_)(true);
+    val headinds2 =   constant(headinds2_)(true);
+    val queriesx_2d = colperm(queries_2d, headinds);
+    val keysx_2d =    colperm(keys_2d, headinds2); 
     val valsx_2d =    colperm(vals_2d, headinds2);
     val queriesx =    reshape(queriesx_2d)(headdimsx,false);
     val keysx =       reshape(keysx_2d)(headdimsx2,false);
     val valsx =       reshape(valsx_2d)(headdimsx2,false);
 
-    val prod =        keysx ^* queriesx;   // layer 25
+    // Query/Key products and masking
+    val prod =        keysx ^* queriesx;
     val cmask =       constant(cmask_)(true);
     val smask =       constant(smask_)(true);
     val mprod =       prod *@ cmask;
     val oprod =       mprod + smask;
 
-    val weights =     softmaxx(oprod)(); // layer 30
+    // Apply softmax, then apply attention to the values.
+    val weights =     softmaxx(oprod)();
     val wvals =       valsx * weights;
     val wvals_2d =    reshape(wvals)(headdims_2d,false);
     val invheadinds = constant(invheadinds_)(true);
     val pvals_2d =    colperm(wvals_2d, invheadinds);
-
     val pvals =       reshape(pvals_2d)(basedimsi,false);
-    val mhattn =      linear(pvals)(outdim=dim, hasBias=hasBias); // layer 36
-    val drop1 =       dropout(mhattn)(opts.dropout)
-    val sum1 =        drop1 + this_in;
-    val norm1 =       layerNorm(sum1)();
-    linear5_nodenum = 36;
 
-    val ffwd1 =       linear(norm1)(outdim=opts.outdim, hasBias=true);  // layer 40
+    // Apply output embedding to the attention-weighted values
+    linear5_nodenum = Net.getDefaultNodeNum;
+    val mhattn =      linear(pvals)(outdim=dim, hasBias=hasBias); 
+    val drop1 =       dropout(mhattn)(opts.dropout)
+    val sum1 =        drop1 + this_in_nopos;
+    val norm1 =       layerNorm(sum1)();
+
+    // Feedforward output layer
+    linear6_nodenum = Net.getDefaultNodeNum
+    val ffwd1 =       linear(norm1)(outdim=opts.outdim, hasBias=true);
     val relu1 =       relu(ffwd1)();
-    val ffwd2 =       linear(relu1)(outdim=dim, hasBias=true);  // layer 42
+    linear7_nodenum = Net.getDefaultNodeNum
+    val ffwd2 =       linear(relu1)(outdim=dim, hasBias=true);
     val drop2 =       dropout(ffwd2)(opts.dropout)
     val sum2 =        norm1 + drop2;
-    linear6_nodenum = 40;
-    linear7_nodenum = 42;
-
     val norm2 =       layerNorm(sum2)();
-    
-    val nodes     = in_qkv       \ this_in      \ last_in      \ headinds     \ headinds2    on
-                    proj_q_this  \ proj_k_this  \ proj_v_this  \ proj_k_last  \ proj_v_last  on
-                    queries_2d   \ keys_this    \ vals_this    \ keys_last    \ vals_last    on
-                    keys         \ vals         \ keys_2d      \ vals_2d      \ queriesx_2d  on
-                    keysx_2d     \ valsx_2d     \ queriesx     \ keysx        \ valsx        on
-                    prod         \ cmask        \ smask        \ mprod        \ oprod        on
-                    weights      \ wvals        \ wvals_2d     \ invheadinds  \ pvals_2d     on
-                    pvals        \ mhattn       \ drop1        \ sum1         \ norm1        on
-                    ffwd1        \ relu1        \ ffwd2        \ drop2        \ sum2         on
-                    norm2        \ null         \ null         \ null         \ null
-    nopts.nodemat = nodes.t;
  
-    net.output_nodes = Array(sum2);
+    nopts.nodeset =   Net.getDefaultNodeSet
+
     net.createLayers;
     net;
   }
@@ -452,6 +458,7 @@ object TransformerLT {
     var STARTsym = 0;    // Start symbol
     var dropout = 0.9f;
     var useRelPos = false;
+    var posEvery = true;
   }
 
 
@@ -541,4 +548,3 @@ object TransformerLT {
   }
 
 }
-

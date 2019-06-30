@@ -556,6 +556,14 @@ object Net  {
   def initDefaultNodeSet {
     defaultNodeList = List[Node]();
   }
+
+  def initDefaultNodeList {
+    defaultNodeList = List[Node]();
+  }
+
+  def getDefaultNodeNum = {
+    defaultNodeList.length;
+  }
   
   def addNode(node:Node) = {
     if (defaultNodeList.asInstanceOf[AnyRef] != null) {
@@ -568,7 +576,7 @@ object Net  {
     defaultNodeList = null;
     nodeset;
   }
-  
+
   def xavierFn(a:Mat, v:Float):Mat = {
     normrnd(0, v/math.sqrt(a.nrows).toFloat, a);
     a;
