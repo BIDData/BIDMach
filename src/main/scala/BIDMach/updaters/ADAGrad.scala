@@ -46,100 +46,102 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	step / firstStep;
       }
     }
-    tscale = if (opts.texp.asInstanceOf[AnyRef] != null) {
-      te <-- opts.texp;
-      stepn.set(1/(nsteps+1));
-      stepn ^ te;
-    } else if (opts.pexp.asInstanceOf[AnyRef] != null) {
-      pe <-- opts.pexp;
-      stepn.set(1f/(ipass+1));
-      stepn ^ pe;
-    } else {
-      te.set(0f);
-      stepn ^ te;
-    }
-    if (opts.gsq_decay >= 0){
-      stepn.set(1f - opts.gsq_decay);
-    } else {
-      stepn.set(1/(nsteps+1));
-    }
-    val nw = stepn;
-    val nmats = math.min(modelmats.length, updatemats.length);
-    //    println("u sumsq %g" format mini(sumSq(0)).dv)
-    val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
-    for (i <- 0 until nmats) {
-      if (updatemats(i).asInstanceOf[AnyRef] != null) {
-    	val mm = modelmats(i);
-    	val um = updatemats(i);
-    	if (opts.l2reg.asInstanceOf[AnyRef] != null) {
-    	  val i0 = if (opts.l2reg.length > 1) i else 0;
-    	  um ~ um - (mm *@ (opts.l2reg(i0) * model.l2reg_scales(i)));
-    	}
-    	if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
-    	  lrate.set(lr0);
-    	} else {
-    	  if (opts.lrate.ncols > 1) {
-    	    lrate <-- opts.lrate(?,i);
+    if (opts.update_every > 0 && (nsteps.toInt % opts.update_every == 0)) { 
+      tscale = if (opts.texp.asInstanceOf[AnyRef] != null) {
+	te <-- opts.texp;
+	stepn.set(1/(nsteps+1));
+	stepn ^ te;
+      } else if (opts.pexp.asInstanceOf[AnyRef] != null) {
+	pe <-- opts.pexp;
+	stepn.set(1f/(ipass+1));
+	stepn ^ pe;
+      } else {
+	te.set(0f);
+	stepn ^ te;
+      }
+      if (opts.gsq_decay >= 0){
+	stepn.set(1f - opts.gsq_decay);
+      } else {
+	stepn.set(1/(nsteps+1));
+      }
+      val nw = stepn;
+      val nmats = math.min(modelmats.length, updatemats.length);
+      //    println("u sumsq %g" format mini(sumSq(0)).dv)
+      val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
+      for (i <- 0 until nmats) {
+	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+    	  val mm = modelmats(i);
+    	  val um = updatemats(i);
+    	  if (opts.l2reg.asInstanceOf[AnyRef] != null) {
+    	    val i0 = if (opts.l2reg.length > 1) i else 0;
+    	    um ~ um - (mm *@ (opts.l2reg(i0) * model.l2reg_scales(i)));
+    	  }
+    	  if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
+    	    lrate.set(lr0);
     	  } else {
-    	    lrate <-- opts.lrate;
-    	  }    	  
-    	}
-    	val ss = sumSq(i);
-    	val lr_scales = model.lr_scales;
-    	if (lr_scales.asInstanceOf[AnyRef] != null) {
-    	  lrate ~ lrate *@ lr_scales(i);
-    	}
-    	(mm, um, ss, ve, tscale, lrate) match {
-	  /*    		case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
-    	   if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
-    	   val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
-    	   ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
-    	   } else if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
-    	   val mu = if (opts.nesterov_vel_decay.length > 1) opts.nesterov_vel_decay(i) else opts.nesterov_vel_decay(0);
-    	   ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
-    	   } else {
-    	   ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
-    	   }
-    	   }*/
-    	  case _ => {
-    	    val newsquares = um *@ um;
-    	    newsquares ~ newsquares *@ nw;
-    	    ss ~ ss *@ (one - nw);
-    	    ss ~ ss + newsquares;
-    	    if (opts.waitsteps < nsteps) {
-    	      // if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
-    	      val grad = ss + opts.epsilon;
-    	      // if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
-    	      grad ~ grad ^ ve;
-    	      grad ~ um / grad;                                      // Normalized gradient
-    	      if (opts.langevin > 0) {                               // Add Langevin random permutations
-    		normrnd(0, opts.langevin, randmat(i));
-    		grad ~ grad + randmat(i);
+    	    if (opts.lrate.ncols > 1) {
+    	      lrate <-- opts.lrate(?,i);
+    	    } else {
+    	      lrate <-- opts.lrate;
+    	    }    	  
+    	  }
+    	  val ss = sumSq(i);
+    	  val lr_scales = model.lr_scales;
+    	  if (lr_scales.asInstanceOf[AnyRef] != null) {
+    	    lrate ~ lrate *@ lr_scales(i);
+    	  }
+    	  (mm, um, ss, ve, tscale, lrate) match {
+	    /*    		case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
+    	     if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+    	     val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
+    	     ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+    	     } else if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+    	     val mu = if (opts.nesterov_vel_decay.length > 1) opts.nesterov_vel_decay(i) else opts.nesterov_vel_decay(0);
+    	     ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+    	     } else {
+    	     ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+    	     }
+    	     }*/
+    	    case _ => {
+    	      val newsquares = um *@ um;
+    	      newsquares ~ newsquares *@ nw;
+    	      ss ~ ss *@ (one - nw);
+    	      ss ~ ss + newsquares;
+    	      if (opts.waitsteps < nsteps) {
+    		// if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
+    		val grad = ss + opts.epsilon;
+    		// if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
+    		grad ~ grad ^ ve;
+    		grad ~ um / grad;                                      // Normalized gradient
+    		if (opts.langevin > 0) {                               // Add Langevin random permutations
+    		  normrnd(0, opts.langevin, randmat(i));
+    		  grad ~ grad + randmat(i);
+    		}
+    		// if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
+    		grad ~ grad *@ (tscale *@ lrate);                                   // Basic scaled gradient
+    		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+    		  val i0 = if (opts.vel_decay.length > 1) i else 0;
+    		  mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
+    		  momentum(i) ~ momentum(i) *@ mu;                     // Memory-efficient version of p = mu * p + grad
+    		  momentum(i) ~ momentum(i) + grad;
+    		  grad <-- momentum(i);
+    		}
+    		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+    		  val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
+    		  mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
+    		  momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
+    		  mm ~ mm - momentum(i);                               // Subtract mu * p_t-1 from the model
+    		  momentum(i) ~ momentum(i) + grad;        	           // p_t = mu * p_t-1 + g
+    		  mm ~ mm + momentum(i);                               // Add p_t to the model;
+    		  grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added. 
+    		}
+    		mm ~ mm + grad;                                        // Add full gradient to the model
+    		if (mask != null) mm ~ mm *@ mask;
     	      }
-    	      // if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
-    	      grad ~ grad *@ (tscale *@ lrate);                                   // Basic scaled gradient
-    	      if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
-    		val i0 = if (opts.vel_decay.length > 1) i else 0;
-    		mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
-    		momentum(i) ~ momentum(i) *@ mu;                     // Memory-efficient version of p = mu * p + grad
-    		momentum(i) ~ momentum(i) + grad;
-    		grad <-- momentum(i);
-    	      }
-    	      if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
-    		val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-    		mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
-    		momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
-    		mm ~ mm - momentum(i);                               // Subtract mu * p_t-1 from the model
-    		momentum(i) ~ momentum(i) + grad;        	           // p_t = mu * p_t-1 + g
-    		mm ~ mm + momentum(i);                               // Add p_t to the model;
-    		grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added. 
-    	      }
-    	      mm ~ mm + grad;                                        // Add full gradient to the model
-    	      if (mask != null) mm ~ mm *@ mask;
     	    }
     	  }
-    	}
-    	um.clear
+    	  um.clear
+	}
       }
     }
     runningtime += toc - start;

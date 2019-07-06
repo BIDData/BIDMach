@@ -150,82 +150,84 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     val batchSize = model.gmats(0).ncols;
     val nmats = updatemats.length;
     //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
-    val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
-    for (i <- 0 until nmats) {
-      if (updatemats(i).asInstanceOf[AnyRef] != null) {
-	val mm = modelmats(i);
-        mm.synchronized {
-	  tscale = if (te.asInstanceOf[AnyRef] != null) {
-	    te <-- opts.texp;
-	    stepn.set(1f/nsteps);
-	    stepn ^ te;
-	  } else {
-	    pe <-- opts.pexp;
-	    stepn.set(1f/(ipass+1));
-	    stepn ^ pe;
-	  }
-	  if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
-	    lrate.set(lr0);
-	  } else {
-	    if (opts.lrate.ncols > 1) {
-	      lrate <-- opts.lrate(?,i);
+    if (opts.update_every > 0 && (nsteps.toInt % opts.update_every == 0)) { 
+      val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
+      for (i <- 0 until nmats) {
+	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	  val mm = modelmats(i);
+          mm.synchronized {
+	    tscale = if (te.asInstanceOf[AnyRef] != null) {
+	      te <-- opts.texp;
+	      stepn.set(1f/nsteps);
+	      stepn ^ te;
 	    } else {
-	      lrate <-- opts.lrate;
+	      pe <-- opts.pexp;
+	      stepn.set(1f/(ipass+1));
+	      stepn ^ pe;
 	    }
-	  }
-	  lrate ~ lrate / batchSize;
-	  val lr_scales = model.lr_scales;
-	  val l2reg_scales = model.l2reg_scales;
-	  if (lr_scales.asInstanceOf[AnyRef] != null) {
-	    lrate ~ lrate *@ lr_scales(i);
-	  } 
-	  if (opts.waitsteps < nsteps) {
-	    val grad = updatemats(i);
-	    if (opts.l2reg.asInstanceOf[AnyRef] != null) {
-	      val i0 = if (opts.l2reg.length > 1) i else 0;
-              val l2r = opts.l2reg(i0)*l2reg_scales(i)*batchSize;
-	      (grad, mm) match {
-	    	case (ggrad:GMat, gmm:GMat) => Grad.linComb(ggrad, 1f, gmm, - l2r, ggrad);
-	    	case _ => grad ~ grad - (mm *@ l2r);
+	    if (opts.lr_policy.asInstanceOf[AnyRef] != null) {
+	      lrate.set(lr0);
+	    } else {
+	      if (opts.lrate.ncols > 1) {
+		lrate <-- opts.lrate(?,i);
+	      } else {
+		lrate <-- opts.lrate;
 	      }
 	    }
-	    if (opts.langevin > 0) {                              // Add Langevin random permutations
-	      normrnd(0, opts.langevin, randmat(i));
-	      grad ~ grad + randmat(i);
-	    }
-	    grad ~ grad *@ (lrate *@ tscale);
-	    if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
-	      val i0 = if (opts.vel_decay.length > 1) i else 0;
-	      (grad, momentum(i)) match {
-	    	case (ggrad:GMat, gmom:GMat) => Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);
-	    	case _ => {
-	    	  mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
-	    	  momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
-	    	  momentum(i) ~ momentum(i) + grad;
-	    	}
+	    lrate ~ lrate / batchSize;
+	    val lr_scales = model.lr_scales;
+	    val l2reg_scales = model.l2reg_scales;
+	    if (lr_scales.asInstanceOf[AnyRef] != null) {
+	      lrate ~ lrate *@ lr_scales(i);
+	    } 
+	    if (opts.waitsteps < nsteps) {
+	      val grad = updatemats(i);
+	      if (opts.l2reg.asInstanceOf[AnyRef] != null) {
+		val i0 = if (opts.l2reg.length > 1) i else 0;
+		val l2r = opts.l2reg(i0)*l2reg_scales(i)*batchSize;
+		(grad, mm) match {
+	    	  case (ggrad:GMat, gmm:GMat) => Grad.linComb(ggrad, 1f, gmm, - l2r, ggrad);
+	    	  case _ => grad ~ grad - (mm *@ l2r);
+		}
 	      }
-	      grad <-- momentum(i);
+	      if (opts.langevin > 0) {                              // Add Langevin random permutations
+		normrnd(0, opts.langevin, randmat(i));
+		grad ~ grad + randmat(i);
+	      }
+	      grad ~ grad *@ (lrate *@ tscale);
+	      if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+		val i0 = if (opts.vel_decay.length > 1) i else 0;
+		(grad, momentum(i)) match {
+	    	  case (ggrad:GMat, gmom:GMat) => Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);
+	    	  case _ => {
+	    	    mu <-- opts.vel_decay(i0);                          // Get the momentum decay rate      
+	    	    momentum(i) ~ momentum(i) *@ mu;                    // update momentum using the new gradient p = mu p + grad
+	    	    momentum(i) ~ momentum(i) + grad;
+	    	  }
+		}
+		grad <-- momentum(i);
+	      }
+	      if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+		val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
+		mu <-- opts.nesterov_vel_decay(i0);                    // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
+		(grad, momentum(i)) match {
+	    	  case (ggrad:GMat, gmom:GMat) => {
+	    	    Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);   // p_t = mu * p_t-1 + g
+	    	    Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), ggrad);  // g' = mu p_t + (p_t - mu*p_t-1) = mu *p_t + g
+	    	  }
+	    	  case _ => {      
+	    	    momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
+	    	    momentum(i) ~ momentum(i) + grad;                    // Compute new momentum p_t = mu * p_t-1 + g
+	    	    mm ~ mm + grad;                                      // Add 2nd and 4th terms: (p_t - mu p_t-1) = g to the model;
+	    	    grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added.
+	    	  }
+		}       	                                  
+	      }
+	      modelmats(i) ~ modelmats(i) + grad;
+	      if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
 	    }
-	    if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
-	      val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-	      mu <-- opts.nesterov_vel_decay(i0);                    // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
-	      (grad, momentum(i)) match {
-	    	case (ggrad:GMat, gmom:GMat) => {
-	    	  Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), gmom);   // p_t = mu * p_t-1 + g
-	    	  Grad.linComb(ggrad, 1f, gmom, opts.vel_decay(i0), ggrad);  // g' = mu p_t + (p_t - mu*p_t-1) = mu *p_t + g
-	    	}
-	    	case _ => {      
-	    	  momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
-	    	  momentum(i) ~ momentum(i) + grad;                    // Compute new momentum p_t = mu * p_t-1 + g
-	    	  mm ~ mm + grad;                                      // Add 2nd and 4th terms: (p_t - mu p_t-1) = g to the model;
-	    	  grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added.
-	    	}
-	      }       	                                  
-	    }
-	    modelmats(i) ~ modelmats(i) + grad;
-	    if (mask != null) modelmats(i) ~ modelmats(i) *@ mask;
+	    updatemats(i).clear;
 	  }
-	  updatemats(i).clear;
 	}
       }
     }
@@ -250,6 +252,7 @@ object Grad {
     var clip_by_value = -1f;
     var clip_grad_norm = -1f;
     var clip_grad_global_norm = -1f;
+    var update_every = -1;
   }
   
   class Options extends Opts {}

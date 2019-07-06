@@ -282,8 +282,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val smat =         oneHot(in)(opts.nvocab);
     fe_model_nodenum = Net.getDefaultNodeNum
     val embed =        linear(smat)(outdim=dim, hasBias=hasBias);
-//    val posenc =       constant(posMat)(false);
-//    val out =          embed + posenc;
+    val posenc =       constant(posMat)(false);
+    val out =          embed + posenc;
 
     nopts.nodeset =    Net.getDefaultNodeSet
  
