@@ -46,7 +46,7 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	step / firstStep;
       }
     }
-    if (opts.update_every > 0 && (nsteps.toInt % opts.update_every == 0)) { 
+    if (opts.update_every <= 0 || (nsteps.toInt % opts.update_every == 0)) { 
       tscale = if (opts.texp.asInstanceOf[AnyRef] != null) {
 	te <-- opts.texp;
 	stepn.set(1/(nsteps+1));

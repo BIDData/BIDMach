@@ -150,7 +150,7 @@ class Grad(override val opts:Grad.Opts = new Grad.Options) extends Updater {
     val batchSize = model.gmats(0).ncols;
     val nmats = updatemats.length;
     //	println("u2 sumsq %g" format mini(sumSq(0)).dv)
-    if (opts.update_every > 0 && (nsteps.toInt % opts.update_every == 0)) { 
+    if (opts.update_every <= 0 || (nsteps.toInt % opts.update_every == 0)) { 
       val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
       for (i <- 0 until nmats) {
 	if (updatemats(i).asInstanceOf[AnyRef] != null) {
