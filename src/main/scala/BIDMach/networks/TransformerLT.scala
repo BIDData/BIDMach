@@ -12,7 +12,8 @@ import BIDMach.networks.layers._
 import BIDMach._
 
 /*
- * Transformer-LT network. 
+ * Transformer-LT network.
+ * Currently pos encoding is used in both front-end and intermediate layers.
  */
 
 @SerialVersionUID(100L)
@@ -465,11 +466,11 @@ object TransformerLT {
   def posEncoding(startpos:Long, mat:FMat, maxr:Float=10000, scale:Float=1f) = { 
     val d = mat.nrows;
     val n = mat.ncols;
-    val pos = row(startpos.toInt->(startpos.toInt + n));
+    val pos = DMat(row(0->n)) + startpos.toDouble;
     for (i <- 0 until d/2) { 
-      val rate = math.pow(maxr, -i*2.0/d).toFloat
-      mat(i*2, ?) = sin(pos * rate) * scale;
-      mat(i*2+1, ?) = cos(pos * rate) * scale;
+      val rate = math.pow(maxr, -i*2.0/d);
+      mat(i*2, ?) = FMat(sin(pos * rate)) * scale;
+      mat(i*2+1, ?) = FMat(cos(pos * rate)) * scale;
     }
     mat
   }
