@@ -1,3 +1,4 @@
+// Sum before Layernorm
 
 import BIDMach.networks.TransformerLT
 import BIDMach.networks.layers._
@@ -10,21 +11,22 @@ val dict = loadCSMat(ddir + "wikitext_spm_vocab.txt")(?,0) on "막"
 val (nn, opts) = TransformerLT.learner(fname);
 
 opts.lrate = 1e-4f
-opts.seqlength = 1024*2
+opts.seqlength = 1024
 opts.batchSize = opts.seqlength
 opts.npasses = 40
-opts.degree = 64
-opts.depth = 8
+opts.degree = 256
+opts.depth = 6
 opts.nheads = 8
-opts.dim = 1024
+opts.dim = 1024*2
 opts.indim = opts.dim
 opts.outdim = opts.dim
 opts.dropout=0.9f;
 opts.texp = 0f
+opts.update_every = 2
 opts.vel_decay = 0.8f;
 opts.lrate = opts.lrate*(1-opts.vel_decay)
 opts.gsq_decay = 0.999f;
-//opts.nvocab = 32
+opts.clip_grad_norm = 10f
 opts.scoreType = SoftmaxOutputLayer.CrossEntropyScore
 opts.pstep = 0.01f
 opts.useCache = false
@@ -36,7 +38,7 @@ val tt = nn.model.asInstanceOf[TransformerLT]
 
 //nn.train
 nn.launchTrain
-Thread.sleep(2000)
+Thread.sleep(4000)
 
 
 val net = tt.txNets(0)

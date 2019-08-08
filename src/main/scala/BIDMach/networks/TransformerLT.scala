@@ -13,7 +13,6 @@ import BIDMach._
 
 /*
  * Transformer-LT network.
- * Currently pos encoding is used in both front-end and intermediate layers.
  */
 
 @SerialVersionUID(100L)
@@ -127,8 +126,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     }
 
     if (!opts.useRelPos) { 
-      TransformerLT.posEncoding(pos, posMat, scale=1f/math.sqrt(opts.dim).toFloat);
-//      TransformerLT.posEncoding(pos, posMat);
+      TransformerLT.posEncoding(pos, posMat, opts.posMagnitude, opts.posScale);
     }
     val backin = backEnd.layers(0)
     if (backin.output.asInstanceOf[AnyRef] == null) { 
@@ -196,7 +194,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       updatemats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
     }
     // Front-end model matrices
-    val m4 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.nvocab));
+    val m4 = convertMat(normrnd(0, opts.posMagnitude, opts.dim, opts.nvocab));
     modelmats(2 * kmodels * opts.depth) = m4;
     modelmats(2 * kmodels * opts.depth + 1) = convertMat(zeros(m4.nrows, 1));
     updatemats(2 * kmodels * opts.depth) = convertMat(zeros(m4.dims));
@@ -363,8 +361,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val in_qkv =      input;
     val this_in_nopos=colslice(in_qkv)(degree, seqlength+degree);
 //    val last_in =     colslice(in_qkv)(0, seqlength);
-    val posenc =      constant(posMat)(false);
-    val in_qkv_pos =  in_qkv + posenc
+//    val posenc =      constant(posMat)(false);
+//    val in_qkv_pos =  in_qkv + posenc
+    val in_qkv_pos =  in_qkv
     val this_in =     colslice(in_qkv_pos)(degree, seqlength+degree);
     val last_in =     colslice(in_qkv_pos)(0, seqlength);
 
@@ -420,17 +419,23 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val drop1 =       dropout(mhattn)(opts.dropout)
     val sum1 =        drop1 + this_in_nopos;
     val norm1 =       layerNorm(sum1)();
+//    val norm1 =       layerNorm(drop1)();
+//    val sum1 =        norm1 + this_in_nopos;
 
     // Feedforward output layer
     linear6_nodenum = Net.getDefaultNodeNum
     val ffwd1 =       linear(norm1)(outdim=opts.outdim, hasBias=true);
+//    val ffwd1 =       linear(sum1)(outdim=opts.outdim, hasBias=true);
     val relu1 =       relu(ffwd1)();
     linear7_nodenum = Net.getDefaultNodeNum
     val ffwd2 =       linear(relu1)(outdim=dim, hasBias=true);
     val drop2 =       dropout(ffwd2)(opts.dropout)
     val sum2 =        norm1 + drop2;
     val norm2 =       layerNorm(sum2)();
- 
+
+//    val norm2 =       layerNorm(drop2)();
+//    val sum2 =        sum1 + norm2;
+
     nopts.nodeset =   Net.getDefaultNodeSet
 
     net.createLayers;
@@ -460,17 +465,21 @@ object TransformerLT {
     var dropout = 0.9f;
     var useRelPos = false;
     var posEvery = true;
+    var posScale = 1f;
+    var posMagnitude = 1f;
   }
 
 
-  def posEncoding(startpos:Long, mat:FMat, maxr:Float=10000, scale:Float=1f) = { 
+  def posEncoding(startpos:Long, mat:FMat, outScale:Float=1f, posScale:Float=1f, maxr:Float=10000) = { 
     val d = mat.nrows;
     val n = mat.ncols;
+    val p = 0.883f;
     val pos = DMat(row(0->n)) + startpos.toDouble;
     for (i <- 0 until d/2) { 
-      val rate = math.pow(maxr, -i*2.0/d);
-      mat(i*2, ?) = FMat(sin(pos * rate)) * scale;
-      mat(i*2+1, ?) = FMat(cos(pos * rate)) * scale;
+//      val rate = math.pow(maxr, -i*2.0/d) * posScale;
+      val rate = math.pow((i*2.0+1)/d, 1.0/(1.0-p)/posScale) * 0.54;
+      mat(i*2, ?) = FMat(sin(pos * rate)) * outScale;
+      mat(i*2+1, ?) = FMat(cos(pos * rate)) * outScale;
     }
     mat
   }
