@@ -731,7 +731,7 @@ __global__ void __ADAGrad(int nrows, int ncols, float *mm, float *um, float *ssq
 // ADAGRAD with standard momentum
 
 __global__ void __ADAGradm(int nrows, int ncols, float *mm, float *um, float *ssq, float *momentum, float mu, float *mask, int maskr,
-			   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float langevin, float eps, int doupdate, curandState *rstates) {
+	       		   float nw, float *ve, int nve, float *ts, int nts, float *lr, int nlr, float langevin, float eps, int doupdate, curandState *rstates) {
   int ithread = threadIdx.x + blockDim.x * (blockIdx.x + gridDim.x * blockIdx.y);
   int nthreads = blockDim.x * gridDim.x * gridDim.y;
   int i, irow, icol;

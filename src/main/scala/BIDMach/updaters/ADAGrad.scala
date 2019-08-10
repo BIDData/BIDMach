@@ -48,28 +48,28 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     }
     if (opts.update_every <= 0 || (nsteps.toInt % opts.update_every == 0)) { 
       tscale = if (opts.texp.asInstanceOf[AnyRef] != null) {
-	te <-- opts.texp;
-	stepn.set(1/(nsteps+1));
-	stepn ^ te;
+	    te <-- opts.texp;
+	    stepn.set(1/(nsteps+1));
+	    stepn ^ te;
       } else if (opts.pexp.asInstanceOf[AnyRef] != null) {
-	pe <-- opts.pexp;
-	stepn.set(1f/(ipass+1));
-	stepn ^ pe;
+	    pe <-- opts.pexp;
+	    stepn.set(1f/(ipass+1));
+	    stepn ^ pe;
       } else {
-	te.set(0f);
-	stepn ^ te;
+	    te.set(0f);
+	    stepn ^ te;
       }
       if (opts.gsq_decay >= 0){
-	stepn.set(1f - opts.gsq_decay);
+	    stepn.set(1f - opts.gsq_decay);
       } else {
-	stepn.set(1/(nsteps+1));
+	    stepn.set(1/(nsteps+1));
       }
       val nw = stepn;
       val nmats = math.min(modelmats.length, updatemats.length);
       //    println("u sumsq %g" format mini(sumSq(0)).dv)
       val lr0 = if (opts.lr_policy.asInstanceOf[AnyRef] != null) opts.lr_policy(ipass, nsteps, gprogress) else 0;
       for (i <- 0 until nmats) {
-	if (updatemats(i).asInstanceOf[AnyRef] != null) {
+	    if (updatemats(i).asInstanceOf[AnyRef] != null) {
     	  val mm = modelmats(i);
     	  val um = updatemats(i);
     	  if (opts.l2reg.asInstanceOf[AnyRef] != null) {
@@ -91,60 +91,64 @@ class ADAGrad(override val opts:ADAGrad.Opts = new ADAGrad.Options) extends Grad
     	    lrate ~ lrate *@ lr_scales(i);
     	  }
     	  (mm, um, ss, ve, tscale, lrate) match {
-	    /*    		case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
-    	     if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
-    	     val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
-    	     ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
-    	     } else if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
-    	     val mu = if (opts.nesterov_vel_decay.length > 1) opts.nesterov_vel_decay(i) else opts.nesterov_vel_decay(0);
-    	     ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
-    	     } else {
-    	     ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
-    	     }
-    	     }*/
-    	    case _ => {
-    	      val newsquares = um *@ um;
-    	      newsquares ~ newsquares *@ nw;
-    	      ss ~ ss *@ (one - nw);
-    	      ss ~ ss + newsquares;
-    	      if (opts.waitsteps < nsteps) {
-    		// if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
-    		val grad = ss + opts.epsilon;
-    		// if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
-    		grad ~ grad ^ ve;
-    		grad ~ um / grad;                                      // Normalized gradient
-    		if (opts.langevin > 0) {                               // Add Langevin random permutations
-    		  normrnd(0, opts.langevin, randmat(i));
-    		  grad ~ grad + randmat(i);
-    		}
-    		// if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
-    		grad ~ grad *@ (tscale *@ lrate);                                   // Basic scaled gradient
-    		if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
-    		  val i0 = if (opts.vel_decay.length > 1) i else 0;
-    		  mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
-    		  momentum(i) ~ momentum(i) *@ mu;                     // Memory-efficient version of p = mu * p + grad
-    		  momentum(i) ~ momentum(i) + grad;
-    		  grad <-- momentum(i);
-    		}
-    		if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
-    		  val i0 = if (opts.nesterov_vel_decay.length > 1) i else 0;
-    		  mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
-    		  momentum(i) ~ momentum(i) *@ mu;                     // Compute mu * p_t-1
-    		  mm ~ mm - momentum(i);                               // Subtract mu * p_t-1 from the model
-    		  momentum(i) ~ momentum(i) + grad;        	           // p_t = mu * p_t-1 + g
-    		  mm ~ mm + momentum(i);                               // Add p_t to the model;
-    		  grad ~ momentum(i) *@ mu;                            // grad = mu p_t is ready to be added. 
-    		}
-    		mm ~ mm + grad;                                        // Add full gradient to the model
-    		if (mask != null) mm ~ mm *@ mask;
+	    	case (gmm:GMat, gum:GMat, gss:GMat, gve:GMat, gts:GMat, glrate:GMat) => {
+    	      if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+    	        val mu = if (opts.vel_decay.length > 1) opts.vel_decay(i) else opts.vel_decay(0);
+    	        ADAGrad.ADAGradm(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+    	      } else if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+    	        val mu = if (opts.nesterov_vel_decay.length > 1) opts.nesterov_vel_decay(i) else opts.nesterov_vel_decay(0);
+    	        ADAGrad.ADAGradn(gmm, gum, gss, momentum(i).asInstanceOf[GMat], mu, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
+    	      } else {
+    	        ADAGrad.ADAGradx(gmm, gum, gss, mask.asInstanceOf[GMat], nw.dv.toFloat, gve, gts, glrate, opts.langevin, opts.epsilon, (opts.waitsteps < nsteps));
     	      }
+            } 
+    	    case _ => {
+              defaultUpdate(mm, um, ss, ve, nw, tscale, lrate, nsteps, i);
     	    }
-    	  }
+          }
     	  um.clear
-	}
+	    }
       }
     }
     runningtime += toc - start;
+  }
+  
+  def defaultUpdate(mm:Mat, um:Mat, ss:Mat, ve:Mat, nw:Mat, tscale:Mat, lrate:Mat, nsteps:Float, imat:Int) = { 
+    val newsquares = um *@ um;
+    newsquares ~ newsquares *@ nw;
+    ss ~ ss *@ (one - nw);
+    ss ~ ss + newsquares;
+    if (opts.waitsteps < nsteps) {
+      // if (java.lang.Double.isNaN(sum(sum(ss)).dv)) throw new RuntimeException("ADAGrad NaN in sumsquares matrix "+i);
+      val grad = ss + opts.epsilon;
+      // if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in scaled sumsquares matrix "+i);
+      grad ~ grad ^ ve;
+      grad ~ um / grad;                                      // Normalized gradient
+      if (opts.langevin > 0) {                               // Add Langevin random permutations
+        normrnd(0, opts.langevin, randmat(imat));
+        grad ~ grad + randmat(imat);
+      }
+      // if (java.lang.Double.isNaN(sum(sum(grad)).dv)) throw new RuntimeException("ADAGrad NaN in gradient quotient in derivative "+i);
+      grad ~ grad *@ (tscale *@ lrate);                                   // Basic scaled gradient
+      if (opts.vel_decay.asInstanceOf[AnyRef] != null) {
+        val i0 = if (opts.vel_decay.length > 1) imat else 0;
+        mu <-- opts.vel_decay(i0);                           // Get the momentum decay rate      
+        momentum(imat) ~ momentum(imat) *@ mu;                     // Memory-efficient version of p = mu * p + grad
+        momentum(imat) ~ momentum(imat) + grad;
+        grad <-- momentum(imat);
+      }
+      if (opts.nesterov_vel_decay.asInstanceOf[AnyRef] != null) {
+        val i0 = if (opts.nesterov_vel_decay.length > 1) imat else 0;
+        mu <-- opts.nesterov_vel_decay(i0);                  // Implement x_t = x_t-1 + p_t + mu * (p_t - p_t-1)
+        momentum(imat) ~ momentum(imat) *@ mu;                     // Compute mu * p_t-1
+        mm ~ mm - momentum(imat);                               // Subtract mu * p_t-1 from the model
+        momentum(imat) ~ momentum(imat) + grad;        	           // p_t = mu * p_t-1 + g
+        mm ~ mm + momentum(imat);                               // Add p_t to the model;
+        grad ~ momentum(imat) *@ mu;                            // grad = mu p_t is ready to be added. 
+      }
+      mm ~ mm + grad;                                        // Add full gradient to the model
+      if (mask != null) mm ~ mm *@ mask;
+    }
   }
 }
 
@@ -161,7 +165,7 @@ object ADAGrad {
   
   
   def multUpdateHelperT(a:FMat, b:SMat, mm:FMat, ssq:FMat, mask:FMat, lrate:FMat, vexp:FMat, texp:FMat, 
-			istep:Float, addgrad:Int, epsilon:Float, ithread:Int, numThreads:Int) = {
+			            istep:Float, addgrad:Int, epsilon:Float, ithread:Int, numThreads:Int) = {
     val nr = a.nrows;
     val lrdim = lrate.length;
     val vedim = vexp.length;
@@ -232,14 +236,14 @@ object ADAGrad {
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.pdata else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
         val err = CUMACH.multADAGrad(nr, nc, b.nnz, ga.pdata, gsb.pdata, gsb.pir, gsb.pic, gmm.pdata, gssq.pdata, gmaskdata, masknr,
-				     glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps, biasv, nbr);
+				                     glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps, biasv, nbr);
         if (err > 0) {
           throw new RuntimeException("multADAgrad error " + cudaGetErrorString(err))
         }
       }
       case (ga:GMat, gsb:GSMat, gmm:TMat, gssq:TMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
-	//	println("istep=%f" format istep);
+	    //	println("istep=%f" format istep);
         val gmask0 = mask.asInstanceOf[GMat];
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.pdata else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
@@ -251,7 +255,7 @@ object ADAGrad {
           val y = gmm.y(i);
           val x = gmm.x(i);
           val err = CUMACH.multADAGradTile(nr, nc, y, x, gsb.nnz, ga.pdata, ga.nrows, gsb.pdata, gsb.pir, gsb.pic, mmtile.pdata, ssqtile.pdata, gmaskdata, masknr,
-          				   glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps, biasv, nbr);
+          				                   glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps, biasv, nbr);
           if (err > 0) {
             throw new RuntimeException("multADAgrad error " + cudaGetErrorString(err))
           }
@@ -262,7 +266,7 @@ object ADAGrad {
         val fmask = mask.asInstanceOf[FMat];
         val masknr = if (fmask.asInstanceOf[AnyRef] != null) fmask.nrows else 0;
         CPUMACH.multADAGrad(nr, nc, b.nnz, fa.data, sb.data, sb.ir, sb.jc, fmm.data, fssq.data, if (fmask != null) fmask.data else null, masknr, 
-			    flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
+			                flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
       }
       case (fa:FMat, sb:SMat, fmm:TMat, fssq:TMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
       	Mat.nflops += 20L * nr * b.nnz;
@@ -276,7 +280,7 @@ object ADAGrad {
           val y = fmm.y(i);
           val x = fmm.x(i);
           CPUMACH.multADAGradTile(nr, nc, y, x, b.nnz, fa.data, fa.nrows, sb.data, sb.ir, sb.jc, mmtile.data, ssqtile.data, if (fmask != null) fmask.data else null, masknr, 
-        			  flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
+        			              flrate.data, flrate.nrows, fvexp.data, fvexp.nrows, ftexp.data, ftexp.nrows, istep, addgrad, eps, biasv, nbr);
         }
       }
       case _ => {
@@ -308,18 +312,18 @@ object ADAGrad {
     val biasv = if (hasBias) 1 else 0;
     (a, b, mm, sumSq, lrate, vexp, texp) match {
       case (ga:GMat, gsb:GSMat, gmm:GMat, gssq:GMat, glrate:GMat, gvexp:GMat, gtexp:GMat) => {
-	val nr = a.nrows;   // = mm.nrows
-	val nc = a.ncols;   // = b.ncols
-	val nbr = b.nrows;
-	val nfeats = mm.ncols/2;
+	    val nr = a.nrows;   // = mm.nrows
+	    val nc = a.ncols;   // = b.ncols
+	    val nbr = b.nrows;
+	    val nfeats = mm.ncols/2;
     	Mat.nflops += 20L * nr * b.nnz;
     	if (nr != mm.nrows || nc != b.ncols) {
     	  throw new RuntimeException("pairMultUpdate: dimensions mismatch");
     	}
     	val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].pdata, mask.length) else (null, 0);
     	val err = CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.pdata, nr, 0, 0, gsb.pdata, gsb.pir, gsb.pjc, 0, 0, 1, gmm.pdata, mm.nrows, 
-    					     gssq.pdata, gmdata, masklen, glrate.pdata, lrate.length, gvexp.pdata, vexp.length, gtexp.pdata, texp.length,
-    					     istep, 1, eps);
+    					                     gssq.pdata, gmdata, masklen, glrate.pdata, lrate.length, gvexp.pdata, vexp.length, gtexp.pdata, texp.length,
+    					                     istep, 1, eps);
     	if (err > 0) {
           throw new RuntimeException("pairMultADAgrad error " + cudaGetErrorString(err))
     	}
@@ -339,26 +343,26 @@ object ADAGrad {
     	  }
     	  val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[GMat].pdata, mask.length) else (null, 0);
     	  val err = CUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, ga.pdata, a.nrows, y, 0, gsb.pdata, gsb.pir, gsb.pjc, x, 0, 1, 
-    					       mmtile.pdata, mmtile.nrows, ssqtile.pdata, gmdata, masklen, glrate.pdata, lrate.length, 
-    					       gvexp.pdata, vexp.length, gtexp.pdata, texp.length,	istep, 1, eps);
+    					                       mmtile.pdata, mmtile.nrows, ssqtile.pdata, gmdata, masklen, glrate.pdata, lrate.length, 
+    					                       gvexp.pdata, vexp.length, gtexp.pdata, texp.length,	istep, 1, eps);
     	  if (err > 0) {
             throw new RuntimeException("pairMultADAgrad error " + cudaGetErrorString(err))
     	  }
     	}
       }
       case (fa:FMat, fsb:SMat, fmm:FMat, fssq:FMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
-	val nr = a.nrows;
-	val nc = b.ncols;
-	val nbr = b.nrows;
-	val nfeats = mm.ncols/2;
+	    val nr = a.nrows;
+	    val nc = b.ncols;
+	    val nbr = b.nrows;
+	    val nfeats = mm.ncols/2;
     	Mat.nflops += 20L * nr * b.nnz;
     	if (nr != mm.nrows || nc != a.ncols) {
     	  throw new RuntimeException("pairMultUpdate: dimensions mismatch");
     	}
     	val (fmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[FMat].data, mask.length) else (null, 0);
     	CPUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, fa.data, nr, 0, 0, fsb.data, fsb.ir, fsb.jc, 0, 0, fmm.data, mm.nrows, 
-    				    fssq.data, fmdata, masklen, flrate.data, lrate.length, fvexp.data, vexp.length, ftexp.data, texp.length,
-    				    istep, 1, eps, biasv, 0);
+    				                fssq.data, fmdata, masklen, flrate.data, lrate.length, fvexp.data, vexp.length, ftexp.data, texp.length,
+    				                istep, 1, eps, biasv, 0);
       }
       case (fa:FMat, fsb:SMat, fmm:TMat, fssq:TMat, flrate:FMat, fvexp:FMat, ftexp:FMat) => {
     	Mat.nflops += 20L * a.nrows * b.nnz;
@@ -375,8 +379,8 @@ object ADAGrad {
     	  }
     	  val (gmdata, masklen) = if (mask.asInstanceOf[AnyRef] != null) (mask.asInstanceOf[FMat].data, mask.length) else (null, 0);
     	  CPUMACH.pairMultADAGradTile(nr, nc, nfeats, nfeats, fa.data, y, 0, nr, fsb.data, fsb.ir, fsb.jc, x, 0, 
-    				      mmtile.data, mm.nrows, ssqtile.data, gmdata, masklen, flrate.data, lrate.length, 
-    				      fvexp.data, vexp.length, ftexp.data, texp.length,	istep, 1, eps, biasv, 0);
+    				                  mmtile.data, mm.nrows, ssqtile.data, gmdata, masklen, flrate.data, lrate.length, 
+    				                  fvexp.data, vexp.length, ftexp.data, texp.length,	istep, 1, eps, biasv, 0);
     	}
       }
       case _ => throw new RuntimeException("ADAGrad PairMultUpdate matrix type not matched");
@@ -388,7 +392,7 @@ object ADAGrad {
   * Supports both CPU and GPU implementation.
   */
   def hashmultUpdate(a:Mat, b:Mat, nfeats:Int, bound1:Int, bound2:Int, transpose:Int,
-  		     mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int) = {
+  		             mm:Mat, sumSq:Mat, mask:Mat, lrate:Mat, vexp:Mat, texp:Mat, eps:Float, step:Float, waitsteps:Int) = {
     val istep = 1f/step;
     val addgrad = if (step > waitsteps - 0.5f) 1 else 0;
     val nr = a.nrows;
@@ -401,7 +405,7 @@ object ADAGrad {
         val gmaskdata = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.pdata else new jcuda.Pointer();
         val masknr = if (gmask0.asInstanceOf[AnyRef] != null) gmask0.nrows else 0;
         val err = CUMACH.hashmultADAGrad(nr, nfeats, nc, bound1,  bound2, ga.pdata, gsb.pdata, gsb.pir, gsb.pjc, transpose,
-        				 gmm.pdata, gssq.pdata, gmaskdata, masknr, glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps);
+        				                 gmm.pdata, gssq.pdata, gmaskdata, masknr, glrate.pdata, lrate.nrows, gvexp.pdata, vexp.nrows, gtexp.pdata, texp.nrows, istep, addgrad, eps);
         if (err != 0) {
           throw new RuntimeException("hashMultUpdate error " + jcuda.runtime.JCuda.cudaGetErrorString(err));
         }
@@ -422,19 +426,19 @@ object ADAGrad {
   def ADAGradx(mm:GMat, um:GMat, ss:GMat, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
     val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
     CUMACH.ADAGrad(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, gmask, maskr, nw, ve.pdata, ve.nrows,
-  		   ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
+  		           ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
   
   def ADAGradm(mm:GMat, um:GMat, ss:GMat, vel_decay:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
     val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
     CUMACH.ADAGradm(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, vel_decay.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
-		    ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
+		            ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
   
   def ADAGradn(mm:GMat, um:GMat, ss:GMat, vel_decay:GMat, mu:Float, mask:GMat, nw:Float, ve:GMat, ts:GMat, lrate:GMat, langevin:Float, epsilon:Float, doupdate:Boolean) = {
     val (gmask, maskr) = if (mask.asInstanceOf[AnyRef] == null) (null, 0) else (mask.pdata, mask.nrows);
     CUMACH.ADAGradn(mm.nrows, mm.ncols, mm.pdata, um.pdata, ss.pdata, vel_decay.pdata, mu, gmask, maskr, nw, ve.pdata, ve.nrows,
-		    ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
+		            ts.pdata, ts.nrows, lrate.pdata, lrate.nrows, langevin, epsilon, if (doupdate) 1 else 0);
   }
 }
 

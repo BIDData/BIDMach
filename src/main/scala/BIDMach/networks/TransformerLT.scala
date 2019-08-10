@@ -242,7 +242,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       dtable(i) = convertMat(zeros(opts.dim, batchSize + opts.degree));
     }
     inData = convertMat(izeros(1, batchSize + opts.degree + 1));
-    posMat = zeros(opts.dim, opts.seqlength + opts.degree);
   }
 
   def createModelmats() { 
@@ -293,6 +292,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     modelmats(2 * kmodels * opts.depth + 3) = convertMat(zeros(m5.nrows, 1));
     updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(m5.dims));
     updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(m5.nrows, 1));
+
+    posMat = zeros(opts.dim, opts.seqlength + opts.degree);
   }
 
   def attachEnds() { 
