@@ -23,16 +23,17 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var txNets:Array[Net] = null;
   var frontEnd:Net = null;
   var backEnd:Net = null;
-  var lastScores:FMat = null;
+  var allScores:FMat = null;
   var posMat:FMat = null;
+  var inData:Mat = null;
   
   val kmodels = 6
   var cacheState = false;
   var cacheGPUstate = false;
   var useCache = false;
   var useGPUCache = true;
-  var seqptr = 0;
   var batchSize = -1;
+  var lastPos = -1L;
 
   var linear0_nodenum = 0
   var linear5_nodenum = 0
@@ -49,10 +50,11 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     Mat.useCache = useCache;
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = useGPUCache;
-    seqptr = 0;
-
-    createTables();
     createModelmats();
+  }
+
+  def initData() = { 
+    createTables();
 
     frontEnd = createFrontEnd();
     frontEnd.setmodelmats(modelmats);
@@ -77,57 +79,88 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
+    if (table.asInstanceOf[AnyRef] == null) initData();
     if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
-      assignInputsAndTargets(gmats, ipass, pos);
-      if (seqptr >= opts.seqlength) { 
-        forward();
-        backward();
-        wrapInput();
-        seqptr = 0;
-        step += 1;
-      }
+      assignInputs(gmats);
+      forward(pos, false);
+      backward(pos);
+      wrapData(pos);
     }
   }
 
   override def evalbatch(gmats:Array[Mat], ipass:Int, pos:Long):FMat = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
+    if (table.asInstanceOf[AnyRef] == null) initData();
     if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
-      assignInputsAndTargets(gmats, ipass, pos);
-      if (lastScores.asInstanceOf[AnyRef] == null) lastScores = zeros(backEnd.score_layers.length, batchSize);
-      if (seqptr >= opts.seqlength) { 
-        forward(true);
-        wrapInput();
-        seqptr = 0;
-        step += 1;
-  	for (i <- 0 until backEnd.score_layers.length) {
-  	  lastScores(i,?) = backEnd.score_layers(i).score;
-  	}
-      }
-      lastScores
+      assignInputs(gmats);
+      forward(pos, true);
+      wrapData(pos);
+      allScores
     } else { 
       zeros(backEnd.score_layers.length, 1);
     }
   }
 
-  def assignInputsAndTargets(gmats:Array[Mat], ipass:Int, pos:Long) = {
+  def assignInputs(gmats:Array[Mat]) { 
     val src = gmats(0);
-    if (opts.seqlength % batchSize != 0) { 
-      throw new RuntimeException("TransformerLT sequence length must be a multiple of batch size");
+    if (batchSize % opts.seqlength != 0) { 
+      throw new RuntimeException("TransformerLT batch size must be a multiple of sequence length");
     }
     src ~ src - ((src >= opts.nvocab) ∘ (src - opts.OOVsym)) // Map OOV words to the OOV symbol
+    src.colslice(0, batchSize, inData, opts.degree + 1);
+  }
 
+  def wrapData(pos:Long) = { 
+    if (pos != lastPos) { 
+      val copyDataEnd = inData.colslice(batchSize, batchSize + opts.degree + 1); // Wrap overlapping input
+      copyDataEnd.colslice(0, opts.degree + 1, inData, 0);
+      for (level <- 0 to opts.depth) { 
+        val copyEnd = table(level).colslice(batchSize, batchSize + opts.degree); // Wrap overlapping table data
+        copyEnd.colslice(0, opts.degree, table(level), 0);
+      }
+      lastPos = pos
+    }
+  }
+
+  def forwardNet(net:Net, indata:Mat, outdata:Mat, offset:Int, pos:Long, predicting:Boolean, dopos:Boolean) = { 
+
+    var tmppred = net.predicting;
+    net.predicting = predicting;
+    val inmat = net.layers(0).output
+
+    var ipos = 0;
+    while (ipos < batchSize) { 
+      indata.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
+      if (dopos) TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
+      net.forward
+      val outmat = net.layers(net.layers.length-1).output
+      outmat.colslice(0, opts.seqlength + offset, outdata, ipos + opts.degree - offset)
+      ipos += opts.seqlength;
+    }
+    net.predicting = tmppred;
+  }
+
+
+  def forwardFrontEnd(pos:Long, predicting:Boolean) = {
     val inlayer = frontEnd.layers(0)
     if (inlayer.output.asInstanceOf[AnyRef] == null) inlayer.output = convertMat(izeros(1, opts.seqlength+opts.degree))
-    val inmat = inlayer.output
-    if (seqptr + batchSize < opts.seqlength) { 
-      src.colslice(0, batchSize, inmat, seqptr + opts.degree + 1);
-    } else { 
-      src.colslice(0, batchSize - 1, inmat, seqptr + opts.degree + 1);
-    }
+    forwardNet(frontEnd, inData, table(0), opts.degree, pos, predicting, true);
+  }
 
-    if (!opts.useRelPos) { 
-      TransformerLT.posEncoding(pos, posMat, opts.posMagnitude, opts.posScale);
+  def forwardMainNet(pos:Long, predicting:Boolean, level:Int) = {
+    val net = txNets(0);
+    val inlayer = net.layers(0)
+    if (inlayer.output.asInstanceOf[AnyRef] == null) {
+      inlayer.output = convertMat(zeros(opts.dim, opts.seqlength+opts.degree))
+      inlayer.deriv = convertMat(zeros(opts.dim, opts.seqlength+opts.degree))
     }
+    forwardNet(net, table(level), table(level + 1), 0, pos, predicting, false);
+  }
+
+  def forwardBackEnd(predicting:Boolean) = { 
+    var tmppred = backEnd.predicting;
+    backEnd.predicting = predicting;
+
     val backin = backEnd.layers(0)
     if (backin.output.asInstanceOf[AnyRef] == null) { 
       backin.output = convertMat(zeros(opts.dim, opts.seqlength))
@@ -137,24 +170,82 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val backout = backEnd.output_layers(0)
     if (backout.target.asInstanceOf[AnyRef] == null) backout.target = convertMat(izeros(1, opts.seqlength))
     val target = backout.target;
-    src.colslice(0, batchSize, target, seqptr);
 
-    seqptr += batchSize;
+    var ipos = 0;
+    while (ipos < batchSize) { 
+      table(opts.depth).colslice(ipos + opts.degree, ipos + opts.seqlength + opts.degree, backin.output, 0);
+      inData.colslice(ipos + opts.degree + 1, ipos + opts.seqlength + opts.degree + 1, target, 0);
+      backEnd.forward
+      if (allScores.asInstanceOf[AnyRef] == null) allScores = zeros(backEnd.score_layers.length, batchSize);
+      for (i <- 0 until backEnd.score_layers.length) { 
+        allScores(i,ipos->(ipos+opts.seqlength)) = backEnd.score_layers(i).score;
+      }
+      ipos += opts.seqlength;
+    }
+    backEnd.predicting = tmppred;
   }
-  
-  def wrapInput() { 
+
+
+  def backwardNet(net:Net, intable:Mat, indtable:Mat, outdtable:Mat, offset:Int, pos:Long, dopos:Boolean) = {
+    val inmat = net.layers(0).output
+    val outderiv = net.layers(net.layers.length-1).deriv
+    val inderiv = net.layers(0).deriv
+
+    var ipos = 0;
+    if (indtable.asInstanceOf[AnyRef] != null) indtable.clear
+    while (ipos < batchSize) { 
+      if (dopos) TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
+      intable.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
+      net.forward
+      outdtable.colslice(ipos + offset, ipos + opts.degree + opts.seqlength, outderiv, 0);
+      net.backward();
+      if (indtable.asInstanceOf[AnyRef] != null) { 
+        val tmp = indtable.colslice(ipos, ipos + opts.degree + opts.seqlength);
+        tmp ~ tmp + inderiv;
+        tmp.colslice(0, opts.degree + opts.seqlength, indtable, ipos);
+      }
+      ipos += opts.seqlength;
+    }
+  }
+
+  def backwardFrontEnd(pos:Long) = {
+    backwardNet(frontEnd, inData, null, dtable(0), 0, pos, true);
+  }
+
+  def backwardMainNet(pos:Long, level:Int) = {
+    val net = txNets(0);
+    backwardNet(net, table(level), dtable(level), dtable(level+1), opts.degree, pos, false);
+  }
+
+  def backwardBackEnd() = {
+    val inmat = backEnd.layers(0).output
+    val outderiv = backEnd.layers(backEnd.layers.length-1).deriv
+    val inderiv = backEnd.layers(0).deriv
+    val intable = table(opts.depth)
+    val indtable = dtable(opts.depth)
     val target = backEnd.output_layers(0).target;
-    val inmat = frontEnd.layers(0).output
-    target.colslice(opts.seqlength - opts.degree - 1, opts.seqlength, inmat, 0);
+
+    var ipos = 0;
+    indtable.clear
+    while (ipos < batchSize) { 
+      intable.colslice(ipos + opts.degree, ipos + opts.seqlength + opts.degree, inmat, 0);
+      inData.colslice(ipos + opts.degree + 1, ipos + opts.seqlength + opts.degree + 1, target, 0);
+      backEnd.forward
+      outderiv.set(1f);
+      backEnd.backward();
+      inderiv.colslice(0, opts.seqlength, indtable, ipos + opts.degree);
+      ipos += opts.seqlength;
+    }
   }
 
   def createTables() { 
     table = new Array[Mat](opts.depth+1);
     dtable = new Array[Mat](opts.depth+1);
     for (i <- 0 to opts.depth) { 
-      table(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
-      dtable(i) = convertMat(zeros(opts.dim, opts.seqlength + opts.degree));
+      table(i) = convertMat(zeros(opts.dim, batchSize + opts.degree));
+      dtable(i) = convertMat(zeros(opts.dim, batchSize + opts.degree));
     }
+    inData = convertMat(izeros(1, batchSize + opts.degree + 1));
     posMat = zeros(opts.dim, opts.seqlength + opts.degree);
   }
 
@@ -209,15 +300,15 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   }
 
   def attachEnds() { 
-    frontEnd.layers(frontEnd.layers.length-1).output = table(0);
-    frontEnd.layers(frontEnd.layers.length-1).deriv = dtable(0);
+//    frontEnd.layers(frontEnd.layers.length-1).output = table(0);
+//    frontEnd.layers(frontEnd.layers.length-1).deriv = dtable(0);
     frontEnd.layers(fe_model_nodenum).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2;
     backEnd.layers(be_model_nodenum).asInstanceOf[ModelLayer].imodel = opts.depth * kmodels * 2 + 2;
   }
 
   def attach(net:Net, level:Int = 0) { 
-    net.layers(0).output = table(level);
-    net.layers(0).deriv = dtable(level);
+//    net.layers(0).output = table(level);
+//    net.layers(0).deriv = dtable(level);
     net.layers(linear0_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2;
     net.layers(linear0_nodenum+1).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 2;
     net.layers(linear0_nodenum+2).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 4;
@@ -228,42 +319,27 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.layers(linear7_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 10;
   }
 
-  def forward(predicting:Boolean=false) { 
-    var tmppred = frontEnd.predicting;
-    frontEnd.predicting = predicting;
-    frontEnd.forward;
-    frontEnd.predicting = tmppred;
+  def forward(pos:Long, predicting:Boolean=false) { 
     val net = txNets(0);
+    step += 1;
+    forwardFrontEnd(pos, predicting);
     for (level <- 0 until opts.depth) { 
       attach(net, level);
-      val tmppred = net.predicting;
-      net.predicting = predicting;
-      setseed((5434*level+2354*step).toInt);    // Needed for dropout to be consistent
-      net.forward;
-      net.predicting = tmppred;
-      table(level+1).colslice(opts.seqlength, opts.seqlength+opts.degree, table(level+1), 0);
-      net.layers(net.layers.length-1).output.colslice(0, opts.seqlength, table(level+1), opts.degree);
+      setseed((5434*level+2354*step).toInt);
+      forwardMainNet(pos, predicting, level);
     }
-    tmppred = backEnd.predicting;
-    table(opts.depth).colslice(opts.degree, opts.seqlength+opts.degree, backEnd.layers(0).output, 0);
-    backEnd.predicting = predicting;
-    backEnd.forward;
-    backEnd.predicting = tmppred;
+    forwardBackEnd(predicting);
   }
 
-  def backward() { 
+  def backward(pos:Long) { 
     val net = txNets(0);
-    backEnd.layers(backEnd.layers.length-1).deriv.set(1f);
-    backEnd.backward();
-    backEnd.layers(0).deriv.colslice(0, opts.seqlength, dtable(opts.depth), opts.degree);
+    backwardBackEnd();
     for (level <- (opts.depth -1) to 0 by -1) { 
       attach(net, level);
       setseed((5434*level+2354*step).toInt);
-      net.forward;
-      dtable(level+1).colslice(opts.degree, opts.seqlength+opts.degree, net.layers(net.layers.length-1).deriv, 0)
-      net.backward();
+      backwardMainNet(pos, level);
     }
-    frontEnd.backward();
+    backwardFrontEnd(pos);
   }
 
   def createFrontEnd() = {
