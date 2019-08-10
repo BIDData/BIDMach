@@ -51,10 +51,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     cacheGPUstate = Mat.useGPUcache;
     Mat.useGPUcache = useGPUCache;
     createModelmats();
-  }
-
-  def initData() = { 
-    createTables();
 
     frontEnd = createFrontEnd();
     frontEnd.setmodelmats(modelmats);
@@ -70,7 +66,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.setmodelmats(modelmats);
     net.updatemats = updatemats;
     txNets = Array(net);
-  }  
+  }
   
   def wrapUp() = { 
     Mat.useCache = cacheState;
@@ -79,7 +75,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
   override def dobatch(gmats:Array[Mat], ipass:Int, pos:Long):Unit = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
-    if (table.asInstanceOf[AnyRef] == null) initData();
+    if (table.asInstanceOf[AnyRef] == null) createTables();
     if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
       assignInputs(gmats);
       forward(pos, false);
@@ -90,7 +86,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
   override def evalbatch(gmats:Array[Mat], ipass:Int, pos:Long):FMat = {
     if (batchSize < 0) batchSize = gmats(0).ncols;
-    if (table.asInstanceOf[AnyRef] == null) initData();
+    if (table.asInstanceOf[AnyRef] == null) createTables();
     if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
       assignInputs(gmats);
       forward(pos, true);
