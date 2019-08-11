@@ -130,7 +130,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       if (dopos) TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
       net.forward
       val outmat = net.layers(net.layers.length-1).output
-      outmat.colslice(0, opts.seqlength + offset, outdata, ipos + opts.degree - offset)
+      outmat.colslice(0, opts.seqlength + opts.degree - offset, outdata, ipos + offset)
       ipos += opts.seqlength;
     }
     net.predicting = tmppred;
@@ -140,7 +140,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   def forwardFrontEnd(pos:Long, predicting:Boolean) = {
     val inlayer = frontEnd.layers(0)
     if (inlayer.output.asInstanceOf[AnyRef] == null) inlayer.output = convertMat(izeros(1, opts.seqlength+opts.degree))
-    forwardNet(frontEnd, inData, table(0), opts.degree, pos, predicting, true);
+    forwardNet(frontEnd, inData, table(0), 0, pos, predicting, true);
   }
 
   def forwardMainNet(pos:Long, predicting:Boolean, level:Int) = {
@@ -150,7 +150,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       inlayer.output = convertMat(zeros(opts.dim, opts.seqlength+opts.degree))
       inlayer.deriv = convertMat(zeros(opts.dim, opts.seqlength+opts.degree))
     }
-    forwardNet(net, table(level), table(level + 1), 0, pos, predicting, false);
+    forwardNet(net, table(level), table(level + 1), opts.degree, pos, predicting, false);
   }
 
   def forwardBackEnd(predicting:Boolean) = { 
