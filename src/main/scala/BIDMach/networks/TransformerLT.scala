@@ -210,7 +210,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
       inData.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
       frontEnd.forward
-      table(0).colslice(ipos, ipos + opts.degree + opts.seqlength, outderiv, 0);
+      dtable(0).colslice(ipos, ipos + opts.degree + opts.seqlength, outderiv, 0);
       frontEnd.backward();
       ipos += opts.seqlength;
     }
@@ -226,7 +226,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val outdtable = dtable(level+1);
 
     var ipos = 0;
-    if (indtable.asInstanceOf[AnyRef] != null) indtable.clear
+    indtable.clear
     while (ipos < batchSize) { 
       if (opts.updateMasks) { 
         inData.colslice(ipos, ipos + opts.seqlength + opts.degree, frontEnd.layers(0).output, 0);
