@@ -47,7 +47,16 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var be_model_nodenum = 0;
   var fe_model_nodenum = 0;
   var step = 0L
+
   var updateTime = 0f
+  var time1 = 0.0
+  var time2 = 0.0
+  var time3 = 0.0
+  var time4 = 0.0
+
+  var time5 = 0.0
+  var time6 = 0.0
+  var time7 = 0.0
 
   override def init() = {
     useGPU = opts.useGPU && Mat.hasCUDA > 0;
@@ -83,10 +92,19 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (table.asInstanceOf[AnyRef] == null) createTables();
     if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
+      val t1 = toc
       assignInputs(gmats);
+      val t2 = toc
       forward(pos, false);
+      val t3 = toc
       backward(pos);
+      val t4 = toc
       wrapData(pos);
+      val t5 = toc
+      time1 += t2 - t1
+      time2 += t3 - t2
+      time3 += t4 - t3
+      time4 += t5 - t4
     }
   }
 
@@ -94,9 +112,16 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     if (batchSize < 0) batchSize = gmats(0).ncols;
     if (table.asInstanceOf[AnyRef] == null) createTables();
     if (batchSize == gmats(0).ncols) {                       // discard odd-sized minibatches
+      val t1 = toc
       assignInputs(gmats);
+      val t2 = toc
       forward(pos, true);
+      val t3 = toc
       wrapData(pos);
+      val t4 = toc
+      time1 += t2 - t1
+      time2 += t3 - t2
+      time4 += t4 - t3
       allScores
     } else { 
       zeros(backEnd.score_layers.length, 1);
@@ -232,7 +257,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
         inData.colslice(ipos, ipos + opts.seqlength + opts.degree, frontEnd.layers(0).output, 0);
         updateMasks(frontEnd.layers(0).output);
       }
-      TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
+//      TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
       intable.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
       net.forward
       outdtable.colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength, outderiv, 0);
@@ -390,13 +415,20 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
   def backward(pos:Long) { 
     val net = txNets(0);
+    val t1 = toc
     backwardBackEnd();
+    val t2 = toc
     for (level <- (opts.depth -1) to 0 by -1) { 
       attach(net, level);
       setseed((5434*level+2354*step).toInt);
       backwardMainNet(pos, level);
     }
+    val t3 = toc
     backwardFrontEnd(pos);
+    val t4 = toc
+    time5 += t2 - t1  
+    time6 += t3 - t2
+    time7 += t4 - t3  
   }
 
   def createFrontEnd() = {
