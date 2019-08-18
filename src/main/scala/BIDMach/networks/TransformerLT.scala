@@ -48,7 +48,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var fe_model_nodenum = 0;
   var step = 0L
 
-  var updateTime = 0f
+  var updateTime = 0.0
+
   var time1 = 0.0
   var time2 = 0.0
   var time3 = 0.0
@@ -636,8 +637,10 @@ object TransformerLT {
     var boundaryWord = 2;
   }
 
+  var posEncTime = 0.0
 
   def posEncoding(startpos:Long, mat:FMat, outScale:Float=1f, posScale:Float=1f, maxr:Float=10000) = { 
+    val t1 = toc
     val d = mat.nrows;
     val n = mat.ncols;
     val p = 0.883f;
@@ -648,6 +651,8 @@ object TransformerLT {
       mat(i*2, ?) = FMat(sin(pos * rate)) * outScale;
       mat(i*2+1, ?) = FMat(cos(pos * rate)) * outScale;
     }
+    val t2 = toc
+    posEncTime += t2 - t1
     mat
   }
 
