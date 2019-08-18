@@ -26,6 +26,11 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var allScores:FMat = null;
   var posMat:FMat = null;
   var inData:Mat = null;
+  var convMask:FMat = null;
+  var fullMask:FMat = null;
+  var nfullMask:FMat = null;
+  var maskRowInds:IMat = null;
+  var maskColInds:IMat = null;
   
   val kmodels = 6
   var cacheState = false;
@@ -42,6 +47,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var be_model_nodenum = 0;
   var fe_model_nodenum = 0;
   var step = 0L
+  var updateTime = 0f
 
   override def init() = {
     useGPU = opts.useGPU && Mat.hasCUDA > 0;
@@ -118,29 +124,23 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     }
   }
 
-  def forwardNet(net:Net, indata:Mat, outdata:Mat, offset:Int, pos:Long, predicting:Boolean, dopos:Boolean) = { 
-
-    var tmppred = net.predicting;
-    net.predicting = predicting;
-    val inmat = net.layers(0).output
-
-    var ipos = 0;
-    while (ipos < batchSize) { 
-      indata.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
-      if (dopos) TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
-      net.forward
-      val outmat = net.layers(net.layers.length-1).output
-      outmat.colslice(0, opts.seqlength + opts.degree - offset, outdata, ipos + offset)
-      ipos += opts.seqlength;
-    }
-    net.predicting = tmppred;
-  }
-
-
   def forwardFrontEnd(pos:Long, predicting:Boolean) = {
     val inlayer = frontEnd.layers(0)
     if (inlayer.output.asInstanceOf[AnyRef] == null) inlayer.output = convertMat(izeros(1, opts.seqlength+opts.degree))
-    forwardNet(frontEnd, inData, table(0), 0, pos, predicting, true);
+    var tmppred = frontEnd.predicting;
+    frontEnd.predicting = predicting;
+    val inmat = frontEnd.layers(0).output
+
+    var ipos = 0;
+    while (ipos < batchSize) { 
+      inData.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
+      TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
+      frontEnd.forward
+      val outmat = frontEnd.layers(frontEnd.layers.length-1).output
+      outmat.colslice(0, opts.seqlength + opts.degree, table(0), ipos)
+      ipos += opts.seqlength;
+    }
+    frontEnd.predicting = tmppred;
   }
 
   def forwardMainNet(pos:Long, predicting:Boolean, level:Int) = {
@@ -150,7 +150,25 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       inlayer.output = convertMat(zeros(opts.dim, opts.seqlength+opts.degree))
       inlayer.deriv = convertMat(zeros(opts.dim, opts.seqlength+opts.degree))
     }
-    forwardNet(net, table(level), table(level + 1), opts.degree, pos, predicting, false);
+    var tmppred = net.predicting;
+    net.predicting = predicting;
+    val inmat = net.layers(0).output;
+    val indata = table(level);
+    val outdata = table(level+1);
+
+    var ipos = 0;
+    while (ipos < batchSize) { 
+      indata.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
+      if (opts.updateMasks) { 
+        inData.colslice(ipos, ipos + opts.seqlength + opts.degree, frontEnd.layers(0).output, 0);
+        updateMasks(frontEnd.layers(0).output);
+      }
+      net.forward
+      val outmat = net.layers(net.layers.length-1).output
+      outmat.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
+      ipos += opts.seqlength;
+    }
+    net.predicting = tmppred;
   }
 
   def forwardBackEnd(predicting:Boolean) = { 
@@ -182,35 +200,48 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   }
 
 
-  def backwardNet(net:Net, intable:Mat, indtable:Mat, outdtable:Mat, offset:Int, pos:Long, dopos:Boolean) = {
-    val inmat = net.layers(0).output
-    val outderiv = net.layers(net.layers.length-1).deriv
-    val inderiv = net.layers(0).deriv
-
+  def backwardFrontEnd(pos:Long) = {
+    val inmat = frontEnd.layers(0).output
+    val outderiv = frontEnd.layers(frontEnd.layers.length-1).deriv
+    val inderiv = frontEnd.layers(0).deriv
     var ipos = 0;
-    if (indtable.asInstanceOf[AnyRef] != null) indtable.clear
+
     while (ipos < batchSize) { 
-      if (dopos) TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
-      intable.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
-      net.forward
-      outdtable.colslice(ipos + offset, ipos + opts.degree + opts.seqlength, outderiv, 0);
-      net.backward();
-      if (indtable.asInstanceOf[AnyRef] != null) { 
-        val tmp = indtable.colslice(ipos, ipos + opts.degree + opts.seqlength);
-        tmp ~ tmp + inderiv;
-        tmp.colslice(0, opts.degree + opts.seqlength, indtable, ipos);
-      }
+      TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
+      inData.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
+      frontEnd.forward
+      table(0).colslice(ipos, ipos + opts.degree + opts.seqlength, outderiv, 0);
+      frontEnd.backward();
       ipos += opts.seqlength;
     }
   }
 
-  def backwardFrontEnd(pos:Long) = {
-    backwardNet(frontEnd, inData, null, dtable(0), 0, pos, true);
-  }
-
   def backwardMainNet(pos:Long, level:Int) = {
     val net = txNets(0);
-    backwardNet(net, table(level), dtable(level), dtable(level+1), opts.degree, pos, false);
+    val inmat = net.layers(0).output
+    val outderiv = net.layers(net.layers.length-1).deriv
+    val inderiv = net.layers(0).deriv
+    val intable = table(level);
+    val indtable = dtable(level);
+    val outdtable = dtable(level+1);
+
+    var ipos = 0;
+    if (indtable.asInstanceOf[AnyRef] != null) indtable.clear
+    while (ipos < batchSize) { 
+      if (opts.updateMasks) { 
+        inData.colslice(ipos, ipos + opts.seqlength + opts.degree, frontEnd.layers(0).output, 0);
+        updateMasks(frontEnd.layers(0).output);
+      }
+      TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
+      intable.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
+      net.forward
+      outdtable.colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength, outderiv, 0);
+      net.backward();
+      val tmp = indtable.colslice(ipos, ipos + opts.degree + opts.seqlength);
+      tmp ~ tmp + inderiv;
+      tmp.colslice(0, opts.degree + opts.seqlength, indtable, ipos);
+      ipos += opts.seqlength;
+    }
   }
 
   def backwardBackEnd() = {
@@ -293,7 +324,36 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     updatemats(2 * kmodels * opts.depth + 2) = convertMat(zeros(m5.dims));
     updatemats(2 * kmodels * opts.depth + 3) = convertMat(zeros(m5.nrows, 1));
 
+    // Position encoding matrix
     posMat = zeros(opts.dim, opts.seqlength + opts.degree);
+
+    // Mask matrices
+    val (cm, ncm, cmask) = TransformerLT.boundaryMats(opts.degree, opts.nheads, opts.seqlength);
+    fullMask = convertMat(zeros((opts.degree*2) \ opts.degree \ opts.nheads \ (opts.seqlength/opts.degree))).asInstanceOf[FMat];
+    nfullMask = convertMat(zeros((opts.degree*2) \ opts.degree \ opts.nheads \ (opts.seqlength/opts.degree))).asInstanceOf[FMat];;
+    maskRowInds = convertMat(cm).asInstanceOf[IMat];;
+    maskColInds = convertMat(ncm).asInstanceOf[IMat];;
+    convMask = convertMat(cmask).asInstanceOf[FMat];
+    updateMasks(null);
+  }
+
+  def updateMasks(inmat:Mat) { 
+    val t1 = toc
+    if (inmat.asInstanceOf[AnyRef] != null) { 
+      val iinmat = float(inmat);
+      val ndoc = cumsum(iinmat.t == opts.boundaryWord.toFloat).t;
+      val cc = (ndoc(maskRowInds) == ndoc(maskColInds));
+      fullMask ~ cc *@ convMask; 
+    } else { 
+      fullMask <-- convMask
+    }
+    nfullMask ~ fullMask *@ -1f;
+    nfullMask ~ nfullMask + 1f;
+    nfullMask ~ nfullMask *@ -1e37f;
+    val v = 1/math.sqrt(opts.dim/opts.nheads).toFloat;
+    fullMask ~ fullMask *@ v
+    val t2 = toc;
+    updateTime += t2 - t1;
   }
 
   def attachEnds() { 
@@ -413,7 +473,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val headperm2 = irow(2,0,1,3);
     val hasBias  = opts.hasBias;
 
-    val cmask_ =  zeros((degree*2) \ degree \ opts.nheads \ (seqlength/degree));
+/*    val cmask_ =  zeros((degree*2) \ degree \ opts.nheads \ (seqlength/degree));
     val col = icol(0->degree);
     for (i <- 0 until seqlength/degree) { 
       for (j <- 0 until opts.nheads) { 
@@ -425,7 +485,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val smask_ =  (1f - cmask_) *@ -1e37f;
     if (opts.useRelPos) smask_ ~ smask_ + TransformerLT.getRelPos(cmask_, headScale=0.5f);
     val v = 1/math.sqrt(indim/opts.nheads).toFloat;
-    cmask_ ~ cmask_ * v;
+    cmask_ ~ cmask_ * v; */
 
     Net.initDefaultNodeSet;
 
@@ -473,8 +533,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
     // Query/Key products and masking
     val prod =        keysx ^* queriesx;
-    val cmask =       constant(cmask_)(true);
-    val smask =       constant(smask_)(true);
+    val cmask =       constant(fullMask)(false);
+    val smask =       constant(nfullMask)(false);
     val mprod =       prod *@ cmask;
     val oprod =       mprod + smask;
 
@@ -540,6 +600,8 @@ object TransformerLT {
     var posEvery = true;
     var posScale = 1f;
     var posMagnitude = 1f;
+    var updateMasks = true;
+    var boundaryWord = 2;
   }
 
 
@@ -588,6 +650,27 @@ object TransformerLT {
 @SerialVersionUID(100L)
   class FSopts extends Learner.Options with TransformerLT.Opts with FileSource.Opts with ADAGrad.Opts
 
+  def boundaryMats(degree:Int, nheads:Int, seqlength:Int):(IMat, IMat, FMat) = { 
+    val len = seqlength / degree;
+    val colmask = izeros((2*degree) \ degree \ nheads \ len);
+    val rowmask = izeros((2*degree) \ degree \ nheads \ len);
+    val cmask = zeros((2*degree) \ degree \ nheads \ len);
+    val colseq = izeros((2*degree) \ 1 \ 1 \ 1)
+    val rowseq = izeros((2*degree) \ 1 \ 1 \ 1)
+    colseq(?) = icol(0->(2*degree));
+    rowseq(?) = degree;
+    val colvec = icol(0->degree);
+    for (i <- 0 until len) { 
+      for (j <- 0 until nheads) { 
+        for (k <- 0 until degree) { 
+          colmask(?, k, j, i) = colseq + (i * degree)
+          rowmask(?, k, j, i) = rowseq + (k + i * degree)
+          cmask(k + colvec + 1, k, j, i) = 1f
+        }
+      }
+    }
+    (colmask, rowmask, cmask)
+  }
 
   def learner(mat0:Mat, useADAGrad:Boolean) = {
     val opts = new LearnOptions;
