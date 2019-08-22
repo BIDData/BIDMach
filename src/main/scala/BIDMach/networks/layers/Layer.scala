@@ -134,8 +134,7 @@ import akka.actor.{Actor,Props,ActorSystem,ActorRef};
                                          tensorFormat:Int = Net.UseNetFormat)
  - RandMirror:                   randmirror(x)(prob:Float=0.5f)
  - RectLayer:                    rect(x)(inplace:Int=Net.UseNetPlacing)    or    relu(x)(inplace:Int=Net.UseNetPlacing) 
- - ScaleLayer:                   scale(x)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
-                                          lr_scale:Float=1f, bias_scale:Float=1f)
+ - ScaleLayer:                   scale(x)(name:String="", modelDims=irow(0), hasBias:Boolean = true)
  - SelectLayer:                  x(i) 
  - SignLayer:                    sign(x)
  - SigmoidLayer:                 sigmoid(x)
@@ -820,12 +819,11 @@ object Layer {
     new PoolingLayer(net, new PoolingNode{h=hh; w=ww; stride=str; pad=ppad; poolingMode=pm; poolingNaN=pn; tensorFormat=tf;}){inputs(0)=a;}  
   }
   
-  def scale(a:LayerTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true, lr_scale:Float=1f, bias_scale:Float=1f, net:Net=null) = {
-  	val hb = hasBias;
+  def scale(a:LayerTerm)(name:String="", modelDims:IMat=irow(0), hasBias:Boolean = true, net:Net=null) = {
   	val mname = name;
-  	val lrs = lr_scale;
-  	val bs = bias_scale;
-    new ScaleLayer(net, new ScaleNode{modelName = mname; batchNormMode=normMode; hasBias=hb; lr_scale=lrs; bias_scale=bs;}){inputs(0)=a;}   
+  	val hb = hasBias;
+  	val md = modelDims;
+    new ScaleLayer(net, new ScaleNode{modelName = mname; modelDims=md; hasBias=hb;}){inputs(0)=a;}   
   }
     
   def randmirror(a:LayerTerm)(prob:Float=0.5f, net:Net=null) = {

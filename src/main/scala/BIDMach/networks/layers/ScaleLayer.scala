@@ -18,32 +18,22 @@ import java.util.HashMap;
 import BIDMach.networks._ 
 
 /**
- * Linear layer. 
- * Includes a model matrix that contains the linear map. 
+ * Scale layer. 
+ * Includes model matrices for the scale and bias
  */
 
 @SerialVersionUID(100L)
 class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new ScaleNode) extends ModelLayer(net, opts, 2) {
   
-	var scaleMat:Mat = null;
+  var scaleMat:Mat = null;
   var biasMat:Mat = null;
   var updateScaleMat:Mat = null;
   var updateBiasMat:Mat = null;
-  var batchDim:IMat = null;
+  var initDone = false;
   
   def initModelMats = {
     val bdims = inputData.dims.copy;
-    opts.batchNormMode match {
-      case BatchNormLayer.SPATIAL => {
-      	batchDim = irow(1->inputData.dims.length);
-      	bdims(1->bdims.length) = 1;
-     
-      }
-      case BatchNormLayer.PER_ACTIVATION => {
-      	batchDim = irow(inputData.dims.length-1);
-      	bdims(bdims.length-1) = 1;
-      }
-    }
+    bdims(opts.modelDims) = 1
     if (modelmats(imodel) == null) {
     	modelmats(imodel) = convertMat(ones(bdims));
     	modelmats(imodel+1) = convertMat(zeros(bdims));
@@ -54,15 +44,12 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
     biasMat = modelmats(imodel+1);
     updateScaleMat = updatemats(imodel);
     updateBiasMat = updatemats(imodel+1);
+    initDone = true;
   }
 
   override def forward = {
-    val cuTensorFormat = Net.getCUDNNformat(opts.tensorFormat, net.opts.tensorFormat);
-    if (opts.batchNormMode == BatchNormLayer.SPATIAL && cuTensorFormat == cudnnTensorFormat.CUDNN_TENSOR_NCHW) {
-      throw new RuntimeException("Spatial ScaleBias with NCHW tensors requires CUDNN fused BatchNormScaleLayer");
-    }
     val start = toc;
-    if (batchDim.asInstanceOf[AnyRef] == null) initModelMats;
+    if (!initDone) initModelMats;
     inplaceNoConnectGetOutput();
     
     output ~ scaleMat *@ inputData
@@ -76,9 +63,9 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
     inplaceNoConnectGetInputDerivs();
     
     inputDeriv ~ inputDeriv + (scaleMat *@ deriv);
-    updateScaleMat ~ updateScaleMat + (inputData dotr deriv);
+    updateScaleMat ~ updateScaleMat + (inputData *@ deriv).sum(opts.modelDims);
     
-    if (opts.hasBias) updateBiasMat ~ updateBiasMat + deriv.sum(batchDim);
+    if (opts.hasBias) updateBiasMat ~ updateBiasMat + deriv.sum(opts.modelDims);
 
     inplaceNoConnectReleaseDeriv()
     backwardtime += toc - start;
@@ -90,7 +77,6 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
   	biasMat = null;
   	updateScaleMat = null;
   	updateBiasMat = null;
-  	batchDim = null;
   }
   
   override def toString = {
@@ -101,13 +87,13 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
 
 trait ScaleNodeOpts extends ModelNodeOpts {
   var hasBias:Boolean = true;
-  var batchNormMode = BatchNormLayer.SPATIAL;
+  var modelDims = irow(0);
   weight_decay_scale = 0f;
    
   def copyOpts(opts:ScaleNodeOpts):ScaleNodeOpts = {
   		super.copyOpts(opts);
   		opts.hasBias = hasBias;
-  		opts.batchNormMode = batchNormMode;
+  		opts.modelDims = modelDims;
    		opts;
   }
 }

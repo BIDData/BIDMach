@@ -119,8 +119,7 @@ package BIDMach.networks.layers
                                          tensorFormat:Int = Net.UseNetFormat)
  - RandMirror:                   randmirror(x)(prob:Float=0.5f)
  - RectNode:                    rect(x)(inplace:Int=Net.UseNetPlacing)    or    relu(x)(inplace:Int=Net.UseNetPlacing) 
- - ScaleNode:                   scale(x)(name:String="", normMode:Int=BatchNormNode.SPATIAL, hasBias:Boolean = true,
-                                          lr_scale:Float=1f, bias_scale:Float=1f)
+ - ScaleNode:                   scale(x)(name:String="", modelDims=irow(0), hasBias:Boolean = true)
  - SelectNode:                  x(i) 
  - SignNode:                    sign(x)
  - SigmoidNode:                 sigmoid(x)
@@ -655,13 +654,11 @@ bias_scale=bs; inplace=inp}
     new ReshapeNode{inputs(0) = a; dims = dims0; addBatchDim = addbatch};
   }
   
-  def scale(a:NodeTerm)(name:String="", normMode:Int=BatchNormLayer.SPATIAL, hasBias:Boolean = true,
-      lr_scale:Float=1f, bias_scale:Float=1f) = {
-  	val hb = hasBias;
+  def scale(a:NodeTerm)(name:String="", modelDims:IMat=irow(0), hasBias:Boolean = true) = { 
   	val mname = name;
-  	val lrs = lr_scale;
-  	val bs = bias_scale;
-    new ScaleNode{inputs(0)=a; modelName=mname; batchNormMode=normMode; hasBias=hb; lr_scale=lrs; bias_scale=bs;}    
+    val md = modelDims;
+  	val hb = hasBias;
+    new ScaleNode{inputs(0)=a; modelName=mname; modelDims=md; hasBias=hb;}    
   }
   
   def sigmoid(a:NodeTerm) = new SigmoidNode{inputs(0) = a};
