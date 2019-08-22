@@ -32,8 +32,9 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
   var initDone = false;
   
   def initModelMats = {
-    val bdims = inputData.dims.copy;
-    bdims(opts.modelDims) = 1
+    val idims = inputData.dims;
+    val bdims = iones(1, inputData.dims.length);
+    bdims(opts.modelDims) = idims(opts.modelDims)
     if (modelmats(imodel) == null) {
     	modelmats(imodel) = convertMat(ones(bdims));
     	modelmats(imodel+1) = convertMat(zeros(bdims));
