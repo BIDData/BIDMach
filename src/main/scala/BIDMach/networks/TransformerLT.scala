@@ -633,12 +633,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       val rateDMat = dzeros(d, 1);
       val posFMat = row(0->n);
       for (i <- 0 until d/2) { 
-	val rate = math.pow((i*2.0+1)/d, 1.0/(1.0-p)/posScale) * 0.54;
-//      val rate = math.pow(maxr, -i*2.0/d) * posScale;
-	rateDMat(2*i, 0) = rate
-	rateDMat(2*i+1, 0) = rate
-	baseFMat(i*2, ?) = posFMat * rate.toFloat
-	baseFMat(i*2+1, ?) = posFMat * rate.toFloat + (Math.PI/2).toFloat; // Add pi/2 to the angle for cos rows
+	    val rate = math.pow((i*2.0+1)/d, 1.0/(1.0-p)/posScale) * 0.54;
+        //      val rate = math.pow(maxr, -i*2.0/d) * posScale;
+	    rateDMat(2*i, 0) = rate
+	    rateDMat(2*i+1, 0) = rate
+	    baseFMat(i*2, ?) = posFMat * rate.toFloat
+	    baseFMat(i*2+1, ?) = posFMat * rate.toFloat + (Math.PI/2).toFloat; // Add pi/2 to the angle for cos rows
       }
       encBase = convertMat(baseFMat).asInstanceOf[FMat];
       encRates = if (useGPU) GDMat(rateDMat) else rateDMat;
@@ -659,7 +659,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 @SerialVersionUID(100L)
 object TransformerLT {
   trait Opts extends Model.Opts {
-    var seqlength = 16384;
+    var seqlength = 2048;
     dim = 512;
     var indim = 512;
     var outdim = 2048;
