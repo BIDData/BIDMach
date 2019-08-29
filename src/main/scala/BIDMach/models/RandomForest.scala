@@ -219,7 +219,7 @@ class RandomForest(override val opts:RandomForest.Opts = new RandomForest.Option
       //  	  implicit val ec = threadPool(ntrees) // make sure there are enough threads (more than the lookahead count)
       //    	for (i <- 0 until ntrees) Future {driver_thread(i)(ec)}
       nodecounts = iones(ntrees, 1);
-      ctrees.set(-1);
+      ctrees.set(-1f);
       ctrees(0,?) = 0;
       ftrees.set(-1)
       setmodelmats(Array(itrees, ftrees, vtrees, ctrees));
