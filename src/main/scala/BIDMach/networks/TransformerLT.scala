@@ -172,7 +172,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     while (ipos < batchSize) { 
       inData.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
 //      TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
-      posEncoding(pos + ipos, opts.posMagnitude, opts.posScale);
+      posEncoding(pos + ipos);
       frontEnd.forward
       val outmat = frontEnd.layers(frontEnd.layers.length-1).output
       outmat.colslice(0, opts.seqlength + opts.degree, table(0), ipos)
@@ -246,7 +246,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
     while (ipos < batchSize) { 
 //      TransformerLT.posEncoding(pos + ipos, posMat, opts.posMagnitude, opts.posScale);
-      posEncoding(pos + ipos, opts.posMagnitude, opts.posScale);
+      posEncoding(pos + ipos);
       inData.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
       frontEnd.forward
       dtable(0).colslice(ipos, ipos + opts.degree + opts.seqlength, outderiv, 0);
@@ -621,7 +621,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net;
   }
 
-  def posEncoding(startpos:Long, outScale:Float=1f, posScale:Float=1f, maxr:Float=10000) = { 
+  def posEncoding(startpos:Long) = { 
     val t1 = toc
     val d = opts.dim
     val n = opts.seqlength + opts.degree;
@@ -633,11 +633,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       val rateDMat = dzeros(d, 1);
       val posFMat = row(0->n);
       for (i <- 0 until d/2) { 
-	    val rate = math.pow((i*2.0+1)/d, 1.0/(1.0-p)/posScale) * 0.54;
-        //      val rate = math.pow(maxr, -i*2.0/d) * posScale;
-	    rateDMat(2*i, 0) = rate
-	    rateDMat(2*i+1, 0) = rate
-	    baseFMat(i*2, ?) = posFMat * rate.toFloat
+	    val rate0 = math.pow((i*2.0+1)/d, 1.0/(1.0-p)/opts.posScale) * 0.54;
+//      val rate = math.pow(maxr, -i*2.0/d) * posScale;
+	    val rate = if (rate0 > 1.0/opts.posDistance) rate0 else 0.0;
+	    rateDMat(2*i, 0) = rate;
+	    rateDMat(2*i+1, 0) = rate;
+	    baseFMat(i*2, ?) = posFMat * rate.toFloat;
 	    baseFMat(i*2+1, ?) = posFMat * rate.toFloat + (Math.PI/2).toFloat; // Add pi/2 to the angle for cos rows
       }
       encBase = convertMat(baseFMat).asInstanceOf[FMat];
@@ -649,7 +650,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     encTheta ~ encTheta - (trunc(encTheta *@ (0.5/Math.PI)) *@ (2 * Math.PI)) // Limit to (0, 2*pi)
     posMat ~ encBase + float(encTheta)     // Add the offset angles to the base angles
     sin(posMat, posMat);                    // Compute the sine
-    if (outScale != 1f) posMat ~ posMat * outScale; // Scale if needed
+    if (opts.posMagnitude != 1f) posMat ~ posMat * opts.posMagnitude; // Scale if needed
     val t2 = toc
     posEncTime += t2 - t1
     posMat
@@ -659,7 +660,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 @SerialVersionUID(100L)
 object TransformerLT {
   trait Opts extends Model.Opts {
-    var seqlength = 2048;
+    var seqlength = 16384;
     dim = 512;
     var indim = 512;
     var outdim = 2048;
@@ -680,6 +681,7 @@ object TransformerLT {
     var posEvery = true;
     var posScale = 1f;
     var posMagnitude = 1f;
+    var posDistance = 10000.0;
     var updateMasks = true;
     var boundaryWord = 2;
   }
