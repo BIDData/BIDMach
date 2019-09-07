@@ -268,7 +268,7 @@ class Net(override val opts:Net.Opts = new Net.Options) extends Model(opts) {
         if (opts.bootstrap > 0) { 
           deriv <-- poissonBlock(deriv.nrows, deriv.ncols, opts.bootstrap);
         } else { 
-      	  deriv.set(1);
+      	  deriv.set(1f);
         }
       } else {
         if (opts.bootstrap > 0) { 
