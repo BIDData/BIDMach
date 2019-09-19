@@ -254,7 +254,8 @@
     </plugins>
     <resources>
       <resource>
-	<directory>lib/</directory>
+	<targetPath>lib/</targetPath>
+        <directory>src/main/resources/lib/</directory>
 	<excludes>
 	  <exclude>*</exclude>
 	</excludes>
