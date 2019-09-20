@@ -94,74 +94,6 @@
         <osarch>linux-aarch64</osarch>
       </properties>
     </profile>
-    <profile>
-      <id>gpu</id>
-      <activation>
-        <property>
-          <name>!cpu</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>3.0.2</version>
-            <executions>
-              <execution>
-                <id>build_cuda_native_jar</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <classesDirectory>../src/main/resources</classesDirectory>
-                  <classifier>gpu-${osarch}</classifier>
-                  <includes>
-                    <include>lib/*bidmachcuda*</include>
-                  </includes>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>cpu</id>
-      <activation>
-        <property>
-          <name>!gpu</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>3.0.2</version>
-            <executions>
-              <execution>
-                <id>build_cpu_native_jar</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <classesDirectory>../src/main/resources</classesDirectory>
-                  <classifier>cpu-${osarch}</classifier>
-                  <includes>
-                    <include>lib/*bidmachcpu*</include>
-                    <include>lib/*iomp5*</include>
-                    <include>cbin/*</include>
-                  </includes>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
   </profiles>
   <build>
     <plugins>
@@ -173,6 +105,28 @@
           <source>1.8</source>
           <target>1.8</target>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.0.2</version>
+        <executions>
+          <execution>
+            <id>build_cpu_native_jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classesDirectory>../src/main/resources</classesDirectory>
+              <classifier>cpu-${osarch}</classifier>
+              <includes>
+                <include>lib/*bidmachale*</include>
+                <include>lib/*iomp5*</include>
+              </includes>
+              </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
     <resources>

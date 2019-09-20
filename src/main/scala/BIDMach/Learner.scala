@@ -340,7 +340,7 @@ class Learner(
     cacheState = Mat.useCache
     Mat.useCache = opts.useCache
     cacheGPUstate = Mat.useGPUcache;
-    Mat.useGPUcache = opts.useCache;
+    Mat.useGPUcache = opts.useGPUcache;
     here = 0L;
     lasti = 0;
     bytes = 0L;
