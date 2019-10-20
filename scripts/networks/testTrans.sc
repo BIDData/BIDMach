@@ -10,17 +10,19 @@ val dict = loadCSMat(ddir + "wikitext_spm_vocab.txt")(?,0) on "막"
 
 val (nn, opts) = TransformerLT.learner(fname);
 
-opts.lrate = 2e-5f
+opts.lrate = 5e-5f
 opts.seqlength = 1024
 opts.batchSize = 2048
 opts.npasses = 40
-opts.degree = 256
-opts.depth = 12
+opts.degree = 128
+opts.decay = 0.999f
+opts.depth = 8
 opts.nheads = 8
-opts.dim = 1024*2
+opts.dim = 2048
 opts.indim = opts.dim
 opts.outdim = opts.dim
-opts.dropout=0.9f;
+opts.dropout=0.8f;
+opts.normInit = 2f
 opts.texp = 0f
 opts.vel_decay = 0.8f;
 opts.lrate = opts.lrate*(1-opts.vel_decay)

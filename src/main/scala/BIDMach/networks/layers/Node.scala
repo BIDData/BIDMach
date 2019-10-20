@@ -347,6 +347,13 @@ object Node {
 	  Array.copy(a, 0, n.inputs, 0, a.length);
 	  n
 	}
+
+  def autoNorm(a:NodeTerm)(epsilon:Float = 1e-4f, decay:Float = 0.999f, dims:IMat = null) = {
+    val eps = epsilon;
+    val dec = decay;
+    val dd = dims;
+    new AutoNormNode{inputs(0)=a; epsilon=eps; decay=dec; dims=dd}    
+  }
   
   def batchNorm(a:NodeTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, eps:Float=1e-4f) = {
     new BatchNormNode{inputs(0)=a; expAvgFactor=avgFactor; batchNormMode=normMode; epsilon=eps}    

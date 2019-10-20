@@ -570,6 +570,14 @@ class LayerTerm(val _layer:Layer, val term:Int) extends Serializable {
 object Layer {
   
   def abs(a:LayerTerm) = new AbsLayer(null){inputs(0) = a;};
+
+  def autoNorm(a:LayerTerm)(epsilon:Float = 1e-4f, decay:Float = 0.999f, dims:IMat=null, net:Net=null) = {
+    val eps = epsilon;
+    val dec = decay;
+    val dd = dims;
+    new AutoNormLayer(net, new AutoNormNode{epsilon=eps; decay=dec; dims=dd}){inputs(0)=a}
+  }
+
   
   def batchNorm(a:LayerTerm)(avgFactor:Float=0.1f, normMode:Int=BatchNormLayer.SPATIAL, epsilon:Float=1e-4f) = {
     val eps = epsilon;

@@ -42,7 +42,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var encTheta:DMat = null;
 
   
-  val kmodels = 6
+//  val kmodels = 6
+  val kmodels = 8
   var cacheState = false;
   var cacheGPUstate = false;
   var useCache = false;
@@ -54,6 +55,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var linear5_nodenum = 0
   var linear6_nodenum = 0
   var linear7_nodenum = 0
+  var scale1_nodenum = 0
+  var scale2_nodenum = 0
   var be_model_nodenum = 0;
   var fe_model_nodenum = 0;
   var step = 0L
@@ -348,6 +351,18 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       modelmats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
       updatemats(2 * (5 + kmodels * i)) = convertMat(zeros(m3.dims))
       updatemats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
+
+      // scaleNorm matrices
+      val adims = irow(1,1);
+      modelmats(2 * (6 + kmodels * i)) = convertMat(ones(adims)*opts.normInit);
+      modelmats(2 * (6 + kmodels * i) + 1) = convertMat(zeros(adims));
+      updatemats(2 * (6 + kmodels * i)) = convertMat(zeros(adims))
+      updatemats(2 * (6 + kmodels * i) + 1) = convertMat(zeros(adims))
+
+      modelmats(2 * (7 + kmodels * i)) = convertMat(ones(adims)*opts.normInit);
+      modelmats(2 * (7 + kmodels * i) + 1) = convertMat(zeros(adims));
+      updatemats(2 * (7 + kmodels * i)) = convertMat(zeros(adims))
+      updatemats(2 * (7 + kmodels * i) + 1) = convertMat(zeros(adims))
     }
     // Front-end model matrices
     val m4 = convertMat(normrnd(0, opts.posMagnitude, opts.dim, opts.nvocab));
@@ -413,6 +428,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     net.layers(linear5_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 6;
     net.layers(linear6_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 8;
     net.layers(linear7_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 10;
+    net.layers(scale1_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 12;
+    net.layers(scale2_nodenum).asInstanceOf[ModelLayer].imodel = level * kmodels * 2 + 14;
   }
 
   def forward(pos:Long, predicting:Boolean=false) { 
@@ -597,7 +614,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val mhattn =      linear(pvals)(outdim=dim, hasBias=hasBias); 
     val drop1 =       dropout(mhattn)(opts.dropout)
     val sum1 =        drop1 + this_in_nopos;
-    val norm1 =       layerNorm(sum1)();
+    scale1_nodenum =   Net.getDefaultNodeNum
+//    val norm1 =       scale(sum1)(modelDims=0\1)
+    val norm1 =       autoNorm(sum1)(decay=opts.decay)
 //    val norm1 =       layerNorm(drop1)();
 //    val sum1 =        norm1 + this_in_nopos;
 
@@ -610,7 +629,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val ffwd2 =       linear(relu1)(outdim=dim, hasBias=true);
     val drop2 =       dropout(ffwd2)(opts.dropout)
     val sum2 =        norm1 + drop2;
-    val norm2 =       layerNorm(sum2)();
+    scale2_nodenum =   Net.getDefaultNodeNum
+//     val norm2 =       scale(sum2)(modelDims=0\1);
+    val norm2 =       autoNorm(sum2)(decay=opts.decay);
 
 //    val norm2 =       layerNorm(drop2)();
 //    val sum2 =        sum1 + norm2;
@@ -665,6 +686,7 @@ object TransformerLT {
     var indim = 512;
     var outdim = 2048;
     var degree = 128;
+    var decay = 0.999f;
     var nheads = 8;
     var depth = 32;
     var stride = 4;
@@ -684,6 +706,7 @@ object TransformerLT {
     var posDistance = 10000.0;
     var updateMasks = true;
     var boundaryWord = 2;
+    var normInit = 1f;
   }
 
   var posEncTime = 0.0

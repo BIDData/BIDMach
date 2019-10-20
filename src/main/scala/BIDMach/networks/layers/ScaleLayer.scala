@@ -34,25 +34,26 @@ class ScaleLayer(override val net:Net, override val opts:ScaleNodeOpts = new Sca
   def initModelMats = {
     val idims = inputData.dims;
     val bdims = iones(1, inputData.dims.length);
-    bdims(opts.modelDims) = idims(opts.modelDims)
     if (modelmats(imodel) == null) {
-    	modelmats(imodel) = convertMat(ones(bdims));
-    	modelmats(imodel+1) = convertMat(zeros(bdims));
-    	updatemats(imodel) = convertMat(zeros(bdims));
-    	updatemats(imodel+1) = convertMat(zeros(bdims));
+      bdims(opts.modelDims) = idims(opts.modelDims)
+      modelmats(imodel) = convertMat(ones(bdims));
+      modelmats(imodel+1) = convertMat(zeros(bdims));
+      updatemats(imodel) = convertMat(zeros(bdims));
+      updatemats(imodel+1) = convertMat(zeros(bdims));
     }
-    scaleMat = modelmats(imodel);
-    biasMat = modelmats(imodel+1);
-    updateScaleMat = updatemats(imodel);
-    updateBiasMat = updatemats(imodel+1);
     initDone = true;
   }
 
   override def forward = {
     val start = toc;
     if (!initDone) initModelMats;
+    scaleMat = modelmats(imodel);
+    biasMat = modelmats(imodel+1);
+    updateScaleMat = updatemats(imodel);
+    updateBiasMat = updatemats(imodel+1);
+
     inplaceNoConnectGetOutput();
-    
+     
     output ~ scaleMat *@ inputData
     if (opts.hasBias) output ~ output + biasMat;
     
