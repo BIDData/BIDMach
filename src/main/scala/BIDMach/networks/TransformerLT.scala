@@ -25,6 +25,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var backEnd:Net = null;
   var allScores:FMat = null;
   var inData:Mat = null;
+  var linkMask:IMat = null;
 
   // Masking matrices
   var convMask:FMat = null;
@@ -198,7 +199,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     val outdata = table(level+1);
 
     var ipos = 0;
-    while (ipos < batchSize) { 
+    while (ipos < batchSize) {
       indata.colslice(ipos, ipos + opts.seqlength + opts.degree, inmat, 0);
       if (opts.updateMasks) { 
         inData.colslice(ipos, ipos + opts.seqlength + opts.degree, frontEnd.layers(0).output, 0);
@@ -206,7 +207,13 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       }
       net.forward
       val outmat = net.layers(net.layers.length-1).output
-      outmat.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
+      if (linkMask.asInstanceOf[AnyRef] == null || linkMask(level+1,1) == 0) { 
+	outmat.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
+      } else { 
+	val tmp = table(linkMask(level+1,1)).colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength);
+	tmp ~ tmp + outmat;
+	tmp.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
+      }
       ipos += opts.seqlength;
     }
     net.predicting = tmppred;
@@ -283,6 +290,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       tmp ~ tmp + inderiv;
       tmp.colslice(0, opts.degree + opts.seqlength, indtable, ipos);
       ipos += opts.seqlength;
+    }
+    if (linkMask.asInstanceOf[AnyRef] != null && linkMask(level,0) > 0) { 
+      indtable ~ indtable + dtable(linkMask(level,0));
     }
   }
 
@@ -389,6 +399,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
     maskColInds = convertMat(ncm).asInstanceOf[IMat];;
     convMask = convertMat(cmask).asInstanceOf[FMat];
     updateMasks(null);
+
+    if (opts.resLinks.asInstanceOf[AnyRef] != null) { 
+      linkMask = izeros(opts.depth + 1, 2);
+      linkMask(opts.resLinks(?,0), 0) = opts.resLinks(?,1);
+      linkMask(opts.resLinks(?,1), 1) = opts.resLinks(?,0);
+    }
   }
 
   def updateMasks(inmat:Mat) { 
@@ -707,6 +723,7 @@ object TransformerLT {
     var updateMasks = true;
     var boundaryWord = 2;
     var normInit = 1f;
+    var resLinks:IMat = null;
   }
 
   var posEncTime = 0.0

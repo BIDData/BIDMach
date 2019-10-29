@@ -11,20 +11,22 @@ val dict = loadCSMat(ddir + "wikitext_spm_vocab.txt")(?,0) on "막"
 val (nn, opts) = TransformerLT.learner(fname);
 
 opts.lrate = 5e-5f
-opts.seqlength = 1024
-opts.batchSize = 2048
+opts.seqlength = 2048
+opts.batchSize = 4096
 opts.npasses = 40
 opts.degree = 128
 opts.decay = 0.999f
-opts.depth = 8
+opts.depth = 10
 opts.nheads = 8
 opts.dim = 2048
+opts.dim = 1024+512
 opts.indim = opts.dim
 opts.outdim = opts.dim
 opts.dropout=0.8f;
 opts.normInit = 2f
+opts.decay = 0.999f
 opts.texp = 0f
-opts.vel_decay = 0.8f;
+opts.vel_decay = 0.6f;
 opts.lrate = opts.lrate*(1-opts.vel_decay)
 opts.gsq_decay = 0.999f;
 opts.clip_grad_norm = 10f
@@ -33,7 +35,7 @@ opts.pstep = 0.01f
 opts.useCache = false
 opts.useGPUcache = true
 
-opts.logfile = "logTrans_d%d_n%d_m%d_lr%7.6f.txt" format (opts.degree, opts.depth, opts.dim, opts.lrate.v)
+opts.logfile = "logTrans_d%d_n%d_m%d_lr%7.6fA.txt" format (opts.degree, opts.depth, opts.dim, opts.lrate.v)
 
 val tt = nn.model.asInstanceOf[TransformerLT]
 
