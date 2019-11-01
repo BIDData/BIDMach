@@ -1,4 +1,5 @@
 package BIDMach.networks
+// resScale now computes a convex combination
 
 import BIDMat.{Mat,SBMat,CMat,CSMat,DMat,FMat,IMat,LMat,HMat,GMat,GDMat,GIMat,GLMat,GSMat,GSDMat,SMat,SDMat}
 import BIDMat.MatFunctions._
@@ -208,11 +209,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       net.forward
       val outmat = net.layers(net.layers.length-1).output
       if (linkMask.asInstanceOf[AnyRef] == null || linkMask(level+1,1) == 0) { 
-	outmat.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
+	    outmat.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
       } else { 
-	val tmp = table(linkMask(level+1,1)).colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength);
-	tmp ~ tmp + outmat;
-	tmp.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
+	    val tmp = table(linkMask(level+1,1)).colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength);
+        tmp ~ tmp *@ opts.resScale
+	    tmp ~ tmp + (outmat *@ (1f - opts.resScale))
+	    tmp.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
       }
       ipos += opts.seqlength;
     }
@@ -292,7 +294,8 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       ipos += opts.seqlength;
     }
     if (linkMask.asInstanceOf[AnyRef] != null && linkMask(level,0) > 0) { 
-      indtable ~ indtable + dtable(linkMask(level,0));
+      indtable ~ indtable *@ (1f - opts.resScale)
+      indtable ~ indtable + (dtable(linkMask(level,0)) *@ opts.resScale);
     }
   }
 
@@ -649,9 +652,6 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 //     val norm2 =       scale(sum2)(modelDims=0\1);
     val norm2 =       autoNorm(sum2)(decay=opts.decay);
 
-//    val norm2 =       layerNorm(drop2)();
-//    val sum2 =        sum1 + norm2;
-
     nopts.nodeset =   Net.getDefaultNodeSet
 
     net.createLayers;
@@ -724,6 +724,7 @@ object TransformerLT {
     var boundaryWord = 2;
     var normInit = 1f;
     var resLinks:IMat = null;
+    var resScale:Float = 1f;
   }
 
   var posEncTime = 0.0
