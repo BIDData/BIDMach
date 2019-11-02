@@ -208,7 +208,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       }
       net.forward
       val outmat = net.layers(net.layers.length-1).output
-      if (linkMask.asInstanceOf[AnyRef] == null || linkMask(level+1,1) == 0) { 
+      if (linkMask.asInstanceOf[AnyRef] == null || linkMask(level+1,1) == 0 || opts.resScale == 0) { 
 	    outmat.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
       } else { 
 	    val tmp = table(linkMask(level+1,1)).colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength);
@@ -293,7 +293,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       tmp.colslice(0, opts.degree + opts.seqlength, indtable, ipos);
       ipos += opts.seqlength;
     }
-    if (linkMask.asInstanceOf[AnyRef] != null && linkMask(level,0) > 0) { 
+    if (linkMask.asInstanceOf[AnyRef] != null && linkMask(level,0) > 0 && opts.resScale > 0) { 
       indtable ~ indtable *@ (1f - opts.resScale)
       indtable ~ indtable + (dtable(linkMask(level,0)) *@ opts.resScale);
     }
