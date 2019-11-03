@@ -16,12 +16,13 @@ opts.batchSize = 2048
 opts.npasses = 40
 opts.degree = 128
 opts.decay = 0.999f
-opts.depth = 12
+opts.depth = 16
 opts.nheads = 8
 opts.dim = 2048
+opts.dim = 1536
 opts.indim = opts.dim
 opts.outdim = opts.dim
-opts.dropout= 0.5f;
+opts.dropout= 0.7f;
 opts.normInit = 2f
 opts.decay = 0.999f
 opts.texp = 0f
@@ -33,8 +34,8 @@ opts.scoreType = SoftmaxOutputLayer.CrossEntropyScore
 opts.pstep = 0.01f
 opts.useCache = false
 opts.useGPUcache = true
-opts.resScale = 0.6f
-opts.resLinks = 2 \ 4 on 5 \ 7 on 8 \ 10
+opts.resScale = 0.9f
+opts.resLinks = 2 \ 4 on 5 \ 7 on 9 \ 11 on 12 \ 14
 //opts.resLinks = 4 \ 8
 
 opts.logfile = "logTrans_d%d_n%d_m%d_lr%7.6f.txt" format (opts.degree, opts.depth, opts.dim, opts.lrate.v)
@@ -43,7 +44,7 @@ val tt = nn.model.asInstanceOf[TransformerLT]
 
 //nn.train
 nn.launchTrain
-Thread.sleep(4000)
+Thread.sleep(6000)
 
 
 val net = tt.txNets(0)

@@ -34,6 +34,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
   var nfullMask:FMat = null;
   var maskRowInds:IMat = null;
   var maskColInds:IMat = null;
+  var resScaleMat:FMat = null;
 
   // Pos encoding matrices
   var posMat:FMat = null;
@@ -211,10 +212,12 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       if (linkMask.asInstanceOf[AnyRef] == null || linkMask(level+1,1) == 0 || opts.resScale == 0) { 
 	    outmat.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
       } else { 
-	    val tmp = table(linkMask(level+1,1)).colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength);
-        tmp ~ tmp *@ opts.resScale
-	    tmp ~ tmp + (outmat *@ (1f - opts.resScale))
-	    tmp.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
+	val tmp = table(linkMask(level+1,1)).colslice(ipos + opts.degree, ipos + opts.degree + opts.seqlength);
+	resScaleMat.set(opts.resScale);
+        tmp ~ tmp *@ resScaleMat
+	resScaleMat.set(1f - opts.resScale);
+	tmp ~ tmp + (outmat *@ resScaleMat);
+	tmp.colslice(0, opts.seqlength, outdata, ipos + opts.degree)
       }
       ipos += opts.seqlength;
     }
@@ -294,8 +297,10 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       ipos += opts.seqlength;
     }
     if (linkMask.asInstanceOf[AnyRef] != null && linkMask(level,0) > 0 && opts.resScale > 0) { 
-      indtable ~ indtable *@ (1f - opts.resScale)
-      indtable ~ indtable + (dtable(linkMask(level,0)) *@ opts.resScale);
+      resScaleMat.set(1f -opts.resScale);
+      indtable ~ indtable *@ resScaleMat;
+      resScaleMat.set(opts.resScale);
+      indtable ~ indtable + (dtable(linkMask(level,0)) *@ resScaleMat);
     }
   }
 
@@ -408,6 +413,7 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       linkMask(opts.resLinks(?,0), 0) = opts.resLinks(?,1);
       linkMask(opts.resLinks(?,1), 1) = opts.resLinks(?,0);
     }
+    resScaleMat = convertMat(zeros(1,1)).asInstanceOf[FMat];
   }
 
   def updateMasks(inmat:Mat) { 
