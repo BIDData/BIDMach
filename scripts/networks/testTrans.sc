@@ -34,7 +34,7 @@ opts.scoreType = SoftmaxOutputLayer.CrossEntropyScore
 opts.pstep = 0.01f
 opts.useCache = false
 opts.useGPUcache = true
-opts.resScale = 0.9f
+opts.resScale = 0.8f
 opts.resLinks = 2 \ 4 on 5 \ 7 on 9 \ 11 on 12 \ 14
 //opts.resLinks = 4 \ 8
 
