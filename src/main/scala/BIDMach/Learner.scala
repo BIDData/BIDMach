@@ -190,7 +190,7 @@ class Learner(
       here += datasource.opts.batchSize
       bytes += mats.map(Learner.numBytes _).reduce(_+_);
       val dsp = datasource.progress;
-      val gprogress = (ipass + dsp)/opts.npasses;
+      val gprogress = (ipass + dsp);
       if ((istep - 1) % opts.evalStep == 0 || (istep > 0 && (! datasource.hasNext))) {
         if (opts.updateAll) {
           model.dobatchg(mats, ipass, here);
@@ -640,7 +640,7 @@ class ParLearner(
     		val mats = datasource.next;
     		nsamps += mats(0).ncols;
 			progress = datasource.progress
-			gprogress = (ipass + progress)/opts.npasses
+			gprogress = (ipass + progress)
     		for (j <- 0 until mats.length) {
     		  cmats(ithread)(j) = safeCopy(mats(j), ithread)
     		}
@@ -877,7 +877,7 @@ class ParLearnerx(
 	  	  val mats = datasources(ithread).next
 	  	  here += datasources(ithread).opts.batchSize
 	  	  bytes += mats.map(Learner.numBytes _).reduce(_+_);
-          gprogress = (dsProgress + ipass)/opts.npasses
+          gprogress = (dsProgress + ipass)
 	  	  models(0).synchronized {
 	  		istep += 1
 	  		istep0 += 1
