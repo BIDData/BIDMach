@@ -342,7 +342,9 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
 
       // Query, Key, Value embedding model matrices
       for (j <- 0 until 3) {     
-        val m0 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.indim, opts.dim));
+//        val init_std = 1/math.sqrt(opts.dim).toFloat
+        val proj_init_std = opts.proj_init_std;
+        val m0 = convertMat(normrnd(0, proj_init_std, opts.indim, opts.dim));
         modelmats(2 * (j + kmodels * i)) = m0;
         modelmats(2 * (j + kmodels * i) + 1) = convertMat(zeros(m0.nrows, 1));             // Bias vector
         updatemats(2 * (j + kmodels * i)) = convertMat(zeros(m0.dims))                     // Matches model dims
@@ -350,21 +352,25 @@ class TransformerLT(override val opts:TransformerLT.Opts = new TransformerLT.Opt
       }
 
       // MHattn linear map matrices
-      val m1 = convertMat(normrnd(0, 1/math.sqrt(opts.indim).toFloat, opts.dim, opts.indim));
+//      val init_std = 1/math.sqrt(opts.indim).toFloat
+      val proj_init_std = opts.proj_init_std;
+      val m1 = convertMat(normrnd(0, proj_init_std, opts.dim, opts.indim));
       modelmats(2 * (3 + kmodels * i)) = m1
       modelmats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(m1.nrows, 1));
       updatemats(2 * (3 + kmodels * i)) = convertMat(zeros(m1.dims));
       updatemats(2 * (3 + kmodels * i) + 1) = convertMat(zeros(m1.nrows, 1));
 
       // First feedforward net matrices
-      val m2 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.outdim, opts.dim));
+//      val init_std = 1/math.sqrt(opts.dim).toFloat
+      val init_std = opts.init_std;
+      val m2 = convertMat(normrnd(0, init_std, opts.outdim, opts.dim));
       modelmats(2 * (4 + kmodels * i)) = m2;
       modelmats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(m2.nrows, 1));
       updatemats(2 * (4 + kmodels * i)) = convertMat(zeros(m2.dims));
       updatemats(2 * (4 + kmodels * i) + 1) = convertMat(zeros(m2.nrows, 1));
 
       // Second feedforward net matrices
-      val m3 = convertMat(normrnd(0, 1/math.sqrt(opts.dim).toFloat, opts.dim, opts.outdim));
+      val m3 = convertMat(normrnd(0, init_std, opts.dim, opts.outdim));
       modelmats(2 * (5 + kmodels * i)) = m3;
       modelmats(2 * (5 + kmodels * i) + 1) = convertMat(zeros(m3.nrows, 1));
       updatemats(2 * (5 + kmodels * i)) = convertMat(zeros(m3.dims))
@@ -731,6 +737,8 @@ object TransformerLT {
     var normInit = 1f;
     var resLinks:IMat = null;
     var resScale:Float = 1f;
+    var init_std:Float = 0.02f
+    var proj_init_std:Float = 0.01f
   }
 
   var posEncTime = 0.0

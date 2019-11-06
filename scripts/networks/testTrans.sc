@@ -16,10 +16,9 @@ opts.batchSize = 2048
 opts.npasses = 40
 opts.degree = 128
 opts.decay = 0.999f
-opts.depth = 16
+opts.depth = 20
 opts.nheads = 8
 opts.dim = 2048
-opts.dim = 1536
 opts.indim = opts.dim
 opts.outdim = opts.dim
 opts.dropout= 0.7f;
@@ -34,9 +33,8 @@ opts.scoreType = SoftmaxOutputLayer.CrossEntropyScore
 opts.pstep = 0.01f
 opts.useCache = false
 opts.useGPUcache = true
-opts.resScale = 0.8f
-opts.resLinks = 2 \ 4 on 5 \ 7 on 9 \ 11 on 12 \ 14
-//opts.resLinks = 4 \ 8
+opts.resScale = 0.9f
+opts.resLinks = 1 \ 3 on 4 \ 6 on 7 \ 9 on 11 \ 13 on 14 \ 16 on 17 \ 19
 
 opts.logfile = "logTrans_d%d_n%d_m%d_lr%7.6f.txt" format (opts.degree, opts.depth, opts.dim, opts.lrate.v)
 
