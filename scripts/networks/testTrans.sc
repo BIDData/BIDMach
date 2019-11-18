@@ -10,7 +10,7 @@ val dict = loadCSMat(ddir + "wikitext_spm_vocab.txt")(?,0) on "막"
 
 val (nn, opts) = TransformerLT.learner(fname);
 
-opts.lrate = 5e-5f
+opts.lrate = 1e-4f
 opts.seqlength = 2048
 opts.batchSize = 2048
 opts.npasses = 40
@@ -19,6 +19,7 @@ opts.decay = 0.999f
 opts.depth = 16
 opts.nheads = 8
 opts.dim = 2048
+opts.dim = 1024
 opts.indim = opts.dim
 opts.outdim = opts.dim
 opts.dropout= 0.8f;
@@ -39,12 +40,13 @@ opts.useGPUcache = true
 
 val lrfinal = opts.lrate.v
 val lrinit = lrfinal / 2
+val lastepoch = 10f
 
 def lr_update(ipass:Float, istep:Float, frac:Float):Float = {
   val lr = if (ipass < 1) { 
     lrinit + frac * (lrfinal - lrinit)
   } else { 
-    lrfinal
+    lrfinal * math.max(0f, lastepoch - frac) / (lastepoch - 1)
   }
   opts.lrate = lr;
   lr
