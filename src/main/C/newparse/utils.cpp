@@ -364,6 +364,44 @@ int writeIntVec(ivector & im, string fname, int buffsize) {
   return 0;
 }
 
+int writeIntVec2Cols(ivector & im1, ivector & im2, string fname, int buffsize) {
+  int fmt, nrows, nnz;
+  int ncols = 2;
+
+  ostream *ofstr = open_out_buf(fname.c_str(), buffsize);
+  fmt = 110;
+  nrows = im1.size();
+  nnz = nrows * ncols;
+  ofstr->write((const char *)&fmt, 4);
+  ofstr->write((const char *)&nrows, 4);
+  ofstr->write((const char *)&ncols, 4);
+  ofstr->write((const char *)&nnz, 4);
+  ofstr->write((const char *)&im1[0], 4 * nrows);
+  ofstr->write((const char *)&im2[0], 4 * nrows);
+  closeos(ofstr);
+  return 0;
+}
+
+int writeIntVec3Cols(ivector & im1, ivector & im2, ivector & im3, string fname, int buffsize) {
+  int fmt, nrows, nnz;
+  int ncols = 3;
+
+  ostream *ofstr = open_out_buf(fname.c_str(), buffsize);
+  fmt = 110;
+  nrows = im1.size();
+  nnz = nrows * ncols;
+  ofstr->write((const char *)&fmt, 4);
+  ofstr->write((const char *)&nrows, 4);
+  ofstr->write((const char *)&ncols, 4);
+  ofstr->write((const char *)&nnz, 4);
+  ofstr->write((const char *)&im1[0], 4 * nrows);
+  ofstr->write((const char *)&im2[0], 4 * nrows);
+  ofstr->write((const char *)&im3[0], 4 * nrows);
+  closeos(ofstr);
+  return 0;
+}
+
+
 int writeDIntVec(divector & im, string fname, int buffsize) {
   int fmt, nrows, ncols, nnz;
   ostream *ofstr = open_out_buf(fname.c_str(), buffsize);

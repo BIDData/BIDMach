@@ -10,6 +10,8 @@
 
 ivector wcount;
 ivector tokens;
+ivector paragraphids;
+ivector sentenceids;
 unhash unh;
 strhash htab;
 
@@ -18,9 +20,14 @@ extern int yylex(void);
 extern FILE*   yyin;
 
 int numlines=0;
+int doparagraphids=0;
+int paragraphid=0;
+int sentenceid=0;
 }
 
 int checkword(char *str) {
+  paragraphids.push_back(paragraphid);
+  sentenceids.push_back(sentenceid);
   return checkword(str, htab, wcount, tokens, unh);
 }
 
@@ -98,9 +105,17 @@ int main(int argc, char ** argv) {
     pos = rname.rfind('/');
     if (pos == string::npos) pos = rname.rfind('\\');
     if (pos != string::npos) rname = rname.substr(pos+1, rname.size());
-    writeIntVec(tokens, odname+rname+".imat"+suffix, membuf);
+    if (doparagraphids) {
+      writeIntVec3Cols(paragraphids, sentenceids, tokens, odname+rname+".imat"+suffix, membuf);
+    } else {
+      writeIntVec(tokens, odname+rname+".imat"+suffix, membuf);
+    }
     tokens.clear();
+    sentenceids.clear();
+    paragraphids.clear();
     numlines = 0;
+    sentenceid = 0;
+    paragraphid = 0;
     here = strtok(NULL, " ,");
   }
   fprintf(stderr, "\nWriting Dictionary\n");

@@ -162,6 +162,10 @@ void closeos(ostream *ofs);
 
 int writeIntVec(ivector & im, string fname, int buffsize);
 
+int writeIntVec2Cols(ivector & im1, ivector & im2, string fname, int buffsize);
+
+int writeIntVec3Cols(ivector & im1, ivector & im2, ivector & im3, string fname, int buffsize);
+
 int writeDIntVec(divector & im, string fname, int buffsize);
 
 int writeQIntVec(qvector & im, string fname, int buffsize);

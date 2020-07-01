@@ -2,10 +2,10 @@
 .SUFFIXES: 
 .SUFFIXES: .c .cpp .o .exe .lxc .flex
 
-EXES=xmltweet.exe xmlwiki.exe trec.exe tparse.exe parsevw.exe tparse2.exe
+EXES=xmltweet.exe xmlwiki.exe trec.exe tparse.exe parsevw.exe tparse2.exe nnparse.exe
 OBJS=newparse.o utils.o gzstream.o
 
-.SECONDARY: xmltweet.lxc xmlwiki.lxc trec.lxc
+.SECONDARY: xmltweet.lxc xmlwiki.lxc trec.lxc nnparse.lxc
 
 all: $(EXES)
 
