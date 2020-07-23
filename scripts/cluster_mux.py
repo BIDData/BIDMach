@@ -2,7 +2,7 @@
 import subprocess
 import time
 
-SPARK_SLAVE_PATH = '/opt/spark/conf/slaves'
+SPARK_SLAVE_PATH = '/opt/spark/conf/subordinates'
 
 
 def tmux_cmd(cmd, fail_ok=False):
@@ -31,9 +31,9 @@ def main():
     pane_ids = tmux_cmd('list-panes -t tail-workers -F #D')
 
     with open(SPARK_SLAVE_PATH, 'r') as f:
-        slave_addrs = list(f.readlines())
+        subordinate_addrs = list(f.readlines())
 
-    for pid, saddr in zip(pane_ids, slave_addrs):
+    for pid, saddr in zip(pane_ids, subordinate_addrs):
         send_cmd(pid, 'su2')
         time.sleep(0.05)
         send_cmd(pid, 'ssh {}'.format(saddr))
